@@ -1,0 +1,1692 @@
+/* ============================================================
+   Terminal design system — structural primitives.
+
+   Rules:
+   - Classes are scoped with `term-*` so nothing pre-existing is affected.
+   - Colors come exclusively from the existing `--color-*` semantic tokens
+     (defined in tokens.css). No new palette is introduced; every active
+     theme — flynn, neo, ifrit, daruma, deckard, galadriel, horizon, sand,
+     etc. — renders these primitives in its own voice.
+   - Spacing follows the 4 / 8 / 16 / 24 / 48 grid.
+   - Fonts use a mono stack matching the project's imported web fonts
+     (JetBrains Mono, IBM Plex Mono) with system monospace fallbacks.
+
+   ============================================================ */
+
+:root {
+  --term-font-mono:
+    'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular,
+    'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --term-space-1: 4px;
+  --term-space-2: 8px;
+  --term-space-3: 16px;
+  --term-space-4: 24px;
+  --term-space-5: 48px;
+  --app-header-h: 52px;
+  --term-radius: 2px;
+  --term-border: 1px solid var(--color-border);
+  --term-divider: 1px solid var(--color-border);
+}
+
+/* ------------------------------------------------------------
+   TermHeader: `▶ name` + optional sub line
+   ------------------------------------------------------------ */
+.term-header {
+  font-family: var(--term-font-mono);
+  margin: 0 0 var(--term-space-4);
+  color: var(--color-text);
+}
+.term-header__prompt {
+  display: flex;
+  align-items: baseline;
+  gap: var(--term-space-2);
+}
+.term-header__glyph {
+  color: var(--color-accent);
+  font-size: 14px;
+  line-height: 1;
+}
+.term-header__name {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.term-header__sub {
+  margin-top: var(--term-space-1);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------
+   StatStrip: horizontal label/value cells
+   ------------------------------------------------------------ */
+.term-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--term-space-4);
+  font-family: var(--term-font-mono);
+  padding: var(--term-space-3) 0;
+}
+.term-stat-strip--bordered {
+  border: var(--term-border);
+  border-radius: var(--term-radius);
+  padding: var(--term-space-3);
+}
+/* cards variant: each <Stat> renders as its own bordered card with a subtle
+   surface fill so the top row reads as a band of chrome rather than bare page.
+   Vertical padding is deliberately generous so the large numeric value has
+   breathing room above the hint line. */
+.term-stat-strip--cards {
+  padding: 0;
+}
+.term-stat-strip--cards .term-stat {
+  border: var(--term-border);
+  border-radius: var(--term-radius);
+  padding: var(--term-space-3) var(--term-space-3) 18px;
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--term-space-1);
+}
+
+/* `count-abbr` sev badge variant used in the VIOLATIONS stat cell */
+.term-sev-badge--count-abbr {
+  font-variant-numeric: tabular-nums;
+  padding: 3px 6px;
+  text-transform: lowercase;
+  letter-spacing: 0;
+}
+.term-stat__label {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: var(--term-space-1);
+}
+.term-stat__value-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--term-space-2);
+}
+.term-stat__value {
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.term-stat__trailing {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.term-stat__hint {
+  margin-top: var(--term-space-1);
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+.term-stat--success .term-stat__value { color: var(--color-success); }
+.term-stat--warning .term-stat__value { color: var(--color-warning); }
+.term-stat--critical .term-stat__value { color: var(--color-sev-critical-text); }
+
+/* ------------------------------------------------------------
+   FlagPill: `--flag` toggle
+   ------------------------------------------------------------ */
+.term-flag-pill {
+  appearance: none;
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+  line-height: 1;
+  padding: var(--term-space-2) 10px;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+}
+.term-flag-pill:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+.term-flag-pill__dashes {
+  opacity: 0.55;
+  margin-right: 2px;
+}
+.term-flag-pill__count {
+  opacity: 0.7;
+}
+.term-flag-pill--active {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+.term-flag-pill--active:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  color: var(--color-on-accent);
+}
+.term-flag-pill--active .term-flag-pill__dashes,
+.term-flag-pill--active .term-flag-pill__count { opacity: 0.9; }
+
+/* ------------------------------------------------------------
+   SevBadge: CRIT / MAJ / MIN
+   ------------------------------------------------------------ */
+.term-sev-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--term-font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: var(--term-radius);
+  border: 1px solid transparent;
+  text-transform: uppercase;
+}
+.term-sev-badge__count {
+  font-weight: 400;
+  opacity: 0.9;
+}
+.term-sev-badge--critical {
+  color: var(--color-sev-critical-text);
+  background: var(--color-sev-critical-bg);
+  border-color: var(--color-sev-critical-border);
+}
+.term-sev-badge--major {
+  color: var(--color-sev-major-text);
+  background: var(--color-sev-major-bg);
+  border-color: var(--color-sev-major-border);
+}
+.term-sev-badge--minor {
+  color: var(--color-sev-minor-text);
+  background: var(--color-sev-minor-bg);
+  border-color: var(--color-sev-minor-border);
+}
+
+/* ------------------------------------------------------------
+   TermInput: `$ grep -r [field]`
+   ------------------------------------------------------------ */
+.term-input {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--term-space-2);
+  padding: var(--term-space-2) 10px;
+  background: var(--color-surface);
+  border: var(--term-border);
+  border-radius: var(--term-radius);
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+}
+.term-input:focus-within {
+  border-color: var(--color-border-focus);
+}
+.term-input__prompt {
+  color: var(--color-accent);
+  user-select: none;
+}
+.term-input__command {
+  color: var(--color-text-muted);
+}
+.term-input__field {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: inherit;
+  min-width: 120px;
+  flex: 1;
+  padding: 0;
+}
+.term-input__field::placeholder {
+  color: var(--color-text-subtle, var(--color-text-muted));
+}
+
+/* ------------------------------------------------------------
+   SectionLabel: `// MAJOR · 2`
+   ------------------------------------------------------------ */
+.term-section-label {
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding: var(--term-space-3) 0 var(--term-space-2);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.term-section-label__marker { opacity: 0.6; }
+
+/* ------------------------------------------------------------
+   GridTable: grid-based tabular rows
+   ------------------------------------------------------------ */
+.term-grid {
+  font-family: var(--term-font-mono);
+  font-size: 13px;
+  color: var(--color-text);
+  width: 100%;
+}
+.term-grid__row {
+  display: grid;
+  grid-template-columns: var(--term-grid-cols);
+  align-items: center;
+  gap: var(--term-space-3);
+  padding: 10px var(--term-space-2);
+  border-bottom: var(--term-divider);
+  min-height: 36px;
+}
+.term-grid--dense .term-grid__row {
+  padding: 6px var(--term-space-2);
+  min-height: 28px;
+}
+.term-grid__row--header {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: var(--term-space-2);
+  min-height: 28px;
+}
+.term-grid__row--muted {
+  color: var(--color-text-muted);
+}
+.term-grid__row--clickable {
+  cursor: pointer;
+  transition: background-color 0.12s;
+}
+.term-grid__row--clickable:hover {
+  background: var(--color-surface-alt);
+}
+.term-grid__row--clickable:focus-visible {
+  outline: 0;
+  background: var(--color-surface-alt);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+.term-grid__cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.term-grid__cell--left   { text-align: left; }
+.term-grid__cell--center { text-align: center; }
+.term-grid__cell--right  { text-align: right; }
+.term-grid__cell--numeric {
+  font-variant-numeric: tabular-nums;
+}
+.term-grid__cell--muted {
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------------------
+   CodeGutter: code block with line numbers
+   ------------------------------------------------------------ */
+.term-code {
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+  line-height: 18px;
+  background: var(--color-surface);
+  border: var(--term-border);
+  border-radius: var(--term-radius);
+  margin: 0;
+  padding: var(--term-space-2) 0;
+  overflow: auto;
+}
+.term-code__line {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  padding: 0 var(--term-space-2);
+}
+.term-code__line--hl {
+  background: var(--color-sev-critical-bg);
+  box-shadow: inset 2px 0 0 var(--color-sev-critical-text);
+}
+.term-code__num {
+  color: var(--color-text-subtle, var(--color-text-muted));
+  text-align: right;
+  padding-right: var(--term-space-2);
+  user-select: none;
+}
+.term-code__text {
+  color: var(--color-text);
+  white-space: pre;
+}
+
+/* ------------------------------------------------------------
+   KeyHint: <kbd> badges
+   ------------------------------------------------------------ */
+.term-key-hint {
+  font-family: var(--term-font-mono);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.term-key-hint__group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.term-key-hint__kbd {
+  font-family: inherit;
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 5px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+  min-width: 16px;
+  text-align: center;
+}
+.term-key-hint__sep {
+  color: var(--color-text-subtle, var(--color-text-muted));
+  opacity: 0.6;
+}
+
+/* ------------------------------------------------------------
+   Overview hero (migrated — replaces .acc-eval-top layout)
+   Scoped under --terminal variant so legacy consumers of
+   .acc-eval-panel remain untouched.
+   ------------------------------------------------------------ */
+.acc-eval-panel--terminal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--term-space-3);
+  margin-bottom: var(--term-space-4);
+}
+.acc-eval-panel--terminal .acc-eval-panel__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--term-space-3);
+}
+.acc-eval-panel--terminal .acc-eval-panel__top .term-header {
+  margin: 0;
+}
+.acc-eval-panel--terminal .acc-eval-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--term-space-2);
+}
+.acc-eval-sev-row {
+  display: inline-flex;
+  gap: var(--term-space-1);
+  align-items: center;
+}
+
+/* ------------------------------------------------------------
+   Violations (migrated) — terminal-style flag row & sev row
+   ------------------------------------------------------------ */
+.violations-page--terminal .violations-flag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--term-space-2);
+  margin: 0 0 var(--term-space-3);
+}
+.violations-sev-row {
+  display: inline-flex;
+  gap: var(--term-space-1);
+  align-items: center;
+}
+
+/* ------------------------------------------------------------
+   Map (migrated) — header becomes a stack of TermHeader + controls row
+   ------------------------------------------------------------ */
+.map-page--terminal .map-header--terminal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--term-space-2);
+  align-items: center;
+  margin: 0 0 var(--term-space-3);
+}
+
+/* ------------------------------------------------------------
+   History (migrated) — TermHeader + run-navigator on same row
+   ------------------------------------------------------------ */
+.history-page--terminal .history-page__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--term-space-3);
+  margin: 0 0 var(--term-space-3);
+}
+.history-page--terminal .history-page__top .term-header {
+  margin: 0;
+}
+
+/* ------------------------------------------------------------
+   Standards (migrated) — terminal header w/ right-aligned actions
+   ------------------------------------------------------------ */
+.standards-page--terminal .standards-page-header--terminal {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--term-space-3);
+  margin: 0 0 var(--term-space-4);
+}
+.standards-page--terminal .standards-page-header--terminal .term-header {
+  margin: 0;
+}
+
+/* ------------------------------------------------------------
+   PrincipleDetailPage (migrated) — terminal-style summary header
+   ------------------------------------------------------------ */
+.principle-detail-header--terminal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--term-space-3);
+  margin-bottom: var(--term-space-4);
+}
+.principle-detail-header--terminal .principle-detail-header__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--term-space-3);
+}
+.principle-detail-header--terminal .principle-detail-header__top .term-header {
+  margin: 0;
+}
+.principle-detail-sev-row {
+  display: inline-flex;
+  gap: var(--term-space-1);
+  align-items: center;
+}
+
+/* ------------------------------------------------------------
+   Shared severity filter pill row (used by SeverityFilterPills)
+   Severity-coloured flags use --term-sev-accent when active.
+   ------------------------------------------------------------ */
+.term-flag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--term-space-2);
+  margin: 0 0 var(--term-space-3);
+}
+.term-flag-sev .term-flag-pill {
+  color: var(--term-sev-accent, var(--color-text-muted));
+  border-color: color-mix(in srgb, var(--term-sev-accent, var(--color-border)) 40%, transparent);
+}
+.term-flag-sev .term-flag-pill--active {
+  background: var(--term-sev-accent);
+  color: var(--color-on-accent);
+  border-color: var(--term-sev-accent);
+}
+
+/* ------------------------------------------------------------
+   Dimension overview (migrated — ExplorerPage DimensionOverview)
+   ------------------------------------------------------------ */
+.dimension-overview--terminal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--term-space-3);
+  margin-bottom: var(--term-space-4);
+}
+.dimension-overview--terminal .dimension-overview__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--term-space-3);
+}
+.dimension-overview--terminal .dimension-overview__top .term-header {
+  margin: 0;
+}
+.dimension-overview--terminal .dimension-overview__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--term-space-2);
+}
+
+/* ------------------------------------------------------------
+   Evaluate screen (migrated — EvaluateScreen)
+   ------------------------------------------------------------ */
+.evaluate-header--terminal {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--term-space-3);
+  margin: 0 0 var(--term-space-4);
+}
+.evaluate-header--terminal .evaluate-header__left {
+  min-width: 0;
+  flex: 1;
+}
+.evaluate-header--terminal .term-header {
+  margin: 0;
+}
+
+/* ------------------------------------------------------------
+   EvalCards (migrated) — left-accent bar, terminal REASON/DETAIL,
+   mono-styled code with highlighted line border.
+   All rules are scoped under .vdetail-row--terminal so legacy
+   consumers of .vdetail-row remain untouched.
+   ------------------------------------------------------------ */
+.vdetail-row--terminal {
+  /* accent color per severity; overridden by sibling rules below */
+  --vrow-accent: var(--color-border);
+  background: transparent;
+  border: 0;
+  border-left: 2px solid var(--vrow-accent);
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: var(--term-space-3);
+  box-shadow: none;
+}
+.vdetail-row--terminal.vdetail-row--critical  { --vrow-accent: var(--color-sev-critical-text); }
+.vdetail-row--terminal.vdetail-row--major     { --vrow-accent: var(--color-sev-major-text); }
+.vdetail-row--terminal.vdetail-row--minor     { --vrow-accent: var(--color-sev-minor-text); }
+.vdetail-row--terminal.vdetail-row--compliant { --vrow-accent: var(--color-success); }
+
+.vdetail-row--terminal .vdetail-row-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--term-space-2);
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+}
+.vdetail-row--terminal .vrow-label {
+  color: var(--color-text-muted);
+  font-family: var(--term-font-mono);
+}
+
+/* Compliance green badge mirrors SevBadge styling */
+.term-sev-badge--compliant {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 6%, transparent);
+  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
+}
+
+/* ---------- Terminal detail (REASON / DETAIL) ---------- */
+.vlive-detail--terminal {
+  font-family: var(--term-font-mono);
+  margin-top: var(--term-space-3);
+}
+.vlive-detail--terminal .vlive-detail-section {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+.vlive-detail--terminal .vlive-detail-section-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  display: block;
+  margin-top: var(--term-space-2);
+  margin-bottom: 4px;
+}
+.vlive-detail--terminal .vlive-detail-title {
+  font-size: 13px;
+  color: var(--color-text);
+  margin: 0 0 var(--term-space-2);
+  font-family: var(--term-font-mono);
+}
+.vlive-detail--terminal .vlive-detail-reason {
+  font-size: 12px;
+  color: var(--color-text);
+  line-height: 1.55;
+  margin: 0 0 var(--term-space-2);
+  font-family: var(--term-font-mono);
+}
+
+/* ---------- Code block + "-- see code · N lines" affordance ---------- */
+.vlive-detail--terminal .scope-bar {
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  padding: var(--term-space-1) 0;
+  background: transparent;
+  border: 0;
+}
+.vlive-detail--terminal .scope-bar-chevron {
+  display: none;
+}
+.vlive-detail--terminal .scope-bar-label::before {
+  content: '-- ';
+  opacity: 0.55;
+  margin-right: 2px;
+}
+.vlive-detail--terminal .scope-bar-code {
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+  background: var(--color-surface);
+  border: var(--term-border);
+  border-radius: var(--term-radius);
+  padding: var(--term-space-2) 0;
+  margin-top: var(--term-space-1);
+  overflow: auto;
+}
+.vlive-detail--terminal .ctx-line {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  padding: 0 var(--term-space-2);
+  line-height: 18px;
+}
+.vlive-detail--terminal .ctx-line--hl {
+  background: var(--color-sev-critical-bg);
+  box-shadow: inset 2px 0 0 var(--color-sev-critical-text);
+}
+.vlive-detail--terminal .ctx-gutter {
+  color: var(--color-text-subtle, var(--color-text-muted));
+  text-align: right;
+  padding-right: var(--term-space-2);
+  user-select: none;
+}
+.vlive-detail--terminal .ctx-code {
+  color: var(--color-text);
+  white-space: pre;
+}
+
+/* ------------------------------------------------------------
+   Responsive shell — stack the sidebar above the content on
+   tablet/mobile viewports so `.dashboard` gets the full width.
+   Desktop behaviour (fixed 64-px rail with hover-expand) is
+   untouched above the breakpoint.
+   ------------------------------------------------------------ */
+
+/* Tablet: 900px is the existing breakpoint used elsewhere. */
+@media (max-width: 900px) {
+  /* Mobile: the sidebar disappears entirely from the flow. The TopBar burger
+     is the only way to open it, and when open it floats over the content as
+     a drawer instead of squeezing layout. */
+  .app-shell__body {
+    grid-template-columns: 1fr !important;
+  }
+  .app-shell__body:has(.sidebar.sidebar--pinned) {
+    grid-template-columns: 1fr !important;
+  }
+  .app-shell--with-topbar .topbar {
+    padding-left: var(--term-space-3);
+  }
+  /* Mobile: the sidebar is ALWAYS mounted as a fixed overlay. It translates
+     off-screen when closed and back when pinned, so the close animation
+     mirrors the open animation. */
+  .sidebar.sidebar--expanded {
+    position: fixed !important;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: min(280px, 85vw) !important;
+    z-index: 50;
+    display: flex !important;
+    box-shadow: 0 0 32px rgba(0, 0, 0, 0.35);
+    transform: translateX(-100%);
+    transition: transform 200ms ease !important;
+    animation: none !important;
+    pointer-events: none;
+  }
+  .sidebar.sidebar--expanded.sidebar--pinned {
+    transform: translateX(0) !important;
+    pointer-events: auto;
+  }
+
+  /* TopBar: show the burger, hide desktop-only pills and the primary
+     `+ Evaluate` button (the sidebar already has an Evaluate nav item). */
+  .topbar-menu-btn { display: inline-flex !important; }
+  .topbar-pill,
+  .topbar-btn--evaluate { display: none !important; }
+  .topbar-actions { gap: var(--term-space-1); }
+  .sidebar.sidebar--expanded.sidebar--pinned .sidebar-brand-text,
+  .sidebar.sidebar--expanded.sidebar--pinned .sidebar-version,
+  .sidebar.sidebar--expanded.sidebar--pinned .sidebar-section-label,
+  .sidebar.sidebar--expanded.sidebar--pinned .sidebar-nav-label,
+  .sidebar.sidebar--expanded.sidebar--pinned .sidebar-nav-count,
+  .sidebar.sidebar--expanded.sidebar--pinned .sidebar-status {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .sidebar-scrim { display: block !important; }
+
+  /* Legacy selectors kept for the earlier non-expanded sidebar path */
+  .app-shell:has(.sidebar:hover) {
+    grid-template-columns: 1fr !important;
+  }
+  /* Do not apply legacy horizontal top-bar rules to the new expanded
+     sidebar — they would conflict with the icon-rail layout. */
+  .sidebar:not(.sidebar--expanded) {
+    width: 100% !important;
+    height: auto;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+  }
+  .sidebar:not(.sidebar--expanded):hover { width: 100% !important; }
+  .sidebar-header {
+    border-bottom: 0;
+    border-right: 1px solid var(--color-border);
+    padding: var(--term-space-2) var(--term-space-3);
+  }
+  .sidebar-nav {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0;
+    overflow-x: auto;
+    padding: var(--term-space-1) var(--term-space-2);
+    flex: 1;
+    min-width: 0;
+  }
+  .sidebar-nav-item {
+    flex-shrink: 0;
+    padding: var(--term-space-2);
+  }
+  /* Horizontal nav: icon-only, keep badges. */
+  .sidebar-nav-item > span:not(.sidebar-nav-badge) {
+    display: none !important;
+  }
+  .sidebar-nav-item {
+    gap: 0;
+    padding: var(--term-space-2) !important;
+    width: 40px !important;
+    min-width: 40px;
+    max-width: 40px;
+    flex: 0 0 40px !important;
+    justify-content: center;
+  }
+  /* Bottom-of-sidebar controls (help, theme toggle) inline into the row. */
+  .sidebar-bottom,
+  .sidebar-footer,
+  .sidebar-controls {
+    border-top: 0;
+    padding: 0 var(--term-space-2);
+    flex-direction: row;
+    gap: var(--term-space-1);
+  }
+  .dashboard {
+    padding: var(--term-space-3);
+    overflow-y: visible;
+    overflow-x: hidden;
+    height: auto;
+  }
+}
+
+/* ------------------------------------------------------------
+   Responsive .history-panels-row — wrap chart + dimensions onto
+   two rows once combined min width is no longer available.
+   Each child keeps a soft floor so it doesn't collapse too thin.
+   ------------------------------------------------------------ */
+.history-panels-row {
+  flex-wrap: wrap !important;
+  gap: var(--term-space-3) !important;
+}
+.history-panels-row > .run-history-panel,
+.history-panels-row > .dim-score-panel {
+  /* Wrap sooner — below ~1040px combined, the two panels stack vertically
+     so each has full width rather than cramming side-by-side and clipping
+     the DIMENSIONS row numerics. */
+  flex: 1 1 500px !important;
+  min-width: min(100%, 500px) !important;
+}
+
+/* ------------------------------------------------------------
+   Unified panel chrome — .run-history-panel, .dim-score-panel,
+   and .top-findings in terminal mode share the same outer
+   aesthetic: thin 1px border, 2px radius, subtle surface bg,
+   no shadow. The inner "banner" headers sit in a slightly
+   lighter/darker band (surface-alt) to matches the mockup's
+   squared-header treatment.
+   ------------------------------------------------------------ */
+.run-history-panel--terminal,
+.dim-score-panel--terminal,
+.top-findings {
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--term-radius) !important;
+  box-shadow: none !important;
+  background: var(--color-surface) !important;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+/* Shared banner header — sits flush to the panel's top edge, has its own
+   contrast tint, and a bottom divider. Used in all three overview panels. */
+.run-history-panel--terminal .run-history-panel__header,
+.top-findings__head,
+.dim-score-panel--terminal .dim-score-panel__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--term-space-2);
+  padding: var(--term-space-2) var(--term-space-3);
+  margin: 0;
+  background: var(--color-surface-alt);
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+.run-history-panel--terminal .run-history-panel__header .term-section-label,
+.top-findings__head .term-section-label {
+  padding: 0;
+}
+
+/* Panel body padding — all content under the banner uses consistent padding */
+.run-history-panel--terminal > *:not(.run-history-panel__header),
+.top-findings > *:not(.top-findings__head),
+.dim-score-panel--terminal > *:not(.dim-score-panel__header) {
+  padding: var(--term-space-3);
+}
+/* Dense sub-components (rows, chart container) manage their own padding.
+   `.dim-score-rows` still gets vertical breathing room so the first row
+   doesn't hug the banner divider. */
+.dim-score-panel--terminal > .dim-score-rows {
+  padding: var(--term-space-2) 0;
+}
+/* Horizontal padding for dim rows is consolidated into the main rule below
+   so a shorthand `padding` doesn't reset left/right. */
+
+.run-history-panel--terminal .run-history-panel__stats {
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+}
+
+/* ------------------------------------------------------------
+   History › EVALUATIONS panel
+   ------------------------------------------------------------ */
+.history-evaluations {
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+  background: var(--color-surface);
+  padding: 0 !important;
+  overflow: hidden;
+  margin-bottom: var(--term-space-4);
+}
+.history-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--term-font-mono);
+  font-size: 14px;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-surface-alt) 65%, transparent);
+}
+/* Row layout — explicit column widths per child so the header and every
+   data row align pixel-for-pixel. Gap controls all inter-column spacing;
+   individual columns set their own `text-align`. Rows are deliberately
+   chrome-less (no background) so the panel bg shows through — matches the
+   mockup's flat list look. */
+.history-table .history-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 13px 22px;
+  background: var(--color-surface) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.history-table .history-row--header {
+  padding: 12px 22px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.history-table .history-row:not(.history-row--header) {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.history-table .history-row:not(.history-row--header):hover {
+  background: color-mix(in srgb, var(--color-accent) 2%, transparent) !important;
+}
+.history-table .history-row--selected {
+  background: var(--color-surface-alt) !important;
+}
+
+/* Monospace + theme-correct text colour inside every data row, overriding
+   the inherited Plus Jakarta from `.panel`. */
+.history-row,
+.history-row * {
+  font-family: var(--term-font-mono);
+}
+.history-row__col--date { color: var(--color-text); }
+.history-row__col--time { color: var(--color-text-muted); }
+/* DIMENSIONS CHANGED is secondary info — match row font-size for clarity */
+.history-row__col--dims { font-size: 13px; }
+/* The score value is the primary datum in the row — bold it */
+.history-row__col--score strong,
+.history-row__col--score {
+  font-weight: 700;
+}
+
+/* Grade chip — tight, square, 1 px border, uppercase mono. Overrides the
+   legacy `.chip.small` rounding/bg. */
+.history-row .chip.small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  min-width: 22px;
+}
+
+.history-row__col {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Header cells should never clip their own labels */
+.history-row--header .history-row__col { overflow: visible; }
+
+.history-row__col--date   { flex: 0 0 130px; }
+.history-row__col--time   { flex: 0 0 82px;  }
+.history-row__col--grade  { flex: 0 0 44px; text-align: left; }
+.history-row__col--score  { flex: 0 0 52px; text-align: left; font-variant-numeric: tabular-nums; }
+.history-row__col--delta  { flex: 0 0 56px; text-align: left; font-variant-numeric: tabular-nums; }
+.history-row__col--dims   { flex: 1 1 auto; min-width: 0; }
+.history-row__col--chevron {
+  flex: 0 0 12px;
+  color: var(--color-text-muted);
+  text-align: right;
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.5;
+  transition: opacity 0.12s, transform 0.12s;
+}
+.history-row:not(.history-row--header):hover .history-row__col--chevron {
+  opacity: 1;
+  transform: translateX(2px);
+}
+
+.history-row__muted { color: var(--color-text-muted); }
+.history-evaluations__header {
+  padding: var(--term-space-2) var(--term-space-3);
+  background: var(--color-surface-alt);
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* Delta colours in the Δ column — theme-aware via grade tokens. */
+.history-delta--up   { color: var(--color-success); }
+.history-delta--down { color: var(--color-danger); }
+
+/* Row-end "view" affordance */
+.history-view-btn {
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.history-view-btn:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+.history-view-btn.is-selected {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+/* ------------------------------------------------------------
+   DimensionScorePanel — dense terminal layout.
+   Columns: label | track | score | delta | violations count.
+   ------------------------------------------------------------ */
+.dim-score-panel--terminal {
+  font-family: var(--term-font-mono);
+  display: flex;
+  flex-direction: column;
+}
+.dim-score-panel--terminal > .term-section-label {
+  padding: 0 0 var(--term-space-2);
+}
+/* .dim-score-panel__header inherits banner styling from the shared rule */
+
+/* ------------------------------------------------------------
+   TopFindings — overview summary table (SEV / DIM / PRINCIPLE /
+   FILE:LINE / CWE / TITLE). Wraps the shared GridTable primitive
+   with a titled header row.
+   ------------------------------------------------------------ */
+.top-findings {
+  margin: 0 0 var(--term-space-4);
+  font-family: var(--term-font-mono);
+}
+/* .top-findings__head inherits banner styling from the shared rule */
+
+/* Let the grid-table inside top-findings handle its own inner padding so
+   rows align with the banner text above. Undo the generic body-padding
+   applied by the unified panel-body rule. */
+.top-findings > :not(.top-findings__head) {
+  padding: var(--term-space-2) 0 !important;
+}
+.top-findings .term-grid__row {
+  padding-left: var(--term-space-3);
+  padding-right: var(--term-space-3);
+}
+.top-findings .term-grid__row--header {
+  /* Column header row — lives inside the body, sits flush under the banner */
+  padding-top: var(--term-space-1);
+  padding-bottom: var(--term-space-1);
+}
+.top-findings__meta {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+.top-findings__cwe {
+  color: var(--color-sev-critical-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.finding-detail-breadcrumb {
+  font-family: var(--term-font-mono);
+  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.finding-detail-breadcrumb .finding-detail-sep {
+  color: var(--color-text-subtle, var(--color-text-muted));
+  opacity: 0.6;
+}
+
+/* ============================================================
+   App shell — sidebar on the left spans full height; the right
+   column (main-column) stacks the TopBar above the main content.
+   This lets the sidebar reach the top of the screen on desktop
+   while the TopBar sits flush-right of it.
+   ============================================================ */
+.app-shell.app-shell--with-topbar {
+  display: flex !important;
+  flex-direction: column;
+  grid-template-columns: none;
+  height: 100vh;
+  overflow: hidden;
+}
+.app-shell__topbar {
+  flex: 0 0 auto;
+  z-index: 5;
+}
+.app-shell__body {
+  display: grid;
+  grid-template-columns: var(--sidebar-width, 64px) 1fr;
+  flex: 1 1 auto;
+  min-height: 0;
+  transition: grid-template-columns 200ms ease;
+}
+.app-shell__body:has(.sidebar.sidebar--expanded:hover),
+.app-shell__body:has(.sidebar.sidebar--expanded.sidebar--pinned) {
+  grid-template-columns: 240px 1fr;
+}
+.app-shell__main-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.app-shell__main-column > .dashboard {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* Full-width topbar: align breadcrumb with dashboard content below.
+   sidebar-width (64px) + dashboard padding (32px) = 96px left-inset. */
+.app-shell--with-topbar .topbar {
+  padding-left: 96px;
+}
+
+/* ============================================================
+   Sidebar — collapsed by default (icon rail), expands on hover.
+   Extra layout blocks (section labels, counts, status footer)
+   fade in when the sidebar widens.
+   ============================================================ */
+.sidebar.sidebar--expanded {
+  width: var(--sidebar-width, 64px);
+  font-family: var(--term-font-mono);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  padding: 0;
+  transition: width 200ms ease;
+}
+.sidebar.sidebar--expanded:hover,
+.sidebar.sidebar--expanded.sidebar--pinned {
+  width: 240px;
+}
+/* Logo becomes a burger/close toggle button */
+.sidebar-brand-icon--toggle {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--term-radius);
+}
+.sidebar-brand-icon--toggle:hover {
+  background: var(--color-surface-alt);
+}
+.sidebar-brand-icon--toggle:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Scrim behind the mobile drawer — dims the page and closes the menu when
+   tapped. Hidden on desktop; only relevant when the sidebar is pinned
+   (i.e. opened by clicking the logo) below the mobile breakpoint. */
+/* Scrim is always mounted; the `--visible` modifier animates it in/out so
+   opening and closing use the same transition curve/duration. */
+.sidebar-scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  z-index: 49;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+.sidebar-scrim--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* When the user pins the sidebar on desktop the grid stays wide */
+.app-shell__body:has(.sidebar.sidebar--expanded.sidebar--pinned) {
+  grid-template-columns: 240px 1fr;
+}
+/* Hide expanded-only content when the rail is collapsed */
+.sidebar.sidebar--expanded .sidebar-brand-text,
+.sidebar.sidebar--expanded .sidebar-version,
+.sidebar.sidebar--expanded .sidebar-section-label,
+.sidebar.sidebar--expanded .sidebar-nav-label,
+.sidebar.sidebar--expanded .sidebar-nav-count,
+.sidebar.sidebar--expanded .sidebar-status {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+  white-space: nowrap;
+}
+.sidebar.sidebar--expanded:hover .sidebar-brand-text,
+.sidebar.sidebar--expanded:hover .sidebar-version,
+.sidebar.sidebar--expanded:hover .sidebar-section-label,
+.sidebar.sidebar--expanded:hover .sidebar-nav-label,
+.sidebar.sidebar--expanded:hover .sidebar-nav-count,
+.sidebar.sidebar--expanded:hover .sidebar-status,
+.sidebar.sidebar--expanded.sidebar--pinned .sidebar-brand-text,
+.sidebar.sidebar--expanded.sidebar--pinned .sidebar-version,
+.sidebar.sidebar--expanded.sidebar--pinned .sidebar-section-label,
+.sidebar.sidebar--expanded.sidebar--pinned .sidebar-nav-label,
+.sidebar.sidebar--expanded.sidebar--pinned .sidebar-nav-count,
+.sidebar.sidebar--expanded.sidebar--pinned .sidebar-status {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sidebar.sidebar--expanded .sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: var(--term-space-2);
+  height: var(--app-header-h);
+  min-height: var(--app-header-h);
+  padding: 0 var(--term-space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+.sidebar.sidebar--expanded .sidebar-brand-icon {
+  display: flex;
+  flex: 0 0 auto;
+}
+.sidebar.sidebar--expanded .sidebar-brand-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text);
+  letter-spacing: -0.005em;
+  opacity: 1 !important;
+  flex: 1 1 auto;
+}
+.sidebar.sidebar--expanded .sidebar-version {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  padding: 2px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.sidebar.sidebar--expanded .sidebar-block {
+  padding: var(--term-space-1) var(--term-space-3);
+}
+/* Visible divider between groups. --color-border can be too faint in dark
+   themes; use a mix against the text color so it reads clearly in both
+   light and dark variants. The footer's Help row also gets one even
+   though it's not an immediate sibling (the .sidebar-status block sits
+   between it and OPERATE). */
+.sidebar.sidebar--expanded .sidebar-block + .sidebar-block,
+.sidebar.sidebar--expanded .sidebar-footer .sidebar-block--flush {
+  border-top: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+}
+.sidebar.sidebar--expanded .sidebar-block--flush {
+  padding: 0 var(--term-space-3);
+}
+.sidebar-section-label {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 0;
+  font-family: var(--term-font-mono);
+  display: block;
+}
+
+.sidebar.sidebar--expanded .sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.sidebar.sidebar--expanded .sidebar-nav-item {
+  display: flex !important;
+  align-items: center;
+  gap: var(--term-space-2);
+  padding: 8px var(--term-space-2);
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  flex: 1 1 auto !important;
+  background: transparent;
+  border: 0;
+  border-radius: var(--term-radius);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  justify-content: flex-start !important;
+  cursor: pointer;
+}
+.sidebar.sidebar--expanded .sidebar-nav-item:hover {
+  background: var(--color-surface-alt);
+}
+.sidebar.sidebar--expanded .sidebar-nav-item.active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.sidebar.sidebar--expanded .sidebar-nav-label {
+  display: inline !important;
+  flex: 1 1 auto;
+  opacity: 1 !important;
+}
+.sidebar.sidebar--expanded .sidebar-nav-count {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-border) 65%, transparent);
+  padding: 1px 5px;
+  border-radius: var(--term-radius);
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar.sidebar--expanded .sidebar-spacer { flex: 1 1 auto; }
+
+.sidebar.sidebar--expanded .sidebar-footer {
+  padding: var(--term-space-2) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--term-space-1);
+}
+.sidebar.sidebar--expanded .sidebar-status {
+  padding: var(--term-space-2) var(--term-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-family: var(--term-font-mono);
+}
+.sidebar-status-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--term-space-2);
+}
+.sidebar-status-label { color: var(--color-text-muted); }
+.sidebar-status-value {
+  color: var(--color-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+}
+.sidebar-dot--ok   { background: var(--color-success); }
+.sidebar-dot--warn { background: var(--color-warning); }
+.sidebar-dot--err  { background: var(--color-danger); }
+
+/* ============================================================
+   TopBar — replaces ProjectHeader
+   ============================================================ */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--term-space-3);
+  height: var(--app-header-h);
+  padding: 0 var(--space-8);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-family: var(--term-font-mono);
+  font-size: 13px;
+}
+.topbar-breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+}
+.topbar-breadcrumb-parent {
+  color: var(--color-text-muted);
+}
+.topbar-breadcrumb-sep {
+  color: var(--color-text-subtle, var(--color-text-muted));
+  opacity: 0.55;
+}
+.topbar-breadcrumb-current {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--term-space-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.topbar-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  background: transparent;
+  font-family: inherit;
+}
+/* Clickable provider pill — same visuals as the span variant plus hover */
+.topbar-pill--button {
+  cursor: pointer;
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
+}
+.topbar-pill--button:hover {
+  border-color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+.topbar-pill--button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.topbar-pill--status.is-ok    { border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border)); }
+.topbar-pill--status.is-err   { border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border)); color: var(--color-danger); }
+.topbar-pill--kbd {
+  font-family: var(--term-font-mono);
+  letter-spacing: 0.04em;
+  padding: 4px 8px;
+}
+.topbar-pill-sep   { opacity: 0.4; }
+.topbar-pill-muted { color: var(--color-text-muted); }
+
+.topbar-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+}
+.topbar-dot--ok  { background: var(--color-success); }
+.topbar-dot--err { background: var(--color-danger); }
+
+.topbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+}
+.topbar-btn:hover {
+  background: var(--color-surface-alt);
+  border-color: var(--color-text-muted);
+}
+/* Evaluate button: same footprint as Report, with an accent-tinted
+   border + text so it still reads as the primary action without
+   shouting. */
+.topbar-btn--evaluate {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+}
+.topbar-btn--evaluate:hover {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.topbar-btn--evaluate:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Leading `+` glyph — subtle accent tint, matches the button color */
+.topbar-btn--evaluate .topbar-btn__plus {
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+/* Running state: muted surface + spinner. Still clickable so users can
+   navigate back to the Evaluate tab to watch progress. */
+.topbar-btn--evaluate--running {
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+  background: var(--color-surface-alt);
+  cursor: progress;
+}
+.topbar-btn--evaluate--running:hover {
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+  border-color: var(--color-text-muted);
+}
+.topbar-btn__spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+  border-top-color: var(--color-accent);
+  animation: topbar-spin 0.8s linear infinite;
+}
+@keyframes topbar-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Burger button in TopBar — hidden on desktop, shown on mobile via the
+   media query above. */
+.topbar-menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  margin-right: var(--term-space-2);
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+  cursor: pointer;
+}
+.topbar-menu-btn:hover {
+  background: var(--color-surface-alt);
+  border-color: var(--color-text-muted);
+}
+
+/* Mobile-extras slot inside the sidebar footer (server status, provider). */
+.sidebar-mobile-extras {
+  padding-top: var(--term-space-2);
+  margin-top: var(--term-space-2);
+  border-top: 1px dotted color-mix(in srgb, var(--color-border) 60%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+}
+.sidebar-mobile-extras__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dim-score-panel--terminal .dim-score-rows {
+  display: flex;
+  flex-direction: column;
+}
+/* Column layout:
+   [ label (content width, capped) ] [ flex spacer — sparkline floats right within ]
+   [ score ] [ delta ] [ violations ]
+   Keeping the label's column at `max-content` prevents it from eating all the
+   row width on wide panels, so the sparkline + numerics stay pinned to the
+   right edge no matter how wide the panel stretches. */
+/* Compound selector so terminal rules beat dashboard.css (loaded later in
+   index.css) without needing !important. */
+.dim-score-row.dim-score-row--terminal {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto 32px 56px 40px;
+  align-items: center;
+  gap: var(--term-space-4);
+  padding: 8px var(--term-space-4);
+  border-bottom: 1px dotted color-mix(in srgb, var(--color-border) 60%, transparent);
+  cursor: pointer;
+  font-size: 12px;
+  min-width: 0;
+}
+.dim-score-row.dim-score-row--terminal:last-child { border-bottom: 0; }
+/* Override dashboard.css's `.dim-score-row:hover` that applies a -8px margin
+   shift and extra padding — it jumps the whole row sideways on hover.
+   Keep hover as a pure background tint. */
+.dim-score-row.dim-score-row--terminal:hover {
+  background: var(--color-surface-alt);
+  margin: 0;
+  padding-left: var(--term-space-4);
+  padding-right: var(--term-space-4);
+  border-radius: 0;
+}
+.dim-score-row--terminal .dim-score-label {
+  color: var(--color-text);
+  text-transform: lowercase;
+  letter-spacing: 0;
+  /* Override the legacy dashboard.css rule `flex: 0 0 100px` that would
+     otherwise clamp the span to 100 px even inside a grid container. */
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+}
+.dim-score-row--terminal .dim-score-spark {
+  display: flex;
+  align-items: center;
+  justify-self: stretch;       /* fill the 1fr spacer column */
+  width: 100%;
+  max-width: 92px;             /* compact sparkline — matches the reference
+                                  mockup's tighter proportion */
+  margin-left: auto;           /* push to right edge of the column */
+  min-width: 48px;
+}
+.dim-sparkline {
+  display: block;
+  width: 100%;
+}
+.dim-sparkline--empty {
+  display: inline-block;
+  width: 100%;
+  height: 20px;
+  opacity: 0.4;
+}
+.dim-score-row--terminal .dim-score-value {
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  min-width: 28px;
+}
+.dim-score-row--terminal .dim-score-trend {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+}
+.dim-score-row--terminal .dim-score-viol {
+  color: var(--color-text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  min-width: 36px;
+}
+
+/* FileCopyBtn label: allow the pretext-fitted text to shrink with its container. */
+.vlive-detail-file-btn__label {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Mobile: tighten padding further at very narrow widths. */
+@media (max-width: 480px) {
+  .dashboard { padding: var(--term-space-2); }
+  .term-header__name { font-size: 17px; }
+  .term-stat__value { font-size: 22px; }
+}
