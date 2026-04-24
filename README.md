@@ -63,7 +63,18 @@ quodeq                 # Launch the dashboard
 
 Running `quodeq` opens the dashboard, where you can point to any project and run evaluations from the UI. Also available via `pip install quodeq`.
 
-**Requirements:** [Python 3.12+](https://www.python.org/downloads/) and [Node.js 18+](https://nodejs.org/) (for the dashboard UI).
+**Requirements:** [Python 3.12+](https://www.python.org/downloads/), [Node.js 18+](https://nodejs.org/) and npm 9+ (for the dashboard UI).
+
+Install Node.js + npm from [nodejs.org](https://nodejs.org/) or via your package manager:
+
+```bash
+brew install node                    # macOS — ships node + npm together
+sudo apt install -y nodejs npm       # Debian/Ubuntu — two separate packages
+sudo dnf install -y nodejs npm       # Fedora/RHEL
+pacman -S nodejs npm                 # Arch
+```
+
+> **Heads-up for Debian/Ubuntu users:** on Ubuntu `nodejs` and `npm` are separate packages. `apt install nodejs` alone is not enough.
 
 ### macOS App (beta)
 
