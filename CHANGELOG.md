@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.7] — 2026-04-25
+
+### Features
+- **History management** — filter cancelled/failed runs from the history list, per-run delete button with confirmation dialog, score_history chart no longer shows phantom partial-score points from interrupted runs
+- **Run lifecycle resilience** — scans survive dashboard restarts (detached from API lifecycle), reconnected dashboards stream live violations and logs, cancel-and-close dialog fires when a scan is running on window close
+- **macOS app identity** — dashboard shows the Quodeq icon in the dock + menu bar (not generic Python/document), About panel includes version, copyright and website/repo links
+
+### Improvements
+- **Evaluation prompt quality** — evidence gate (no absence-inference violations), tighter critical severity rubric (must describe concrete attack/failure), severity self-check for every finding, `minor` severity ceiling for test files, `max_retries=1` on structured output so a single broken JSON response doesn't silently cost ~6 minutes
+- **Dashboard UX** — long finding/history lists lazy-render via CSS `content-visibility: auto` (no JS virtualizer, no "Show more" pagination, LazyColumn-feel on modern WebKit/Chromium)
+- **Setup** — README quickstart covers OS prereqs (Homebrew / apt / dnf / pacman) + provider choice (Ollama or agentic CLIs); prereq check on dashboard start aggregates missing Node + npm into one error with the correct multi-package install command; auto-fallback to `--browser` on Linux when `gir1.2-webkit2-4.1` is missing
+- **CI / release** — PR-review workflow allows 0-findings runs when the incremental filter is active, uses COMMENT verdicts instead of APPROVE (GitHub Actions can't submit approvals via `GITHUB_TOKEN`); per-project CI config moved from `.quodeq/workflow.env` to `quodeq.env` at repo root; duplicate local Homebrew formula dropped in favour of the tap repo as source of truth
+
+### Fixes
+- **Dashboard exited silently on Linux** — now probes for GTK/WebKit bindings, falls back to browser mode with actionable install hints; webview stderr lands in `~/.quodeq/run/webview.log` instead of /dev/null
+- **BrokenPipeError at scan end marked runs as failed** — transition now walks through finalizing → done; evidence data was always safe, status now reflects that
+- **Close dialog never fired for any user** — long-standing bug from bad URL parsing plus Promise-unaware `evaluate_js`; polls a JS global every 100 ms until the user picks keep/cancel/back
+- **Live violations panel empty on reconnect** — seed `partialDimensions` from the requested-dimension list when `current_dimension` is null; `dimensions` is now populated in external-job snapshots
+- **External runs had no logs in the UI** — tail `run.log` from the run directory when serializing `ext-*` snapshots
+- **Detail pages showed a huge empty scroll** — replaced the home-grown JS virtualizer with native CSS content-visibility, scrolls inside the app's single scroll container
+- **test_shutdown_ignores_dead_process** used the wrong patch target, letting the real `_kill_tree` run on PID 999 and SIGTERM the test runner's process group on Linux CI
+
 ## [1.0.6] — 2026-04-15
 
 ### Fixes
