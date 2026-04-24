@@ -335,6 +335,17 @@ def _set_macos_app_identity() -> None:
 
 _about_target: object | None = None  # keep delegate alive for the menu item's weak ref
 
+
+def _diag_path() -> Path:
+    return Path.home() / ".quodeq" / "run" / "webview_debug.log"
+
+
+try:
+    _diag_path().parent.mkdir(parents=True, exist_ok=True)
+    _diag = _diag_path().open("a", encoding="utf-8")  # noqa: SIM115 — lives for the process
+except OSError:
+    _diag = sys.stderr
+
 _QUODEQ_WEBSITE = "https://quodeq.com"
 _QUODEQ_REPO = "https://github.com/quodeq/quodeq"
 
@@ -407,7 +418,7 @@ def _install_about_panel_override() -> None:
         app = NSApplication.sharedApplication()
         main_menu = app.mainMenu()
         if main_menu is None or main_menu.numberOfItems() == 0:
-            print("[quodeq-about] no main menu yet", file=sys.stderr, flush=True)
+            print("[quodeq-about] no main menu yet", file=_diag, flush=True)
             return
         # Scan every menu + submenu for items whose title contains "About".
         # pywebview's menu layout isn't strictly [0] = About, and on some
@@ -424,16 +435,16 @@ def _install_about_panel_override() -> None:
                     about_items.append(item)
         if not about_items:
             print("[quodeq-about] no About item found in any submenu",
-                  file=sys.stderr, flush=True)
+                  file=_diag, flush=True)
             return
         _about_target = _AboutHandler.alloc().init()
         for item in about_items:
             item.setTarget_(_about_target)
             item.setAction_("showAbout:")
         print(f"[quodeq-about] retargeted {len(about_items)} About item(s)",
-              file=sys.stderr, flush=True)
+              file=_diag, flush=True)
     except (AttributeError, IndexError, ValueError) as exc:
-        print(f"[quodeq-about] install failed: {exc}", file=sys.stderr, flush=True)
+        print(f"[quodeq-about] install failed: {exc}", file=_diag, flush=True)
 
 
 def _set_app_icon() -> None:
