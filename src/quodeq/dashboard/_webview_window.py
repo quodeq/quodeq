@@ -278,7 +278,7 @@ def _icon_path(ext: str) -> str | None:
     return str(p) if p.exists() else None
 
 
-_APP_DISPLAY_NAME = "Quodeq"
+_APP_DISPLAY_NAME = "quodeq"
 
 
 def _set_macos_app_identity() -> None:
