@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
-import NavBreadcrumb from './features/explorer/components/NavBreadcrumb.jsx';
+import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
 import ExplorerPage from './features/explorer/components/ExplorerPage.jsx';
 import FileDetailPage from './features/explorer/components/FileDetailPage.jsx';
 import PrincipleDetailPage from './features/explorer/components/PrincipleDetailPage.jsx';
@@ -244,10 +244,10 @@ function MainContent({ activePage, props }) {
 }
 
 /**
- * @param {{ sidebar: JSX.Element, header: JSX.Element|null, breadcrumb: JSX.Element|null, content: JSX.Element }} props
+ * @param {{ sidebar: JSX.Element, header: JSX.Element|null, content: JSX.Element }} props
  * @returns {JSX.Element}
  */
-function AppShell({ sidebar, header, breadcrumb, content }) {
+function AppShell({ sidebar, header, content }) {
   return (
     <div className={`app-shell${header ? ' app-shell--with-topbar' : ''}`}>
       {header && <div className="app-shell__topbar">{header}</div>}
@@ -255,7 +255,6 @@ function AppShell({ sidebar, header, breadcrumb, content }) {
         {sidebar}
         <div className="app-shell__main-column">
           <main className="dashboard">
-            {breadcrumb}
             {content}
           </main>
         </div>
@@ -372,9 +371,18 @@ export default function App() {
           evaluating={state.evalLifecycle?.job?.status === 'running'}
           onProviderClick={() => navTab('settings')}
           onMenuToggle={() => setSidebarPinned((v) => !v)}
+          breadcrumb={
+            <NavBreadcrumb
+              stack={navStack}
+              onBack={navPop}
+              onGoTo={navGoTo}
+            />
+          }
+          mobileTitle={navStack.length ? navLabelFor(navStack[navStack.length - 1]) : (activeTab || '')}
+          canGoBack={navStack.length > 1}
+          onBack={navPop}
         />
       }
-      breadcrumb={navStack.length > 1 ? <NavBreadcrumb stack={navStack} onBack={navPop} onGoTo={navGoTo} /> : null}
       content={<div className="tab-fade" key={activeTab}><MainContent activePage={activePage} props={contentProps} /></div>}
     />
   );

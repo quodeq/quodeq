@@ -1,8 +1,11 @@
 /**
  * TopBar — global app header sitting above the page content.
  *
- * Layout (left → right):
- *   [ breadcrumb `project / activeTab` ]           [ live pill | model pill | ⌘K | Report | + Evaluate ]
+ * Desktop layout (left → right):
+ *   [ breadcrumb (projectName / page / …) ]        [ provider pill | Report | + Evaluate ]
+ *
+ * Mobile layout (left → right):
+ *   [ ‹ back ]  [ current page title ]                                          [ burger ]
  *
  * Stateless; the parent passes the data it has.
  */
@@ -11,28 +14,20 @@ function Dot({ ok }) {
   return <span className={`topbar-dot ${ok ? 'topbar-dot--ok' : 'topbar-dot--err'}`} aria-hidden="true" />;
 }
 
-const TAB_TITLES = {
-  overview: 'Overview',
-  violations: 'Violations',
-  map: 'Map',
-  history: 'History',
-  evaluate: 'Evaluate',
-  standards: 'Standards',
-  settings: 'Settings',
-  projects: 'Projects',
-  help: 'Help',
-  file: 'File',
-  evalprinciple: 'Principle',
-  finding: 'Finding',
-  explorer: 'Explorer',
-};
-
 function BurgerIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <line x1="3" y1="6" x2="21" y2="6" />
       <line x1="3" y1="12" x2="21" y2="12" />
       <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  );
+}
+
+function BackIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="15 18 9 12 15 6" />
     </svg>
   );
 }
@@ -49,25 +44,32 @@ export default function TopBar({
   evaluating = false,
   onProviderClick,
   onMenuToggle,
+  breadcrumb = null,
+  mobileTitle = '',
+  canGoBack = false,
+  onBack,
 }) {
-  const tabTitle = TAB_TITLES[activeTab] || activeTab || '';
   return (
     <header className="topbar">
-      {onMenuToggle && (
+      {/* Compact-mode back button. Hidden entirely at the root of the
+          nav stack — showing a disabled arrow adds visual noise without
+          giving the user anything to click. */}
+      {canGoBack && (
         <button
           type="button"
-          className="topbar-menu-btn"
-          onClick={onMenuToggle}
-          aria-label="Open menu"
+          className="topbar-back-btn"
+          onClick={onBack}
+          aria-label="Go back"
         >
-          <BurgerIcon />
+          <BackIcon />
         </button>
       )}
-      <div className="topbar-breadcrumb">
-        {projectName && <span className="topbar-breadcrumb-parent">{projectName}</span>}
-        {projectName && tabTitle && <span className="topbar-breadcrumb-sep">/</span>}
-        {tabTitle && <span className="topbar-breadcrumb-current">{tabTitle}</span>}
-      </div>
+
+      {/* Desktop: full breadcrumb chain. Mobile: just the current page title. */}
+      {breadcrumb && <div className="topbar-breadcrumb-slot">{breadcrumb}</div>}
+      <div className="topbar-mobile-title" aria-hidden={!mobileTitle}>{mobileTitle}</div>
+
+      <div className="topbar-spacer" />
 
       <div className="topbar-actions">
         {(provider || model) && (
@@ -114,6 +116,18 @@ export default function TopBar({
                 <span>Evaluate</span>
               </>
             )}
+          </button>
+        )}
+
+        {/* Burger is mobile-only and lives on the right. Desktop hides it. */}
+        {onMenuToggle && (
+          <button
+            type="button"
+            className="topbar-menu-btn"
+            onClick={onMenuToggle}
+            aria-label="Open menu"
+          >
+            <BurgerIcon />
           </button>
         )}
       </div>
