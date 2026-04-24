@@ -50,7 +50,11 @@ jobs:
 
       - name: Load Quodeq CI config
         run: |
-          if [[ -f .quodeq/workflow.env ]]; then
+          # Prefer the new root-level path; fall back to the legacy .quodeq/
+          # folder for repos that haven't migrated yet.
+          if [[ -f quodeq.env ]]; then
+            grep -Ev '^(#|$)' quodeq.env >> "$GITHUB_ENV"
+          elif [[ -f .quodeq/workflow.env ]]; then
             grep -Ev '^(#|$)' .quodeq/workflow.env >> "$GITHUB_ENV"
           else
             {
