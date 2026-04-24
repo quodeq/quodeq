@@ -56,25 +56,51 @@ Each finding includes a reason, the offending code, and a fix plan. Results are 
 
 ## Getting Started
 
+### 1. Prerequisites
+
+| OS | Command |
+|---|---|
+| **macOS** | `brew install python node pipx` |
+| **Debian / Ubuntu** | `sudo apt install -y python3.12 python3-pip pipx nodejs npm` |
+| **Fedora / RHEL** | `sudo dnf install -y python3.12 python3-pip pipx nodejs npm` |
+| **Arch** | `sudo pacman -S python python-pipx nodejs npm` |
+
+> **Debian/Ubuntu heads-up:** `nodejs` and `npm` are separate packages. `apt install nodejs` alone is not enough. If you also use the native desktop window (not `--browser`), you'll need `sudo apt install -y python3-gi gir1.2-webkit2-4.1` too — otherwise quodeq will auto-fall-back to opening the dashboard in your default browser.
+
+Minimum versions: Python 3.12+, Node.js 18+, npm 9+.
+
+### 2. Install quodeq
+
 ```bash
-pipx install quodeq    # Install quodeq
-quodeq                 # Launch the dashboard
+pipx install quodeq    # isolated, recommended
+# or: pip install quodeq
 ```
 
-Running `quodeq` opens the dashboard, where you can point to any project and run evaluations from the UI. Also available via `pip install quodeq`.
+### 3. Pick an AI provider
 
-**Requirements:** [Python 3.12+](https://www.python.org/downloads/), [Node.js 18+](https://nodejs.org/) and npm 9+ (for the dashboard UI).
+Quodeq needs an LLM to do the evaluation. You have two options:
 
-Install Node.js + npm from [nodejs.org](https://nodejs.org/) or via your package manager:
-
+**Local, free, private** — [Ollama](https://ollama.com/download) with Gemma 4:
 ```bash
-brew install node                    # macOS — ships node + npm together
-sudo apt install -y nodejs npm       # Debian/Ubuntu — two separate packages
-sudo dnf install -y nodejs npm       # Fedora/RHEL
-pacman -S nodejs npm                 # Arch
+# install ollama from https://ollama.com/download, then:
+ollama pull gemma4-26b-32k
+ollama serve    # runs in the background
 ```
 
-> **Heads-up for Debian/Ubuntu users:** on Ubuntu `nodejs` and `npm` are separate packages. `apt install nodejs` alone is not enough.
+**Cloud, faster** — one of the agentic CLIs (at least one):
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) — `npm install -g @anthropic-ai/claude-code`
+- [Codex CLI](https://developers.openai.com/codex/quickstart) — `npm install -g @openai/codex`
+- [Gemini CLI](https://geminicli.com/docs/get-started/installation/) — `npm install -g @anthropic-ai/gemini-cli`
+
+### 4. Launch the dashboard
+
+```bash
+quodeq
+```
+
+The dashboard opens at `http://127.0.0.1:4173`. Use **Settings → AI Provider** to select the one you installed in step 3, then **Evaluate** to point at a project and start your first scan.
+
+If the native window doesn't show up (common on Linux without GTK), run `quodeq --browser` instead.
 
 ### macOS App (beta)
 

@@ -111,7 +111,14 @@ def _serve_native(
     action_api_process: subprocess.Popen | None,
     stop_children: typing.Callable,
 ) -> None:
-    """Open a PyWebView native window with single-instance support."""
+    """Open a PyWebView native window with single-instance support.
+
+    On Linux, pywebview additionally needs a working GTK+/WebKit2GTK stack
+    (python3-gi, gir1.2-webkit2-4.1) that isn't shipped with the pip wheel.
+    When those bindings are missing we fall back to --browser mode instead
+    of silently dying after spawning a webview subprocess that immediately
+    crashes on import.
+    """
     try:
         import webview  # noqa: F401
     except ImportError:
@@ -119,6 +126,17 @@ def _serve_native(
             "pywebview is not installed. "
             "Try reinstalling with 'pip install --upgrade quodeq' or use --browser."
         )
+
+    if sys.platform.startswith("linux") and not _linux_webview_backend_available():
+        logging.getLogger(__name__).warning(
+            "pywebview's Linux GTK+/WebKit backend is missing — "
+            "falling back to opening the dashboard in your browser. "
+            "Install 'python3-gi' and 'gir1.2-webkit2-4.1' (Debian/Ubuntu) "
+            "or 'python3-gobject' + 'webkit2gtk4.1' (Fedora/Arch) to get the native window.",
+        )
+        webbrowser.open(action_api_url)
+        _serve_blocking(action_api_process, stop_children)
+        return
 
     from quodeq.dashboard._instance import InstanceController
 
@@ -141,12 +159,46 @@ def _serve_native(
     # Pass Flask PID so the webview process can kill it on window close.
     api_pid = str(action_api_process.pid) if action_api_process else ""
 
+    # Route webview stderr to a log file (not DEVNULL) so a platform import
+    # failure or GTK error is actually recoverable from ~/.quodeq/run/.
+    webview_log_path = Path.home() / ".quodeq" / "run" / "webview.log"
+    try:
+        webview_log_path.parent.mkdir(parents=True, exist_ok=True)
+        webview_stderr = webview_log_path.open("a", encoding="utf-8")
+    except OSError:
+        webview_stderr = subprocess.DEVNULL
+
     subprocess.Popen(
         subprocess_cmd("webview", [action_api_url, str(instance.sock_path), api_pid]),
         start_new_session=True,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stderr=webview_stderr,
     )
+
+    # Block on the API process, not the webview. If the webview subprocess
+    # crashes (missing platform bindings, GTK errors, etc.) the API survives
+    # and the user can still reach the dashboard in their browser. Without
+    # this block the whole `quodeq dashboard` command returned immediately
+    # after spawning the detached webview child and the API was torn down.
+    _serve_blocking(action_api_process, stop_children)
+
+
+def _linux_webview_backend_available() -> bool:
+    """Return True if pywebview's GTK backend can actually load on Linux.
+
+    pywebview-on-Linux needs PyGObject + WebKit2GTK; neither is a pip
+    dependency of the `pywebview` wheel. Importing the GTK backend is the
+    only reliable probe — a successful `import webview` only proves the
+    Python package installed, not that its Linux backend is usable.
+    """
+    try:
+        import gi  # type: ignore[import-untyped]
+        gi.require_version("WebKit2", "4.1")
+        from gi.repository import WebKit2  # noqa: F401
+        return True
+    except (ImportError, ValueError):
+        # ValueError: "Namespace WebKit2 not available"
+        return False
 
 
 # Public alias for cross-module use within the dashboard package
