@@ -407,16 +407,33 @@ def _install_about_panel_override() -> None:
         app = NSApplication.sharedApplication()
         main_menu = app.mainMenu()
         if main_menu is None or main_menu.numberOfItems() == 0:
+            print("[quodeq-about] no main menu yet", file=sys.stderr, flush=True)
             return
-        app_menu = main_menu.itemAtIndex_(0).submenu()
-        if app_menu is None or app_menu.numberOfItems() == 0:
+        # Scan every menu + submenu for items whose title contains "About".
+        # pywebview's menu layout isn't strictly [0] = About, and on some
+        # macOS versions the Apple menu is merged/injected out of order.
+        about_items = []
+        for mi in range(main_menu.numberOfItems()):
+            sub = main_menu.itemAtIndex_(mi).submenu()
+            if sub is None:
+                continue
+            for i in range(sub.numberOfItems()):
+                item = sub.itemAtIndex_(i)
+                title = str(item.title() or "")
+                if title.lower().startswith("about"):
+                    about_items.append(item)
+        if not about_items:
+            print("[quodeq-about] no About item found in any submenu",
+                  file=sys.stderr, flush=True)
             return
-        about_item = app_menu.itemAtIndex_(0)  # convention: "About …" is first
         _about_target = _AboutHandler.alloc().init()
-        about_item.setTarget_(_about_target)
-        about_item.setAction_("showAbout:")
-    except (AttributeError, IndexError, ValueError):
-        pass
+        for item in about_items:
+            item.setTarget_(_about_target)
+            item.setAction_("showAbout:")
+        print(f"[quodeq-about] retargeted {len(about_items)} About item(s)",
+              file=sys.stderr, flush=True)
+    except (AttributeError, IndexError, ValueError) as exc:
+        print(f"[quodeq-about] install failed: {exc}", file=sys.stderr, flush=True)
 
 
 def _set_app_icon() -> None:
