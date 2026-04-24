@@ -1,8 +1,9 @@
-import { useMemo, useRef, useEffect, useState, lazy, Suspense } from 'react';
+import { useMemo, lazy, Suspense } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { gradeLabel, scoreColorClass } from '../../../utils/formatters.js';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
+import { useAppScrollParent } from '../../../hooks/useAppScrollParent.js';
 const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
 
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
@@ -14,20 +15,6 @@ import FittedText from '../../../components/FittedText.jsx';
 
 const HIDDEN_STATUSES = new Set(['cancelled', 'failed']);
 const VIRTUALIZE_THRESHOLD = 20;  // use virtuoso lazy-render above this many rows
-
-function findAppScrollParent(el) {
-  if (typeof window === 'undefined' || !el) return null;
-  let node = el.parentElement;
-  while (node && node !== document.body && node !== document.documentElement) {
-    const style = window.getComputedStyle(node);
-    if ((style.overflowY === 'auto' || style.overflowY === 'scroll')
-        && node.scrollHeight > node.clientHeight) {
-      return node;
-    }
-    node = node.parentElement;
-  }
-  return null;
-}
 
 function formatDateParts(dateISO, fallbackLabel) {
   if (!dateISO) return { date: fallbackLabel || '', time: '' };
@@ -166,12 +153,11 @@ function EvaluationRow({ entry, index, selectedRunId, deltas, onRunClick, onDele
 
 function EvaluationsTable({ visible, selectedRunId, deltas, onRunClick, onDeleteRun }) {
   // Reuse the app's existing scroll container — adding a second scrollbar
-  // just for this list would be bad UX. Discover it once on mount.
-  const probeRef = useRef(null);
-  const [scrollParent, setScrollParent] = useState(null);
-  useEffect(() => {
-    setScrollParent(findAppScrollParent(probeRef.current));
-  }, []);
+  // just for this list would be bad UX. `ready` gates the virtuoso render
+  // so it mounts exactly once with the correct scrollParent; without the
+  // gate, users saw a ghost-empty first paint and rows only appeared on
+  // their first scroll interaction.
+  const [probeRef, scrollParent, ready] = useAppScrollParent();
 
   const headerRow = (
     <HistoryRow
@@ -187,7 +173,7 @@ function EvaluationsTable({ visible, selectedRunId, deltas, onRunClick, onDelete
     />
   );
 
-  const useVirtual = visible.length >= VIRTUALIZE_THRESHOLD;
+  const useVirtual = ready && visible.length >= VIRTUALIZE_THRESHOLD;
 
   return (
     <section className="history-evaluations panel">
@@ -197,7 +183,7 @@ function EvaluationsTable({ visible, selectedRunId, deltas, onRunClick, onDelete
       </div>
       <div className="history-table">
         {headerRow}
-        {useVirtual ? (
+        {!ready ? null : useVirtual ? (
           <Virtuoso
             data={visible}
             computeItemKey={(_i, entry) => entry.runId}

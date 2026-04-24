@@ -1,5 +1,6 @@
-import { memo, useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { Virtuoso } from 'react-virtuoso';
+import { useAppScrollParent } from '../../../hooks/useAppScrollParent.js';
 import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
@@ -10,43 +11,11 @@ import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 
-const PAGE_SIZE = 20;
 const VIRTUALIZE_THRESHOLD = 20;     // only virtualize groups this long
 
-/**
- * Walk up from `el` to the nearest ancestor that already scrolls (css
- * overflow-y: auto | scroll + real overflow). That's the app's main scroll
- * container; we reuse it instead of creating a second scrollbar inside
- * the list. Returns null if nothing scrollable is above — Virtuoso then
- * falls back to window scroll via its default behaviour.
- */
-function findAppScrollParent(el) {
-  if (typeof window === 'undefined' || !el) return null;
-  let node = el.parentElement;
-  while (node && node !== document.body && node !== document.documentElement) {
-    const style = window.getComputedStyle(node);
-    if ((style.overflowY === 'auto' || style.overflowY === 'scroll')
-        && node.scrollHeight > node.clientHeight) {
-      return node;
-    }
-    node = node.parentElement;
-  }
-  return null;
-}
-
-function ViolationListSection({ violationsBySeverity, principle, buildViolationPlanText, onDismiss }) {
-  // All virtualized groups on this page share the app's existing scroll
-  // container. Discover it once on mount and hand the element to each
-  // <Virtuoso>, so there's still only one scrollbar on the screen.
-  const probeRef = useRef(null);
-  const [scrollParent, setScrollParent] = useState(null);
-  useEffect(() => {
-    setScrollParent(findAppScrollParent(probeRef.current));
-  }, []);
-
+function ViolationListSection({ violationsBySeverity, principle, buildViolationPlanText, onDismiss, scrollParent }) {
   return (
     <>
-      <span ref={probeRef} aria-hidden="true" style={{ display: 'none' }} />
       {EVAL_SEVERITY_ORDER.map((sev) => {
         const vs = violationsBySeverity[sev];
         if (!vs || vs.length === 0) return null;
@@ -80,8 +49,7 @@ function ViolationListSection({ violationsBySeverity, principle, buildViolationP
   );
 }
 
-function ComplianceListSection({ data }) {
-  const { compliance, principle, scrollParent } = data;
+function ComplianceListSection({ compliance, principle, scrollParent }) {
   if (compliance.length === 0) return null;
   const itemContent = (idx, c) => (
     <ComplianceCard c={c} principle={principle} index={idx} />
@@ -251,7 +219,10 @@ function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) {
 
 const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
   const { principleData, principle, score, grade } = evalPrincipal;
-  const [showAllCompliance, setShowAllCompliance] = useState(false);
+  // Resolve the app's existing scroll container once per page and share it
+  // between both list sections. One scrollbar, no "Show more" pagination —
+  // virtuoso streams the rows lazily on demand.
+  const [probeRef, scrollParent, ready] = useAppScrollParent();
 
   const {
     violations, compliance, violationsBySeverity,
@@ -259,10 +230,9 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
     handleDismiss, filteredViolations, liveSevCounts, displayedBySeverity,
   } = usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss);
 
-  const displayedCompliance = showAllCompliance ? compliance : compliance.slice(0, PAGE_SIZE);
-
   return (
     <>
+      <span ref={probeRef} aria-hidden="true" style={{ display: 'none' }} />
       <PrincipleHeader
         data={{ principle, score: liveScore ?? score, grade: liveGrade ?? grade, violations: filteredViolations, compliance, sevCounts: liveSevCounts }}
         onCopyPlan={() => copyToClipboard(buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData))}
@@ -271,11 +241,22 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
       {filteredViolations.length > 0 && (
         <SeverityFilterPills counts={liveSevCounts} activeFilter={activeSevFilter} onFilterChange={setActiveSevFilter} />
       )}
-      <ViolationListSection violationsBySeverity={displayedBySeverity} principle={principle} buildViolationPlanText={(v) => buildViolationPlanText(v, principle)} onDismiss={handleDismiss} />
-      <ComplianceListSection
-        data={{ compliance, displayedCompliance, principle }}
-        controls={{ hasMore: compliance.length > PAGE_SIZE, showAll: showAllCompliance, setShowAll: setShowAllCompliance }}
-      />
+      {ready && (
+        <>
+          <ViolationListSection
+            violationsBySeverity={displayedBySeverity}
+            principle={principle}
+            buildViolationPlanText={(v) => buildViolationPlanText(v, principle)}
+            onDismiss={handleDismiss}
+            scrollParent={scrollParent}
+          />
+          <ComplianceListSection
+            compliance={compliance}
+            principle={principle}
+            scrollParent={scrollParent}
+          />
+        </>
+      )}
     </>
   );
 });
