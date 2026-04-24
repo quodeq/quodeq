@@ -110,3 +110,18 @@ def get_github_raw_base_url(env: dict[str, str] | None = None) -> str:
 def get_findings_file(env: dict[str, str] | None = None) -> str | None:
     """Return the findings file path from environment, or None."""
     return (env or os.environ).get("FINDINGS_FILE")
+
+
+_DEFAULT_INDEX_DB_PATH = Path.home() / ".quodeq" / "index.db"
+
+
+def get_index_db_path(default: str | None = None, env: dict[str, str] | None = None) -> str:
+    """Return the absolute path to the SQLite run index DB.
+
+    Resolution order: QUODEQ_INDEX_DB_PATH env var, then *default*, then
+    ~/.quodeq/index.db. Always returns a str for downstream Path/sqlite3 use.
+    """
+    environ = env if env is not None else os.environ
+    if "QUODEQ_INDEX_DB_PATH" in environ:
+        return environ["QUODEQ_INDEX_DB_PATH"]
+    return default or str(_DEFAULT_INDEX_DB_PATH)

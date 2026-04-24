@@ -82,7 +82,7 @@ class EvaluationActions(Protocol):
         """Start an asynchronous evaluation job and return job metadata."""
         ...
 
-    def get_evaluation_status(self, job_id: str) -> JobSnapshot | None:
+    def get_evaluation_status(self, job_id: str, reports_dir: str | None = None) -> JobSnapshot | None:
         """Return current status of an evaluation job."""
         ...
 
@@ -90,8 +90,20 @@ class EvaluationActions(Protocol):
         """Cancel a running evaluation job. Return True on success."""
         ...
 
-    def list_evaluations(self) -> list[JobSnapshot]:
-        """Return all evaluation jobs (running, done, failed, cancelled)."""
+    def list_evaluations(
+        self,
+        *,
+        limit: int = 0,
+        reports_dir: str | None = None,
+        states: set[str] | None = None,
+    ) -> list[JobSnapshot]:
+        """Return evaluation jobs. If *states* is given, only jobs whose status
+        is in the set are returned (e.g. {"running", "done"} to hide cancelled/failed)."""
+        ...
+
+    def delete_evaluation(self, job_id: str, reports_dir: str | None = None) -> bool:
+        """Delete a finished evaluation's on-disk artifacts and index row.
+        Refuses to delete a running job (returns False). Returns True on success."""
         ...
 
 

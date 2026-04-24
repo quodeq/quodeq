@@ -277,6 +277,39 @@ class TestCancelEvaluation:
         result = m.cancel_evaluation("j1")
         assert result is True
 
+    def test_cancel_scores_external_jobs_via_get_evaluation_status(self):
+        """External (ext-) cancels must still score completed dimensions.
+
+        Before this refactor, cancel_evaluation used self._jobs.get_job which
+        returns None for ext- ids after Plan B2, so the scoring block was dead
+        for externals. Now it goes through self.get_evaluation_status, which
+        the FilesystemActionProvider overrides to resolve ext- ids via the
+        SQLite index. This test mocks that override pattern on the mixin
+        itself.
+        """
+        m = FsEvaluationMixin()
+        m._jobs = MagicMock()
+        m._jobs.cancel_job.return_value = True
+        # Simulate Plan B2 behavior: JobManager.get_job returns None for ext-.
+        m._jobs.get_job.return_value = None
+        # Simulate the FilesystemActionProvider override: get_evaluation_status
+        # resolves ext- via the index and returns a real snapshot.
+        ext_snapshot = JobSnapshot(
+            job_id="ext-run-42", status="running",
+            output_project="proj-uuid", output_run_id="run-42",
+        )
+        with patch.object(FsEvaluationMixin, "get_evaluation_status", return_value=ext_snapshot), \
+             patch("quodeq.services.evaluation_mixin._score_completed_evidence") as mock_score:
+            result = m.cancel_evaluation("ext-run-42", reports_dir="/reports")
+        assert result is True
+        mock_score.assert_called_once()
+        # Scoring was passed the snapshot's project/run ids, proving it came
+        # from get_evaluation_status (not the dead get_job path).
+        call_args = mock_score.call_args
+        assert call_args.args[0] == "/reports"
+        assert call_args.args[1]["outputProject"] == "proj-uuid"
+        assert call_args.args[1]["outputRunId"] == "run-42"
+
 
 class TestScoreFailedEvaluation:
     def test_returns_false_for_running_job(self):

@@ -1,0 +1,117 @@
+/* ─ Dimension Gauge Card ───────────────────────────────────────────────
+   Terminal-styled large card with a circular score gauge. Used by the
+   Quality Dimensions grid on both the accumulated and run overviews. */
+
+.dim-gauge-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+.dim-gauge-card:hover,
+.dim-gauge-card:focus-visible {
+  border-color: var(--color-accent);
+}
+
+/* corner brackets — match other terminal cards */
+.dim-gauge-card::before,
+.dim-gauge-card::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: var(--color-border-strong, var(--color-border));
+  border-style: solid;
+  border-width: 0;
+  pointer-events: none;
+}
+.dim-gauge-card::before { top: 6px;    left: 6px;  border-top-width: 1px;    border-left-width: 1px; }
+.dim-gauge-card::after  { bottom: 6px; right: 6px; border-bottom-width: 1px; border-right-width: 1px; }
+
+/* header row: name + trend */
+.dim-gauge-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1);
+  flex-wrap: nowrap;
+}
+.dim-gauge-card__name {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dim-gauge-card__head .trend-badge {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  padding: 0;
+  gap: 2px;
+}
+
+/* gauge */
+.dim-gauge-card__gauge {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-2) 0;
+}
+.dim-gauge-card__ring-bg   { stroke: var(--color-border); fill: none; }
+.dim-gauge-card__ring-fill { fill: none; stroke-linecap: round; transition: stroke-dashoffset 300ms ease; }
+.dim-gauge-card__score     {
+  font-size: 1.5rem;
+  font-weight: var(--weight-semibold);
+  fill: var(--color-text);
+  dominant-baseline: central;
+  text-anchor: middle;
+}
+.dim-gauge-card__grade {
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  fill: var(--color-text-muted);
+  dominant-baseline: central;
+  text-anchor: middle;
+  text-transform: uppercase;
+}
+
+/* meta + severity */
+.dim-gauge-card__meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+.dim-gauge-card__sev-row {
+  display: flex;
+  gap: var(--space-1);
+  justify-content: center;
+  flex-wrap: wrap;
+  min-height: 1.5em; /* reserve space so layout doesn't jump */
+}
+
+/* stale (carried-over) variant — mutes the frame */
+.dim-gauge-card--stale {
+  opacity: 0.6;
+}
+.dim-gauge-card--stale:hover,
+.dim-gauge-card--stale:focus-visible {
+  opacity: 0.85;
+}
+.dim-gauge-card__stale-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-style: italic;
+  text-align: center;
+}

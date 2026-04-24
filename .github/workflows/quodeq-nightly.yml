@@ -1,0 +1,146 @@
+name: Quodeq Nightly
+
+# Runs an incremental full evaluation on develop each night, building up the
+# quality baseline over time. Skips if develop has no new commits since the
+# last successful nightly run.
+#
+# Requires a self-hosted runner labeled "quodeq" with Ollama running locally.
+
+on:
+  schedule:
+    # 22:01 UTC — corresponds to 00:01 in the maintainer's local timezone (CEST,
+    # UTC+2). Note: GitHub Actions cron is UTC-only with no DST handling, so
+    # after October's DST transition this fires at 23:01 local until next March.
+    - cron: "1 22 * * *"
+
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Run even if no changes since last nightly"
+        type: boolean
+        default: false
+      dimensions:
+        description: "Dimensions (empty = all)"
+        default: ""
+      pool_budget:
+        description: "Pool budget in seconds"
+        default: "600"
+
+jobs:
+  nightly:
+    runs-on: [self-hosted, quodeq]
+
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Load Quodeq CI config
+        run: |
+          # Prefer the new root-level path; fall back to the legacy .quodeq/
+          # folder for repos that haven't migrated yet.
+          if [[ -f quodeq.env ]]; then
+            grep -Ev '^(#|$)' quodeq.env >> "$GITHUB_ENV"
+          elif [[ -f .quodeq/workflow.env ]]; then
+            grep -Ev '^(#|$)' .quodeq/workflow.env >> "$GITHUB_ENV"
+          else
+            {
+              echo "AI_PROVIDER=ollama"
+              echo "AI_MODEL=gemma4-26b-32k:latest"
+              echo "EVAL_DIR=$HOME/.quodeq/evaluations"
+            } >> "$GITHUB_ENV"
+          fi
+
+      - name: Expand EVAL_DIR (~ → $HOME)
+        run: |
+          DIR="${EVAL_DIR:-$HOME/.quodeq/evaluations}"
+          DIR="${DIR/#\~/$HOME}"
+          mkdir -p "$DIR"
+          echo "EVAL_DIR=$DIR" >> "$GITHUB_ENV"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install quodeq
+        run: uv sync
+
+      - name: Check for changes since last nightly
+        id: changes
+        run: |
+          # Per-runner SHA marker kept outside EVAL_DIR so it can't accidentally
+          # pollute the evaluations tree. Lives under .quodeq-ci/ in the runner work dir.
+          mkdir -p .quodeq-ci
+          LAST_SHA_FILE=".quodeq-ci/.last-nightly-sha"
+          CURRENT_SHA=$(git rev-parse HEAD)
+          FORCE="${{ github.event.inputs.force }}"
+          if [[ "$FORCE" != "true" && -f "$LAST_SHA_FILE" ]] && [[ "$(cat "$LAST_SHA_FILE")" == "$CURRENT_SHA" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "No changes since last nightly ($CURRENT_SHA), skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Running nightly for $CURRENT_SHA"
+          fi
+
+      - name: Run evaluation
+        if: steps.changes.outputs.skip != 'true'
+        id: eval
+        run: |
+          START=$(date +%s)
+          # Precedence: workflow_dispatch input > NIGHTLY_DIMENSIONS from quodeq.env > all
+          DIMS="${{ github.event.inputs.dimensions }}"
+          DIMS="${DIMS:-$NIGHTLY_DIMENSIONS}"
+          BUDGET="${{ github.event.inputs.pool_budget }}"
+          BUDGET="${BUDGET:-600}"
+          # Use an array so flag values are passed as proper argv entries
+          # (avoids SC2086 word-splitting issues with unquoted $ARGS).
+          ARGS=(evaluate . --incremental
+                --pool-budget "$BUDGET"
+                --max-duration 300
+                --n-subagents "${N_SUBAGENTS:-3}"
+                --output "$EVAL_DIR")
+          if [[ -n "$DIMS" ]]; then
+            ARGS+=(--dimensions "$DIMS")
+          fi
+
+          # Heartbeat: keep GitHub's result-server websocket alive during long
+          # evaluations. Without stdout output, the runner can lose its
+          # connection to GitHub (~30 min) and the job gets killed.
+          (while :; do date -u +"[heartbeat %H:%M:%SZ]"; sleep 30; done) &
+          HEART=$!
+          trap 'kill $HEART 2>/dev/null || true' EXIT
+
+          uv run quodeq "${ARGS[@]}"
+          echo "duration=$(( $(date +%s) - START ))" >> "$GITHUB_OUTPUT"
+
+      - name: Record nightly SHA
+        if: steps.changes.outputs.skip != 'true'
+        run: |
+          git rev-parse HEAD > .quodeq-ci/.last-nightly-sha
+
+      - name: Locate latest run for artifact upload
+        if: steps.changes.outputs.skip != 'true'
+        id: latest_run
+        run: |
+          # EVAL_DIR may contain many projects; upload only the latest run dir
+          # (the one that was just created by this evaluation).
+          LATEST=$(find "$EVAL_DIR" -mindepth 2 -maxdepth 2 -type d -print0 \
+            | xargs -0 stat -f '%m %N' 2>/dev/null \
+            | sort -rn | head -1 | cut -d' ' -f2-)
+          if [[ -z "$LATEST" ]]; then
+            echo "No run directory found" >&2
+            exit 1
+          fi
+          echo "path=$LATEST" >> "$GITHUB_OUTPUT"
+
+      - name: Upload evaluation artifact
+        if: steps.changes.outputs.skip != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: quodeq-nightly-${{ github.sha }}
+          path: ${{ steps.latest_run.outputs.path }}
+          retention-days: 30

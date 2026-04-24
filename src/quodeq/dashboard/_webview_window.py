@@ -7,6 +7,7 @@ import os
 import signal
 import sys
 import threading
+import urllib.parse
 import urllib.request
 import webbrowser
 from pathlib import Path
@@ -51,22 +52,21 @@ class _WindowApi:
         self._base_url = base_url.rstrip('/')
 
     def close(self) -> None:
-        # Show closing overlay immediately so the user sees feedback
+        # Check for running evaluation FIRST. Don't render the closing
+        # overlay yet — it covers the screen and would hide the dialog.
+        job = self._get_running_evaluation() if self._window else None
+        if job and self._window:
+            choice = self._await_close_dialog(job)
+            if choice == 'back':
+                return
+            if choice == 'cancel':
+                self._cancel_evaluation(job.get("jobId") or job.get("job_id"))
+            # Any other value (including 'keep') falls through to the exit path.
+
+        # Show closing overlay (only reached when user actually closes).
         if self._window:
             try:
                 self._window.evaluate_js(CLOSING_OVERLAY_JS)
-            except Exception:
-                pass
-
-        # Check for running evaluation — fast path (0.5s timeout)
-        job = self._get_running_evaluation() if self._window else None
-        if job:
-            try:
-                choice = self._window.evaluate_js(self._build_close_dialog_js(job))
-                if choice == 'back':
-                    return
-                if choice == 'keep':
-                    os._exit(0)  # bypass cleanup — webview event loop would deadlock sys.exit
             except Exception:
                 pass
 
@@ -81,12 +81,65 @@ class _WindowApi:
         t.join(timeout=_CLEANUP_JOIN_TIMEOUT_S)
         os._exit(0)  # bypass cleanup — webview event loop would deadlock sys.exit
 
+    def _await_close_dialog(self, job: dict, timeout_s: float = 300.0) -> str | None:
+        """Render the close dialog and poll a JS global for the user's choice.
+
+        pywebview's evaluate_js does NOT await Promises — it returns None
+        immediately when given Promise-returning JS. That made the existing
+        `choice = evaluate_js(dialog_js)` call return None every time, skip
+        every if-branch, and fall through to os._exit. Instead, stash the
+        Promise result on a global and poll until it's set.
+        """
+        if not self._window:
+            return None
+        try:
+            self._window.evaluate_js(
+                "window._qd_close_result = null; "
+                "(" + self._build_close_dialog_js(job) + ")"
+                ".then(function(r){ window._qd_close_result = r; });"
+            )
+        except Exception:
+            return None
+        import time as _time  # noqa: PLC0415
+        deadline = _time.monotonic() + timeout_s
+        while _time.monotonic() < deadline:
+            try:
+                result = self._window.evaluate_js("window._qd_close_result")
+            except Exception:
+                result = None
+            if result:
+                return str(result)
+            _time.sleep(0.1)
+        return None
+
+    def _cancel_evaluation(self, job_id: str | None) -> None:
+        """Issue DELETE /api/evaluations/<job_id> to stop a running scan.
+
+        The API enforces an Origin header to reject cross-site requests; a
+        missing header returns 403 which silently fails this call, so we
+        set Origin explicitly to self._base_url.
+        """
+        if not job_id or not self._base_url:
+            return
+        try:
+            req = urllib.request.Request(
+                f"{self._base_url}/api/evaluations/{urllib.parse.quote(job_id)}",
+                method="DELETE",
+                headers={"Origin": self._base_url},
+            )
+            # Give the API enough time to SIGTERM the scan and respond —
+            # the 0.5s used for the eval-check poll is too tight here.
+            with urllib.request.urlopen(req, timeout=5.0):
+                pass
+        except Exception:
+            pass
+
     def _get_running_evaluation(self) -> dict | None:
         """Return the first running evaluation job, or None."""
+        if not self._base_url:
+            return None
         try:
-            url = self._window.get_current_url().split("#")[0].rstrip("/")
-            base = url.rsplit("/", 1)[0] if "/" in url.lstrip("http") else url
-            req = urllib.request.Request(f"{base}/api/evaluations")
+            req = urllib.request.Request(f"{self._base_url}/api/evaluations")
             with urllib.request.urlopen(req, timeout=_EVAL_CHECK_TIMEOUT_S) as resp:
                 jobs = json.loads(resp.read())
                 for j in (jobs if isinstance(jobs, list) else []):
@@ -122,7 +175,7 @@ class _WindowApi:
                     + '<h3 style="margin:0 0 12px;font-size:1rem">Evaluation in progress</h3>'
                     + '<div style="margin:0 0 16px;padding:10px 14px;background:var(--color-surface-alt,#161b22);border-radius:{_BUTTON_BORDER_RADIUS};font-size:{_DIALOG_FONT_SIZE};line-height:1.6;color:var(--color-text-muted,#8b949e)">{info_html}</div>'
                     + '<div style="display:flex;flex-direction:column;gap:8px">'
-                    + '<button id="_qd_close_keep" style="padding:{_BUTTON_PADDING};border:1px solid var(--color-border,#333);border-radius:{_BUTTON_BORDER_RADIUS};background:var(--color-surface-alt,#161b22);color:var(--color-text,#e6edf3);cursor:pointer;font-size:{_BUTTON_FONT_SIZE}">Close window (evaluation continues in background)</button>'
+                    + '<button id="_qd_close_keep" style="padding:{_BUTTON_PADDING};border:1px solid var(--color-border,#333);border-radius:{_BUTTON_BORDER_RADIUS};background:var(--color-surface-alt,#161b22);color:var(--color-text,#e6edf3);cursor:pointer;font-size:{_BUTTON_FONT_SIZE};line-height:1.5">Close window<br><span style="opacity:0.7;font-size:0.85em">evaluation continues in background</span></button>'
                     + '<button id="_qd_close_cancel" style="padding:{_BUTTON_PADDING};border:1px solid #da3633;border-radius:{_BUTTON_BORDER_RADIUS};background:transparent;color:#f85149;cursor:pointer;font-size:{_BUTTON_FONT_SIZE}">Cancel evaluation and close</button>'
                     + '<button id="_qd_close_back" style="padding:{_BUTTON_PADDING};border:none;border-radius:{_BUTTON_BORDER_RADIUS};background:transparent;color:var(--color-text-muted,#8b949e);cursor:pointer;font-size:{_BUTTON_FONT_SIZE}">Go back</button>'
                     + '</div></div>';
@@ -225,18 +278,206 @@ def _icon_path(ext: str) -> str | None:
     return str(p) if p.exists() else None
 
 
+_APP_DISPLAY_NAME = "quodeq"
+
+
+_macos_app_icon: object | None = None  # cache the NSImage across _set calls
+
+
+def _set_macos_app_identity() -> None:
+    """Set dock icon, menu-bar app name, and About-panel icon on macOS.
+
+    Called both at startup (early) and after pywebview is shown — pywebview
+    spins up its own NSApplication when start() runs, which overrides the
+    early-set icon. Re-applying from the `loaded` event ensures the icon
+    lands on the NSApp instance that actually renders the dock tile.
+
+    The About panel (Apple menu → About quodeq) draws from the bundle info
+    dict, not the runtime icon image, so we also write NSApplicationIcon
+    into the info dict and register a swizzled action on the menu item.
+    """
+    global _macos_app_icon
+    try:
+        from AppKit import NSApplication, NSBundle, NSImage  # type: ignore[import-untyped]
+    except ImportError:
+        return
+    # Patch the bundle name so the menu bar reads "quodeq" instead of "python3".
+    # Runtime mutation of the NSBundle info dict; works as long as NSApp
+    # hasn't cached the name (i.e. before webview.start draws the menu bar).
+    # Repeat calls are harmless.
+    try:
+        info = NSBundle.mainBundle().infoDictionary()
+        if info is not None:
+            info["CFBundleName"] = _APP_DISPLAY_NAME
+            info["CFBundleDisplayName"] = _APP_DISPLAY_NAME
+    except (AttributeError, TypeError):
+        pass
+    path = _icon_path(".icns")
+    if not path:
+        return
+    try:
+        icon = NSImage.alloc().initWithContentsOfFile_(path)
+    except (AttributeError, ValueError):
+        icon = None
+    if not icon:
+        return
+    _macos_app_icon = icon  # keep a live reference for the About-panel override
+    try:
+        NSApplication.sharedApplication().setApplicationIconImage_(icon)
+    except (AttributeError, ValueError):
+        pass
+    # Override the default About panel so it shows our icon + name. The
+    # standard panel reads from Info.plist and ignores setApplicationIconImage_
+    # for non-bundled apps, so we wire a custom action on the first-responder
+    # chain using orderFrontStandardAboutPanelWithOptions_.
+    _install_about_panel_override()
+
+
+_about_target: object | None = None  # keep delegate alive for the menu item's weak ref
+
+
+def _diag_path() -> Path:
+    return Path.home() / ".quodeq" / "run" / "webview_debug.log"
+
+
+try:
+    _diag_path().parent.mkdir(parents=True, exist_ok=True)
+    _diag = _diag_path().open("a", encoding="utf-8")  # noqa: SIM115 — lives for the process
+except OSError:
+    _diag = sys.stderr
+
+_QUODEQ_WEBSITE = "https://quodeq.com"
+_QUODEQ_REPO = "https://github.com/quodeq/quodeq"
+
+
+def _quodeq_version() -> str:
+    try:
+        from importlib.metadata import version  # noqa: PLC0415
+        return version("quodeq")
+    except Exception:  # noqa: BLE001 — metadata may be missing in dev
+        return "dev"
+
+
+def _build_about_credits() -> object | None:
+    """Build a clickable NSAttributedString with website + repo links."""
+    try:
+        from AppKit import (  # type: ignore[import-untyped]
+            NSAttributedString,
+            NSMutableAttributedString,
+            NSURL,
+        )
+        from Foundation import NSRange  # type: ignore[import-untyped]  # noqa: F401
+    except ImportError:
+        return None
+    try:
+        body = NSMutableAttributedString.alloc().init()
+        def _append(text: str, link: str | None = None) -> None:
+            attrs = {}
+            if link:
+                url = NSURL.URLWithString_(link)
+                if url is not None:
+                    attrs = {"NSLink": url}
+            fragment = NSAttributedString.alloc().initWithString_attributes_(text, attrs)
+            body.appendAttributedString_(fragment)
+        _append(_QUODEQ_WEBSITE, _QUODEQ_WEBSITE)
+        _append("\n")
+        _append(_QUODEQ_REPO, _QUODEQ_REPO)
+        return body
+    except (AttributeError, ValueError):
+        return None
+
+
+def _install_about_panel_override() -> None:
+    """Point the Apple-menu 'About …' at a handler that shows a rich panel.
+
+    The app main menu is built lazily by NSApp during the Cocoa run loop.
+    On the first call from the `loaded` event it's typically still nil, so
+    schedule a repeating NSTimer that retries until the About item exists
+    (or we give up after ~5s).
+    """
+    global _about_target
+    try:
+        from AppKit import NSApplication, NSObject  # type: ignore[import-untyped]
+        from Foundation import NSTimer  # type: ignore[import-untyped]
+    except ImportError:
+        return
+
+    import datetime as _dt  # noqa: PLC0415
+    version = _quodeq_version()
+    copyright_line = f"© {_dt.date.today().year} quodeq"
+
+    class _AboutHandler(NSObject):
+        def showAbout_(self, sender):  # noqa: ARG002 — ObjC selector signature
+            opts: dict[str, object] = {
+                "ApplicationName": _APP_DISPLAY_NAME,
+                "ApplicationVersion": version,
+                "Version": "",  # hide the "Build" line Apple renders by default
+                "Copyright": copyright_line,
+            }
+            if _macos_app_icon is not None:
+                opts["ApplicationIcon"] = _macos_app_icon
+            credits = _build_about_credits()
+            if credits is not None:
+                opts["Credits"] = credits
+            NSApplication.sharedApplication().orderFrontStandardAboutPanelWithOptions_(opts)
+
+    _about_target = _AboutHandler.alloc().init()
+    state = {"attempts": 0, "timer": None}
+    max_attempts = 25  # ~5 seconds at 200ms
+
+    class _InstallPoller(NSObject):
+        def tryInstall_(self, timer):  # noqa: ARG002
+            state["attempts"] += 1
+            app = NSApplication.sharedApplication()
+            main_menu = app.mainMenu()
+            if main_menu is None or main_menu.numberOfItems() == 0:
+                if state["attempts"] >= max_attempts:
+                    print(f"[quodeq-about] gave up after {state['attempts']} attempts — no main menu",
+                          file=_diag, flush=True)
+                    if state["timer"]:
+                        state["timer"].invalidate()
+                return
+            about_items = []
+            for mi in range(main_menu.numberOfItems()):
+                sub = main_menu.itemAtIndex_(mi).submenu()
+                if sub is None:
+                    continue
+                for i in range(sub.numberOfItems()):
+                    item = sub.itemAtIndex_(i)
+                    title = str(item.title() or "")
+                    if title.lower().startswith("about"):
+                        about_items.append(item)
+            if not about_items:
+                if state["attempts"] >= max_attempts:
+                    print(f"[quodeq-about] gave up — no About item found after {state['attempts']} attempts",
+                          file=_diag, flush=True)
+                    if state["timer"]:
+                        state["timer"].invalidate()
+                return
+            for item in about_items:
+                item.setTarget_(_about_target)
+                item.setAction_("showAbout:")
+            print(f"[quodeq-about] retargeted {len(about_items)} About item(s) on attempt {state['attempts']}",
+                  file=_diag, flush=True)
+            if state["timer"]:
+                state["timer"].invalidate()
+
+    poller = _InstallPoller.alloc().init()
+    # Retain the poller so it isn't GC'd while the timer holds a weak ref
+    state["poller"] = poller
+    try:
+        timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            0.2, poller, "tryInstall:", None, True,
+        )
+        state["timer"] = timer
+    except (AttributeError, ValueError) as exc:
+        print(f"[quodeq-about] NSTimer schedule failed: {exc}", file=_diag, flush=True)
+
+
 def _set_app_icon() -> None:
     """Set the application icon (dock on macOS, taskbar on Windows)."""
     if sys.platform == "darwin":
-        try:
-            from AppKit import NSApplication, NSImage  # type: ignore[import-untyped]
-            path = _icon_path(".icns")
-            if path:
-                icon = NSImage.alloc().initWithContentsOfFile_(path)
-                if icon:
-                    NSApplication.sharedApplication().setApplicationIconImage_(icon)
-        except ImportError:
-            pass
+        _set_macos_app_identity()
     elif sys.platform == "win32":
         try:
             import ctypes
@@ -277,8 +518,37 @@ def main() -> None:
     def _on_loaded() -> None:
         window.show()
         window.evaluate_js(INJECT_JS)
+        # Re-apply the dock icon + bundle name now that pywebview's
+        # NSApplication instance is live. Calling this earlier in main()
+        # targets the pre-pywebview NSApp and gets overridden.
+        if sys.platform == "darwin":
+            _set_macos_app_identity()
+
+    def _on_closing() -> bool:
+        """Intercept native close (Cmd+Q, red button, window manager).
+
+        Runs on pywebview's main thread. If a scan is running, render the
+        close dialog synchronously and branch on the user's choice:
+          - 'back'   → block the native close (return False)
+          - 'keep'   → allow close; scan continues in background
+          - 'cancel' → issue cancel API call, then allow close
+        If no scan is running, allow the close without prompting.
+        """
+        try:
+            job = api._get_running_evaluation()
+        except Exception:
+            job = None
+        if not job:
+            return True
+        choice = api._await_close_dialog(job)
+        if choice == 'back':
+            return False
+        if choice == 'cancel':
+            api._cancel_evaluation(job.get("jobId") or job.get("job_id"))
+        return True
 
     window.events.loaded += _on_loaded
+    window.events.closing += _on_closing
 
     instance.start_listening(on_reload=_on_reload)
 

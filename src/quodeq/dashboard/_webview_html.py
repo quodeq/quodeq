@@ -6,58 +6,38 @@ import sys
 
 _CONTROLS_MAC = """\
 <style>
+  /* Traffic-light dots sit INSIDE the topbar's empty left-padding area
+     (the topbar has padding-left: 96px so its breadcrumb starts clear of
+     the 64px wide sidebar column). No separate strip above the app. */
   .qd-traffic {
     position: fixed;
     top: 0;
     left: 0;
     display: flex;
-    gap: 6px;
+    align-items: center;
+    gap: 8px;
     z-index: 99999;
-    padding: 14px 10px;
+    padding: 0 12px;
+    height: var(--app-header-h, 52px);
     pointer-events: auto;
   }
-  .qd-traffic::after {
-    content: "";
-    position: absolute;
-    top: 0; left: 0;
-    width: 64px; height: 100%;
-    z-index: -1;
-  }
   .qd-dot {
-    width: 11px; height: 11px;
+    width: 12px; height: 12px;
     border-radius: 50%;
     border: none;
     cursor: pointer;
-    transition: background 0.15s, transform 0.15s, opacity 0.15s, box-shadow 0.15s;
+    transition: transform 0.15s, box-shadow 0.15s;
     padding: 0;
-    background: var(--color-text-muted, #484f58);
-    opacity: 0.4;
   }
-  .qd-traffic:hover .qd-dot,
-  body:has(.sidebar:hover) .qd-dot { opacity: 1; }
-  .qd-traffic:hover .qd-dot--close,
-  body:has(.sidebar:hover) .qd-dot--close { background: #ff5f57; }
-  .qd-traffic:hover .qd-dot--minimize,
-  body:has(.sidebar:hover) .qd-dot--minimize { background: #febc2e; }
-  .qd-traffic:hover .qd-dot--maximize,
-  body:has(.sidebar:hover) .qd-dot--maximize { background: #28c840; }
-  .qd-dot:hover { transform: scale(1.25); }
-  .qd-dot--close:hover { box-shadow: 0 0 6px rgba(255, 95, 87, 0.6); }
+  /* Canonical macOS colors — always rendered so users can see the controls
+     without needing to hover. */
+  .qd-dot--close    { background: #ff5f57; }
+  .qd-dot--minimize { background: #febc2e; }
+  .qd-dot--maximize { background: #28c840; }
+  .qd-dot:hover { transform: scale(1.1); }
+  .qd-dot--close:hover    { box-shadow: 0 0 6px rgba(255, 95, 87, 0.6); }
   .qd-dot--minimize:hover { box-shadow: 0 0 6px rgba(254, 188, 46, 0.6); }
   .qd-dot--maximize:hover { box-shadow: 0 0 6px rgba(40, 200, 64, 0.6); }
-  .sidebar { padding-top: 26px !important; }
-  body:has(.qd-traffic:hover) .app-shell {
-    grid-template-columns: var(--sidebar-expanded-width) 1fr;
-  }
-  body:has(.qd-traffic:hover) .sidebar {
-    width: var(--sidebar-expanded-width);
-  }
-  body:has(.qd-traffic:hover) .sidebar-brand-text {
-    opacity: 1;
-  }
-  body:has(.qd-traffic:hover) .sidebar-nav-label {
-    opacity: 1;
-  }
 </style>
 <div class="qd-traffic">
   <button class="qd-dot qd-dot--close" title="Close" onclick="pywebview.api.close()"></button>

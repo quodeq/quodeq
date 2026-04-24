@@ -1,17 +1,15 @@
 import { useMemo, lazy, Suspense } from 'react';
-import DimensionViolationsRow from './DimensionViolationsRow.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import DimensionCardsGrid from './DimensionCardsGrid.jsx';
-import { formatRunId, scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
-import { sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
+import { formatRunId, gradeLetter, complianceRatio, extDisplayName } from '../../../utils/formatters.js';
 import { collapseByDay, collectDayDimensions } from '../../../utils/dailyGrouping.js';
 const RunHistoryPanel = lazy(() => import('./RunHistoryPanel.jsx'));
 import DimensionScorePanel from './DimensionScorePanel.jsx';
-import ScoreCircle from '../../../components/ScoreCircle.jsx';
+import TopFindings from './TopFindings.jsx';
+import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 
-const HERO_SCORE_CIRCLE_SIZE = 120;
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
-import { filterTrendByVisibleStandardsDaily, filterAccumulatedByVisibleStandards } from '../../../utils/scoreFiltering.js';
+import { filterTrendByVisibleStandards, filterTrendByVisibleStandardsDaily, filterAccumulatedByVisibleStandards } from '../../../utils/scoreFiltering.js';
 import CopyButton, { FileTextIcon } from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildOverviewReport } from '../../../utils/reportBuilder.js';
@@ -22,18 +20,17 @@ import { buildOverviewReport } from '../../../utils/reportBuilder.js';
 
 function computeAccumulatedStats(accumulated, accumulatedDimensions, dailyTrend, selectedRunId) {
   const curr = parseFloat(accumulated?.summary?.numericAverage);
-  // Derive delta from the selected run vs its predecessor in the trend
   let scoreDelta = null;
   if (dailyTrend && dailyTrend.length >= 2) {
     const selectedIdx = selectedRunId ? dailyTrend.findIndex((t) => t.runId === selectedRunId) : 0;
     const idx = selectedIdx >= 0 ? selectedIdx : 0;
     const current = parseFloat(dailyTrend[idx]?.numericAverage);
     const previous = idx + 1 < dailyTrend.length ? parseFloat(dailyTrend[idx + 1]?.numericAverage) : NaN;
-    if (!isNaN(current) && !isNaN(previous)) scoreDelta = (current - previous).toFixed(1);
+    if (!Number.isNaN(current) && !Number.isNaN(previous)) scoreDelta = (current - previous).toFixed(1);
   }
   if (scoreDelta === null) {
     const prev = parseFloat(accumulated?.summary?.previousNumericAverage);
-    scoreDelta = (isNaN(curr) || isNaN(prev)) ? null : (curr - prev).toFixed(1);
+    scoreDelta = (Number.isNaN(curr) || Number.isNaN(prev)) ? null : (curr - prev).toFixed(1);
   }
 
   const withDates = accumulatedDimensions
@@ -44,109 +41,106 @@ function computeAccumulatedStats(accumulated, accumulatedDimensions, dailyTrend,
     ? { date: null, runId: null }
     : { date: withDates[0].dateLabel || formatRunId(withDates[0].runId), runId: withDates[0].runId };
 
-  const dimsWithViolations = sortDimensionsByViolationSeverity(accumulatedDimensions);
   const sorted = [...accumulatedDimensions].sort((a, b) => a.dimension.localeCompare(b.dimension));
 
-  return { scoreDelta, lastRun, dimsWithViolations, sorted };
+  return { scoreDelta, lastRun, sorted };
 }
 
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function SeverityTags({ severity }) {
+function SeverityBadgeRow({ severity }) {
+  const sev = severity || {};
+  if (!(sev.critical || sev.major || sev.minor)) return null;
   return (
-    <div className="acc-eval-tags">
-      {(severity?.critical || 0) > 0 && <span className="severity-tag critical">{severity.critical} critical</span>}
-      {(severity?.major || 0) > 0 && <span className="severity-tag major">{severity.major} major</span>}
-      {(severity?.minor || 0) > 0 && <span className="severity-tag minor">{severity.minor} minor</span>}
-    </div>
+    <span className="acc-eval-sev-row">
+      {sev.critical > 0 && <SevBadge level="critical" count={sev.critical} format="count-abbr" />}
+      {sev.major > 0    && <SevBadge level="major"    count={sev.major}    format="count-abbr" />}
+      {sev.minor > 0    && <SevBadge level="minor"    count={sev.minor}    format="count-abbr" />}
+    </span>
   );
 }
 
-function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulatedDimensions, projectName }) {
+const MAX_LANGS_IN_SUB = 5;
+
+function buildLanguageSub(projectInfo) {
+  const stats = projectInfo?.languageStats;
+  if (!stats) return null;
+  const sorted = Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, MAX_LANGS_IN_SUB);
+  if (sorted.length === 0) return null;
+  return sorted
+    .map(([lang, count]) => `${count} ${extDisplayName(lang).toLowerCase()}`)
+    .join('  ');
+}
+
+function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulatedDimensions, projectName, projectInfo }) {
   const summary = accumulated?.summary;
+  const scoreNum = parseFloat(summary?.numericAverage);
+  const scoreDisplay = isNaN(scoreNum) ? '—' : scoreNum.toFixed(1);
+  const grade = summary?.overallGrade;
+  const violations = summary?.totalViolations || 0;
+  const compliance = summary?.totalCompliance || 0;
+  const totalChecks = violations + compliance;
+  const ratio = complianceRatio(violations, compliance);
+
   return (
-    <section className="acc-eval-panel panel">
-      <div className="acc-eval-top">
-        <span className="acc-eval-label">Accumulated Evaluation</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+    <section className="acc-eval-panel acc-eval-panel--terminal">
+      <div className="acc-eval-panel__top">
+        <TermHeader
+          name="overview"
+          sub={buildLanguageSub(projectInfo) || (lastDate ? `last_evaluated · ${lastDate}` : null)}
+        />
+        <div className="acc-eval-panel__actions">
           <CopyButton
             label="Report"
             className="fix-plan-btn-header"
             icon={<FileTextIcon />}
             onClick={() => copyToClipboard(buildOverviewReport(accumulated, accumulatedDimensions || [], projectName))}
           />
-          {lastDate && <span className="acc-eval-date">Last evaluated {lastDate}</span>}
         </div>
       </div>
-      <div className="acc-eval-golden">
-        <div className="acc-eval-circle-col">
-          <ScoreCircle
-            score={summary?.numericAverage}
-            grade={summary?.overallGrade}
-            size={HERO_SCORE_CIRCLE_SIZE}
-          />
-          {scoreDelta !== null && (
-            <div className="acc-eval-trend">
-              <TrendBadge delta={scoreDelta} showLabel={false} />
-            </div>
-          )}
-        </div>
-        <div className="acc-eval-stats-col">
-          <div className="acc-eval-stats-row">
-            <div className="acc-eval-stat-block">
-              <span className="acc-eval-stat-label">Violations</span>
-              <span className="acc-eval-stat-value">{summary?.totalViolations || 0}</span>
-              <SeverityTags severity={summary?.severity} />
-            </div>
-            <div className="acc-eval-stats-divider" />
-            <div className="acc-eval-stat-block">
-              <span className="acc-eval-stat-label">Ratio</span>
-              <span className="acc-eval-stat-value">
-                {complianceRatio(summary?.totalViolations || 0, summary?.totalCompliance || 0)}
-              </span>
-              <span className="acc-eval-ratio-sublabel">comp / viol</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <StatStrip cards>
+        <Stat
+          label="SCORE"
+          value={scoreDisplay}
+          trailing={scoreDelta !== null ? <TrendBadge delta={scoreDelta} showLabel={false} /> : null}
+          hint={grade ? `grade ${gradeLetter(grade)}` : null}
+        />
+        <Stat
+          label="VIOLATIONS"
+          value={violations}
+          hint={<SeverityBadgeRow severity={summary?.severity} />}
+        />
+        <Stat
+          label="COMPLIANCE"
+          value={compliance}
+          hint={totalChecks > 0 ? `passing / ${totalChecks} checks` : null}
+        />
+        <Stat
+          label="RATIO"
+          value={ratio}
+          hint="compliance : violations"
+        />
+      </StatStrip>
     </section>
   );
 }
 
-function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, dimensionsWithViolations, selectedDayDimNames }) {
+function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, selectedDayDimNames }) {
   return (
-    <>
-      <div className="section-header">
-        <h3 className="section-title">Quality Dimensions</h3>
+    <section className="quality-dimensions" aria-label="Quality dimensions">
+      <div className="quality-dimensions__head">
+        <SectionLabel>quality_dimensions · {sortedDimensions.length}</SectionLabel>
       </div>
       <div className="dimensions-panel">
-        <DimensionCardsGrid sortedDimensions={sortedDimensions} onDimensionClick={onDimensionClick} selectedDayDimNames={selectedDayDimNames} />
+        <DimensionCardsGrid
+          sortedDimensions={sortedDimensions}
+          onDimensionClick={onDimensionClick}
+          selectedDayDimNames={selectedDayDimNames}
+        />
       </div>
-
-      {dimensionsWithViolations.length > 0 && (
-        <>
-          <div className="section-header">
-            <h3 className="section-title">Violations by Dimension</h3>
-            <span className="section-count">
-              {dimensionsWithViolations.length} dimensions analyzed
-            </span>
-          </div>
-          <section className="panel violations-panel expandable">
-            <div className="dimension-violations-list">
-              {dimensionsWithViolations.map((dim) => (
-                <DimensionViolationsRow
-                  key={dim.dimension}
-                  dimension={dim}
-                  onClick={() => onDimensionClick(dim)}
-                />
-              ))}
-            </div>
-          </section>
-        </>
-      )}
-    </>
+    </section>
   );
 }
 
@@ -181,16 +175,20 @@ function useAccumulatedComputations(data) {
   const visibleIds = useMemo(() => readVisibleStandardIds(), [accumulatedDimensions]);
   const visibleSet = useMemo(() => new Set(visibleIds), [visibleIds]);
   const filteredDailyTrend = useMemo(() => filterTrendByVisibleStandardsDaily(trend, dailyTrend, visibleSet), [trend, dailyTrend, visibleSet]);
+  // Raw (per-run) filtered trend — needed by the dimension sparklines so they
+  // can show every evaluation where the standard was measured, not only the
+  // daily-collapsed representatives.
+  const filteredTrend = useMemo(() => filterTrendByVisibleStandards(trend, visibleSet), [trend, visibleSet]);
   const filteredDimensions = useMemo(() => accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase())), [accumulatedDimensions, visibleIds]);
   const filteredAccumulated = useMemo(() => filterAccumulatedByVisibleStandards(accumulated, visibleSet, filteredDailyTrend, currentOverviewRun), [accumulated, visibleSet, filteredDailyTrend, currentOverviewRun]);
   const filteredStats = useMemo(() => computeAccumulatedStats(filteredAccumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun), [filteredAccumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun]);
 
-  return { currentOverviewRun, selectedDayDimNames, filteredDailyTrend, filteredDimensions, filteredAccumulated, filteredStats };
+  return { currentOverviewRun, selectedDayDimNames, filteredDailyTrend, filteredTrend, filteredDimensions, filteredAccumulated, filteredStats };
 }
 
 export default function AccumulatedOverviewPanel({ data, callbacks }) {
-  const { onRunClick, onDimensionClick } = callbacks;
-  const { currentOverviewRun, selectedDayDimNames, filteredDailyTrend, filteredDimensions, filteredAccumulated, filteredStats } = useAccumulatedComputations(data);
+  const { onRunClick, onDimensionClick, onNavigate } = callbacks;
+  const { currentOverviewRun, selectedDayDimNames, filteredDailyTrend, filteredTrend, filteredDimensions, filteredAccumulated, filteredStats } = useAccumulatedComputations(data);
 
   return (
     <>
@@ -200,20 +198,35 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
         lastDate={filteredStats.lastRun.date}
         accumulatedDimensions={filteredDimensions}
         projectName={data.selectedProject}
+        projectInfo={data.projectInfo}
       />
 
       <div className="history-panels-row">
         <Suspense fallback={null}>
           <RunHistoryPanel trend={filteredDailyTrend} selectedRunId={currentOverviewRun} onBarClick={onRunClick} />
         </Suspense>
-        <DimensionScorePanel dimensions={filteredDimensions} onBarClick={onDimensionClick} runDate={filteredStats.lastRun.date} runId={filteredStats.lastRun.runId} />
+        <DimensionScorePanel dimensions={filteredDimensions} onBarClick={onDimensionClick} runDate={filteredStats.lastRun.date} runId={filteredStats.lastRun.runId} trend={filteredTrend} />
       </div>
 
       <AccumulatedDimensionsSection
         sortedDimensions={filteredStats.sorted}
         onDimensionClick={onDimensionClick}
-        dimensionsWithViolations={filteredStats.dimsWithViolations}
         selectedDayDimNames={selectedDayDimNames}
+      />
+
+      <TopFindings
+        dimensions={filteredDimensions}
+        onFindingClick={(f) => {
+          if (onNavigate) {
+            onNavigate('finding', {
+              finding: f,
+              dimension: f._dim,
+              principle: f.principle,
+            });
+          } else if (onDimensionClick) {
+            onDimensionClick({ dimension: f._dim, fromRunId: filteredStats.lastRun.runId, fromDateLabel: filteredStats.lastRun.date });
+          }
+        }}
       />
     </>
   );

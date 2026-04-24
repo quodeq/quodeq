@@ -174,9 +174,10 @@ class TestServeNative:
         fake = types.ModuleType("webview")
         return patch.dict("sys.modules", {"webview": fake})
 
+    @patch("quodeq.dashboard._server._linux_webview_backend_available", return_value=True)
     @patch("quodeq.dashboard._server.subprocess.Popen")
     @patch("quodeq.dashboard._server.subprocess_cmd", return_value=["quodeq-webview"])
-    def test_acquires_and_launches(self, mock_cmd, mock_popen):
+    def test_acquires_and_launches(self, mock_cmd, mock_popen, mock_backend):
         from quodeq.dashboard._server import _serve_native
         mock_instance = MagicMock()
         mock_instance.try_acquire.return_value = True
@@ -192,8 +193,9 @@ class TestServeNative:
 
         mock_popen.assert_called_once()
 
+    @patch("quodeq.dashboard._server._linux_webview_backend_available", return_value=True)
     @patch("quodeq.dashboard._server.subprocess.Popen")
-    def test_send_reload_to_existing(self, mock_popen):
+    def test_send_reload_to_existing(self, mock_popen, mock_backend):
         from quodeq.dashboard._server import _serve_native
         mock_instance = MagicMock()
         mock_instance.try_acquire.return_value = False
@@ -216,9 +218,10 @@ class TestServeNative:
             with pytest.raises((RuntimeError, ImportError)):
                 _serve_native("http://localhost:8000", MagicMock(), mock_stop)
 
+    @patch("quodeq.dashboard._server._linux_webview_backend_available", return_value=True)
     @patch("quodeq.dashboard._server.subprocess.Popen")
     @patch("quodeq.dashboard._server.subprocess_cmd", return_value=["quodeq-webview"])
-    def test_reload_fails_opens_new(self, mock_cmd, mock_popen):
+    def test_reload_fails_opens_new(self, mock_cmd, mock_popen, mock_backend):
         from quodeq.dashboard._server import _serve_native
         mock_instance1 = MagicMock()
         mock_instance1.try_acquire.return_value = False
@@ -242,8 +245,9 @@ class TestServeNative:
         mock_instance1.shutdown.assert_called_once()
         mock_popen.assert_called_once()
 
+    @patch("quodeq.dashboard._server._linux_webview_backend_available", return_value=True)
     @patch("quodeq.dashboard._server.subprocess.Popen")
-    def test_reload_fails_second_acquire_fails(self, mock_popen):
+    def test_reload_fails_second_acquire_fails(self, mock_popen, mock_backend):
         """When reload fails and second acquire also fails, stop_children is called."""
         from quodeq.dashboard._server import _serve_native
         mock_instance1 = MagicMock()

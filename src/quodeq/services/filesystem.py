@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 from quodeq.core.types import ProjectEntry, ViolationSummary, to_camel_dict
+from quodeq.core.types.job import JobSnapshot
 from quodeq.services import _fs_clone, _fs_projects, _fs_reports
+from quodeq.services import run_index as _run_index
 from quodeq.services.base import ActionProvider
 from quodeq.services.evaluation_mixin import FsEvaluationMixin
 from quodeq.services.jobs import JobManager
@@ -31,15 +33,211 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
     purely for composition.
     """
 
-    def __init__(self, job_manager: JobManager | None = None, compiled_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        job_manager: JobManager | None = None,
+        compiled_dir: Path | None = None,
+        index_db_path: Path | None = None,
+        reports_root: Path | None = None,
+    ) -> None:
         super().__init__()
-        self._jobs = job_manager or JobManager()
+        self._reports_root = reports_root
+        self._jobs = job_manager or JobManager(reports_root=reports_root)
         self._compiled_dir = compiled_dir
+        self._index_db_path = Path(index_db_path) if index_db_path is not None else None
         self._model_fetchers: dict[str, Callable] = {
             "claude": self._get_claude_models,
         }
         self._project_cache: dict[str, Any] | None = None
         self._project_cache_time: float = 0
+
+    # -- index helpers --------------------------------------------------
+
+    def _open_index(self):
+        """Open (lazily) the index DB. Resolved from init kwarg or env."""
+        if self._index_db_path is None:
+            from quodeq.shared._env import get_index_db_path
+            self._index_db_path = Path(get_index_db_path())
+        return _run_index.open_index(self._index_db_path)
+
+    def list_evaluations(
+        self,
+        limit: int = 0,
+        reports_dir: Path | None = None,
+        states: set[str] | None = None,
+    ) -> list[JobSnapshot]:
+        """Return runs from the SQLite index merged with in-memory JobManager jobs."""
+        if reports_dir is None:
+            from quodeq.shared._env import get_evaluations_dir
+            reports_dir = Path(get_evaluations_dir())
+        else:
+            reports_dir = Path(reports_dir)
+        db = self._open_index()
+        try:
+            _run_index.sync_index(db, reports_dir)
+            rows = _run_index.list_runs(db, limit=0)  # fetch all, merge, then limit
+        finally:
+            db.close()
+        snapshots = [self._run_row_to_snapshot(r) for r in rows]
+        # Merge in-memory dashboard-spawned jobs (JobManager).
+        # Only non-external (internally spawned) jobs override the index; external
+        # heuristics from find_external_runs may be stale and the index wins there.
+        try:
+            internal_jobs = self._jobs.list_jobs(reports_root=None)  # no external heuristic
+        except (AttributeError, TypeError):
+            internal_jobs = []
+        by_id = {s.job_id: s for s in snapshots}
+        for j in internal_jobs:
+            by_id[j.job_id] = j  # internal dashboard-spawned jobs always take priority
+        merged = list(by_id.values())
+        if states:
+            merged = [s for s in merged if s.status in states]
+        merged.sort(key=lambda s: s.started_at or "", reverse=True)
+        return merged[:limit] if limit and limit > 0 else merged
+
+    def delete_evaluation(self, job_id: str, reports_dir: Path | None = None) -> bool:
+        """Delete a run's on-disk dir and index row. Refuses to delete a running job."""
+        import shutil
+
+        snapshot = self.get_evaluation_status(job_id, reports_dir=reports_dir)
+        if snapshot is None:
+            return False
+        if snapshot.status == "running":
+            return False
+        if reports_dir is None:
+            from quodeq.shared._env import get_evaluations_dir
+            reports_dir = Path(get_evaluations_dir())
+        else:
+            reports_dir = Path(reports_dir)
+        # Job IDs of form "ext-<run_uuid>"; run_uuid is also the run directory name.
+        run_uuid = job_id[len("ext-"):] if job_id.startswith("ext-") else job_id
+        # Scan all project dirs for the run directory (runs are nested by project).
+        removed_dir = False
+        if reports_dir.is_dir():
+            for project_dir in reports_dir.iterdir():
+                candidate = project_dir / run_uuid
+                if candidate.is_dir():
+                    shutil.rmtree(candidate, ignore_errors=True)
+                    removed_dir = True
+                    break
+        # Remove from index regardless so stale rows get cleaned up.
+        db = self._open_index()
+        try:
+            _run_index.delete_run(db, job_id)
+        finally:
+            db.close()
+        # Also drop any in-memory JobManager entry.
+        try:
+            if hasattr(self._jobs, "delete"):
+                self._jobs.delete(job_id)
+        except (KeyError, AttributeError):
+            pass
+        return removed_dir
+
+    def get_evaluation_status(self, job_id: str, reports_dir: Path | None = None) -> JobSnapshot | None:
+        """Return a single run's snapshot.
+
+        For internal (non-ext) job_ids, JobManager is the authoritative in-memory
+        store. For ext- job_ids (external/CLI runs), the SQLite index is
+        authoritative — route there directly and run the scoped sync so stale
+        runs get promoted to cancelled on this request.
+        """
+        # Internal job_ids: live dashboard-spawned — JobManager's in-memory state wins.
+        if not job_id.startswith("ext-"):
+            try:
+                internal = self._jobs.get_job(job_id, reports_root=None) if hasattr(self._jobs, "get_job") else None
+            except TypeError:
+                internal = None
+            if internal is not None:
+                return internal
+
+        # ext- job_ids (and any internal ID we didn't find in memory): go to the index.
+        if reports_dir is None:
+            from quodeq.shared._env import get_evaluations_dir
+            reports_dir = Path(get_evaluations_dir())
+        else:
+            reports_dir = Path(reports_dir)
+        db = self._open_index()
+        try:
+            # Scoped sync: only walk the target run_dir if we can resolve it.
+            if job_id.startswith("ext-"):
+                run_id = job_id[len("ext-"):]
+                # Search for this run across all projects (same pattern as legacy code).
+                for project_dir in (reports_dir.iterdir() if reports_dir.is_dir() else []):
+                    candidate = project_dir / run_id
+                    if candidate.is_dir():
+                        _run_index.sync_index_for_run(db, candidate)
+                        break
+                else:
+                    # Fall back to full sync so legacy runs are synthesized too.
+                    _run_index.sync_index(db, reports_dir)
+            else:
+                _run_index.sync_index(db, reports_dir)
+            row = _run_index.get_run(db, job_id)
+        finally:
+            db.close()
+        if row is None:
+            return None
+        return self._run_row_to_snapshot(row)
+
+    @staticmethod
+    def _tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
+        """Return the last *max_lines* lines from run.log. Cheap for normal logs."""
+        log_path = run_dir / "run.log"
+        if not log_path.is_file():
+            return []
+        try:
+            with log_path.open("r", encoding="utf-8", errors="replace") as fp:
+                lines = fp.readlines()
+        except OSError:
+            return []
+        tail = lines[-max_lines:] if len(lines) > max_lines else lines
+        return [line.rstrip("\n") for line in tail]
+
+    @staticmethod
+    def _read_dimensions_from_status(run_dir: Path) -> list[str] | None:
+        """Read the `dimensions` list from status.json, or None if unavailable."""
+        import json as _json  # noqa: PLC0415
+        status_path = run_dir / "status.json"
+        if not status_path.is_file():
+            return None
+        try:
+            data = _json.loads(status_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        dims = data.get("dimensions")
+        return dims if isinstance(dims, list) else None
+
+    def _run_row_to_snapshot(self, row: "_run_index.RunRow") -> JobSnapshot:
+        logs: list[str] = []
+        dimensions: list[str] | None = None
+        if row.run_dir:
+            run_dir_path = Path(row.run_dir)
+            try:
+                logs = self._tail_run_log(run_dir_path)
+            except (OSError, ValueError):
+                logs = []
+            try:
+                dimensions = self._read_dimensions_from_status(run_dir_path)
+            except (OSError, ValueError):
+                dimensions = None
+        return JobSnapshot(
+            job_id=row.job_id,
+            status=row.state,
+            command="",
+            started_at=row.started_at,
+            ended_at=row.finalized_at,
+            exit_code=None,
+            logs=logs,
+            output_project=row.project_uuid,
+            output_run_id=row.run_id,
+            phase=row.phase,
+            current_dimension=row.current_dimension,
+            dimensions=dimensions,
+            error=row.exit_reason,
+            source="external" if row.job_id.startswith("ext-") else "internal",
+            exit_reason=row.exit_reason,
+        )
 
     # -- helpers --------------------------------------------------------
 
@@ -94,3 +292,65 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
 
     def get_violations(self, reports_dir: str, project: str, run_id: str) -> ViolationSummary:
         return _fs_reports.get_violations(reports_dir, project, run_id)
+
+    def _resolve_reports_root(self) -> Path | None:
+        """Return the active reports directory.
+
+        Prefers the per-instance root set at construction time; falls back to
+        the ``QUODEQ_EVALUATIONS_DIR`` environment variable so that the default
+        provider (constructed with no arguments) still resolves paths correctly
+        at runtime.
+        """
+        if self._reports_root is not None:
+            return Path(self._reports_root)
+        try:
+            from quodeq.shared.utils import get_evaluations_dir
+            return Path(get_evaluations_dir())
+        except Exception:
+            return None
+
+    def get_log_run_dir(self, job_id: str) -> Path | None:
+        """Return the run_dir for *job_id*, or None if unknown.
+
+        Handles both internal JobManager ids and 'ext-<run_id>' external ids.
+        """
+        if job_id.startswith("ext-"):
+            run_id = job_id[len("ext-"):]
+            reports_root = self._resolve_reports_root()
+            if reports_root is None or not reports_root.is_dir():
+                return None
+            for project_dir in reports_root.iterdir():
+                if not project_dir.is_dir():
+                    continue
+                candidate = project_dir / run_id
+                if candidate.is_dir():
+                    return candidate
+            return None
+        # Internal: look up job in the store (returns Job with output fields)
+        job = self._jobs._store.get(job_id)
+        if job is None or job.output_project is None or job.output_run_id is None:
+            return None
+        reports_root = self._resolve_reports_root()
+        if reports_root is None:
+            return None
+        return reports_root / job.output_project / job.output_run_id
+
+    def is_job_complete(self, job_id: str) -> bool:
+        """Return True if *job_id* has reached a terminal state."""
+        if job_id.startswith("ext-"):
+            run_dir = self.get_log_run_dir(job_id)
+            if run_dir is None:
+                return False
+            if (run_dir / "scan.json").exists():
+                return True
+            # Stale detection: no scan.json AND no live PID -> treat as complete.
+            from quodeq.services._external_jobs import resolve_external_pid
+            pid_file = run_dir / ".pid"
+            if not pid_file.exists():
+                return True  # no PID file -> stale/crashed -> complete
+            project_uuid = run_dir.parent.name
+            run_id = run_dir.name
+            reports_root = run_dir.parent.parent
+            return resolve_external_pid(project_uuid, run_id, reports_root) is None
+        job = self._jobs._store.get(job_id)
+        return job is not None and job.status in {"done", "failed", "cancelled"}

@@ -1,0 +1,177 @@
+name: Quodeq Review
+
+# Runs a security-focused Quodeq evaluation on PR creation and posts findings
+# as a GitHub pull request review.
+#
+# Requires a self-hosted runner labeled "quodeq" with Ollama running locally.
+
+on:
+  pull_request:
+    types: [opened]
+    branches: [develop, main]
+
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review"
+        required: true
+        type: number
+      dimensions:
+        description: "Dimensions (comma-separated, aliases allowed)"
+        default: "sec"
+      pool_budget:
+        description: "Pool budget in seconds"
+        default: "180"
+      base_ref:
+        description: "Base ref to diff against (for workflow_dispatch)"
+        default: "origin/develop"
+
+# GITHUB_TOKEN permissions — needed to post PR reviews via the GitHub API.
+# Default token is read-only; pull-requests:write enables review creation.
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    # SECURITY: skip PRs opened from forks. Self-hosted runner on a public repo
+    # would otherwise run arbitrary attacker code via a malicious fork PR.
+    # Manual dispatch (workflow_dispatch) always runs.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, quodeq]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Load Quodeq CI config
+        run: |
+          # Prefer the new root-level path; fall back to the legacy .quodeq/
+          # folder for repos that haven't migrated yet.
+          if [[ -f quodeq.env ]]; then
+            grep -Ev '^(#|$)' quodeq.env >> "$GITHUB_ENV"
+          elif [[ -f .quodeq/workflow.env ]]; then
+            grep -Ev '^(#|$)' .quodeq/workflow.env >> "$GITHUB_ENV"
+          else
+            {
+              echo "AI_PROVIDER=ollama"
+              echo "AI_MODEL=gemma4-26b-32k:latest"
+              echo "EVAL_DIR=$HOME/.quodeq/evaluations"
+            } >> "$GITHUB_ENV"
+          fi
+
+      - name: Set up ephemeral PR eval directory
+        run: |
+          # PR evaluations are ephemeral — they write to a runner-temp dir
+          # that vanishes with the job. Diff mode doesn't use the dashboard
+          # store for baselines, so we no longer copy project_index.json.
+          PR_EVAL_DIR="$RUNNER_TEMP/quodeq-pr-eval"
+          rm -rf "$PR_EVAL_DIR"  # guard against leftovers from prior invocations
+          mkdir -p "$PR_EVAL_DIR"
+          echo "PR_EVAL_DIR=$PR_EVAL_DIR" >> "$GITHUB_ENV"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install quodeq
+        run: uv sync
+
+      - name: Determine parameters
+        id: params
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER_INPUT: ${{ github.event.inputs.pr_number }}
+          PR_NUMBER_EVENT: ${{ github.event.pull_request.number }}
+          DIMS_INPUT: ${{ github.event.inputs.dimensions }}
+          POOL_INPUT: ${{ github.event.inputs.pool_budget }}
+          BASE_REF_INPUT: ${{ github.event.inputs.base_ref }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            {
+              echo "pr=$PR_NUMBER_EVENT"
+              echo "dimensions=sec"
+              echo "pool_budget=180"
+              echo "base_ref=origin/$PR_BASE_REF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "pr=$PR_NUMBER_INPUT"
+              echo "dimensions=$DIMS_INPUT"
+              echo "pool_budget=$POOL_INPUT"
+              echo "base_ref=${BASE_REF_INPUT:-origin/develop}"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run evaluation
+        id: eval
+        env:
+          BASE_REF: ${{ steps.params.outputs.base_ref }}
+          DIMS: ${{ steps.params.outputs.dimensions }}
+          POOL_BUDGET: ${{ steps.params.outputs.pool_budget }}
+        run: |
+          START=$(date +%s)
+
+          # Heartbeat: keep GitHub's result-server websocket alive during long
+          # evaluations. Without stdout output, the runner can lose its
+          # connection to GitHub (~30 min) and the job gets killed.
+          (while :; do date -u +"[heartbeat %H:%M:%SZ]"; sleep 30; done) &
+          HEART=$!
+          trap 'kill $HEART 2>/dev/null || true' EXIT
+
+          uv run quodeq evaluate . \
+            --diff-from "$BASE_REF" \
+            --dimensions "$DIMS" \
+            --pool-budget "$POOL_BUDGET" \
+            --max-duration 120 \
+            --n-subagents "${N_SUBAGENTS:-3}" \
+            --output "$PR_EVAL_DIR"
+          echo "duration=$(( $(date +%s) - START ))" >> "$GITHUB_OUTPUT"
+
+      - name: Locate this runs evaluation output
+        id: eval_dir
+        run: |
+          # Diff-mode runs write evidence/ only (no evaluation/). Find the
+          # run dir = parent of the freshly-written evidence/ directory.
+          EVIDENCE_DIR=$(find "$PR_EVAL_DIR" -path "*/evidence" -type d 2>/dev/null | head -1)
+          if [[ -z "$EVIDENCE_DIR" ]]; then
+            echo "No evidence directory produced in $PR_EVAL_DIR" >&2
+            exit 1
+          fi
+          RUN_DIR=$(dirname "$EVIDENCE_DIR")
+          echo "path=$RUN_DIR" >> "$GITHUB_OUTPUT"
+          echo "Run dir: $RUN_DIR"
+
+      - name: Post PR review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVAL_PATH: ${{ steps.eval_dir.outputs.path }}
+          OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          PR_NUM: ${{ steps.params.outputs.pr }}
+          DURATION: ${{ steps.eval.outputs.duration }}
+        run: |
+          # --from-evidence: read violations from evidence JSONL (diff-mode
+          # runs skip the scoring phase, so no scored reports exist).
+          uv run quodeq ci report \
+            --evaluation-dir "$EVAL_PATH" \
+            --from-evidence \
+            --owner "$OWNER" \
+            --repo "$REPO_NAME" \
+            --pr "$PR_NUM" \
+            --duration "$DURATION"
+
+      - name: Upload evaluation artifact
+        if: always() && steps.eval_dir.outputs.path != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: quodeq-review-${{ github.sha }}
+          path: ${{ steps.eval_dir.outputs.path }}
+          retention-days: 14

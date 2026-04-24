@@ -5,9 +5,9 @@ import RunOverviewPanel from './RunOverviewPanel.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 
 function DashboardContent({ runMode, data, focus, callbacks }) {
-  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject } = data;
+  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo } = data;
   const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
-  const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick } = callbacks;
+  const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick, onNavigate } = callbacks;
   if (runMode) {
     return (
       <RunOverviewPanel
@@ -39,10 +39,10 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
       data={{
         accumulated: accumulated ? { ...accumulated, dimensions: accumulatedDimensions } : accumulated,
         accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex,
-        trend: dashboard?.trend || [], selectedRunId, selectedProject,
+        trend: dashboard?.trend || [], selectedRunId, selectedProject, projectInfo,
       }}
       callbacks={{
-        onRunClick: onRunSelect, onDimensionClick: onAccumulatedDimensionClick,
+        onRunClick: onRunSelect, onDimensionClick: onAccumulatedDimensionClick, onNavigate,
       }}
     />
   );
@@ -70,6 +70,7 @@ function useDashboardHandlers(onNavigate, dashboard) {
 
 export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
   const { selectedProject, selectedRun, projects = [], dashboard, accumulated, loading, error, availableRuns = [], dailyRuns, overviewRunIndex = 0 } = data;
+  const projectInfo = projects.find((p) => (p.id || p.name) === selectedProject) || null;
   const { onNavigate, onRunSelect } = callbacks;
   const [focusedDimension, setFocusedDimension] = useState(null);
   const selectedRunId = dashboard?.selectedRun?.runId || selectedRun;
@@ -100,9 +101,9 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       {dashboard && (
         <DashboardContent
           runMode={runMode}
-          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject }}
+          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo }}
           focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
-          callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick }}
+          callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onNavigate }}
         />
       )}
     </div>

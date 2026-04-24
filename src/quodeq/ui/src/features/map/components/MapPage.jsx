@@ -5,6 +5,7 @@ import {
 } from '../viz/index.js';
 import { complianceRatio } from '../../../utils/formatters.js';
 import useMapPageState from './useMapPageState.js';
+import { TermHeader } from '../../../components/terminal/index.js';
 
 function getAppThemeInfo() {
   const attr = document.documentElement.getAttribute('data-theme') || '';
@@ -52,16 +53,22 @@ function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
 
   if (allDimensions.length <= 1) return null;
 
-  const activeCount = selectedDimensions.size === allDimensions.length ? allDimensions.length : selectedDimensions.size;
-  const label = activeCount === allDimensions.length ? 'All dimensions' : `${activeCount} of ${allDimensions.length}`;
+  const isFiltered = selectedDimensions.size !== allDimensions.length;
 
   return (
     <div className="map-filter-wrap" ref={ref}>
-      <button type="button" className="map-pill map-filter-btn" onClick={() => setOpen((v) => !v)}>
+      <button
+        type="button"
+        className={`map-pill map-filter-btn${isFiltered ? ' is-filtered' : ''}`}
+        onClick={() => setOpen((v) => !v)}
+        title={isFiltered ? `${selectedDimensions.size} of ${allDimensions.length} dimensions` : 'All dimensions'}
+        aria-label={isFiltered ? `Dimensions (${selectedDimensions.size} of ${allDimensions.length} active)` : 'Dimensions'}
+      >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
         </svg>
-        {label}
+        Dimensions
+        {isFiltered && <span className="map-filter-btn__dot" aria-hidden="true" />}
       </button>
       {open && (
         <div className="map-filter-dropdown">
@@ -155,20 +162,23 @@ export default function MapPage(props) {
 
   if (state.allDimensions.length === 0) {
     return (
-      <div className="map-page">
-        <div className="page-header"><h2 className="page-title">Map</h2></div>
+      <div className="map-page map-page--terminal">
+        <TermHeader name="map" sub="no evaluation data · run an evaluation to populate" />
         <div className="empty-state"><p>No evaluation data yet. Run an evaluation from the Evaluate tab.</p></div>
       </div>
     );
   }
 
+  const viol = state.currentNode.violations;
+  const ratio = complianceRatio(viol, state.currentNode.compliance);
+
   return (
-    <div className="map-page">
-      <div className="map-header">
-        <h2 className="page-title">Map</h2>
-        <span className="map-total-count">
-          <strong>{state.currentNode.violations}</strong> violation{state.currentNode.violations !== 1 ? 's' : ''} · <strong>{complianceRatio(state.currentNode.violations, state.currentNode.compliance)}</strong> ratio
-        </span>
+    <div className="map-page map-page--terminal">
+      <div className="map-page__top">
+        <TermHeader
+          name="map"
+          sub={`${viol} violation${viol !== 1 ? 's' : ''} · ratio ${ratio}`}
+        />
         <MapControls viewState={state.viewState} galaxyState={state.galaxyState} dimensionState={state.dimensionState} />
       </div>
       <MapVizContainer vizState={state.vizState} treeState={state.treeState} dimensions={state.dimensions} callbacks={state.callbacks} display={state.display} />

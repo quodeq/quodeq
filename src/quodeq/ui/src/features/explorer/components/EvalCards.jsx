@@ -1,8 +1,11 @@
+import { useRef } from 'react';
 import { parseFileRef } from '../../../utils/formatters.js';
 import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
+import SevBadge from '../../../components/terminal/SevBadge.jsx';
+import usePretextHeight from '../../../hooks/usePretextHeight.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
@@ -31,18 +34,43 @@ function RefsLinks({ reqRefs }) {
 }
 
 function ViolationDetail({ item }) {
+  // Measure the wrap-sensitive REASON title and DETAIL paragraph off-DOM via
+  // pretext so heights are stable across resizes and so a future virtualiser
+  // can query them without paint. The measured paragraph is set as
+  // `min-height` on the element to reserve space before layout.
+  const titleRef = useRef(null);
+  const reasonRef = useRef(null);
+  const titleMeasure = usePretextHeight(titleRef, item.title, { lineHeight: 18 });
+  const reasonMeasure = usePretextHeight(reasonRef, item.reason, { lineHeight: 20 });
+
   return (
-    <div className="vlive-detail">
+    <div className="vlive-detail vlive-detail--terminal">
       {(item.title || item.reason || item.findings) && (
         <div className="vlive-detail-section">
           <div className="vlive-detail-section-header">
-            {item.title && <span className="vlive-detail-section-label">Reason</span>}
+            {item.title && <span className="vlive-detail-section-label">REASON</span>}
             <RefsLinks reqRefs={item.reqRefs} />
           </div>
-          {item.title && <p className="vlive-detail-title">{item.title}</p>}
+          {item.title && (
+            <p
+              ref={titleRef}
+              className="vlive-detail-title"
+              style={titleMeasure.height ? { minHeight: titleMeasure.height } : undefined}
+              data-pretext-lines={titleMeasure.lineCount || undefined}
+            >
+              {item.title}
+            </p>
+          )}
           {item.reason && <>
-            <span className="vlive-detail-section-label">Detail</span>
-            <p className="vlive-detail-reason">{item.reason}</p>
+            <span className="vlive-detail-section-label">DETAIL</span>
+            <p
+              ref={reasonRef}
+              className="vlive-detail-reason"
+              style={reasonMeasure.height ? { minHeight: reasonMeasure.height } : undefined}
+              data-pretext-lines={reasonMeasure.lineCount || undefined}
+            >
+              {item.reason}
+            </p>
           </>}
         </div>
       )}
@@ -54,9 +82,12 @@ function ViolationDetail({ item }) {
 export function EvalViolationCard({ v, principle, buildViolationPlanText, index, onDismiss }) {
   const { filename, ref, display } = useFileInfo(v.file, v.line, v.endLine);
   return (
-    <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}>
+    <div
+      className={`vdetail-row vdetail-row--terminal vdetail-row--${v.severity}`}
+      style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}
+    >
       <div className="vdetail-row-main">
-        <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
+        <SevBadge level={v.severity} format="long" />
         <span className="vrow-label">[{v.principle || principle}]</span>
         {filename && <FileCopyBtn display={display} copyText={ref} />}
         <CopyButton
@@ -85,9 +116,12 @@ export function EvalViolationCard({ v, principle, buildViolationPlanText, index,
 export function ComplianceCard({ c, principle, index }) {
   const { filename, ref, display } = useFileInfo(c.file, c.line, c.endLine);
   return (
-    <div className="vdetail-row vdetail-row--compliant" style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}>
+    <div
+      className="vdetail-row vdetail-row--terminal vdetail-row--compliant"
+      style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}
+    >
       <div className="vdetail-row-main">
-        <span className="severity-tag compliance">compliant</span>
+        <span className="term-sev-badge term-sev-badge--compliant">COMPLIANT</span>
         <span className="vrow-label">[{c.principle || principle}]</span>
         {filename && <FileCopyBtn display={display} copyText={ref} />}
       </div>

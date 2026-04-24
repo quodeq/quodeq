@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useStandards } from './hooks/useStandards.js';
 import { useVisibleStandards } from './hooks/useVisibleStandards.js';
-import StandardsList from './components/StandardsList.jsx';
+import StandardsTable from './components/StandardsTable.jsx';
 import StandardEditor from './components/StandardEditor.jsx';
 import ImportModal from './components/ImportModal.jsx';
+import { TermHeader } from '../../components/terminal/index.js';
 
 function useStandardsPageActions(refresh, handleDelete, addVisible, removeVisible) {
   const [view, setView] = useState({ mode: 'list' });
@@ -30,7 +31,7 @@ function StandardsListView({ grouped, loading, error, actions }) {
       {loading ? (
         <div className="standards-loading">Loading standards...</div>
       ) : (
-        <StandardsList grouped={grouped} actions={actions} />
+        <StandardsTable grouped={grouped} actions={actions} />
       )}
     </>
   );
@@ -54,13 +55,17 @@ export default function StandardsPage() {
     return <StandardEditor standardId={view.standardId} isNew={view.mode === 'new'} onBack={handleEditorBack} onSaved={handleSaved} />;
   }
 
+  const activeCount = grouped
+    ? Object.values(grouped).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0)
+    : 0;
+
   return (
-    <div className="standards-page">
-      <div className="standards-page-header">
-        <div>
-          <h1 className="standards-page-title">Standards</h1>
-          <p className="standards-page-subtitle">Manage evaluation standards and quality criteria.</p>
-        </div>
+    <div className="standards-page standards-page--terminal">
+      <div className="standards-page-header standards-page-header--terminal">
+        <TermHeader
+          name="standards"
+          sub={`manage evaluation standards and quality criteria · ${activeCount} active`}
+        />
         <div className="standards-page-header-actions">
           <button type="button" className="btn-secondary" onClick={() => setShowImport(true)}>Import</button>
           <button type="button" className="btn-primary" onClick={handleNewStandard}>+ New Standard</button>

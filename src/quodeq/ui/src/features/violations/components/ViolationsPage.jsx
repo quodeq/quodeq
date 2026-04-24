@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { listDismissedFindings, restoreFinding, restoreAllFindings } from '../../../api/index.js';
 import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../utils/visibleStandards.js';
-import { complianceRatio } from '../../../utils/formatters.js';
+import { readCachedState, writeCachedState, resetCachedScope } from '../../../utils/pageStateCache.js';
 import { buildFileTree, treeNodeToFileObj, HeatGridView } from '../../map/viz/index.js';
 import DimensionHeatGridView from './DimensionHeatGridView.jsx';
 import DismissedSubTab from './DismissedSubTab.jsx';
+import { TermHeader, SevBadge, FlagPill } from '../../../components/terminal/index.js';
 
 const MAX_TREE_DEPTH = 64;
 
@@ -87,7 +88,7 @@ function FileSubTab({ dimensions, onFileClick, currentPath, setCurrentPath }) {
   return (
     <>
       <FileBreadcrumb path={breadcrumb} onNavigate={setCurrentPath} onBack={() => setCurrentPath(findParentPath(fullTree, currentPath))} />
-      <HeatGridView node={currentNode} onDrillDown={setCurrentPath} onFileClick={handleFileClick} onCellClick={handleCellClick} />
+      <HeatGridView node={currentNode} onDrillDown={setCurrentPath} onFileClick={handleFileClick} onCellClick={handleCellClick} variant="flat" />
     </>
   );
 }
@@ -125,11 +126,17 @@ function useDismissedFindings(selectedProject, onRefresh, setRestoreError) {
   return { dismissed, handleRestore, handleRestoreAll };
 }
 
-function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, savedSubTabRef, savedFilePathRef }) {
-  const [activeSubTab, _setActiveSubTab] = useState(savedSubTabRef.current);
-  const setActiveSubTab = (v) => { savedSubTabRef.current = v; _setActiveSubTab(v); };
-  const [fileCurrentPath, _setFileCurrentPath] = useState(savedFilePathRef.current);
-  const setFileCurrentPath = (v) => { savedFilePathRef.current = v; _setFileCurrentPath(v); };
+function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, initialSubTab, initialFilePath }) {
+  const [activeSubTab, _setActiveSubTab] = useState(initialSubTab);
+  const setActiveSubTab = (v) => {
+    writeCachedState('violations', selectedProject, { activeSubTab: v });
+    _setActiveSubTab(v);
+  };
+  const [fileCurrentPath, _setFileCurrentPath] = useState(initialFilePath);
+  const setFileCurrentPath = (v) => {
+    writeCachedState('violations', selectedProject, { fileCurrentPath: v });
+    _setFileCurrentPath(v);
+  };
 
   const [restoreError, setRestoreError] = useState(null);
   const { dismissed, handleRestore, handleRestoreAll } = useDismissedFindings(selectedProject, onRefresh, setRestoreError);
@@ -159,41 +166,15 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, 
   };
 }
 
-function ViolationsStatsGrid({ summary, topFilesCount, uniquePrinciples, dimensionCount }) {
+function SevInline({ severity }) {
+  const sev = severity || {};
+  if (!(sev.critical || sev.major || sev.minor)) return null;
   return (
-    <section className="panel violations-stats-panel">
-      <div className="violations-stats-grid">
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Violations</span>
-          <span className="acc-eval-stat-value">{summary.totalViolations || 0}</span>
-          <div className="acc-eval-tags">
-            {(summary.severity?.critical || 0) > 0 && <span className="severity-tag critical">{summary.severity.critical} critical</span>}
-            {(summary.severity?.major || 0) > 0 && <span className="severity-tag major">{summary.severity.major} major</span>}
-            {(summary.severity?.minor || 0) > 0 && <span className="severity-tag minor">{summary.severity.minor} minor</span>}
-          </div>
-        </div>
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Compliance</span>
-          <span className="acc-eval-stat-value">{summary.totalCompliance || 0}</span>
-        </div>
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Ratio</span>
-          <span className="acc-eval-stat-value">{complianceRatio(summary.totalViolations || 0, summary.totalCompliance || 0)}</span>
-        </div>
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Files</span>
-          <span className="acc-eval-stat-value">{topFilesCount}</span>
-        </div>
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Principles</span>
-          <span className="acc-eval-stat-value">{uniquePrinciples}</span>
-        </div>
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Dimensions</span>
-          <span className="acc-eval-stat-value">{dimensionCount}</span>
-        </div>
-      </div>
-    </section>
+    <span className="violations-sev-row">
+      {sev.critical > 0 && <SevBadge level="critical" count={sev.critical} />}
+      {sev.major > 0    && <SevBadge level="major" count={sev.major} />}
+      {sev.minor > 0    && <SevBadge level="minor" count={sev.minor} />}
+    </span>
   );
 }
 
@@ -214,16 +195,23 @@ function ViolationsSubTabContent(props) {
 }
 
 export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
-  const savedSubTabRef = useRef('dimension');
-  const savedFilePathRef = useRef('');
-  const lastViolationsTabKeyRef = useRef(null);
-
-  const isFreshTabClick = lastViolationsTabKeyRef.current !== null && tabKey !== lastViolationsTabKeyRef.current;
-  lastViolationsTabKeyRef.current = tabKey;
-  if (isFreshTabClick) savedFilePathRef.current = '';
-
   const { accumulatedDimensions, selectedProject } = data;
   const { onRefresh } = callbacks;
+
+  // Fresh tab click (tabKey changed) drops the cached navigation state so
+  // the user lands at the default sub-tab / root path. Round-tripping
+  // through a file detail does NOT change tabKey, so the cache survives
+  // unmount and the page resumes where it was.
+  const lastTabKeyRef = useRef(tabKey);
+  if (lastTabKeyRef.current !== tabKey) {
+    resetCachedScope('violations', selectedProject);
+    lastTabKeyRef.current = tabKey;
+  }
+
+  const cached = readCachedState('violations', selectedProject, {
+    activeSubTab: 'dimension',
+    fileCurrentPath: '',
+  });
 
   useEffect(() => {
     onRefresh?.();
@@ -234,26 +222,39 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
     handleRestore, handleRestoreAll, restoreError, visibleDimensions,
     summary, topFilesCount, uniquePrinciples,
     fileCurrentPath, setFileCurrentPath,
-  } = useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, savedSubTabRef, savedFilePathRef });
+  } = useViolationsData({
+    accumulatedDimensions,
+    selectedProject,
+    onRefresh,
+    initialSubTab: cached.activeSubTab,
+    initialFilePath: cached.fileCurrentPath,
+  });
+
+  const total = summary.totalViolations || 0;
+  const subParts = [
+    `${total} total`,
+    `${visibleDimensions.length} dim${visibleDimensions.length !== 1 ? 's' : ''}`,
+    `${uniquePrinciples} princ.`,
+    `${topFilesCount} files`,
+  ];
+  const subLine = (
+    <span className="violations-sub">
+      <span className="violations-sub__text">{subParts.join(' · ')}</span>
+      <SevInline severity={summary.severity} />
+    </span>
+  );
 
   return (
-    <div className="violations-page">
+    <div className="violations-page violations-page--terminal">
       {restoreError && <div className="error-banner">{restoreError}</div>}
-      <div className="map-header">
-        <h2 className="page-title">Violations</h2>
-        <div className="map-pill-group">
-          {[
-            { id: 'dimension', label: 'By Dimension' },
-            { id: 'file', label: 'By File' },
-            { id: 'dismissed', label: dismissed.length > 0 ? `Dismissed (${dismissed.length})` : 'Dismissed' },
-          ].map((tab) => (
-            <button key={tab.id} type="button" className={`map-pill${activeSubTab === tab.id ? ' active' : ''}`} onClick={() => setActiveSubTab(tab.id)}>
-              {tab.label}
-            </button>
-          ))}
+      <div className="violations-page__top">
+        <TermHeader name="violations" sub={subLine} />
+        <div className="violations-flag-row">
+          <FlagPill flag="by-dimension" active={activeSubTab === 'dimension'} onClick={() => setActiveSubTab('dimension')} />
+          <FlagPill flag="by-file"      active={activeSubTab === 'file'}      onClick={() => setActiveSubTab('file')} />
+          <FlagPill flag="dismissed"    active={activeSubTab === 'dismissed'} count={dismissed.length || undefined} onClick={() => setActiveSubTab('dismissed')} />
         </div>
       </div>
-      <ViolationsStatsGrid summary={summary} topFilesCount={topFilesCount} uniquePrinciples={uniquePrinciples} dimensionCount={visibleDimensions.length} />
       <ViolationsSubTabContent
         activeSubTab={activeSubTab} visibleDimensions={visibleDimensions} dismissed={dismissed}
         callbacks={callbacks} fileCurrentPath={fileCurrentPath} setFileCurrentPath={setFileCurrentPath}

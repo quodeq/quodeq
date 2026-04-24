@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
+import ConsoleLogViewer from './ConsoleLogViewer.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { CONSOLE_DOT_DISMISSED_KEY } from '../../../constants.js';
@@ -48,7 +49,16 @@ function lastRelevantLog(logs) {
   return null;
 }
 
-function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef, hasEvaluations }) {
+function ExternalRunBadge() {
+  return (
+    <div className="job-meta-item">
+      <span className="job-meta-label">Source</span>
+      <span className="job-meta-value">External</span>
+    </div>
+  );
+}
+
+function ConsolePanel({ job, consoleOpen, setConsoleOpen, hasEvaluations }) {
   const isRunning = job.status === STATUS.RUNNING;
   const isFailed = job.status === STATUS.FAILED;
   const isLost = job.status === STATUS.LOST;
@@ -86,14 +96,19 @@ function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef, hasEvalu
           {showDot && !consoleOpen && <span className="sidebar-nav-dot" style={{ top: DOT_OFFSET_TOP, right: DOT_OFFSET_RIGHT }} />}
         </span>
       </div>
-      {consoleOpen && (
-        <div className="console-output">
-          <pre ref={logViewerRef}>
-            {job.logs?.length ? job.logs.join('\n') : 'Waiting for output\u2026'}
-          </pre>
-        </div>
-      )}
+      {consoleOpen && <ConsoleLogViewer logs={job.logs} />}
     </>
+  );
+}
+
+function StatusChip({ status, exitReason }) {
+  const isStale = status === 'cancelled' && typeof exitReason === 'string' && exitReason.startsWith('stale_');
+  const text = isStale ? 'cancelled (stale)' : status;
+  const className = `job-status-badge ${status}${isStale ? ' job-status-badge--stale' : ''}`;
+  return (
+    <span className={className} title={exitReason ?? ''}>
+      {text}
+    </span>
   );
 }
 
@@ -109,7 +124,7 @@ function JobHeader({ job, onDismiss, onCancel }) {
         {isRunning && <button type="button" className="job-cancel-inline" onClick={onCancel}>Cancel</button>}
         {!isRunning && isDone && <button type="button" className="job-header-view-btn" onClick={() => onDismiss('view')}>View Results</button>}
         {!isRunning && <button type="button" className="job-header-dismiss-btn" onClick={() => onDismiss('close')}>{isDone ? 'Dismiss' : 'Close'}</button>}
-        <span className={`job-status-badge ${job.status}`}>{job.status}</span>
+        <StatusChip status={job.status} exitReason={job.exitReason} />
       </div>
     </div>
   );
@@ -128,6 +143,7 @@ function JobProviderBadge() {
 }
 
 function JobMeta({ job, projectName }) {
+  const isExternal = job.source === 'external';
   return (
     <div className="job-meta">
       {projectName && (
@@ -136,7 +152,7 @@ function JobMeta({ job, projectName }) {
           <span className="job-meta-value">{projectName}</span>
         </div>
       )}
-      <JobProviderBadge />
+      {isExternal ? <ExternalRunBadge /> : <JobProviderBadge />}
       <div className="job-meta-item">
         <span className="job-meta-label">Job ID</span>
         <div className="job-meta-id-row">
@@ -155,12 +171,7 @@ function JobMeta({ job, projectName }) {
 }
 
 export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, onCancel, hasEvaluations }) {
-  const logViewerRef = useRef(null);
   const [consoleOpen, setConsoleOpen] = useState(false);
-
-  useEffect(() => {
-    if (logViewerRef.current) logViewerRef.current.scrollTop = logViewerRef.current.scrollHeight;
-  }, [job?.logs]);
 
   if (!job) return null;
 
@@ -168,7 +179,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
     <div className="panel evaluate-job-panel">
       <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
       <JobMeta job={job} projectName={deriveProjectName(job.repo)} />
-      <ConsolePanel job={job} consoleOpen={consoleOpen} setConsoleOpen={setConsoleOpen} logViewerRef={logViewerRef} hasEvaluations={hasEvaluations} />
+      <ConsolePanel job={job} consoleOpen={consoleOpen} setConsoleOpen={setConsoleOpen} hasEvaluations={hasEvaluations} />
       <LiveViolationsFeed liveViolations={liveViolations} />
     </div>
   );

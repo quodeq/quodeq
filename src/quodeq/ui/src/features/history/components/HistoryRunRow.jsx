@@ -39,7 +39,9 @@ export default function HistoryRunRow({ entry, delta, isSelected, onClick }) {
     runNumericAverage, runOverallGrade,
     numericAverage, overallGrade,
     dimensionDetails,
+    status,
   } = entry;
+  const isInProgress = status === 'in_progress';
   const runScore = parseFloat(runNumericAverage);
   const accScore = parseFloat(numericAverage);
   const dims = dimensionDetails || [];
@@ -47,21 +49,37 @@ export default function HistoryRunRow({ entry, delta, isSelected, onClick }) {
   const accLetter = gradeLabel(overallGrade) || '—';
   const runGradeWord = runOverallGrade ? capitalize(runOverallGrade) : '';
   return (
-    <button type="button" className={`history-row${isSelected ? ' selected' : ''}`} onClick={() => onClick(runId, dateLabel)}>
+    <button
+      type="button"
+      className={`history-row${isSelected ? ' selected' : ''}`}
+      onClick={isInProgress ? undefined : () => onClick(runId, dateLabel)}
+      style={isInProgress ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+      disabled={isInProgress}
+    >
       <div className="history-row-date">
         <span className="history-row-date-main">{formatDate(dateISO) || dateLabel}</span>
-        <span className="history-row-date-time">{formatTime(dateISO)}</span>
+        <span className="history-row-date-time">
+          {isInProgress
+            ? <span style={{ color: 'var(--color-text-subtle)', fontStyle: 'italic' }}>&#8635; Running&hellip;</span>
+            : formatTime(dateISO)
+          }
+        </span>
       </div>
       <div className="history-row-score">
-        <span className="history-row-score-val">{isNaN(runScore) ? '—' : runScore.toFixed(1)}</span>
+        <span className="history-row-score-val">{isInProgress ? '—' : (isNaN(runScore) ? '—' : runScore.toFixed(1))}</span>
       </div>
       <div className="history-row-eval">
         <div className="history-row-eval-grade">
-          <span className={`chip small ${scoreColorClass(runScore)}`}>{runLetter}</span>
-          <span className={`history-row-eval-grade-label ${scoreColorClass(runScore)}-text`}>{runGradeWord}</span>
+          {isInProgress
+            ? <span className="chip small" style={{ background: 'var(--color-surface-alt)', color: 'var(--color-text-subtle)' }}>…</span>
+            : <>
+                <span className={`chip small ${scoreColorClass(runScore)}`}>{runLetter}</span>
+                <span className={`history-row-eval-grade-label ${scoreColorClass(runScore)}-text`}>{runGradeWord}</span>
+              </>
+          }
         </div>
         <div className="history-row-eval-dims">
-          {dims.map((d) => (
+          {!isInProgress && dims.map((d) => (
             <span key={d.dimension} className="history-dim-tag">
               {capitalize(d.dimension)}
               {d.score != null && <span className="history-dim-score">{d.score.toFixed(1)}</span>}
@@ -73,9 +91,14 @@ export default function HistoryRunRow({ entry, delta, isSelected, onClick }) {
       <div className="history-row-acc">
         <span className="history-row-acc-label">Accumulated</span>
         <div className="history-row-acc-line">
-          <span className={`chip small ${scoreColorClass(accScore)}`} style={{ opacity: 0.85 }}>{accLetter}</span>
-          <span className="history-row-acc-score">{isNaN(accScore) ? '—' : accScore.toFixed(1)}</span>
-          <TrendBadge delta={delta} />
+          {isInProgress
+            ? <span style={{ color: 'var(--color-text-subtle)', fontSize: 'var(--text-sm)' }}>In progress</span>
+            : <>
+                <span className={`chip small ${scoreColorClass(accScore)}`} style={{ opacity: 0.85 }}>{accLetter}</span>
+                <span className="history-row-acc-score">{isNaN(accScore) ? '—' : accScore.toFixed(1)}</span>
+                <TrendBadge delta={delta} />
+              </>
+          }
         </div>
       </div>
     </button>

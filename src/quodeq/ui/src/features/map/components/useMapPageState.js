@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { buildFileTree, treeNodeToFileObj } from '../viz/index.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { listStandards } from '../../../api/standards.js';
+import { readCachedState, writeCachedState, resetCachedScope } from '../../../utils/pageStateCache.js';
 
 const MAP_LABELS_KEY = 'quodeq-map-labels';
 const MAP_DARK_KEY = 'quodeq-map-dark';
@@ -43,18 +44,23 @@ function buildBreadcrumbPath(root, path) {
 }
 
 export default function useMapPageState({ data, callbacks, tabKey = 0 }) {
-  const savedMapPathRef = useRef('');
-  // UI defaults for map visualisation mode. These are presentation-layer
-  // defaults only; they do not affect evaluation logic or server behaviour.
-  const savedVizStyleRef = useRef('zoompack');
-  const savedViewModeRef = useRef('health');
-  const savedGalaxyModeRef = useRef('filesystem');
-  const lastTabKeyRef = useRef(null);
+  const selectedProject = data?.projectName || data?.selectedProject || '__map__';
 
-  // Reset only on fresh tab click (tabKey changed), not on back from detail
-  const isFreshTabClick = lastTabKeyRef.current !== null && tabKey !== lastTabKeyRef.current;
-  lastTabKeyRef.current = tabKey;
-  if (isFreshTabClick) savedMapPathRef.current = '';
+  // Fresh tab click drops the cache; round-tripping through a detail view
+  // does not change tabKey, so cached state survives unmount/remount.
+  const lastTabKeyRef = useRef(tabKey);
+  if (lastTabKeyRef.current !== tabKey) {
+    resetCachedScope('map', selectedProject);
+    lastTabKeyRef.current = tabKey;
+  }
+
+  const cached = readCachedState('map', selectedProject, {
+    currentPath: '',
+    vizStyle: 'zoompack',
+    viewMode: 'health',
+    galaxyMode: 'filesystem',
+    selectedDimensionsArr: [],
+  });
 
   // Lock parent to viewport height while map is active.
   // Uses document.querySelector because the .dashboard ancestor is outside
@@ -85,12 +91,12 @@ export default function useMapPageState({ data, callbacks, tabKey = 0 }) {
   }, []);
 
   const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
-  const [viewMode, _setViewMode] = useState(savedViewModeRef.current);
-  const setViewMode = (v) => { savedViewModeRef.current = v; _setViewMode(v); };
-  const [vizStyle, _setVizStyle] = useState(savedVizStyleRef.current);
-  const setVizStyle = (v) => { savedVizStyleRef.current = v; _setVizStyle(v); };
-  const [galaxyMode, _setGalaxyMode] = useState(savedGalaxyModeRef.current);
-  const setGalaxyMode = (v) => { savedGalaxyModeRef.current = v; _setGalaxyMode(v); };
+  const [viewMode, _setViewMode] = useState(cached.viewMode);
+  const setViewMode = (v) => { writeCachedState('map', selectedProject, { viewMode: v }); _setViewMode(v); };
+  const [vizStyle, _setVizStyle] = useState(cached.vizStyle);
+  const setVizStyle = (v) => { writeCachedState('map', selectedProject, { vizStyle: v }); _setVizStyle(v); };
+  const [galaxyMode, _setGalaxyMode] = useState(cached.galaxyMode);
+  const setGalaxyMode = (v) => { writeCachedState('map', selectedProject, { galaxyMode: v }); _setGalaxyMode(v); };
   const [showLabels, _setShowLabels] = useState(() => { try { const v = localStorage.getItem(MAP_LABELS_KEY); return v === null ? true : v === '1'; } catch { return true; } });
   const setShowLabels = (v) => { _setShowLabels(v); try { localStorage.setItem(MAP_LABELS_KEY, v ? '1' : '0'); } catch {} };
   const [darkMode, _setDarkMode] = useState(() => {
@@ -106,8 +112,8 @@ export default function useMapPageState({ data, callbacks, tabKey = 0 }) {
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     return () => obs.disconnect();
   }, []);
-  const [currentPath, _setCurrentPath] = useState(savedMapPathRef.current);
-  const setCurrentPath = (p) => { savedMapPathRef.current = p; _setCurrentPath(p); };
+  const [currentPath, _setCurrentPath] = useState(cached.currentPath);
+  const setCurrentPath = (p) => { writeCachedState('map', selectedProject, { currentPath: p }); _setCurrentPath(p); };
 
   // Animate back to root when tab is re-clicked while already on map
   const prevTabKey = useRef(tabKey);
@@ -130,8 +136,16 @@ export default function useMapPageState({ data, callbacks, tabKey = 0 }) {
     [visibleDimensions]
   );
 
-  // Selected dimensions filter — defaults to all visible
-  const [selectedDimensions, setSelectedDimensions] = useState(() => new Set());
+  // Selected dimensions filter — defaults to all visible. Empty set means
+  // "no filter applied" (show all). Persisted across unmount as an array.
+  const [selectedDimensions, _setSelectedDimensions] = useState(() => new Set(cached.selectedDimensionsArr));
+  const setSelectedDimensions = (updater) => {
+    _setSelectedDimensions((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      writeCachedState('map', selectedProject, { selectedDimensionsArr: Array.from(next) });
+      return next;
+    });
+  };
   const effectiveSelected = useMemo(
     () => selectedDimensions.size === 0 ? new Set(dimensionNames) : selectedDimensions,
     [selectedDimensions, dimensionNames]

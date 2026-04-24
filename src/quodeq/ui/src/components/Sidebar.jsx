@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
-import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, ICON_PROJECTS, ICON_SETTINGS, ICON_STANDARDS, ICON_HELP } from '../constants/navigation.jsx';
+import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, ICON_SETTINGS, ICON_STANDARDS, ICON_HELP } from '../constants/navigation.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey, SETTINGS_DOT_DISMISSED_KEY, EVALUATE_DOT_DISMISSED_KEY } from '../constants.js';
+
+// Folder glyph for the REPOSITORY row — visually distinct from the list-style
+// ICON_PROJECTS so the repo context reads as a folder even on the collapsed rail.
+const ICON_FOLDER = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+  </svg>
+);
 
 const SETUP_POLL_INTERVAL_MS = 2000;
 
@@ -36,7 +44,7 @@ function useSetupStatus(hasEvaluations, storage = localStorage) {
 
 function Logo() {
   return (
-    <svg viewBox="288 209 965 588" role="img" aria-label="Quodeq" width="36" height="36" style={{overflow:'visible'}}>
+    <svg viewBox="288 209 965 588" role="img" aria-label="Quodeq" width="32" height="32" style={{overflow:'visible'}}>
       <defs>
         <filter id="chevron-glow" x="-25%" y="-25%" width="150%" height="150%">
           <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="var(--logo-chevron-hover)" floodOpacity="0.28" />
@@ -57,7 +65,7 @@ function Logo() {
   );
 }
 
-function NavButton({ id, label, icon, activeTab, onNavTab, showDot }) {
+function NavButton({ id, label, icon, activeTab, onNavTab, count, showDot }) {
   return (
     <button
       type="button"
@@ -67,37 +75,162 @@ function NavButton({ id, label, icon, activeTab, onNavTab, showDot }) {
     >
       {icon}
       <span className="sidebar-nav-label">{label}</span>
+      {count != null && <span className="sidebar-nav-count">{count}</span>}
       {showDot && <span className="sidebar-nav-dot" />}
     </button>
   );
 }
 
-export default function Sidebar({ activeTab, onNavTab, hasEvaluations }) {
+function formatLastEval(iso) {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleString(undefined, {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return null;
+  }
+}
+
+export default function Sidebar({
+  activeTab,
+  onNavTab,
+  hasEvaluations,
+  projectInfo = null,
+  version = null,
+  violationsCount = null,
+  historyCount = null,
+  standardsCount = null,
+  lastEvalAt = null,
+  serverConnected = null,
+  /* Controlled pin state — when provided, the parent owns the toggle.
+     Falls back to internal state when the parent doesn't care. */
+  isPinned: controlledPinned,
+  onPinChange,
+  /* Optional mobile-only extras rendered inside the drawer. Desktop still
+     shows these in the TopBar; on mobile the TopBar strips them so the bar
+     stays tidy, and the drawer surfaces them here instead. */
+  mobileExtras = null,
+}) {
   const { needsSettings, readyToEvaluate } = useSetupStatus(hasEvaluations);
+  const [internalPinned, setInternalPinned] = useState(false);
+  const isPinned = controlledPinned != null ? controlledPinned : internalPinned;
+  const setPinned = (next) => {
+    if (onPinChange) onPinChange(next);
+    else setInternalPinned(next);
+  };
+  const repoName = projectInfo?.displayName || projectInfo?.name || projectInfo?.id || null;
+  const branch = projectInfo?.meta?.branch || projectInfo?.branch || null;
+  const repoStatus = projectInfo?.meta?.repoStatus || (branch ? 'clean' : null);
+  const lastEvalStr = formatLastEval(lastEvalAt);
+
+  const handleTogglePin = () => setPinned(!isPinned);
+
+  // Close the mobile drawer after navigating — otherwise the overlay stays
+  // covering the just-navigated-to page.
+  const handleNav = (id) => {
+    onNavTab(id);
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches) {
+      setPinned(false);
+    }
+  };
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-header">
-        <div className="sidebar-brand-icon">
-          <Logo />
+    <>
+      <button
+        type="button"
+        className={`sidebar-scrim${isPinned ? ' sidebar-scrim--visible' : ''}`}
+        aria-label="Close menu"
+        aria-hidden={!isPinned}
+        tabIndex={isPinned ? 0 : -1}
+        onClick={() => setPinned(false)}
+      />
+      <aside className={`sidebar sidebar--expanded${isPinned ? ' sidebar--pinned' : ''}`}>
+        <div className="sidebar-header">
+          <button
+            type="button"
+            className="sidebar-brand-icon sidebar-brand-icon--toggle"
+            onClick={handleTogglePin}
+            aria-label={isPinned ? 'Close menu' : 'Open menu'}
+            aria-expanded={isPinned}
+          >
+            <Logo />
+          </button>
+          <span className="sidebar-brand-text">quodeq</span>
+          {version && <span className="sidebar-version">v{version}</span>}
         </div>
-        <span className="sidebar-brand-text">quodeq</span>
-      </div>
 
-      <nav className="sidebar-nav">
-        <NavButton id="overview" label="Overview" icon={ICON_OVERVIEW} activeTab={activeTab} onNavTab={onNavTab} />
-        <NavButton id="violations" label="Violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={onNavTab} />
-        <NavButton id="map" label="Map" icon={ICON_MAP} activeTab={activeTab} onNavTab={onNavTab} />
-        <NavButton id="history" label="History" icon={ICON_HISTORY} activeTab={activeTab} onNavTab={onNavTab} />
-        <NavButton id="evaluate" label="Evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={(id) => { try { localStorage.setItem(EVALUATE_DOT_DISMISSED_KEY, '1'); } catch {} onNavTab(id); }} showDot={readyToEvaluate} />
-        <NavButton id="standards" label="Standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={onNavTab} />
-        <NavButton id="projects" label="Projects" icon={ICON_PROJECTS} activeTab={activeTab} onNavTab={onNavTab} />
+      <nav className="sidebar-nav sidebar-block">
+        <NavButton
+          id="projects"
+          label={repoName || 'Loading…'}
+          icon={ICON_FOLDER}
+          activeTab={activeTab}
+          onNavTab={handleNav}
+        />
       </nav>
 
-      <div className="sidebar-bottom-nav">
-        <NavButton id="help" label="Help" icon={ICON_HELP} activeTab={activeTab} onNavTab={onNavTab} />
-        <NavButton id="settings" label="Settings" icon={ICON_SETTINGS} activeTab={activeTab} onNavTab={(id) => { try { localStorage.setItem(SETTINGS_DOT_DISMISSED_KEY, '1'); } catch {} onNavTab(id); }} showDot={needsSettings} />
-      </div>
-    </aside>
+        <nav className="sidebar-nav sidebar-block">
+          <NavButton id="overview"   label="overview"   icon={ICON_OVERVIEW}   activeTab={activeTab} onNavTab={handleNav} />
+          <NavButton id="violations" label="violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={handleNav} count={violationsCount} />
+          <NavButton id="map"        label="map"        icon={ICON_MAP}        activeTab={activeTab} onNavTab={handleNav} />
+          <NavButton id="history"    label="history"    icon={ICON_HISTORY}    activeTab={activeTab} onNavTab={handleNav} count={historyCount} />
+        </nav>
+
+        <nav className="sidebar-nav sidebar-block">
+          <NavButton
+            id="evaluate"
+            label="evaluate"
+            icon={ICON_EVALUATE}
+            activeTab={activeTab}
+            onNavTab={(id) => { try { localStorage.setItem(EVALUATE_DOT_DISMISSED_KEY, '1'); } catch {} handleNav(id); }}
+            showDot={readyToEvaluate}
+          />
+          <NavButton id="standards" label="standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={handleNav} count={standardsCount} />
+          <NavButton
+            id="settings"
+            label="settings"
+            icon={ICON_SETTINGS}
+            activeTab={activeTab}
+            onNavTab={(id) => { try { localStorage.setItem(SETTINGS_DOT_DISMISSED_KEY, '1'); } catch {} handleNav(id); }}
+            showDot={needsSettings}
+          />
+        </nav>
+
+        <div className="sidebar-spacer" />
+
+        <div className="sidebar-footer">
+          <div className="sidebar-status">
+            {lastEvalStr && (
+              <div className="sidebar-status-row">
+                <span className="sidebar-status-label">Last eval</span>
+                <span className="sidebar-status-value">{lastEvalStr}</span>
+              </div>
+            )}
+            {serverConnected != null && (
+              <div className="sidebar-status-row">
+                <span className="sidebar-status-label">Server</span>
+                <span className="sidebar-status-value">
+                  <span className={`sidebar-dot ${serverConnected ? 'sidebar-dot--ok' : 'sidebar-dot--err'}`} aria-hidden="true" />
+                  {serverConnected ? 'running' : 'offline'}
+                </span>
+              </div>
+            )}
+            {mobileExtras && (
+              <div className="sidebar-mobile-extras">{mobileExtras}</div>
+            )}
+          </div>
+          <div className="sidebar-nav sidebar-block sidebar-block--flush">
+            <NavButton id="help" label="help" icon={ICON_HELP} activeTab={activeTab} onNavTab={handleNav} />
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 
 const HEALTH_POLL_MS = 10000;
 const LOG_POLL_MS = 2000;
@@ -118,7 +119,7 @@ export default function ServerSection() {
   return (
     <section className="panel settings-section">
       <div className="panel-header">
-        <h2 className="settings-section-title">Server</h2>
+        <SectionLabel marker="▶">Server</SectionLabel>
       </div>
 
       <div className={`server-status ${status === 'online' ? 'server-status--online' : 'server-status--offline'}`}>

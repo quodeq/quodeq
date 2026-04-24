@@ -14,9 +14,9 @@ export function TimeLimitSetting({ state, update }) {
         <span className="settings-description">Max time per dimension. Unlimited runs until all files processed.</span>
       </div>
       <div className="settings-budget-control">
-        <div className="theme-toggle">
-          <button type="button" className={`theme-toggle-btn${unlimited ? ' active' : ''}`} onClick={() => update('pool-budget', '0')} aria-pressed={unlimited}>Unlimited</button>
-          <button type="button" className={`theme-toggle-btn${!unlimited ? ' active' : ''}`} onClick={() => update('pool-budget', String(DEFAULT_POOL_BUDGET))} aria-pressed={!unlimited}>Limited</button>
+        <div className="settings-pill-group">
+          <button type="button" className={`settings-pill${unlimited ? ' settings-pill--active' : ''}`} onClick={() => update('pool-budget', '0')} aria-pressed={unlimited}>Unlimited</button>
+          <button type="button" className={`settings-pill${!unlimited ? ' settings-pill--active' : ''}`} onClick={() => update('pool-budget', String(DEFAULT_POOL_BUDGET))} aria-pressed={!unlimited}>Limited</button>
         </div>
         <input
           type="number"
@@ -44,9 +44,9 @@ export function AdvancedAnalysisSettings({ state, update }) {
           <span className="settings-label">Analysis mode</span>
           <span className="settings-description">Per-dimension gives deeper coverage per quality area</span>
         </div>
-        <div className="theme-toggle">
-          <button type="button" className={`theme-toggle-btn${perDimension ? ' active' : ''}`} onClick={() => update('per-dimension', 'true')}>Per-dimension</button>
-          <button type="button" className={`theme-toggle-btn${!perDimension ? ' active' : ''}`} onClick={() => update('per-dimension', 'false')}>Grouped</button>
+        <div className="settings-pill-group">
+          <button type="button" className={`settings-pill${perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'true')}>Per-dimension</button>
+          <button type="button" className={`settings-pill${!perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'false')}>Grouped</button>
         </div>
       </div>
 
@@ -55,9 +55,9 @@ export function AdvancedAnalysisSettings({ state, update }) {
           <span className="settings-label">Verify findings</span>
           <span className="settings-description">Re-check findings from previous runs against current code</span>
         </div>
-        <div className="theme-toggle">
-          <button type="button" className={`theme-toggle-btn${verify ? ' active' : ''}`} onClick={() => update('verify', 'true')}>On</button>
-          <button type="button" className={`theme-toggle-btn${!verify ? ' active' : ''}`} onClick={() => update('verify', 'false')}>Off</button>
+        <div className="settings-pill-group">
+          <button type="button" className={`settings-pill${verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'true')}>On</button>
+          <button type="button" className={`settings-pill${!verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'false')}>Off</button>
         </div>
       </div>
     </>

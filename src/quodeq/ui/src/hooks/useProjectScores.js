@@ -119,9 +119,13 @@ export function useProjectScores({ selectedProject, selectedRun }) {
   }, [selectedProject, refreshKey]);
 
   const availableRuns = useMemo(() => {
+    // Prefer availableRuns from the scores payload (includes in_progress runs not in trend).
+    // Fall back to deriving from trend entries (which only contain completed runs).
+    const fromPayload = scores?.availableRuns || latestScores?.availableRuns;
+    if (fromPayload && fromPayload.length > 0) return fromPayload;
     const trend = scores?.trend || latestScores?.trend || [];
     if (trend.length === 0) return [];
-    return trend.map((row) => ({ runId: row.runId, dateLabel: row.dateLabel || row.runId }));
+    return trend.map((row) => ({ runId: row.runId, dateLabel: row.dateLabel || row.runId, status: 'complete' }));
   }, [scores, latestScores]);
 
   const refreshTimerRef = useRef(null);

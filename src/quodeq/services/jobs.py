@@ -6,6 +6,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 import json
 import os
+from pathlib import Path
 import threading
 import uuid
 from typing import Any, Callable, Iterable
@@ -16,6 +17,7 @@ import subprocess
 from quodeq.core.types import JobSnapshot
 
 from quodeq.analysis._process import _kill_tree
+from quodeq.shared.run_log import RunLogWriter
 from quodeq.services._job_model import (
     Job,
     JobStore,
@@ -68,12 +70,28 @@ class JobManager:
         spawn_impl: Callable[..., subprocess.Popen] | None = None,
         job_store: JobStore | None = None,
         on_job_complete: Callable[[str, Job], None] | None = None,
+        reports_root: Path | None = None,
     ) -> None:
         self._spawn = spawn_impl or subprocess.Popen
         self._store: JobStore = job_store or create_job_store()
         self._processes: dict[str, Any] = {}
         self._lock = threading.Lock()
         self._on_job_complete = on_job_complete
+        self._reports_root: Path | None = reports_root
+        # _run_log_writers and _pre_marker_buffer are owned exclusively by the
+        # per-job _consume_stream thread started in start_job(). No other code
+        # path may read or mutate these dicts — doing so reintroduces the
+        # use-after-close race that self._lock does not protect against.
+        self._run_log_writers: dict[str, RunLogWriter] = {}
+        self._pre_marker_buffer: dict[str, list[str]] = {}
+
+    def set_reports_root(self, path: Path) -> None:
+        """Update the reports root used to resolve run.log directories.
+
+        Called by ``FilesystemActionProvider.start_evaluation`` to keep
+        ``_reports_root`` consistent with the per-request reports directory.
+        """
+        self._reports_root = path
 
     def start_job(self, cmd: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None) -> JobSnapshot:
         """Spawn a subprocess and return its initial job state."""
@@ -117,8 +135,18 @@ class JobManager:
 
         return job.to_dict()
 
-    def cancel_job(self, job_id: str) -> bool:
-        """Terminate a running job. Return True if cancelled successfully."""
+    def cancel_job(self, job_id: str, reports_root: Path | None = None) -> bool:
+        """Terminate a running job. Return True if cancelled successfully.
+
+        For external jobs (``ext-`` prefix), sends SIGTERM to the process that
+        owns the run.  For internal jobs, kills the tracked subprocess.
+        """
+        if job_id.startswith("ext-") and reports_root is not None:
+            return self._cancel_external(job_id, reports_root)
+        return self._cancel_internal(job_id)
+
+    def _cancel_internal(self, job_id: str) -> bool:
+        """Kill an internal tracked subprocess."""
         with self._lock:
             job = self._store.get(job_id)
             process = self._processes.get(job_id)
@@ -131,6 +159,17 @@ class JobManager:
             _kill_tree(process.pid)
         return True
 
+    def _cancel_external(self, job_id: str, reports_root: Path) -> bool:
+        """Send SIGTERM to an external run's process."""
+        from quodeq.services._external_jobs import cancel_external_run
+        run_id = job_id[len("ext-"):]
+        for project_dir in reports_root.iterdir():
+            if not project_dir.is_dir():
+                continue
+            if (project_dir / run_id).is_dir():
+                return cancel_external_run(project_dir.name, run_id, reports_root)
+        return False
+
     def shutdown(self) -> None:
         """Kill all running job subprocesses. Called on server shutdown."""
         with self._lock:
@@ -141,23 +180,51 @@ class JobManager:
                     pass
             self._processes.clear()
 
-    def get_job(self, job_id: str) -> JobSnapshot | None:
-        """Return the current state of a job, or None if not found."""
+    def get_job(self, job_id: str, reports_root: Path | None = None) -> JobSnapshot | None:
+        """Return the current state of an in-memory job, or None if not found.
+
+        External runs (``ext-`` prefix) are not tracked in-memory — they are
+        served by ``FilesystemActionProvider.get_evaluation_status`` via the
+        SQLite index. Callers that encounter an ``ext-`` id here should route
+        through the provider instead.
+        """
+        if job_id.startswith("ext-"):
+            return None
         with self._lock:
             job = self._store.get(job_id)
             if not job:
                 return None
             return job.to_dict()
 
-    def list_jobs(self, *, limit: int = _DEFAULT_LIST_LIMIT, offset: int = 0) -> list[JobSnapshot]:
-        """Return tracked jobs as frozen snapshots with pagination.
+    def list_jobs(
+        self,
+        *,
+        limit: int = _DEFAULT_LIST_LIMIT,
+        offset: int = 0,
+        reports_root: Path | None = None,
+    ) -> list[JobSnapshot]:
+        """Return tracked in-memory jobs as frozen snapshots with pagination.
 
-        When *limit* is 0 all jobs are returned (no cap).
+        External runs are served via the SQLite index, not JobManager. The
+        ``reports_root`` kwarg is retained for signature compatibility with
+        callers that still pass it; it is deprecated and ignored.
         """
+        if reports_root is not None:
+            import warnings
+            warnings.warn(
+                "JobManager.list_jobs(reports_root=...) is deprecated and ignored. "
+                "External runs are now served via FilesystemActionProvider + the "
+                "SQLite index; pass reports_root=None (or omit the kwarg).",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         with self._lock:
-            all_jobs = [job.to_dict() for job in self._store.list()]
-        page = all_jobs[offset:] if offset else all_jobs
-        return page[:limit] if limit > 0 else page
+            internal = [job.to_dict() for job in self._store.list()]
+        # Preserve existing ordering (newest first).
+        internal.sort(key=lambda s: s.started_at or "", reverse=True)
+        if limit == 0:
+            return internal[offset:]
+        return internal[offset:offset + limit]
 
     @staticmethod
     def _apply_marker(job: Job, line: str) -> None:
@@ -209,17 +276,85 @@ class JobManager:
         if stream is None:
             return
         batch: list[str] = []
+        self._pre_marker_buffer.setdefault(job_id, [])
         try:
-            for line in stream:
-                batch.append(line.rstrip("\n"))
-                if len(batch) >= _CONSUME_BATCH_SIZE:
-                    if not self._flush_batch(job_id, batch):
-                        return
-                    batch.clear()
-        except (IOError, BrokenPipeError) as exc:
-            _logger.warning("Stream read error for job %s: %s", job_id, exc)
-        if batch:
-            self._flush_batch(job_id, batch)
+            try:
+                for line in stream:
+                    stripped = line.rstrip("\n")
+                    batch.append(stripped)
+                    if len(batch) >= _CONSUME_BATCH_SIZE:
+                        if not self._flush_batch(job_id, batch):
+                            return
+                        batch.clear()
+                    # Tee after flush so the marker is already applied to the
+                    # job before we try to resolve run_dir. Skip _cc JSON
+                    # markers — they are structured IPC, not user-facing
+                    # terminal output, and leaking them makes the xterm pane
+                    # in the dashboard noisy.
+                    if not stripped.startswith(_CC_MARKER_PREFIX):
+                        self._tee_run_log(job_id, stripped)
+            except (IOError, BrokenPipeError) as exc:
+                _logger.warning("Stream read error for job %s: %s", job_id, exc)
+            if batch:
+                self._flush_batch(job_id, batch)
+            # Final drain: if the report_path marker arrived in the last batch,
+            # the writer may not have been created yet — try one more time so
+            # buffered pre-marker lines are not lost.
+            self._drain_pre_marker_buffer(job_id)
+        finally:
+            # Always release the writer and buffer, even on unexpected exceptions.
+            writer = self._run_log_writers.pop(job_id, None)
+            if writer is not None:
+                writer.close()
+            self._pre_marker_buffer.pop(job_id, None)
+
+    def _drain_pre_marker_buffer(self, job_id: str) -> None:
+        """Attempt to resolve run_dir and flush any buffered pre-marker lines.
+
+        Called after the final ``_flush_batch`` so that lines buffered before
+        the report_path marker are not lost when the marker arrives in the last
+        batch of the stream.
+        """
+        if self._run_log_writers.get(job_id) is not None:
+            # Writer already open — nothing to drain.
+            return
+        job = self._store.get(job_id)
+        if job and job.output_project and job.output_run_id and self._reports_root is not None:
+            run_dir = self._reports_root / job.output_project / job.output_run_id
+            if run_dir.is_dir():
+                writer = RunLogWriter(run_dir)
+                self._run_log_writers[job_id] = writer
+                for pending in self._pre_marker_buffer.get(job_id, []):
+                    writer.write(pending)
+                self._pre_marker_buffer[job_id] = []
+
+    def _tee_run_log(self, job_id: str, line: str) -> None:
+        """Forward *line* to the job's run.log writer.
+
+        Before the report_path marker arrives, ``run_dir`` is unknown — lines
+        are held in ``self._pre_marker_buffer`` and flushed once the marker
+        resolves the directory.
+
+        Caller invariant: at most one ``_consume_stream`` runs per job_id at a
+        time.  This method is not re-entrant for the same job_id.
+        """
+        writer = self._run_log_writers.get(job_id)
+        if writer is None:
+            # Try to resolve run_dir from the job snapshot now.
+            job = self._store.get(job_id)
+            if job and job.output_project and job.output_run_id and self._reports_root is not None:
+                run_dir = self._reports_root / job.output_project / job.output_run_id
+                if run_dir.is_dir():
+                    writer = RunLogWriter(run_dir)
+                    self._run_log_writers[job_id] = writer
+                    # Flush any buffered pre-marker lines.
+                    for pending in self._pre_marker_buffer.get(job_id, []):
+                        writer.write(pending)
+                    self._pre_marker_buffer[job_id] = []
+            if writer is None:
+                self._pre_marker_buffer.setdefault(job_id, []).append(line)
+                return
+        writer.write(line)
 
     def _evict_completed_jobs(self) -> None:
         """Remove oldest completed/failed/cancelled jobs beyond _MAX_COMPLETED_JOBS."""

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey, DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET } from '../../../constants.js';
+import { confirmDialog } from '../../../utils/confirmDialog.js';
 
 const DIMENSION_POLL_INITIAL_MS = 2000;
 const DIMENSION_POLL_MAX_MS = 8000;
@@ -49,6 +50,23 @@ function handleJobUpdate(updated, refs, setJob, callbacks) {
   const hasOutput = updated.outputProject && updated.outputRunId;
   const isAnalyzing = updated.phase === 'analyzing' || updated.phase === 'scoring' || updated.status !== 'running';
   const canPollDims = hasOutput && isAnalyzing;
+  // Seed partialDimensions on reconnect. When the dashboard is restarted
+  // while a scan is running, the CLI-launched job reports phase=analyzing
+  // but currentDimension is often null (the pipeline-level phase setter
+  // does not know which dimension the worker pool is on right now), so
+  // the block above adds nothing to partialDimensions. Without any
+  // dimensions queued, startDimPolling spins with no work and the Live
+  // Violations panel stays empty. If we're analyzing and know the list
+  // of requested dimensions, seed them all — pollSingleDimension will
+  // remove each one from the set as soon as its status comes back
+  // non-partial.
+  if (isAnalyzing
+      && refs.partialDimensions.size === 0
+      && refs.requestedDimensions.length) {
+    for (const dim of refs.requestedDimensions) {
+      refs.partialDimensions.add(dim);
+    }
+  }
   if (updated.status !== 'running') {
     callbacks.stopPolling();
     if (canPollDims && !refs.dimPollingStarted) {
@@ -222,6 +240,14 @@ function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPoll
 
   async function cancelEvaluationJob(jobId) {
     if (!jobId) return;
+    const ok = await confirmDialog({
+      title: 'Cancel evaluation?',
+      message: 'Stop the running scan. Any findings collected so far will still be saved.',
+      confirmLabel: 'Cancel evaluation',
+      cancelLabel: 'Keep running',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await cancelEvaluation(jobId);
       clearJob();

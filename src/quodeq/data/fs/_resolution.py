@@ -5,6 +5,7 @@ import json
 import logging
 import uuid
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 from quodeq.data.fs._index_io import _MAX_LEGACY_SCAN
@@ -16,8 +17,16 @@ _URL_PREFIXES = ("https://", "git@")
 
 
 def _index_key(identity: ProjectIdentity) -> str:
-    """Return a stable string key for the (name, path[, scope]) tuple."""
-    base = f"{identity.project_name}\x00{identity.repo_path}"
+    """Return a stable string key for the identity.
+
+    When a git remote URL is present, use it as the primary key component so
+    that two clones of the same repo in different local paths resolve to the
+    same key. Otherwise fall back to the absolute local path (legacy behavior).
+    """
+    if identity.remote_url:
+        base = f"{identity.project_name}\x00remote:{identity.remote_url}"
+    else:
+        base = f"{identity.project_name}\x00{identity.repo_path}"
     if identity.scope_path:
         return f"{base}\x00{identity.scope_path}"
     return base
@@ -29,7 +38,7 @@ def _find_existing_project(
     load_fn: Callable[[Path], dict[str, str]],
     save_fn: Callable[[Path, dict[str, str]], None],
 ) -> str | None:
-    """Look up project by (name, path) in the index; fall back to directory scan for
+    """Look up project by identity in the index; fall back to directory scan for
     projects created before the index existed, updating the index on success."""
     key = _index_key(identity)
     index = load_fn(reports_dir)
@@ -38,6 +47,17 @@ def _find_existing_project(
             return index[key]
         del index[key]
         save_fn(reports_dir, index)
+
+    # Legacy path-based key migration: when a remote_url is set, also try the
+    # path-based key that would have been used before remote-URL identity.
+    if identity.remote_url:
+        legacy_identity = replace(identity, remote_url=None)
+        legacy_key = _index_key(legacy_identity)
+        if legacy_key in index and (reports_dir / index[legacy_key]).is_dir():
+            uuid_value = index[legacy_key]
+            index[key] = uuid_value
+            save_fn(reports_dir, index)
+            return uuid_value
 
     scanned = 0
     for entry in reports_dir.iterdir():
@@ -53,7 +73,14 @@ def _find_existing_project(
             info = json.loads(info_file.read_text())
         except (json.JSONDecodeError, OSError):
             continue
-        if info.get("name") == identity.project_name and info.get("path") == identity.repo_path:
+        if info.get("name") != identity.project_name:
+            continue
+        # Prefer remote_url match when both sides have one
+        if identity.remote_url and info.get("remote_url") == identity.remote_url:
+            index[key] = entry.name
+            save_fn(reports_dir, index)
+            return entry.name
+        if info.get("path") == identity.repo_path:
             index[key] = entry.name
             save_fn(reports_dir, index)
             return entry.name
@@ -87,6 +114,8 @@ def _create_project(
     }
     if identity.scope_path:
         info["scopePath"] = identity.scope_path
+    if identity.remote_url:
+        info["remote_url"] = identity.remote_url
     if parent_uuid:
         info["parent"] = parent_uuid
     try:

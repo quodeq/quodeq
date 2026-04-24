@@ -2,7 +2,6 @@
 
 .help-page {
   padding: var(--space-6);
-  max-width: 1040px;
 }
 
 .help-page .page-subtitle {
@@ -63,6 +62,15 @@
   min-width: 0;
 }
 
+/* ── Page header (title + tips) ──────────────────────── */
+
+.help-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-6);
+}
+
 .help-section {
   animation: help-fade-in 250ms ease;
 }
@@ -104,7 +112,7 @@
   color: var(--color-text-muted);
   line-height: 1.7;
   margin: 0 0 var(--space-3);
-  font-size: var(--text-sm);
+  font-size: clamp(0.875rem, 0.4vw + 0.75rem, 1.05rem);
 }
 
 .help-section ul, .help-section ol {
@@ -112,7 +120,7 @@
   line-height: 1.7;
   padding-left: var(--space-5);
   margin: 0 0 var(--space-4);
-  font-size: var(--text-sm);
+  font-size: clamp(0.875rem, 0.4vw + 0.75rem, 1.05rem);
 }
 
 .help-section li {
@@ -134,111 +142,33 @@
   border: 1px solid var(--color-border);
 }
 
-/* ── Callouts ────────────────────────────────────────── */
+/* ── Terminal-style code container (for <pre> blocks in help) ─ */
 
-.help-callout {
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  margin: var(--space-4) 0;
-  font-size: var(--text-sm);
-  line-height: 1.65;
-  color: var(--color-text-muted);
-  border: 1px solid transparent;
-}
-
-.help-callout strong {
-  color: var(--color-text);
-  font-weight: var(--weight-semibold);
-}
-
-.help-callout code {
-  border-color: transparent;
-}
-
-.help-callout-tip {
-  background: color-mix(in srgb, var(--color-grade-a, #28a745) 6%, var(--color-surface-alt));
-  border-color: color-mix(in srgb, var(--color-grade-a, #28a745) 20%, var(--color-border));
-  border-left: 3px solid var(--color-grade-a, #28a745);
-}
-
-.help-callout-warning {
-  background: color-mix(in srgb, #f0883e 6%, var(--color-surface-alt));
-  border-color: color-mix(in srgb, #f0883e 20%, var(--color-border));
-  border-left: 3px solid #f0883e;
-}
-
-.help-callout-info {
-  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface-alt));
-  border-color: color-mix(in srgb, var(--color-accent) 20%, var(--color-border));
-  border-left: 3px solid var(--color-accent);
-}
-
-/* ── Tables ──────────────────────────────────────────── */
-
-.help-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  margin: var(--space-4) 0;
-  font-size: var(--text-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-
-.help-table th {
-  text-align: left;
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-surface-alt);
-  color: var(--color-text-muted);
-  font-weight: var(--weight-semibold);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.help-table td {
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  line-height: 1.5;
-}
-
-.help-table tr:last-child td {
-  border-bottom: none;
-}
-
-.help-table td strong {
-  color: var(--color-text);
-  font-weight: var(--weight-semibold);
-}
-
-/* Severity colors */
-.help-severity-critical { color: var(--color-severity-critical, #f85149); font-weight: var(--weight-semibold); }
-.help-severity-major    { color: var(--color-severity-major, #f0883e); font-weight: var(--weight-semibold); }
-.help-severity-minor    { color: var(--color-severity-minor, #d29922); font-weight: var(--weight-semibold); }
-.help-severity-info     { color: var(--color-severity-info, #58a6ff); font-weight: var(--weight-semibold); }
-
-/* ── Code blocks ─────────────────────────────────────── */
-
-.help-code {
+.help-pre {
   background: var(--color-surface-alt);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
   font-family: var(--font-mono);
-  font-size: 0.8rem;
-  line-height: 1.65;
+  font-size: 0.85rem;
+  line-height: 1.6;
   overflow-x: auto;
-  color: var(--color-text-muted);
+  color: var(--color-text);
   margin: var(--space-4) 0;
   white-space: pre;
 }
 
 /* ── Responsive ──────────────────────────────────────── */
 
-@media (max-width: 720px) {
+@media (max-width: 900px) {
+  .help-header {
+    grid-template-columns: 1fr;
+  }
+
+  .help-header .brand-carousel {
+    display: none;
+  }
+
   .help-layout {
     flex-direction: column;
   }

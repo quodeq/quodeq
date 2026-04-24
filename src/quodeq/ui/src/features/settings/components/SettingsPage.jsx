@@ -1,24 +1,11 @@
 import { useState, useEffect } from 'react';
 import { getHealth, getProviderConfigs } from '../../../api/index.js';
-import SettingsAside from './SettingsAside.jsx';
 import AboutSection from './AboutSection.jsx';
+import AppearanceSection from './AppearanceSection.jsx';
 import ProviderTabs from './ProviderTabs.jsx';
 import ServerSection from './ServerSection.jsx';
 import { SETTINGS_TOAST_SEEN_KEY } from '../../../constants.js';
-
-const MODE_OPTIONS = [
-  { value: 'system',   label: 'System' },
-  { value: 'light',    label: 'Light' },
-  { value: 'dark',     label: 'Dark' },
-];
-
-const FAMILY_OPTIONS = [
-  { value: 'daruma',    label: 'Daruma' },
-  { value: 'neo',       label: 'Neo' },
-  { value: 'ifrit',     label: 'Ifrit' },
-  { value: 'deckard',   label: 'Deckard' },
-  { value: 'galadriel', label: 'Galadriel' },
-];
+import { TermHeader } from '../../../components/terminal/index.js';
 
 const _SETTINGS_PHRASES = [
   'quode with cuore \u2665',
@@ -27,78 +14,6 @@ const _SETTINGS_PHRASES = [
   'navigate your quode to excellence',
   'code quality compass',
 ];
-
-function ThemeSection({ themeMode, themeFamily, onApplyMode, onApplyFamily }) {
-  return (
-    <section className="panel settings-section">
-      <div className="panel-header">
-        <h2 className="settings-section-title">Appearance</h2>
-      </div>
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">Mode</span>
-          <span className="settings-description">Choose light, dark, or follow your system</span>
-        </div>
-        <div className="theme-toggle">
-          {MODE_OPTIONS.map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              className={`theme-toggle-btn${themeMode === value ? ' active' : ''}`}
-              onClick={() => onApplyMode(value)}
-              aria-pressed={themeMode === value}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">Theme</span>
-          <span className="settings-description">Pick a color palette</span>
-        </div>
-        <div className="theme-family-picker">
-          {FAMILY_OPTIONS.map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              className={`theme-family-card${themeFamily === value ? ' active' : ''}`}
-              onClick={() => onApplyFamily(value)}
-              aria-pressed={themeFamily === value}
-            >
-              <span className="theme-family-label">{label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SettingsHeader() {
-  return (
-    <div className="settings-header">
-      <div className="settings-header-content">
-        <div className="settings-header-left">
-          <div className="settings-page-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="settings-title">Settings</h1>
-            <p className="settings-subtitle">Manage your Quodeq preferences</p>
-          </div>
-        </div>
-        <div className="settings-header-center">
-          <SettingsAside />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const TOAST_DISMISS_MS = 8000;
 
@@ -136,18 +51,19 @@ export default function SettingsPage({ theme }) {
   }, []);
 
   return (
-    <div className="settings-page">
-      <SettingsHeader />
+    <div className="settings-page settings-page--terminal">
+      <TermHeader
+        name="settings"
+        sub="manage your quodeq preferences"
+      />
       {showToast && <SettingsToast onDismiss={dismissToast} />}
-      <div className="settings-body settings-body--full">
-        <div className="settings-grid">
-          <ProviderTabs providerConfigs={providerConfigs} />
+      <div className="settings-grid">
+        <ProviderTabs providerConfigs={providerConfigs} />
 
-          <div className="settings-grid-col">
-            <ServerSection />
-            <ThemeSection themeMode={themeMode} themeFamily={themeFamily} onApplyMode={onApplyMode} onApplyFamily={onApplyFamily} />
-            <AboutSection appVersion={appVersion} settingsPhrase={settingsPhrase} />
-          </div>
+        <div className="settings-grid-col">
+          <ServerSection />
+          <AppearanceSection themeMode={themeMode} themeFamily={themeFamily} onApplyMode={onApplyMode} onApplyFamily={onApplyFamily} />
+          <AboutSection appVersion={appVersion} settingsPhrase={settingsPhrase} />
         </div>
       </div>
     </div>

@@ -34,6 +34,9 @@ def test_list_projects_returns_latest_run(tmp_path: Path) -> None:
             "overallGrade": "Adequate",
         },
     )
+    (reports / "proj" / "20260101" / "evidence").mkdir(parents=True, exist_ok=True)
+    (reports / "proj" / "20260101" / "evidence" / "manifest.json").write_text("{}")
+    (reports / "proj" / "20260101" / "scan.json").write_text("{}")
     _write_json(
         reports / "proj" / "20260102" / "evaluation" / "maintainability.json",
         {
@@ -42,6 +45,9 @@ def test_list_projects_returns_latest_run(tmp_path: Path) -> None:
             "overallGrade": "Good",
         },
     )
+    (reports / "proj" / "20260102" / "evidence").mkdir(parents=True, exist_ok=True)
+    (reports / "proj" / "20260102" / "evidence" / "manifest.json").write_text("{}")
+    (reports / "proj" / "20260102" / "scan.json").write_text("{}")
 
     provider = FilesystemActionProvider()
     result = provider.list_projects(str(reports))

@@ -34,7 +34,7 @@ function sortRows(items, sortCol, sortDir) {
   });
 }
 
-export default function HeatGridView({ node, onDrillDown, onFileClick, onCellClick }) {
+export default function HeatGridView({ node, onDrillDown, onFileClick, onCellClick, variant = 'heat' }) {
   const [sortCol, setSortCol] = useState(COL_VIOLATIONS);
   const [sortDir, setSortDir] = useState('desc');
 
@@ -57,9 +57,13 @@ export default function HeatGridView({ node, onDrillDown, onFileClick, onCellCli
     return <p className="empty-state">No data available for this view.</p>;
   }
 
+  const flat = variant === 'flat';
+  const wrapCls = `heat-grid-wrap${flat ? ' heat-grid-wrap--flat' : ''}`;
+  const tableCls = `heat-grid${flat ? ' heat-grid--flat' : ''}`;
+
   return (
-    <div className="heat-grid-wrap">
-      <table className="heat-grid">
+    <div className={wrapCls}>
+      <table className={tableCls}>
         <thead>
           <tr>
             {COLUMNS.map((col) => (
@@ -86,7 +90,7 @@ export default function HeatGridView({ node, onDrillDown, onFileClick, onCellCli
                     {row.isFile ? '' : '\uD83D\uDCC1 '}{row.name}
                   </div>
                 </td>
-                <HeatGridCells row={row} onCellClick={onCellClick} />
+                <HeatGridCells row={row} onCellClick={onCellClick} variant={variant} />
               </tr>
             );
           })}

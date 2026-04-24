@@ -556,11 +556,13 @@
 }
 
 .dimensions-panel {
-  padding: 16px;
   margin-bottom: 28px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--card-bg);
+}
+/* Inside the terminal-style quality_dimensions panel the wrapping panel
+   itself provides the surrounding rhythm; kill the legacy margin so the
+   grid doesn't add extra whitespace to the panel's bottom. */
+.quality-dimensions .dimensions-panel {
+  margin-bottom: 0;
 }
 
 /* ── Dimension cards ──────────────────────────────────── */
@@ -574,7 +576,7 @@
 .dimensions-grid {
   display: grid;
   gap: var(--space-3);
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
 }
 
 .dimension-card {
@@ -2549,34 +2551,17 @@
 /* ── Projects page ─────────────────────────────────────── */
 
 .projects-page {
-  padding: var(--space-6);
   display: flex;
   flex-direction: column;
-  align-items: center;
-}
-
-.projects-page > * {
+  gap: var(--space-4);
   width: 100%;
-  max-width: 680px;
-}
-
-.projects-header {
-  margin-bottom: var(--space-6);
-}
-
-.projects-title {
-  font-size: var(--text-xl);
-  font-weight: var(--weight-semibold);
-  color: var(--color-text);
-  margin: 0;
 }
 
 .projects-cards {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  max-width: 680px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 /* ── Project card ── */
@@ -2632,8 +2617,9 @@
 }
 
 .project-card-name {
+  font-family: var(--term-font-mono);
   font-size: var(--text-base);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-medium);
   color: var(--color-text);
   line-height: 1.3;
 }

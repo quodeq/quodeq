@@ -50,12 +50,17 @@ def _setup_project(tmp_path: Path, project: str, runs: list[tuple[str, list[Dime
     """
     reports_root = tmp_path / "evaluations"
     for run_id, dims in runs:
+        run_dir = reports_root / project / run_id
         for dim in dims:
             dim_name = dim.dimension
-            eval_dir = reports_root / project / run_id / "evaluation"
+            eval_dir = run_dir / "evaluation"
             _write_eval(eval_dir, dim_name, dim.overall_score or "7.5", dim.overall_grade or "B")
-            evidence_dir = reports_root / project / run_id / "evidence"
+            evidence_dir = run_dir / "evidence"
             _write_evidence(evidence_dir, dim_name)
+        evidence_dir = run_dir / "evidence"
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        (evidence_dir / "manifest.json").write_text("{}")
+        (run_dir / "scan.json").write_text("{}")
     return reports_root
 
 

@@ -168,14 +168,18 @@ def get_project_scores(
     # Apply rescore to accumulated dimensions
     accumulated = _rescore_accumulated_response(accumulated, reports_root, project)
 
-    # Build trend using a rescoring fetcher (applies dismissals to each run)
-    history_runs = all_runs[:_max_history_runs()]
+    # Build trend using a rescoring fetcher (applies dismissals to each run).
+    # Exclude cancelled/failed runs — their partial scores are misleading on
+    # the history chart. They remain in availableRuns so the UI can show them
+    # when the user asks for them explicitly.
+    scoreable_runs = [r for r in all_runs if r.status not in ("cancelled", "failed")]
+    history_runs = scoreable_runs[:_max_history_runs()]
     rescoring_fetcher = _make_rescoring_fetcher(reports_root, project)
     trend = build_accumulated_trend(history_runs, rescoring_fetcher)
 
     # Build available runs list
     available_runs = [
-        {"runId": r.run_id, "dateLabel": r.date_label}
+        {"runId": r.run_id, "dateLabel": r.date_label, "status": r.status}
         for r in all_runs
     ]
 

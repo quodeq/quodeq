@@ -6,7 +6,7 @@ const PHRASES = [
   'run evaluations over time and <b>track quality trends</b> across runs',
   'each finding includes a <b>fix plan</b>, a concrete path to resolve the issue',
   'violations explain <b>what went wrong</b>, why it matters, and <b>how to fix it</b>',
-  'findings are mapped to <b>CWE</b> — the industry standard for software weaknesses',
+  'findings are mapped to <b>CWE</b>, the industry standard for software weaknesses',
   'dimensions follow <b>ISO 25010</b>, the international standard for software quality',
   'quality covers <b>reliability</b>, <b>security</b>, <b>maintainability</b>, <b>performance</b>, and more',
   'compare <b>accumulated scores</b> across all runs to see overall project health',
@@ -15,10 +15,23 @@ const PHRASES = [
   'click any <b>dimension card</b> to explore violations, files, and principles in detail',
   'copy a <b>fix plan</b> to your clipboard and paste it into your IDE or AI assistant',
   'choose between <b>fast</b>, <b>balanced</b>, or <b>thorough</b> analysis modes',
-  'switch <b>themes</b> — from Daruma to Neo, Deckard to Galadriel',
+  'switch <b>themes</b>, from Daruma to Neo, Deckard to Galadriel',
   'the <b>score history</b> chart shows how your codebase quality evolves over time',
-  'violations are ranked by <b>severity</b> — critical, major, and minor',
+  'violations are ranked by <b>severity</b>: critical, major, and minor',
   'every principle is graded and mapped to a <b>quality dimension</b>',
+  'use <b>incremental scans</b> to re-evaluate only the files you changed since last run',
+  'run analysis with <b>local Ollama</b> models for free, private code review on your own machine',
+  'the <b>code map</b> visualises file size and issue density so you can spot hotspots at a glance',
+  'every finding gets a <b>severity</b>, an explanation, and pointers to the exact code that triggered it',
+  'dismiss <b>false positives</b> in one click and they disappear from future runs too',
+  'group <b>sub-projects</b> from the same repo to compare quality across services or modules',
+  'the <b>Q&#xB2; formula</b> rewards strong compliance and never lets minor issues swamp critical ones',
+  'write <b>custom standards</b> in JSON when the built-in dimensions are not enough',
+  'ask any <b>AI assistant</b> to draft a custom standard for you, then drop the JSON file into Quodeq',
+  'enable <b>Clean Architecture</b> and <b>DDD</b> dimensions when you want architectural review, not just quality',
+  'the <b>severity grade floor</b> stops compliance from hiding genuinely critical issues',
+  'click a <b>file</b> in the violations grid to read the offending lines in context',
+  'every run is saved, so you can <b>look back</b> and see when a regression first appeared',
 ];
 
 const AUTO_ADVANCE_MS = 3500;
@@ -107,7 +120,7 @@ function useKeyNav(stopAuto, stepPhrase) {
       if (e.key === 'ArrowLeft') { stopAuto(); stepPhrase(-1); }
       if (e.key === 'ArrowRight') { stopAuto(); stepPhrase(1); }
     }
-    // Browser-only: keyboard navigation for settings phrases
+    // Browser-only: keyboard navigation for rotating phrases
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [stopAuto, stepPhrase]);
@@ -141,7 +154,7 @@ function useAutoAdvance(stepPhrase, setRightAuto, setLeftPress, setRightPress) {
 }
 
 function useCarousel() {
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() => Math.floor(Math.random() * PHRASES.length));
   const [changing, setChanging] = useState(false);
   const [leftPress, setLeftPress] = useState(false);
   const [rightPress, setRightPress] = useState(false);
@@ -173,11 +186,11 @@ function useCarousel() {
   return { index, changing, leftPress, setLeftPress, rightPress, setRightPress, needleWobble, leftCls, rightCls, handleLeft, handleRight };
 }
 
-export default function SettingsAside() {
+export default function BrandCarousel() {
   const c = useCarousel();
 
   return (
-    <div className="settings-aside" aria-hidden="true">
+    <div className="brand-carousel" aria-hidden="true">
       <div className="sa-brand">
         <LogoShell
           press={{ left: c.leftPress, setLeft: c.setLeftPress, right: c.rightPress, setRight: c.setRightPress }}

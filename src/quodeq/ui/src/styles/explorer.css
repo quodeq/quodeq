@@ -159,56 +159,76 @@
 .fix-it-btn:hover:not(:disabled) { background: var(--color-accent-hover); }
 .fix-it-btn:disabled { opacity: 0.5; cursor: default; }
 
-/* Breadcrumb navigation */
+/* --------------------------------------------------------------
+   Single canonical breadcrumb — lives in the TopBar on desktop,
+   hidden on mobile (replaced by a compact title + back button).
+   Slash-separated plain text, no chips.
+   -------------------------------------------------------------- */
 .nav-breadcrumb {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  flex-shrink: 0;
-}
-
-.nav-back-btn {
-  display: none;
-}
-
-.nav-crumbs {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.nav-crumb-sep {
-  color: var(--color-text-subtle);
-  font-size: 0.7rem;
-  user-select: none;
-  padding: 0 1px;
-}
-
-.nav-crumb-btn {
-  background: color-mix(in srgb, var(--color-text-muted) 6%, transparent);
-  border: none;
+  gap: 8px;
+  min-width: 0;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12px;
   color: var(--color-text-muted);
-  font-family: var(--font-sans);
-  font-size: 0.75rem;
-  font-weight: var(--weight-medium);
+  user-select: none;
+}
+
+.nav-breadcrumb__crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.nav-breadcrumb__sep {
+  color: var(--color-text-subtle);
+  opacity: 0.55;
+  font-weight: 400;
+}
+
+.nav-breadcrumb__crumb {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+.nav-breadcrumb__crumb > button,
+.nav-breadcrumb__crumb > span {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nav-breadcrumb__crumb > button {
   cursor: pointer;
-  padding: 3px 10px;
-  border-radius: 12px;
-  transition: background 120ms ease, color 120ms ease;
+  transition: color 120ms ease;
+}
+.nav-breadcrumb__crumb > button:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+.nav-breadcrumb__crumb.is-current > span,
+.nav-breadcrumb__crumb.is-current > button {
+  color: var(--color-text);
+  font-weight: 500;
 }
 
-.nav-crumb-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-text-muted) 12%, transparent);
-  color: var(--color-text);
-}
-
-.nav-crumb-btn.active,
-.nav-crumb-btn:disabled {
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-  color: var(--color-text);
-  cursor: default;
-  font-weight: var(--weight-semibold);
-}
+/* Legacy chip-trail classes — kept inert in case a stray consumer
+   imports them; the new breadcrumb does not use them. */
+.nav-back-btn,
+.nav-crumbs,
+.nav-crumb-sep,
+.nav-crumb-btn { display: none; }
 
 /* ── File detail ──────────────────────────────────────── */
 

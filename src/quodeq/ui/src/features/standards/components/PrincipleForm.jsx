@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 
 export default function PrincipleForm({ principle, principleIndex, onUpdateField, editable }) {
   const nameRef = useRef(null);
@@ -9,7 +10,7 @@ export default function PrincipleForm({ principle, principleIndex, onUpdateField
 
   return (
     <div className="principle-form">
-      <h3 className="detail-form-title">Principle</h3>
+      <SectionLabel marker="▶">Principle</SectionLabel>
 
       <div className="form-group">
         <label htmlFor={`principle-name-${principleIndex}`}>Name</label>

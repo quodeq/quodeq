@@ -32,6 +32,12 @@ class AnalysisOptions:
     pool_budget: int | None = None
     incremental: bool = False
     incremental_file_filter: set[str] | None = None
+    dry_run: bool = False
+    # PR diff mode: analyze only files changed since `diff_from`.
+    # When set, skip_scoring is also set by the CLI layer so that fingerprint
+    # persistence and scoring are suppressed — PR runs are evidence-only.
+    diff_from: str | None = None
+    skip_scoring: bool = False
 
 
 @dataclass

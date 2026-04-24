@@ -196,6 +196,11 @@ class FsEvaluationMixin:
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
         _register_project(repo, options.discipline, reports_dir, scope_path=options.scope_path)
+        # Keep JobManager aware of the current reports root so _tee_run_log
+        # can resolve run.log paths for dashboard-spawned evaluations.
+        # Guard with hasattr so custom/stub job managers remain compatible.
+        if hasattr(self._jobs, "set_reports_root"):
+            self._jobs.set_reports_root(Path(reports_dir))
         env = self._build_eval_env(repo, options)
         if is_repo_url(repo):
             cwd = str(Path.cwd())
@@ -214,15 +219,30 @@ class FsEvaluationMixin:
                 cwd = str(resolved)
         return self.dispatcher.dispatch(cmd, cwd=cwd, env=env)
 
-    def get_evaluation_status(self, job_id: str) -> JobSnapshot | None:
-        """Return the current status of an evaluation job."""
-        return self._jobs.get_job(job_id)
+    def get_evaluation_status(self, job_id: str, reports_dir: str | None = None) -> JobSnapshot | None:
+        """Return the current status of an evaluation job.
+
+        Passes *reports_dir* to ``JobManager.get_job`` so that external jobs
+        (``ext-`` prefix) can be looked up from the filesystem.
+        """
+        reports_root = Path(reports_dir) if reports_dir else None
+        return self._jobs.get_job(job_id, reports_root=reports_root)
 
     def cancel_evaluation(self, job_id: str, reports_dir: str | None = None) -> bool:
-        """Cancel a running evaluation job and score any completed dimensions."""
-        # Get job info before cancellation
-        job = self._jobs.get_job(job_id)
-        ok = self._jobs.cancel_job(job_id)
+        """Cancel a running evaluation job and score any completed dimensions.
+
+        Uses ``self.get_evaluation_status`` rather than a bare
+        ``self._jobs.get_job`` so that external runs (``ext-`` prefix) also
+        resolve correctly via the SQLite index (Plan B1 override on
+        ``FilesystemActionProvider``). Before this, ``get_job`` returned
+        ``None`` for ``ext-`` ids and the scoring block was dead for them.
+        ``_score_completed_evidence`` is idempotent (skips dimensions whose
+        report file already exists), so double-firing with the route-level
+        scoring in ``_evaluation_routes`` is a no-op.
+        """
+        reports_root = Path(reports_dir) if reports_dir else None
+        job = self.get_evaluation_status(job_id, reports_dir=reports_dir)
+        ok = self._jobs.cancel_job(job_id, reports_root=reports_root)
         if ok and reports_dir and job:
             _score_completed_evidence(reports_dir, {
                 "outputProject": job.output_project,
@@ -238,12 +258,23 @@ class FsEvaluationMixin:
         _score_completed_evidence(reports_dir, job)
         return True
 
-    def list_evaluations(self, *, limit: int = 0) -> list[JobSnapshot]:
+    def list_evaluations(
+        self,
+        *,
+        limit: int = 0,
+        reports_dir: str | None = None,
+        states: set[str] | None = None,
+    ) -> list[JobSnapshot]:
         """Return evaluation jobs (running, done, failed, cancelled).
 
         When *limit* > 0 only the most recent *limit* jobs are returned.
+        When *reports_dir* is provided, external in-progress runs are merged in.
+        When *states* is provided, only jobs with status in the set are returned.
         """
-        jobs = self._jobs.list_jobs()
+        reports_root = Path(reports_dir) if reports_dir else None
+        jobs = self._jobs.list_jobs(reports_root=reports_root)
+        if states:
+            jobs = [j for j in jobs if j.status in states]
         return jobs[:limit] if limit > 0 else jobs
 
 

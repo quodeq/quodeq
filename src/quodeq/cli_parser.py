@@ -76,6 +76,21 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         "--scope", default=None,
         help="Subdirectory to analyze (relative to repo root)",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Skip AI calls and generate placeholder findings (for CI pipeline testing)",
+    )
+    parser.add_argument(
+        "--diff-from",
+        default=None,
+        metavar="REF",
+        help=(
+            "PR mode: analyze only files changed since <ref> (e.g., "
+            "origin/develop). Mutually exclusive with --incremental. "
+            "Produces evidence only — no scored evaluation reports."
+        ),
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -91,5 +106,66 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_evaluate_args(evaluate_parser)
     evaluate_parser.set_defaults(handler_command="evaluate")
+
+    ci_parser = subparsers.add_parser("ci", help="CI integration commands")
+    ci_sub = ci_parser.add_subparsers(dest="ci_action")
+    report_parser = ci_sub.add_parser("report", help="Post evaluation results as PR review")
+    report_parser.add_argument("--evaluation-dir", required=True, help="Path to evaluation output directory")
+    report_parser.add_argument("--owner", required=True, help="GitHub repository owner")
+    report_parser.add_argument("--repo", required=True, help="GitHub repository name")
+    report_parser.add_argument("--pr", type=int, required=True, help="Pull request number")
+    report_parser.add_argument("--token", help="GitHub token (default: GITHUB_TOKEN env var)")
+    report_parser.add_argument("--duration", type=int, help="Evaluation duration in seconds")
+    report_parser.add_argument(
+        "--baseline-dir",
+        help="Path to baseline evaluation directory for new vs. existing classification (optional)",
+    )
+    report_parser.add_argument(
+        "--artifact-url",
+        help="URL to the workflow run page where the evaluation artifact can be downloaded (optional)",
+    )
+    report_parser.add_argument(
+        "--from-evidence",
+        action="store_true",
+        dest="from_evidence",
+        help=(
+            "Read violations from <evaluation-dir>/evidence/<dim>_evidence.jsonl "
+            "instead of scored evaluation/<dim>.json reports. Use for PR diff "
+            "mode runs that skip the scoring phase."
+        ),
+    )
+
+    review_parser = subparsers.add_parser(
+        "review",
+        help="Run Quodeq locally and post findings as a PR review (uses gh CLI)",
+    )
+    review_parser.add_argument(
+        "--pr",
+        type=int,
+        help="PR number to post to (default: auto-detect from current branch)",
+    )
+    review_parser.add_argument(
+        "--dimensions",
+        help=(
+            "Dimensions to evaluate (comma-separated). Accepts full names or aliases: "
+            "sec, rel, mnt, perf, flex, ux. Default: all dimensions."
+        ),
+    )
+    review_parser.add_argument(
+        "--pool-budget",
+        type=int,
+        dest="pool_budget",
+        help="Total time budget in seconds for the evaluation (default: 300)",
+    )
+    review_parser.add_argument(
+        "--output",
+        help="Evaluation output directory (default: ~/.quodeq/evaluations)",
+    )
+    review_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Build the review but do not post it",
+    )
 
     return parser

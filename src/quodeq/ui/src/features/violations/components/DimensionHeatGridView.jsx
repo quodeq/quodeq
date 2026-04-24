@@ -136,8 +136,8 @@ export default function DimensionHeatGridView({ dimensions, onDimensionClick, on
   }
 
   return (
-    <div className="heat-grid-wrap">
-      <table className="heat-grid">
+    <div className="heat-grid-wrap heat-grid-wrap--flat">
+      <table className="heat-grid heat-grid--flat">
         <thead>
           <tr>
             {COLUMNS.map((col) => (
@@ -164,7 +164,7 @@ export default function DimensionHeatGridView({ dimensions, onDimensionClick, on
                     {row.name}
                   </div>
                 </td>
-                <HeatGridCells row={row} onCellClick={onCellClick} />
+                <HeatGridCells row={row} onCellClick={onCellClick} variant="flat" />
               </tr>
             );
           })}

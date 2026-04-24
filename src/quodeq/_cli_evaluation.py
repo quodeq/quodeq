@@ -11,7 +11,6 @@ import argparse
 import json
 import logging
 import os
-import sys
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
@@ -19,10 +18,14 @@ from quodeq.analysis.subprocess import AnalysisError
 from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
 from quodeq.engine.scoring_pipeline import run_full
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
+from quodeq.shared.logging import log_error, log_info
 from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_repo, write_text
 from quodeq.shared.repo_handler import cleanup_cloned_repo
 from quodeq.engine._runner_markers import emit_marker
 from quodeq.shared.prereqs import check_evaluate_prereqs
+from quodeq.analysis._dimension_aliases import expand_dimension_aliases
+from quodeq.analysis._diff_resolver import DiffResolveError, resolve_diff_files
+from quodeq.shared.run_lifecycle import RunLifecycleContext
 
 # Re-export resolution helpers — keep the public API stable
 from quodeq._cli_resolution import (  # noqa: F401
@@ -85,7 +88,18 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
     project_name = project_name_from_repo(args.repo)
     location = "online" if is_repo_url(args.repo) else "local"
     scope = getattr(args, "scope", None)
-    project_uuid = resolve_project_uuid(reports_root, ProjectIdentity(project_name, str(src), None, location, scope_path=scope))
+
+    # Detect the git 'origin' remote so two clones of the same repo in
+    # different local paths share a single project identity.
+    remote_url = None
+    if location == "local":
+        from quodeq.shared._repo import git_remote_url
+        remote_url = git_remote_url(str(src))
+
+    project_uuid = resolve_project_uuid(
+        reports_root,
+        ProjectIdentity(project_name, str(src), None, location, scope_path=scope, remote_url=remote_url),
+    )
 
     run_id = str(uuid.uuid4())
     evidence_dir = reports_root / project_uuid / run_id / "evidence"
@@ -100,28 +114,44 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
 # ---------------------------------------------------------------------------
 
 def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir: Path, evaluation_dir: Path) -> int:
-    """Execute the evidence/scoring pipeline and print results."""
-    try:
-        if args.evidence_only:
-            print("Starting evidence collection (this may take several minutes per dimension)...", file=sys.stderr)
-            evidence = run(config)
+    """Execute the evidence/scoring pipeline and print results.
+
+    Three modes:
+    - scoring (default): run_full → scored evaluation/<dim>.json reports
+    - --evidence-only: run() → merged <language>_evidence.json, no scoring
+    - PR diff (skip_scoring): run() → per-dimension JSONL only, no merged json, no scoring
+
+    Domain errors (AnalysisError, EvaluationError) are intentionally *not*
+    caught here — they propagate to _run_pipeline_with_cleanup so that
+    RunLifecycleContext.__exit__ can write state=failed before the error is
+    mapped to exit code 1.
+    """
+    if args.evidence_only or config.options.skip_scoring:
+        label = "PR diff" if config.options.skip_scoring else "evidence collection"
+        log_info(f"Starting {label} (this may take several minutes per dimension)...")
+        evidence = run(config)
+        if config.options.skip_scoring:
+            # PR diff mode: per-dimension JSONL is already written by the
+            # pipeline. No merged whole-repo artifact — PR reviews consume
+            # the JSONL directly via `ci report --from-evidence`.
+            log_info(f"PR diff evaluation complete — evidence written to {evidence_dir}/")
+        else:
+            # --evidence-only: write the merged whole-repo Evidence JSON.
             out_file = evidence_dir / f"{config.language}_evidence.json"
             try:
                 write_text(out_file, json.dumps(evidence.to_evidence_dict(), indent=2))
             except OSError as exc:
-                print(f"Failed to write evidence file {out_file}: {exc}", file=sys.stderr)
+                log_error(f"Failed to write evidence file {out_file}: {exc}")
                 return 1
-            print(f"Evidence written to {out_file}", file=sys.stderr)
-        else:
-            print("Starting evaluation (this may take several minutes per dimension)...", file=sys.stderr)
-            scores = run_full(config, evaluation_dir, mode=args.mode)
-            print(f"Report path: {evaluation_dir}/", file=sys.stderr)
-            print(f"Reports written to {evaluation_dir}/", file=sys.stderr)
-            for dim, score in scores.items():
-                print(f"  {dim}: {score}")
-    except (AnalysisError, EvaluationError) as exc:
-        print(f"\nError: {exc}", file=sys.stderr)
-        return 1
+            log_info(f"Evidence written to {out_file}")
+        return 0
+
+    log_info("Starting evaluation (this may take several minutes per dimension)...")
+    scores = run_full(config, evaluation_dir, mode=args.mode)
+    log_info(f"Report path: {evaluation_dir}/")
+    log_info(f"Reports written to {evaluation_dir}/")
+    for dim, score in scores.items():
+        print(f"  {dim}: {score}")
     return 0
 
 
@@ -138,19 +168,25 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
     """Assemble a RunConfig from CLI args and resolved inputs."""
     _env = env or os.environ
     standards_dir = default_paths().standards_dir
-    dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
-    print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all", file=sys.stderr)
+    expanded_dimensions = expand_dimension_aliases(args.dimensions)
+    dimensions_filter = [d.strip() for d in expanded_dimensions.split(",") if d.strip()] if expanded_dimensions else None
+    log_info(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all")
 
     is_single_file = getattr(args, '_single_file', False)
 
     consolidated = not getattr(args, 'no_consolidated', False) and not bool(_env.get("QUODEQ_NO_CONSOLIDATE"))
     if is_single_file:
         consolidated = False
-        print("Single-file mode: per-dimension analysis for deeper coverage", file=sys.stderr)
+        log_info("Single-file mode: per-dimension analysis for deeper coverage")
 
     ai_model = get_ai_model(env=env)
     subagent_model_val = _subagent_model(env=env)
     effective_ai_model = ai_model or subagent_model_val
+
+    diff_from = getattr(args, "diff_from", None)
+    diff_files: set[str] | None = getattr(args, "_diff_files", None)
+    incremental_file_filter: set[str] | None = diff_files
+    skip_scoring = diff_from is not None
 
     return RunConfig(
         src=inputs.src,
@@ -171,6 +207,10 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
             consolidated=consolidated,
             pool_budget=args.pool_budget if args.pool_budget is not None else _env_int(_ENV_POOL_BUDGET, None, env=env),
             incremental=args.incremental,
+            incremental_file_filter=incremental_file_filter,
+            dry_run=getattr(args, "dry_run", False),
+            diff_from=diff_from,
+            skip_scoring=skip_scoring,
         ),
     )
 
@@ -180,35 +220,116 @@ def _run_pipeline_with_cleanup(
 ) -> int:
     """Set up directories, build config, run the pipeline, and clean up cloned repos."""
     _reports_root, evidence_dir, evaluation_dir = paths
-    print(f"Report path: {evaluation_dir}", file=sys.stderr)
-    run_id = evaluation_dir.parent.name
-    project_uuid = evaluation_dir.parent.parent.name
+    log_info(f"Report path: {evaluation_dir}")
+    run_dir = evaluation_dir.parent
+    run_id = run_dir.name
+    project_uuid = run_dir.parent.name
     emit_marker("report_path", project=project_uuid, runId=run_id)
     _save_manifest(inputs.manifest, evidence_dir)
 
-    config = _build_run_config(args, inputs=inputs, evidence_dir=evidence_dir)
+    # Write a .pid file so the dashboard can detect and cancel this external run
+    pid_file = run_dir / ".pid"
     try:
-        return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+        pid_file.write_text(str(os.getpid()))
+    except OSError:
+        pass  # non-fatal; cancel-by-filesystem just won't work for this run
+
+    config = _build_run_config(args, inputs=inputs, evidence_dir=evidence_dir)
+
+    # Install a per-run log handler so every log_info lands in run.log.
+    from quodeq.shared.run_log import RunLogHandler, RunLogWriter
+    writer = RunLogWriter(run_dir)
+    handler = RunLogHandler(writer)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    _logger_root = logging.getLogger("quodeq")
+    _logger_root.addHandler(handler)
+
+    # Resolve dimensions list for status.json metadata.
+    # Defensively coerce to a real list — config may be a Mock in tests.
+    _raw_dims = getattr(getattr(config, "options", None), "dimensions", None)
+    dimensions_list: list[str] = list(_raw_dims) if isinstance(_raw_dims, list) else []
+
+    try:
+        # Lifecycle context: pending → running on enter, done on clean exit,
+        # failed on exception, cancelled on SIGINT/SIGTERM/SIGHUP or atexit.
+        try:
+            with RunLifecycleContext(
+                run_dir=run_dir,
+                job_id=f"ext-{run_id}",
+                dimensions=dimensions_list,
+            ) as lifecycle:
+                try:
+                    # Mark the pipeline as actively analyzing so dashboard
+                    # clients begin polling per-dimension partial results
+                    # (the UI gates dim-polling on phase in
+                    # {analyzing, scoring}).
+                    lifecycle.set_phase("analyzing")
+                    result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+                    # run_full writes per-dimension reports as each dimension
+                    # completes, so by the time it returns scoring is already
+                    # done. Record the last pre-finalize phase as "scoring"
+                    # so the UI shows a sensible state even if the process
+                    # lingers briefly before transition_to_finalizing.
+                    lifecycle.set_phase("scoring")
+                    lifecycle.transition_to_finalizing()
+                    return result
+                finally:
+                    # Clean up .pid file on exit so we don't leave stale PIDs
+                    try:
+                        pid_file.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+                    if is_repo_url(args.repo):
+                        cleanup_cloned_repo(str(inputs.src))
+                    worktree_dir = getattr(args, "_worktree_dir", None)
+                    worktree_origin = getattr(args, "_worktree_origin", None)
+                    if worktree_dir and worktree_origin:
+                        _cleanup_worktree(worktree_origin, worktree_dir)
+        except (AnalysisError, EvaluationError) as exc:
+            # RunLifecycleContext.__exit__ has already written state=failed.
+            # Map the domain error to exit code 1.
+            log_error(f"{exc}")
+            return 1
     finally:
-        if is_repo_url(args.repo):
-            cleanup_cloned_repo(str(inputs.src))
-        worktree_dir = getattr(args, "_worktree_dir", None)
-        worktree_origin = getattr(args, "_worktree_origin", None)
-        if worktree_dir and worktree_origin:
-            _cleanup_worktree(worktree_origin, worktree_dir)
+        _logger_root.removeHandler(handler)
+        writer.close()
 
 
 def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
-    try:
-        check_evaluate_prereqs()
-    except RuntimeError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+    if getattr(args, "incremental", False) and getattr(args, "diff_from", None):
+        log_error(
+            "Error: --incremental and --diff-from are mutually exclusive. "
+            "--incremental is for nightly whole-repo runs; --diff-from is for "
+            "PR-scoped analysis."
+        )
         return 1
+
+    if not getattr(args, "dry_run", False):
+        try:
+            check_evaluate_prereqs()
+        except RuntimeError as exc:
+            log_error(f"Error: {exc}")
+            return 1
 
     inputs = _resolve_evaluation_inputs(args)
     if inputs is None:
         return 1
+
+    # Resolve --diff-from here (not inside _build_run_config) so a
+    # DiffResolveError fails fast before any run directory is created.
+    # This keeps the lifecycle contract: once a run dir exists, its state
+    # is always written by RunLifecycleContext.
+    diff_from = getattr(args, "diff_from", None)
+    if diff_from:
+        try:
+            args._diff_files = set(resolve_diff_files(inputs.src, diff_from))
+        except DiffResolveError as exc:
+            log_error(f"Error: could not resolve --diff-from {diff_from!r}: {exc}")
+            return 1
+        log_info(f"PR diff mode: {len(args._diff_files)} changed file(s) vs {diff_from}")
+    else:
+        args._diff_files = None
 
     try:
         paths = _setup_run_dirs(args, inputs.src)
