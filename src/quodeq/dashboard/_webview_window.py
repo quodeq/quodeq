@@ -278,18 +278,46 @@ def _icon_path(ext: str) -> str | None:
     return str(p) if p.exists() else None
 
 
+_APP_DISPLAY_NAME = "Quodeq"
+
+
+def _set_macos_app_identity() -> None:
+    """Set dock icon + menu-bar app name on macOS.
+
+    Called both at startup (early) and after pywebview is shown — pywebview
+    spins up its own NSApplication when start() runs, which overrides the
+    early-set icon. Calling this from the `shown` event ensures the icon is
+    applied on the NSApp instance that actually renders the dock tile.
+    """
+    try:
+        from AppKit import NSApplication, NSBundle, NSImage  # type: ignore[import-untyped]
+    except ImportError:
+        return
+    # Patch the bundle name so the menu bar reads "Quodeq" instead of "python3".
+    # This is a runtime mutation of the NSBundle info dict; it works as long as
+    # we do it before NSApp caches its name (i.e. before webview.start() draws
+    # the menu bar). Calling it again from the `shown` event is harmless.
+    try:
+        info = NSBundle.mainBundle().infoDictionary()
+        if info is not None:
+            info["CFBundleName"] = _APP_DISPLAY_NAME
+            info["CFBundleDisplayName"] = _APP_DISPLAY_NAME
+    except (AttributeError, TypeError):
+        pass
+    path = _icon_path(".icns")
+    if path:
+        try:
+            icon = NSImage.alloc().initWithContentsOfFile_(path)
+            if icon:
+                NSApplication.sharedApplication().setApplicationIconImage_(icon)
+        except (AttributeError, ValueError):
+            pass
+
+
 def _set_app_icon() -> None:
     """Set the application icon (dock on macOS, taskbar on Windows)."""
     if sys.platform == "darwin":
-        try:
-            from AppKit import NSApplication, NSImage  # type: ignore[import-untyped]
-            path = _icon_path(".icns")
-            if path:
-                icon = NSImage.alloc().initWithContentsOfFile_(path)
-                if icon:
-                    NSApplication.sharedApplication().setApplicationIconImage_(icon)
-        except ImportError:
-            pass
+        _set_macos_app_identity()
     elif sys.platform == "win32":
         try:
             import ctypes
@@ -330,6 +358,11 @@ def main() -> None:
     def _on_loaded() -> None:
         window.show()
         window.evaluate_js(INJECT_JS)
+        # Re-apply the dock icon + bundle name now that pywebview's
+        # NSApplication instance is live. Calling this earlier in main()
+        # targets the pre-pywebview NSApp and gets overridden.
+        if sys.platform == "darwin":
+            _set_macos_app_identity()
 
     def _on_closing() -> bool:
         """Intercept native close (Cmd+Q, red button, window manager).
