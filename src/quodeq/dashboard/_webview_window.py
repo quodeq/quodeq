@@ -335,24 +335,72 @@ def _set_macos_app_identity() -> None:
 
 _about_target: object | None = None  # keep delegate alive for the menu item's weak ref
 
+_QUODEQ_WEBSITE = "https://quodeq.com"
+_QUODEQ_REPO = "https://github.com/quodeq/quodeq"
+
+
+def _quodeq_version() -> str:
+    try:
+        from importlib.metadata import version  # noqa: PLC0415
+        return version("quodeq")
+    except Exception:  # noqa: BLE001 — metadata may be missing in dev
+        return "dev"
+
+
+def _build_about_credits() -> object | None:
+    """Build a clickable NSAttributedString with website + repo links."""
+    try:
+        from AppKit import (  # type: ignore[import-untyped]
+            NSAttributedString,
+            NSMutableAttributedString,
+            NSURL,
+        )
+        from Foundation import NSRange  # type: ignore[import-untyped]  # noqa: F401
+    except ImportError:
+        return None
+    try:
+        body = NSMutableAttributedString.alloc().init()
+        def _append(text: str, link: str | None = None) -> None:
+            attrs = {}
+            if link:
+                url = NSURL.URLWithString_(link)
+                if url is not None:
+                    attrs = {"NSLink": url}
+            fragment = NSAttributedString.alloc().initWithString_attributes_(text, attrs)
+            body.appendAttributedString_(fragment)
+        _append(_QUODEQ_WEBSITE, _QUODEQ_WEBSITE)
+        _append("\n")
+        _append(_QUODEQ_REPO, _QUODEQ_REPO)
+        return body
+    except (AttributeError, ValueError):
+        return None
+
 
 def _install_about_panel_override() -> None:
-    """Point the Apple-menu 'About …' at a handler that passes our icon."""
+    """Point the Apple-menu 'About …' at a handler that shows a rich panel."""
     global _about_target
     try:
         from AppKit import NSApplication, NSObject  # type: ignore[import-untyped]
     except ImportError:
         return
 
+    import datetime as _dt  # noqa: PLC0415
+    version = _quodeq_version()
+    copyright_line = f"© {_dt.date.today().year} quodeq"
+
     class _AboutHandler(NSObject):
         def showAbout_(self, sender):  # noqa: ARG002 — ObjC selector signature
-            if _macos_app_icon is None:
-                NSApplication.sharedApplication().orderFrontStandardAboutPanel_(sender)
-                return
-            opts = {
-                "ApplicationIcon": _macos_app_icon,
+            opts: dict[str, object] = {
                 "ApplicationName": _APP_DISPLAY_NAME,
+                "ApplicationVersion": version,
+                "Version": "",  # hide the "Build" line Apple renders by default
+                "Copyright": copyright_line,
             }
+            if _macos_app_icon is not None:
+                opts["ApplicationIcon"] = _macos_app_icon
+            credits = _build_about_credits()
+            if credits is not None:
+                opts["Credits"] = credits
             NSApplication.sharedApplication().orderFrontStandardAboutPanelWithOptions_(opts)
 
     try:
