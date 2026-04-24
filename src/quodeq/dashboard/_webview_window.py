@@ -113,15 +113,23 @@ class _WindowApi:
         return None
 
     def _cancel_evaluation(self, job_id: str | None) -> None:
-        """Issue DELETE /api/evaluations/<job_id> to stop a running scan."""
+        """Issue DELETE /api/evaluations/<job_id> to stop a running scan.
+
+        The API enforces an Origin header to reject cross-site requests; a
+        missing header returns 403 which silently fails this call, so we
+        set Origin explicitly to self._base_url.
+        """
         if not job_id or not self._base_url:
             return
         try:
             req = urllib.request.Request(
                 f"{self._base_url}/api/evaluations/{urllib.parse.quote(job_id)}",
                 method="DELETE",
+                headers={"Origin": self._base_url},
             )
-            with urllib.request.urlopen(req, timeout=_EVAL_CHECK_TIMEOUT_S):
+            # Give the API enough time to SIGTERM the scan and respond —
+            # the 0.5s used for the eval-check poll is too tight here.
+            with urllib.request.urlopen(req, timeout=5.0):
                 pass
         except Exception:
             pass
