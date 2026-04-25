@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { exportStandard } from '../../../api/index.js';
 import { STANDARD_TYPES } from '../hooks/useStandards.js';
 import { ICON_STAR_FILLED, ICON_STAR_OUTLINE } from '../../../constants/navigation.jsx';
@@ -200,7 +200,10 @@ function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onTog
 
 export default function StandardsTable({ grouped, actions }) {
   const { onEdit, onDelete, onDuplicate, isVisible, onToggleVisibility } = actions;
-  const all = [...(grouped.builtin || []), ...(grouped.quodeq || []), ...(grouped.community || []), ...(grouped.custom || [])];
+  const all = useMemo(
+    () => [...(grouped.builtin || []), ...(grouped.quodeq || []), ...(grouped.community || []), ...(grouped.custom || [])],
+    [grouped],
+  );
 
   if (all.length === 0) {
     return (

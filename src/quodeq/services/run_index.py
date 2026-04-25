@@ -179,8 +179,9 @@ def sync_index(db: sqlite3.Connection, evaluations_root: Path) -> None:
     changed since last seen OR that lacks an index row entirely. Promote
     stale non-terminal runs.
     """
-    for project_uuid, run_id, run_dir in _walk_run_dirs(evaluations_root):
-        _sync_one_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+    with db:
+        for project_uuid, run_id, run_dir in _walk_run_dirs(evaluations_root):
+            _sync_one_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
 
 
 def sync_index_for_run(db: sqlite3.Connection, run_dir: Path) -> None:
@@ -189,7 +190,8 @@ def sync_index_for_run(db: sqlite3.Connection, run_dir: Path) -> None:
         return
     project_uuid = run_dir.parent.name
     run_id = run_dir.name
-    _sync_one_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+    with db:
+        _sync_one_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
 
 
 # ---------------------------------------------------------------------------
