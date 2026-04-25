@@ -25,6 +25,7 @@ _JSONRPC_METHOD_NOT_FOUND = -32601
 _MCP_DEFAULT_PROTOCOL_VERSION = "2024-11-05"
 _SERVER_NAME = "quodeq-findings"
 _SERVER_VERSION = "1.0.0"
+_MAX_FILE_BATCH_SIZE = 1000
 
 
 def handle_initialize(request_id: object, msg: dict) -> dict:
@@ -77,6 +78,7 @@ def handle_tools_call(
         count = args.get("count", _DEFAULT_FILE_BATCH_SIZE)
         if not isinstance(count, int) or count < 1:
             count = _DEFAULT_FILE_BATCH_SIZE
+        count = min(count, _MAX_FILE_BATCH_SIZE)
         files = queue.take(count, agent_id=agent_id)
         if not files:
             return _ok(request_id, {
