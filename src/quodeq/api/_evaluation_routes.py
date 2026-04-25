@@ -18,6 +18,7 @@ from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.api.routes import _reports_dir
 from quodeq.services.base import ActionProvider
 from quodeq.services.evaluation_mixin import _score_completed_evidence
+from quodeq.services.scan_progress import build_scan_progress, progress_to_dict
 
 _logger = logging.getLogger(__name__)
 
@@ -99,6 +100,28 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
             except Exception as exc:
                 _logger.debug("Could not score cancelled dimension for %s: %s", job_id, exc)
         return jsonify(to_camel_dict(job))
+
+    @app.get("/api/evaluations/<job_id>/progress")
+    def get_evaluation_progress(job_id: str) -> Response | tuple[Response, int]:
+        """Return live progress for a scan (works for internal and external runs)."""
+        run_dir = provider.get_log_run_dir(job_id) if hasattr(provider, "get_log_run_dir") else None
+        if run_dir is None:
+            body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+        # Pool budget for the running dim's bar — only available for jobs the
+        # JobManager started; external runs surface no budget metadata.
+        pool_budget_s: int | None = None
+        snapshot = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
+        if snapshot is not None:
+            options = getattr(snapshot, "options", None) or {}
+            raw = options.get("poolBudget") if isinstance(options, dict) else None
+            if isinstance(raw, int) and raw > 0:
+                pool_budget_s = raw
+        progress = build_scan_progress(job_id, run_dir, pool_budget_s=pool_budget_s)
+        if progress is None:
+            body, status = error_response("Run not ready", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+        return jsonify(to_camel_dict(progress_to_dict(progress)))
 
     @app.delete("/api/evaluations/<job_id>")
     def cancel_or_delete_evaluation(job_id: str) -> Response | tuple[Response, int]:

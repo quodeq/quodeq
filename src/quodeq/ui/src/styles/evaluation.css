@@ -2585,3 +2585,132 @@
   border-color: var(--color-accent);
   background: rgba(88, 166, 255, 0.08);
 }
+
+/* ─── ScanProgress ─── */
+.scan-progress {
+  border-bottom: 1px solid var(--color-border-soft, var(--color-border));
+}
+
+.scan-progress__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 9px 18px;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.scan-progress__row:hover { background: var(--color-surface-alt); }
+
+.scan-progress__bar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.scan-progress__bar {
+  height: 4px;
+  background: var(--color-surface-alt);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.scan-progress__bar-fill {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 0.3s ease;
+}
+.scan-progress__bar-fill--done    { background: var(--color-success, #56d364); }
+.scan-progress__bar-fill--partial { background: var(--color-warn, #d29922); }
+
+.scan-progress__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--color-text-dim, var(--color-text-muted));
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+.scan-progress__meta strong {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.scan-progress__dim-active {
+  color: var(--color-accent);
+  text-transform: lowercase;
+}
+
+.scan-progress__caret {
+  color: var(--color-text-dim, var(--color-text-muted));
+  font-size: 10px;
+  user-select: none;
+  transition: transform 0.18s;
+}
+.scan-progress__caret--open {
+  transform: rotate(90deg);
+  color: var(--color-text-muted);
+}
+
+.scan-progress__expanded {
+  border-top: 1px solid var(--color-border-soft, var(--color-border));
+  padding: 10px 18px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scan-progress__expanded-label {
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--color-text-dim, var(--color-text-muted));
+  margin-bottom: 2px;
+}
+
+.scan-progress__dim {
+  display: grid;
+  grid-template-columns: 14px 130px 1fr 240px;
+  gap: 12px;
+  align-items: center;
+  font-size: 11px;
+}
+.scan-progress__dim--pending { color: var(--color-text-dim, var(--color-text-muted)); }
+
+.scan-progress__dim-icon {
+  font-size: 11px;
+  color: var(--color-text-dim, var(--color-text-muted));
+  text-align: center;
+}
+.scan-progress__dim-icon--done    { color: var(--color-success, #56d364); }
+.scan-progress__dim-icon--running { color: var(--color-accent); }
+.scan-progress__dim-icon--partial { color: var(--color-warn, #d29922); }
+
+.scan-progress__dim-name {
+  color: var(--color-text);
+  text-transform: lowercase;
+}
+.scan-progress__dim--pending .scan-progress__dim-name { color: var(--color-text-dim, var(--color-text-muted)); }
+
+.scan-progress__dim-meta {
+  text-align: right;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.scan-progress__dim-meta-pending {
+  color: var(--color-text-dim, var(--color-text-muted));
+  font-style: italic;
+}
+.scan-progress__v        { color: var(--color-sev-critical-text, #f85149); }
+.scan-progress__c        { color: var(--color-success, #56d364); }
+.scan-progress__budget   { color: var(--color-warn, #d29922); }
+.scan-progress__budget--overrun { color: var(--color-sev-critical-text, #f85149); }
+.scan-progress__partial  { color: var(--color-warn, #d29922); text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; }
