@@ -141,6 +141,16 @@ export async function getEvaluation(jobId) {
 }
 
 /**
+ * Live progress for a scan. Pure on-disk read — works for internal and
+ * external (CLI-started) runs uniformly.
+ * @param {string} jobId
+ * @returns {Promise<Object>}
+ */
+export function getEvaluationProgress(jobId) {
+  return request(`/evaluations/${encodeURIComponent(jobId)}/progress`);
+}
+
+/**
  * @param {string} jobId
  * @returns {Promise<Object>}
  */

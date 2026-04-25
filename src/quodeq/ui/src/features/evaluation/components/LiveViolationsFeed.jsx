@@ -79,38 +79,56 @@ function ViolationLiveRow({ violation, index }) {
   );
 }
 
-export default function LiveViolationsFeed({ liveViolations }) {
-  const dims = Object.keys(liveViolations ?? {});
-  const totalCount = dims.reduce((sum, d) => sum + (liveViolations[d]?.length ?? 0), 0);
+function DimensionGroup({ dim, violations, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const count = violations.length;
+  return (
+    <div className={`vlive-dimension-group${open ? '' : ' vlive-dimension-group--collapsed'}`}>
+      <button
+        type="button"
+        className="vlive-dimension-label"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span className={`vlive-dimension-caret${open ? ' vlive-dimension-caret--open' : ''}`} aria-hidden="true">▸</span>
+        <span className="vlive-dimension-name">{dim}</span>
+        <span className="vlive-dimension-count">{count}</span>
+      </button>
+      {open && violations.map((v, i) => (
+        <ViolationLiveRow key={`${dim}-${v.file}-${v.principle}-${String(v.line ?? '')}`} violation={v} index={i} />
+      ))}
+    </div>
+  );
+}
 
-  const sortedByDim = useMemo(() => {
-    const result = {};
-    for (const dim of Object.keys(liveViolations ?? {})) {
-      result[dim] = [...(liveViolations[dim] ?? [])].sort((a, b) =>
-        severityOrder(a.severity) - severityOrder(b.severity)
-      );
-    }
-    return result;
+export default function LiveViolationsFeed({ liveViolations }) {
+  const orderedDims = useMemo(() => {
+    const entries = Object.entries(liveViolations ?? {})
+      .map(([dim, vs]) => ({
+        dim,
+        violations: [...(vs ?? [])].sort((a, b) => severityOrder(a.severity) - severityOrder(b.severity)),
+      }))
+      .filter(({ violations }) => violations.length > 0)
+      .sort((a, b) => b.violations.length - a.violations.length);
+    return entries;
   }, [liveViolations]);
 
+  const totalCount = orderedDims.reduce((sum, d) => sum + d.violations.length, 0);
   if (!totalCount) return null;
 
   return (
     <div className="vlive-feed">
       <div className="vlive-counter">
-        {totalCount} violation{totalCount !== 1 ? 's' : ''} found across {dims.length} dimension{dims.length !== 1 ? 's' : ''}
+        {totalCount} violation{totalCount !== 1 ? 's' : ''} found across {orderedDims.length} dimension{orderedDims.length !== 1 ? 's' : ''}
       </div>
-      {dims.map(dim => {
-        const violations = sortedByDim[dim] || [];
-        return (
-          <div key={dim} className="vlive-dimension-group">
-            <div className="vlive-dimension-label">{dim}</div>
-            {violations.map((v, i) => (
-              <ViolationLiveRow key={`${dim}-${v.file}-${v.principle}-${String(v.line ?? '')}`} violation={v} index={i} />
-            ))}
-          </div>
-        );
-      })}
+      {orderedDims.map(({ dim, violations }, idx) => (
+        <DimensionGroup
+          key={dim}
+          dim={dim}
+          violations={violations}
+          defaultOpen={idx === 0}
+        />
+      ))}
     </div>
   );
 }
