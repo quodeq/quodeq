@@ -34,13 +34,15 @@ function lastRelevantLog(logs) {
   return null;
 }
 
-function DimRow({ dim }) {
+function DimRow({ dim, fallbackTotal }) {
   const taken = dim.files?.taken ?? 0;
-  const total = dim.files?.total ?? 0;
+  const isPending = dim.state === 'pending';
+  // Pending dims don't have a real queue yet. Use the running/done dims'
+  // queue total as a better estimate than the project-wide upper bound.
+  const total = isPending && fallbackTotal ? fallbackTotal : (dim.files?.total ?? 0);
   const p = pct(taken, total);
   const isDone = dim.state === 'done';
   const isRunning = dim.state === 'running';
-  const isPending = dim.state === 'pending';
 
   const isPartial = isDone && total > 0 && taken < total;
 
@@ -56,15 +58,9 @@ function DimRow({ dim }) {
 
   let meta;
   if (isPending) {
-    meta = (
-      <>
-        {total > 0
-          ? <>0 / <span className="scan-progress__dim-meta-projected">{total}</span></>
-          : null}
-        {' · '}
-        <span className="scan-progress__dim-meta-pending">pending</span>
-      </>
-    );
+    meta = total > 0
+      ? <span className="scan-progress__dim-meta-projected">0 / {total}</span>
+      : null;
   } else if (isDone) {
     meta = (
       <>
@@ -251,7 +247,17 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
       {detailOpen && dims.length > 0 && (
         <div className="scan-progress__expanded" id={`scan-progress-detail-${jobId}`}>
           <div className="scan-progress__expanded-label">Per-dimension</div>
-          {dims.map((d) => <DimRow key={d.id} dim={d} />)}
+          {(() => {
+            // Best estimate for pending dims: the largest queue total observed
+            // among dims that have actually started (running or done). Falls
+            // back to whatever total the backend gave (project-wide ceiling).
+            const observed = dims
+              .filter((d) => d.state !== 'pending')
+              .map((d) => d.files?.total ?? 0)
+              .filter((n) => n > 0);
+            const fallbackTotal = observed.length > 0 ? Math.max(...observed) : 0;
+            return dims.map((d) => <DimRow key={d.id} dim={d} fallbackTotal={fallbackTotal} />);
+          })()}
         </div>
       )}
       {consoleOpen && <ConsoleLogViewer logs={job.logs} />}
