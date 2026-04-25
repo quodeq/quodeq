@@ -2636,9 +2636,13 @@
   font: inherit;
   color: inherit;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, box-shadow 0.15s;
 }
-.scan-progress__row:hover { background: var(--color-surface-alt); }
+.scan-progress__row:hover {
+  background: var(--color-surface-alt);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+.scan-progress__row:hover .scan-progress__caret { color: var(--color-accent); }
 .scan-progress__row:focus-visible { outline: 1px solid var(--color-accent); outline-offset: -1px; }
 
 .scan-progress__error {
@@ -2654,20 +2658,29 @@
   gap: 4px;
   padding: 4px 6px;
   background: transparent;
-  border: 0;
+  border: 1px solid transparent;
   color: var(--color-text-muted);
   cursor: pointer;
   position: relative;
   border-radius: 2px;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 .scan-progress__console-btn:hover {
-  color: var(--color-text);
+  color: var(--color-accent);
   background: var(--color-surface-alt);
+  border-color: var(--color-border);
 }
 .scan-progress__console-btn:focus-visible {
   outline: 1px solid var(--color-accent);
   outline-offset: 1px;
+}
+.scan-progress__console-btn--open {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+.scan-progress__console-btn--open:hover {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
 }
 .scan-progress__console-icon { width: 14px; height: 14px; }
 .scan-progress__console-caret { font-size: 10px; line-height: 1; }

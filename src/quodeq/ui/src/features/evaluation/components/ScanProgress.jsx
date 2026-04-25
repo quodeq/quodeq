@@ -125,10 +125,11 @@ function ConsoleButton({ open, showDot, onToggle }) {
   return (
     <button
       type="button"
-      className="scan-progress__console-btn"
+      className={`scan-progress__console-btn${open ? ' scan-progress__console-btn--open' : ''}`}
       onClick={(e) => { e.stopPropagation(); onToggle(); }}
       aria-label={open ? 'Hide console' : 'Show console'}
       aria-expanded={open}
+      title={open ? 'Hide console' : 'Show console'}
     >
       <svg className="scan-progress__console-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <rect x="1" y="2" width="14" height="12" rx="2" />
