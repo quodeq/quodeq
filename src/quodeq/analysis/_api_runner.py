@@ -142,9 +142,9 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
         raw = str(exc)
         salvaged = _salvage_partial_findings(raw)
         if salvaged:
-            _log.warning("Instructor validation failed — salvaged %d findings from malformed response", len(salvaged))
+            _log.debug("Instructor validation failed — salvaged %d findings from malformed response", len(salvaged))
             return salvaged
-        _log.warning("Instructor validation failed — no findings salvaged: %s", str(exc)[:200])
+        _log.debug("Instructor validation failed — no findings salvaged: %s", str(exc)[:200])
         return []
 
 
