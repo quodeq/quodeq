@@ -271,11 +271,14 @@
   50% { opacity: 0.55; }
 }
 
-/* Meta grid */
+/* Meta grid — flex with wrap. Each item is sized to its content; the
+   Job ID item gets `flex: 1` so the long UUID + copy row absorbs the
+   leftover horizontal space rather than leaving a dead gap. */
 .job-meta {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 28px;
   margin-bottom: 20px;
   padding: 16px;
   background: var(--color-bg);
@@ -288,10 +291,15 @@
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  flex: 0 0 auto;
+}
+
+.job-meta-item--id {
+  flex: 1 1 220px;
 }
 
 .job-meta-item--full {
-  grid-column: 1 / -1;
+  flex: 0 0 100%;
 }
 
 .job-meta-label {
@@ -2623,43 +2631,78 @@
   border-bottom: 1px solid var(--color-border-soft, var(--color-border));
 }
 
-.scan-progress {
-  /* Negative margin so the hover bg can extend visually past the row's
-     content while the row itself still sits at the panel's 24px inset. */
-  margin: 0 -10px;
-}
-
 .scan-progress__row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   width: 100%;
-  padding: 9px 10px;
-  background: transparent;
-  border: 0;
-  border-radius: 4px;
-  text-align: left;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-  transition: background 0.15s, box-shadow 0.15s;
+  padding: 12px 8px;
 }
-.scan-progress__row:hover {
-  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+
+.scan-progress__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
-.scan-progress__row:hover .scan-progress__caret {
-  color: var(--color-accent);
-  transform: translateX(2px);
-}
-.scan-progress__row:hover .scan-progress__bar {
-  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface-alt));
-}
-.scan-progress__row:focus-visible {
-  outline: 1px solid var(--color-accent);
-  outline-offset: -1px;
-}
+
 .scan-progress__caret { transition: transform 0.18s, color 0.15s; }
+
+/* Detail toggle: a real button next to the console toggle. Same visual
+   language as .scan-progress__console-btn (ghost border, accent on
+   hover, accent fill when open) so the two read as a paired cluster. */
+.scan-progress__detail-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.scan-progress__detail-toggle:hover {
+  color: var(--color-accent);
+  background: var(--color-surface-alt);
+  border-color: var(--color-border);
+}
+.scan-progress__detail-toggle:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+.scan-progress__detail-toggle--open {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+.scan-progress__detail-toggle--open:hover {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+/* Stack the active label on top of an invisible ghost label sized to the
+   longest possible text ("details") so the button — and therefore the
+   1fr progress bar to its left — does not reflow when toggling. */
+.scan-progress__detail-label {
+  display: inline-grid;
+  line-height: 1;
+}
+.scan-progress__detail-label-ghost,
+.scan-progress__detail-label-active {
+  grid-area: 1 / 1;
+}
+.scan-progress__detail-label-ghost {
+  visibility: hidden;
+  pointer-events: none;
+}
+.scan-progress__detail-label-active {
+  text-align: center;
+}
 
 .scan-progress__error {
   padding: 8px 10px;
@@ -2718,9 +2761,9 @@
 }
 
 .scan-progress__bar {
-  height: 4px;
+  height: 6px;
   background: var(--color-surface-alt);
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
 }
 .scan-progress__bar-fill {
@@ -2751,22 +2794,27 @@
 }
 
 .scan-progress__caret {
-  color: var(--color-text-dim, var(--color-text-muted));
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 1;
   user-select: none;
   transition: transform 0.18s;
 }
 .scan-progress__caret--open {
   transform: rotate(90deg);
-  color: var(--color-text-muted);
 }
 
 .scan-progress__expanded {
   border-top: 1px solid var(--color-border-soft, var(--color-border));
-  padding: 10px 10px 12px;
+  padding: 14px 8px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* Console sits as a sibling of __row inside .scan-progress; give it a
+   bit of breathing room so it doesn't butt up against the row above. */
+.scan-progress > .console-shell {
+  margin-top: 8px;
 }
 
 .scan-progress__expanded-label {
@@ -2777,12 +2825,19 @@
   margin-bottom: 2px;
 }
 
+/* Dim row: [icon | name | progress bar (flex) | meta]. The meta column
+   is `auto` — grid sizes it to the widest meta string across all rows,
+   keeping numbers vertically aligned (tabular-nums) without the ch-based
+   over-allocation that previously squashed the bar. */
 .scan-progress__dim {
   display: grid;
-  grid-template-columns: 14px 130px 1fr 240px;
-  gap: 12px;
+  grid-template-columns: 14px 110px minmax(0, 1fr) auto;
+  gap: 14px;
   align-items: center;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  padding: 8px 4px;
 }
 .scan-progress__dim--pending { color: var(--color-text-dim, var(--color-text-muted)); }
 
@@ -2790,14 +2845,20 @@
   font-size: 11px;
   color: var(--color-text-dim, var(--color-text-muted));
   text-align: center;
+  line-height: 1;
 }
 .scan-progress__dim-icon--done    { color: var(--color-success, #56d364); }
 .scan-progress__dim-icon--running { color: var(--color-accent); }
-.scan-progress__dim-icon--partial { color: var(--color-warn, #d29922); }
+/* `partial` is no longer applied at runtime (done = green). Kept defined
+   so any stray markup doesn't fall back to default browser styling. */
+.scan-progress__dim-icon--partial { color: var(--color-success, #56d364); }
 
 .scan-progress__dim-name {
   color: var(--color-text);
   text-transform: lowercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .scan-progress__dim--pending .scan-progress__dim-name { color: var(--color-text-dim, var(--color-text-muted)); }
 
@@ -2806,6 +2867,9 @@
   color: var(--color-text-muted);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .scan-progress__dim-meta-pending {
   color: var(--color-text-dim, var(--color-text-muted));

@@ -40,17 +40,19 @@ function DimRow({ dim, fallbackTotal }) {
   // Pending dims don't have a real queue yet. Use the running/done dims'
   // queue total as a better estimate than the project-wide upper bound.
   const total = isPending && fallbackTotal ? fallbackTotal : (dim.files?.total ?? 0);
-  const p = pct(taken, total);
+  // When the dimension reports `done`, force the bar to 100% even if
+  // `files.taken < files.total` (incremental skips, dismissed files, etc.).
+  // Backend `done` is the source of truth — count drift shouldn't make a
+  // green dimension look red.
   const isDone = dim.state === 'done';
   const isRunning = dim.state === 'running';
-
-  const isPartial = isDone && total > 0 && taken < total;
+  const p = isDone ? 100 : pct(taken, total);
 
   let icon = '○';
   let iconClass = '';
   if (isDone) {
-    icon = isPartial ? '◐' : '✓';
-    iconClass = isPartial ? 'scan-progress__dim-icon--partial' : 'scan-progress__dim-icon--done';
+    icon = '✓';
+    iconClass = 'scan-progress__dim-icon--done';
   } else if (isRunning) {
     icon = '▶';
     iconClass = 'scan-progress__dim-icon--running';
@@ -64,20 +66,17 @@ function DimRow({ dim, fallbackTotal }) {
   } else if (isDone) {
     meta = (
       <>
-        {isPartial ? (
-          <>
-            {`${taken} / ${total}`} · <span className="scan-progress__partial">partial</span>
-          </>
-        ) : (
-          total > 0 ? `${total} files` : ''
-        )}
+        {total > 0 ? `${taken} files` : ''}
         {dim.violations > 0 && <> · <span className="scan-progress__v">{dim.violations}v</span></>}
         {dim.compliance > 0 && <> · <span className="scan-progress__c">{dim.compliance}c</span></>}
         {dim.elapsedS != null && <> · {formatClock(dim.elapsedS)}</>}
       </>
     );
   } else {
-    let budgetPart;
+    // Only show a clock segment when we actually have a number to print.
+    // Without this guard, a running dim with no elapsed time yields a
+    // dangling "· —" tail.
+    let budgetPart = null;
     if (dim.budgetS) {
       const overrun = dim.elapsedS != null && dim.elapsedS > dim.budgetS;
       const cls = overrun ? 'scan-progress__budget scan-progress__budget--overrun' : 'scan-progress__budget';
@@ -86,7 +85,7 @@ function DimRow({ dim, fallbackTotal }) {
           {formatClock(dim.elapsedS)} / {formatClock(dim.budgetS)} budget
         </span>
       );
-    } else {
+    } else if (dim.elapsedS != null) {
       budgetPart = <span className="scan-progress__budget">{formatClock(dim.elapsedS)}</span>;
     }
     meta = (
@@ -95,15 +94,12 @@ function DimRow({ dim, fallbackTotal }) {
         {dim.activeAgents > 0 && <> · {dim.activeAgents} agents</>}
         {dim.violations > 0 && <> · <span className="scan-progress__v">{dim.violations}v</span></>}
         {dim.compliance > 0 && <> · <span className="scan-progress__c">{dim.compliance}c</span></>}
-        {' · '}
-        {budgetPart}
+        {budgetPart && <> · {budgetPart}</>}
       </>
     );
   }
 
-  const fillClass = isDone
-    ? (isPartial ? 'scan-progress__bar-fill--partial' : 'scan-progress__bar-fill--done')
-    : '';
+  const fillClass = isDone ? 'scan-progress__bar-fill--done' : '';
 
   return (
     <div className={`scan-progress__dim${isPending ? ' scan-progress__dim--pending' : ''}`}>
@@ -200,12 +196,6 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
       try { localStorage.setItem(CONSOLE_DOT_DISMISSED_KEY, '1'); } catch { /* ignore */ }
     }
   }
-  function rowKey(e) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      toggleDetail();
-    }
-  }
 
   // Failed / lost: show the error message inline above the progress bar.
   const errorBanner = isFailed
@@ -217,16 +207,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   return (
     <div className="scan-progress">
       {errorBanner}
-      <div
-        className="scan-progress__row"
-        role="button"
-        tabIndex={0}
-        onClick={toggleDetail}
-        onKeyDown={rowKey}
-        aria-expanded={detailOpen}
-        aria-controls={`scan-progress-detail-${jobId}`}
-        aria-label={detailOpen ? 'Hide per-dimension detail' : 'Show per-dimension detail'}
-      >
+      <div className="scan-progress__row">
         <div className="scan-progress__bar-wrap">
           <div className="scan-progress__bar">
             <div className="scan-progress__bar-fill" style={{ width: `${overallPct}%` }} />
@@ -241,8 +222,26 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
             )}
           </div>
         </div>
-        <span className={`scan-progress__caret${detailOpen ? ' scan-progress__caret--open' : ''}`} aria-hidden="true">▸</span>
-        <ConsoleButton open={consoleOpen} showDot={showDot} onToggle={toggleConsole} />
+        <div className="scan-progress__actions">
+          <button
+            type="button"
+            className={`scan-progress__detail-toggle${detailOpen ? ' scan-progress__detail-toggle--open' : ''}`}
+            onClick={toggleDetail}
+            aria-expanded={detailOpen}
+            aria-controls={`scan-progress-detail-${jobId}`}
+            title={detailOpen ? 'Hide per-dimension detail' : 'Show per-dimension detail'}
+          >
+            <span className="scan-progress__detail-label">
+              {/* Ghost label reserves the width of the longest label so the
+                  button (and therefore the progress bar to its left) doesn't
+                  reflow when toggling between "details" and "hide". */}
+              <span className="scan-progress__detail-label-ghost" aria-hidden="true">details</span>
+              <span className="scan-progress__detail-label-active">{detailOpen ? 'hide' : 'details'}</span>
+            </span>
+            <span className={`scan-progress__caret${detailOpen ? ' scan-progress__caret--open' : ''}`} aria-hidden="true">▸</span>
+          </button>
+          <ConsoleButton open={consoleOpen} showDot={showDot} onToggle={toggleConsole} />
+        </div>
       </div>
       {detailOpen && dims.length > 0 && (
         <div className="scan-progress__expanded" id={`scan-progress-detail-${jobId}`}>
