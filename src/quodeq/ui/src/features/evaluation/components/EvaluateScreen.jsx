@@ -50,12 +50,15 @@ function ActiveProviderBadge({ storage = localStorage }) {
   );
 }
 
-function EvaluateHeader({ isRunning }) {
+function EvaluateHeader() {
+  // Page title stays steady ("evaluate"); the live "in progress / failed /
+  // done" state is carried by the JobHeader card title below to avoid
+  // doubling the same status on screen.
   return (
     <header className="evaluate-header evaluate-header--terminal">
       <div className="evaluate-header__left">
         <TermHeader
-          name={`evaluate${isRunning ? ' · running' : ''}`}
+          name="evaluate"
           sub="run a comprehensive code quality evaluation on any repository"
         />
       </div>
@@ -105,7 +108,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
 
   return (
     <section className="evaluate-screen">
-      <EvaluateHeader isRunning={job?.status === 'running'} />
+      <EvaluateHeader />
 
       <div className="evaluate-content">
         {!job && selectedProject && (

@@ -41,8 +41,16 @@ async function pollSingleDimension(dim, project, runId, refs, setLiveViolations,
 
 function handleJobUpdate(updated, refs, setJob, callbacks) {
   setJob((prev) => ({ ...updated, repo: prev?.repo }));
-  if (updated.dimensions?.length && !refs.requestedDimensions.length) {
+  // Track the latest known dimension list so external (CLI-launched) runs
+  // surface every dimension in the live feed. Local runs already have it
+  // populated via parseDimensions(payload); for external runs the list
+  // arrives via the polled job. Write through to both the persistent ref
+  // and the local closure copy so a polling restart doesn't lose it.
+  if (updated.dimensions?.length) {
     refs.requestedDimensions = updated.dimensions;
+    if (refs.requestedDimensionsRef) {
+      refs.requestedDimensionsRef.current = updated.dimensions;
+    }
   }
   if (updated.phase === 'analyzing' && updated.currentDimension) {
     refs.partialDimensions.add(updated.currentDimension);
@@ -118,6 +126,7 @@ function createJobPoller(refs, setters, startDimensionPolling, getEvaluation) {
     const localRefs = {
       requestedDimensions: requestedDimensionsRef.current,
       partialDimensions: partialDimensionsRef.current,
+      requestedDimensionsRef,
       dimPollingStarted: false,
     };
     const callbacks = {

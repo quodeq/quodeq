@@ -80,7 +80,7 @@ function JobMeta({ job, projectName }) {
         </div>
       )}
       {isExternal ? <ExternalRunBadge /> : <JobProviderBadge />}
-      <div className="job-meta-item">
+      <div className="job-meta-item job-meta-item--id">
         <span className="job-meta-label">Job ID</span>
         <div className="job-meta-id-row">
           <code className="job-meta-code job-meta-code--muted">{job.jobId}</code>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import usePretextHeight from '../../../hooks/usePretextHeight.js';
 
 /**
@@ -8,9 +8,44 @@ import usePretextHeight from '../../../hooks/usePretextHeight.js';
  * outside the scroll content) pins the scroll to the bottom; manual
  * scrolling away from the bottom turns it off so the user can read past
  * output without being yanked back down.
+ *
+ * Logs from the runner can carry SGR escape sequences (colourised level
+ * tokens, etc.). We render the visible terminal output, not the raw
+ * bytes, so we strip both real ESC-prefixed CSI sequences and the bare
+ * `[0;34m`-style remnants that show up when the ESC byte was lost in
+ * transport. Consecutive identical lines are also collapsed — the runner
+ * sometimes emits the same status both via a coloured logger and a plain
+ * stdout echo, which doubled every row in the live view.
  */
 
 const SCROLL_BOTTOM_TOLERANCE = 8;
+// Real ANSI: \x1b[ ... <letter>. Bare CSI fallback: [0;34m, [0m, etc.
+const ANSI_ESC_RE = /\x1b\[[\d;?]*[A-Za-z]/g;
+const ANSI_BARE_RE = /\[(?:\d+(?:;\d+)*)?m/g;
+
+function cleanLine(text) {
+  if (text == null) return '';
+  return String(text)
+    .replace(ANSI_ESC_RE, '')
+    .replace(ANSI_BARE_RE, '')
+    // Collapse runs of inner whitespace introduced where escape codes
+    // hugged a token (e.g. "[0m   [performance]" → "   [performance]").
+    .replace(/[ \t]{2,}/g, ' ')
+    .trimEnd();
+}
+
+function dedupeConsecutive(lines) {
+  if (!lines || lines.length === 0) return lines;
+  const out = [];
+  let prev = null;
+  for (const line of lines) {
+    const key = line.trim();
+    if (key && key === prev) continue;
+    out.push(line);
+    prev = key;
+  }
+  return out;
+}
 
 function LogLine({ text }) {
   const ref = useRef(null);
@@ -45,6 +80,11 @@ export default function ConsoleLogViewer({ logs }) {
   const lastLogCount = useRef(0);
   const programmaticScroll = useRef(false);
 
+  const cleanedLogs = useMemo(
+    () => dedupeConsecutive((logs ?? []).map(cleanLine)),
+    [logs],
+  );
+
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -54,12 +94,12 @@ export default function ConsoleLogViewer({ logs }) {
   }, []);
 
   useEffect(() => {
-    const count = logs?.length || 0;
+    const count = cleanedLogs.length;
     if (count !== lastLogCount.current) {
       lastLogCount.current = count;
       if (follow) scrollToBottom();
     }
-  }, [logs?.length, follow, scrollToBottom]);
+  }, [cleanedLogs.length, follow, scrollToBottom]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -85,10 +125,10 @@ export default function ConsoleLogViewer({ logs }) {
   return (
     <div className="console-shell">
       <div className="console-scroll" ref={scrollRef}>
-        {!logs || logs.length === 0 ? (
+        {cleanedLogs.length === 0 ? (
           <div className="console-log-empty">Waiting for output\u2026</div>
         ) : (
-          logs.map((line, i) => <LogLine key={i} text={line} />)
+          cleanedLogs.map((line, i) => <LogLine key={i} text={line} />)
         )}
       </div>
       <FollowToggle active={follow} onToggle={handleToggle} />
