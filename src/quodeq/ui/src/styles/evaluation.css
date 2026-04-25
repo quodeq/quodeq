@@ -436,6 +436,8 @@
   color: var(--color-console-text);
   white-space: pre-wrap;
   word-break: break-word;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 22px;
 }
 
 .console-log-empty {
