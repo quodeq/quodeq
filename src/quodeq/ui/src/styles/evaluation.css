@@ -2593,9 +2593,9 @@
 
 .scan-progress__row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
   padding: 9px 18px;
   background: transparent;
@@ -2607,6 +2607,47 @@
   transition: background 0.15s;
 }
 .scan-progress__row:hover { background: var(--color-surface-alt); }
+.scan-progress__row:focus-visible { outline: 1px solid var(--color-accent); outline-offset: -1px; }
+
+.scan-progress__error {
+  padding: 8px 18px;
+  font-size: 11px;
+  color: var(--color-sev-critical-text, #f85149);
+  border-bottom: 1px solid var(--color-border-soft, var(--color-border));
+}
+
+.scan-progress__console-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: transparent;
+  border: 0;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  position: relative;
+  border-radius: 2px;
+  transition: color 0.15s, background 0.15s;
+}
+.scan-progress__console-btn:hover {
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+}
+.scan-progress__console-btn:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+.scan-progress__console-icon { width: 14px; height: 14px; }
+.scan-progress__console-caret { font-size: 10px; line-height: 1; }
+.scan-progress__console-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
 
 .scan-progress__bar-wrap {
   display: flex;

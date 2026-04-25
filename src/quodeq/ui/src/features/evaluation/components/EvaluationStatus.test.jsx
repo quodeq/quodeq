@@ -4,6 +4,7 @@ import EvaluationStatus from './EvaluationStatus.jsx';
 
 // Mock child components so we isolate what we care about.
 vi.mock('./LiveViolationsFeed.jsx', () => ({ default: () => null }));
+vi.mock('./ScanProgress.jsx', () => ({ default: () => null }));
 
 const baseJob = {
   jobId: 'ext-test',

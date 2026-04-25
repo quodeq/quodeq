@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { getEvaluationProgress } from '../../../api/index.js';
+import ConsoleLogViewer from './ConsoleLogViewer.jsx';
+import { CONSOLE_DOT_DISMISSED_KEY } from '../../../constants.js';
 
 const POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATES = new Set(['done', 'failed', 'cancelled']);
+const STATUS_MARKERS = { arrow: '\u2192', check: '\u2713', error: 'Error:', failed: 'failed' };
 
 function formatClock(s) {
   if (s == null || !Number.isFinite(s)) return '—';
@@ -15,6 +18,20 @@ function formatClock(s) {
 function pct(taken, total) {
   if (!total || total <= 0) return 0;
   return Math.min(100, Math.round((taken / total) * 100));
+}
+
+function isStatusLine(line) {
+  const prefixes = [STATUS_MARKERS.arrow, STATUS_MARKERS.check, STATUS_MARKERS.error];
+  return prefixes.some((p) => line.startsWith(p)) || line.includes(STATUS_MARKERS.failed);
+}
+
+function lastRelevantLog(logs) {
+  if (!logs?.length) return null;
+  for (let i = logs.length - 1; i >= 0; i--) {
+    const line = logs[i].trim();
+    if (isStatusLine(line)) return line;
+  }
+  return null;
 }
 
 function DimRow({ dim }) {
@@ -64,7 +81,6 @@ function DimRow({ dim }) {
       </>
     );
   } else {
-    // running
     let budgetPart;
     if (dim.budgetS) {
       const overrun = dim.elapsedS != null && dim.elapsedS > dim.budgetS;
@@ -105,9 +121,40 @@ function DimRow({ dim }) {
   );
 }
 
-export default function ScanProgress({ jobId, status }) {
+function ConsoleButton({ open, showDot, onToggle }) {
+  return (
+    <button
+      type="button"
+      className="scan-progress__console-btn"
+      onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      aria-label={open ? 'Hide console' : 'Show console'}
+      aria-expanded={open}
+    >
+      <svg className="scan-progress__console-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1" y="2" width="14" height="12" rx="2" />
+        <polyline points="4.5,6.5 7,9 4.5,11.5" />
+        <line x1="9" y1="11" x2="12" y2="11" />
+      </svg>
+      <span className="scan-progress__console-caret">{open ? '▾' : '▸'}</span>
+      {showDot && !open && <span className="scan-progress__console-dot" />}
+    </button>
+  );
+}
+
+export default function ScanProgress({ job, hasEvaluations = false }) {
+  const jobId = job?.jobId;
+  const status = job?.status;
+  const isRunning = status === 'running';
+  const isFailed = status === 'failed';
+  const isLost = status === 'lost';
+
   const [progress, setProgress] = useState(null);
-  const [open, setOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [consoleOpen, setConsoleOpen] = useState(false);
+  const [showDot, setShowDot] = useState(() => {
+    if (hasEvaluations) return false;
+    try { return !localStorage.getItem(CONSOLE_DOT_DISMISSED_KEY); } catch { return true; }
+  });
   const timerRef = useRef(null);
   const isTerminal = TERMINAL_STATES.has(status);
 
@@ -120,7 +167,7 @@ export default function ScanProgress({ jobId, status }) {
         const data = await getEvaluationProgress(jobId);
         if (!stopped) setProgress(data);
       } catch {
-        // ignore — progress is best-effort
+        /* progress is best-effort */
       }
     }
 
@@ -134,26 +181,54 @@ export default function ScanProgress({ jobId, status }) {
     };
   }, [jobId, isTerminal]);
 
-  if (!progress) return null;
+  if (!jobId) return null;
 
-  const dims = progress.dimensions || [];
+  const dims = progress?.dimensions || [];
   const totalFiles = dims.reduce((acc, d) => acc + (d.files?.total ?? 0), 0);
   const takenFiles = dims.reduce((acc, d) => acc + (d.files?.taken ?? 0), 0);
   const overallPct = pct(takenFiles, totalFiles);
-  const phaseLabel = progress.currentDimension
+  const inlineLabel = progress?.currentDimension
     ? <>running <span className="scan-progress__dim-active">{progress.currentDimension}</span></>
-    : progress.phase
+    : progress?.phase
       ? <>phase: <span className="scan-progress__dim-active">{progress.phase}</span></>
+      : null;
+
+  function toggleDetail() {
+    setDetailOpen((v) => !v);
+  }
+  function toggleConsole() {
+    setConsoleOpen((v) => !v);
+    if (showDot) {
+      setShowDot(false);
+      try { localStorage.setItem(CONSOLE_DOT_DISMISSED_KEY, '1'); } catch { /* ignore */ }
+    }
+  }
+  function rowKey(e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggleDetail();
+    }
+  }
+
+  // Failed / lost: show the error message inline above the progress bar.
+  const errorBanner = isFailed
+    ? <div className="scan-progress__error">{lastRelevantLog(job.logs) || 'Analysis failed'}</div>
+    : isLost
+      ? <div className="scan-progress__error">Server restarted — job tracking lost</div>
       : null;
 
   return (
     <div className="scan-progress">
-      <button
-        type="button"
+      {errorBanner}
+      <div
         className="scan-progress__row"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
+        role="button"
+        tabIndex={0}
+        onClick={toggleDetail}
+        onKeyDown={rowKey}
+        aria-expanded={detailOpen}
         aria-controls={`scan-progress-detail-${jobId}`}
+        aria-label={detailOpen ? 'Hide per-dimension detail' : 'Show per-dimension detail'}
       >
         <div className="scan-progress__bar-wrap">
           <div className="scan-progress__bar">
@@ -161,22 +236,24 @@ export default function ScanProgress({ jobId, status }) {
           </div>
           <div className="scan-progress__meta">
             <span>
-              <strong>{takenFiles} / {totalFiles}</strong> files · {overallPct}%
-              {phaseLabel && <> · {phaseLabel}</>}
+              {totalFiles > 0 ? <><strong>{takenFiles} / {totalFiles}</strong> files · {overallPct}%</> : <strong>preparing…</strong>}
+              {isRunning && inlineLabel && <> · {inlineLabel}</>}
             </span>
-            {progress.totalElapsedS != null && (
+            {progress?.totalElapsedS != null && (
               <span><strong>{formatClock(progress.totalElapsedS)}</strong> total</span>
             )}
           </div>
         </div>
-        <span className={`scan-progress__caret${open ? ' scan-progress__caret--open' : ''}`} aria-hidden="true">▸</span>
-      </button>
-      {open && (
+        <span className={`scan-progress__caret${detailOpen ? ' scan-progress__caret--open' : ''}`} aria-hidden="true">▸</span>
+        <ConsoleButton open={consoleOpen} showDot={showDot} onToggle={toggleConsole} />
+      </div>
+      {detailOpen && dims.length > 0 && (
         <div className="scan-progress__expanded" id={`scan-progress-detail-${jobId}`}>
           <div className="scan-progress__expanded-label">Per-dimension</div>
           {dims.map((d) => <DimRow key={d.id} dim={d} />)}
         </div>
       )}
+      {consoleOpen && <ConsoleLogViewer logs={job.logs} />}
     </div>
   );
 }
