@@ -48,8 +48,9 @@ def update(standard_id: str, data: dict, evaluators_dir: Path, io: JsonIO) -> St
         raise FileNotFoundError(f"Standard not found: {standard_id}")
     if io.read(path).get("managed", False):
         raise PermissionError(f"Cannot edit managed standard '{standard_id}'")
-    io.write(path, {**data, "id": standard_id, "type": _TYPE_CUSTOM, "managed": False})
-    return build_detail(io.read(path))
+    payload = {**data, "id": standard_id, "type": _TYPE_CUSTOM, "managed": False}
+    io.write(path, payload)
+    return build_detail(payload)
 
 
 def delete(standard_id: str, evaluators_dir: Path, compiled_dir: Path,

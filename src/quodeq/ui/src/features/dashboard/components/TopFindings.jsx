@@ -10,6 +10,7 @@
  * dimension name, sorted newest-severity-first, and the top `limit` rows are
  * rendered. No extra API call is required.
  */
+import { useMemo } from 'react';
 import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
 import { GridTable, GridRow, GridCell, SectionLabel, SevBadge } from '../../../components/terminal/index.js';
 
@@ -80,9 +81,12 @@ function shortDim(name) {
  * @param {(v: object) => void} [props.onFindingClick]
  */
 export default function TopFindings({ dimensions, limit = DEFAULT_LIMIT, onFindingClick }) {
-  const findings = collectFindings(dimensions)
-    .sort((a, b) => sevRank(a.severity) - sevRank(b.severity))
-    .slice(0, limit);
+  const findings = useMemo(
+    () => collectFindings(dimensions)
+      .sort((a, b) => sevRank(a.severity) - sevRank(b.severity))
+      .slice(0, limit),
+    [dimensions, limit],
+  );
 
   if (findings.length === 0) return null;
 
