@@ -24,7 +24,7 @@ Every violation must cite code that is directly visible in the provided source.
 For violations:
 - **critical** — An exploitable vulnerability or production-breaking bug with clear, demonstrable impact visible in the code. Examples: SQL injection with user-controlled input reaching a raw query; hardcoded secret committed to source; authentication bypass; data loss on a code path that will execute in production. Do NOT use `critical` for missing best-practice controls, hardening gaps, defense-in-depth concerns, or hypothetical attack scenarios — those are `major` or `minor`. If you cannot describe a concrete attack or failure that this code enables right now, it is not critical.
 - **major** — Significant quality issue or real security weakness that should be fixed, but not directly exploitable or production-breaking as-is.
-- **minor** — Style issue, minor inefficiency, or improvement opportunity.
+- **minor** — A real, observable defect in the quoted code: a style violation, a measurable inefficiency, or a concrete improvement opportunity. `minor` is NOT a dumping ground for findings that fail the higher-severity bar — it has its own bar (see Severity self-check). Speculative concerns, hedged reasoning, and "could be slow under hypothetical load" findings are NOT minors; they are dropped.
 
 For compliance — use the same severity to indicate the importance of what's done right:
 - **critical** — Security best practice correctly implemented, safe data handling
@@ -39,14 +39,18 @@ Why: test files routinely contain patterns that look vulnerable (`eval(x)`, hard
 
 ## Severity self-check
 
-Before finalizing ANY violation, verify:
+Before finalizing ANY violation — including `minor` — verify:
 
 1. **Evidence**: Can you quote the exact line of code that IS the problem? If you can only point to what's *missing* or *absent*, drop the finding.
 2. **Concreteness**: Can you state the problem in one specific sentence that refers to the quoted code? Vague concerns ("might not be safe", "could be improved") do not pass.
+3. **No hedging**: Does your reasoning rely on "could", "might", "may", "should consider", "if X were larger", "if this were async", "in a hot path"? If yes, the finding is conditional on a hypothetical — drop it. A real `minor` describes what the quoted line does wrong *as written today*, not what it might do under imagined load.
+4. **Demonstrable impact**: Can you name the *observable* consequence of the quoted code (a measurable inefficiency, a style rule violated, a concrete improvement)? "Linear scan over a deque", "synchronous I/O blocks event loop", or "could become slow as log grows" without a known load profile are not demonstrable — they are speculation.
 
 Additionally for `critical` and `major`:
 
-3. **Attack/failure scenario**: Can you describe, in one sentence, a specific attack or failure this code enables *as written*? If your reasoning uses "could", "might", "may", or "should consider" — downgrade to `minor`.
-4. **Reachability**: Does this code execute in a realistic production path? Code in test files, examples, or dev-only scaffolding is not `critical`.
+5. **Attack/failure scenario**: Can you describe, in one sentence, a specific attack or failure this code enables *as written*? If your reasoning uses hedge words (see check 3) — downgrade to `minor` only if checks 1–4 still hold; otherwise drop.
+6. **Reachability**: Does this code execute in a realistic production path? Code in test files, examples, or dev-only scaffolding is not `critical`.
 
-If checks 1–2 fail, omit the finding. If checks 3–4 fail, downgrade to `minor` or omit. Being wrong on severity hurts the report more than missing a true positive at a lower severity.
+**Decision rule**: If checks 1–4 fail, **drop the finding entirely** — do NOT relabel it as `minor`. `minor` is not a fallback bucket. If checks 5–6 fail, downgrade to `minor` only when checks 1–4 still hold; otherwise drop.
+
+A clean report with fewer, sharper findings is more valuable than a long report padded with speculative minors.
