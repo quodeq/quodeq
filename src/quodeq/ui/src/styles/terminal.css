@@ -1140,11 +1140,12 @@
 .qd-confirm-btn--confirm {
   background: var(--color-accent, #2f81f7);
   border-color: var(--color-accent, #2f81f7);
-  color: #fff;
+  color: var(--color-on-accent, #fff);
 }
 .qd-confirm-btn--confirm.qd-confirm-btn--danger {
-  background: #da3633;
-  border-color: #da3633;
+  background: var(--color-danger, #da3633);
+  border-color: var(--color-danger, #da3633);
+  color: #fff;
 }
 .qd-confirm-btn--confirm:hover { filter: brightness(1.12); }
 

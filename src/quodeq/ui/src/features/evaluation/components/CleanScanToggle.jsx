@@ -91,7 +91,8 @@ export default function CleanScanToggle({ value, onChange, disabled = false }) {
           <div className="qd-confirm-dialog">
             <h3 className="qd-confirm-title">Clean scan</h3>
             <div className="qd-confirm-message">
-              <p>Drops carry-forward from previous runs. Every file goes through the LLM again — slower, but produces fresh findings under the current prompts and standards.</p>
+              <p>Reanalyze every file from scratch. Slower than a normal scan, but findings will reflect your current standards and settings.</p>
+              <p>Use this after you change a standard, or whenever you want a fresh second opinion.</p>
             </div>
             <div className="qd-confirm-actions clean-scan-confirm-actions">
               <button type="button" className="qd-confirm-btn qd-confirm-btn--cancel" onClick={cancel}>Cancel</button>

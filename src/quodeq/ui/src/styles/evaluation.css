@@ -1020,6 +1020,14 @@
   margin-left: 4px;
 }
 
+.qd-confirm-message p {
+  margin: 0 0 8px;
+}
+
+.qd-confirm-message p:last-child {
+  margin-bottom: 0;
+}
+
 .scope-compact-btn {
   padding: 2px 8px;
   background: var(--color-surface-alt);
