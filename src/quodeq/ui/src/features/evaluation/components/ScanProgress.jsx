@@ -208,7 +208,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
           </div>
           <div className="scan-progress__meta">
             <span>
-              {totalFiles > 0 ? <><strong>{takenFiles} / {totalFiles}</strong> files · {overallPct}%</> : <strong>preparing…</strong>}
+              {totalFiles > 0 ? <><strong>{takenFiles} / {totalFiles}</strong> checks · {overallPct}%</> : <strong>preparing…</strong>}
               {isRunning && inlineLabel && <> · {inlineLabel}</>}
             </span>
             {progress?.totalElapsedS != null && (
