@@ -947,10 +947,85 @@
 }
 
 .scope-toggle-group {
-  margin-bottom: 12px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+}
+
+.re-eval-toggle-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: 12px;
+  min-height: 22px;
+}
+
+.re-eval-toggle-row .scope-toggle-group {
+  margin-bottom: 0;
+}
+
+.clean-scan-toggle {
+  padding: 2px 8px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.clean-scan-toggle:hover:not(:disabled) {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.clean-scan-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.clean-scan-toggle--on {
+  background: var(--color-accent);
+  color: var(--color-on-accent, #fff);
+  border-color: var(--color-accent);
+}
+
+.clean-scan-toggle--on:hover:not(:disabled) {
+  background: var(--color-accent);
+  color: var(--color-on-accent, #fff);
+}
+
+.clean-scan-toggle__dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.clean-scan-confirm-actions {
+  flex-wrap: wrap;
+}
+
+.clean-scan-confirm-meta {
+  font-size: 0.7em;
+  opacity: 0.75;
+  margin-left: 4px;
+}
+
+.qd-confirm-message p {
+  margin: 0 0 8px;
+}
+
+.qd-confirm-message p:last-child {
+  margin-bottom: 0;
 }
 
 .scope-compact-btn {

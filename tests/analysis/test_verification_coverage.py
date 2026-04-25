@@ -146,7 +146,7 @@ class TestRunVerificationStep:
         from quodeq.analysis.subagents._verification import _run_verification_step
         mock_load.return_value = [{"file": "a.py", "p": "", "line": 0}]
         mock_partition.return_value = ([{"file": "a.py"}], [])
-        config = RunConfig(src=tmp_path, language="python")
+        config = RunConfig(src=tmp_path, language="python", options=AnalysisOptions(incremental=True))
         evidence_dir = tmp_path / "evidence"
         evidence_dir.mkdir()
         result = _run_verification_step(config, "security", evidence_dir, ["a.py"], prev_fingerprint={})
@@ -182,7 +182,7 @@ class TestRunVerificationStep:
         from quodeq.analysis.subagents._verification import _run_verification_step
         mock_load.return_value = [{"file": "a.py", "p": "", "line": 0}]
         mock_partition.return_value = ([], [{"file": "a.py"}])
-        config = RunConfig(src=tmp_path, language="python")
+        config = RunConfig(src=tmp_path, language="python", options=AnalysisOptions(incremental=True))
         evidence_dir = tmp_path / "evidence"
         evidence_dir.mkdir()
         _run_verification_step(config, "security", evidence_dir, ["a.py"], prev_fingerprint=None)

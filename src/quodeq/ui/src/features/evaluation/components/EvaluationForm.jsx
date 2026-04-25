@@ -138,7 +138,7 @@ export default function EvaluationForm({ onStart, disabled, selectedProject }) {
         )}
 
         <button type="submit" className="evaluate-submit-btn" disabled={!canSubmit}>
-          {disabled ? 'Running Evaluation...' : 'Start Evaluation'}
+          {disabled ? 'Running...' : 'Scan'}
         </button>
       </form>
 

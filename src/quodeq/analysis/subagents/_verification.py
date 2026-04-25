@@ -112,15 +112,21 @@ def _run_verification_step(
     if not prev_findings:
         return []
 
-    if prev_fingerprint is None:
-        prev_fingerprint, _ = find_previous_fingerprint(evidence_dir, dim_id)
+    if not config.options.incremental:
+        # Clean scan: every previous finding goes back through verification.
+        log_info(f"  [{dim_id}] Clean scan — re-verifying all previous findings")
+        carry_forward: list[dict] = []
+        needs_verify: list[dict] = list(prev_findings)
+    else:
         if prev_fingerprint is None:
-            log_info(f"  [{dim_id}] No previous fingerprint — all findings need verification")
+            prev_fingerprint, _ = find_previous_fingerprint(evidence_dir, dim_id)
+            if prev_fingerprint is None:
+                log_info(f"  [{dim_id}] No previous fingerprint — all findings need verification")
 
-    carry_forward, needs_verify = partition_findings_by_fingerprint(
-        prev_findings, prev_fingerprint, config.src,
-        standards_dir=config.standards_dir, dimension=dim_id,
-    )
+        carry_forward, needs_verify = partition_findings_by_fingerprint(
+            prev_findings, prev_fingerprint, config.src,
+            standards_dir=config.standards_dir, dimension=dim_id,
+        )
     if carry_forward:
         written = write_carry_forward_findings(carry_forward, evidence_dir, dim_id)
         log_info(f"  [{dim_id}] {written} findings carried forward (unchanged files)")
