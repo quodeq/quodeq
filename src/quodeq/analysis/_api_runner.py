@@ -101,13 +101,15 @@ def _salvage_partial_findings(raw_json: str) -> list[dict]:
 
 
 def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
-    """Call LLM via Instructor — returns validated finding dicts."""
+    """Call LLM via Instructor — returns validated finding dicts.
+
+    The OpenAI client owns an httpx connection pool whose sockets count
+    against the process FD limit. Without an explicit close, a long scan
+    (one call per file) accumulates pools until macOS's 256-FD soft cap
+    aborts the dimension with EMFILE on the next queue read.
+    """
     if config.api_base and config.api_base != _OLLAMA_DEFAULT_BASE:
         validate_url_safe(config.api_base, allow_private=True)
-    client = instructor.from_openai(
-        openai.OpenAI(base_url=config.api_base, api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY),
-        mode=instructor.Mode.JSON,
-    )
 
     extra_body: dict = {"reasoning_effort": "none"}
     ctx_size = config.context_size
@@ -133,19 +135,24 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
         create_kwargs["max_tokens"] = config.max_tokens
 
     _log.debug("Calling %s model=%s via Instructor", config.api_base, config.model)
-    try:
-        result = client.chat.completions.create(**create_kwargs)
-        _log.debug("Instructor returned %d findings", len(result.findings))
-        return [f.model_dump() for f in result.findings]
-    except Exception as exc:
-        # Try to salvage valid findings from the malformed response
-        raw = str(exc)
-        salvaged = _salvage_partial_findings(raw)
-        if salvaged:
-            _log.debug("Instructor validation failed — salvaged %d findings from malformed response", len(salvaged))
-            return salvaged
-        _log.debug("Instructor validation failed — no findings salvaged: %s", str(exc)[:200])
-        return []
+    with openai.OpenAI(
+        base_url=config.api_base,
+        api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY,
+    ) as oa_client:
+        client = instructor.from_openai(oa_client, mode=instructor.Mode.JSON)
+        try:
+            result = client.chat.completions.create(**create_kwargs)
+            _log.debug("Instructor returned %d findings", len(result.findings))
+            return [f.model_dump() for f in result.findings]
+        except Exception as exc:
+            # Try to salvage valid findings from the malformed response
+            raw = str(exc)
+            salvaged = _salvage_partial_findings(raw)
+            if salvaged:
+                _log.debug("Instructor validation failed — salvaged %d findings from malformed response", len(salvaged))
+                return salvaged
+            _log.debug("Instructor validation failed — no findings salvaged: %s", str(exc)[:200])
+            return []
 
 
 # ---------------------------------------------------------------------------

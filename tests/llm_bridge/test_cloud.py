@@ -11,6 +11,7 @@ from quodeq.llm_bridge._cloud import check_cloud_connection
 class TestCloudConnection:
     def test_successful_connection(self):
         mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
         mock_choice = MagicMock()
         mock_choice.message.content = "hi"
         mock_response = MagicMock()
@@ -27,10 +28,14 @@ class TestCloudConnection:
 
         assert result["success"] is True
         assert "latency_ms" in result
+        mock_client.__exit__.assert_called_once()
 
     def test_auth_failure(self):
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_client.chat.completions.create.side_effect = Exception("401 Unauthorized")
         with patch("quodeq.llm_bridge._cloud.openai") as mock_openai:
-            mock_openai.OpenAI.return_value.chat.completions.create.side_effect = Exception("401 Unauthorized")
+            mock_openai.OpenAI.return_value = mock_client
             result = check_cloud_connection(
                 api_base="https://openrouter.ai/api/v1",
                 model="test-model",
@@ -39,6 +44,7 @@ class TestCloudConnection:
 
         assert result["success"] is False
         assert "401" in result["error"]
+        mock_client.__exit__.assert_called_once()
 
     def test_missing_openai_package(self):
         with patch("quodeq.llm_bridge._cloud.openai", None):
