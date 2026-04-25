@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 from copy import copy
 from dataclasses import replace
 from collections.abc import Callable
@@ -13,6 +15,22 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.engine._runner_markers import emit_marker
 # NOTE: logging in inner layer — tracked for middleware extraction
 from quodeq.shared.logging import log_info, log_warning
+
+
+def _silence_broken_stdout() -> None:
+    """Redirect stdout/stderr to /dev/null after a BrokenPipeError.
+
+    Once the parent has closed its end of the pipe every subsequent write to
+    stdout/stderr raises BrokenPipeError. The actual analysis work (evidence
+    files, MCP calls, etc.) doesn't depend on those streams — only logging
+    does. Swapping the streams to /dev/null lets remaining dimensions run.
+    """
+    try:
+        devnull = open(os.devnull, "w")  # noqa: SIM115 — long-lived
+        sys.stdout = devnull
+        sys.stderr = devnull
+    except OSError:
+        pass
 
 
 def check_zero_findings(
@@ -64,12 +82,19 @@ def run_incremental_loop(
         log_info(f"\u2192 [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
         try:
             ev = run_dimension_incremental(config, dimension, idx, ctx)
+        except BrokenPipeError:
+            _silence_broken_stdout()
+            ev = None
         except (OSError, KeyError, ValueError, RuntimeError) as exc:
             log_warning(f"[{idx}/{ctx.total}] {dimension} \u2014 incremental failed: {exc}, falling back to full")
             fallback_options = copy(config.options)
             fallback_options.incremental_file_filter = None
             fallback_config = replace(config, options=fallback_options)
-            ev = process_fn(fallback_config, dimension, idx, ctx)
+            try:
+                ev = process_fn(fallback_config, dimension, idx, ctx)
+            except BrokenPipeError:
+                _silence_broken_stdout()
+                ev = None
         if ev:
             log_result_fn(ev, dimension, idx, ctx.total)
             result[dimension] = ev
@@ -102,6 +127,15 @@ def run_per_dimension_loop(
     for idx, dimension in enumerate(dimensions, 1):
         try:
             ev = process_fn(config, dimension, idx, ctx)
+        except BrokenPipeError:
+            # Parent closed the pipe mid-run. The current dim is treated as
+            # skipped — its evidence may already be on disk (scoring will
+            # pick that up via _score_completed_evidence on the API side),
+            # but we don't try to recover it here. Silence stdout so the
+            # remaining dims can run without every log call re-raising.
+            _silence_broken_stdout()
+            skipped_count += 1
+            continue
         except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
             log_warning(f"[{idx}/{ctx.total}] {dimension} \u2014 failed: {exc}")
             skipped_count += 1
