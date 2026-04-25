@@ -3,6 +3,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
 import { useScanData } from '../hooks/useScanData.js';
 import BranchScopeSelector from './BranchScopeSelector.jsx';
+import CleanScanToggle from './CleanScanToggle.jsx';
 import DimensionSelector from './DimensionSelector.jsx';
 import FolderBrowser from './FolderBrowser.jsx';
 
@@ -54,6 +55,7 @@ function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }
 
 function useDimensionSelection(allDimensions, info, branch, scopePath, onStart) {
   const [selectedDims, setSelectedDims] = useState(new Set());
+  const [cleanScan, setCleanScan] = useState('off');
 
   const toggleDim = (id) => {
     setSelectedDims((prev) => {
@@ -65,17 +67,20 @@ function useDimensionSelection(allDimensions, info, branch, scopePath, onStart) 
   };
   const selectAll = () => setSelectedDims(new Set(allDimensions.map((d) => d.id)));
   const clearAll = () => setSelectedDims(new Set());
-  const buildPayload = (extra) => {
-    const payload = { repo: info.path, ...extra };
+  const buildPayload = () => {
+    const payload = { repo: info.path };
     payload.dimensions = [...selectedDims];
     if (branch) payload.branch = branch;
     if (scopePath) payload.scopePath = scopePath;
+    payload.incremental = cleanScan === 'off';
     return payload;
   };
-  const handleStart = () => onStart(buildPayload());
-  const handleIncremental = () => onStart(buildPayload({ incremental: true }));
+  const handleScan = () => {
+    onStart(buildPayload());
+    if (cleanScan === 'once') setCleanScan('off');
+  };
 
-  return { selectedDims, toggleDim, selectAll, clearAll, handleStart, handleIncremental };
+  return { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan };
 }
 
 function useReEvaluateCard(project, onStart, projectInfo) {
@@ -95,7 +100,7 @@ function useReEvaluateCard(project, onStart, projectInfo) {
   const isLocal = info?.location === 'local';
   const { scanData } = useScanData(isLocal ? project : null);
 
-  const { selectedDims, toggleDim, selectAll, clearAll, handleStart, handleIncremental } =
+  const { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan } =
     useDimensionSelection(allDimensions, info, branch, scopePath, onStart);
 
   async function handleCloneToLocal(destination) {
@@ -115,7 +120,7 @@ function useReEvaluateCard(project, onStart, projectInfo) {
 
   return {
     info, error, allDimensions, selectedDims,
-    toggleDim, selectAll, clearAll, handleStart, handleIncremental,
+    toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
     cloneBrowserOpen, setCloneBrowserOpen, cloning, cloneDest, cloneError, handleCloneToLocal,
     isLocal, scanData, branch, setBranch, scopePath, setScopePath,
@@ -185,28 +190,17 @@ function CloneSection({ info, cloning, cloneDest, cloneError, setCloneBrowserOpe
   );
 }
 
-function ActionButtons({ info, project, disabled, canStart, cloning, handleIncremental, handleStart }) {
+function ActionButtons({ disabled, canStart, handleScan }) {
   return (
     <div style={buttonRowStyle}>
       <button
         type="button"
         className="evaluate-submit-btn"
-        style={{ flex: 3 }}
+        style={flexButtonStyle}
         disabled={!canStart}
-        onClick={handleIncremental}
-        title="Only analyze files changed since last evaluation"
+        onClick={handleScan}
       >
-        {disabled ? 'Running...' : 'Scan incremental'}
-      </button>
-      <button
-        type="button"
-        className="evaluate-submit-btn evaluate-submit-btn--secondary"
-        style={{ flex: 1 }}
-        disabled={!canStart}
-        onClick={handleStart}
-        title="Fresh re-evaluation of all selected dimensions"
-      >
-        Clean scan
+        {disabled ? 'Running...' : 'Scan'}
       </button>
     </div>
   );
@@ -215,7 +209,7 @@ function ActionButtons({ info, project, disabled, canStart, cloning, handleIncre
 function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scope }) {
   const { all: allDimensions, selected: selectedDims } = dimensions;
   const {
-    toggleDim, selectAll, clearAll, handleStart, handleIncremental,
+    toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
     cloneBrowserOpen, setCloneBrowserOpen, cloning, cloneDest, cloneError, handleCloneToLocal,
   } = actions;
@@ -240,19 +234,22 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
 
         <CloneSection info={info} cloning={cloning} cloneDest={cloneDest} cloneError={cloneError} setCloneBrowserOpen={setCloneBrowserOpen} />
 
-        {scope.isLocal && (
-          <BranchScopeSelector
-            branches={scope.scanData?.branches}
-            currentBranch={scope.scanData?.currentBranch || scope.branch}
-            projectPath={info.path}
-            onScopeChange={scope.setScopePath}
-            scopePath={scope.scopePath}
-          />
-        )}
+        <div className="re-eval-toggle-row">
+          <CleanScanToggle value={cleanScan} onChange={setCleanScan} disabled={!canStart} />
+          {scope.isLocal && (
+            <BranchScopeSelector
+              branches={scope.scanData?.branches}
+              currentBranch={scope.scanData?.currentBranch || scope.branch}
+              projectPath={info.path}
+              onScopeChange={scope.setScopePath}
+              scopePath={scope.scopePath}
+            />
+          )}
+        </div>
 
         <div className={`re-eval-actions-group${cloning ? ' re-eval-disabled-section' : ''}`}>
           <DimensionSelectionSection allDimensions={allDimensions} selectedDims={selectedDims} cloning={cloning} toggleDim={toggleDim} selectAll={selectAll} clearAll={clearAll} />
-          <ActionButtons info={info} project={project} disabled={disabled} canStart={canStart} cloning={cloning} handleIncremental={handleIncremental} handleStart={handleStart} />
+          <ActionButtons disabled={disabled} canStart={canStart} handleScan={handleScan} />
         </div>
       </div>
 
@@ -271,7 +268,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
 export default function ReEvaluateCard({ project, projectInfo, onStart, disabled }) {
   const {
     info, error, allDimensions, selectedDims,
-    toggleDim, selectAll, clearAll, handleStart, handleIncremental,
+    toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
     cloneBrowserOpen, setCloneBrowserOpen, cloning, cloneDest, cloneError, handleCloneToLocal,
     isLocal, scanData, branch, setBranch, scopePath, setScopePath,
@@ -291,7 +288,7 @@ export default function ReEvaluateCard({ project, projectInfo, onStart, disabled
       disabled={disabled}
       dimensions={{ all: allDimensions, selected: selectedDims }}
       actions={{
-        toggleDim, selectAll, clearAll, handleStart, handleIncremental,
+        toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
         urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
         cloneBrowserOpen, setCloneBrowserOpen, cloning, cloneDest, cloneError, handleCloneToLocal,
       }}

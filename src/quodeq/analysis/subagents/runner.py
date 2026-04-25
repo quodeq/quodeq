@@ -82,12 +82,15 @@ def _prepare_findings_and_queue(
     prev_findings = _load_and_filter_previous(config, dc.dim_id, dc.evidence_dir)
     carry_forward: list[dict] = []
     needs_verify: list[dict] = []
-    if prev_findings:
+    if prev_findings and config.options.incremental:
         prev_fp, _ = find_previous_fingerprint(dc.evidence_dir, dc.dim_id)
         carry_forward, needs_verify = partition_findings_by_fingerprint(
             prev_findings, prev_fp, config.src,
             standards_dir=config.standards_dir, dimension=dc.dim_id,
         )
+    elif prev_findings:
+        # Clean scan: every previous finding goes back through verification.
+        needs_verify = list(prev_findings)
     if carry_forward:
         written = write_carry_forward_findings(carry_forward, dc.evidence_dir, dc.dim_id)
         log_info(f"  [{dc.idx}/{dc.ctx.total}] {dc.dim_id} -- {written} findings carried forward")

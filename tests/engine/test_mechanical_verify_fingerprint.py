@@ -86,7 +86,7 @@ class TestRunVerificationStepFingerprint:
         evidence_dir = tmp_path / "evidence"
         evidence_dir.mkdir(parents=True)
 
-        config = self._make_config(tmp_path)
+        config = self._make_config(tmp_path, incremental=True)
         config.src = src
 
         mock_load_findings.return_value = findings
