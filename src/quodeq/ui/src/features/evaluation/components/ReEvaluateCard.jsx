@@ -235,7 +235,6 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
         <CloneSection info={info} cloning={cloning} cloneDest={cloneDest} cloneError={cloneError} setCloneBrowserOpen={setCloneBrowserOpen} />
 
         <div className="re-eval-toggle-row">
-          <CleanScanToggle value={cleanScan} onChange={setCleanScan} disabled={!canStart} />
           {scope.isLocal && (
             <BranchScopeSelector
               branches={scope.scanData?.branches}
@@ -245,6 +244,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
               scopePath={scope.scopePath}
             />
           )}
+          <CleanScanToggle value={cleanScan} onChange={setCleanScan} disabled={!canStart} />
         </div>
 
         <div className={`re-eval-actions-group${cloning ? ' re-eval-disabled-section' : ''}`}>

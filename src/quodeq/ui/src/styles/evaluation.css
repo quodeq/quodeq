@@ -955,7 +955,7 @@
 .re-eval-toggle-row {
   display: flex;
   flex-direction: row;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   gap: var(--space-2);
   margin-bottom: 12px;
