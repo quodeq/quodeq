@@ -2623,15 +2623,22 @@
   border-bottom: 1px solid var(--color-border-soft, var(--color-border));
 }
 
+.scan-progress {
+  /* Negative margin so the hover bg can extend visually past the row's
+     content while the row itself still sits at the panel's 24px inset. */
+  margin: 0 -10px;
+}
+
 .scan-progress__row {
   display: grid;
   grid-template-columns: 1fr auto auto;
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 9px 0;
+  padding: 9px 10px;
   background: transparent;
   border: 0;
+  border-radius: 4px;
   text-align: left;
   font: inherit;
   color: inherit;
