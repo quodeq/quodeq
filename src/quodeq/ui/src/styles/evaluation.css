@@ -2629,7 +2629,7 @@
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 9px 18px;
+  padding: 9px 0;
   background: transparent;
   border: 0;
   text-align: left;
@@ -2646,7 +2646,7 @@
 .scan-progress__row:focus-visible { outline: 1px solid var(--color-accent); outline-offset: -1px; }
 
 .scan-progress__error {
-  padding: 8px 18px;
+  padding: 8px 0;
   font-size: 11px;
   color: var(--color-sev-critical-text, #f85149);
   border-bottom: 1px solid var(--color-border-soft, var(--color-border));
@@ -2747,7 +2747,7 @@
 
 .scan-progress__expanded {
   border-top: 1px solid var(--color-border-soft, var(--color-border));
-  padding: 10px 18px 12px;
+  padding: 10px 0 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
