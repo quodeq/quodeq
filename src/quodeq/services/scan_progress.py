@@ -234,7 +234,15 @@ def build_scan_progress(
         )
 
         if queue is not None:
-            taken = len(queue.get("taken") or [])
+            # `taken` is a list of batch entries [{"files": [...], "agent": ..., "ts": ...}, ...].
+            # Match FileQueue.stats(): flatten file counts across batches so the
+            # number matches the heartbeat log.
+            taken_entries = queue.get("taken") or []
+            taken = 0
+            for entry in taken_entries:
+                fs = entry.get("files") if isinstance(entry, dict) else None
+                if isinstance(fs, list):
+                    taken += len(fs)
             pending = len(queue.get("pending") or [])
             files = {"taken": taken, "total": taken + pending}
         elif d_state == "pending":
