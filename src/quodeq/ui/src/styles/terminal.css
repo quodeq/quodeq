@@ -1142,12 +1142,17 @@
   border-color: var(--color-accent, #2f81f7);
   color: var(--color-on-accent, #fff);
 }
-.qd-confirm-btn--confirm.qd-confirm-btn--danger {
+.qd-confirm-btn--confirm:hover {
+  background: var(--color-accent, #2f81f7);
+  color: var(--color-on-accent, #fff);
+  filter: brightness(1.12);
+}
+.qd-confirm-btn--confirm.qd-confirm-btn--danger,
+.qd-confirm-btn--confirm.qd-confirm-btn--danger:hover {
   background: var(--color-danger, #da3633);
   border-color: var(--color-danger, #da3633);
   color: #fff;
 }
-.qd-confirm-btn--confirm:hover { filter: brightness(1.12); }
 
 .history-row__muted { color: var(--color-text-muted); }
 .history-evaluations__header {
