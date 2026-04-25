@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getEvaluationProgress } from '../../../api/index.js';
 import ConsoleLogViewer from './ConsoleLogViewer.jsx';
 import { CONSOLE_DOT_DISMISSED_KEY } from '../../../constants.js';
+import { pct, computeOverallProgress } from './scanProgressTotals.js';
 
 const POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATES = new Set(['done', 'failed', 'cancelled']);
@@ -13,11 +14,6 @@ function formatClock(s) {
   const m = Math.floor(total / 60);
   const sec = total % 60;
   return `${m}:${String(sec).padStart(2, '0')}`;
-}
-
-function pct(taken, total) {
-  if (!total || total <= 0) return 0;
-  return Math.min(100, Math.round((taken / total) * 100));
 }
 
 function isStatusLine(line) {
@@ -177,21 +173,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   if (!jobId) return null;
 
   const dims = progress?.dimensions || [];
-  // Per-dim file totals are *not* comparable across dims at runtime:
-  // running dims expose the post-filter queue size while pending dims
-  // fall back to the project-wide ceiling (see scan_progress.py:248-249).
-  // Summing them inflates the headline by ~N× the project file count.
-  // Use the run's project_files for a stable, intuitive denominator and
-  // derive the numerator from the overall work-unit ratio so the
-  // displayed `taken / total` matches the overall percentage.
-  const projectFiles = progress?.projectFiles ?? 0;
-  const workTotal = dims.reduce((acc, d) => acc + (d.files?.total ?? 0), 0);
-  const workTaken = dims.reduce((acc, d) => acc + (d.files?.taken ?? 0), 0);
-  const overallPct = pct(workTaken, workTotal);
-  const totalFiles = projectFiles;
-  const takenFiles = projectFiles > 0 && workTotal > 0
-    ? Math.round((workTaken / workTotal) * projectFiles)
-    : 0;
+  const { totalFiles, takenFiles, overallPct } = computeOverallProgress(progress);
   const inlineLabel = progress?.currentDimension
     ? <>running <span className="scan-progress__dim-active">{progress.currentDimension}</span></>
     : progress?.phase
