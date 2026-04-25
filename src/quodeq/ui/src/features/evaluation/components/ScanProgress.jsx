@@ -177,9 +177,21 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   if (!jobId) return null;
 
   const dims = progress?.dimensions || [];
-  const totalFiles = dims.reduce((acc, d) => acc + (d.files?.total ?? 0), 0);
-  const takenFiles = dims.reduce((acc, d) => acc + (d.files?.taken ?? 0), 0);
-  const overallPct = pct(takenFiles, totalFiles);
+  // Per-dim file totals are *not* comparable across dims at runtime:
+  // running dims expose the post-filter queue size while pending dims
+  // fall back to the project-wide ceiling (see scan_progress.py:248-249).
+  // Summing them inflates the headline by ~N× the project file count.
+  // Use the run's project_files for a stable, intuitive denominator and
+  // derive the numerator from the overall work-unit ratio so the
+  // displayed `taken / total` matches the overall percentage.
+  const projectFiles = progress?.projectFiles ?? 0;
+  const workTotal = dims.reduce((acc, d) => acc + (d.files?.total ?? 0), 0);
+  const workTaken = dims.reduce((acc, d) => acc + (d.files?.taken ?? 0), 0);
+  const overallPct = pct(workTaken, workTotal);
+  const totalFiles = projectFiles;
+  const takenFiles = projectFiles > 0 && workTotal > 0
+    ? Math.round((workTaken / workTotal) * projectFiles)
+    : 0;
   const inlineLabel = progress?.currentDimension
     ? <>running <span className="scan-progress__dim-active">{progress.currentDimension}</span></>
     : progress?.phase
