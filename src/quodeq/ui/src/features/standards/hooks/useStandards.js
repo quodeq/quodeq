@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 
 export const STANDARD_TYPES = { BUILTIN: 'builtin', QUODEQ: 'quodeq', COMMUNITY: 'community', CUSTOM: 'custom' };
@@ -36,15 +36,18 @@ export function useStandards() {
     }
   }, [refresh]);
 
-  const grouped = {
-    [STANDARD_TYPES.BUILTIN]: [],
-    [STANDARD_TYPES.QUODEQ]: [],
-    [STANDARD_TYPES.COMMUNITY]: [],
-    [STANDARD_TYPES.CUSTOM]: [],
-  };
-  for (const s of standards) {
-    if (grouped[s.type]) grouped[s.type].push(s);
-  }
+  const grouped = useMemo(() => {
+    const g = {
+      [STANDARD_TYPES.BUILTIN]: [],
+      [STANDARD_TYPES.QUODEQ]: [],
+      [STANDARD_TYPES.COMMUNITY]: [],
+      [STANDARD_TYPES.CUSTOM]: [],
+    };
+    for (const s of standards) {
+      if (g[s.type]) g[s.type].push(s);
+    }
+    return g;
+  }, [standards]);
 
   return { standards, grouped, loading, error, refresh, handleDelete, handleDuplicate };
 }
