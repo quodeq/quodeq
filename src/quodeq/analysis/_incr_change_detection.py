@@ -5,7 +5,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from quodeq.analysis.fingerprint import _hash_file, _hash_standards
+from quodeq.analysis.fingerprint import _hash_file, _hash_prompts, _hash_standards
 
 _GIT_DIFF_TIMEOUT_S = 10
 
@@ -56,6 +56,12 @@ def detect_changed_files(
         prev_std = prev_fingerprint.get("standards_checksum")
         if current_std != prev_std and prev_std is not None:
             return ChangeDetectionResult(full_reanalysis=True, reason="standards changed")
+
+    prev_prompts = prev_fingerprint.get("prompts_checksum")
+    if prev_prompts is not None:
+        current_prompts = _hash_prompts()
+        if current_prompts != prev_prompts:
+            return ChangeDetectionResult(full_reanalysis=True, reason="prompts changed")
 
     prev_commit = prev_fingerprint.get("git_commit")
     file_set = set(files)

@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.analysis.subagents.verify import resolve_evidence_paths
+from quodeq.config.paths import default_paths
 from quodeq.data.fs.report_parser.runs import list_runs
 from quodeq.shared.validation import validate_path_segment
 
@@ -62,6 +63,29 @@ def _hash_standards(standards_dir: Path, dimension: str) -> str | None:
     return _hash_file(compiled)
 
 
+def _hash_prompts(prompts_dir: Path | None = None) -> str | None:
+    """SHA-256 over the concatenated *.md prompt files in *prompts_dir*.
+
+    A change to any prompt template (notably ``evaluation_rules.md``) shifts
+    LLM behavior even when source files and standards are byte-identical.
+    Mixing the prompt directory's content into the fingerprint forces
+    re-analysis after a prompt update — otherwise carry-forward keeps
+    serving findings produced under the old rules.
+    """
+    if prompts_dir is None:
+        prompts_dir = default_paths().prompts_dir
+    if prompts_dir is None or not prompts_dir.is_dir():
+        return None
+    h = hashlib.sha256()
+    for path in sorted(prompts_dir.glob("*.md")):
+        per_file = _hash_file(path)
+        if per_file is None:
+            continue
+        h.update(path.name.encode())
+        h.update(per_file.encode())
+    return h.hexdigest()
+
+
 def build_fingerprint(src: Path, files: list[str], dimension: str, standards_dir: Path | None, *, analyzed_files: set[str] | None = None) -> dict:
     """Build a fingerprint for the current evaluation state."""
     file_hashes = {}
@@ -74,6 +98,7 @@ def build_fingerprint(src: Path, files: list[str], dimension: str, standards_dir
         "git_commit": _get_git_commit(src),
         "file_hashes": file_hashes,
         "standards_checksum": _hash_standards(standards_dir, dimension) if standards_dir else None,
+        "prompts_checksum": _hash_prompts(),
         "analyzed_files": sorted(analyzed_files) if analyzed_files else [],
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }

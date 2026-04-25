@@ -69,7 +69,7 @@ def partition_findings_by_fingerprint(
     If standards changed since the previous run, all findings need verification
     regardless of file hashes (findings were evaluated under different criteria).
     """
-    from quodeq.analysis.fingerprint import _hash_standards
+    from quodeq.analysis.fingerprint import _hash_prompts, _hash_standards
 
     if not prev_fingerprint or not findings:
         return [], list(findings)
@@ -80,5 +80,11 @@ def partition_findings_by_fingerprint(
         prev_std = prev_fingerprint.get("standards_checksum")
         if prev_std is not None and current_std != prev_std:
             return [], list(findings)
+
+    # Prompts guard: a prompt-rule change shifts what counts as a violation,
+    # so previously-accepted findings must be re-verified.
+    prev_prompts = prev_fingerprint.get("prompts_checksum")
+    if prev_prompts is not None and _hash_prompts() != prev_prompts:
+        return [], list(findings)
 
     return _classify_findings(findings, prev_fingerprint.get("file_hashes", {}), src)
