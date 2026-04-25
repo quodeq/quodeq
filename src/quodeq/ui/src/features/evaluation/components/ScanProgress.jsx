@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getEvaluationProgress } from '../../../api/index.js';
 import ConsoleLogViewer from './ConsoleLogViewer.jsx';
 import { CONSOLE_DOT_DISMISSED_KEY } from '../../../constants.js';
+import { pct, computeOverallProgress } from './scanProgressTotals.js';
 
 const POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATES = new Set(['done', 'failed', 'cancelled']);
@@ -13,11 +14,6 @@ function formatClock(s) {
   const m = Math.floor(total / 60);
   const sec = total % 60;
   return `${m}:${String(sec).padStart(2, '0')}`;
-}
-
-function pct(taken, total) {
-  if (!total || total <= 0) return 0;
-  return Math.min(100, Math.round((taken / total) * 100));
 }
 
 function isStatusLine(line) {
@@ -177,9 +173,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   if (!jobId) return null;
 
   const dims = progress?.dimensions || [];
-  const totalFiles = dims.reduce((acc, d) => acc + (d.files?.total ?? 0), 0);
-  const takenFiles = dims.reduce((acc, d) => acc + (d.files?.taken ?? 0), 0);
-  const overallPct = pct(takenFiles, totalFiles);
+  const { totalFiles, takenFiles, overallPct } = computeOverallProgress(progress);
   const inlineLabel = progress?.currentDimension
     ? <>running <span className="scan-progress__dim-active">{progress.currentDimension}</span></>
     : progress?.phase
