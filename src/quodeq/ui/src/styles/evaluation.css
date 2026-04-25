@@ -2662,7 +2662,7 @@
 .scan-progress__caret { transition: transform 0.18s, color 0.15s; }
 
 .scan-progress__error {
-  padding: 8px 0;
+  padding: 8px 10px;
   font-size: 11px;
   color: var(--color-sev-critical-text, #f85149);
   border-bottom: 1px solid var(--color-border-soft, var(--color-border));
@@ -2763,7 +2763,7 @@
 
 .scan-progress__expanded {
   border-top: 1px solid var(--color-border-soft, var(--color-border));
-  padding: 10px 0 12px;
+  padding: 10px 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
