@@ -109,16 +109,35 @@ def _active_agents(evidence_dir: Path, dim_id: str) -> int:
     return count
 
 
-def _dim_state(dim_id: str, status: dict, terminal: bool) -> str:
+def _dim_state(
+    dim_id: str,
+    status: dict,
+    terminal: bool,
+    *,
+    has_queue: bool,
+    has_evaluation: bool,
+) -> str:
     """Classify a dimension as done | running | pending.
 
-    A dim is *done* if its evidence file exists AND it isn't the current_dimension
-    of a still-running scan. Falls back to current_dimension match for *running*.
+    Order of checks:
+    1. If a scored evaluation file exists for this dim → done
+    2. If the run reached a terminal state → done (whatever state on disk)
+    3. If the queue file exists (dim has been started) → running
+    4. If current_dimension matches → running (covers the moment after queue
+       creation, before takens are written)
+    5. Otherwise → pending
     """
-    current = status.get("current_dimension")
-    if terminal:
+    if has_evaluation:
         return "done"
-    if current == dim_id:
+    if terminal:
+        # If the run terminated and this dim has a queue but no eval, the
+        # dimension is *partially done* — surfaces visually via the
+        # taken < total signal in the UI. Dims with no queue at all never
+        # ran; keep them as pending so they don't claim completion.
+        return "done" if has_queue else "pending"
+    if has_queue:
+        return "running"
+    if status.get("current_dimension") == dim_id:
         return "running"
     return "pending"
 
@@ -205,12 +224,15 @@ def build_scan_progress(
 
     dim_results: list[_DimProgress] = []
     for dim_id in dim_ids:
-        # Treat all dims as "done" once the run reaches a terminal state — a dim
-        # that started and wasn't the current_dimension at termination is finished.
-        d_state = _dim_state(dim_id, status, terminal=is_terminal)
-
         queue_path = evidence_dir / f"{dim_id}_queue.json"
+        eval_path = run_dir / "evaluation" / f"{dim_id}.json"
         queue = _read_json(queue_path) if queue_path.is_file() else None
+        d_state = _dim_state(
+            dim_id, status, terminal=is_terminal,
+            has_queue=queue is not None,
+            has_evaluation=eval_path.is_file(),
+        )
+
         if queue is not None:
             taken = len(queue.get("taken") or [])
             pending = len(queue.get("pending") or [])
