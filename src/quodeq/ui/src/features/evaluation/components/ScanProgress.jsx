@@ -39,7 +39,15 @@ function DimRow({ dim }) {
 
   let meta;
   if (isPending) {
-    meta = <span className="scan-progress__dim-meta-pending">pending</span>;
+    meta = (
+      <>
+        {total > 0
+          ? <>0 / <span className="scan-progress__dim-meta-projected">{total}</span></>
+          : null}
+        {' · '}
+        <span className="scan-progress__dim-meta-pending">pending</span>
+      </>
+    );
   } else if (isDone) {
     meta = (
       <>

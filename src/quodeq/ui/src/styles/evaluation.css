@@ -2709,6 +2709,10 @@
   color: var(--color-text-dim, var(--color-text-muted));
   font-style: italic;
 }
+.scan-progress__dim-meta-projected {
+  color: var(--color-text-dim, var(--color-text-muted));
+  font-style: italic;
+}
 .scan-progress__v        { color: var(--color-sev-critical-text, #f85149); }
 .scan-progress__c        { color: var(--color-success, #56d364); }
 .scan-progress__budget   { color: var(--color-warn, #d29922); }
