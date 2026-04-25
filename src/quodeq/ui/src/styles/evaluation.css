@@ -2639,11 +2639,20 @@
   transition: background 0.15s, box-shadow 0.15s;
 }
 .scan-progress__row:hover {
-  background: var(--color-surface-alt);
-  box-shadow: inset 2px 0 0 var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
 }
-.scan-progress__row:hover .scan-progress__caret { color: var(--color-accent); }
-.scan-progress__row:focus-visible { outline: 1px solid var(--color-accent); outline-offset: -1px; }
+.scan-progress__row:hover .scan-progress__caret {
+  color: var(--color-accent);
+  transform: translateX(2px);
+}
+.scan-progress__row:hover .scan-progress__bar {
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface-alt));
+}
+.scan-progress__row:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+.scan-progress__caret { transition: transform 0.18s, color 0.15s; }
 
 .scan-progress__error {
   padding: 8px 0;
