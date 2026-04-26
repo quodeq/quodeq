@@ -34,6 +34,7 @@ def test_registry_parses_suggested_topics_and_quotes(tmp_path: Path):
     conf.write_text(
         """
 [frontend_react]
+detect_file=package.json
 detect_contains="react"
 suggested_topics=React Best Practices,Frontend Architecture,TypeScript Standards
 """.strip()
@@ -90,3 +91,42 @@ detect_priority=1
 
     registry = DisciplineRegistry.from_file(conf)
     assert registry.choose_highest_priority(["a", "b"]) == "b"
+
+
+def test_detect_file_without_contains_does_not_misalign_alts(tmp_path: Path):
+    """A primary detect_file without detect_contains must not let later detect_file_alt entries
+    bypass their detect_contains check via index misalignment.
+
+    Regression: python_django had detect_file=manage.py (no contains), then
+    detect_file_alt2=pyproject.toml + detect_contains_alt2=django. The parser dropped the
+    leading None from detect_contains, shifting indices so pyproject.toml's check fell out of
+    range and matched any pyproject.toml regardless of content.
+    """
+    conf = tmp_path / "disciplines.conf"
+    conf.write_text(
+        """
+[python_django]
+language=python
+detect_file=manage.py
+detect_file_alt=requirements.txt
+detect_contains_alt=django
+detect_file_alt2=pyproject.toml
+detect_contains_alt2=django
+detect_priority=4
+""".strip()
+    )
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    # pyproject.toml present but no "django" anywhere — should NOT match python_django.
+    (repo / "pyproject.toml").write_text('[project]\nname = "quodeq"\ndependencies = ["flask"]\n')
+
+    registry = DisciplineRegistry.from_file(conf)
+    rule = registry.disciplines["python_django"]
+    # Alignment invariant: contains tuple must align 1:1 with files tuple.
+    assert len(rule.detect_contains) == len(rule.detect_files)
+    assert rule.detect_contains[0] == ""  # manage.py has no content check
+    assert rule.detect_contains[2] == "django"  # pyproject.toml must check for "django"
+
+    matches = registry.detect_matches(repo)
+    assert "python_django" not in matches

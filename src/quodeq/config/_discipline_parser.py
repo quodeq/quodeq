@@ -66,16 +66,20 @@ def _dispatch_field(
 
 
 def _pad_and_finalize(files: list[str | None], contains: list[str | None], kwargs: dict) -> None:
-    """Pad file/contains lists to equal length and write the tuples into kwargs."""
+    """Pair files with their detect_contains and write aligned tuples into kwargs.
+
+    Drops slots with no file. A missing detect_contains for an existing file is kept as
+    "" (the "no content check" sentinel); independently filtering Nones would misalign
+    indices and let later files bypass their content check.
+    """
     max_len = max(len(files), len(contains))
     while len(files) < max_len:
         files.append(None)
     while len(contains) < max_len:
         contains.append(None)
-    kwargs["detect_files"] = tuple(f for f in files if f is not None)
-    kwargs["detect_contains"] = tuple(
-        c for c in contains[:max_len] if c is not None
-    )
+    paired = [(f, c) for f, c in zip(files, contains) if f is not None]
+    kwargs["detect_files"] = tuple(f for f, _ in paired)
+    kwargs["detect_contains"] = tuple(c if c is not None else "" for _, c in paired)
 
 
 def parse_fields(lines: Iterable[tuple[str, str]]) -> dict[str, Any]:
