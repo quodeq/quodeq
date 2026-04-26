@@ -14,15 +14,20 @@ function todayISO() {
 }
 
 function downloadMarkdown(title, markdown) {
-  const blob = new Blob([markdown], { type: 'text/markdown' });
+  const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = `${slugify(title)}-${todayISO()}.md`;
+  a.rel = 'noopener';
   document.body.appendChild(a);
   a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  // Defer cleanup so the browser has time to start the download before
+  // we revoke the blob URL — synchronous cleanup races and can drop the file.
+  setTimeout(() => {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, 0);
 }
 
 class RenderBoundary extends React.Component {
