@@ -1,22 +1,22 @@
 /**
  * Math helpers for the live evaluation header.
  *
- * The header shows the *aggregated* work across every dim: 2 dims × 100
- * files of analysis = "0 / 200 files" at start. That matches what the
- * dashboard is actually doing — analyse each file once per dim.
+ * The header tracks ONE dimension at a time — the currently-running one.
+ * Multi-dim incremental scans have wildly different cache hit rates per
+ * dim, so summing taken/total across dims produces a moving total that
+ * jumps as each dim reveals its real (post-filter) queue size. Showing
+ * the running dim's progress directly avoids that whiplash; the
+ * per-dimension breakdown lives under the DETAILS toggle.
  *
- * Per-dim totals from `/api/evaluations/<jobId>/progress` are NOT
- * uniform at runtime, though: running/done dims report their post-filter
- * queue size while a pending dim falls back to the project-wide ceiling
- * (see `services/scan_progress.py`). Summing them as-is inflates the
- * headline by ~N× project_files in mixed states.
+ * Dim selection (in order):
+ *   1. `progress.currentDimension` matches a dim → that one
+ *   2. Else first dim where `state === 'running'` (race coverage)
+ *   3. Else last dim where `state === 'done'` (so completed runs read 100%
+ *      instead of 0/0)
+ *   4. Else all zeros (setup phase / nothing started yet)
  *
- * `computeOverallProgress` substitutes a pending-dim's project-ceiling
- * total with the largest *observed* (running or done) queue total — the
- * same fallback the per-dim row uses — so every dim contributes a
- * consistent estimate. Once any dim has started, the fallback is the
- * actual filtered queue size; before that, it falls back to
- * `progress.projectFiles` as a last resort.
+ * `dimFileEstimate` is unchanged and still drives the per-dim row's
+ * pending-dim projection inside the DETAILS panel.
  */
 
 export function pct(taken, total) {
@@ -41,17 +41,32 @@ export function dimFileEstimate(progress) {
 
 export function computeOverallProgress(progress) {
   const dims = progress?.dimensions || [];
-  const dimEstimate = dimFileEstimate(progress);
+  if (dims.length === 0) {
+    return { totalFiles: 0, takenFiles: 0, overallPct: 0 };
+  }
 
-  const totalFiles = dims.reduce((acc, d) => {
-    // Pending dims expose the project-wide ceiling, not the post-filter
-    // queue they'll actually scan. Swap in the fallback estimate so each
-    // pending dim contributes a comparable number to the aggregate.
-    if (d?.state === 'pending') return acc + dimEstimate;
-    return acc + (d?.files?.total ?? 0);
-  }, 0);
-  const takenFiles = dims.reduce((acc, d) => acc + (d?.files?.taken ?? 0), 0);
-  const overallPct = pct(takenFiles, totalFiles);
+  const currentId = progress?.currentDimension;
+  let dim = null;
+  if (currentId) {
+    dim = dims.find((d) => d?.id === currentId) || null;
+  }
+  if (!dim) {
+    dim = dims.find((d) => d?.state === 'running') || null;
+  }
+  if (!dim) {
+    // Walk from the end so we pick the most recently completed dim.
+    for (let i = dims.length - 1; i >= 0; i--) {
+      if (dims[i]?.state === 'done') {
+        dim = dims[i];
+        break;
+      }
+    }
+  }
+  if (!dim) {
+    return { totalFiles: 0, takenFiles: 0, overallPct: 0 };
+  }
 
-  return { totalFiles, takenFiles, overallPct };
+  const takenFiles = dim.files?.taken ?? 0;
+  const totalFiles = dim.files?.total ?? 0;
+  return { totalFiles, takenFiles, overallPct: pct(takenFiles, totalFiles) };
 }
