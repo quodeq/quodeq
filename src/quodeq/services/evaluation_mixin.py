@@ -228,7 +228,10 @@ class FsEvaluationMixin:
         reports_root = Path(reports_dir) if reports_dir else None
         return self._jobs.get_job(job_id, reports_root=reports_root)
 
-    def cancel_evaluation(self, job_id: str, reports_dir: str | None = None) -> bool:
+    def cancel_evaluation(
+        self, job_id: str, reports_dir: str | None = None,
+        *, discard_partial: bool = False,
+    ) -> bool:
         """Cancel a running evaluation job and score any completed dimensions.
 
         Uses ``self.get_evaluation_status`` rather than a bare
@@ -239,6 +242,10 @@ class FsEvaluationMixin:
         ``_score_completed_evidence`` is idempotent (skips dimensions whose
         report file already exists), so double-firing with the route-level
         scoring in ``_evaluation_routes`` is a no-op.
+
+        When ``discard_partial`` is True we also wipe queue + fingerprint
+        files for any dim that didn't complete scoring — the next run sees
+        no salvageable state and starts fresh for those dims.
         """
         reports_root = Path(reports_dir) if reports_dir else None
         job = self.get_evaluation_status(job_id, reports_dir=reports_dir)
@@ -248,6 +255,11 @@ class FsEvaluationMixin:
                 "outputProject": job.output_project,
                 "outputRunId": job.output_run_id,
             })
+            if discard_partial:
+                _discard_partial_dim_state(reports_dir, {
+                    "outputProject": job.output_project,
+                    "outputRunId": job.output_run_id,
+                })
         return ok
 
     def score_failed_evaluation(self, job_id: str, reports_dir: str) -> bool:
@@ -276,6 +288,42 @@ class FsEvaluationMixin:
         if states:
             jobs = [j for j in jobs if j.status in states]
         return jobs[:limit] if limit > 0 else jobs
+
+
+def _discard_partial_dim_state(reports_dir: str, job: dict) -> None:
+    """Wipe queue + fingerprint files for any dim that didn't finish scoring.
+
+    Invoked when the user opts to discard collected findings on cancel.
+    Dims with ``evaluation/<dim>.json`` (cleanly scored) are preserved —
+    only in-flight ones are reset, so partial work doesn't get accidentally
+    discarded just because the umbrella run was stopped.
+    """
+    project = job.get("outputProject")
+    run_id = job.get("outputRunId")
+    if not project or not run_id:
+        return
+
+    evidence_dir = Path(reports_dir) / project / run_id / "evidence"
+    evaluation_dir = Path(reports_dir) / project / run_id / "evaluation"
+    if not evidence_dir.is_dir():
+        return
+
+    scored_dims: set[str] = set()
+    if evaluation_dir.is_dir():
+        for eval_file in evaluation_dir.glob("*.json"):
+            scored_dims.add(eval_file.stem)
+
+    for queue_path in evidence_dir.glob("*_queue.json"):
+        dim_id = queue_path.name.replace("_queue.json", "")
+        if dim_id in scored_dims:
+            continue
+        for victim in (queue_path, evidence_dir / f"{dim_id}_fingerprint.json"):
+            try:
+                victim.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                _logger.warning("Could not discard %s: %s", victim, exc)
 
 
 def _score_completed_evidence(reports_dir: str, job: dict) -> None:

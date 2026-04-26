@@ -1,12 +1,19 @@
 /**
- * DOM-based confirmation dialog. Returns a Promise that resolves to true
- * (confirm) or false (cancel / clicked-outside). We roll our own instead of
- * using window.confirm because pywebview in frameless mode can suppress
+ * DOM-based confirmation dialog. We roll our own instead of using
+ * window.confirm because pywebview in frameless mode can suppress
  * native dialogs, leaving callers no feedback path.
+ *
+ * Without `checkboxLabel` it resolves to a boolean (cancel/confirm).
+ * With `checkboxLabel` it resolves to `{ ok, checked }` so the caller
+ * can read both the user's confirmation and an opt-in side-effect.
  *
  * Usage:
  *   const ok = await confirmDialog({ title: 'Delete run?', message: '...' });
  *   if (!ok) return;
+ *
+ *   const { ok, checked } = await confirmDialog({
+ *     title: 'Cancel evaluation?', checkboxLabel: 'Discard collected findings',
+ *   });
  */
 const _ALLOWED_VARIANTS = new Set(['default', 'danger']);
 
@@ -16,6 +23,9 @@ export function confirmDialog({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   variant = 'default', // 'default' | 'danger'
+  checkboxLabel = null,
+  checkboxHint = '',
+  checkboxDefault = false,
 } = {}) {
   return new Promise((resolve) => {
     if (typeof document === 'undefined') {
@@ -39,6 +49,32 @@ export function confirmDialog({
     messageEl.className = 'qd-confirm-message';
     messageEl.textContent = message;
 
+    let checkboxInput = null;
+    if (checkboxLabel) {
+      const wrap = document.createElement('label');
+      wrap.className = 'qd-confirm-checkbox';
+      checkboxInput = document.createElement('input');
+      checkboxInput.type = 'checkbox';
+      checkboxInput.checked = !!checkboxDefault;
+      const labelText = document.createElement('span');
+      labelText.className = 'qd-confirm-checkbox-label';
+      labelText.textContent = checkboxLabel;
+      wrap.appendChild(checkboxInput);
+      wrap.appendChild(labelText);
+      if (checkboxHint) {
+        const hint = document.createElement('span');
+        hint.className = 'qd-confirm-checkbox-hint';
+        hint.textContent = checkboxHint;
+        wrap.appendChild(hint);
+      }
+      dialog.appendChild(titleEl);
+      dialog.appendChild(messageEl);
+      dialog.appendChild(wrap);
+    } else {
+      dialog.appendChild(titleEl);
+      dialog.appendChild(messageEl);
+    }
+
     const actions = document.createElement('div');
     actions.className = 'qd-confirm-actions';
 
@@ -54,15 +90,17 @@ export function confirmDialog({
 
     actions.appendChild(cancelBtn);
     actions.appendChild(confirmBtn);
-    dialog.appendChild(titleEl);
-    dialog.appendChild(messageEl);
     dialog.appendChild(actions);
     overlay.appendChild(dialog);
 
-    function close(result) {
+    function close(ok) {
       overlay.remove();
       document.removeEventListener('keydown', onKey);
-      resolve(result);
+      if (checkboxInput) {
+        resolve({ ok, checked: ok ? checkboxInput.checked : false });
+      } else {
+        resolve(ok);
+      }
     }
     function onKey(e) {
       if (e.key === 'Escape') close(false);
