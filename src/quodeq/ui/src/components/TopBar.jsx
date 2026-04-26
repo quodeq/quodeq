@@ -73,7 +73,7 @@ export default function TopBar({
   effectiveDark = false,
   onToggleTheme,
 }) {
-  const { activeBuilder, openReport } = useReportViewer();
+  const { activeBuilder, isOpen: reportOpen, openReport } = useReportViewer();
   return (
     <header className="topbar">
       {/* Compact-mode back button. Hidden entirely at the root of the
@@ -132,7 +132,7 @@ export default function TopBar({
         {activeBuilder && (
           <button
             type="button"
-            className="topbar-btn topbar-btn--evaluate topbar-btn--report"
+            className={`topbar-btn topbar-btn--report${reportOpen ? ' topbar-btn--report--open' : ''}`}
             onClick={() => openReport({
               title: activeBuilder.title,
               markdown: activeBuilder.buildMarkdown(),
