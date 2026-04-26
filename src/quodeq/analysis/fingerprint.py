@@ -63,14 +63,40 @@ def _hash_standards(standards_dir: Path, dimension: str) -> str | None:
     return _hash_file(compiled)
 
 
-def _hash_prompts(prompts_dir: Path | None = None) -> str | None:
-    """SHA-256 over the concatenated *.md prompt files in *prompts_dir*.
+# Prompts in this set, when changed, force a full re-analysis because they
+# carry the rules that classify a finding (what counts as a violation, what
+# doesn't). Other prompt files are framing/scaffolding — a change to those
+# still flows into the next run's prompts naturally, but doesn't invalidate
+# carry-forward findings produced under the same rules.
+_RULES_BEARING_PROMPTS: frozenset[str] = frozenset({"evaluation_rules.md"})
 
-    A change to any prompt template (notably ``evaluation_rules.md``) shifts
-    LLM behavior even when source files and standards are byte-identical.
-    Mixing the prompt directory's content into the fingerprint forces
-    re-analysis after a prompt update — otherwise carry-forward keeps
-    serving findings produced under the old rules.
+
+def _hash_prompts_map(prompts_dir: Path | None = None) -> dict[str, str]:
+    """Per-file SHA-256 of every *.md prompt under *prompts_dir*.
+
+    Stored in fingerprints so future runs can decide selectively whether a
+    prompt change is the kind that should invalidate carry-forward (a
+    rules-bearing file in ``_RULES_BEARING_PROMPTS``) versus the kind that
+    shouldn't (framing, runner-specific instructions).
+    """
+    if prompts_dir is None:
+        prompts_dir = default_paths().prompts_dir
+    if prompts_dir is None or not prompts_dir.is_dir():
+        return {}
+    out: dict[str, str] = {}
+    for path in sorted(prompts_dir.glob("*.md")):
+        h = _hash_file(path)
+        if h:
+            out[path.name] = h
+    return out
+
+
+def _hash_prompts(prompts_dir: Path | None = None) -> str | None:
+    """Legacy single-string hash of all prompts concatenated.
+
+    Retained so fingerprints written before the per-file split can still
+    be compared against the current prompt state (back-compat read path).
+    New fingerprints use ``_hash_prompts_map``.
     """
     if prompts_dir is None:
         prompts_dir = default_paths().prompts_dir
@@ -93,12 +119,14 @@ def build_fingerprint(src: Path, files: list[str], dimension: str, standards_dir
         h = _hash_file(src / f)
         if h:
             file_hashes[f] = h
+    prompts_map = _hash_prompts_map() or None
     return {
         "dimension": dimension,
         "git_commit": _get_git_commit(src),
         "file_hashes": file_hashes,
         "standards_checksum": _hash_standards(standards_dir, dimension) if standards_dir else None,
-        "prompts_checksum": _hash_prompts(),
+        # Per-file map; readers handle the legacy single-string format too.
+        "prompts_checksum": prompts_map,
         "analyzed_files": sorted(analyzed_files) if analyzed_files else [],
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }

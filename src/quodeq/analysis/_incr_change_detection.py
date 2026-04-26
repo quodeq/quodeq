@@ -5,7 +5,13 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from quodeq.analysis.fingerprint import _hash_file, _hash_prompts, _hash_standards
+from quodeq.analysis.fingerprint import (
+    _RULES_BEARING_PROMPTS,
+    _hash_file,
+    _hash_prompts,
+    _hash_prompts_map,
+    _hash_standards,
+)
 
 _GIT_DIFF_TIMEOUT_S = 10
 
@@ -59,9 +65,27 @@ def detect_changed_files(
 
     prev_prompts = prev_fingerprint.get("prompts_checksum")
     if prev_prompts is not None:
-        current_prompts = _hash_prompts()
-        if current_prompts != prev_prompts:
-            return ChangeDetectionResult(full_reanalysis=True, reason="prompts changed")
+        # New format: per-file dict. Only rules-bearing prompts (those that
+        # define what counts as a violation) trigger full re-analysis.
+        # Framing or runner-specific instruction changes flow into the next
+        # run's prompt naturally without invalidating prior carry-forward.
+        if isinstance(prev_prompts, dict):
+            current_prompts_map = _hash_prompts_map()
+            for fname in _RULES_BEARING_PROMPTS:
+                if prev_prompts.get(fname) != current_prompts_map.get(fname):
+                    return ChangeDetectionResult(
+                        full_reanalysis=True, reason=f"prompts changed ({fname})",
+                    )
+        else:
+            # Legacy single-string format: any change to any prompt
+            # triggers, matching pre-split behavior. Once this dim runs
+            # again under the new code, its fingerprint upgrades to the
+            # selective per-file format.
+            current_prompts = _hash_prompts()
+            if current_prompts != prev_prompts:
+                return ChangeDetectionResult(
+                    full_reanalysis=True, reason="prompts changed (legacy)",
+                )
 
     prev_commit = prev_fingerprint.get("git_commit")
     file_set = set(files)
