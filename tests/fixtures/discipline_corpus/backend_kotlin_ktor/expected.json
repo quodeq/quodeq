@@ -1,0 +1,11 @@
+{
+  "matches": [
+    "backend_kotlin_ktor"
+  ],
+  "primary": "backend_kotlin_ktor",
+  "language": "kotlin",
+  "not_matches": [
+    "backend_springboot_kotlin",
+    "mobile_android"
+  ]
+}
