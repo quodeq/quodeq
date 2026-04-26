@@ -10,8 +10,8 @@ import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../co
 
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterTrendByVisibleStandardsDaily, filterAccumulatedByVisibleStandards } from '../../../utils/scoreFiltering.js';
-import CopyButton, { FileTextIcon } from '../../../components/CopyButton.jsx';
-import { copyToClipboard } from '../../../utils/clipboard.js';
+import { FileTextIcon } from '../../../components/CopyButton.jsx';
+import { ReportSplitButton } from '../../report-viewer/index.js';
 import { buildOverviewReport } from '../../../utils/reportBuilder.js';
 
 // ---------------------------------------------------------------------------
@@ -92,11 +92,12 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulated
           sub={buildLanguageSub(projectInfo) || (lastDate ? `last_evaluated · ${lastDate}` : null)}
         />
         <div className="acc-eval-panel__actions">
-          <CopyButton
+          <ReportSplitButton
             label="Report"
+            title={`Code Quality Report — ${projectName || 'project'}`}
+            buildMarkdown={() => buildOverviewReport(accumulated, accumulatedDimensions || [], projectName)}
             className="fix-plan-btn-header"
             icon={<FileTextIcon />}
-            onClick={() => copyToClipboard(buildOverviewReport(accumulated, accumulatedDimensions || [], projectName))}
           />
         </div>
       </div>
