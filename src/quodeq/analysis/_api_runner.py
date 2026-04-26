@@ -52,10 +52,31 @@ class _Finding(BaseModel):
     req: str = Field(description="Requirement ID (e.g. P-TIM-1, S-CON-3)")
     t: _FindingType = Field(description="violation or compliance")
     file: str = Field(description="File path relative to repo root")
-    line: int = Field(default=0, description="Line number")
+    line: int = Field(description="1-indexed line number of the offending expression. MUST be > 0.", gt=0)
+    end_line: int | None = Field(
+        default=None,
+        description=(
+            "Last line of the offending span. Omit unless the violation is structural "
+            "(long function, nesting depth, file length). The server reads the actual source "
+            "to render the snippet; setting this widens the rendered window."
+        ),
+    )
     severity: _Severity = Field(default=_Severity.minor)
     w: str = Field(description="Short title of the finding")
-    reason: str = Field(default="", description="Why this is a violation or compliance")
+    snippet: str = Field(
+        description=(
+            "Exact text of the offending line, verbatim from the source file. "
+            "Required. If you cannot quote the line, drop the finding."
+        ),
+        min_length=1,
+    )
+    reason: str = Field(
+        description=(
+            "One sentence: what the quoted line does wrong AS WRITTEN. "
+            "No hedging ('could', 'might', 'should consider', 'if X were larger')."
+        ),
+        min_length=1,
+    )
 
 
 class _Findings(BaseModel):
@@ -124,7 +145,7 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
         model=config.model,
         response_model=_Findings,
         messages=[
-            {"role": "system", "content": "You are a code quality evaluator."},
+            {"role": "system", "content": "You are a code quality evaluator. Quote the offending line into `snippet`. Empty `findings` is a valid answer."},
             {"role": "user", "content": prompt},
         ],
         temperature=config.temperature,

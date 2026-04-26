@@ -29,7 +29,7 @@ from quodeq.analysis._api_runner import (
 
 class TestSalvagePartialFindings:
     def test_extracts_valid_findings_from_malformed_json(self):
-        raw = '{"findings": [{"req":"S-1","t":"violation","file":"a.py","line":1,"severity":"minor","w":"test","reason":"bad"}, BROKEN'
+        raw = '{"findings": [{"req":"S-1","t":"violation","file":"a.py","line":1,"severity":"minor","w":"test","snippet":"x = 1","reason":"bad"}, BROKEN'
         result = _salvage_partial_findings(raw)
         assert len(result) >= 1
         assert result[0]["req"] == "S-1"
@@ -39,16 +39,19 @@ class TestSalvagePartialFindings:
         assert result == []
 
     def test_skips_invalid_objects(self):
-        # Missing required 'req' field
-        raw = '{"req":"X-1","t":"violation","file":"a.py","w":"ok"} {"not_a_finding": true}'
+        # First object is well-formed and valid; second lacks required fields and must be dropped.
+        raw = (
+            '{"req":"X-1","t":"violation","file":"a.py","line":1,"severity":"minor","w":"ok","snippet":"x = 1","reason":"r"} '
+            '{"not_a_finding": true}'
+        )
         result = _salvage_partial_findings(raw)
-        # First one should parse, second should not
-        assert len(result) >= 1
+        assert len(result) == 1
+        assert result[0]["req"] == "X-1"
 
     def test_handles_multiple_valid_objects(self):
         raw = (
-            '{"req":"A-1","t":"violation","file":"a.py","line":1,"severity":"minor","w":"one","reason":"r"} '
-            '{"req":"B-2","t":"compliance","file":"b.py","line":2,"severity":"major","w":"two","reason":"r"}'
+            '{"req":"A-1","t":"violation","file":"a.py","line":1,"severity":"minor","w":"one","snippet":"x = 1","reason":"r"} '
+            '{"req":"B-2","t":"compliance","file":"b.py","line":2,"severity":"major","w":"two","snippet":"y = 2","reason":"r"}'
         )
         result = _salvage_partial_findings(raw)
         assert len(result) == 2
@@ -151,7 +154,7 @@ class TestCallApi:
         )
         mock_client = MagicMock()
         # Simulate instructor validation failure with valid JSON in the error message
-        error_msg = 'Validation failed: {"req":"X-1","t":"violation","file":"a.py","line":1,"severity":"minor","w":"test","reason":"bad"}'
+        error_msg = 'Validation failed: {"req":"X-1","t":"violation","file":"a.py","line":1,"severity":"minor","w":"test","snippet":"x = 1","reason":"bad"}'
         mock_client.chat.completions.create.side_effect = Exception(error_msg)
 
         with patch("quodeq.analysis._api_runner.instructor") as mock_inst, \
@@ -243,7 +246,7 @@ class TestRunApiAnalysisAppend:
 
         config = ApiRunnerConfig(model="m", api_base="http://localhost/v1")
         findings = _Findings(findings=[
-            _Finding(req="NEW-1", t=_FindingType.violation, file="a.py", w="new"),
+            _Finding(req="NEW-1", t=_FindingType.violation, file="a.py", line=1, w="new", snippet="x = 1", reason="placeholder"),
         ])
 
         mock_client = MagicMock()
@@ -264,7 +267,7 @@ class TestRunApiAnalysisAppend:
         jsonl = tmp_path / "evidence.jsonl"
         config = ApiRunnerConfig(model="m", api_base="http://localhost/v1")
         findings = _Findings(findings=[
-            _Finding(req="X-1", t=_FindingType.violation, file="a.py", w="test"),
+            _Finding(req="X-1", t=_FindingType.violation, file="a.py", line=1, w="test", snippet="x = 1", reason="placeholder"),
         ])
 
         mock_client = MagicMock()

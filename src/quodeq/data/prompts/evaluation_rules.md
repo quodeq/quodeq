@@ -6,7 +6,7 @@ Report BOTH violations AND compliance. Scoring is a ratio. For every principle w
 
 Report each occurrence separately. 5 misplaced methods = 5 findings.
 
-NOT a violation: literal inside a constant/enum definition; long function that only registers routes; duplicated test setup; code that IS the remediation for the issue.
+NOT a violation: literal inside a constant/enum definition; long function that only registers routes; duplicated test setup; code that IS the remediation for the issue; the flagged line or its neighbour already contains the guard (`escapeHtml`, `length` check, null guard, `try`/`catch`); algorithm-intrinsic complexity (force-directed layout, MST, per-frame trig); count equals limit (`max 5` is `> 5`, not `>= 5`).
 
 ## Evidence
 
