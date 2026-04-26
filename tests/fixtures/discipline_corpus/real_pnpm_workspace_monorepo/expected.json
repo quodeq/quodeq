@@ -1,0 +1,8 @@
+{
+  "recursive": true,
+  "matches": [
+    "nodejs",
+    "frontend_react",
+    "javascript_express"
+  ]
+}

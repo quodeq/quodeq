@@ -125,10 +125,26 @@ class DisciplineRegistry:
         return needle in content
 
     def _has_required_files(self, repo: Path, rule: DisciplineRule) -> bool:
-        """detect_requires_file is the only hard prerequisite — a gate on any trigger."""
-        if rule.detect_requires_file:
-            return any(repo.glob(rule.detect_requires_file))
-        return True
+        """detect_requires_file is the only hard prerequisite — a gate on any trigger.
+
+        Honors the same vendor/skip-dir set used by recursive subproject discovery
+        so a vendored copy under ``node_modules`` / ``.venv`` / ``vendor`` doesn't
+        satisfy the prereq and falsely classify the host repo.
+        """
+        if not rule.detect_requires_file:
+            return True
+        for match in repo.glob(rule.detect_requires_file):
+            try:
+                rel = match.relative_to(repo)
+            except ValueError:
+                continue
+            if any(
+                part in _SUBPROJECT_SKIP_DIRS or part.startswith(".")
+                for part in rel.parts[:-1]
+            ):
+                continue
+            return True
+        return False
 
     def _any_detect_file_matches(self, repo: Path, rule: DisciplineRule) -> bool:
         for i, file_name in enumerate(rule.detect_files):
