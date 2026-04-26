@@ -1,6 +1,9 @@
 from pathlib import Path
 
+import pytest
+
 from quodeq.config.discipline_registry import DisciplineRegistry
+from quodeq.config.paths import default_paths
 
 
 def test_registry_parses_disciplines(tmp_path: Path):
@@ -130,3 +133,54 @@ detect_priority=4
 
     matches = registry.detect_matches(repo)
     assert "python_django" not in matches
+
+
+def test_validate_flags_unknown_keys(tmp_path: Path, capsys: pytest.CaptureFixture):
+    conf = tmp_path / "disciplines.conf"
+    conf.write_text(
+        """
+[python_django]
+detect_file=manage.py
+detect_contians=django
+detect_priority=4
+""".strip()
+    )
+    DisciplineRegistry.from_file(conf)
+    assert "'detect_contians'" in capsys.readouterr().err
+
+
+def test_validate_flags_dangling_excludes(tmp_path: Path, capsys: pytest.CaptureFixture):
+    conf = tmp_path / "disciplines.conf"
+    conf.write_text(
+        """
+[a]
+detect_file=foo
+detect_excludes=does_not_exist
+""".strip()
+    )
+    DisciplineRegistry.from_file(conf)
+    assert "does_not_exist" in capsys.readouterr().err
+
+
+def test_validate_flags_rule_with_no_triggers(tmp_path: Path, capsys: pytest.CaptureFixture):
+    conf = tmp_path / "disciplines.conf"
+    conf.write_text("[a]\nlanguage=python\n")
+    DisciplineRegistry.from_file(conf)
+    assert "no triggers" in capsys.readouterr().err
+
+
+def test_strict_mode_raises_on_validation_failure(tmp_path: Path):
+    conf = tmp_path / "disciplines.conf"
+    conf.write_text("[a]\ndetect_file=foo\ndetect_excludes=missing\n")
+    with pytest.raises(ValueError, match="missing"):
+        DisciplineRegistry.from_file(conf, strict=True)
+
+
+def test_bundled_disciplines_conf_passes_strict_validation():
+    """Regression guard: the shipped disciplines.conf must have no typos, no
+    dangling detect_excludes, and no rules without triggers. If this fails,
+    add a unit test for the new defect and fix the conf — don't loosen the gate."""
+    conf = default_paths().disciplines_conf
+    if not conf.exists():
+        pytest.skip("disciplines.conf not installed")
+    DisciplineRegistry.from_file(conf, strict=True)  # raises on any issue

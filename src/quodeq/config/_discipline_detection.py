@@ -29,9 +29,52 @@ class DisciplineRegistry:
         self._file_cache: dict[Path, str] = {}
 
     @classmethod
-    def from_file(cls, path: Path) -> "DisciplineRegistry":
-        """Parse an INI-style disciplines.conf file into a registry."""
-        return cls(load_disciplines_from_file(path))
+    def from_file(cls, path: Path, *, strict: bool = False) -> "DisciplineRegistry":
+        """Parse an INI-style disciplines.conf file into a registry.
+
+        Surfaces issues (unknown keys, dangling ``detect_excludes`` references,
+        rules with no triggers) found during load. With ``strict=True`` any issue
+        raises ``ValueError`` — use this in CI against the bundled conf so typos
+        cannot ship. Without ``strict`` issues are logged as warnings and the
+        registry loads as usual (preserves user-facing tolerance).
+        """
+        rules, parse_problems = load_disciplines_from_file(path)
+        registry = cls(rules)
+        problems = parse_problems + registry.validate()
+        if problems:
+            if strict:
+                raise ValueError(
+                    f"disciplines config {path} has issues:\n  - "
+                    + "\n  - ".join(problems)
+                )
+            for p in problems:
+                _logger.warning("disciplines.conf: %s", p)
+        return registry
+
+    def validate(self) -> list[str]:
+        """Return a list of human-readable issues discovered in the loaded rules.
+
+        Currently catches:
+
+        * ``detect_excludes`` references to rules that don't exist (silent typos
+          would otherwise mean "exclude nothing").
+        * Rules with no triggers — no detect_file*, detect_glob, or detect_dir —
+          which can never match and are therefore dead config.
+        """
+        problems: list[str] = []
+        names = set(self.disciplines)
+        for name, rule in self.disciplines.items():
+            for excl in rule.detect_excludes or ():
+                if excl not in names:
+                    problems.append(
+                        f"section [{name}]: detect_excludes references unknown rule {excl!r}"
+                    )
+            has_trigger = bool(rule.detect_files) or bool(rule.detect_glob) or bool(rule.detect_dir)
+            if not has_trigger:
+                problems.append(
+                    f"section [{name}]: has no triggers (detect_file*, detect_glob, or detect_dir)"
+                )
+        return problems
 
     def iter_disciplines(self) -> Iterable[DisciplineRule]:
         """Yield all discipline rules sorted by detection priority."""
