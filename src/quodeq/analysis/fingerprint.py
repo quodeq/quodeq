@@ -124,13 +124,41 @@ def load_fingerprint(evidence_dir: Path, dimension: str) -> dict | None:
         return None
 
 
+def _queue_taken_files(evidence_dir: Path, dimension: str) -> set[str]:
+    """Read files that were dispatched to agents from a dim's queue.json.
+
+    Returns the union of files appearing in any taken batch. Empty set if the
+    queue is missing or unreadable. Used to salvage analyzed_files from runs
+    that crashed or were cancelled before the fingerprint was finalized.
+    """
+    path = evidence_dir / f"{dimension}_queue.json"
+    if not path.is_file():
+        return set()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return set()
+    taken = data.get("taken") if isinstance(data, dict) else None
+    if not isinstance(taken, list):
+        return set()
+    out: set[str] = set()
+    for entry in taken:
+        files = entry.get("files") if isinstance(entry, dict) else None
+        if isinstance(files, list):
+            out.update(f for f in files if isinstance(f, str))
+    return out
+
+
 def find_previous_fingerprint(
     evidence_dir: Path, dimension: str,
 ) -> tuple[dict | None, Path | None]:
     """Find the fingerprint and evidence dir from the most recent previous run.
 
     Walks the run history to find the latest run (other than the current one)
-    that has a fingerprint for the given dimension.
+    that has a fingerprint for the given dimension. Crash/cancel salvage:
+    when the previous run died before finalising, its `analyzed_files` set
+    is stale — we union in whatever files the queue actually dispatched so
+    the catch-up loop doesn't keep re-sweeping work that already happened.
     """
     paths_info = resolve_evidence_paths(evidence_dir)
     if not paths_info:
@@ -141,12 +169,18 @@ def find_previous_fingerprint(
         if run_info.run_id == current_run_id:
             continue
         run_dir = reports_base / project_uuid / run_info.run_id
-        # Only carry forward from runs that completed (have a scored report)
-        eval_report = run_dir / "evaluation" / f"{dimension}.json"
-        if not eval_report.is_file():
-            continue
         prev_evidence = run_dir / "evidence"
         fp = load_fingerprint(prev_evidence, dimension)
-        if fp:
-            return fp, prev_evidence
+        if not fp:
+            continue
+        # Augment analyzed_files with anything the queue dispatched. For
+        # cleanly finalised runs this is a no-op (queue.taken ⊆ analyzed_files
+        # already). For crashed/cancelled runs it salvages partial work.
+        queue_analyzed = _queue_taken_files(prev_evidence, dimension)
+        if queue_analyzed:
+            current_analyzed = set(fp.get("analyzed_files") or [])
+            merged = current_analyzed | queue_analyzed
+            if merged != current_analyzed:
+                fp["analyzed_files"] = sorted(merged)
+        return fp, prev_evidence
     return None, None
