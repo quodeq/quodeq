@@ -1,4 +1,4 @@
-import { useMemo, lazy, Suspense } from 'react';
+import { useMemo, lazy, Suspense, useEffect } from 'react';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import DimensionCardsGrid from './DimensionCardsGrid.jsx';
 import { formatRunId, gradeLetter, complianceRatio, extDisplayName } from '../../../utils/formatters.js';
@@ -10,8 +10,7 @@ import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../co
 
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterTrendByVisibleStandardsDaily, filterAccumulatedByVisibleStandards } from '../../../utils/scoreFiltering.js';
-import CopyButton, { FileTextIcon } from '../../../components/CopyButton.jsx';
-import { copyToClipboard } from '../../../utils/clipboard.js';
+import { useReportViewer } from '../../report-viewer/index.js';
 import { buildOverviewReport } from '../../../utils/reportBuilder.js';
 
 // ---------------------------------------------------------------------------
@@ -91,14 +90,6 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulated
           name="overview"
           sub={buildLanguageSub(projectInfo) || (lastDate ? `last_evaluated · ${lastDate}` : null)}
         />
-        <div className="acc-eval-panel__actions">
-          <CopyButton
-            label="Report"
-            className="fix-plan-btn-header"
-            icon={<FileTextIcon />}
-            onClick={() => copyToClipboard(buildOverviewReport(accumulated, accumulatedDimensions || [], projectName))}
-          />
-        </div>
       </div>
       <StatStrip cards>
         <Stat
@@ -189,6 +180,30 @@ function useAccumulatedComputations(data) {
 export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const { onRunClick, onDimensionClick, onNavigate } = callbacks;
   const { currentOverviewRun, selectedDayDimNames, filteredDailyTrend, filteredTrend, filteredDimensions, filteredAccumulated, filteredStats } = useAccumulatedComputations(data);
+
+  const { setActiveBuilder, clearActiveBuilder } = useReportViewer();
+  const reportProjectName =
+    data.projectInfo?.displayName
+    || data.projectInfo?.name
+    || data.selectedDisplayName
+    || data.selectedProject
+    || 'project';
+  const hasReportData = Boolean(
+    filteredAccumulated?.summary
+    && Number.isFinite(parseFloat(filteredAccumulated.summary.numericAverage))
+    && (filteredDimensions?.length ?? 0) > 0
+  );
+  useEffect(() => {
+    if (!hasReportData) {
+      clearActiveBuilder();
+      return undefined;
+    }
+    setActiveBuilder({
+      title: `Code Quality Report — ${reportProjectName}`,
+      buildMarkdown: () => buildOverviewReport(filteredAccumulated, filteredDimensions || [], reportProjectName),
+    });
+    return () => clearActiveBuilder();
+  }, [hasReportData, setActiveBuilder, clearActiveBuilder, reportProjectName, filteredAccumulated, filteredDimensions]);
 
   return (
     <>

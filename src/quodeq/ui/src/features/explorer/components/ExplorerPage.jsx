@@ -1,12 +1,13 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
-import CopyButton, { SparkleIcon, FileTextIcon } from '../../../components/CopyButton.jsx';
+import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { gradeColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { buildDimensionReport } from '../../../utils/reportBuilder.js';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
+import { useReportViewer } from '../../report-viewer/index.js';
 import { useExplorerData, buildEvalPrincipalFn } from './explorerDataHooks.js';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 
@@ -30,12 +31,6 @@ function DimensionOverview({ data, stats, onNavigate }) {
           sub={dateLabel || runId || null}
         />
         <div className="dimension-overview__actions">
-          <CopyButton
-            label="Report"
-            className="fix-plan-btn-header"
-            icon={<FileTextIcon />}
-            onClick={() => copyToClipboard(buildDimensionReport({ evalData, principleGrades: principleGrades || [], allViolations, overallGrade, dateLabel, runId }))}
-          />
           {allViolations.length > 0 && (
             <CopyButton
               label="Full fix plan"
@@ -155,6 +150,28 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, sev
       : d.topFiles,
     [filteredViolations, activeSevFilter, d.topFiles]
   );
+
+  const { setActiveBuilder, clearActiveBuilder } = useReportViewer();
+  useEffect(() => {
+    if (!d.evalData) {
+      clearActiveBuilder();
+      return undefined;
+    }
+    const dim = d.evalData.dimension || 'Unknown';
+    const dimTitle = dim.charAt(0).toUpperCase() + dim.slice(1);
+    setActiveBuilder({
+      title: `${dimTitle} Report`,
+      buildMarkdown: () => buildDimensionReport({
+        evalData: d.evalData,
+        principleGrades: d.principleGrades || [],
+        allViolations: filteredViolations,
+        overallGrade: d.overallGrade,
+        dateLabel,
+        runId,
+      }),
+    });
+    return () => clearActiveBuilder();
+  }, [setActiveBuilder, clearActiveBuilder, d.evalData, d.principleGrades, filteredViolations, d.overallGrade, dateLabel, runId]);
 
   if (d.loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
   if (d.error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;
