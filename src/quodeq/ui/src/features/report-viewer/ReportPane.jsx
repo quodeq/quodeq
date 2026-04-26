@@ -14,14 +14,24 @@ function todayISO() {
 }
 
 function downloadMarkdown(title, markdown) {
-  // Prepend a UTF-8 BOM so text viewers (especially the ones pywebview hands
-  // the file off to on macOS) detect the encoding correctly. Without it,
-  // characters like —, ·, ✓ render as mojibake.
+  const filename = `${slugify(title)}-${todayISO()}.md`;
+
+  // Inside pywebview, blob-URL downloads get handed off to the OS as a
+  // viewer instead of saved to disk. Use the Python-side native Save dialog
+  // when it's available.
+  const pyApi = typeof window !== 'undefined' && window.pywebview && window.pywebview.api;
+  if (pyApi && typeof pyApi.save_file === 'function') {
+    pyApi.save_file(markdown, filename);
+    return;
+  }
+
+  // Browser path: anchor-driven blob download. UTF-8 BOM so text viewers
+  // detect encoding correctly if the file ends up displayed instead of saved.
   const blob = new Blob(['﻿', markdown], { type: 'text/markdown;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${slugify(title)}-${todayISO()}.md`;
+  a.download = filename;
   a.rel = 'noopener';
   document.body.appendChild(a);
   a.click();
