@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { ReportPane } from './ReportPane.jsx';
 import { ReportViewerProvider } from './ReportViewerProvider.jsx';
@@ -30,11 +30,13 @@ describe('ReportPane', () => {
     expect(screen.queryByRole('complementary', { name: /report/i })).toBeNull();
   });
 
-  it('renders the title and markdown when open', () => {
+  it('renders the title immediately and the markdown body once the slide finishes', async () => {
     harness({ title: 'Quality Report', markdown: '# Hello' });
     fireEvent.click(screen.getByText('open'));
     expect(screen.getByText('Quality Report')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Hello' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Hello' })).toBeInTheDocument();
+    });
   });
 
   it('Copy button writes the current markdown to the clipboard', () => {
@@ -51,9 +53,11 @@ describe('ReportPane', () => {
     expect(screen.queryByRole('complementary', { name: /report/i })).toBeNull();
   });
 
-  it('renders the empty-state message for empty markdown', () => {
+  it('renders the empty-state message for empty markdown after the slide finishes', async () => {
     harness({ markdown: '' });
     fireEvent.click(screen.getByText('open'));
-    expect(screen.getByText(/no content/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/no content/i)).toBeInTheDocument();
+    });
   });
 });

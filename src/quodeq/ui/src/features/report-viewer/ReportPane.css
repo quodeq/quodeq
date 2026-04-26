@@ -92,6 +92,24 @@
   font-style: italic;
 }
 
+/* Skeleton shown during slide-in, before the markdown body mounts. */
+.report-pane__body-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 4px;
+}
+.report-pane__body-skeleton > span {
+  display: block;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--color-surface-alt);
+  opacity: 0.6;
+}
+.report-pane__body-skeleton > span:nth-child(1) { width: 55%; height: 18px; }
+.report-pane__body-skeleton > span:nth-child(2) { width: 90%; }
+.report-pane__body-skeleton > span:nth-child(3) { width: 75%; }
+
 /* ── Markdown content (.report-pane-md) ──────────────── */
 .report-pane-md h1,
 .report-pane-md h2 {

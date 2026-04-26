@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useReportViewer } from './ReportViewerContext.jsx';
 import { ReportMarkdown } from './markdownRenderer.jsx';
 import { clampPaneWidth } from './resizeMath.js';
@@ -42,13 +42,29 @@ class RenderBoundary extends React.Component {
   }
 }
 
+// Defer mounting the markdown body until after the column slide-in finishes
+// (~220ms transition). Otherwise the heavy DOM work happens mid-animation
+// and the slide stutters.
+const SLIDE_MS = 220;
+
 export function ReportPane() {
   const { current, isOpen, paneWidth, setPaneWidth, closeReport } = useReportViewer();
   const bodyRef = useRef(null);
+  const [bodyReady, setBodyReady] = useState(false);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
   }, [current]);
+
+  useEffect(() => {
+    if (!isOpen || !current) {
+      setBodyReady(false);
+      return undefined;
+    }
+    setBodyReady(false);
+    const id = setTimeout(() => setBodyReady(true), SLIDE_MS);
+    return () => clearTimeout(id);
+  }, [isOpen, current]);
 
   const onCopy = useCallback(() => {
     if (current) navigator.clipboard?.writeText(current.markdown);
@@ -102,9 +118,15 @@ export function ReportPane() {
         </div>
       </header>
       <div className="report-pane__body" ref={bodyRef}>
-        <RenderBoundary contentKey={current?.title}>
-          <ReportMarkdown markdown={current.markdown} />
-        </RenderBoundary>
+        {bodyReady ? (
+          <RenderBoundary contentKey={current?.title}>
+            <ReportMarkdown markdown={current.markdown} />
+          </RenderBoundary>
+        ) : (
+          <div className="report-pane__body-skeleton" aria-hidden="true">
+            <span /><span /><span />
+          </div>
+        )}
       </div>
     </aside>
   );
