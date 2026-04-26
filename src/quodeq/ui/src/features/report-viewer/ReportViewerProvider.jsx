@@ -26,6 +26,7 @@ export function ReportViewerProvider({ children }) {
   const [current, setCurrent] = useState(null); // { title, markdown } | null
   const [isOpen, setIsOpen] = useState(false);
   const [paneWidth, setPaneWidthState] = useState(readStoredWidth);
+  const [activeBuilder, setActiveBuilderState] = useState(null); // { title, buildMarkdown } | null
 
   const openReport = useCallback(({ title, markdown }) => {
     setCurrent({ title, markdown });
@@ -40,6 +41,9 @@ export function ReportViewerProvider({ children }) {
     setPaneWidthState(px);
     writeStoredWidth(px);
   }, []);
+
+  const setActiveBuilder = useCallback((builder) => setActiveBuilderState(builder), []);
+  const clearActiveBuilder = useCallback(() => setActiveBuilderState(null), []);
 
   // Sync the open width into a CSS variable on the root so the grid template can read it.
   useEffect(() => {
@@ -65,8 +69,8 @@ export function ReportViewerProvider({ children }) {
   }, [isOpen]);
 
   const value = useMemo(
-    () => ({ current, isOpen, paneWidth, openReport, closeReport, setPaneWidth }),
-    [current, isOpen, paneWidth, openReport, closeReport, setPaneWidth]
+    () => ({ current, isOpen, paneWidth, openReport, closeReport, setPaneWidth, activeBuilder, setActiveBuilder, clearActiveBuilder }),
+    [current, isOpen, paneWidth, openReport, closeReport, setPaneWidth, activeBuilder, setActiveBuilder, clearActiveBuilder]
   );
 
   return (

@@ -9,6 +9,7 @@
  *
  * Stateless; the parent passes the data it has.
  */
+import { useReportViewer } from '../features/report-viewer/index.js';
 
 function Dot({ ok }) {
   return <span className={`topbar-dot ${ok ? 'topbar-dot--ok' : 'topbar-dot--err'}`} aria-hidden="true" />;
@@ -56,7 +57,6 @@ export default function TopBar({
   serverUrl,
   provider,
   model,
-  onReport,
   onEvaluate,
   evaluating = false,
   onProviderClick,
@@ -72,6 +72,7 @@ export default function TopBar({
   effectiveDark = false,
   onToggleTheme,
 }) {
+  const { activeBuilder, openReport } = useReportViewer();
   return (
     <header className="topbar">
       {/* Compact-mode back button. Hidden entirely at the root of the
@@ -116,9 +117,17 @@ export default function TopBar({
           )
         )}
 
-        {onReport && (
-          <button type="button" className="topbar-btn" onClick={onReport}>
-            Report
+        {activeBuilder && (
+          <button
+            type="button"
+            className="topbar-btn topbar-btn--report"
+            onClick={() => openReport({
+              title: activeBuilder.title,
+              markdown: activeBuilder.buildMarkdown(),
+            })}
+          >
+            <span className="topbar-btn__plus" aria-hidden="true">↗</span>
+            <span>Report</span>
           </button>
         )}
         {onToggleTheme && (

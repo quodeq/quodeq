@@ -57,4 +57,23 @@ describe('ReportViewerProvider', () => {
     expect(() => render(<Probe />)).toThrow();
     spy.mockRestore();
   });
+
+  it('setActiveBuilder and clearActiveBuilder manage the activeBuilder slot', () => {
+    function BuilderProbe() {
+      const { activeBuilder, setActiveBuilder, clearActiveBuilder } = useReportViewer();
+      return (
+        <div>
+          <div data-testid="builder">{activeBuilder ? activeBuilder.title : 'none'}</div>
+          <button onClick={() => setActiveBuilder({ title: 'My Report', buildMarkdown: () => '# md' })}>set</button>
+          <button onClick={clearActiveBuilder}>clear</button>
+        </div>
+      );
+    }
+    render(<ReportViewerProvider><BuilderProbe /></ReportViewerProvider>);
+    expect(screen.getByTestId('builder')).toHaveTextContent('none');
+    fireEvent.click(screen.getByText('set'));
+    expect(screen.getByTestId('builder')).toHaveTextContent('My Report');
+    fireEvent.click(screen.getByText('clear'));
+    expect(screen.getByTestId('builder')).toHaveTextContent('none');
+  });
 });

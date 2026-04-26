@@ -4,13 +4,13 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--surface-1, #11151c);
-  color: var(--fg, #cbd5e1);
-  border-left: 1px solid var(--border, #2a2f3a);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-left: 1px solid var(--color-border);
   border-radius: 12px 0 0 12px;
-  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.35);
   overflow: hidden;
   min-width: 0;
+  margin-left: 8px;
 }
 
 /* ── Resize divider — visually in the gutter on the pane's left edge ─ */
@@ -32,11 +32,11 @@
   width: 2px;
   height: 32px;
   border-radius: 1px;
-  background: var(--border, #2a2f3a);
+  background: var(--color-border);
   transition: background 120ms ease;
 }
 .report-pane__divider:hover::after {
-  background: var(--accent, #6366f1);
+  background: var(--color-accent);
 }
 
 /* ── Header ───────────────────────────────────────────── */
@@ -45,10 +45,10 @@
   height: 44px;
   display: flex;
   align-items: center;
-  gap: var(--space-3, 8px);
-  padding: 0 var(--space-4, 12px);
-  border-bottom: 1px solid var(--border, #2a2f3a);
-  background: linear-gradient(180deg, #161b24, #11151c);
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
 }
 .report-pane__chrome-dots {
   display: flex;
@@ -67,7 +67,7 @@
   flex: 1 1 auto;
   font-size: 13px;
   font-weight: 600;
-  color: var(--fg-strong, #e5e7eb);
+  color: var(--color-text);
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -80,7 +80,7 @@
 .report-pane__icon-btn {
   background: transparent;
   border: 1px solid transparent;
-  color: var(--fg-muted, #94a3b8);
+  color: var(--color-text-muted);
   width: 28px;
   height: 28px;
   border-radius: 6px;
@@ -89,43 +89,43 @@
   line-height: 1;
 }
 .report-pane__icon-btn:hover {
-  background: var(--surface-2, #1a1f2b);
-  color: var(--fg-strong, #e5e7eb);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
 }
 
 /* ── Body ─────────────────────────────────────────────── */
 .report-pane__body {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: var(--space-5, 16px);
+  padding: 16px;
   line-height: 1.55;
 }
 .report-pane__error {
-  color: var(--danger, #fca5a5);
+  color: var(--color-danger, #fca5a5);
   font-style: italic;
 }
 
 /* ── Markdown content (.report-pane-md) ──────────────── */
 .report-pane-md h1,
 .report-pane-md h2 {
-  border-bottom: 1px solid var(--border, #2a2f3a);
-  padding-bottom: var(--space-2, 4px);
-  margin-top: var(--space-5, 16px);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 4px;
+  margin-top: 16px;
 }
 .report-pane-md h1:first-child,
 .report-pane-md h2:first-child { margin-top: 0; }
 .report-pane-md code {
-  background: var(--surface-2, #1a1f2b);
+  background: var(--color-surface-alt);
   padding: 1px 5px;
   border-radius: 3px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.9em;
 }
 .report-pane-md pre {
-  background: var(--surface-2, #1a1f2b);
-  border: 1px solid var(--border, #2a2f3a);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  padding: var(--space-4, 12px);
+  padding: 12px;
   overflow-x: auto;
 }
 .report-pane-md pre > code {
@@ -135,7 +135,7 @@
 }
 .report-pane-md .md-table-wrap {
   overflow-x: auto;
-  margin: var(--space-4, 12px) 0;
+  margin: 12px 0;
 }
 .report-pane-md table {
   border-collapse: collapse;
@@ -144,7 +144,7 @@
 }
 .report-pane-md th,
 .report-pane-md td {
-  border: 1px solid var(--border, #2a2f3a);
+  border: 1px solid var(--color-border);
   padding: 6px 10px;
   text-align: left;
 }
@@ -152,13 +152,13 @@
   background: rgba(255, 255, 255, 0.02);
 }
 .report-pane-md blockquote {
-  border-left: 3px solid var(--accent, #6366f1);
-  margin: var(--space-4, 12px) 0;
-  padding: 0 var(--space-4, 12px);
-  color: var(--fg-muted, #94a3b8);
+  border-left: 3px solid var(--color-accent);
+  margin: 12px 0;
+  padding: 0 12px;
+  color: var(--color-text-muted);
 }
 .report-pane-md--empty {
-  color: var(--fg-muted, #94a3b8);
+  color: var(--color-text-muted);
   font-style: italic;
 }
 
@@ -173,6 +173,7 @@
     max-width: 480px;
     z-index: 50;
     border-radius: 0;
+    margin-left: 0;
   }
   .report-pane__divider { display: none; }
 }

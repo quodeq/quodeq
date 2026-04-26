@@ -402,7 +402,6 @@ export default function App() {
           serverUrl={state.serverHealth?.url || null}
           provider={sidebarProvider}
           model={sidebarModel}
-          onReport={null}
           onEvaluate={state.projects?.length > 0 ? (() => navTab('evaluate')) : null}
           evaluating={state.evalLifecycle?.job?.status === 'running'}
           onProviderClick={() => navTab('settings')}
