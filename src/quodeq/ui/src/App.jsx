@@ -23,6 +23,8 @@ import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { readVisibleStandardIds } from './utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
+import { ReportViewerProvider } from './features/report-viewer/ReportViewerProvider.jsx';
+import { ReportPane } from './features/report-viewer/ReportPane.jsx';
 
 const NO_PROJECT_TABS = ['evaluate', 'standards', 'settings', 'help'];
 
@@ -282,6 +284,7 @@ function AppShell({ sidebar, header, content }) {
             {content}
           </main>
         </div>
+        <ReportPane />
       </div>
     </div>
   );
@@ -358,6 +361,7 @@ export default function App() {
           : null);
 
   return (
+    <ReportViewerProvider>
     <AppShell
       sidebar={
         <Sidebar
@@ -419,5 +423,6 @@ export default function App() {
       }
       content={<div className="tab-fade" key={activeTab}><MainContent activePage={activePage} props={contentProps} /></div>}
     />
+    </ReportViewerProvider>
   );
 }

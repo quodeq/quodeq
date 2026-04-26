@@ -1276,14 +1276,20 @@
 }
 .app-shell__body {
   display: grid;
-  grid-template-columns: var(--sidebar-width, 64px) 1fr;
+  grid-template-columns:
+    var(--sidebar-width, 64px)
+    minmax(0, 1fr)
+    var(--report-pane-width, 0px);
   flex: 1 1 auto;
   min-height: 0;
-  transition: grid-template-columns 200ms ease;
+  transition: grid-template-columns 220ms ease;
 }
 .app-shell__body:has(.sidebar.sidebar--expanded:hover),
 .app-shell__body:has(.sidebar.sidebar--expanded.sidebar--pinned) {
-  grid-template-columns: 240px 1fr;
+  grid-template-columns:
+    240px
+    minmax(0, 1fr)
+    var(--report-pane-width, 0px);
 }
 .app-shell__main-column {
   display: flex;
