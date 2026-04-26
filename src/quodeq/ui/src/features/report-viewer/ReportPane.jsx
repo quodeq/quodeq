@@ -14,15 +14,33 @@ function todayISO() {
 }
 
 function downloadMarkdown(title, markdown) {
-  const blob = new Blob([markdown], { type: 'text/markdown' });
+  const filename = `${slugify(title)}-${todayISO()}.md`;
+
+  // Inside pywebview, blob-URL downloads get handed off to the OS as a
+  // viewer instead of saved to disk. Use the Python-side native Save dialog
+  // when it's available.
+  const pyApi = typeof window !== 'undefined' && window.pywebview && window.pywebview.api;
+  if (pyApi && typeof pyApi.save_file === 'function') {
+    pyApi.save_file(markdown, filename);
+    return;
+  }
+
+  // Browser path: anchor-driven blob download. UTF-8 BOM so text viewers
+  // detect encoding correctly if the file ends up displayed instead of saved.
+  const blob = new Blob(['﻿', markdown], { type: 'text/markdown;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${slugify(title)}-${todayISO()}.md`;
+  a.download = filename;
+  a.rel = 'noopener';
   document.body.appendChild(a);
   a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  // Defer cleanup so the browser has time to start the download before
+  // we revoke the blob URL — synchronous cleanup races and can drop the file.
+  setTimeout(() => {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, 0);
 }
 
 class RenderBoundary extends React.Component {
