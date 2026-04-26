@@ -168,3 +168,172 @@ def test_go_mod(body: str, needle: str, expected: bool) -> None:
 ])
 def test_composer(body: str, needle: str, expected: bool) -> None:
     assert has_composer_dependency(body, needle) is expected
+
+
+# --- pom.xml -----------------------------------------------------------------
+
+
+from quodeq.config._dependency_parsers import (
+    has_gemfile_gem, has_gradle_dependency, has_julia_dependency,
+    has_mix_dep, has_pom_xml_dependency, has_pubspec_dependency,
+)
+
+
+@pytest.mark.parametrize("body, needle, expected", [
+    # spring-boot artifactId substring match.
+    (
+        "<project>"
+        "<dependencies><dependency>"
+        "<groupId>org.springframework.boot</groupId>"
+        "<artifactId>spring-boot-starter-web</artifactId>"
+        "</dependency></dependencies></project>",
+        "spring-boot", True,
+    ),
+    # io.quarkus exact groupId.
+    (
+        "<project>"
+        "<dependencies><dependency>"
+        "<groupId>io.quarkus</groupId>"
+        "<artifactId>quarkus-resteasy</artifactId>"
+        "</dependency></dependencies></project>",
+        "io.quarkus", True,
+    ),
+    # Description text must NOT match (chunk-9 regression).
+    (
+        "<project>"
+        "<description>migrating off spring-boot to quarkus</description>"
+        "<dependencies><dependency>"
+        "<groupId>io.quarkus</groupId>"
+        "<artifactId>quarkus-resteasy</artifactId>"
+        "</dependency></dependencies></project>",
+        "spring-boot", False,
+    ),
+    # Maven default namespace is stripped.
+    (
+        '<project xmlns="http://maven.apache.org/POM/4.0.0">'
+        "<dependencies><dependency>"
+        "<groupId>org.springframework.boot</groupId>"
+        "<artifactId>spring-boot-starter</artifactId>"
+        "</dependency></dependencies></project>",
+        "spring-boot", True,
+    ),
+    # Empty content → no match.
+    ("not <xml", "anything", False),
+])
+def test_pom_xml(body: str, needle: str, expected: bool) -> None:
+    assert has_pom_xml_dependency(body, needle) is expected
+
+
+# --- Gradle (Groovy / Kotlin DSL) -------------------------------------------
+
+
+@pytest.mark.parametrize("body, needle, expected", [
+    # Groovy DSL.
+    ('implementation "org.springframework.boot:spring-boot-starter-web:3.2.0"', "spring-boot", True),
+    # Kotlin DSL.
+    ('implementation("io.ktor:ktor-server-core:2.3.0")', "io.ktor", True),
+    # Plugins block.
+    ('plugins { id "org.springframework.boot" version "3.2.0" }', "org.springframework.boot", True),
+    # // line comment must NOT match.
+    ('// migrating off org.springframework.boot\nplugins { id "kotlin" }', "org.springframework.boot", False),
+    # /* block comment */ must NOT match.
+    (
+        '/* fall-back: io.ktor used to be here */\nplugins { id "kotlin" }',
+        "io.ktor", False,
+    ),
+    # Mixed: comment FP-bait + real dep — should still match the real dep.
+    (
+        '// notes about io.ktor\nimplementation("io.ktor:ktor-server-core:2.3.0")',
+        "io.ktor", True,
+    ),
+])
+def test_gradle(body: str, needle: str, expected: bool) -> None:
+    assert has_gradle_dependency(body, needle) is expected
+
+
+# --- Gemfile -----------------------------------------------------------------
+
+
+@pytest.mark.parametrize("body, needle, expected", [
+    ('gem "rails"\n', "rails", True),
+    ("gem 'sinatra'\n", "sinatra", True),
+    ('gem "rails", "~> 7.1"\n', "rails", True),
+    # Comment-only mention does NOT match.
+    ('# we used to use rails\ngem "rack"\n', "rails", False),
+    # Derived gem name doesn't match the parent name (exact match).
+    ('gem "rails-controller-testing"\n', "rails", False),
+    ('gem "rails-controller-testing"\n', "rails-controller-testing", True),
+    # Multiple gems.
+    ('gem "rack"\ngem "sinatra"\n', "sinatra", True),
+])
+def test_gemfile(body: str, needle: str, expected: bool) -> None:
+    assert has_gemfile_gem(body, needle) is expected
+
+
+# --- mix.exs -----------------------------------------------------------------
+
+
+@pytest.mark.parametrize("body, needle, expected", [
+    ('def deps, do: [{:phoenix, "~> 1.7"}]\n', "phoenix", True),
+    ('def deps, do: [{:phoenix, "~> 1.7"}, {:ecto, "~> 3.0"}]\n', "ecto", True),
+    # Only declared as comment — no match.
+    ('# was using phoenix\ndef deps, do: [{:plug, "~> 1.0"}]\n', "phoenix", False),
+    # Underscored atom names allowed.
+    ('def deps, do: [{:tesla_otel, "~> 1.0"}]\n', "tesla_otel", True),
+])
+def test_mix_exs(body: str, needle: str, expected: bool) -> None:
+    assert has_mix_dep(body, needle) is expected
+
+
+# --- pubspec.yaml ------------------------------------------------------------
+
+
+@pytest.mark.parametrize("body, needle, expected", [
+    (
+        "name: x\ndependencies:\n  flutter:\n    sdk: flutter\n",
+        "flutter", True,
+    ),
+    (
+        "name: x\ndev_dependencies:\n  flutter_test:\n    sdk: flutter\n",
+        "flutter_test", True,
+    ),
+    # description containing 'flutter' must NOT match.
+    (
+        'name: x\ndescription: "a flutter-style framework"\ndependencies:\n  http: ^1.0.0\n',
+        "flutter", False,
+    ),
+    # Comments stripped.
+    (
+        "# flutter is great\nname: x\ndependencies:\n  http: ^1.0.0\n",
+        "flutter", False,
+    ),
+    # Nested values (sdk: flutter under flutter:) do NOT contribute to matches at outer level.
+    (
+        "name: x\ndependencies:\n  http:\n    version: ^1.0.0\n",
+        "http", True,
+    ),
+])
+def test_pubspec(body: str, needle: str, expected: bool) -> None:
+    assert has_pubspec_dependency(body, needle) is expected
+
+
+# --- Project.toml (Julia) ----------------------------------------------------
+
+
+@pytest.mark.parametrize("body, needle, expected", [
+    (
+        'name = "X"\n[deps]\nDataFrames = "00000000-0000-0000-0000-000000000000"\n',
+        "DataFrames", True,
+    ),
+    (
+        'name = "X"\n[deps]\nDataFrames = "00000000-0000-0000-0000-000000000000"\n',
+        "Plots", False,
+    ),
+    # Case-insensitive lookup.
+    (
+        'name = "X"\n[deps]\nDataFrames = "00000000-0000-0000-0000-000000000000"\n',
+        "dataframes", True,
+    ),
+])
+def test_julia_project_toml(body: str, needle: str, expected: bool) -> None:
+    assert has_julia_dependency(body, needle) is expected

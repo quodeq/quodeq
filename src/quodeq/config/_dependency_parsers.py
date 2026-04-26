@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import re
 import tomllib
+import xml.etree.ElementTree as ET
 from typing import Callable
 
 # PEP 503: package names are case-insensitive and ``[-_.]+`` normalize to ``-``.
@@ -250,6 +251,182 @@ def has_composer_dependency(content: str, needle: str) -> bool:
     return needle.strip().lower() in _composer_dep_names(content)
 
 
+# --- pom.xml (Maven) ---------------------------------------------------------
+
+
+def _pom_coords(content: str) -> set[str]:
+    """Return all groupId / artifactId text values declared in *content*.
+
+    Captures dependencies, parent coords, plugins, and BOM imports — anywhere a
+    ``<groupId>`` or ``<artifactId>`` element appears. Commentary and free text
+    in ``<description>`` / ``<comment>`` are not collected.
+    """
+    try:
+        root = ET.fromstring(content)
+    except ET.ParseError:
+        return set()
+    coords: set[str] = set()
+    for elem in root.iter():
+        # Strip default Maven namespace if present (``{http://maven.apache.org/POM/4.0.0}groupId``).
+        tag = elem.tag.rsplit("}", 1)[-1]
+        if tag in ("groupId", "artifactId") and elem.text:
+            coords.add(elem.text.strip())
+    return coords
+
+
+def has_pom_xml_dependency(content: str, needle: str) -> bool:
+    """Substring-match *needle* against extracted Maven coordinates.
+
+    Substring (not exact) because rule needles like ``spring-boot`` must match
+    artifactIds like ``spring-boot-starter-web``. Description / comment text is
+    excluded by construction — only ``<groupId>`` / ``<artifactId>`` are
+    considered, so a ``<description>migrating off spring-boot</description>``
+    no longer triggers a false match.
+    """
+    needle_low = needle.strip().lower()
+    if not needle_low:
+        return True
+    return any(needle_low in c.lower() for c in _pom_coords(content))
+
+
+# --- Gradle (Groovy / Kotlin DSL) -------------------------------------------
+
+
+_GRADLE_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+_GRADLE_LINE_COMMENT = re.compile(r"//[^\n]*")
+
+
+def _strip_gradle_comments(content: str) -> str:
+    return _GRADLE_LINE_COMMENT.sub("", _GRADLE_BLOCK_COMMENT.sub("", content))
+
+
+def has_gradle_dependency(content: str, needle: str) -> bool:
+    """Substring-match against build.gradle / build.gradle.kts with comments stripped.
+
+    Real Gradle parsing requires a JVM; a comment-aware substring is the best
+    we can do without one. Strips ``//`` line and ``/* */`` block comments first
+    so a ``// migrating off spring-boot`` line no longer triggers a match.
+    Coordinates inside string literals (the actual dep declarations) survive.
+    """
+    needle_low = needle.strip().lower()
+    if not needle_low:
+        return True
+    return needle_low in _strip_gradle_comments(content).lower()
+
+
+# --- Gemfile (Ruby DSL) ------------------------------------------------------
+
+
+_GEMFILE_GEM = re.compile(r"""^\s*gem\s+["']([^"']+)["']""", re.MULTILINE)
+
+
+def _strip_hash_comments(content: str) -> str:
+    """Remove ``#``-style line comments, preserving the rest of each line."""
+    out: list[str] = []
+    for line in content.splitlines():
+        idx = line.find("#")
+        out.append(line[:idx] if idx >= 0 else line)
+    return "\n".join(out)
+
+
+def _gemfile_gems(content: str) -> set[str]:
+    body = _strip_hash_comments(content)
+    return {m.group(1).lower() for m in _GEMFILE_GEM.finditer(body)}
+
+
+def has_gemfile_gem(content: str, needle: str) -> bool:
+    """Match exact gem names declared via ``gem "name"`` lines.
+
+    A Gemfile mentioning ``rails`` only in a comment, or declaring a derived
+    gem like ``rails-controller-testing``, no longer matches a needle of
+    ``rails``. The match is exact against the first argument of ``gem "..."``.
+    """
+    return needle.strip().lower() in _gemfile_gems(content)
+
+
+# --- mix.exs (Elixir) --------------------------------------------------------
+
+
+_MIX_DEP = re.compile(r"\{:(\w+)\s*,")
+
+
+def _mix_deps(content: str) -> set[str]:
+    body = _strip_hash_comments(content)
+    return {m.group(1).lower() for m in _MIX_DEP.finditer(body)}
+
+
+def has_mix_dep(content: str, needle: str) -> bool:
+    """Match dep atoms declared in mix.exs as ``{:name, ...}`` tuples.
+
+    A mix.exs with ``# was using phoenix`` in a comment but no actual phoenix
+    dep no longer matches needle ``phoenix``.
+    """
+    return needle.strip().lower() in _mix_deps(content)
+
+
+# --- pubspec.yaml (Dart) -----------------------------------------------------
+
+
+def _pubspec_deps(content: str) -> set[str]:
+    """First-level keys under ``dependencies:`` / ``dev_dependencies:``.
+
+    Hand-rolled rather than pulled in via PyYAML — pubspec layout is shallow,
+    consistent, and we only need top-level keys under those two blocks.
+    """
+    deps: set[str] = set()
+    in_block = False
+    block_indent = -1
+    for raw in content.splitlines():
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        stripped = raw.lstrip()
+        indent = len(raw) - len(stripped)
+        if indent == 0:
+            in_block = stripped.startswith(("dependencies:", "dev_dependencies:", "dependency_overrides:"))
+            block_indent = -1
+            continue
+        if not in_block:
+            continue
+        if block_indent == -1:
+            block_indent = indent
+        if indent != block_indent:
+            continue  # nested key, e.g. ``sdk: flutter`` under a dep — skip
+        if ":" in stripped:
+            key = stripped.split(":", 1)[0].strip()
+            if key:
+                deps.add(key.lower())
+    return deps
+
+
+def has_pubspec_dependency(content: str, needle: str) -> bool:
+    """Match top-level keys in pubspec.yaml's dependency blocks.
+
+    A description containing ``flutter`` no longer matches; only an actual
+    ``flutter:`` key under ``dependencies:`` / ``dev_dependencies:`` does.
+    """
+    return needle.strip().lower() in _pubspec_deps(content)
+
+
+# --- Project.toml (Julia) ----------------------------------------------------
+
+
+def _julia_deps(content: str) -> set[str]:
+    try:
+        data = tomllib.loads(content)
+    except tomllib.TOMLDecodeError:
+        return set()
+    names: set[str] = set()
+    for key in ("deps", "weakdeps", "extras"):
+        v = data.get(key)
+        if isinstance(v, dict):
+            names.update(k.lower() for k in v if isinstance(k, str))
+    return names
+
+
+def has_julia_dependency(content: str, needle: str) -> bool:
+    return needle.strip().lower() in _julia_deps(content)
+
+
 # --- dispatch ----------------------------------------------------------------
 
 
@@ -262,6 +439,13 @@ STRUCTURED_MATCHERS: dict[str, StructuredMatcher] = {
     "Cargo.toml": has_cargo_dependency,
     "go.mod": has_go_mod_module,
     "composer.json": has_composer_dependency,
+    "pom.xml": has_pom_xml_dependency,
+    "build.gradle": has_gradle_dependency,
+    "build.gradle.kts": has_gradle_dependency,
+    "Gemfile": has_gemfile_gem,
+    "mix.exs": has_mix_dep,
+    "pubspec.yaml": has_pubspec_dependency,
+    "Project.toml": has_julia_dependency,
 }
 
 
