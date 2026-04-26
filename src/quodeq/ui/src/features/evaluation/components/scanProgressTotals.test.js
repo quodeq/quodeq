@@ -76,45 +76,46 @@ test('computeOverallProgress: returns zeros when dimensions array is empty', () 
 });
 
 test('computeOverallProgress: handles missing files object on a dim', () => {
+  // No currentDimension, no done dim, only pending → header shows zeros.
+  // Pending dims never drive the header on their own (per the new contract).
   const r = computeOverallProgress({
     projectFiles: 50,
     dimensions: [{ id: 'x', state: 'pending' }],
   });
-  // Pending dim with no observed sibling → fallback estimate is projectFiles.
-  assert.equal(r.totalFiles, 50);
+  assert.equal(r.totalFiles, 0);
   assert.equal(r.takenFiles, 0);
   assert.equal(r.overallPct, 0);
 });
 
 // ---------------------------------------------------------------------------
-// computeOverallProgress — aggregated headline
+// computeOverallProgress — current-dim headline
 // ---------------------------------------------------------------------------
 
-test('computeOverallProgress: 2 dims × 100 files reads "X / 200" (aggregated)', () => {
-  // Header is the aggregated work across dims, not the project file
-  // count. Two dims that each scan 100 files = 200 work units.
+test('computeOverallProgress: tracks the running dim by id', () => {
+  // currentDimension picks security; reliability is also running but ignored.
   const progress = {
-    projectFiles: 100,
+    projectFiles: 1682,
+    currentDimension: 'security',
     dimensions: [
-      { state: 'running', files: { taken: 50, total: 100 } },
-      { state: 'pending', files: { taken: 0,  total: 100 } },
+      { id: 'security',    state: 'running', files: { taken: 55, total: 2035 } },
+      { id: 'reliability', state: 'running', files: { taken: 999, total: 999 } },
+      { id: 'performance', state: 'pending', files: { taken: 0,  total: 1682 } },
     ],
   };
   const r = computeOverallProgress(progress);
-  assert.equal(r.totalFiles, 200);
-  assert.equal(r.takenFiles, 50);
-  assert.equal(r.overallPct, 25);
+  assert.equal(r.totalFiles, 2035);
+  assert.equal(r.takenFiles, 55);
+  assert.equal(r.overallPct, 3);
 });
 
-test('computeOverallProgress: 6-dim run does NOT use project-ceiling for pending dims (regression)', () => {
-  // Reproduces the bug from the screenshot. Without the fallback
-  // substitution, pending dims would each contribute the project-wide
-  // ceiling (1682) and the headline becomes "3 / 9237 files". With the
-  // substitution, every dim contributes the post-filter queue size (827)
-  // observed on the running dim, and the headline becomes the coherent
-  // aggregated "3 / 4962 files".
+test('computeOverallProgress: pending dim fallback ceiling does NOT leak into header (regression)', () => {
+  // Reproduces the screenshot bug: 6-dim incremental run with one running
+  // (security, 827 changed files) and five pending. Old aggregation summed
+  // them and produced a misleading total. New contract: header tracks only
+  // security.
   const progress = {
     projectFiles: 1682,
+    currentDimension: 'security',
     dimensions: [
       { id: 'security',        state: 'running', files: { taken: 3, total: 827 } },
       { id: 'reliability',     state: 'pending', files: { taken: 0, total: 1682 } },
@@ -125,60 +126,55 @@ test('computeOverallProgress: 6-dim run does NOT use project-ceiling for pending
     ],
   };
   const r = computeOverallProgress(progress);
-  assert.equal(r.totalFiles, 4962, 'pending dims contribute 827 each, not 1682');
+  assert.equal(r.totalFiles, 827, 'header is just security, not summed');
   assert.equal(r.takenFiles, 3);
   assert.equal(r.overallPct, 0);
 });
 
-test('computeOverallProgress: pending dims before any has started fall back to projectFiles', () => {
-  // Every dim is pending — no observed running/done queue total exists,
-  // so the only sensible fallback is projectFiles (the upper bound).
+test('computeOverallProgress: falls back to first running dim when currentDimension is unset', () => {
+  // Race window between dim transitions: a dim is running but the backend
+  // hasn't set currentDimension yet.
   const progress = {
-    projectFiles: 200,
+    projectFiles: 1682,
+    currentDimension: null,
     dimensions: [
-      { state: 'pending', files: { taken: 0, total: 200 } },
-      { state: 'pending', files: { taken: 0, total: 200 } },
+      { id: 'security',    state: 'pending', files: { taken: 0, total: 1682 } },
+      { id: 'reliability', state: 'running', files: { taken: 7, total: 200 } },
     ],
   };
   const r = computeOverallProgress(progress);
-  assert.equal(r.totalFiles, 400);
-  assert.equal(r.takenFiles, 0);
-  assert.equal(r.overallPct, 0);
+  assert.equal(r.totalFiles, 200);
+  assert.equal(r.takenFiles, 7);
+  assert.equal(r.overallPct, 4);
 });
 
-test('computeOverallProgress: single-dim run keeps the per-dim count intact', () => {
+test('computeOverallProgress: falls back to last done dim when run has finished', () => {
+  // After completion, currentDimension is null and no dim is running.
+  // We surface the last completed dim so the header reads a real 100%
+  // instead of 0/0.
   const progress = {
-    projectFiles: 500,
+    projectFiles: 1682,
+    currentDimension: null,
     dimensions: [
-      { state: 'running', files: { taken: 120, total: 500 } },
+      { id: 'security',    state: 'done', files: { taken: 827, total: 827 } },
+      { id: 'reliability', state: 'done', files: { taken: 200, total: 200 } },
     ],
   };
   const r = computeOverallProgress(progress);
-  assert.equal(r.totalFiles, 500);
-  assert.equal(r.takenFiles, 120);
-  assert.equal(r.overallPct, 24);
-});
-
-test('computeOverallProgress: all dims done → 100% and full aggregated count', () => {
-  const progress = {
-    projectFiles: 200,
-    dimensions: [
-      { state: 'done', files: { taken: 200, total: 200 } },
-      { state: 'done', files: { taken: 200, total: 200 } },
-      { state: 'done', files: { taken: 200, total: 200 } },
-    ],
-  };
-  const r = computeOverallProgress(progress);
-  assert.equal(r.totalFiles, 600);
-  assert.equal(r.takenFiles, 600);
+  assert.equal(r.totalFiles, 200, 'last done dim wins');
+  assert.equal(r.takenFiles, 200);
   assert.equal(r.overallPct, 100);
 });
 
-test('computeOverallProgress: zero workTotal yields 0% (avoid div-by-zero)', () => {
+test('computeOverallProgress: setup phase (all pending) → zeros', () => {
+  // Before any dim has started: no current, no running, no done. The header
+  // shows preparing… per the JSX guard, which expects totalFiles: 0.
   const progress = {
-    projectFiles: 0,
+    projectFiles: 200,
+    currentDimension: null,
     dimensions: [
-      { state: 'pending', files: { taken: 0, total: 0 } },
+      { id: 'a', state: 'pending', files: { taken: 0, total: 200 } },
+      { id: 'b', state: 'pending', files: { taken: 0, total: 200 } },
     ],
   };
   const r = computeOverallProgress(progress);
@@ -187,21 +183,46 @@ test('computeOverallProgress: zero workTotal yields 0% (avoid div-by-zero)', () 
   assert.equal(r.overallPct, 0);
 });
 
-test('computeOverallProgress: mixed running queues contribute their own totals', () => {
-  // Two running dims with different post-filter queues — each contributes
-  // its actual queue total to the aggregate; only pending dims get the
-  // fallback estimate (which here is the larger of the two running totals).
+test('computeOverallProgress: single-dim run reads the dim directly', () => {
   const progress = {
-    projectFiles: 200,
+    projectFiles: 500,
+    currentDimension: 'security',
     dimensions: [
-      { state: 'running', files: { taken: 30, total: 100 } },
-      { state: 'running', files: { taken: 80, total: 150 } },
-      { state: 'pending', files: { taken: 0,  total: 200 } },
+      { id: 'security', state: 'running', files: { taken: 120, total: 500 } },
     ],
   };
   const r = computeOverallProgress(progress);
-  // 100 (running) + 150 (running) + 150 (pending → fallback = max observed)
-  assert.equal(r.totalFiles, 400);
-  assert.equal(r.takenFiles, 110);
-  assert.equal(r.overallPct, 28);
+  assert.equal(r.totalFiles, 500);
+  assert.equal(r.takenFiles, 120);
+  assert.equal(r.overallPct, 24);
+});
+
+test('computeOverallProgress: zero workTotal on running dim yields 0% (avoid div-by-zero)', () => {
+  const progress = {
+    projectFiles: 0,
+    currentDimension: 'x',
+    dimensions: [
+      { id: 'x', state: 'running', files: { taken: 0, total: 0 } },
+    ],
+  };
+  const r = computeOverallProgress(progress);
+  assert.equal(r.totalFiles, 0);
+  assert.equal(r.takenFiles, 0);
+  assert.equal(r.overallPct, 0);
+});
+
+test('computeOverallProgress: currentDimension that does not match any dim falls back gracefully', () => {
+  // Defensive: backend hiccup where currentDimension references a dim that
+  // isn't in the array. Fall through to the running-dim fallback.
+  const progress = {
+    projectFiles: 200,
+    currentDimension: 'ghost',
+    dimensions: [
+      { id: 'security', state: 'running', files: { taken: 5, total: 100 } },
+    ],
+  };
+  const r = computeOverallProgress(progress);
+  assert.equal(r.totalFiles, 100);
+  assert.equal(r.takenFiles, 5);
+  assert.equal(r.overallPct, 5);
 });
