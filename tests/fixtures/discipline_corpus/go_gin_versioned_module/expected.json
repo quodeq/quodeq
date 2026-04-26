@@ -1,5 +1,4 @@
 {
-  "xfail": "go_gin matches but go_backend co-matches due to inverted detect_excludes (tracked for chunk 7)",
   "matches": [
     "go_gin"
   ],

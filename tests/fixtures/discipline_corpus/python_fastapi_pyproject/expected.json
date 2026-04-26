@@ -1,7 +1,6 @@
 {
   "matches": [
-    "python_fastapi",
-    "python_fullstack"
+    "python_fastapi"
   ],
   "primary": "python_fastapi",
   "language": "python"

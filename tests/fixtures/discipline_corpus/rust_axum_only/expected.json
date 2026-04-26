@@ -1,0 +1,11 @@
+{
+  "matches": [
+    "rust_axum"
+  ],
+  "primary": "rust_axum",
+  "language": "rust",
+  "not_matches": [
+    "rust_backend",
+    "rust_actix"
+  ]
+}

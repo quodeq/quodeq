@@ -1,5 +1,4 @@
 {
-  "xfail": "detect_excludes semantics inverted: go_gin lists go_backend in detect_excludes but iteration order means go_backend matches anyway. Tracked for precedence-groups refactor.",
   "matches": [
     "go_gin"
   ],

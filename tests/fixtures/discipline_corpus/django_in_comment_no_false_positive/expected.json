@@ -1,7 +1,6 @@
 {
   "matches": [
-    "python_flask",
-    "python_fullstack"
+    "python_flask"
   ],
   "primary": "python_flask",
   "language": "python",

@@ -1,7 +1,6 @@
 {
   "matches": [
-    "python_django",
-    "python_fullstack"
+    "python_django"
   ],
   "primary": "python_django",
   "language": "python",
