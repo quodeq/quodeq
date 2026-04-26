@@ -1,0 +1,1 @@
+<project><parent><groupId>com.x</groupId><artifactId>parent</artifactId></parent><artifactId>service-b</artifactId><dependencies><dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-jpa</artifactId></dependency></dependencies></project>

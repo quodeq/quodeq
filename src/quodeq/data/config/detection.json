@@ -26,7 +26,17 @@
     ".ex": "elixir",
     ".exs": "elixir",
     ".r": "r",
-    ".R": "r"
+    ".R": "r",
+    ".hs": "haskell",
+    ".lhs": "haskell",
+    ".lua": "lua",
+    ".jl": "julia",
+    ".zig": "zig",
+    ".ml": "ocaml",
+    ".mli": "ocaml",
+    ".cr": "crystal",
+    ".pl": "perl",
+    ".pm": "perl"
   },
   "config_files": {
     "pyproject.toml": "python",
@@ -48,7 +58,15 @@
     "CMakeLists.txt": "cpp",
     "build.sbt": "scala",
     ".bashrc": "bash",
-    "Makefile": "bash"
+    "Makefile": "bash",
+    "cabal.project": "haskell",
+    "stack.yaml": "haskell",
+    "DESCRIPTION": "r",
+    "Project.toml": "julia",
+    "build.zig": "zig",
+    "dune-project": "ocaml",
+    "shard.yml": "crystal",
+    "cpanfile": "perl"
   },
   "skip_dirs": [
     "node_modules", "vendor", "venv", ".venv", "__pycache__",

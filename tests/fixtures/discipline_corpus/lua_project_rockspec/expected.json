@@ -1,0 +1,7 @@
+{
+  "matches": [
+    "lua_project"
+  ],
+  "primary": "lua_project",
+  "language": "lua"
+}

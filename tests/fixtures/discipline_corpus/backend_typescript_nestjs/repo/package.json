@@ -1,0 +1,1 @@
+{"name":"x","dependencies":{"@nestjs/core":"^10.0.0","@nestjs/common":"^10.0.0","reflect-metadata":"^0.1.13"}}

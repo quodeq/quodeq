@@ -1,0 +1,10 @@
+{
+  "matches": [
+    "nodejs"
+  ],
+  "primary": "nodejs",
+  "language": "typescript",
+  "not_matches": [
+    "frontend_react"
+  ]
+}

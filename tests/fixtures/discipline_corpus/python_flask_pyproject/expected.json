@@ -1,0 +1,13 @@
+{
+  "matches": [
+    "python_flask"
+  ],
+  "primary": "python_flask",
+  "language": "python",
+  "topics": [
+    "Flask Best Practices",
+    "Python Code Standards",
+    "API Design",
+    "Web Security"
+  ]
+}

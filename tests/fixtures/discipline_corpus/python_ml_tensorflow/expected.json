@@ -1,0 +1,11 @@
+{
+  "matches": [
+    "python_ml_tensorflow"
+  ],
+  "primary": "python_ml_tensorflow",
+  "language": "python",
+  "not_matches": [
+    "python_fullstack",
+    "python_ml_pytorch"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "recursive": true,
+  "matches": [
+    "javascript_vue"
+  ],
+  "not_matches": [
+    "python_django"
+  ]
+}

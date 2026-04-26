@@ -1,0 +1,3 @@
+service: x
+provider:
+  name: aws

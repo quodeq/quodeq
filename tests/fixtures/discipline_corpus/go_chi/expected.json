@@ -1,0 +1,13 @@
+{
+  "matches": [
+    "go_chi"
+  ],
+  "primary": "go_chi",
+  "language": "go",
+  "not_matches": [
+    "go_backend",
+    "go_gin",
+    "go_fiber",
+    "go_echo"
+  ]
+}

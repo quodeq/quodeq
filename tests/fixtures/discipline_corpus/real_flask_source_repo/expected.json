@@ -1,0 +1,10 @@
+{
+  "matches": [
+    "python_fullstack"
+  ],
+  "primary": "python_fullstack",
+  "language": "python",
+  "not_matches": [
+    "python_flask"
+  ]
+}

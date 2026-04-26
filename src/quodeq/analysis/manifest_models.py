@@ -10,7 +10,13 @@ _MAX_EXTENSION_DISPLAY = 8
 
 @dataclass
 class AnalysisTarget:
-    """One analysis unit within a repository (e.g. 'rust_backend', 'dart_mobile')."""
+    """One analysis unit within a repository (e.g. 'rust_backend', 'dart_mobile').
+
+    ``scope_path`` is the repo-relative directory the target lives in, or ``""`` for
+    repo-root targets. In a monorepo, each subproject becomes its own target with
+    its own scope_path; ``source_files`` paths are still expressed relative to the
+    repo root regardless.
+    """
 
     name: str
     language: str
@@ -19,6 +25,7 @@ class AnalysisTarget:
     source_files: list[str] = field(default_factory=list)
     total_files: int = 0
     language_stats: dict[str, int] = field(default_factory=dict)
+    scope_path: str = ""
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -54,6 +61,7 @@ class AnalysisTarget:
             "total_files": self.total_files,
             "source_files_count": len(self.source_files),
             "language_stats": self.language_stats,
+            "scope_path": self.scope_path,
         }
 
 

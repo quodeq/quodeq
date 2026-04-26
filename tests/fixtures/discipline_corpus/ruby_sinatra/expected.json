@@ -1,0 +1,11 @@
+{
+  "matches": [
+    "ruby_sinatra"
+  ],
+  "primary": "ruby_sinatra",
+  "language": "ruby",
+  "not_matches": [
+    "ruby_rails",
+    "ruby_backend"
+  ]
+}

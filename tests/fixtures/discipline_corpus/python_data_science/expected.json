@@ -1,0 +1,10 @@
+{
+  "matches": [
+    "python_data_science"
+  ],
+  "primary": "python_data_science",
+  "language": "python",
+  "not_matches": [
+    "python_fullstack"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "matches": [
+    "go_echo"
+  ],
+  "primary": "go_echo",
+  "language": "go",
+  "not_matches": [
+    "go_backend",
+    "go_gin",
+    "go_fiber"
+  ]
+}

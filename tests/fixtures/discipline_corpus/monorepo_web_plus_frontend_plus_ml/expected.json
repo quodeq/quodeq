@@ -1,0 +1,8 @@
+{
+  "recursive": true,
+  "matches": [
+    "python_flask",
+    "frontend_react",
+    "python_ml_pytorch"
+  ]
+}
