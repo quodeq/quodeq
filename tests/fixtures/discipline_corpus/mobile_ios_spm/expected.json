@@ -1,5 +1,4 @@
 {
-  "xfail": "detect_glob=*.xcodeproj acts as hard prereq, blocking Package.swift detect_file_alt trigger. Tracked for trigger/prereq refactor.",
   "matches": [
     "mobile_ios"
   ],

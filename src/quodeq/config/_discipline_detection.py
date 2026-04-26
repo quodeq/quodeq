@@ -69,12 +69,11 @@ class DisciplineRegistry:
             return matcher(content, needle)
         return needle in content
 
-    def _check_prerequisites(self, repo: Path, rule: DisciplineRule) -> bool:
-        if rule.detect_dir and not (repo / rule.detect_dir).exists():
-            return False
-        if rule.detect_glob and not any(repo.glob(rule.detect_glob)):
-            return False
-        return not (rule.detect_requires_file and not any(repo.glob(rule.detect_requires_file)))
+    def _has_required_files(self, repo: Path, rule: DisciplineRule) -> bool:
+        """detect_requires_file is the only hard prerequisite — a gate on any trigger."""
+        if rule.detect_requires_file:
+            return any(repo.glob(rule.detect_requires_file))
+        return True
 
     def _any_detect_file_matches(self, repo: Path, rule: DisciplineRule) -> bool:
         for i, file_name in enumerate(rule.detect_files):
@@ -86,8 +85,21 @@ class DisciplineRegistry:
                 return True
         return False
 
+    def _glob_or_dir_matches(self, repo: Path, rule: DisciplineRule) -> bool:
+        if rule.detect_glob and any(repo.glob(rule.detect_glob)):
+            return True
+        return bool(rule.detect_dir and (repo / rule.detect_dir).is_dir())
+
     def _matches_rule(self, repo: Path, rule: DisciplineRule) -> bool:
-        return self._check_prerequisites(repo, rule) and self._any_detect_file_matches(repo, rule)
+        """A rule matches when its prerequisites hold and at least one trigger fires.
+
+        Triggers are alternatives: any of detect_file(_alt|_alt2) (with optional
+        content check), detect_glob, or detect_dir is enough. Glob-only or dir-only
+        rules (e.g. frontend_nextjs's detect_glob=next.config.*) match correctly.
+        """
+        if not self._has_required_files(repo, rule):
+            return False
+        return self._any_detect_file_matches(repo, rule) or self._glob_or_dir_matches(repo, rule)
 
     def detect_matches(self, repo: Path) -> list[str]:
         """Return discipline names matching the repo. Fallbacks only if no primary match."""

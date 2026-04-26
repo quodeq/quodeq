@@ -1,5 +1,4 @@
 {
-  "xfail": "detect_dir=terraform acts as hard prereq, blocking Dockerfile trigger. Tracked for trigger/prereq refactor.",
   "matches": [
     "infrastructure"
   ],
