@@ -1,0 +1,6 @@
+{
+  "xfail": "root-only detection: misses apps/web/manage.py; needs recursive/scoped detection",
+  "matches": [
+    "python_django"
+  ]
+}

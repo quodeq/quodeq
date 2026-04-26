@@ -1,0 +1,11 @@
+{
+  "xfail": "glob-only rules cannot fire: _any_detect_file_matches iterates empty detect_files. Tracked for trigger/prereq refactor.",
+  "matches": [
+    "frontend_nextjs"
+  ],
+  "primary": "frontend_nextjs",
+  "language": "typescript",
+  "not_matches": [
+    "frontend_react"
+  ]
+}

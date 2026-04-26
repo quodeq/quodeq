@@ -1,0 +1,8 @@
+{
+  "matches": [
+    "python_fastapi",
+    "python_fullstack"
+  ],
+  "primary": "python_fastapi",
+  "language": "python"
+}
