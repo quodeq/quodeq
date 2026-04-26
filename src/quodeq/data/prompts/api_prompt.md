@@ -15,13 +15,10 @@ You MUST evaluate EVERY principle group — not just the first ones.
 
 ## Your Task
 
-Evaluate the source files against EACH principle group in the checklist above.
+Evaluate the source files against EACH principle group in the checklist above. Clean code returns `{"findings": []}`.
 
 {{EVALUATION_RULES}}
 
 {{FINDING_SCHEMA}}
 
-Respond with ONLY this JSON format — no other text:
-{"findings": [{"req": "M-MOD-1", "t": "violation", "file": "src/app.py", "line": 10, "severity": "major", "w": "Multiple responsibilities", "reason": "Module handles both IO and logic"}]}
-
-If no issues found: {"findings": []}
+Respond with ONLY this JSON.

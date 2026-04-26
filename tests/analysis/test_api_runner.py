@@ -21,7 +21,9 @@ def _make_findings(*findings_data):
     for req, t, file, line, severity, w in findings_data:
         findings.append(_Finding(
             req=req, t=_FindingType(t), file=file, line=line,
-            severity=_Severity(severity), w=w, reason=f"Test reason for {req}",
+            severity=_Severity(severity), w=w,
+            snippet=f"line for {req}",
+            reason=f"Test reason for {req}",
         ))
     return _Findings(findings=findings)
 
