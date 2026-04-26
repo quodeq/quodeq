@@ -94,9 +94,6 @@ export function ReportPane() {
         onPointerDown={onDividerPointerDown}
       />
       <header className="report-pane__header">
-        <div className="report-pane__chrome-dots" aria-hidden="true">
-          <span /><span /><span />
-        </div>
         <h2 className="report-pane__title" title={current.title}>{current.title}</h2>
         <div className="report-pane__actions">
           <button type="button" className="report-pane__icon-btn" onClick={onCopy} aria-label="Copy as Markdown" title="Copy as Markdown">⧉</button>

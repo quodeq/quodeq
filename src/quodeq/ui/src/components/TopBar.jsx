@@ -10,6 +10,7 @@
  * Stateless; the parent passes the data it has.
  */
 import { useReportViewer } from '../features/report-viewer/index.js';
+import { FileTextIcon } from './CopyButton.jsx';
 
 function Dot({ ok }) {
   return <span className={`topbar-dot ${ok ? 'topbar-dot--ok' : 'topbar-dot--err'}`} aria-hidden="true" />;
@@ -117,19 +118,6 @@ export default function TopBar({
           )
         )}
 
-        {activeBuilder && (
-          <button
-            type="button"
-            className="topbar-btn topbar-btn--report"
-            onClick={() => openReport({
-              title: activeBuilder.title,
-              markdown: activeBuilder.buildMarkdown(),
-            })}
-          >
-            <span className="topbar-btn__plus" aria-hidden="true">↗</span>
-            <span>Report</span>
-          </button>
-        )}
         {onToggleTheme && (
           <button
             type="button"
@@ -139,6 +127,19 @@ export default function TopBar({
             title={effectiveDark ? 'Switch to light theme' : 'Switch to dark theme'}
           >
             {effectiveDark ? <SunIcon /> : <MoonIcon />}
+          </button>
+        )}
+        {activeBuilder && (
+          <button
+            type="button"
+            className="topbar-btn topbar-btn--evaluate topbar-btn--report"
+            onClick={() => openReport({
+              title: activeBuilder.title,
+              markdown: activeBuilder.buildMarkdown(),
+            })}
+          >
+            <FileTextIcon />
+            <span>Report</span>
           </button>
         )}
         {onEvaluate && (

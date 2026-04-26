@@ -50,19 +50,6 @@
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface-alt);
 }
-.report-pane__chrome-dots {
-  display: flex;
-  gap: 5px;
-}
-.report-pane__chrome-dots > span {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  display: inline-block;
-}
-.report-pane__chrome-dots > span:nth-child(1) { background: #ef4444; }
-.report-pane__chrome-dots > span:nth-child(2) { background: #f59e0b; }
-.report-pane__chrome-dots > span:nth-child(3) { background: #22c55e; }
 .report-pane__title {
   flex: 1 1 auto;
   font-size: 13px;

@@ -182,13 +182,22 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const { currentOverviewRun, selectedDayDimNames, filteredDailyTrend, filteredTrend, filteredDimensions, filteredAccumulated, filteredStats } = useAccumulatedComputations(data);
 
   const { setActiveBuilder, clearActiveBuilder } = useReportViewer();
+  const hasReportData = Boolean(
+    filteredAccumulated?.summary
+    && Number.isFinite(parseFloat(filteredAccumulated.summary.numericAverage))
+    && (filteredDimensions?.length ?? 0) > 0
+  );
   useEffect(() => {
+    if (!hasReportData) {
+      clearActiveBuilder();
+      return undefined;
+    }
     setActiveBuilder({
       title: `Code Quality Report — ${data.selectedProject || 'project'}`,
       buildMarkdown: () => buildOverviewReport(filteredAccumulated, filteredDimensions || [], data.selectedProject),
     });
     return () => clearActiveBuilder();
-  }, [setActiveBuilder, clearActiveBuilder, data.selectedProject, filteredAccumulated, filteredDimensions]);
+  }, [hasReportData, setActiveBuilder, clearActiveBuilder, data.selectedProject, filteredAccumulated, filteredDimensions]);
 
   return (
     <>
