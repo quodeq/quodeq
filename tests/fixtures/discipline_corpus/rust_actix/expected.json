@@ -1,0 +1,11 @@
+{
+  "xfail": "rust_actix matches but rust_backend co-matches due to inverted detect_excludes (tracked for chunk 7)",
+  "matches": [
+    "rust_actix"
+  ],
+  "primary": "rust_actix",
+  "language": "rust",
+  "not_matches": [
+    "rust_backend"
+  ]
+}

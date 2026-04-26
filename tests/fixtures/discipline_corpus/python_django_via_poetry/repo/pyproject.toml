@@ -1,0 +1,6 @@
+[tool.poetry]
+name = "x"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+django = "^4.2"

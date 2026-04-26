@@ -1,5 +1,4 @@
 {
-  "xfail": "naive substring match: 'preact' contains 'react' so frontend_react fires; needs structured dep parsing",
   "matches": [
     "nodejs"
   ],

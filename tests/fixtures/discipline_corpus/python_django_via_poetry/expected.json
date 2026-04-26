@@ -1,0 +1,8 @@
+{
+  "matches": [
+    "python_django",
+    "python_fullstack"
+  ],
+  "primary": "python_django",
+  "language": "python"
+}
