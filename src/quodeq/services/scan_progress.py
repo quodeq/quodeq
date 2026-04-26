@@ -6,7 +6,8 @@ the in-memory JobManager state.
 
 Sources:
 - ``status.json``                 — phase, current_dimension, started_at, dimensions
-- ``scan.json``                   — total_files (project-wide upper bound for pending dims)
+- ``dim_estimates.json``          — per-dim file count predicted before any dim runs
+- ``scan.json``                   — total_files (project-wide fallback for pending dims)
 - ``<dim>_queue.json``            — taken / pending counts (precise once dim has started)
 - ``<dim>_evidence.jsonl``        — violation / compliance counters
 - ``<dim>_agent-*.stream`` mtime  — per-dim active-agents heuristic
@@ -32,6 +33,7 @@ class _DimProgress:
     elapsed_s: float | None = None
     budget_s: int | None = None
     active_agents: int = 0
+    estimate_reason: str | None = None  # see _dim_estimates module docstring
 
 
 @dataclass
@@ -60,6 +62,23 @@ def _project_total_files(run_dir: Path) -> int:
         return 0
     raw = scan.get("total_files")
     return int(raw) if isinstance(raw, int) else 0
+
+
+def _read_dim_estimates(run_dir: Path) -> dict[str, dict]:
+    """Per-dim file estimates written before any dim ran. Returns {} when absent.
+
+    Each value is ``{"count": int, "reason": str}`` (see _dim_estimates module).
+    """
+    raw = _read_json(run_dir / "dim_estimates.json") or {}
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, dict] = {}
+    for k, v in raw.items():
+        if isinstance(v, dict) and isinstance(v.get("count"), int):
+            out[k] = {"count": v["count"], "reason": str(v.get("reason", ""))}
+        elif isinstance(v, int):
+            out[k] = {"count": v, "reason": ""}
+    return out
 
 
 def _count_jsonl_findings(jsonl_path: Path) -> tuple[int, int]:
@@ -219,6 +238,7 @@ def build_scan_progress(
         total_elapsed_s = None
 
     project_files = _project_total_files(run_dir)
+    dim_estimates = _read_dim_estimates(run_dir)
     dim_ids = list(status.get("dimensions") or [])
     evidence_dir = run_dir / "evidence"
 
@@ -246,9 +266,18 @@ def build_scan_progress(
             pending = len(queue.get("pending") or [])
             files = {"taken": taken, "total": taken + pending}
         elif d_state == "pending":
-            files = {"taken": 0, "total": project_files}
+            # Pending dims report 0 until the precomputed estimate lands.
+            # The UI uses "any pending dim with total=0" as the signal to
+            # keep the header in "preparing…" — better to show nothing
+            # than the project-wide ceiling, which is misleading once
+            # incremental filters are applied.
+            estimate = dim_estimates.get(dim_id)
+            files = {"taken": 0, "total": estimate["count"] if estimate else 0}
         else:
             files = {"taken": 0, "total": 0}
+
+        estimate_meta = dim_estimates.get(dim_id)
+        estimate_reason = estimate_meta["reason"] if estimate_meta else None
 
         v, c = _count_jsonl_findings(evidence_dir / f"{dim_id}_evidence.jsonl")
         elapsed = _dim_elapsed_s(dim_id, run_dir, d_state)
@@ -264,6 +293,7 @@ def build_scan_progress(
             elapsed_s=elapsed,
             budget_s=budget,
             active_agents=active,
+            estimate_reason=estimate_reason,
         ))
 
     return _ScanProgress(
