@@ -57,6 +57,93 @@ class TestDetectChangedFiles:
         assert result.full_reanalysis is False
 
 
+class TestDetectPromptsChanged:
+    """Selective prompt invalidation: only rules-bearing files trigger
+    full re-analysis. Framing/runner-prompt changes carry forward.
+    """
+
+    def _make_fingerprint(self, prompts_checksum):
+        return {
+            "dimension": "security",
+            "git_commit": "abc",
+            "file_hashes": {},
+            "standards_checksum": None,
+            "prompts_checksum": prompts_checksum,
+            "timestamp": "2026-01-01",
+        }
+
+    def test_rules_file_change_triggers_full(self, tmp_path, monkeypatch):
+        # evaluation_rules.md is the rules-bearing file → any change
+        # invalidates carry-forward.
+        from quodeq.analysis import _incr_change_detection as mod
+        monkeypatch.setattr(mod, "_hash_prompts_map", lambda: {
+            "evaluation_rules.md": "NEW",
+            "api_prompt.md": "same",
+        })
+        prev = self._make_fingerprint({
+            "evaluation_rules.md": "OLD",
+            "api_prompt.md": "same",
+        })
+        result = detect_changed_files(
+            src=tmp_path, files=[], prev_fingerprint=prev,
+            standards_dir=None, dimension="security",
+        )
+        assert result.full_reanalysis is True
+        assert "evaluation_rules.md" in result.reason
+
+    def test_non_rules_file_change_does_not_trigger(self, tmp_path, monkeypatch):
+        # api_prompt.md is framing — a change shouldn't force full re-analysis,
+        # so prior findings carry forward.
+        from quodeq.analysis import _incr_change_detection as mod
+        monkeypatch.setattr(mod, "_hash_prompts_map", lambda: {
+            "evaluation_rules.md": "same",
+            "api_prompt.md": "NEW",
+            "cli_subagent_prompt.md": "NEW",
+        })
+        prev = self._make_fingerprint({
+            "evaluation_rules.md": "same",
+            "api_prompt.md": "OLD",
+            "cli_subagent_prompt.md": "OLD",
+        })
+        result = detect_changed_files(
+            src=tmp_path, files=[], prev_fingerprint=prev,
+            standards_dir=None, dimension="security",
+        )
+        assert result.full_reanalysis is False
+
+    def test_legacy_string_format_still_triggers(self, tmp_path, monkeypatch):
+        # Pre-split fingerprints stored a single concatenated hash. The reader
+        # falls back to comparing legacy hashes to keep the conservative
+        # behavior until the next run upgrades the fingerprint format.
+        from quodeq.analysis import _incr_change_detection as mod
+        monkeypatch.setattr(mod, "_hash_prompts", lambda: "NEW_LEGACY_HASH")
+        prev = self._make_fingerprint("OLD_LEGACY_HASH")
+        result = detect_changed_files(
+            src=tmp_path, files=[], prev_fingerprint=prev,
+            standards_dir=None, dimension="security",
+        )
+        assert result.full_reanalysis is True
+        assert "legacy" in result.reason
+
+    def test_legacy_string_format_unchanged_does_not_trigger(self, tmp_path, monkeypatch):
+        from quodeq.analysis import _incr_change_detection as mod
+        monkeypatch.setattr(mod, "_hash_prompts", lambda: "SAME_HASH")
+        prev = self._make_fingerprint("SAME_HASH")
+        result = detect_changed_files(
+            src=tmp_path, files=[], prev_fingerprint=prev,
+            standards_dir=None, dimension="security",
+        )
+        assert result.full_reanalysis is False
+
+    def test_missing_prompts_checksum_does_not_trigger(self, tmp_path):
+        prev = self._make_fingerprint(None)
+        result = detect_changed_files(
+            src=tmp_path, files=[], prev_fingerprint=prev,
+            standards_dir=None, dimension="security",
+        )
+        assert result.full_reanalysis is False
+
+
 class TestFindDependents:
     def test_finds_files_that_import_changed_file(self, tmp_path):
         (tmp_path / "auth.py").write_text("")
