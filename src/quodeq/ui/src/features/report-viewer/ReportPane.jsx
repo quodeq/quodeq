@@ -46,11 +46,13 @@ class RenderBoundary extends React.Component {
 // (~220ms transition). Otherwise the heavy DOM work happens mid-animation
 // and the slide stutters.
 const SLIDE_MS = 220;
+const COPY_FEEDBACK_MS = 1500;
 
 export function ReportPane() {
   const { current, isOpen, paneWidth, setPaneWidth, closeReport } = useReportViewer();
   const bodyRef = useRef(null);
   const [bodyReady, setBodyReady] = useState(false);
+  const [justCopied, setJustCopied] = useState(false);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
@@ -66,9 +68,20 @@ export function ReportPane() {
     return () => clearTimeout(id);
   }, [isOpen, current]);
 
+  // Reset the copied indicator any time the report content changes.
+  useEffect(() => { setJustCopied(false); }, [current]);
+
   const onCopy = useCallback(() => {
-    if (current) navigator.clipboard?.writeText(current.markdown);
+    if (!current) return;
+    navigator.clipboard?.writeText(current.markdown);
+    setJustCopied(true);
   }, [current]);
+
+  useEffect(() => {
+    if (!justCopied) return undefined;
+    const id = setTimeout(() => setJustCopied(false), COPY_FEEDBACK_MS);
+    return () => clearTimeout(id);
+  }, [justCopied]);
 
   const onDownload = useCallback(() => {
     if (current) downloadMarkdown(current.title, current.markdown);
@@ -112,7 +125,13 @@ export function ReportPane() {
       <header className="report-pane__header">
         <h2 className="report-pane__title" title={current.title}>{current.title}</h2>
         <div className="report-pane__actions">
-          <button type="button" className="report-pane__icon-btn" onClick={onCopy} aria-label="Copy as Markdown" title="Copy as Markdown">⧉</button>
+          <button
+            type="button"
+            className={`report-pane__icon-btn${justCopied ? ' report-pane__icon-btn--ok' : ''}`}
+            onClick={onCopy}
+            aria-label={justCopied ? 'Copied' : 'Copy as Markdown'}
+            title={justCopied ? 'Copied' : 'Copy as Markdown'}
+          >{justCopied ? '✓' : '⧉'}</button>
           <button type="button" className="report-pane__icon-btn" onClick={onDownload} aria-label="Download .md" title="Download .md">↓</button>
           <button type="button" className="report-pane__icon-btn" onClick={closeReport} aria-label="Close report" title="Close">✕</button>
         </div>

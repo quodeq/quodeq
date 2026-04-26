@@ -79,6 +79,11 @@
   background: var(--color-surface-alt);
   color: var(--color-text);
 }
+.report-pane__icon-btn--ok,
+.report-pane__icon-btn--ok:hover {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
 
 /* ── Body ─────────────────────────────────────────────── */
 .report-pane__body {
