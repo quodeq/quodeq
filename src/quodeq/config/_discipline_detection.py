@@ -15,6 +15,18 @@ from quodeq.config._discipline_conf_loader import load_disciplines_from_file
 _logger = logging.getLogger(__name__)
 _FILE_CACHE_MAX = 256
 
+# Directories never recursed into when discovering subproject roots in a
+# monorepo. Mirrors detection.json's skip_dirs plus a few more dependency caches.
+# Hidden dirs (those starting with '.') are also skipped.
+_SUBPROJECT_SKIP_DIRS: frozenset[str] = frozenset({
+    "node_modules", "vendor", "venv", ".venv", "__pycache__",
+    "dist", "build", "out", ".next", "target", "static",
+    ".git", ".svn", ".hg", ".tox", ".mypy_cache", ".pytest_cache",
+})
+
+# How deep to walk when looking for subproject roots. Caps cost on huge repos.
+_DEFAULT_MAX_DEPTH = 4
+
 
 @dataclass
 class DisciplineRegistry:
@@ -171,3 +183,78 @@ class DisciplineRegistry:
             if rule.name in match_set:
                 return rule.name
         return matches[0]
+
+    def _manifest_basenames(self) -> tuple[frozenset[str], tuple[str, ...]]:
+        """Return ``(filenames, globs)`` that mark a directory as a subproject root.
+
+        Derived from the registry's own rules so it stays in sync with
+        ``disciplines.conf``. Files referenced by a path (e.g. ``config/routes.rb``)
+        are excluded — only top-level manifests count as roots.
+        """
+        files: set[str] = set()
+        globs: list[str] = []
+        for rule in self.disciplines.values():
+            for f in rule.detect_files:
+                if "/" not in f and "\\" not in f:
+                    files.add(f)
+            if rule.detect_glob:
+                globs.append(rule.detect_glob)
+        return frozenset(files), tuple(globs)
+
+    def _is_subproject_root(self, dir_path: Path, files: frozenset[str], globs: tuple[str, ...]) -> bool:
+        try:
+            entries = {p.name for p in dir_path.iterdir() if p.is_file()}
+        except OSError:
+            return False
+        if entries & files:
+            return True
+        return any(any(dir_path.glob(p)) for p in globs)
+
+    def _iter_subproject_roots(self, repo: Path, max_depth: int) -> list[Path]:
+        """BFS for directories that look like subproject roots, capped by depth.
+
+        The repo root is always included first. Vendor/cache dirs and dotted dirs
+        are pruned. The traversal continues into already-found roots so nested
+        subprojects are still discoverable, but in practice ``max_depth`` keeps
+        cost bounded.
+        """
+        files, globs = self._manifest_basenames()
+        roots: list[Path] = [repo]
+        queue: list[tuple[Path, int]] = [(repo, 0)]
+        seen: set[Path] = {repo}
+        while queue:
+            current, depth = queue.pop(0)
+            if depth >= max_depth:
+                continue
+            try:
+                children = list(current.iterdir())
+            except OSError:
+                continue
+            for child in children:
+                if not child.is_dir() or child in seen:
+                    continue
+                if child.name.startswith(".") or child.name in _SUBPROJECT_SKIP_DIRS:
+                    continue
+                seen.add(child)
+                if self._is_subproject_root(child, files, globs):
+                    roots.append(child)
+                queue.append((child, depth + 1))
+        return roots
+
+    def detect_matches_recursive(
+        self, repo: Path, max_depth: int = _DEFAULT_MAX_DEPTH,
+    ) -> list[tuple[str, list[str]]]:
+        """Walk *repo* finding subproject roots and return ``(rel_path, matches)`` per root.
+
+        The repo root itself is always probed first. ``rel_path`` is ``"."`` for the
+        root or the POSIX-style path relative to *repo* for nested subprojects.
+        Roots with no matches are omitted from the result.
+        """
+        results: list[tuple[str, list[str]]] = []
+        for root in self._iter_subproject_roots(repo, max_depth):
+            matches = self.detect_matches(root)
+            if not matches:
+                continue
+            rel = "." if root == repo else root.relative_to(repo).as_posix()
+            results.append((rel, matches))
+        return results

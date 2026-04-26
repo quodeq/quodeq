@@ -1,0 +1,3 @@
+[project]
+name="api"
+dependencies=["flask==3.1.3"]

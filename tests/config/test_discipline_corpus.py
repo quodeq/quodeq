@@ -20,6 +20,9 @@ thing required to add coverage for a new stack — no test code changes.
 * ``topics`` (list[str], optional): expected ``suggested_topics`` on ``primary``.
 * ``not_matches`` (list[str], optional): rules that must NOT fire (regression
   guard for false positives, e.g. quodeq classifying as Django).
+* ``recursive`` (bool, optional): when true, run ``detect_matches_recursive``
+  and aggregate matches across all subproject roots. Use this for monorepo
+  fixtures where the project of interest lives in a subdirectory.
 * ``xfail`` (str, optional): reason marker for a fixture that documents a known
   bug we have not fixed yet. The test still runs; failures become xfails so the
   corpus stays green while the gap is tracked.
@@ -73,10 +76,15 @@ def test_discipline_corpus(
         request.applymarker(pytest.mark.xfail(reason=expected["xfail"], strict=False))
 
     repo = fixture_dir / "repo"
-    matches = registry.detect_matches(repo)
+    if expected.get("recursive"):
+        sub_results = registry.detect_matches_recursive(repo)
+        actual: set[str] = set()
+        for _path, sub_matches in sub_results:
+            actual.update(sub_matches)
+    else:
+        actual = set(registry.detect_matches(repo))
 
     expected_matches = set(expected.get("matches", []))
-    actual = set(matches)
     assert actual == expected_matches, (
         f"[{name}] match mismatch: expected {sorted(expected_matches)}, got {sorted(actual)}"
     )
