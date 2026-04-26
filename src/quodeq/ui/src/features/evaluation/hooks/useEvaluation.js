@@ -249,16 +249,18 @@ function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPoll
 
   async function cancelEvaluationJob(jobId) {
     if (!jobId) return;
-    const ok = await confirmDialog({
+    const result = await confirmDialog({
       title: 'Cancel evaluation?',
-      message: 'Stop the running scan. Any findings collected so far will still be saved.',
+      message: 'Stop the running scan. Findings collected so far will be saved for the next incremental run.',
       confirmLabel: 'Cancel evaluation',
       cancelLabel: 'Keep running',
       variant: 'danger',
+      checkboxLabel: 'Discard collected findings',
+      checkboxHint: 'Force a full rescan next time instead of resuming from this run.',
     });
-    if (!ok) return;
+    if (!result || !result.ok) return;
     try {
-      await cancelEvaluation(jobId);
+      await cancelEvaluation(jobId, { discard: result.checked });
       clearJob();
     } catch (err) {
       console.error('Cancel error:', err);

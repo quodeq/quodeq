@@ -152,10 +152,12 @@ export function getEvaluationProgress(jobId) {
 
 /**
  * @param {string} jobId
+ * @param {{discard?: boolean}} [opts]
  * @returns {Promise<Object>}
  */
-export function cancelEvaluation(jobId) {
-  return request(`/evaluations/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
+export function cancelEvaluation(jobId, opts = {}) {
+  const qs = opts.discard ? '?discard=true' : '';
+  return request(`/evaluations/${encodeURIComponent(jobId)}${qs}`, { method: 'DELETE' });
 }
 
 /**

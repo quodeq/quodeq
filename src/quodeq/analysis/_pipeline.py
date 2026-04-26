@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime, timezone
 
+from quodeq.analysis._dim_estimates import compute_dim_estimates, write_dim_estimates
 from quodeq.analysis._incremental_context import load_analysis_context as _load_ctx
 from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
 from quodeq.analysis._types import RunConfig, _AnalysisContext
@@ -63,6 +64,20 @@ def _run_dry_run(
     return result
 
 
+def _persist_dim_estimates(config: RunConfig, dimensions: list[str]) -> None:
+    """Compute and persist per-dim file estimates so the dashboard total
+    is accurate before any dim starts. Best-effort: a failure here must
+    not break the run — the UI will fall back to the project-wide ceiling.
+    """
+    if not config.work_dir:
+        return  # dev mode (no run_dir) — nothing for the dashboard to read
+    try:
+        estimates = compute_dim_estimates(config, dimensions)
+    except (OSError, ValueError, KeyError, RuntimeError):
+        return
+    write_dim_estimates(config.work_dir.parent, estimates)
+
+
 def _run_dimensions(
     config: RunConfig,
     on_dimension_done: "Callable[[str, Evidence], None] | None" = None,
@@ -72,6 +87,7 @@ def _run_dimensions(
         return _run_dry_run(config, on_dimension_done=on_dimension_done)
 
     dimensions, ctx = load_analysis_context(config)
+    _persist_dim_estimates(config, dimensions)
 
     # Diff mode always per-dimension — consolidated/incremental loops are
     # incompatible with evidence-only runs (no prior fingerprint, no

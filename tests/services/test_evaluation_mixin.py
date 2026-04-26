@@ -16,6 +16,7 @@ from quodeq.services.evaluation_mixin import (
     FsEvaluationMixin,
     SubprocessDispatcher,
     _build_evaluate_cmd,
+    _discard_partial_dim_state,
     _register_project,
     _score_completed_evidence,
 )
@@ -309,6 +310,96 @@ class TestCancelEvaluation:
         assert call_args.args[0] == "/reports"
         assert call_args.args[1]["outputProject"] == "proj-uuid"
         assert call_args.args[1]["outputRunId"] == "run-42"
+
+
+class TestCancelDiscardPartial:
+    def test_discard_default_off_does_not_clean(self):
+        # Cancel without discard_partial=True must not touch any files.
+        m = FsEvaluationMixin()
+        m._jobs = MagicMock()
+        m._jobs.cancel_job.return_value = True
+        m._jobs.get_job.return_value = JobSnapshot(
+            job_id="j1", status="running",
+            output_project="proj", output_run_id="run1",
+        )
+        with patch("quodeq.services.evaluation_mixin._score_completed_evidence"), \
+             patch("quodeq.services.evaluation_mixin._discard_partial_dim_state") as mock_discard:
+            m.cancel_evaluation("j1", reports_dir="/reports")
+        mock_discard.assert_not_called()
+
+    def test_discard_true_invokes_cleanup(self):
+        m = FsEvaluationMixin()
+        m._jobs = MagicMock()
+        m._jobs.cancel_job.return_value = True
+        m._jobs.get_job.return_value = JobSnapshot(
+            job_id="j1", status="running",
+            output_project="proj", output_run_id="run1",
+        )
+        with patch("quodeq.services.evaluation_mixin._score_completed_evidence"), \
+             patch("quodeq.services.evaluation_mixin._discard_partial_dim_state") as mock_discard:
+            m.cancel_evaluation("j1", reports_dir="/reports", discard_partial=True)
+        mock_discard.assert_called_once()
+        args = mock_discard.call_args.args
+        assert args[0] == "/reports"
+        assert args[1]["outputProject"] == "proj"
+        assert args[1]["outputRunId"] == "run1"
+
+
+class TestDiscardPartialDimState:
+    def _make_run(self, tmp_path: Path, *, dims: list[str], scored: list[str]) -> Path:
+        evidence = tmp_path / "reports" / "proj" / "run1" / "evidence"
+        evaluation = tmp_path / "reports" / "proj" / "run1" / "evaluation"
+        evidence.mkdir(parents=True)
+        evaluation.mkdir(parents=True)
+        for dim in dims:
+            (evidence / f"{dim}_queue.json").write_text("{}")
+            (evidence / f"{dim}_fingerprint.json").write_text("{}")
+        for dim in scored:
+            (evaluation / f"{dim}.json").write_text("{}")
+        return tmp_path / "reports"
+
+    def test_wipes_only_unscored_dim_state(self, tmp_path: Path):
+        # security finished (has eval/security.json) — must be preserved.
+        # usability is in-flight — its queue + fingerprint must be wiped.
+        reports = self._make_run(
+            tmp_path, dims=["security", "usability"], scored=["security"],
+        )
+        _discard_partial_dim_state(
+            str(reports), {"outputProject": "proj", "outputRunId": "run1"},
+        )
+        evidence = reports / "proj" / "run1" / "evidence"
+        assert (evidence / "security_queue.json").exists()
+        assert (evidence / "security_fingerprint.json").exists()
+        assert not (evidence / "usability_queue.json").exists()
+        assert not (evidence / "usability_fingerprint.json").exists()
+
+    def test_no_evaluation_dir_wipes_everything(self, tmp_path: Path):
+        # Run cancelled before any dim could finalise — every queue/fingerprint
+        # is in-flight and gets wiped.
+        evidence = tmp_path / "reports" / "proj" / "run1" / "evidence"
+        evidence.mkdir(parents=True)
+        (evidence / "security_queue.json").write_text("{}")
+        (evidence / "security_fingerprint.json").write_text("{}")
+        (evidence / "usability_queue.json").write_text("{}")
+        (evidence / "usability_fingerprint.json").write_text("{}")
+
+        _discard_partial_dim_state(
+            str(tmp_path / "reports"),
+            {"outputProject": "proj", "outputRunId": "run1"},
+        )
+        assert list(evidence.iterdir()) == []
+
+    def test_missing_evidence_dir_is_silent(self, tmp_path: Path):
+        # A truly empty run dir shouldn't raise.
+        _discard_partial_dim_state(
+            str(tmp_path),
+            {"outputProject": "ghost", "outputRunId": "ghost"},
+        )
+
+    def test_missing_project_or_run_id_is_silent(self, tmp_path: Path):
+        # Defensive: a malformed job dict should noop, not throw.
+        _discard_partial_dim_state(str(tmp_path), {})
+        _discard_partial_dim_state(str(tmp_path), {"outputProject": "p"})
 
 
 class TestScoreFailedEvaluation:

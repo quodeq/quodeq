@@ -1,22 +1,16 @@
 /**
  * Math helpers for the live evaluation header.
  *
- * The header tracks ONE dimension at a time — the currently-running one.
- * Multi-dim incremental scans have wildly different cache hit rates per
- * dim, so summing taken/total across dims produces a moving total that
- * jumps as each dim reveals its real (post-filter) queue size. Showing
- * the running dim's progress directly avoids that whiplash; the
- * per-dimension breakdown lives under the DETAILS toggle.
+ * The header sums every dimension's file counts. Per-dim totals come from
+ * the backend: pending dims carry a precomputed estimate (written before
+ * any dim runs), running/done dims carry their actual queue total. This
+ * keeps the header total stable from t=0 — no jumps as new dims start
+ * and reveal their post-filter queue size.
  *
- * Dim selection (in order):
- *   1. `progress.currentDimension` matches a dim → that one
- *   2. Else first dim where `state === 'running'` (race coverage)
- *   3. Else last dim where `state === 'done'` (so completed runs read 100%
- *      instead of 0/0)
- *   4. Else all zeros (setup phase / nothing started yet)
- *
- * `dimFileEstimate` is unchanged and still drives the per-dim row's
- * pending-dim projection inside the DETAILS panel.
+ * Until every pending dim has an estimate, the header reads "preparing…"
+ * rather than printing a misleading partial sum. This covers the brief
+ * window between status.json (state=running) and dim_estimates.json
+ * landing on disk.
  */
 
 export function pct(taken, total) {
@@ -45,28 +39,25 @@ export function computeOverallProgress(progress) {
     return { totalFiles: 0, takenFiles: 0, overallPct: 0 };
   }
 
-  const currentId = progress?.currentDimension;
-  let dim = null;
-  if (currentId) {
-    dim = dims.find((d) => d?.id === currentId) || null;
-  }
-  if (!dim) {
-    dim = dims.find((d) => d?.state === 'running') || null;
-  }
-  if (!dim) {
-    // Walk from the end so we pick the most recently completed dim.
-    for (let i = dims.length - 1; i >= 0; i--) {
-      if (dims[i]?.state === 'done') {
-        dim = dims[i];
-        break;
-      }
-    }
-  }
-  if (!dim) {
+  // "preparing…" only when *nothing* is known yet — i.e. no dim has
+  // started AND no pending dim has an estimate. Once any dim is
+  // running/done or has a total, we show what we know rather than
+  // contradicting an obviously-running run with a "preparing" label.
+  const anyDimStarted = dims.some((d) => d?.state === 'running' || d?.state === 'done');
+  const anyTotalKnown = dims.some((d) => (d?.files?.total ?? 0) > 0);
+  if (!anyDimStarted && !anyTotalKnown) {
     return { totalFiles: 0, takenFiles: 0, overallPct: 0 };
   }
 
-  const takenFiles = dim.files?.taken ?? 0;
-  const totalFiles = dim.files?.total ?? 0;
+  // Sum across dims using whatever total each one carries. Pending dims
+  // with no estimate (total=0) contribute nothing — they'll join the
+  // header sum once their estimate or queue lands.
+  let takenFiles = 0;
+  let totalFiles = 0;
+  for (const d of dims) {
+    takenFiles += d?.files?.taken ?? 0;
+    totalFiles += d?.files?.total ?? 0;
+  }
+
   return { totalFiles, takenFiles, overallPct: pct(takenFiles, totalFiles) };
 }

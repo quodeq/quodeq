@@ -30,12 +30,25 @@ function lastRelevantLog(logs) {
   return null;
 }
 
-function DimRow({ dim, fallbackTotal }) {
+// Reasons surfaced as a badge so an unusually large estimate isn't a mystery.
+const ESTIMATE_REASON_LABEL = {
+  'catching-up': 'catching up',
+  'first-run': 'first run',
+  'standards-changed': 'standards changed',
+  'prompts-changed': 'prompts changed',
+};
+
+function DimRow({ dim }) {
   const taken = dim.files?.taken ?? 0;
   const isPending = dim.state === 'pending';
-  // Pending dims don't have a real queue yet. Use the running/done dims'
-  // queue total as a better estimate than the project-wide upper bound.
-  const total = isPending && fallbackTotal ? fallbackTotal : (dim.files?.total ?? 0);
+  // Backend supplies accurate per-dim totals: a precomputed estimate for
+  // pending dims, the live queue size for running/done. A 0 here means
+  // estimates haven't landed yet — render nothing rather than a guess.
+  const total = dim.files?.total ?? 0;
+  const reasonLabel = ESTIMATE_REASON_LABEL[dim.estimateReason];
+  const reasonBadge = reasonLabel
+    ? <> · <span className="scan-progress__dim-reason">{reasonLabel}</span></>
+    : null;
   // When the dimension reports `done`, force the bar to 100% even if
   // `files.taken < files.total` (incremental skips, dismissed files, etc.).
   // Backend `done` is the source of truth — count drift shouldn't make a
@@ -57,8 +70,8 @@ function DimRow({ dim, fallbackTotal }) {
   let meta;
   if (isPending) {
     meta = total > 0
-      ? <span className="scan-progress__dim-meta-projected">0 / {total}</span>
-      : null;
+      ? <span className="scan-progress__dim-meta-projected">0 / {total}{reasonBadge}</span>
+      : <span className="scan-progress__dim-meta-projected">estimating…</span>;
   } else if (isDone) {
     meta = (
       <>
@@ -87,6 +100,7 @@ function DimRow({ dim, fallbackTotal }) {
     meta = (
       <>
         {`${taken} / ${total}`}
+        {reasonBadge}
         {dim.activeAgents > 0 && <> · {dim.activeAgents} agents</>}
         {dim.violations > 0 && <> · <span className="scan-progress__v">{dim.violations}v</span></>}
         {dim.compliance > 0 && <> · <span className="scan-progress__c">{dim.compliance}c</span></>}
@@ -240,17 +254,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
       {detailOpen && dims.length > 0 && (
         <div className="scan-progress__expanded" id={`scan-progress-detail-${jobId}`}>
           <div className="scan-progress__expanded-label">Per-dimension</div>
-          {(() => {
-            // Best estimate for pending dims: the largest queue total observed
-            // among dims that have actually started (running or done). Falls
-            // back to whatever total the backend gave (project-wide ceiling).
-            const observed = dims
-              .filter((d) => d.state !== 'pending')
-              .map((d) => d.files?.total ?? 0)
-              .filter((n) => n > 0);
-            const fallbackTotal = observed.length > 0 ? Math.max(...observed) : 0;
-            return dims.map((d) => <DimRow key={d.id} dim={d} fallbackTotal={fallbackTotal} />);
-          })()}
+          {dims.map((d) => <DimRow key={d.id} dim={d} />)}
         </div>
       )}
       {consoleOpen && <ConsoleLogViewer logs={job.logs} />}

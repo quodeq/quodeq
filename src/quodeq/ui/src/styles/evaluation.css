@@ -2884,3 +2884,4 @@
 .scan-progress__budget   { color: var(--color-warn, #d29922); }
 .scan-progress__budget--overrun { color: var(--color-sev-critical-text, #f85149); }
 .scan-progress__partial  { color: var(--color-warn, #d29922); text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; }
+.scan-progress__dim-reason { color: var(--color-warn, #d29922); font-style: italic; }

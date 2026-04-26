@@ -1121,6 +1121,28 @@
   line-height: 1.5;
   white-space: pre-wrap;
 }
+.qd-confirm-checkbox {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  row-gap: 2px;
+  margin: 0 0 16px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  color: var(--color-text, #e6edf3);
+}
+.qd-confirm-checkbox input[type="checkbox"] {
+  margin-top: 2px;
+  cursor: pointer;
+}
+.qd-confirm-checkbox-label { font-weight: 500; }
+.qd-confirm-checkbox-hint {
+  grid-column: 2;
+  color: var(--color-text-muted, #8b949e);
+  font-size: 12px;
+  line-height: 1.4;
+}
 .qd-confirm-actions {
   display: flex;
   justify-content: flex-end;
