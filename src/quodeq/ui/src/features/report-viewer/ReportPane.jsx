@@ -14,7 +14,10 @@ function todayISO() {
 }
 
 function downloadMarkdown(title, markdown) {
-  const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+  // Prepend a UTF-8 BOM so text viewers (especially the ones pywebview hands
+  // the file off to on macOS) detect the encoding correctly. Without it,
+  // characters like —, ·, ✓ render as mojibake.
+  const blob = new Blob(['﻿', markdown], { type: 'text/markdown;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
