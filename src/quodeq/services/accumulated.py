@@ -66,12 +66,24 @@ def _compute_result(
     reports_root: Path, project: str, all_run_infos: list[RunInfo],
     cache_config: AccumulatedCacheConfig | None,
 ) -> _AccumulatedResult:
-    """Load run data and compute trends, severity, and scores."""
-    runs = [r.run_id for r in all_run_infos]
+    """Load run data and compute trends, severity, and scores.
+
+    Cancelled/failed runs are excluded from the per-dim "latest" pick so the
+    overview cards don't quietly mix partial-run scores (e.g. inflated 9.x
+    from a dim the model only finished a fraction of) with stable scores
+    from older complete runs. The trend chart already excludes them; this
+    aligns the cards with that contract. If every run on file is partial
+    (fresh project, all attempts crashed), fall back to all runs so the
+    dashboard isn't blank.
+    """
+    complete_run_infos = [r for r in all_run_infos if r.status == "complete"]
+    if not complete_run_infos:
+        complete_run_infos = all_run_infos
+    runs = [r.run_id for r in complete_run_infos]
     _cache, _lock, _max = _resolve_cache(cache_config)
     get_run_data = make_lru_dimension_fetcher(reports_root, project, _cache, _lock, _max)
     latest_by_dim, prev_occurrence, prev_run_latest = _read_all_run_data(
-        reports_root, project, all_run_infos, runs, get_run_data,
+        reports_root, project, complete_run_infos, runs, get_run_data,
     )
     all_dims = filter_dismissed_from_dimensions(list(latest_by_dim.values()), reports_root / project)
     dims_with_trend = _compute_accumulated_trends(all_dims, prev_occurrence)
