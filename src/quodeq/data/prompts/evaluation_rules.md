@@ -10,7 +10,7 @@ NOT a violation: literal inside a constant/enum definition; long function that o
 
 ## Evidence
 
-Quote the specific problem expression in `snippet`. Code must be visible in source.
+Quote the specific problem expression in `snippet` — VERBATIM from the source, exact characters, no paraphrase. Set `end_line` so that `end_line - line + 1` equals the number of lines in `snippet`. Code must be visible in source.
 
 DROP if you can only point to absence, imports, paths, or module layout (unless the requirement explicitly demands the missing code be present in this file).
 
@@ -33,7 +33,7 @@ Test files contain `eval(x)`, secrets, path-traversal payloads on purpose. A rea
 ## Self-check (every finding, including minor)
 
 1. **Evidence** — Quote the problem line. Only "missing"/"absent" → drop.
-2. **Concrete** — State the problem in one sentence about the quoted code.
+2. **Concrete** — State the problem in 1–3 sentences about the quoted code, and name the concrete impact (what breaks, who is affected, or what attack/failure it enables).
 3. **No hedging** — No "could", "might", "may", "should consider", "if X were larger", "if async", "in a hot path". Describe what the line does wrong AS WRITTEN.
 4. **Impact** — Name the observable consequence. "Could be slow under load" without a profile is speculation.
 
