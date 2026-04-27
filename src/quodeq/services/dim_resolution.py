@@ -26,7 +26,33 @@ from quodeq.shared.validation import validate_path_segment
 # scoring, so any eval files written are not to be trusted.
 _TRUSTABLE_RUN_STATES: frozenset[str] = frozenset({"complete", "in_progress", "cancelled"})
 
+# Run states whose eval files are eligible to drive the *default* per-dim
+# card / headline view. Narrower than ``_TRUSTABLE_RUN_STATES``: ``cancelled``
+# is excluded here because its evals can have low coverage (model only
+# inspected a sliver of files before stop), and silently mixing those into
+# a default view distorts the cards. A user can still navigate to a
+# cancelled run explicitly via the chart / history table — this rule only
+# governs the default landing-page selection.
+_DEFAULT_VIEW_RUN_STATES: frozenset[str] = frozenset({"complete", "in_progress"})
+
 _EVAL_GLOB = "*.json"
+
+
+def is_trustable_run(run_status: str) -> bool:
+    """Whether a run's eval files can be trusted at all (history visibility)."""
+    return run_status in _TRUSTABLE_RUN_STATES
+
+
+def is_eligible_for_default_view(run_status: str) -> bool:
+    """Whether a run can drive the overview cards / headline by default.
+
+    The single source of truth for both the accumulated per-dim resolver
+    (``compute_accumulated`` filtering) and the dashboard's default-run
+    selection (``_resolve_selected_run("latest")``). Keeping them on the
+    same predicate is what prevents the "headline says one thing, cards
+    say another" inconsistency users hit when the two filters drift.
+    """
+    return run_status in _DEFAULT_VIEW_RUN_STATES
 
 
 @dataclass(frozen=True, slots=True)

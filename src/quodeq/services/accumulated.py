@@ -11,6 +11,7 @@ from quodeq.services.ports import RunInfo, list_runs
 from quodeq.core.types import DimensionResult
 from quodeq.shared.utils import _env_int
 from quodeq.services._cache import make_lru_dimension_fetcher
+from quodeq.services.dim_resolution import is_eligible_for_default_view
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
 from quodeq.services._fs_projects import find_children as _find_children
 
@@ -78,12 +79,12 @@ def _compute_result(
     If every run on file is partial (fresh project, all attempts crashed),
     fall back to all runs so the dashboard isn't blank.
 
-    Interim solution: this filter duplicates the trust rule that lives in
-    ``services.dim_resolution._TRUSTABLE_RUN_STATES``; phase 2 of #311 will
-    migrate this call site to ``resolve_latest_per_dim`` and remove the
-    duplication.
+    The eligibility predicate is the shared
+    ``dim_resolution.is_eligible_for_default_view`` rule, used by both this
+    call site and ``dashboard._resolve_selected_run`` so the headline and
+    cards always read from the same set of runs.
     """
-    complete_run_infos = [r for r in all_run_infos if r.status in ("complete", "in_progress")]
+    complete_run_infos = [r for r in all_run_infos if is_eligible_for_default_view(r.status)]
     if not complete_run_infos:
         complete_run_infos = all_run_infos
     runs = [r.run_id for r in complete_run_infos]

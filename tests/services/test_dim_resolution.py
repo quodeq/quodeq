@@ -24,6 +24,8 @@ from quodeq.data.fs.report_parser import RunInfo
 from quodeq.services.dim_resolution import (
     DimResolution,
     is_eligible_for_chart_bar,
+    is_eligible_for_default_view,
+    is_trustable_run,
     is_visible_in_history,
     resolve_latest_per_dim,
 )
@@ -235,6 +237,34 @@ class TestIsVisibleInHistory:
 # ---------------------------------------------------------------------------
 # is_eligible_for_chart_bar
 # ---------------------------------------------------------------------------
+
+class TestSharedTrustPredicates:
+    """Pin the two run-state predicates that are the shared source of truth
+    for ``accumulated._compute_result`` and ``dashboard._resolve_selected_run``.
+    Drift between these two predicates is what produces the "headline says
+    one thing, cards say another" class of bug.
+    """
+
+    def test_is_trustable_run_includes_complete_in_progress_cancelled(self):
+        # The broader rule — used by history visibility. Cancelled is in
+        # because a cancelled run can still have dims that finished cleanly.
+        assert is_trustable_run("complete") is True
+        assert is_trustable_run("in_progress") is True
+        assert is_trustable_run("cancelled") is True
+
+    def test_is_trustable_run_excludes_failed(self):
+        assert is_trustable_run("failed") is False
+
+    def test_is_eligible_for_default_view_includes_complete_in_progress(self):
+        # The narrower rule — used by overview cards / headline. Cancelled
+        # is OUT because partial-coverage stub evals can distort the cards.
+        assert is_eligible_for_default_view("complete") is True
+        assert is_eligible_for_default_view("in_progress") is True
+
+    def test_is_eligible_for_default_view_excludes_cancelled_and_failed(self):
+        assert is_eligible_for_default_view("cancelled") is False
+        assert is_eligible_for_default_view("failed") is False
+
 
 class TestIsEligibleForChartBar:
     def _run(self, run_id: str, status: str = "complete") -> RunInfo:
