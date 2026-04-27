@@ -11,7 +11,12 @@ import { filterTrendByVisibleStandards } from '../../../utils/scoreFiltering.js'
 import { TermHeader } from '../../../components/terminal/index.js';
 import FittedText from '../../../components/FittedText.jsx';
 
-const HIDDEN_STATUSES = new Set(['cancelled', 'failed']);
+// Only outright failures are hidden. Cancelled runs may still have written
+// per-dim evaluation files (the dashboard's overview reads them and shows
+// scores), so hiding them here would create a confusing mismatch where the
+// overview shows scores from a run that history claims doesn't exist.
+const HIDDEN_STATUSES = new Set(['failed']);
+const PARTIAL_STATUSES = new Set(['cancelled']);
 
 function formatDateParts(dateISO, fallbackLabel) {
   if (!dateISO) return { date: fallbackLabel || '', time: '' };
@@ -122,7 +127,7 @@ function HistoryRow({ className = '', onClick, cells, onDelete }) {
   );
 }
 
-function EvaluationsTable({ visible, selectedRunId, deltas, onRunClick, onDeleteRun }) {
+function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRunClick, onDeleteRun }) {
   return (
     <section className="history-evaluations panel">
       <div className="history-evaluations__header">
@@ -145,16 +150,29 @@ function EvaluationsTable({ visible, selectedRunId, deltas, onRunClick, onDelete
           const runScore = parseFloat(entry.runNumericAverage ?? entry.numericAverage);
           const grade = gradeLabel(entry.runOverallGrade || entry.overallGrade) || '—';
           const isSelected = entry.runId === selectedRunId;
+          const isPartial = PARTIAL_STATUSES.has(statusByRunId.get(entry.runId));
           return (
             <HistoryRow
               key={entry.runId}
-              className={isSelected ? 'history-row--selected' : ''}
+              className={`${isSelected ? 'history-row--selected' : ''}${isPartial ? ' history-row--partial' : ''}`.trim()}
               onClick={() => onRunClick(entry.runId, entry.dateLabel)}
               onDelete={onDeleteRun ? () => onDeleteRun(entry.runId, entry.dateLabel || date) : undefined}
               cells={{
                 date,
                 time: <span className="history-row__muted">{time}</span>,
-                grade: <span className={`chip small ${scoreColorClass(runScore)}`}>{grade}</span>,
+                grade: (
+                  <>
+                    <span className={`chip small ${scoreColorClass(runScore)}`}>{grade}</span>
+                    {isPartial && (
+                      <span
+                        className="chip small history-row__partial-chip"
+                        title="Run was cancelled — some dimensions completed, others didn't"
+                      >
+                        partial
+                      </span>
+                    )}
+                  </>
+                ),
                 score: <strong>{Number.isNaN(runScore) ? '—' : trimTrailingZero(runScore)}</strong>,
                 delta: <DeltaText delta={deltas[i]} />,
                 dims: (
@@ -223,6 +241,7 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
         visible={visible}
         selectedRunId={selectedRunId}
         deltas={deltas}
+        statusByRunId={statusByRunId}
         onRunClick={onRunClick}
         onDeleteRun={onDeleteRun}
       />
