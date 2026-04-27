@@ -326,11 +326,52 @@ def _discard_partial_dim_state(reports_dir: str, job: dict) -> None:
                 _logger.warning("Could not discard %s: %s", victim, exc)
 
 
+def _read_queue_files_count(queue_path: Path) -> int:
+    """Sum of files dispatched across all batches in a dim's queue.json.
+
+    Used to populate ``files_read`` when scoring residual evidence —
+    without this, ``_score_completed_evidence`` writes eval stubs with
+    ``filesRead: 0``, which the ``scoring_view`` trust rule rejects as
+    untrustworthy. Returning the queue's taken count yields a faithful
+    coverage figure: every file that was actually dispatched to an agent.
+    """
+    try:
+        data = json.loads(queue_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return 0
+    taken = data.get("taken") if isinstance(data, dict) else None
+    if not isinstance(taken, list):
+        return 0
+    total = 0
+    for entry in taken:
+        files = entry.get("files") if isinstance(entry, dict) else None
+        if isinstance(files, list):
+            total += len(files)
+    return total
+
+
+def _read_project_source_file_count(reports_dir: str, project: str) -> int:
+    """Read ``scan.json`` total_files for the project. Returns 0 on failure."""
+    scan_path = Path(reports_dir) / project / "scan.json"
+    try:
+        data = json.loads(scan_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return 0
+    raw = data.get("total_files") if isinstance(data, dict) else None
+    return int(raw) if isinstance(raw, int) else 0
+
+
 def _score_completed_evidence(reports_dir: str, job: dict) -> None:
     """Score any dimensions that have evidence but no evaluation report.
 
     Called after cancellation so completed dimensions are preserved in the
     dashboard even when the overall run was cancelled.
+
+    Populates ``files_read`` from the dim's queue.json (count of dispatched
+    files) and ``source_file_count`` from the project's scan.json. Without
+    these, the scored eval has ``filesRead: 0``, which ``scoring_view``'s
+    trust rule rejects — the user sees the cancelled run's data fall
+    through to an older run's stale value despite real findings on disk.
     """
     project = job.get("outputProject")
     run_id = job.get("outputRunId")
@@ -345,6 +386,7 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
         return
 
     evaluation_dir.mkdir(parents=True, exist_ok=True)
+    source_file_count = _read_project_source_file_count(reports_dir, project)
 
     for jsonl_path in evidence_dir.glob("*_evidence.jsonl"):
         dim_id = jsonl_path.name.replace("_evidence.jsonl", "")
@@ -358,15 +400,19 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
         if not queue_file.exists():
             continue  # verification not completed for this dimension
 
+        files_read = _read_queue_files_count(queue_file)
         try:
             evidence = parse_jsonl_to_evidence(jsonl_path, EvidenceContext(
                 language="", repository="", date_str="",
-                source_file_count=0, files_read=0,
+                source_file_count=source_file_count, files_read=files_read,
             ))
             if evidence is None:
                 continue
             scores = score_evidence(evidence, mode="numerical")
             write_dimension_report(evidence, scores, dim_id, evaluation_dir)
-            _log.info("Scored cancelled dimension '%s' for run %s", dim_id, run_id[:8])
+            _log.info(
+                "Scored cancelled dimension '%s' for run %s (files_read=%d)",
+                dim_id, run_id[:8], files_read,
+            )
         except (OSError, json.JSONDecodeError, ValueError, KeyError) as exc:
             _log.debug("Could not score cancelled dimension '%s': %s", dim_id, exc)
