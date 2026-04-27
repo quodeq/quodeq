@@ -201,12 +201,23 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
     return map;
   }, [availableRuns]);
   const isHiddenStatus = (runId) => HIDDEN_STATUSES.has(statusByRunId.get(runId));
+  const isPartialStatus = (runId) => PARTIAL_STATUSES.has(statusByRunId.get(runId));
+  // A cancelled run with zero completed dimensions has nothing useful to
+  // show — surface only partial runs that actually carry data.
+  const hasMeaningfulData = (entry) => {
+    const dims = entry?.dimensionDetails;
+    return Array.isArray(dims) && dims.some((d) => d?.dimension);
+  };
   // Show every non-hidden run; off-screen rows are lazy-painted via CSS
   // `content-visibility: auto` on `.history-row` (see styles/history.css),
   // so there's no need for a "Load all" pagination toggle.
   const visible = useMemo(() => {
     const combined = [...inProgressStubs, ...trend];
-    return combined.filter((entry) => !isHiddenStatus(entry.runId));
+    return combined.filter((entry) => {
+      if (isHiddenStatus(entry.runId)) return false;
+      if (isPartialStatus(entry.runId) && !hasMeaningfulData(entry)) return false;
+      return true;
+    });
   }, [inProgressStubs, trend, statusByRunId]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
