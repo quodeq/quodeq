@@ -20,6 +20,7 @@ from quodeq.services.ports import (
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services._dashboard_trend import build_accumulated_trend
+from quodeq.services.dim_resolution import is_eligible_for_default_view
 
 
 @dataclass
@@ -164,18 +165,26 @@ def _build_dashboard_result(
 def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     """Return the selected RunInfo and its index in *runs*, raising FileNotFoundError if absent.
 
-    For ``run == _LATEST_RUN``, prefer the most recent fully-completed run so
-    the per-dim cards in the dashboard reflect one coherent run that agrees
-    with the accumulated headline. If every run on file is cancelled or
-    in-progress (e.g. fresh project, all attempts crashed), fall back to
-    ``runs[0]`` rather than refusing to render. Users can still navigate to
-    a specific partial run via the score-history chart.
+    For ``run == _LATEST_RUN``, prefer the most recent run that's eligible
+    to drive the default view (``complete`` or ``in_progress``). The
+    eligibility predicate is the shared
+    ``dim_resolution.is_eligible_for_default_view`` rule, used by both this
+    call site and ``accumulated._compute_result``. Keeping them on the
+    same predicate is what prevents the "headline says one thing, cards
+    say another" inconsistency users hit when the two filters drift.
+
+    If every run is cancelled (fresh project / repeated crashes), fall
+    back to ``runs[0]`` rather than refusing to render. Users can still
+    navigate to a specific partial run via the score-history chart.
 
     Note: run IDs are opaque UUIDs (no sensitive data), safe to include in
     error messages.
     """
     if run == _LATEST_RUN:
-        selected_run = next((r for r in runs if r.status == "complete"), runs[0])
+        selected_run = next(
+            (r for r in runs if is_eligible_for_default_view(r.status)),
+            runs[0],
+        )
     else:
         selected_run = next((item for item in runs if item.run_id == run), None)
     if not selected_run:
