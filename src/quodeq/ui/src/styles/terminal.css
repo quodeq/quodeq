@@ -994,6 +994,22 @@
 .history-table .history-row--selected {
   background: var(--color-surface-alt) !important;
 }
+/* Cancelled-but-partial runs: same row treatment, with a yellow "partial"
+   chip in the grade column so reviewers can tell at a glance the scores
+   come from an incomplete run (not all dims may have run). */
+.history-row__partial-chip {
+  margin-left: 6px;
+  background: transparent;
+  border: 1px solid var(--color-warn, #d29922);
+  color: var(--color-warn, #d29922);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+.history-table .history-row--partial .history-row__col--score strong,
+.history-table .history-row--partial .history-row__col--delta {
+  opacity: 0.7;
+}
 
 /* Monospace + theme-correct text colour inside every data row, overriding
    the inherited Plus Jakarta from `.panel`. */
