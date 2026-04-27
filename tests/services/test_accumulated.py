@@ -201,6 +201,27 @@ class TestComputeAccumulated:
         assert scores == {"security": "7.0", "maintainability": "8.0"}
         assert result["summary"]["numericAverage"] == 7.5  # avg(7.0, 8.0)
 
+    def test_includes_in_progress_run_for_dims_already_scored(self, tmp_path: Path):
+        # A dim that produced an eval file inside an in-progress run is
+        # trustworthy — its score should surface in the cards immediately,
+        # not wait for the umbrella run to finalise. (Without this, users
+        # see today's freshly-completed dim as "Older run · Apr 25" because
+        # the still-running umbrella excluded today's partial state.)
+        reports_root = _setup_project(tmp_path, "proj", [
+            ("run2", [_dim("usability", "9.5", "A")]),
+            ("run1", [_dim("usability", "7.0", "B"), _dim("flexibility", "6.0", "C")]),
+        ])
+        # Mark run2 as still in progress.
+        (reports_root / "proj" / "run2" / "status.json").write_text(
+            json.dumps({"state": "running"}),
+        )
+        result = compute_accumulated(str(reports_root), "proj", None)
+        assert result is not None
+        scores = {d["dimension"]: d["overallScore"] for d in result["dimensions"]}
+        # usability picked up from in-progress run2 (the freshest score for
+        # that dim); flexibility falls through to run1.
+        assert scores == {"usability": "9.5", "flexibility": "6.0"}
+
     def test_falls_back_when_all_runs_cancelled(self, tmp_path: Path):
         # If every run is cancelled (fresh project, all attempts crashed), we
         # still want to render *something* rather than a blank dashboard, so
