@@ -22,10 +22,10 @@ Each finding must be a JSON object with these fields:
     "line": integer - line number
     "severity": string - "critical", "major", or "minor"
     "w": string - short title of the finding
-    "reason": string - why this is a violation or compliance
+    "reason": string - 1–3 sentences: what the quoted code does wrong AS WRITTEN, plus the concrete impact
+    "snippet": string - offending code copied VERBATIM from the source (one or a few contiguous lines, exact characters)
   Optional:
     "end_line": integer - last line if multi-line
-    "snippet": string - code snippet
     "scope": string - "file", "class", or "module"
 """
 

@@ -56,23 +56,34 @@ class _Finding(BaseModel):
     end_line: int | None = Field(
         default=None,
         description=(
-            "Last line of the offending span. Omit unless the violation is structural "
-            "(long function, nesting depth, file length). The server reads the actual source "
-            "to render the snippet; setting this widens the rendered window."
+            "Last line of the offending span. Set this whenever the violation "
+            "spans more than one line — both for structural issues (long "
+            "function, nesting depth) and for multi-line expressions or "
+            "blocks. Omit only when the issue is genuinely a single line. "
+            "The server reads the actual source to render the highlighted "
+            "snippet from line..end_line; getting end_line right is what "
+            "makes the highlight readable."
         ),
     )
     severity: _Severity = Field(default=_Severity.minor)
     w: str = Field(description="Short title of the finding")
     snippet: str = Field(
         description=(
-            "Exact text of the offending line, verbatim from the source file. "
-            "Required. If you cannot quote the line, drop the finding."
+            "Offending code copied VERBATIM from the source file — exact "
+            "characters, no paraphrase, no summarisation. One or a few "
+            "contiguous lines: quote enough that the issue is self-evident, "
+            "no padding. The number of lines in `snippet` must match the "
+            "span from `line` to `end_line` (so end_line - line + 1 == "
+            "snippet line count). Required. If you cannot quote the code, "
+            "drop the finding."
         ),
         min_length=1,
     )
     reason: str = Field(
         description=(
-            "One sentence: what the quoted line does wrong AS WRITTEN. "
+            "1–3 sentences: state what the quoted code does wrong AS WRITTEN, "
+            "and name the concrete impact (what breaks, who is affected, or "
+            "what attack/failure it enables). "
             "No hedging ('could', 'might', 'should consider', 'if X were larger')."
         ),
         min_length=1,
@@ -145,7 +156,7 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
         model=config.model,
         response_model=_Findings,
         messages=[
-            {"role": "system", "content": "You are a code quality evaluator. Quote the offending line into `snippet`. Empty `findings` is a valid answer."},
+            {"role": "system", "content": "You are a code quality evaluator. Quote the offending code into `snippet` VERBATIM from the source — one or a few contiguous lines, exact characters, no paraphrase. Set `end_line` to match the last line of the snippet. In `reason`, state what the code does wrong and the concrete impact in 1–3 sentences. Empty `findings` is a valid answer."},
             {"role": "user", "content": prompt},
         ],
         temperature=config.temperature,
@@ -180,6 +191,26 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
 # Enrichment and path resolution
 # ---------------------------------------------------------------------------
 
+def _infer_end_line(findings: list[dict]) -> None:
+    """Derive end_line from snippet line count when the model omits it.
+
+    Small local models often skip end_line, which collapses the dashboard
+    highlight to a single line even when the model quoted several lines into
+    snippet. If snippet has N>1 lines and end_line is unset, assume the span
+    runs from line to line+N-1.
+    """
+    for f in findings:
+        if f.get("end_line"):
+            continue
+        snippet = f.get("snippet") or ""
+        line = f.get("line") or 0
+        if line <= 0 or not snippet:
+            continue
+        n = snippet.count("\n") + 1
+        if n > 1:
+            f["end_line"] = line + n - 1
+
+
 def _enrich_findings(
     findings: list[dict],
     compiled_dir: Path | None,
@@ -187,6 +218,7 @@ def _enrich_findings(
     work_dir: Path | None,
 ) -> list[dict]:
     """Enrich findings through FindingsRouter (same as MCP path)."""
+    _infer_end_line(findings)
     if not compiled_dir:
         return findings
     try:
