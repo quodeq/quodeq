@@ -164,9 +164,20 @@ def _build_dashboard_result(
 def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     """Return the selected RunInfo and its index in *runs*, raising FileNotFoundError if absent.
 
-    Note: run IDs are opaque UUIDs (no sensitive data), safe to include in error messages.
+    For ``run == _LATEST_RUN``, prefer the most recent fully-completed run so
+    the per-dim cards in the dashboard reflect one coherent run that agrees
+    with the accumulated headline. If every run on file is cancelled or
+    in-progress (e.g. fresh project, all attempts crashed), fall back to
+    ``runs[0]`` rather than refusing to render. Users can still navigate to
+    a specific partial run via the score-history chart.
+
+    Note: run IDs are opaque UUIDs (no sensitive data), safe to include in
+    error messages.
     """
-    selected_run = runs[0] if run == _LATEST_RUN else next((item for item in runs if item.run_id == run), None)
+    if run == _LATEST_RUN:
+        selected_run = next((r for r in runs if r.status == "complete"), runs[0])
+    else:
+        selected_run = next((item for item in runs if item.run_id == run), None)
     if not selected_run:
         raise FileNotFoundError("Run not found")
     selected_index = next((idx for idx, item in enumerate(runs) if item.run_id == selected_run.run_id), None)

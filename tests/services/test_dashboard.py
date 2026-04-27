@@ -127,3 +127,49 @@ class TestBuildDashboard:
         assert result["selectedRun"]["runId"] == "r1"
         assert len(result["dimensions"]) == 1
         assert "trend" in result
+
+    def test_latest_skips_cancelled_runs(self, tmp_path):
+        # ``"latest"`` defaults to the most recent fully-completed run so the
+        # per-dim cards reflect a coherent run that agrees with the headline.
+        # The cancelled run remains reachable via explicit selection.
+        cancelled = RunInfo(run_id="r-newest", date_iso="2024-03-01", date_label="2024-03-01", status="cancelled")
+        complete = RunInfo(run_id="r-older", date_iso="2024-02-01", date_label="2024-02-01", status="complete")
+        dims = [_dim("security", "B", "7.0")]
+        summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
+        with (
+            patch("quodeq.services.dashboard.list_runs", return_value=[cancelled, complete]),
+            patch("quodeq.services.dashboard.read_run_data", return_value=dims),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), "proj", "latest")
+        assert result["selectedRun"]["runId"] == "r-older"
+
+    def test_latest_falls_back_when_all_cancelled(self, tmp_path):
+        # If every run is cancelled, fall back to the newest one rather than
+        # refusing to render — the dashboard still needs to show something.
+        cancelled1 = RunInfo(run_id="r2", date_iso="2024-03-01", date_label="2024-03-01", status="cancelled")
+        cancelled2 = RunInfo(run_id="r1", date_iso="2024-02-01", date_label="2024-02-01", status="cancelled")
+        dims = [_dim("security", "B", "7.0")]
+        summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
+        with (
+            patch("quodeq.services.dashboard.list_runs", return_value=[cancelled1, cancelled2]),
+            patch("quodeq.services.dashboard.read_run_data", return_value=dims),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), "proj", "latest")
+        assert result["selectedRun"]["runId"] == "r2"
+
+    def test_explicit_run_selection_overrides_latest_default(self, tmp_path):
+        # Explicit selection by run_id navigates to that run regardless of
+        # state — users can still inspect partial runs from the bar chart.
+        cancelled = RunInfo(run_id="r-cancelled", date_iso="2024-03-01", date_label="2024-03-01", status="cancelled")
+        complete = RunInfo(run_id="r-complete", date_iso="2024-02-01", date_label="2024-02-01", status="complete")
+        dims = [_dim("security", "B", "7.0")]
+        summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
+        with (
+            patch("quodeq.services.dashboard.list_runs", return_value=[cancelled, complete]),
+            patch("quodeq.services.dashboard.read_run_data", return_value=dims),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), "proj", "r-cancelled")
+        assert result["selectedRun"]["runId"] == "r-cancelled"
