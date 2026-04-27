@@ -71,12 +71,19 @@ def _compute_result(
     Cancelled/failed runs are excluded from the per-dim "latest" pick so the
     overview cards don't quietly mix partial-run scores (e.g. inflated 9.x
     from a dim the model only finished a fraction of) with stable scores
-    from older complete runs. The trend chart already excludes them; this
-    aligns the cards with that contract. If every run on file is partial
-    (fresh project, all attempts crashed), fall back to all runs so the
-    dashboard isn't blank.
+    from older complete runs. ``in_progress`` runs ARE included so dims
+    that have already produced a scored evaluation file (eval/<dim>.json)
+    surface in the cards as soon as they finish — users shouldn't have to
+    wait for the umbrella run to finalise before seeing those results.
+    If every run on file is partial (fresh project, all attempts crashed),
+    fall back to all runs so the dashboard isn't blank.
+
+    Interim solution: this filter duplicates the trust rule that lives in
+    ``services.dim_resolution._TRUSTABLE_RUN_STATES``; phase 2 of #311 will
+    migrate this call site to ``resolve_latest_per_dim`` and remove the
+    duplication.
     """
-    complete_run_infos = [r for r in all_run_infos if r.status == "complete"]
+    complete_run_infos = [r for r in all_run_infos if r.status in ("complete", "in_progress")]
     if not complete_run_infos:
         complete_run_infos = all_run_infos
     runs = [r.run_id for r in complete_run_infos]
