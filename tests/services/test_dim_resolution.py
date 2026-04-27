@@ -139,8 +139,9 @@ class TestResolveLatestPerDim:
         # is trustworthy and should surface — users shouldn't have to
         # wait for the umbrella run to finalise to see results.
         # ``in_progress`` is detected upstream via a live PID lookup, which
-        # we'd need to fake on disk; mocking ``list_runs`` to return the
-        # state directly keeps the test focused on the resolution logic.
+        # we'd need to fake on disk; mocking ``list_runs`` at its new
+        # location in scoring_view._resolution keeps the test focused on
+        # the resolution logic.
         proj_dir = tmp_path / "proj"
         _write_eval(proj_dir, "run2", "security", score="9.0/10")
         _write_eval(proj_dir, "run1", "security", score="7.0/10")
@@ -148,23 +149,27 @@ class TestResolveLatestPerDim:
             RunInfo(run_id="run2", date_iso="2026-02-01T10:00:00", date_label="Feb 1", status="in_progress"),
             RunInfo(run_id="run1", date_iso="2026-01-01T10:00:00", date_label="Jan 1", status="complete"),
         ]
-        with patch("quodeq.services.dim_resolution.list_runs", return_value=runs_for_mock):
+        with patch("quodeq.services.scoring_view._resolution.list_runs", return_value=runs_for_mock):
             result = resolve_latest_per_dim(tmp_path, "proj")
         assert result["security"].run_id == "run2"
         assert result["security"].run_state == "in_progress"
 
-    def test_includes_cancelled_run_with_real_data(self, tmp_path: Path):
-        # A cancelled run can still have dims that finished cleanly before
-        # the cancel — those eval files are real. The chip in the UI tells
-        # the user the parent run was partial; the data itself is fine.
+    def test_excludes_cancelled_run_from_default_view(self, tmp_path: Path):
+        # Cancelled runs are NOT promoted to overview cards by default —
+        # the user didn't intend that stop, so the data shouldn't drive
+        # the cards (per the ``is_eligible_for_default_view`` rule). The
+        # cancelled run's eval IS still on disk and is_visible_in_history
+        # would surface it; resolve_latest_per_dim falls through to the
+        # previous complete run for the dim's default-view value.
         proj_dir = tmp_path / "proj"
         _write_eval(proj_dir, "run2", "security", files_read=500, score="9.0/10")
         _write_status(proj_dir, "run2", state="cancelled")
         _write_eval(proj_dir, "run1", "security", score="7.0/10")
 
         result = resolve_latest_per_dim(tmp_path, "proj")
-        assert result["security"].run_id == "run2"
-        assert result["security"].run_state == "cancelled"
+        # run2 (cancelled) skipped; run1 (default 'complete') wins.
+        assert result["security"].run_id == "run1"
+        assert result["security"].overall_score == "7.0/10"
 
     def test_returns_empty_for_missing_project(self, tmp_path: Path):
         assert resolve_latest_per_dim(tmp_path, "nonexistent") == {}
