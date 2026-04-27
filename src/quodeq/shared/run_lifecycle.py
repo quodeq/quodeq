@@ -25,6 +25,7 @@ from types import TracebackType
 from typing import Any
 
 from quodeq.shared import cancellation
+from quodeq.shared.resource_sampler import ResourceSampler
 from quodeq.shared.run_heartbeat import HeartbeatThread
 from quodeq.shared.run_status import (
     RunState,
@@ -65,6 +66,7 @@ class RunLifecycleContext:
         self._phase: str | None = None
         self._current_dimension: str | None = None
         self._heartbeat = HeartbeatThread(run_dir, interval=heartbeat_interval)
+        self._resources = ResourceSampler()
         self._previous_handlers: dict[int, Any] = {}
         self._atexit_registered = False
 
@@ -78,6 +80,7 @@ class RunLifecycleContext:
         self._atexit_registered = True
         self._transition(RunState.RUNNING)
         self._heartbeat.start()
+        self._resources.start()
         return self
 
     def __exit__(
@@ -87,6 +90,7 @@ class RunLifecycleContext:
         traceback: TracebackType | None,
     ) -> bool:
         self._heartbeat.stop()
+        self._resources.stop()
         if exc_type is None:
             # No exception — pipeline is expected to have transitioned to finalizing.
             if self._current_state not in TERMINAL_STATES:
@@ -158,6 +162,7 @@ class RunLifecycleContext:
             cancellation.request_cancel()
             # Avoid using the transition-validating path — we may be mid-state.
             self._heartbeat.stop()
+            self._resources.stop()
             write_status(
                 self._run_dir,
                 state=RunState.CANCELLED,
@@ -196,6 +201,7 @@ class RunLifecycleContext:
             return
         # We exited without a terminal state — write cancelled.
         self._heartbeat.stop()
+        self._resources.stop()
         write_status(
             self._run_dir,
             state=RunState.CANCELLED,
