@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 
 from quodeq.analysis.prompts._template import load_template
+from quodeq.analysis.prompts.builder import _load_evaluation_rules
 from quodeq.config.prompt_templates import render_template
 
 _log = logging.getLogger(__name__)
@@ -62,7 +63,7 @@ def assemble_api_prompt(
 ) -> str:
     """Assemble a complete evaluation prompt for the API runner."""
     template = load_template(template_name="api_prompt.md")
-    rules = load_template(template_name="evaluation_rules.md")
+    rules = _load_evaluation_rules()
     files_block = _build_files_block(source_files, repo_root=repo_root)
     return render_template(template, {
         "DIMENSION": dimension,
