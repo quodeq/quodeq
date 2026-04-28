@@ -6,6 +6,27 @@ const STORAGE_KEY = 'quodeq.sidePaneWidth';
 const LEGACY_STORAGE_KEY = 'quodeq.reportPaneWidth';
 const DEFAULT_WIDTH_PX = 560;
 const MAX_WINDOWS = 3;
+const NOTICE_DISMISS_MS = 4000;
+const AT_CAP_MESSAGE = `Up to ${MAX_WINDOWS} panels can be open at once — close one first.`;
+
+function SidePaneToast({ notice, onDismiss }) {
+  useEffect(() => {
+    if (!notice) return undefined;
+    const t = setTimeout(onDismiss, NOTICE_DISMISS_MS);
+    return () => clearTimeout(t);
+  }, [notice, onDismiss]);
+  if (!notice) return null;
+  return (
+    <div
+      className="job-error-toast side-pane-toast"
+      onClick={onDismiss}
+      role="status"
+      aria-live="polite"
+    >
+      {notice.message}
+    </div>
+  );
+}
 
 function readStoredWidth() {
   try {
@@ -38,6 +59,10 @@ function writeStoredWidth(px) {
 export function SidePaneProvider({ children }) {
   const [windows, setWindows] = useState([]);
   const [paneWidth, setPaneWidthState] = useState(readStoredWidth);
+  // Transient notice surfaced as a toast (e.g. "max panels open"). The `key`
+  // forces a fresh mount when the same message is shown twice in a row, so
+  // the auto-dismiss timer resets and the slide-in animation replays.
+  const [notice, setNotice] = useState(null);
 
   const isOpen = windows.length > 0;
 
@@ -46,14 +71,21 @@ export function SidePaneProvider({ children }) {
     [windows],
   );
 
+  const showAtCapNotice = useCallback(() => {
+    setNotice({ message: AT_CAP_MESSAGE, key: Date.now() });
+  }, []);
+
+  const clearNotice = useCallback(() => setNotice(null), []);
+
   const addWindow = useCallback((spec) => {
     if (!spec || !spec.id) return;
-    setWindows((prev) => {
-      if (prev.some((w) => w.id === spec.id)) return prev;
-      if (prev.length >= MAX_WINDOWS) return prev;
-      return [...prev, spec];
-    });
-  }, []);
+    if (windows.some((w) => w.id === spec.id)) return;
+    if (windows.length >= MAX_WINDOWS) {
+      showAtCapNotice();
+      return;
+    }
+    setWindows((prev) => [...prev, spec]);
+  }, [windows, showAtCapNotice]);
 
   const removeWindow = useCallback((id) => {
     setWindows((prev) => prev.filter((w) => w.id !== id));
@@ -61,14 +93,16 @@ export function SidePaneProvider({ children }) {
 
   const toggleWindow = useCallback((spec) => {
     if (!spec || !spec.id) return;
-    setWindows((prev) => {
-      if (prev.some((w) => w.id === spec.id)) {
-        return prev.filter((w) => w.id !== spec.id);
-      }
-      if (prev.length >= MAX_WINDOWS) return prev;
-      return [...prev, spec];
-    });
-  }, []);
+    if (windows.some((w) => w.id === spec.id)) {
+      setWindows((prev) => prev.filter((w) => w.id !== spec.id));
+      return;
+    }
+    if (windows.length >= MAX_WINDOWS) {
+      showAtCapNotice();
+      return;
+    }
+    setWindows((prev) => [...prev, spec]);
+  }, [windows, showAtCapNotice]);
 
   const closeAll = useCallback(() => setWindows([]), []);
 
@@ -137,6 +171,7 @@ export function SidePaneProvider({ children }) {
   return (
     <SidePaneContext.Provider value={value}>
       {children}
+      <SidePaneToast key={notice?.key} notice={notice} onDismiss={clearNotice} />
     </SidePaneContext.Provider>
   );
 }

@@ -1355,6 +1355,17 @@
   min-height: 0;
   transition: grid-template-columns 220ms ease;
 }
+/* While the user is dragging the side-pane divider, the column width
+   tracks the cursor every pointermove via the --side-pane-width CSS var.
+   Letting the 220ms grid transition fire on each move makes the column
+   edge animate behind the cursor and reflows the main column many times
+   per drag step — which feels scratchy. Suppress the transition during
+   the drag so the column snaps to the cursor; the open/close slide-in
+   still uses it because it's only set off while data-pane-resizing is
+   present on the root. */
+:root[data-pane-resizing] .app-shell__body {
+  transition: none;
+}
 .app-shell__body:has(.sidebar.sidebar--expanded:hover),
 .app-shell__body:has(.sidebar.sidebar--expanded.sidebar--pinned) {
   grid-template-columns:
@@ -1368,6 +1379,11 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  /* Isolate the main column's layout + paint from the side-pane subtree
+     and topbar so a pane-divider drag doesn't propagate reflow into the
+     entire document. The column already clips its own overflow, so
+     containment doesn't change visible bounds. */
+  contain: layout paint;
 }
 .app-shell__main-column > .dashboard {
   flex: 1 1 auto;

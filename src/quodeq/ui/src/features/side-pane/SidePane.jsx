@@ -16,19 +16,23 @@ export function SidePane() {
     setRatios(Array(Math.max(0, windows.length - 1)).fill(0.5));
   }, [windows.length]);
 
-  // While dragging either divider, set data-resizing on the aside so CSS
-  // can mask the markdown bodies (content-visibility: hidden) — the text
-  // layout pass per pointermove is the actual perf killer with multi-window
-  // multi-paragraph reports.
+  // While dragging either divider, set data-pane-resizing on the document
+  // root. The flag is read by a CSS rule on .app-shell__body that suppresses
+  // its `transition: grid-template-columns 220ms ease` — without that, every
+  // pointermove kicks off a fresh 220ms animation of the column width, so
+  // the pane edge lags the cursor and the heavy main column reflows mid-
+  // animation many times per drag step.
   const containerRef = useRef(null);
   const setResizingFlag = useCallback((on) => {
-    const el = containerRef.current;
-    if (!el) return;
-    if (on) el.dataset.resizing = 'true';
-    else delete el.dataset.resizing;
+    const root = document.documentElement;
+    if (on) root.dataset.paneResizing = 'true';
+    else delete root.dataset.paneResizing;
   }, []);
 
   // Outer pane (left-edge) drag — resizes the whole dock width.
+  // pointermove can fire 100+ times/sec on a 120Hz trackpad. Coalesce
+  // multiple events into one CSS-var write per frame via rAF — same
+  // pattern the inner divider uses for its flex writes.
   const [isDragging, setIsDragging] = useState(false);
   const onOuterDividerPointerDown = useCallback((e) => {
     e.preventDefault();
@@ -41,14 +45,25 @@ export function SidePane() {
     const prevSelect = document.body.style.userSelect;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
+    let pendingNext = startWidth;
+    let rafId = null;
+    const apply = () => {
+      rafId = null;
+      document.documentElement.style.setProperty('--side-pane-width', `${pendingNext}px`);
+    };
     const onMove = (ev) => {
       const delta = startX - ev.clientX;
-      const next = clampSidePaneWidth(startWidth + delta, viewport);
-      document.documentElement.style.setProperty('--side-pane-width', `${next}px`);
+      pendingNext = clampSidePaneWidth(startWidth + delta, viewport);
+      if (rafId == null) rafId = requestAnimationFrame(apply);
     };
     const onUp = (ev) => {
+      if (rafId != null) cancelAnimationFrame(rafId);
       const delta = startX - ev.clientX;
-      setPaneWidth(clampSidePaneWidth(startWidth + delta, window.innerWidth));
+      const finalWidth = clampSidePaneWidth(startWidth + delta, window.innerWidth);
+      // Write final value to the var immediately so the column doesn't
+      // jump on the next React commit; setPaneWidth then persists state.
+      document.documentElement.style.setProperty('--side-pane-width', `${finalWidth}px`);
+      setPaneWidth(finalWidth);
       setIsDragging(false);
       setResizingFlag(false);
       document.body.style.cursor = prevCursor;

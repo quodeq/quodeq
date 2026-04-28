@@ -80,6 +80,16 @@ describe('SidePaneProvider', () => {
     expect(screen.getByTestId('state')).toHaveTextContent('open:a,b,c');
   });
 
+  it('shows an at-cap toast when addWindow is called past MAX_WINDOWS', () => {
+    render(<SidePaneProvider><Probe /></SidePaneProvider>);
+    fireEvent.click(screen.getByText('add-a'));
+    fireEvent.click(screen.getByText('add-b'));
+    fireEvent.click(screen.getByText('add-c'));
+    expect(screen.queryByRole('status')).toBeNull();
+    fireEvent.click(screen.getByText('add-d'));
+    expect(screen.getByRole('status')).toHaveTextContent(/3 panels/i);
+  });
+
   it('hasWindow reflects current dock contents', () => {
     render(<SidePaneProvider><Probe /></SidePaneProvider>);
     expect(screen.getByTestId('has-a')).toHaveTextContent('no');
