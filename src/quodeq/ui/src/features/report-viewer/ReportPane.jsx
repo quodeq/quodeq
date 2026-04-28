@@ -69,8 +69,10 @@ const COPY_FEEDBACK_MS = 1500;
 export function ReportPane() {
   const { current, isOpen, paneWidth, setPaneWidth, closeReport } = useReportViewer();
   const bodyRef = useRef(null);
+  const dividerRef = useRef(null);
   const [bodyReady, setBodyReady] = useState(false);
   const [justCopied, setJustCopied] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
@@ -110,6 +112,14 @@ export function ReportPane() {
     const startX = e.clientX;
     const startWidth = paneWidth;
     const viewport = window.innerWidth;
+    setIsDragging(true);
+    // Lock the col-resize cursor and suppress text selection across the whole
+    // window while the drag is in flight — otherwise the cursor flips to text
+    // any time the pointer leaves the 12px hit zone.
+    const prevCursor = document.body.style.cursor;
+    const prevUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
     const onMove = (ev) => {
       const delta = startX - ev.clientX; // dragging left grows the pane
       const next = clampPaneWidth(startWidth + delta, viewport);
@@ -119,6 +129,9 @@ export function ReportPane() {
       const delta = startX - ev.clientX;
       const next = clampPaneWidth(startWidth + delta, window.innerWidth);
       setPaneWidth(next);
+      setIsDragging(false);
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevUserSelect;
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
@@ -135,9 +148,11 @@ export function ReportPane() {
       aria-label="Report viewer"
     >
       <div
-        className="report-pane__divider"
+        ref={dividerRef}
+        className={`report-pane__divider${isDragging ? ' report-pane__divider--dragging' : ''}`}
         role="separator"
         aria-orientation="vertical"
+        aria-label="Resize report pane"
         onPointerDown={onDividerPointerDown}
       />
       <header className="report-pane__header">
