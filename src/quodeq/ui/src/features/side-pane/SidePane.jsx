@@ -46,29 +46,55 @@ export function SidePane() {
     window.addEventListener('pointerup', onUp);
   }, [paneWidth, setPaneWidth]);
 
-  // Internal between-window resizer.
+  // Internal between-window resizer. Mutates the two adjacent slot
+  // elements' inline flex grow factors directly during the drag (no
+  // setState — same trick as the outer drag with --side-pane-width)
+  // so the markdown bodies don't re-render every pointer move. Commits
+  // the final ratio to React state on release.
   const containerRef = useRef(null);
   const onInnerDividerPointerDown = useCallback((index) => (e) => {
     e.preventDefault();
-    const startY = e.clientY;
-    const startRatio = ratios[index] ?? 0.5;
     const container = containerRef.current;
     if (!container) return;
     const slots = container.querySelectorAll('.side-pane-window-slot');
     const aEl = slots[index];
     const bEl = slots[index + 1];
-    const span = (aEl?.offsetHeight ?? 0) + (bEl?.offsetHeight ?? 0);
+    if (!aEl || !bEl) return;
+    const startY = e.clientY;
+    const startRatio = ratios[index] ?? 0.5;
+    const span = aEl.offsetHeight + bEl.offsetHeight;
     if (span <= 0) return;
+    // Combined weight of these two slots stays constant during this drag —
+    // we just split it differently. Capture it once.
+    const aStartFlex = parseFloat(aEl.style.flexGrow) || 1;
+    const bStartFlex = parseFloat(bEl.style.flexGrow) || 1;
+    const combinedFlex = aStartFlex + bStartFlex;
+    const prevCursor = document.body.style.cursor;
+    const prevSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    let pendingRatio = startRatio;
+    let rafId = null;
+    const apply = () => {
+      rafId = null;
+      aEl.style.flex = `${combinedFlex * pendingRatio} 1 0`;
+      bEl.style.flex = `${combinedFlex * (1 - pendingRatio)} 1 0`;
+    };
     const onMove = (ev) => {
       const delta = ev.clientY - startY;
-      const next = Math.min(1 - MIN_WINDOW_RATIO, Math.max(MIN_WINDOW_RATIO, startRatio + delta / span));
-      setRatios((prev) => {
-        const out = [...prev];
-        out[index] = next;
-        return out;
-      });
+      pendingRatio = Math.min(1 - MIN_WINDOW_RATIO, Math.max(MIN_WINDOW_RATIO, startRatio + delta / span));
+      if (rafId == null) rafId = requestAnimationFrame(apply);
     };
     const onUp = () => {
+      if (rafId != null) cancelAnimationFrame(rafId);
+      apply();
+      setRatios((prev) => {
+        const out = [...prev];
+        out[index] = pendingRatio;
+        return out;
+      });
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevSelect;
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
