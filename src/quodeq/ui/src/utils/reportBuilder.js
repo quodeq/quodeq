@@ -104,8 +104,7 @@ function buildComplianceSection(compliance) {
 }
 
 export function buildDimensionReport({ evalData, principleGrades, allViolations, overallGrade, dateLabel, runId }) {
-  const dim = evalData?.dimension || 'Unknown';
-  const dimTitle = dim.charAt(0).toUpperCase() + dim.slice(1);
+  const dim = (evalData?.dimension || 'unknown').toLowerCase();
   const score = overallGrade?.score || '—';
   const grade = overallGrade?.grade || '—';
   const compliance = evalData?.compliance || [];
@@ -113,7 +112,7 @@ export function buildDimensionReport({ evalData, principleGrades, allViolations,
   const rid = runId ? ` · **Run:** ${runId.slice(0, 8)}` : '';
 
   const lines = [];
-  lines.push(`# ${dimTitle} Report`);
+  lines.push(`# ${dim} report`);
   lines.push('');
   lines.push(`**Date:** ${date}${rid} · **Score:** ${score} ${grade}`);
   lines.push('');
@@ -175,7 +174,7 @@ function buildTopOffendingFiles(accumulatedDimensions) {
   lines.push('| File | Violations | Critical | Major | Minor |');
   lines.push('|------|-----------|----------|-------|-------|');
   for (const [file, stats] of topFiles) {
-    lines.push(`| \`${file}\` | ${stats.count} | ${stats.critical} | ${stats.major} | ${stats.minor} |`);
+    lines.push(`| ${file} | ${stats.count} | ${stats.critical} | ${stats.major} | ${stats.minor} |`);
   }
   lines.push('');
   return lines;
@@ -193,8 +192,7 @@ function buildCritMajorSection(accumulatedDimensions) {
     lines.push(`## Critical & Major Violations (${total})`);
     lines.push('');
     for (const { dimension, violations } of critMajor) {
-      const dimTitle = (dimension || '').charAt(0).toUpperCase() + (dimension || '').slice(1);
-      lines.push(`### ${dimTitle}`);
+      lines.push(`### ${(dimension || '').toLowerCase()}`);
       lines.push('');
       for (const v of violations) lines.push(formatViolationEntry(v));
     }
@@ -231,7 +229,7 @@ export function buildOverviewReport(accumulated, accumulatedDimensions, projectN
   const project = projectName || 'Project';
 
   const lines = [];
-  lines.push(`# Code Quality Report — ${project}`);
+  lines.push(`# ${project} report`);
   lines.push('');
   lines.push(`**Date:** ${date} · **Overall Score:** ${score} ${grade}`);
   lines.push('');

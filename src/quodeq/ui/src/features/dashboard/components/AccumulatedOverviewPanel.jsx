@@ -198,7 +198,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
     return {
       id: `report:overview:${reportProjectName}`,
       type: 'report',
-      title: `Code Quality Report — ${reportProjectName}`,
+      title: `${reportProjectName} report`,
       render: () => <ReportContent markdown={buildMarkdown()} />,
       copy: () => buildMarkdown(),
       download: () => ({ filename: `code-quality-report-${reportProjectName}.md`, body: buildMarkdown() }),

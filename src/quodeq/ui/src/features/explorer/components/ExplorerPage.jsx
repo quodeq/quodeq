@@ -153,8 +153,7 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, sev
 
   const reportSpec = useMemo(() => {
     if (!d.evalData) return null;
-    const dim = d.evalData.dimension || 'Unknown';
-    const dimTitle = dim.charAt(0).toUpperCase() + dim.slice(1);
+    const dim = (d.evalData.dimension || 'unknown').toLowerCase();
     const buildMarkdown = () => buildDimensionReport({
       evalData: d.evalData,
       principleGrades: d.principleGrades || [],
@@ -166,7 +165,7 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, sev
     return {
       id: `report:dimension:${dim}:${runId ?? 'current'}`,
       type: 'report',
-      title: `${dimTitle} Report`,
+      title: `${dim} report`,
       render: () => <ReportContent markdown={buildMarkdown()} />,
       copy: () => buildMarkdown(),
       download: () => ({ filename: `${dim}-report.md`, body: buildMarkdown() }),
