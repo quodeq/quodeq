@@ -119,15 +119,28 @@ def run_incremental_loop(
                 if on_dimension_done:
                     on_dimension_done(dimension, ev)
             except BrokenPipeError:
-                # Stdout pipe to parent died (the most likely cause of the
-                # silent-skip bug observed in production: log_success or the
-                # dashboard's scoring callback writes to a closed parent
-                # pipe). Keep result, log the trail, continue to next dim
-                # instead of letting it bubble out and lifecycle quietly
-                # converting it to state=done.
+                # Stdout pipe to parent died mid-callback. Silence stdout/
+                # stderr, then retry the callback once: scoring callbacks like
+                # ``_score_dimension`` write evaluation/<dim>.json to disk and
+                # are idempotent (overwrite). The previous "result kept"
+                # message was misleading \u2014 only the in-memory Evidence stayed,
+                # the persistent file write was lost with the exception.
                 _silence_broken_stdout()
                 result.setdefault(dimension, ev)
-                log_warning(f"[loop] {dimension} \u2014 callback broken pipe, result kept, continuing loop")
+                if on_dimension_done:
+                    try:
+                        on_dimension_done(dimension, ev)
+                        log_warning(
+                            f"[loop] {dimension} \u2014 callback broken pipe, "
+                            f"retried after silencing stdout, result persisted",
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        log_warning(
+                            f"[loop] {dimension} \u2014 callback retry after broken pipe raised "
+                            f"{type(exc).__name__}: {exc} \u2014 result NOT persisted, continuing loop",
+                        )
+                else:
+                    log_warning(f"[loop] {dimension} \u2014 callback broken pipe, no retry needed, continuing loop")
             except Exception as exc:  # noqa: BLE001
                 log_warning(
                     f"[loop] {dimension} \u2014 callback raised "
@@ -198,11 +211,25 @@ def run_per_dimension_loop(
             if on_dimension_done:
                 on_dimension_done(dimension, ev)
         except BrokenPipeError:
-            # Stdout pipe to parent died (this is the most likely cause of
-            # the silent-skip bug observed in production). Keep result, log
-            # the trail, continue to next dim instead of bubbling out.
+            # Stdout pipe to parent died mid-callback. Silence stdout/stderr,
+            # then retry the callback once so the scoring side effects
+            # (evaluation/<dim>.json) actually land on disk. See the matching
+            # block in run_incremental_loop for rationale.
             _silence_broken_stdout()
-            log_warning(f"[loop] {dimension} — callback broken pipe, result kept, continuing loop")
+            if on_dimension_done:
+                try:
+                    on_dimension_done(dimension, ev)
+                    log_warning(
+                        f"[loop] {dimension} — callback broken pipe, "
+                        f"retried after silencing stdout, result persisted",
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log_warning(
+                        f"[loop] {dimension} — callback retry after broken pipe raised "
+                        f"{type(exc).__name__}: {exc} — result NOT persisted, continuing loop",
+                    )
+            else:
+                log_warning(f"[loop] {dimension} — callback broken pipe, no retry needed, continuing loop")
         except Exception as exc:  # noqa: BLE001
             log_warning(
                 f"[loop] {dimension} — callback raised "
