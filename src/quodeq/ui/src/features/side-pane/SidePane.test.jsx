@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SidePane } from './SidePane.jsx';
 import { SidePaneProvider } from './SidePaneProvider.jsx';
@@ -31,12 +31,14 @@ describe('SidePane', () => {
     expect(screen.queryByRole('complementary', { name: /side pane/i })).toBeNull();
   });
 
-  it('renders one window with its title and body when one is added', () => {
+  it('renders one window with its title immediately and the body once the slide-in defer finishes', async () => {
     render(<SidePaneProvider><Adder /><SidePane /></SidePaneProvider>);
     fireEvent.click(screen.getByText('add-a'));
     expect(screen.getByRole('complementary', { name: /side pane/i })).toBeInTheDocument();
     expect(screen.getByText('Alpha')).toBeInTheDocument();
-    expect(screen.getByText('body:alpha')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('body:alpha')).toBeInTheDocument();
+    });
   });
 
   it('renders multiple windows in registration order with a horizontal resizer between them', () => {

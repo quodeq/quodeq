@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SidePaneWindow } from './SidePaneWindow.jsx';
 
@@ -19,10 +19,12 @@ function makeSpec(overrides = {}) {
 }
 
 describe('SidePaneWindow', () => {
-  it('renders the title and body', () => {
+  it('renders the title immediately and the body once the slide-in defer finishes', async () => {
     render(<SidePaneWindow spec={makeSpec()} onClose={() => {}} />);
     expect(screen.getByText('My Window')).toBeInTheDocument();
-    expect(screen.getByText('body content')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('body content')).toBeInTheDocument();
+    });
   });
 
   it('Close button calls onClose with the window id', () => {

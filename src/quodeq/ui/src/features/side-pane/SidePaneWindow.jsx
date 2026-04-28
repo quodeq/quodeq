@@ -1,6 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const COPY_FEEDBACK_MS = 1500;
+// Defer mounting the body until the slide-in animation finishes (~220ms).
+// Otherwise the heavy markdown render happens mid-animation and stutters.
+const SLIDE_MS = 220;
 
 function slugify(s) {
   return (s || 'window').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'window';
@@ -27,15 +30,41 @@ function triggerDownload({ filename, body }) {
   setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 0);
 }
 
+class RenderBoundary extends React.Component {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch() { /* swallow — header still works */ }
+  componentDidUpdate(prev) {
+    if (prev.contentKey !== this.props.contentKey && this.state.failed) {
+      this.setState({ failed: false });
+    }
+  }
+  render() {
+    if (this.state.failed) {
+      return <p className="side-pane-window__error">Failed to render report.</p>;
+    }
+    return this.props.children;
+  }
+}
+
 export function SidePaneWindow({ spec, onClose }) {
   const bodyRef = useRef(null);
   const [justCopied, setJustCopied] = useState(false);
+  const [bodyReady, setBodyReady] = useState(false);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
   }, [spec.id]);
 
   useEffect(() => { setJustCopied(false); }, [spec.id]);
+
+  // Defer the body mount on each fresh window; the skeleton holds the slot
+  // while the parent's slide-in finishes.
+  useEffect(() => {
+    setBodyReady(false);
+    const t = setTimeout(() => setBodyReady(true), SLIDE_MS);
+    return () => clearTimeout(t);
+  }, [spec.id]);
 
   useEffect(() => {
     if (!justCopied) return undefined;
@@ -55,6 +84,12 @@ export function SidePaneWindow({ spec, onClose }) {
   }, [spec]);
 
   const onClickClose = useCallback(() => onClose(spec.id), [onClose, spec.id]);
+
+  // Memoise the rendered body keyed on spec identity. Prevents the heavy
+  // markdown subtree from re-running through React reconciliation every
+  // time the parent (SidePane) re-renders for unrelated reasons — e.g.
+  // a sibling window resize updating the inline flex weights of the slots.
+  const body = useMemo(() => spec.render(), [spec]);
 
   return (
     <section className="side-pane-window" aria-label={spec.title}>
@@ -89,7 +124,13 @@ export function SidePaneWindow({ spec, onClose }) {
         </div>
       </header>
       <div className="side-pane-window__body" ref={bodyRef}>
-        {spec.render()}
+        {bodyReady ? (
+          <RenderBoundary contentKey={spec.id}>{body}</RenderBoundary>
+        ) : (
+          <div className="side-pane-window__body-skeleton" aria-hidden="true">
+            <span /><span /><span />
+          </div>
+        )}
       </div>
     </section>
   );
