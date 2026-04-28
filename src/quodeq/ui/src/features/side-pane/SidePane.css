@@ -105,14 +105,6 @@
   line-height: 1.55;
 }
 
-/* While a divider is being dragged, skip layout + paint of the body
-   subtrees entirely — the per-pointermove cost of re-flowing markdown
-   text is what makes resize chunky on heavy reports. The bodies stay
-   the right size (their flex slot still takes space); only the content
-   inside is suppressed until pointerup clears the flag. */
-.side-pane[data-resizing] .side-pane-window__body {
-  content-visibility: hidden;
-}
 .side-pane-window__error {
   color: var(--color-danger, #fca5a5);
   font-style: italic;
@@ -139,6 +131,11 @@
 .side-pane-window__body-skeleton > span:nth-child(3) { width: 75%; }
 
 /* ── Markdown content (.side-pane-md) ──────────────── */
+.side-pane-md {
+  /* Scope reflow of the markdown subtree to itself so width changes from
+     a divider drag can't propagate layout work into siblings. */
+  contain: layout;
+}
 .side-pane-md h1,
 .side-pane-md h2 {
   border-bottom: 1px solid var(--color-border);
@@ -153,13 +150,25 @@
   border-radius: 3px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.9em;
+  /* Long unbroken paths inside inline <code> (e.g. file refs in tables)
+     would otherwise paint past their container in WKWebView. Force a
+     break at any character if needed. */
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  /* `min-width: 0` lets the inline-code box actually shrink below the
+     intrinsic width of its content inside table-layout:fixed cells. */
+  min-width: 0;
 }
 .side-pane-md pre {
   background: var(--color-surface-alt);
   border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 12px;
-  overflow-x: auto;
+  /* `scroll` + `scrollbar-gutter: stable` avoids the auto-scrollbar toggle
+     that fires extra layout passes per pointermove when the column width
+     changes. WKWebView is especially expensive at scrollbar-driven layout. */
+  overflow-x: scroll;
+  scrollbar-gutter: stable;
 }
 .side-pane-md pre > code {
   background: none;
@@ -167,12 +176,16 @@
   border-radius: 0;
 }
 .side-pane-md .md-table-wrap {
-  overflow-x: auto;
+  overflow-x: scroll;
+  scrollbar-gutter: stable;
   margin: 12px 0;
 }
 .side-pane-md table {
   border-collapse: collapse;
   width: 100%;
+  /* `fixed` locks column widths from the first row so the browser doesn't
+     re-measure every cell to redistribute widths on each pointermove. */
+  table-layout: fixed;
   font-size: 0.9em;
 }
 .side-pane-md th,
@@ -180,6 +193,18 @@
   border: 1px solid var(--color-border);
   padding: 6px 10px;
   text-align: left;
+  /* With table-layout: fixed, long unbroken strings (e.g. deep file paths)
+     would otherwise overflow into the next column. Allow breaks anywhere
+     so paths wrap inside their cell. Also applied to descendants because
+     inline elements like <code> are treated as a single unbreakable token
+     unless given the same hint. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.side-pane-md th *,
+.side-pane-md td * {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .side-pane-md tr:nth-child(even) td {
   background: rgba(255, 255, 255, 0.02);
