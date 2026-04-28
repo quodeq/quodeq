@@ -504,8 +504,11 @@ def main() -> None:
     instance = InstanceController(sock_path)
     api = _WindowApi()
 
+    # easy_drag intercepts pointer events on any non-interactive element to
+    # move the window — that breaks our resize splitter (a <div>, not a
+    # <button>). Disable it and let the topbar opt-in via -webkit-app-region.
     window = webview.create_window("quodeq", url, width=_WINDOW_WIDTH, height=_WINDOW_HEIGHT,
-                                    frameless=True, easy_drag=True,
+                                    frameless=True, easy_drag=False,
                                     background_color=_WINDOW_BG_COLOR, hidden=True,
                                     js_api=api)
     api.bind(window, api_pid=api_pid, instance=instance, base_url=url)
