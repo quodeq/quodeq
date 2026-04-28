@@ -10,15 +10,18 @@
   border-radius: 12px 0 0 12px;
   overflow: hidden;
   min-width: 0;
-  margin-left: 8px;
+  margin-left: 12px;
 }
 
-/* ── Resize divider — visually in the gutter on the pane's left edge ─ */
+/* ── Resize divider — sits in the gutter on the pane's left edge ─────
+   Wide hit area (12px) so the splitter is easy to grab; the visible rail
+   is a subtle 1px seam at rest that thickens and tints on hover/drag —
+   matching the splitter style used in Claude Code Desktop. */
 .report-pane__divider {
   position: absolute;
   top: 0;
-  left: -3px;
-  width: 6px;
+  left: -12px;
+  width: 12px;
   height: 100%;
   cursor: col-resize;
   z-index: 1;
@@ -26,17 +29,18 @@
 .report-pane__divider::after {
   content: "";
   position: absolute;
-  top: 50%;
+  top: 0;
   left: 50%;
-  transform: translate(-50%, -50%);
-  width: 2px;
-  height: 32px;
-  border-radius: 1px;
+  transform: translateX(-50%);
+  width: 1px;
+  height: 100%;
   background: var(--color-border);
-  transition: background 120ms ease;
+  transition: background 120ms ease, width 120ms ease;
 }
-.report-pane__divider:hover::after {
+.report-pane__divider:hover::after,
+.report-pane__divider--dragging::after {
   background: var(--color-accent);
+  width: 3px;
 }
 
 /* ── Header ───────────────────────────────────────────── */
