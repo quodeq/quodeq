@@ -4,10 +4,10 @@ import '@testing-library/jest-dom/vitest';
 import { ReportContent } from './reportContent.jsx';
 
 describe('ReportContent', () => {
-  it('renders headings inside the report-pane-md scope', () => {
+  it('renders headings inside the side-pane-md scope', () => {
     const { container } = render(<ReportContent markdown={"# Title\n\n## Subtitle"} />);
-    expect(container.querySelector('.report-pane-md h1')).toHaveTextContent('Title');
-    expect(container.querySelector('.report-pane-md h2')).toHaveTextContent('Subtitle');
+    expect(container.querySelector('.side-pane-md h1')).toHaveTextContent('Title');
+    expect(container.querySelector('.side-pane-md h2')).toHaveTextContent('Subtitle');
   });
 
   it('renders inline code and code blocks', () => {
