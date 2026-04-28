@@ -108,7 +108,7 @@ export default function TopBar({
 }) {
   const { isOpen: paneOpen, closeAll } = useSidePane();
   return (
-    <header className="topbar">
+    <header className="topbar pywebview-drag-region">
       {/* Compact-mode back button. Hidden entirely at the root of the
           nav stack — showing a disabled arrow adds visual noise without
           giving the user anything to click. */}
