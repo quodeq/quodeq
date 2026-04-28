@@ -69,7 +69,12 @@ class _FakeEvidence:
 class TestPerDimLoopSafety:
     def test_callback_broken_pipe_does_not_drop_subsequent_dims(self):
         """The bug we observed: scoring callback writes to closed pipe,
-        BrokenPipeError propagates, loop terminates early."""
+        BrokenPipeError propagates, loop terminates early.
+
+        Post-fix the callback is retried once after stdout/stderr are silenced,
+        so usability appears twice in callback_calls (the second invocation
+        is the retry that persists the side effects).
+        """
         cfg = _config()
         seen_dims: list[str] = []
 
@@ -78,9 +83,11 @@ class TestPerDimLoopSafety:
             return _FakeEvidence()
 
         callback_calls: list[str] = []
+        usability_raise_count = {"n": 0}
         def on_done(dim, _ev):
             callback_calls.append(dim)
-            if dim == "usability":  # exact bug: usability's callback dies
+            if dim == "usability" and usability_raise_count["n"] == 0:
+                usability_raise_count["n"] += 1
                 raise BrokenPipeError("parent pipe closed")
 
         result = run_per_dimension_loop(
@@ -91,8 +98,8 @@ class TestPerDimLoopSafety:
         assert seen_dims == ["security", "usability", "flexibility"]
         # Result still includes usability (we kept the evidence).
         assert set(result) == {"security", "usability", "flexibility"}
-        # Callback fired for all three (loop didn't bail early).
-        assert callback_calls == ["security", "usability", "flexibility"]
+        # Callback fired for all three, and usability was retried once.
+        assert callback_calls == ["security", "usability", "usability", "flexibility"]
 
     def test_callback_generic_exception_does_not_drop_subsequent_dims(self):
         cfg = _config()
@@ -187,9 +194,10 @@ class TestIncrementalLoopSafety:
         assert seen == ["security", "usability", "flexibility"]
         # All three results captured (we keep the evidence even when callback fails).
         assert set(result) == {"security", "usability", "flexibility"}
-        # on_done fired for security and flexibility; usability's loop body
-        # bailed out of the try at log_result_fn so on_done didn't fire for it.
-        assert "usability" not in callback_calls
+        # log_result_fn raised before on_done was reached for usability, so the
+        # retry path invokes on_done for usability after silencing — meaning
+        # usability now DOES appear in callback_calls (the persistence retry).
+        assert callback_calls == ["security", "usability", "flexibility"]
 
     def test_unexpected_exception_in_runner_logs_and_continues(self):
         cfg = _config()
@@ -229,6 +237,92 @@ class TestIncrementalLoopSafety:
 
 
 # ---------------------------------------------------------------------------
+# Retry-after-broken-pipe persistence semantics
+# ---------------------------------------------------------------------------
+
+class TestCallbackRetryPersistsSideEffects:
+    """Pin down the per-dim run f061b58e bug: security's queue completed,
+    the scoring callback raised BrokenPipeError mid-run, the loop swallowed
+    it with a misleading "result kept" message but evaluation/security.json
+    was never written.
+
+    Post-fix: when a callback raises BrokenPipeError, stdout is silenced and
+    the callback is retried once so persistent side effects (the on-disk
+    report) actually land.
+    """
+
+    def test_per_dim_retry_persists_when_only_first_call_raises(self):
+        cfg = _config()
+        # Imitate _score_dimension's contract: on success, write a sentinel
+        # file. On the first call for the dim, raise BrokenPipeError before
+        # the write. On retry, the write succeeds.
+        written: list[str] = []
+        attempts: dict[str, int] = {}
+
+        def scoring_callback(dim, _ev):
+            attempts[dim] = attempts.get(dim, 0) + 1
+            if dim == "security" and attempts[dim] == 1:
+                raise BrokenPipeError("parent pipe closed mid-write")
+            written.append(dim)
+
+        run_per_dimension_loop(
+            cfg, ["security", "reliability"], _ctx(2),
+            process_fn=lambda *a, **k: _FakeEvidence(),
+            on_dimension_done=scoring_callback,
+        )
+        # security was retried once; reliability ran straight through.
+        assert attempts == {"security": 2, "reliability": 1}
+        # Both files written — the bug was that security's write was lost.
+        assert written == ["security", "reliability"]
+
+    def test_per_dim_retry_failure_logs_not_persisted_warning(self):
+        cfg = _config()
+
+        def always_raises(_dim, _ev):
+            raise BrokenPipeError("permanently broken")
+
+        with patch("quodeq.analysis._loops.log_warning") as mock_warn:
+            run_per_dimension_loop(
+                cfg, ["security"], _ctx(1),
+                process_fn=lambda *a, **k: _FakeEvidence(),
+                on_dimension_done=always_raises,
+            )
+        warn_messages = [c.args[0] for c in mock_warn.call_args_list]
+        assert any("retry after broken pipe raised" in m for m in warn_messages), warn_messages
+        assert any("NOT persisted" in m for m in warn_messages), warn_messages
+
+    def test_incremental_retry_persists_when_only_first_call_raises(self):
+        cfg = _config()
+        written: list[str] = []
+        attempts: dict[str, int] = {}
+
+        def fake_runner(_c, dim, _i, _ctx):
+            return _FakeEvidence()
+
+        # log_result_fn raises BrokenPipeError before on_dimension_done is
+        # reached on the original try; the retry path then invokes
+        # on_dimension_done with stdout silenced.
+        def log_result(_ev, dim, _i, _t):
+            if dim == "security":
+                raise BrokenPipeError("dashboard pipe closed")
+
+        def scoring_callback(dim, _ev):
+            attempts[dim] = attempts.get(dim, 0) + 1
+            written.append(dim)
+
+        with patch("quodeq.analysis._loops.run_dimension_incremental", side_effect=fake_runner):
+            run_incremental_loop(
+                cfg, ["security", "reliability"], _ctx(2),
+                process_fn=MagicMock(),
+                log_result_fn=log_result,
+                on_dimension_done=scoring_callback,
+            )
+
+        assert attempts == {"security": 1, "reliability": 1}
+        assert written == ["security", "reliability"]
+
+
+# ---------------------------------------------------------------------------
 # Regression test: the exact production bug shape
 # ---------------------------------------------------------------------------
 
@@ -249,12 +343,15 @@ class TestProductionBugRegression:
             attempted.append(dim)
             return _FakeEvidence(files_read=979 if dim == "usability" else 22)
 
+        usability_first_call = {"done": False}
         def scoring_callback(dim, _ev):
             # In production, this callback writes evaluation/{dim}.json AND
             # logs to stdout — the latter dies once the dashboard parent pipe
-            # closes.
+            # closes. Post-fix the loop retries the callback after silencing
+            # stdout, so the second call succeeds and persists the write.
             scored.append(dim)
-            if dim == "usability":
+            if dim == "usability" and not usability_first_call["done"]:
+                usability_first_call["done"] = True
                 raise BrokenPipeError("Broken pipe")
 
         with patch("quodeq.analysis._loops.run_dimension_incremental", side_effect=fake_runner):
@@ -272,11 +369,11 @@ class TestProductionBugRegression:
             "security", "reliability", "maintainability", "performance",
             "usability", "flexibility",
         ]
-        # Scoring callback fired for first 4 + usability (raised) + flexibility
-        # (post-fix continues despite usability's failure).
+        # Scoring callback fired for first 4, then usability twice (initial raise
+        # + retry that persists), then flexibility.
         assert scored == [
             "security", "reliability", "maintainability", "performance",
-            "usability", "flexibility",
+            "usability", "usability", "flexibility",
         ]
         # All six in result — the evidence was captured even though usability's
         # callback raised.
