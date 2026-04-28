@@ -104,6 +104,15 @@
   padding: 12px 16px;
   line-height: 1.55;
 }
+
+/* While a divider is being dragged, skip layout + paint of the body
+   subtrees entirely — the per-pointermove cost of re-flowing markdown
+   text is what makes resize chunky on heavy reports. The bodies stay
+   the right size (their flex slot still takes space); only the content
+   inside is suppressed until pointerup clears the flag. */
+.side-pane[data-resizing] .side-pane-window__body {
+  content-visibility: hidden;
+}
 .side-pane-window__error {
   color: var(--color-danger, #fca5a5);
   font-style: italic;
