@@ -16,6 +16,18 @@ export function SidePane() {
     setRatios(Array(Math.max(0, windows.length - 1)).fill(0.5));
   }, [windows.length]);
 
+  // While dragging either divider, set data-resizing on the aside so CSS
+  // can mask the markdown bodies (content-visibility: hidden) — the text
+  // layout pass per pointermove is the actual perf killer with multi-window
+  // multi-paragraph reports.
+  const containerRef = useRef(null);
+  const setResizingFlag = useCallback((on) => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (on) el.dataset.resizing = 'true';
+    else delete el.dataset.resizing;
+  }, []);
+
   // Outer pane (left-edge) drag — resizes the whole dock width.
   const [isDragging, setIsDragging] = useState(false);
   const onOuterDividerPointerDown = useCallback((e) => {
@@ -24,6 +36,7 @@ export function SidePane() {
     const startWidth = paneWidth;
     const viewport = window.innerWidth;
     setIsDragging(true);
+    setResizingFlag(true);
     const prevCursor = document.body.style.cursor;
     const prevSelect = document.body.style.userSelect;
     document.body.style.cursor = 'col-resize';
@@ -37,6 +50,7 @@ export function SidePane() {
       const delta = startX - ev.clientX;
       setPaneWidth(clampSidePaneWidth(startWidth + delta, window.innerWidth));
       setIsDragging(false);
+      setResizingFlag(false);
       document.body.style.cursor = prevCursor;
       document.body.style.userSelect = prevSelect;
       window.removeEventListener('pointermove', onMove);
@@ -44,14 +58,13 @@ export function SidePane() {
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
-  }, [paneWidth, setPaneWidth]);
+  }, [paneWidth, setPaneWidth, setResizingFlag]);
 
   // Internal between-window resizer. Mutates the two adjacent slot
   // elements' inline flex grow factors directly during the drag (no
   // setState — same trick as the outer drag with --side-pane-width)
   // so the markdown bodies don't re-render every pointer move. Commits
   // the final ratio to React state on release.
-  const containerRef = useRef(null);
   const onInnerDividerPointerDown = useCallback((index) => (e) => {
     e.preventDefault();
     const container = containerRef.current;
@@ -69,6 +82,7 @@ export function SidePane() {
     const aStartFlex = parseFloat(aEl.style.flexGrow) || 1;
     const bStartFlex = parseFloat(bEl.style.flexGrow) || 1;
     const combinedFlex = aStartFlex + bStartFlex;
+    setResizingFlag(true);
     const prevCursor = document.body.style.cursor;
     const prevSelect = document.body.style.userSelect;
     document.body.style.cursor = 'row-resize';
@@ -93,6 +107,7 @@ export function SidePane() {
         out[index] = pendingRatio;
         return out;
       });
+      setResizingFlag(false);
       document.body.style.cursor = prevCursor;
       document.body.style.userSelect = prevSelect;
       window.removeEventListener('pointermove', onMove);
@@ -100,7 +115,7 @@ export function SidePane() {
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
-  }, [ratios]);
+  }, [ratios, setResizingFlag]);
 
   if (!isOpen) return null;
 
