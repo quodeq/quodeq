@@ -12,15 +12,6 @@
 import { useSidePane } from '../features/side-pane/index.js';
 import { FileTextIcon } from './CopyButton.jsx';
 
-function CloseIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
-
 function ReportToolbarButton() {
   const ctx = useSidePane();
   const spec = ctx.getRegisteredSpec ? ctx.getRegisteredSpec('report') : null;
@@ -106,7 +97,6 @@ export default function TopBar({
   effectiveDark = false,
   onToggleTheme,
 }) {
-  const { isOpen: paneOpen, closeAll } = useSidePane();
   return (
     <header className="topbar pywebview-drag-region">
       {/* Compact-mode back button. Hidden entirely at the root of the
@@ -163,17 +153,6 @@ export default function TopBar({
           </button>
         )}
         <ReportToolbarButton />
-        {paneOpen && (
-          <button
-            type="button"
-            className="topbar-btn topbar-btn--icon topbar-btn--close-pane"
-            onClick={closeAll}
-            aria-label="Close all side-pane windows"
-            title="Close all"
-          >
-            <CloseIcon />
-          </button>
-        )}
         {onEvaluate && (
           <button
             type="button"
