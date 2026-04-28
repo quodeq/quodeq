@@ -37,11 +37,17 @@ function trimTrailingZero(n) {
   return fixed.endsWith('.0') ? fixed.slice(0, -2) : fixed;
 }
 
-function computeDeltas(trend) {
-  return trend.map((entry, i) => {
-    if (i >= trend.length - 1) return null;
+function computeDeltas(rows) {
+  // Aligns 1:1 with `rows` (which may include in-progress stubs at the
+  // front). In-progress entries have no score, so their delta is null and
+  // we compare each completed row against the next completed one.
+  return rows.map((entry, i) => {
+    if (entry.status === 'in_progress') return null;
+    let nextIdx = i + 1;
+    while (nextIdx < rows.length && rows[nextIdx].status === 'in_progress') nextIdx++;
+    if (nextIdx >= rows.length) return null;
     const curr = parseFloat(entry.numericAverage);
-    const prev = parseFloat(trend[i + 1].numericAverage);
+    const prev = parseFloat(rows[nextIdx].numericAverage);
     if (Number.isNaN(curr) || Number.isNaN(prev)) return null;
     return Math.round((curr - prev) * 10) / 10;
   });
@@ -146,6 +152,30 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
           }}
         />
         {visible.map((entry, i) => {
+          const isInProgress = entry.status === 'in_progress';
+          if (isInProgress) {
+            const { date } = formatDateParts(new Date().toISOString());
+            return (
+              <HistoryRow
+                key={entry.runId}
+                className="history-row--in-progress"
+                onClick={() => onRunClick(entry.runId)}
+                cells={{
+                  date,
+                  time: (
+                    <span className="history-row__running">
+                      <span className="history-row__running-dot" aria-hidden="true" />
+                      running
+                    </span>
+                  ),
+                  grade: <span className="history-row__muted">—</span>,
+                  score: <span className="history-row__muted">—</span>,
+                  delta: <span className="history-delta history-delta--muted">—</span>,
+                  dims: <span className="history-row__muted">in progress</span>,
+                }}
+              />
+            );
+          }
           const { date, time } = formatDateParts(entry.dateISO, entry.dateLabel);
           const runScore = parseFloat(entry.runNumericAverage ?? entry.numericAverage);
           const grade = gradeLabel(entry.runOverallGrade || entry.overallGrade) || '—';
@@ -193,7 +223,6 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
   const { trend, selectedRunId, availableRuns } = data;
   const { onRunClick, onRunChange, onDeleteRun } = callbacks;
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
-  const deltas = useMemo(() => computeDeltas(trend), [trend]);
   const inProgressStubs = useMemo(() => buildInProgressStubs(availableRuns, trend), [availableRuns, trend]);
   const statusByRunId = useMemo(() => {
     const map = new Map();
@@ -208,6 +237,7 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
     const combined = [...inProgressStubs, ...trend];
     return combined.filter((entry) => !isHiddenStatus(entry.runId));
   }, [inProgressStubs, trend, statusByRunId]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const deltas = useMemo(() => computeDeltas(visible), [visible]);
 
   return (
     <div className="history-page history-page--terminal">

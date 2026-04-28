@@ -1011,6 +1011,39 @@
   opacity: 0.7;
 }
 
+/* In-progress evaluation row: pulsing dot in TIME, "running" chip in GRADE.
+   Lets reviewers tell at a glance which row is a live run vs a finalized one,
+   without showing the (ugly) raw run UUID that we used to fall back to when
+   no dateISO was available yet. */
+.history-table .history-row--in-progress {
+  background: color-mix(in srgb, var(--color-warn, #d29922) 6%, transparent);
+}
+.history-row__running {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-warn, #d29922);
+  text-transform: lowercase;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+.history-row__running-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-warn, #d29922);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-warn, #d29922) 50%, transparent);
+  animation: history-row-running-pulse 1.4s ease-out infinite;
+}
+@keyframes history-row-running-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-warn, #d29922) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-warn, #d29922) 0%,  transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-warn, #d29922) 0%,  transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .history-row__running-dot { animation: none; }
+}
+
 /* Monospace + theme-correct text colour inside every data row, overriding
    the inherited Plus Jakarta from `.panel`. */
 .history-row,
