@@ -29,6 +29,12 @@ on:
 jobs:
   nightly:
     runs-on: [self-hosted, quodeq]
+    # Full re-analyses (rules-bearing prompt or standards change) take ~10h
+    # at the M4 Max + Ollama pace measured on develop. Default GitHub
+    # timeout-minutes is 360 (6h), which truncates those runs mid-dim and
+    # the runner kills the process tree — leaving only completed dims
+    # scored. 720 (12h) gives ~17% headroom over observed worst case.
+    timeout-minutes: 720
 
     steps:
       - name: Checkout develop
