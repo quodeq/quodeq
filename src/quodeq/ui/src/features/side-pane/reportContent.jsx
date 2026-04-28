@@ -13,7 +13,7 @@ const components = {
   ),
 };
 
-export function ReportMarkdown({ markdown }) {
+export function ReportContent({ markdown }) {
   if (!markdown || !markdown.trim()) {
     return <p className="report-pane-md report-pane-md--empty">No content for this report yet.</p>;
   }
