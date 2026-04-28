@@ -72,6 +72,29 @@ export function SidePaneProvider({ children }) {
 
   const closeAll = useCallback(() => setWindows([]), []);
 
+  const [registeredSpecs, setRegisteredSpecs] = useState({}); // { [type]: spec }
+
+  const registerSpec = useCallback((type, spec) => {
+    setRegisteredSpecs((prev) => {
+      if (prev[type] === spec) return prev;
+      return { ...prev, [type]: spec };
+    });
+  }, []);
+
+  const unregisterSpec = useCallback((type) => {
+    setRegisteredSpecs((prev) => {
+      if (!(type in prev)) return prev;
+      const next = { ...prev };
+      delete next[type];
+      return next;
+    });
+  }, []);
+
+  const getRegisteredSpec = useCallback(
+    (type) => registeredSpecs[type] ?? null,
+    [registeredSpecs],
+  );
+
   const setPaneWidth = useCallback((px) => {
     const next = clampSidePaneWidth(px, typeof window !== 'undefined' ? window.innerWidth : 1920);
     setPaneWidthState(next);
@@ -106,8 +129,9 @@ export function SidePaneProvider({ children }) {
       windows, isOpen, paneWidth,
       addWindow, removeWindow, toggleWindow, hasWindow, closeAll,
       setPaneWidth, MAX_WINDOWS,
+      registerSpec, unregisterSpec, getRegisteredSpec,
     }),
-    [windows, isOpen, paneWidth, addWindow, removeWindow, toggleWindow, hasWindow, closeAll, setPaneWidth],
+    [windows, isOpen, paneWidth, addWindow, removeWindow, toggleWindow, hasWindow, closeAll, setPaneWidth, registerSpec, unregisterSpec, getRegisteredSpec],
   );
 
   return (
