@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
 import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
@@ -7,7 +7,7 @@ import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { buildDimensionReport } from '../../../utils/reportBuilder.js';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
-import { useReportViewer } from '../../report-viewer/index.js';
+import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { useExplorerData, buildEvalPrincipalFn } from './explorerDataHooks.js';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 
@@ -151,27 +151,28 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, sev
     [filteredViolations, activeSevFilter, d.topFiles]
   );
 
-  const { setActiveBuilder, clearActiveBuilder } = useReportViewer();
-  useEffect(() => {
-    if (!d.evalData) {
-      clearActiveBuilder();
-      return undefined;
-    }
+  const reportSpec = useMemo(() => {
+    if (!d.evalData) return null;
     const dim = d.evalData.dimension || 'Unknown';
     const dimTitle = dim.charAt(0).toUpperCase() + dim.slice(1);
-    setActiveBuilder({
-      title: `${dimTitle} Report`,
-      buildMarkdown: () => buildDimensionReport({
-        evalData: d.evalData,
-        principleGrades: d.principleGrades || [],
-        allViolations: filteredViolations,
-        overallGrade: d.overallGrade,
-        dateLabel,
-        runId,
-      }),
+    const buildMarkdown = () => buildDimensionReport({
+      evalData: d.evalData,
+      principleGrades: d.principleGrades || [],
+      allViolations: filteredViolations,
+      overallGrade: d.overallGrade,
+      dateLabel,
+      runId,
     });
-    return () => clearActiveBuilder();
-  }, [setActiveBuilder, clearActiveBuilder, d.evalData, d.principleGrades, filteredViolations, d.overallGrade, dateLabel, runId]);
+    return {
+      id: `report:dimension:${dim}:${runId ?? 'current'}`,
+      type: 'report',
+      title: `${dimTitle} Report`,
+      render: () => <ReportContent markdown={buildMarkdown()} />,
+      copy: () => buildMarkdown(),
+      download: () => ({ filename: `${dim}-report.md`, body: buildMarkdown() }),
+    };
+  }, [d.evalData, d.principleGrades, filteredViolations, d.overallGrade, dateLabel, runId]);
+  useRegisterWindowSpec('report', reportSpec);
 
   if (d.loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
   if (d.error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;

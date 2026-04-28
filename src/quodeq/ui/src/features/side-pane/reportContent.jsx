@@ -13,12 +13,12 @@ const components = {
   ),
 };
 
-export function ReportMarkdown({ markdown }) {
+export function ReportContent({ markdown }) {
   if (!markdown || !markdown.trim()) {
-    return <p className="report-pane-md report-pane-md--empty">No content for this report yet.</p>;
+    return <p className="side-pane-md side-pane-md--empty">No content for this report yet.</p>;
   }
   return (
-    <div className="report-pane-md">
+    <div className="side-pane-md">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {markdown}
       </ReactMarkdown>

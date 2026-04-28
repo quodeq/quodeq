@@ -1350,7 +1350,7 @@
   grid-template-columns:
     var(--sidebar-width, 64px)
     minmax(0, 1fr)
-    var(--report-pane-width, 0px);
+    var(--side-pane-width, 0px);
   flex: 1 1 auto;
   min-height: 0;
   transition: grid-template-columns 220ms ease;
@@ -1360,7 +1360,7 @@
   grid-template-columns:
     240px
     minmax(0, 1fr)
-    var(--report-pane-width, 0px);
+    var(--side-pane-width, 0px);
 }
 .app-shell__main-column {
   display: flex;

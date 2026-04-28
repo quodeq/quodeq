@@ -9,8 +9,41 @@
  *
  * Stateless; the parent passes the data it has.
  */
-import { useReportViewer } from '../features/report-viewer/index.js';
+import { useSidePane } from '../features/side-pane/index.js';
 import { FileTextIcon } from './CopyButton.jsx';
+
+function CloseIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+function ReportToolbarButton() {
+  const ctx = useSidePane();
+  const spec = ctx.getRegisteredSpec ? ctx.getRegisteredSpec('report') : null;
+  if (!spec) return null;
+  const inDock = ctx.hasWindow(spec.id);
+  const atCap = ctx.windows.length >= ctx.MAX_WINDOWS && !inDock;
+  return (
+    <button
+      type="button"
+      className={`topbar-btn topbar-btn--report${inDock ? ' topbar-btn--report--open' : ''}`}
+      aria-pressed={inDock}
+      disabled={atCap}
+      title={atCap ? 'Close a window to open another' : (inDock ? 'Close report' : 'Open report')}
+      onClick={() => {
+        if (inDock) ctx.removeWindow(spec.id);
+        else ctx.addWindow(spec);
+      }}
+    >
+      <FileTextIcon />
+      <span>Report</span>
+    </button>
+  );
+}
 
 function Dot({ ok }) {
   return <span className={`topbar-dot ${ok ? 'topbar-dot--ok' : 'topbar-dot--err'}`} aria-hidden="true" />;
@@ -73,7 +106,7 @@ export default function TopBar({
   effectiveDark = false,
   onToggleTheme,
 }) {
-  const { activeBuilder, isOpen: reportOpen, openReport, closeReport } = useReportViewer();
+  const { isOpen: paneOpen, closeAll } = useSidePane();
   return (
     <header className="topbar">
       {/* Compact-mode back button. Hidden entirely at the root of the
@@ -129,24 +162,16 @@ export default function TopBar({
             {effectiveDark ? <SunIcon /> : <MoonIcon />}
           </button>
         )}
-        {activeBuilder && (
+        <ReportToolbarButton />
+        {paneOpen && (
           <button
             type="button"
-            className={`topbar-btn topbar-btn--report${reportOpen ? ' topbar-btn--report--open' : ''}`}
-            aria-pressed={reportOpen}
-            onClick={() => {
-              if (reportOpen) {
-                closeReport();
-              } else {
-                openReport({
-                  title: activeBuilder.title,
-                  markdown: activeBuilder.buildMarkdown(),
-                });
-              }
-            }}
+            className="topbar-btn topbar-btn--icon topbar-btn--close-pane"
+            onClick={closeAll}
+            aria-label="Close all side-pane windows"
+            title="Close all"
           >
-            <FileTextIcon />
-            <span>Report</span>
+            <CloseIcon />
           </button>
         )}
         {onEvaluate && (

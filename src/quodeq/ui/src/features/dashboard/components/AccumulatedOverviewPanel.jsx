@@ -1,4 +1,4 @@
-import { useMemo, lazy, Suspense, useEffect } from 'react';
+import React, { useMemo, lazy, Suspense } from 'react';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import DimensionCardsGrid from './DimensionCardsGrid.jsx';
 import { formatRunId, gradeLetter, complianceRatio, extDisplayName } from '../../../utils/formatters.js';
@@ -10,7 +10,7 @@ import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../co
 
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterTrendByVisibleStandardsDaily, filterAccumulatedByVisibleStandards } from '../../../utils/scoreFiltering.js';
-import { useReportViewer } from '../../report-viewer/index.js';
+import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { buildOverviewReport } from '../../../utils/reportBuilder.js';
 
 // ---------------------------------------------------------------------------
@@ -181,7 +181,6 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const { onRunClick, onDimensionClick, onNavigate } = callbacks;
   const { currentOverviewRun, selectedDayDimNames, filteredDailyTrend, filteredTrend, filteredDimensions, filteredAccumulated, filteredStats } = useAccumulatedComputations(data);
 
-  const { setActiveBuilder, clearActiveBuilder } = useReportViewer();
   const reportProjectName =
     data.projectInfo?.displayName
     || data.projectInfo?.name
@@ -193,17 +192,19 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
     && Number.isFinite(parseFloat(filteredAccumulated.summary.numericAverage))
     && (filteredDimensions?.length ?? 0) > 0
   );
-  useEffect(() => {
-    if (!hasReportData) {
-      clearActiveBuilder();
-      return undefined;
-    }
-    setActiveBuilder({
+  const reportSpec = useMemo(() => {
+    if (!hasReportData) return null;
+    const buildMarkdown = () => buildOverviewReport(filteredAccumulated, filteredDimensions || [], reportProjectName);
+    return {
+      id: `report:overview:${reportProjectName}`,
+      type: 'report',
       title: `Code Quality Report — ${reportProjectName}`,
-      buildMarkdown: () => buildOverviewReport(filteredAccumulated, filteredDimensions || [], reportProjectName),
-    });
-    return () => clearActiveBuilder();
-  }, [hasReportData, setActiveBuilder, clearActiveBuilder, reportProjectName, filteredAccumulated, filteredDimensions]);
+      render: () => <ReportContent markdown={buildMarkdown()} />,
+      copy: () => buildMarkdown(),
+      download: () => ({ filename: `code-quality-report-${reportProjectName}.md`, body: buildMarkdown() }),
+    };
+  }, [hasReportData, reportProjectName, filteredAccumulated, filteredDimensions]);
+  useRegisterWindowSpec('report', reportSpec);
 
   return (
     <>
