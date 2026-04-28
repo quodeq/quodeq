@@ -1641,6 +1641,21 @@
   font-family: var(--term-font-mono);
   font-size: 13px;
 }
+/* Frameless pywebview window: let the topbar act as the OS-style title bar.
+   Drag anywhere on it to move the window; interactive controls inside opt
+   out of the drag region so they remain clickable. */
+.in-webview .topbar {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+.in-webview .topbar button,
+.in-webview .topbar a,
+.in-webview .topbar input,
+.in-webview .topbar select,
+.in-webview .topbar [role="button"] {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
 /* --------------------------------------------------------------
    TopBar breadcrumb zone. Desktop shows the full NavBreadcrumb
    chain; mobile swaps it for a back button on the left, the
