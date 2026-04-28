@@ -35,6 +35,10 @@
   display: flex;
   min-height: 0;
   overflow: hidden;
+  /* Isolate the slot's layout + paint from siblings: while one slot
+     resizes (between-window splitter drag) the browser doesn't have
+     to relayout / repaint the markdown body of the adjacent slots. */
+  contain: layout paint;
 }
 .side-pane-window {
   display: flex;
@@ -42,6 +46,7 @@
   width: 100%;
   min-height: 0;
   overflow: hidden;
+  contain: layout paint;
 }
 
 /* ── Window header ───────────────────────────────────── */
@@ -93,10 +98,36 @@
 /* ── Window body ─────────────────────────────────────── */
 .side-pane-window__body {
   flex: 1 1 auto;
-  overflow-y: auto;
+  /* Reserve scrollbar space always so an inter-window resize doesn't
+     toggle the scrollbar in/out and trigger a content reflow. */
+  overflow-y: scroll;
   padding: 12px 16px;
   line-height: 1.55;
 }
+.side-pane-window__error {
+  color: var(--color-danger, #fca5a5);
+  font-style: italic;
+}
+
+/* Skeleton shown while the slide-in animation runs, before the heavy
+   body content (markdown) mounts. Matches the deferred-mount pattern
+   from the original ReportPane. */
+.side-pane-window__body-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 4px;
+}
+.side-pane-window__body-skeleton > span {
+  display: block;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--color-surface-alt);
+  opacity: 0.6;
+}
+.side-pane-window__body-skeleton > span:nth-child(1) { width: 55%; height: 18px; }
+.side-pane-window__body-skeleton > span:nth-child(2) { width: 90%; }
+.side-pane-window__body-skeleton > span:nth-child(3) { width: 75%; }
 
 /* ── Markdown content (.side-pane-md) ──────────────── */
 .side-pane-md h1,
