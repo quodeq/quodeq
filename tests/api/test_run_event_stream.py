@@ -55,3 +55,24 @@ def test_serialize_finding_event_includes_judgment_fields():
     assert parsed["id"] == 42
     assert parsed["practice_id"] == "P-TIM-1"
     assert parsed["verdict"] == "violation"
+
+
+from quodeq.api._run_event_stream import WatcherState
+
+
+def test_watcher_state_initial_defaults():
+    state = WatcherState()
+    assert state.last_event_id == 0
+    assert state.last_status_mtime is None
+    assert state.emitted_dimensions == frozenset()
+
+
+def test_watcher_state_with_initial_last_event_id():
+    state = WatcherState(last_event_id=42)
+    assert state.last_event_id == 42
+
+
+def test_watcher_state_with_emitted_dimensions():
+    state = WatcherState(emitted_dimensions=frozenset({"security", "timeliness"}))
+    assert "security" in state.emitted_dimensions
+    assert "timeliness" in state.emitted_dimensions

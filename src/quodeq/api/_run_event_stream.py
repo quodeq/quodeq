@@ -10,6 +10,7 @@ Reconnect via Last-Event-ID is supported by SQLite's autoincrement findings.id.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -36,3 +37,15 @@ def serialize_finding_event(judgment_dict: dict[str, Any]) -> str:
     converted via _judgment_as_dict (see Task 3).
     """
     return json.dumps(judgment_dict, separators=(",", ":"))
+
+
+@dataclass
+class WatcherState:
+    """Mutable per-stream state. Tracks what has been emitted to one client.
+
+    last_event_id advances only on `event: finding` (matches SSE Last-Event-ID
+    semantics — status and dimension events are idempotent on reconnect).
+    """
+    last_event_id: int = 0
+    last_status_mtime: float | None = None
+    emitted_dimensions: frozenset[str] = field(default_factory=frozenset)
