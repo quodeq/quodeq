@@ -6,6 +6,10 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from quodeq.data.fs.report_parser._evidence_sqlite import (
+    has_evaluation_db,
+    load_evidence_map_from_db,
+)
 from quodeq.data.fs.report_parser._run_info import safe_read_dir
 from quodeq.data.fs.report_parser.json_parser import parse_evidence_file
 
@@ -33,14 +37,16 @@ def _load_evidence_from_dir(directory: Path, module: str = "") -> dict[str, dict
 def load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
     """Load evidence files keyed by dimension name.
 
-    Supports both flat (single-target) and nested (multi-target) layouts.
+    Prefers SQLite (evaluation.db in the run directory) when available;
+    falls back to per-dimension `_evidence.json` files for legacy runs.
     """
-    evidence_map = _load_evidence_from_dir(evidence_dir)
+    run_dir = evidence_dir.parent
+    if has_evaluation_db(run_dir):
+        return load_evidence_map_from_db(run_dir)
 
-    # Scan target subdirectories
+    evidence_map = _load_evidence_from_dir(evidence_dir)
     for entry in safe_read_dir(evidence_dir):
         if entry.is_dir() and not entry.name.startswith("."):
             sub_map = _load_evidence_from_dir(evidence_dir / entry.name, module=entry.name)
             evidence_map.update(sub_map)
-
     return evidence_map
