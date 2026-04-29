@@ -117,8 +117,10 @@ def test_sse_replays_existing_content(tmp_path, app) -> None:
     assert resp.status_code == HTTPStatus.OK
     assert resp.content_type.startswith("text/event-stream")
     events = _collect_sse(resp)
-    data_events = [e for e in events if "data" in e]
-    assert [e["data"] for e in data_events] == ["alpha", "beta"]
+    # `done` events also carry a `data:` line (the terminal state); filter
+    # them out when asserting on the streamed log lines.
+    line_events = [e for e in events if "data" in e and e.get("event") != "done"]
+    assert [e["data"] for e in line_events] == ["alpha", "beta"]
     assert any(e.get("event") == "done" for e in events)
 
 
@@ -128,8 +130,8 @@ def test_sse_respects_last_event_id(tmp_path, app) -> None:
     resp = client.get("/api/jobs/job-sse-2-done/logs/stream",
                       headers={"Last-Event-ID": str(len("alpha\n"))})
     events = _collect_sse(resp)
-    data_events = [e for e in events if "data" in e]
-    assert [e["data"] for e in data_events] == ["beta", "gamma"]
+    line_events = [e for e in events if "data" in e and e.get("event") != "done"]
+    assert [e["data"] for e in line_events] == ["beta", "gamma"]
 
 
 def test_sse_404_on_missing_log(tmp_path, app) -> None:

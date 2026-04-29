@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { getEvaluationProgress } from '../../../api/index.js';
-import ConsoleLogViewer from './ConsoleLogViewer.jsx';
+import { useEvalLog } from '../eval-log/EvalLogContext.js';
 import { CONSOLE_DOT_DISMISSED_KEY } from '../../../constants.js';
 import { pct, computeOverallProgress } from './scanProgressTotals.js';
+import ConsoleButton from '../../../components/ConsoleButton.jsx';
 
 const POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATES = new Set(['done', 'failed', 'cancelled']);
@@ -123,26 +124,6 @@ function DimRow({ dim }) {
   );
 }
 
-function ConsoleButton({ open, showDot, onToggle }) {
-  return (
-    <button
-      type="button"
-      className={`scan-progress__console-btn${open ? ' scan-progress__console-btn--open' : ''}`}
-      onClick={(e) => { e.stopPropagation(); onToggle(); }}
-      aria-label={open ? 'Hide console' : 'Show console'}
-      aria-expanded={open}
-      title={open ? 'Hide console' : 'Show console'}
-    >
-      <svg className="scan-progress__console-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="1" y="2" width="14" height="12" rx="2" />
-        <polyline points="4.5,6.5 7,9 4.5,11.5" />
-        <line x1="9" y1="11" x2="12" y2="11" />
-      </svg>
-      <span className="scan-progress__console-caret">{open ? '▾' : '▸'}</span>
-      {showDot && !open && <span className="scan-progress__console-dot" />}
-    </button>
-  );
-}
 
 export default function ScanProgress({ job, hasEvaluations = false }) {
   const jobId = job?.jobId;
@@ -153,11 +134,12 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
 
   const [progress, setProgress] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [consoleOpen, setConsoleOpen] = useState(false);
   const [showDot, setShowDot] = useState(() => {
     if (hasEvaluations) return false;
     try { return !localStorage.getItem(CONSOLE_DOT_DISMISSED_KEY); } catch { return true; }
   });
+  const evalLog = useEvalLog();
+  const consoleOpen = evalLog.activeJobId === jobId;
   const timerRef = useRef(null);
   const isTerminal = TERMINAL_STATES.has(status);
 
@@ -184,6 +166,12 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
     };
   }, [jobId, isTerminal]);
 
+  useEffect(() => {
+    if (evalLog.activeJobId === jobId) {
+      evalLog.updateJobStatus(status);
+    }
+  }, [evalLog, jobId, status]);
+
   if (!jobId) return null;
 
   const dims = progress?.dimensions || [];
@@ -198,7 +186,11 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
     setDetailOpen((v) => !v);
   }
   function toggleConsole() {
-    setConsoleOpen((v) => !v);
+    if (consoleOpen) {
+      evalLog.closeLog();
+    } else {
+      evalLog.openLog(jobId, progress?.runId || null, status);
+    }
     if (showDot) {
       setShowDot(false);
       try { localStorage.setItem(CONSOLE_DOT_DISMISSED_KEY, '1'); } catch { /* ignore */ }
@@ -257,7 +249,6 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
           {dims.map((d) => <DimRow key={d.id} dim={d} />)}
         </div>
       )}
-      {consoleOpen && <ConsoleLogViewer logs={job.logs} />}
     </div>
   );
 }

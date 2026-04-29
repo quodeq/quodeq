@@ -91,6 +91,17 @@ export function SidePaneProvider({ children }) {
     setWindows((prev) => prev.filter((w) => w.id !== id));
   }, []);
 
+  const replaceWindow = useCallback((spec) => {
+    if (!spec || !spec.id) return;
+    setWindows((prev) => {
+      const idx = prev.findIndex((w) => w.id === spec.id);
+      if (idx === -1) return prev;
+      const next = prev.slice();
+      next[idx] = spec;
+      return next;
+    });
+  }, []);
+
   const toggleWindow = useCallback((spec) => {
     if (!spec || !spec.id) return;
     if (windows.some((w) => w.id === spec.id)) {
@@ -161,11 +172,11 @@ export function SidePaneProvider({ children }) {
   const value = useMemo(
     () => ({
       windows, isOpen, paneWidth,
-      addWindow, removeWindow, toggleWindow, hasWindow, closeAll,
+      addWindow, removeWindow, replaceWindow, toggleWindow, hasWindow, closeAll,
       setPaneWidth, MAX_WINDOWS,
       registerSpec, unregisterSpec, getRegisteredSpec,
     }),
-    [windows, isOpen, paneWidth, addWindow, removeWindow, toggleWindow, hasWindow, closeAll, setPaneWidth, registerSpec, unregisterSpec, getRegisteredSpec],
+    [windows, isOpen, paneWidth, addWindow, removeWindow, replaceWindow, toggleWindow, hasWindow, closeAll, setPaneWidth, registerSpec, unregisterSpec, getRegisteredSpec],
   );
 
   return (

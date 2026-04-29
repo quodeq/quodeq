@@ -33,13 +33,13 @@ class TestEnsureActionApi:
     @patch("quodeq.dashboard._server._local_hosts", return_value={"127.0.0.1", "localhost"})
     @patch("quodeq.dashboard._server.action_api_healthy", return_value=False)
     @patch("quodeq.dashboard._server._is_port_open", return_value=True)
-    @patch("quodeq.dashboard._server._spawn_and_wait_local", return_value=("http://127.0.0.1:8001", MagicMock()))
+    @patch("quodeq.dashboard._server._spawn_and_wait_local", return_value=("http://127.0.0.1:7863", MagicMock()))
     def test_skips_unhealthy_port_tries_next(self, mock_spawn, mock_port, mock_healthy, mock_hosts):
         from quodeq.dashboard._server import _ensure_action_api
-        # Port 8000 is open but unhealthy, port 8001 is closed so it spawns
+        # Port 8000 is open but unhealthy, port 7863 is closed so it spawns
         mock_port.side_effect = [True, False]
         url, proc = _ensure_action_api("127.0.0.1", 8000, max_tries=2)
-        assert "8001" in url
+        assert "7863" in url
 
     @patch("quodeq.dashboard._server._local_hosts", return_value={"127.0.0.1", "localhost"})
     @patch("quodeq.dashboard._server.action_api_healthy", return_value=False)

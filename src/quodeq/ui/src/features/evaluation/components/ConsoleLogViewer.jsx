@@ -23,6 +23,45 @@ const SCROLL_BOTTOM_TOLERANCE = 8;
 const ANSI_ESC_RE = /\x1b\[[\d;?]*[A-Za-z]/g;
 const ANSI_BARE_RE = /\[(?:\d+(?:;\d+)*)?m/g;
 
+// Match http(s) URLs in log lines. Trailing punctuation is excluded so a
+// URL at the end of a sentence ("see https://x.com.") doesn't pull the
+// terminal "." into the link.
+const URL_RE = /(https?:\/\/[^\s<>"'`]+[^\s<>"'`.,;:!?)\]])/g;
+
+function renderLineWithLinks(text) {
+  if (!text) return ' ';
+  const parts = [];
+  let last = 0;
+  let match;
+  URL_RE.lastIndex = 0;
+  while ((match = URL_RE.exec(text)) !== null) {
+    if (match.index > last) parts.push(text.slice(last, match.index));
+    parts.push(
+      <a
+        key={match.index}
+        href={match[0]}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="console-log-link"
+      >
+        {match[0]}
+      </a>
+    );
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts.length > 0 ? parts : text;
+}
+
+// Don't yank the scroll viewport if the user has an active selection
+// inside the given element — that would collapse their selection.
+function hasActiveSelectionInside(el) {
+  if (!el || typeof window === 'undefined') return false;
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return false;
+  return el.contains(sel.anchorNode) || el.contains(sel.focusNode);
+}
+
 function cleanLine(text) {
   if (text == null) return '';
   return String(text)
@@ -34,12 +73,32 @@ function cleanLine(text) {
     .trimEnd();
 }
 
+// Match severity prefixes the runner's logger adds. The same payload often
+// arrives twice — once via stdout from the dimension runner, once echoed
+// through the logging system with this prefix — so we normalize it away
+// for dedup-key purposes (the visible line keeps whichever copy lands first).
+const LEVEL_PREFIX_RE = /^\s*\[(?:INFO|WARN|WARNING|ERROR|DEBUG|TRACE)\]\s*/i;
+
+// Heartbeat lines like `  [reliability] 4m50s | 1 active (11 total) | …`
+// reprint every 10s, often with identical state. Strip the duration so
+// consecutive identical-state heartbeats collapse to a single row in the
+// view; the next emitted heartbeat appears as soon as the state actually
+// changes.
+const HEARTBEAT_DURATION_RE = /(\[[\w-]+\])\s+\d+m\d+s\s+(?=\|)/;
+
+function normalizeForDedup(line) {
+  return line
+    .replace(LEVEL_PREFIX_RE, '')
+    .replace(HEARTBEAT_DURATION_RE, '$1 ')
+    .trim();
+}
+
 function dedupeConsecutive(lines) {
   if (!lines || lines.length === 0) return lines;
   const out = [];
   let prev = null;
   for (const line of lines) {
-    const key = line.trim();
+    const key = normalizeForDedup(line);
     if (key && key === prev) continue;
     out.push(line);
     prev = key;
@@ -52,7 +111,7 @@ function LogLine({ text }) {
   const { height } = usePretextHeight(ref, text || ' ');
   return (
     <div ref={ref} className="console-log-line" style={height ? { minHeight: height } : undefined}>
-      {text || '\u00A0'}
+      {renderLineWithLinks(text)}
     </div>
   );
 }
@@ -77,7 +136,9 @@ function FollowToggle({ active, onToggle }) {
 export default function ConsoleLogViewer({ logs }) {
   const scrollRef = useRef(null);
   const [follow, setFollow] = useState(true);
+  const followRef = useRef(true);
   const lastLogCount = useRef(0);
+  const lastScrollHeight = useRef(0);
   const programmaticScroll = useRef(false);
 
   const cleanedLogs = useMemo(
@@ -85,11 +146,15 @@ export default function ConsoleLogViewer({ logs }) {
     [logs],
   );
 
+  useEffect(() => { followRef.current = follow; }, [follow]);
+
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
+    if (hasActiveSelectionInside(el)) return;
     programmaticScroll.current = true;
     el.scrollTop = el.scrollHeight;
+    lastScrollHeight.current = el.scrollHeight;
     requestAnimationFrame(() => { programmaticScroll.current = false; });
   }, []);
 
@@ -106,6 +171,19 @@ export default function ConsoleLogViewer({ logs }) {
     if (!el) return;
     const onScroll = () => {
       if (programmaticScroll.current) return;
+      const grew = el.scrollHeight > lastScrollHeight.current;
+      lastScrollHeight.current = el.scrollHeight;
+      if (grew) {
+        // Scroll event caused by content growth, not by the user. Keep follow
+        // state untouched; if still following, snap back to bottom — unless
+        // the user is mid-selection inside the scroller.
+        if (followRef.current && !hasActiveSelectionInside(el)) {
+          programmaticScroll.current = true;
+          el.scrollTop = el.scrollHeight;
+          requestAnimationFrame(() => { programmaticScroll.current = false; });
+        }
+        return;
+      }
       const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
       const atBottom = distanceFromBottom <= SCROLL_BOTTOM_TOLERANCE;
       setFollow((prev) => (prev === atBottom ? prev : atBottom));

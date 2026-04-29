@@ -70,7 +70,7 @@ class TestGetters:
 
     def test_get_action_api_port_default(self, monkeypatch):
         monkeypatch.delenv("QUODEQ_ACTION_API_PORT", raising=False)
-        assert utils.get_action_api_port() == 8001
+        assert utils.get_action_api_port() == 7863
 
     def test_get_action_api_port_from_env(self, monkeypatch):
         monkeypatch.setenv("QUODEQ_ACTION_API_PORT", "9999")

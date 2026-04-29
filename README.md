@@ -98,7 +98,7 @@ ollama serve    # runs in the background
 quodeq
 ```
 
-The dashboard opens at `http://127.0.0.1:4173`. Use **Settings → AI Provider** to select the one you installed in step 3, then **Evaluate** to point at a project and start your first scan.
+The dashboard opens at `http://127.0.0.1:7863`. Use **Settings → AI Provider** to select the one you installed in step 3, then **Evaluate** to point at a project and start your first scan.
 
 If the native window doesn't show up (common on Linux without GTK), run `quodeq --browser` instead.
 

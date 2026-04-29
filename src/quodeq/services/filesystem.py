@@ -2,11 +2,28 @@
 
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 from typing import Any, Callable
 
 from quodeq.core.types import ProjectEntry, ViolationSummary, to_camel_dict
+
+
+_TERMINAL_STATUS_STATES = {"complete", "completed", "done", "cancelled", "failed", "lost"}
+
+
+def _status_json_terminal(run_dir: Path) -> bool:
+    """Return True when the run's status.json says it ended."""
+    status_path = run_dir / "status.json"
+    if not status_path.exists():
+        return False
+    try:
+        data = json.loads(status_path.read_text())
+    except (OSError, ValueError):
+        return False
+    state = data.get("state")
+    return isinstance(state, str) and state in _TERMINAL_STATUS_STATES
 from quodeq.core.types.job import JobSnapshot
 from quodeq.services import _fs_clone, _fs_projects, _fs_reports
 from quodeq.services import run_index as _run_index
@@ -343,6 +360,8 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
                 return False
             if (run_dir / "scan.json").exists():
                 return True
+            if _status_json_terminal(run_dir):
+                return True
             # Stale detection: no scan.json AND no live PID -> treat as complete.
             from quodeq.services._external_jobs import resolve_external_pid
             pid_file = run_dir / ".pid"
@@ -353,4 +372,17 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             reports_root = run_dir.parent.parent
             return resolve_external_pid(project_uuid, run_id, reports_root) is None
         job = self._jobs._store.get(job_id)
-        return job is not None and job.status in {"done", "failed", "cancelled"}
+        if job is not None and job.status in {"done", "failed", "cancelled"}:
+            return True
+        # Fall back to disk: scan.json or a terminal status.json mean the
+        # run is over. Covers the case where the job was evicted from the
+        # in-memory store, or where the runner wrote its outputs but the
+        # dashboard's in-memory status flip is still in flight — without
+        # this the SSE log-stream would tail forever and never emit
+        # `event: done`.
+        run_dir = self.get_log_run_dir(job_id)
+        if run_dir is None:
+            return False
+        if (run_dir / "scan.json").exists():
+            return True
+        return _status_json_terminal(run_dir)

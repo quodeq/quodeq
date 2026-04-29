@@ -24,6 +24,9 @@ import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { readVisibleStandardIds } from './utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
 import { SidePane, SidePaneProvider } from './features/side-pane/index.js';
+import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.jsx';
+import { ServerLogProvider } from './features/settings/server-log/ServerLogProvider.jsx';
+import { OllamaLogProvider } from './features/settings/ollama-log/OllamaLogProvider.jsx';
 
 const NO_PROJECT_TABS = ['evaluate', 'standards', 'settings', 'help'];
 
@@ -361,66 +364,72 @@ export default function App() {
 
   return (
     <SidePaneProvider>
-    <AppShell
-      sidebar={
-        <Sidebar
-          activeTab={activeTab}
-          onNavTab={navTab}
-          hasEvaluations={state.projects.length > 0}
-          projectInfo={{
-            displayName: resolvedDisplayName,
-            meta: state.headerMeta,
-          }}
-          version={APP_VERSION}
-          violationsCount={filteredAccumulated?.summary?.totalViolations ?? state.accumulated?.summary?.totalViolations ?? null}
-          historyCount={filteredTrend.length || state.dashboard?.trend?.length || null}
-          lastEvalAt={state.accumulated?.summary?.lastEvaluatedAt || state.accumulated?.summary?.createdAt || null}
-          serverConnected={state.serverConnected}
-          isPinned={sidebarPinned}
-          onPinChange={setSidebarPinned}
-          mobileExtras={(
-            <div className="sidebar-mobile-extras__grid">
-              {(sidebarProvider || sidebarModel) && (
-                <div className="sidebar-status-row">
-                  <span className="sidebar-status-label">Provider</span>
-                  <span className="sidebar-status-value">
-                    {sidebarProvider || '\u2014'}
-                    {sidebarModel && <>&nbsp;·&nbsp;<span style={{ opacity: 0.7 }}>{sidebarModel}</span></>}
-                  </span>
+      <EvalLogProvider>
+        <ServerLogProvider>
+          <OllamaLogProvider>
+            <AppShell
+          sidebar={
+            <Sidebar
+              activeTab={activeTab}
+              onNavTab={navTab}
+              hasEvaluations={state.projects.length > 0}
+              projectInfo={{
+                displayName: resolvedDisplayName,
+                meta: state.headerMeta,
+              }}
+              version={APP_VERSION}
+              violationsCount={filteredAccumulated?.summary?.totalViolations ?? state.accumulated?.summary?.totalViolations ?? null}
+              historyCount={filteredTrend.length || state.dashboard?.trend?.length || null}
+              lastEvalAt={state.accumulated?.summary?.lastEvaluatedAt || state.accumulated?.summary?.createdAt || null}
+              serverConnected={state.serverConnected}
+              isPinned={sidebarPinned}
+              onPinChange={setSidebarPinned}
+              mobileExtras={(
+                <div className="sidebar-mobile-extras__grid">
+                  {(sidebarProvider || sidebarModel) && (
+                    <div className="sidebar-status-row">
+                      <span className="sidebar-status-label">Provider</span>
+                      <span className="sidebar-status-value">
+                        {sidebarProvider || '\u2014'}
+                        {sidebarModel && <>&nbsp;·&nbsp;<span style={{ opacity: 0.7 }}>{sidebarModel}</span></>}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
-        />
-      }
-      header={
-        <TopBar
-          projectName={resolvedDisplayName}
-          activeTab={activeTab}
-          serverConnected={state.serverConnected}
-          serverUrl={state.serverHealth?.url || null}
-          provider={sidebarProvider}
-          model={sidebarModel}
-          onEvaluate={state.projects?.length > 0 ? (() => navTab('evaluate')) : null}
-          evaluating={state.evalLifecycle?.job?.status === 'running'}
-          onProviderClick={() => navTab('settings')}
-          onMenuToggle={() => setSidebarPinned((v) => !v)}
-          breadcrumb={
-            <NavBreadcrumb
-              stack={navStack}
-              onBack={navPop}
-              onGoTo={navGoTo}
             />
           }
-          mobileTitle={navStack.length ? navLabelFor(navStack[navStack.length - 1]) : (activeTab || '')}
-          canGoBack={navStack.length > 1}
-          onBack={navPop}
-          effectiveDark={effectiveDark}
-          onToggleTheme={toggleTheme}
-        />
-      }
-      content={<div className="tab-fade" key={activeTab}><MainContent activePage={activePage} props={contentProps} /></div>}
-    />
+          header={
+            <TopBar
+              projectName={resolvedDisplayName}
+              activeTab={activeTab}
+              serverConnected={state.serverConnected}
+              serverUrl={state.serverHealth?.url || null}
+              provider={sidebarProvider}
+              model={sidebarModel}
+              onEvaluate={state.projects?.length > 0 ? (() => navTab('evaluate')) : null}
+              evaluating={state.evalLifecycle?.job?.status === 'running'}
+              onProviderClick={() => navTab('settings')}
+              onMenuToggle={() => setSidebarPinned((v) => !v)}
+              breadcrumb={
+                <NavBreadcrumb
+                  stack={navStack}
+                  onBack={navPop}
+                  onGoTo={navGoTo}
+                />
+              }
+              mobileTitle={navStack.length ? navLabelFor(navStack[navStack.length - 1]) : (activeTab || '')}
+              canGoBack={navStack.length > 1}
+              onBack={navPop}
+              effectiveDark={effectiveDark}
+              onToggleTheme={toggleTheme}
+            />
+          }
+          content={<div className="tab-fade" key={activeTab}><MainContent activePage={activePage} props={contentProps} /></div>}
+            />
+          </OllamaLogProvider>
+        </ServerLogProvider>
+      </EvalLogProvider>
     </SidePaneProvider>
   );
 }

@@ -1659,6 +1659,17 @@ textarea:focus {
 .server-dot--offline { background: #f87171; }
 .server-dot--unknown { background: var(--color-text-muted); }
 
+.settings-server-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-server-row .server-status {
+  flex: 1 1 auto;
+}
+
 .server-status {
   display: flex;
   align-items: center;
@@ -1712,29 +1723,55 @@ textarea:focus {
   cursor: not-allowed;
 }
 
-/* Server console */
-.server-console-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: var(--space-3) var(--space-4);
-  margin: 0 var(--space-4);
-  cursor: pointer;
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-  border-top: 1px solid var(--color-border);
-  user-select: none;
-}
-
-.server-console-toggle:hover {
-  color: var(--color-text);
-}
-
-.server-console-toggle .console-chevron {
-  margin-left: auto;
+/* Shared console toggle button (evaluation cards, server, Ollama) */
+.console-button {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.console-button:hover {
+  color: var(--color-accent);
+  background: var(--color-surface-alt);
+  border-color: var(--color-border);
+}
+
+.console-button:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.console-button__icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.console-button__label {
+  font-family: var(--term-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.console-button__dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
 }
 
 .server-console-actions {
