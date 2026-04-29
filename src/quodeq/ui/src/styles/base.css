@@ -1059,6 +1059,8 @@ textarea:focus {
   gap: var(--space-4);
   min-width: 0;
   width: 100%;
+  container-type: inline-size;
+  container-name: settings;
 }
 
 .brand-carousel {
@@ -1081,7 +1083,7 @@ textarea:focus {
   gap: var(--space-5);
 }
 
-@media (max-width: 900px) {
+@container settings (max-width: 900px) {
   .settings-grid {
     grid-template-columns: 1fr;
   }
