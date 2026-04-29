@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey, DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET } from '../../../constants.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
+import { useRunEventStream } from './useRunEventStream.js';
+
+const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === 'true';
 
 const DIMENSION_POLL_INITIAL_MS = 2000;
 const DIMENSION_POLL_MAX_MS = 8000;
@@ -122,6 +125,7 @@ function createJobPoller(refs, setters, startDimensionPolling, getEvaluation) {
   const { poll: pollRef, dimPoll: dimPollRef, requestedDimensions: requestedDimensionsRef, partialDimensions: partialDimensionsRef } = refs;
   const { setJob, setJobError } = setters;
   return function startPolling(jobId) {
+    if (SSE_ENABLED) return;
     stopTimer(pollRef);
     const localRefs = {
       requestedDimensions: requestedDimensionsRef.current,
@@ -204,6 +208,7 @@ function useEvalRefs() {
 
 function useResumeRunning(setJob, startPolling, pollRef, dimPollRef, listEvaluations) {
   useEffect(() => {
+    if (SSE_ENABLED) return undefined;
     listEvaluations()
       .then((jobs) => {
         const running = jobs.find((j) => j.status === 'running');
@@ -290,6 +295,36 @@ export function useEvaluation() {
   const [jobError, setJobError] = useState('');
   const [liveViolations, setLiveViolations] = useState({});
   const refs = useEvalRefs();
+
+  // Hooks must run unconditionally (Rules of Hooks). When the SSE flag is off
+  // we pass null so useRunEventStream stays inert; when on, we feed it the
+  // current job id so it subscribes to /events for that run.
+  const sse = useRunEventStream(SSE_ENABLED ? job?.jobId ?? null : null);
+
+  // Mirror SSE status frames into the same `job` state the polling path
+  // populates, so downstream consumers (useEvaluationLifecycle, dashboards)
+  // see an identical shape regardless of transport.
+  useEffect(() => {
+    if (!SSE_ENABLED) return;
+    if (!sse.status) return;
+    setJob((prev) => ({ ...(prev || {}), ...sse.status, repo: prev?.repo }));
+  }, [sse.status]);
+
+  // Group SSE findings by dimension into the liveViolations shape consumers
+  // already render. Each finding is expected to carry a `dimension` key; we
+  // tolerate missing dimensions by bucketing under '_'.
+  useEffect(() => {
+    if (!SSE_ENABLED) return;
+    if (!sse.findings || sse.findings.length === 0) return;
+    const grouped = {};
+    for (const f of sse.findings) {
+      const key = f?.dimension || '_';
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(f);
+    }
+    setLiveViolations(grouped);
+  }, [sse.findings]);
+
   const startPolling = usePollingSetup(refs, setJob, setJobError, setLiveViolations, { getDimensionEval, getEvaluation, listEvaluations });
   useEffect(() => { refs.liveViolationsRef.current = liveViolations; }, [liveViolations]);
 
