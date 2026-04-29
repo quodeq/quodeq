@@ -18,6 +18,7 @@ if sys.platform != "win32":
 from quodeq.analysis.mcp.enrichment import enrich_code
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
 from quodeq.data.ports.findings import FindingsRepository
+from quodeq.shared._env import sqlite_disabled
 
 _logger = logging.getLogger(__name__)
 _FINDING_SCHEMA_VERSION = 1
@@ -146,7 +147,7 @@ class FindingsRouter:
 
         line = json.dumps(finding) + "\n"
         _locked_write(self._fh, line)
-        if self._findings_repo is not None:
+        if self._findings_repo is not None and not sqlite_disabled():
             try:
                 self._findings_repo.insert_finding(finding)
             except Exception:  # noqa: BLE001 — SQLite must never break JSONL durability

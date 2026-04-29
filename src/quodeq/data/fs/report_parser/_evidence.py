@@ -12,6 +12,7 @@ from quodeq.data.fs.report_parser._evidence_sqlite import (
 )
 from quodeq.data.fs.report_parser._run_info import safe_read_dir
 from quodeq.data.fs.report_parser.json_parser import parse_evidence_file
+from quodeq.shared._env import sqlite_disabled
 
 _logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ def load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
     falls back to per-dimension `_evidence.json` files for legacy runs.
     """
     run_dir = evidence_dir.parent
-    if has_evaluation_db(run_dir):
+    if not sqlite_disabled() and has_evaluation_db(run_dir):
         return load_evidence_map_from_db(run_dir)
 
     evidence_map = _load_evidence_from_dir(evidence_dir)
