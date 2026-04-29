@@ -204,3 +204,71 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
         emitted_dimensions=frozenset(state.emitted_dimensions | set(new_dims)),
     )
     return events, new_state
+
+
+import os
+import time
+from typing import Iterator
+
+from quodeq.api._sse_log_helpers import sse_line
+
+_TICK_MS = int(os.environ.get("QUODEQ_SSE_TICK_MS", "250"))
+_HEARTBEAT_S = 15.0
+_TERMINAL_STATES = frozenset({"done", "failed", "cancelled"})
+
+
+def _is_terminal(status_payload: str) -> tuple[bool, str]:
+    """Check whether the JSON status payload represents a terminal state."""
+    try:
+        data = json.loads(status_payload)
+    except ValueError:
+        return False, ""
+    state = data.get("state") if isinstance(data, dict) else None
+    if isinstance(state, str) and state in _TERMINAL_STATES:
+        return True, state
+    return False, ""
+
+
+def run_events_generator(
+    run_dir: Path,
+    *,
+    last_event_id: int = 0,
+    tick_seconds: float | None = None,
+) -> Iterator[str]:
+    """Yield SSE frames observing run_dir.
+
+    tick_seconds overrides QUODEQ_SSE_TICK_MS for tests (use 0.0 to drain
+    immediately without sleeping).
+    """
+    sleep_s = tick_seconds if tick_seconds is not None else (_TICK_MS / 1000.0)
+    state = WatcherState(last_event_id=last_event_id)
+    last_emit_at = time.monotonic()
+    yield ":keepalive\n\n"
+
+    while True:
+        events, state = compute_tick(run_dir, state)
+        terminal_state = ""
+        for event_type, payload, event_id in events:
+            yield sse_line(payload, event=event_type, event_id=event_id)
+            last_emit_at = time.monotonic()
+            if event_type == "status":
+                done, terminal = _is_terminal(payload)
+                if done:
+                    terminal_state = terminal
+
+        if terminal_state:
+            yield sse_line(
+                json.dumps({"state": terminal_state}, separators=(",", ":")),
+                event="done",
+            )
+            return
+
+        if time.monotonic() - last_emit_at >= _HEARTBEAT_S:
+            yield ":keepalive\n\n"
+            last_emit_at = time.monotonic()
+
+        if sleep_s > 0:
+            time.sleep(sleep_s)
+        else:
+            # tick_seconds=0.0 means "drain once and exit" for tests.
+            return

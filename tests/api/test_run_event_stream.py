@@ -202,3 +202,66 @@ def test_compute_tick_handles_malformed_status_json(tmp_path: Path):
     # Should not crash; emits a fallback status with state=pending.
     status_events = [e for e in events if e[0] == "status"]
     assert len(status_events) == 1
+
+
+def _drain_generator(gen, max_frames: int) -> list[str]:
+    """Pull at most max_frames from a generator, ignoring keepalives."""
+    out = []
+    for frame in gen:
+        if frame.startswith(":"):
+            continue
+        out.append(frame)
+        if len(out) >= max_frames:
+            break
+    return out
+
+
+def test_run_events_generator_emits_status_then_done_for_terminal_run(tmp_path: Path):
+    from quodeq.api._run_event_stream import run_events_generator
+
+    _write_status(tmp_path, state="done")
+    frames = list(run_events_generator(tmp_path, last_event_id=0, tick_seconds=0.0))
+    # Should produce: status frame, then done frame, then return.
+    non_keepalive = [f for f in frames if not f.startswith(":")]
+    assert any("event: status" in f for f in non_keepalive)
+    assert any("event: done" in f for f in non_keepalive)
+
+
+def test_run_events_generator_emits_finding_with_event_id(tmp_path: Path):
+    from quodeq.api._run_event_stream import run_events_generator
+
+    _write_status(tmp_path, state="running")
+    _insert_finding(tmp_path)
+    gen = run_events_generator(tmp_path, last_event_id=0, tick_seconds=0.0)
+    frames = _drain_generator(gen, max_frames=3)
+    finding_frames = [f for f in frames if "event: finding" in f]
+    assert len(finding_frames) == 1
+    assert "id: 1" in finding_frames[0]
+
+
+def test_run_events_generator_respects_initial_last_event_id(tmp_path: Path):
+    from quodeq.api._run_event_stream import run_events_generator
+
+    _write_status(tmp_path, state="running")
+    _insert_finding(tmp_path, p="P1", line=1)
+    _insert_finding(tmp_path, p="P2", line=2)
+    gen = run_events_generator(tmp_path, last_event_id=1, tick_seconds=0.0)
+    frames = _drain_generator(gen, max_frames=3)
+    finding_frames = [f for f in frames if "event: finding" in f]
+    assert len(finding_frames) == 1
+    assert "id: 2" in finding_frames[0]
+
+
+def test_run_events_generator_handles_already_terminal_run(tmp_path: Path):
+    from quodeq.api._run_event_stream import run_events_generator
+
+    _write_status(tmp_path, state="failed")
+    _insert_finding(tmp_path)
+    frames = list(run_events_generator(tmp_path, last_event_id=0, tick_seconds=0.0))
+    non_keepalive = [f for f in frames if not f.startswith(":")]
+    # Snapshot includes status, finding, then done.
+    assert any("event: status" in f for f in non_keepalive)
+    assert any("event: finding" in f for f in non_keepalive)
+    assert any("event: done" in f for f in non_keepalive)
+    # Generator terminates (we got the full list).
+    assert non_keepalive[-1].startswith("id: ") or "event: done" in non_keepalive[-1]
