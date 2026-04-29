@@ -12,6 +12,7 @@ from pathlib import Path
 
 from quodeq.core.types import DimensionResult
 from quodeq.core.types.mappers import parse_dimension_result
+from quodeq.data.fs.report_parser._date_utils import normalize_date
 from quodeq.data.fs.report_parser._evaluations import load_evaluations
 from quodeq.data.fs.report_parser._evidence import load_evidence_map
 from quodeq.data.fs.report_parser._repository import (
@@ -78,12 +79,60 @@ def _read_run_status(run_dir: Path) -> str | None:
 def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIMIT) -> list[RunInfo]:
     """Return runs for a project, sorted newest-first by date.
 
+    Prefers the global ``index.db`` when it exists and has rows for *project*;
+    otherwise falls back to the filesystem scan. Older runs created before the
+    index existed remain readable via the filesystem fallback.
+
     When *limit* > 0 only the most recent *limit* runs are returned.
 
     Example::
 
         runs = list_runs(Path("/reports"), "my-project", limit=5)
     """
+    from quodeq.data.sqlite.connection import INDEX_DB_FILENAME  # noqa: PLC0415
+    from quodeq.data.sqlite.index_repository import SqliteRunIndex  # noqa: PLC0415
+    from quodeq.shared._env import get_quodeq_root  # noqa: PLC0415
+
+    quodeq_root = get_quodeq_root()
+    if (quodeq_root / INDEX_DB_FILENAME).is_file():
+        indexed = SqliteRunIndex(quodeq_root).list_runs(project=project, limit=limit)
+        if indexed:
+            return [_indexed_to_run_info(r) for r in indexed]
+
+    return _list_runs_from_filesystem(reports_root, project, limit=limit)
+
+
+_INDEX_STATE_TO_RUN_INFO_STATUS = {
+    "running": "in_progress",
+    "completed": "complete",
+    "failed": "failed",
+    "cancelled": "cancelled",
+}
+
+
+def _indexed_to_run_info(indexed) -> RunInfo:
+    """Translate an IndexedRun to the RunInfo shape returned by list_runs."""
+    # TODO: index-first path may report stale "in_progress" if the run process
+    # crashed without recording a finished state; consider PID liveness check.
+    parsed = normalize_date(indexed.started_at)
+    if parsed is None:
+        date_iso = indexed.started_at
+        date_label = indexed.started_at
+    else:
+        date_iso, date_label = parsed
+    status = _INDEX_STATE_TO_RUN_INFO_STATUS.get(indexed.state, "complete")
+    return RunInfo(
+        run_id=indexed.run_id,
+        date_iso=date_iso,
+        date_label=date_label,
+        branch=indexed.branch,
+        status=status,
+    )
+
+
+def _list_runs_from_filesystem(
+    reports_root: Path, project: str, *, limit: int,
+) -> list[RunInfo]:
     validate_path_segment(project)
     project_dir = reports_root / project
     run_infos: list[RunInfo] = []
