@@ -151,4 +151,37 @@ describe('SidePaneProvider', () => {
     expect(localStorage.getItem('quodeq.sidePaneWidth')).toBe('777');
     expect(localStorage.getItem('quodeq.reportPaneWidth')).toBeNull();
   });
+
+  it('replaceWindow updates the spec in place when id matches', () => {
+    function ReplaceProbe() {
+      const { addWindow, replaceWindow, windows } = useSidePane();
+      return (
+        <div>
+          <div data-testid="render">{windows[0]?.render?.() ?? 'none'}</div>
+          <button onClick={() => addWindow({ id: 'a', type: 't', title: 'A', render: () => 'v1' })}>add</button>
+          <button onClick={() => replaceWindow({ id: 'a', type: 't', title: 'A', render: () => 'v2' })}>replace</button>
+        </div>
+      );
+    }
+    render(<SidePaneProvider><ReplaceProbe /></SidePaneProvider>);
+    fireEvent.click(screen.getByText('add'));
+    expect(screen.getByTestId('render')).toHaveTextContent('v1');
+    fireEvent.click(screen.getByText('replace'));
+    expect(screen.getByTestId('render')).toHaveTextContent('v2');
+  });
+
+  it('replaceWindow is a no-op when no window with that id exists', () => {
+    function NoopProbe() {
+      const { replaceWindow, windows } = useSidePane();
+      return (
+        <div>
+          <div data-testid="count">{windows.length}</div>
+          <button onClick={() => replaceWindow({ id: 'missing', type: 't', title: 'M', render: () => null })}>r</button>
+        </div>
+      );
+    }
+    render(<SidePaneProvider><NoopProbe /></SidePaneProvider>);
+    fireEvent.click(screen.getByText('r'));
+    expect(screen.getByTestId('count')).toHaveTextContent('0');
+  });
 });
