@@ -30,5 +30,11 @@ class FindingsRepository(Protocol):
         ...
 
     def set_verdict(self, *, practice_id: str, file: str, line: int, verdict: str) -> int:
-        """Update verdict (e.g. dismiss). Returns rows affected."""
+        """Update verdict for findings matching (practice_id, file, line).
+
+        Updates ALL findings matching the tuple — multiple rows with the
+        same (practice_id, file, line) but different titles or snippets
+        will all receive the new verdict. The caller can detect this from
+        the returned rows-affected count. Use this for dismiss/restore flows.
+        """
         ...

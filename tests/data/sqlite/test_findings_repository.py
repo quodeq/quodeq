@@ -52,3 +52,29 @@ def test_dismiss_finding_atomically(tmp_path: Path):
     assert changed == 1
     items = repo.list_by_dimension("dim")
     assert items[0].verdict == "dismissed"
+
+
+def test_search_query_with_fts_special_chars_does_not_raise(tmp_path: Path):
+    """User input with FTS5 operators is treated as a phrase, not a query."""
+    repo = SqliteFindingsRepository(tmp_path)
+    repo.insert_finding(_finding(p="P1", reason="missing input"))
+    # Each of these would raise or misbehave without sanitization.
+    for query in ["foo:", "a-b", 'unbalanced"', "a OR b", "*"]:
+        # Just verify no exception; result set may be empty.
+        repo.search(query)
+
+
+def test_search_query_finds_exact_phrase_with_punctuation(tmp_path: Path):
+    repo = SqliteFindingsRepository(tmp_path)
+    repo.insert_finding(_finding(p="P1", reason="error: connection refused"))
+    repo.insert_finding(_finding(p="P2", line=2, reason="warning: deprecated"))
+    hits = repo.search("error: connection")
+    assert {h.practice_id for h in hits} == {"P1"}
+
+
+def test_search_respects_limit(tmp_path: Path):
+    repo = SqliteFindingsRepository(tmp_path)
+    for i in range(10):
+        repo.insert_finding(_finding(p=f"P{i}", line=i, reason="duplicate text"))
+    hits = repo.search("duplicate", limit=3)
+    assert len(hits) == 3

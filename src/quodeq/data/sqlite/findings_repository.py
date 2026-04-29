@@ -60,13 +60,14 @@ class SqliteFindingsRepository:
         return {dim: n for dim, n in rows}
 
     def search(self, query: str, limit: int = 100) -> list[Judgment]:
+        fts_query = _quote_fts_query(query)
         with open_evaluation_db(self._run_dir) as conn:
             conn.row_factory = _dict_row
             rows = conn.execute(
                 f"SELECT {_SELECT_COLUMNS} FROM findings "
                 "WHERE id IN (SELECT rowid FROM findings_fts WHERE findings_fts MATCH ?) "
                 "ORDER BY id LIMIT ?",
-                (query, limit),
+                (fts_query, limit),
             ).fetchall()
         return [row_to_judgment(r) for r in rows]
 
@@ -83,3 +84,15 @@ class SqliteFindingsRepository:
 
 def _dict_row(cursor, row):
     return {col[0]: row[i] for i, col in enumerate(cursor.description)}
+
+
+def _quote_fts_query(query: str) -> str:
+    """Wrap user input as an FTS5 phrase, escaping embedded quotes.
+
+    FTS5 query syntax includes operators (AND/OR/NOT, NEAR, prefix `*`,
+    column qualifier `:`). Treating arbitrary user input as a phrase makes
+    those characters literal, so a query like `foo:` or `a-b` searches for
+    that exact text instead of raising or matching unexpectedly.
+    """
+    escaped = query.replace('"', '""')
+    return f'"{escaped}"'
