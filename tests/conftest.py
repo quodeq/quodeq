@@ -9,9 +9,9 @@ def _isolate_quodeq_home(tmp_path_factory: pytest.TempPathFactory,
                          monkeypatch: pytest.MonkeyPatch) -> None:
     """Point QUODEQ_HOME at an empty per-test tmp dir.
 
-    Prevents tests from reading or writing the developer's real
-    ``~/.quodeq`` (notably the global ``index.db``, which a Task-12
-    ``list_runs`` index-first lookup would otherwise consult).
+    Defensive isolation so tests cannot accidentally read or write the
+    developer's real ``~/.quodeq`` (which holds the existing global
+    ``index.db`` from ``services/run_index.py``, plus per-run state).
     """
     home = tmp_path_factory.mktemp("quodeq-home")
     monkeypatch.setenv("QUODEQ_HOME", str(home))

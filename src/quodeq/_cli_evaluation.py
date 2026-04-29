@@ -11,15 +11,12 @@ import argparse
 import json
 import logging
 import os
-from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
 from quodeq.analysis.subprocess import AnalysisError
 from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
-from quodeq.data.sqlite.index_repository import SqliteRunIndex
 from quodeq.engine.scoring_pipeline import run_full
-from quodeq.shared._env import get_quodeq_root
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.logging import log_error, log_info
 from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_repo, write_text
@@ -70,40 +67,6 @@ def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -
 def _subagent_model(env: dict[str, str] | None = None) -> str | None:
     """Return the subagent model override from the environment, or None."""
     return (env or os.environ).get("SUBAGENT_MODEL") or None
-
-
-def _now_iso_z() -> str:
-    """Return current UTC time in ISO-8601 format with trailing Z."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def record_run_started(
-    *,
-    project: str,
-    run_id: str,
-    branch: str | None,
-    model: str | None,
-    db_path: str,
-) -> None:
-    """Record a run-started event in the global ~/.quodeq/index.db."""
-    SqliteRunIndex(get_quodeq_root()).record_started(
-        project=project,
-        run_id=run_id,
-        branch=branch,
-        model=model,
-        started_at=_now_iso_z(),
-        db_path=db_path,
-    )
-
-
-def record_run_finished(*, project: str, run_id: str, state: str) -> None:
-    """Record a run terminal-state event in the global ~/.quodeq/index.db."""
-    SqliteRunIndex(get_quodeq_root()).record_finished(
-        project=project,
-        run_id=run_id,
-        finished_at=_now_iso_z(),
-        state=state,
-    )
 
 
 def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> bool:
@@ -286,25 +249,6 @@ def _run_pipeline_with_cleanup(
     _raw_dims = getattr(getattr(config, "options", None), "dimensions", None)
     dimensions_list: list[str] = list(_raw_dims) if isinstance(_raw_dims, list) else []
 
-    # Best-effort extract model for the global index. Optional metadata.
-    ai_model = getattr(getattr(config, "options", None), "ai_model", None)
-    if not isinstance(ai_model, str):
-        ai_model = None
-    db_path = str(run_dir / "evaluation.db")
-
-    # Record run start in the global index BEFORE entering lifecycle context.
-    # If this fails (e.g., disk full on ~/.quodeq), do not break the run.
-    try:
-        record_run_started(
-            project=project_uuid,
-            run_id=run_id,
-            branch=None,
-            model=ai_model,
-            db_path=db_path,
-        )
-    except Exception:  # noqa: BLE001 — index is best-effort, never block runs
-        _logger.warning("Failed to record run start in index.db", exc_info=True)
-
     try:
         # Lifecycle context: pending → running on enter, done on clean exit,
         # failed on exception, cancelled on SIGINT/SIGTERM/SIGHUP or atexit.
@@ -328,14 +272,6 @@ def _run_pipeline_with_cleanup(
                     # lingers briefly before transition_to_finalizing.
                     lifecycle.set_phase("scoring")
                     lifecycle.transition_to_finalizing()
-                    try:
-                        record_run_finished(
-                            project=project_uuid, run_id=run_id, state="completed",
-                        )
-                    except Exception:  # noqa: BLE001
-                        _logger.warning(
-                            "Failed to record run finish in index.db", exc_info=True,
-                        )
                     return result
                 finally:
                     # Clean up .pid file on exit so we don't leave stale PIDs
@@ -352,14 +288,6 @@ def _run_pipeline_with_cleanup(
         except (AnalysisError, EvaluationError) as exc:
             # RunLifecycleContext.__exit__ has already written state=failed.
             # Map the domain error to exit code 1.
-            try:
-                record_run_finished(
-                    project=project_uuid, run_id=run_id, state="failed",
-                )
-            except Exception:  # noqa: BLE001
-                _logger.warning(
-                    "Failed to record run failure in index.db", exc_info=True,
-                )
             log_error(f"{exc}")
             return 1
     finally:
