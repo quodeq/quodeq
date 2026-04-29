@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
+import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
 import { useServerLog } from '../server-log/ServerLogContext.js';
-import ConsoleButton from '../../../components/ConsoleButton.jsx';
 
 const HEALTH_POLL_MS = 10000;
 
@@ -15,7 +15,6 @@ function ping() {
 export default function ServerSection() {
   const [health, setHealth] = useState(null);
   const [status, setStatus] = useState('checking');
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const healthTimerRef = useRef(null);
   const cancelledRef = useRef(false);
   const serverLog = useServerLog();
@@ -43,46 +42,26 @@ export default function ServerSection() {
         <SectionLabel marker="▶">Server</SectionLabel>
       </div>
 
-      <div className={`server-status ${status === 'online' ? 'server-status--online' : 'server-status--offline'}`}>
-        <span className={`server-dot ${status === 'online' ? 'server-dot--online' : 'server-dot--offline'}`} />
-        <span>
-          {status === 'online' && 'Running'}
-          {status === 'offline' && 'Connection lost'}
-          {status === 'checking' && 'Checking...'}
-        </span>
-        {status === 'online' && health?.address && <span className="server-address">{health.address}</span>}
-      </div>
+      <ServerStatusPill
+        status={status === 'online' ? 'online' : 'offline'}
+        address={health?.address}
+        offlineMessage={
+          status === 'checking'
+            ? <span>Checking…</span>
+            : <span>Connection lost</span>
+        }
+        onToggleConsole={() => (serverLog.open ? serverLog.closeLog() : serverLog.openLog())}
+        consoleOpen={serverLog.open}
+      />
 
-      {/* Server details (port, PID, version) are intentionally available
-          for this local-only development tool to aid debugging. They are
-          hidden by default behind a toggle to avoid casual disclosure. */}
       {status === 'online' && health && (
-        <div className="settings-row">
-          <div className="settings-row-label">
-            <span
-              className="settings-label"
-              role="button"
-              tabIndex={0}
-              style={{ cursor: 'pointer' }}
-              onClick={() => setDetailsOpen((o) => !o)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailsOpen((o) => !o); } }}
-            >
-              Details {detailsOpen ? '▾' : '▸'}
-            </span>
-            {detailsOpen && (
-              <span className="settings-description">
-                Port <strong>{health.port}</strong> &middot; PID <strong>{health.pid}</strong> &middot; v{health.version}
-              </span>
-            )}
-          </div>
+        <div className="server-details">
+          Port <strong>{health.port}</strong>
+          {' · '}
+          PID <strong>{health.pid}</strong>
+          {' · '}
+          v{health.version}
         </div>
-      )}
-
-      {status === 'online' && (
-        <ConsoleButton
-          open={serverLog.open}
-          onToggle={() => (serverLog.open ? serverLog.closeLog() : serverLog.openLog())}
-        />
       )}
 
       {status === 'offline' && (

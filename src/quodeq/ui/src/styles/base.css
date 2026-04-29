@@ -1706,6 +1706,15 @@ textarea:focus {
   align-self: stretch;
 }
 
+.server-details {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  /* The pill above has vertical margin; align the details caption with the
+     pill's horizontal padding and give it a small bottom padding so it
+     doesn't read as glued to the pill's underside. */
+  padding: 0 var(--space-5) var(--space-3);
+}
+
 .server-status {
   display: flex;
   align-items: center;
