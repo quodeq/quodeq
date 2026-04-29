@@ -76,3 +76,129 @@ def test_watcher_state_with_emitted_dimensions():
     state = WatcherState(emitted_dimensions=frozenset({"security", "timeliness"}))
     assert "security" in state.emitted_dimensions
     assert "timeliness" in state.emitted_dimensions
+
+
+import json as _json
+from pathlib import Path
+
+from quodeq.api._run_event_stream import compute_tick
+from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
+
+
+def _write_status(run_dir: Path, state: str = "running") -> None:
+    (run_dir / "status.json").write_text(_json.dumps({"state": state}))
+
+
+def _write_dim_eval(run_dir: Path, dim: str, score: int = 90) -> None:
+    eval_dir = run_dir / "evaluation"
+    eval_dir.mkdir(exist_ok=True)
+    (eval_dir / f"{dim}.json").write_text(
+        _json.dumps({"dimension": dim, "score": score}),
+    )
+
+
+def _insert_finding(run_dir: Path, p: str = "P1", line: int = 1) -> None:
+    repo = SqliteFindingsRepository(run_dir)
+    repo.insert_finding({
+        "p": p, "file": "x.py", "line": line, "t": "violation",
+        "severity": "medium", "d": "dim", "reason": "r", "snippet": "s", "w": "t",
+    })
+
+
+def test_compute_tick_initial_emits_status_when_status_json_present(tmp_path: Path):
+    _write_status(tmp_path, "running")
+    state = WatcherState()
+    events, new_state = compute_tick(tmp_path, state)
+    types = [e[0] for e in events]
+    assert "status" in types
+
+
+def test_compute_tick_emits_status_pending_when_status_json_missing(tmp_path: Path):
+    state = WatcherState()
+    events, new_state = compute_tick(tmp_path, state)
+    status_events = [e for e in events if e[0] == "status"]
+    assert len(status_events) == 1
+    payload = _json.loads(status_events[0][1])
+    assert payload["state"] == "pending"
+
+
+def test_compute_tick_does_not_re_emit_unchanged_status(tmp_path: Path):
+    _write_status(tmp_path)
+    state = WatcherState()
+    _, state2 = compute_tick(tmp_path, state)
+    events, _ = compute_tick(tmp_path, state2)
+    status_events = [e for e in events if e[0] == "status"]
+    assert status_events == []
+
+
+def test_compute_tick_re_emits_status_when_mtime_changes(tmp_path: Path):
+    import os
+    import time as _time
+    _write_status(tmp_path, "running")
+    state = WatcherState()
+    _, state2 = compute_tick(tmp_path, state)
+    _time.sleep(0.05)
+    os.utime(tmp_path / "status.json", None)  # bump mtime
+    events, _ = compute_tick(tmp_path, state2)
+    status_events = [e for e in events if e[0] == "status"]
+    assert len(status_events) == 1
+
+
+def test_compute_tick_emits_dimension_events_for_new_files(tmp_path: Path):
+    _write_status(tmp_path)
+    _write_dim_eval(tmp_path, "timeliness")
+    state = WatcherState()
+    events, new_state = compute_tick(tmp_path, state)
+    dim_events = [e for e in events if e[0] == "dimension-completed"]
+    assert len(dim_events) == 1
+    assert "timeliness" in new_state.emitted_dimensions
+
+
+def test_compute_tick_does_not_re_emit_already_emitted_dimensions(tmp_path: Path):
+    _write_status(tmp_path)
+    _write_dim_eval(tmp_path, "timeliness")
+    state = WatcherState()
+    _, state2 = compute_tick(tmp_path, state)
+    events, _ = compute_tick(tmp_path, state2)
+    dim_events = [e for e in events if e[0] == "dimension-completed"]
+    assert dim_events == []
+
+
+def test_compute_tick_emits_findings_with_id_advances_last_event_id(tmp_path: Path):
+    _write_status(tmp_path)
+    _insert_finding(tmp_path, "P1", line=1)
+    _insert_finding(tmp_path, "P2", line=2)
+    state = WatcherState()
+    events, new_state = compute_tick(tmp_path, state)
+    finding_events = [e for e in events if e[0] == "finding"]
+    assert len(finding_events) == 2
+    assert new_state.last_event_id == 2  # SQLite IDs are 1, 2
+
+
+def test_compute_tick_skips_findings_already_emitted(tmp_path: Path):
+    _write_status(tmp_path)
+    _insert_finding(tmp_path, "P1", line=1)
+    _insert_finding(tmp_path, "P2", line=2)
+    state = WatcherState(last_event_id=1)
+    events, new_state = compute_tick(tmp_path, state)
+    finding_events = [e for e in events if e[0] == "finding"]
+    assert len(finding_events) == 1
+    assert new_state.last_event_id == 2
+
+
+def test_compute_tick_handles_missing_evaluation_db(tmp_path: Path):
+    _write_status(tmp_path)
+    state = WatcherState()
+    events, _ = compute_tick(tmp_path, state)
+    # Should not crash and should not emit any finding events.
+    finding_events = [e for e in events if e[0] == "finding"]
+    assert finding_events == []
+
+
+def test_compute_tick_handles_malformed_status_json(tmp_path: Path):
+    (tmp_path / "status.json").write_text("not valid json {")
+    state = WatcherState()
+    events, _ = compute_tick(tmp_path, state)
+    # Should not crash; emits a fallback status with state=pending.
+    status_events = [e for e in events if e[0] == "status"]
+    assert len(status_events) == 1
