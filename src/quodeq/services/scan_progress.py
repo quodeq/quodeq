@@ -9,7 +9,7 @@ Sources:
 - ``dim_estimates.json``          — per-dim file count predicted before any dim runs
 - ``scan.json``                   — total_files (project-wide fallback for pending dims)
 - ``<dim>_queue.json``            — taken / pending counts (precise once dim has started)
-- ``<dim>_evidence.jsonl``        — violation / compliance counters
+- ``<dim>_evidence.jsonl``        — unique violation / compliance / duplicate counts (in-memory dedup)
 - ``<dim>_agent-*.stream`` mtime  — per-dim active-agents heuristic
 """
 from __future__ import annotations
@@ -19,6 +19,8 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+
+from quodeq.analysis.subagents.jsonl_utils import tally_unique_findings
 
 _AGENT_ACTIVE_WINDOW_S = 30
 
@@ -30,6 +32,7 @@ class _DimProgress:
     files: dict
     violations: int = 0
     compliance: int = 0
+    duplicates: int = 0
     elapsed_s: float | None = None
     budget_s: int | None = None
     active_agents: int = 0
@@ -79,35 +82,6 @@ def _read_dim_estimates(run_dir: Path) -> dict[str, dict]:
         elif isinstance(v, int):
             out[k] = {"count": v, "reason": ""}
     return out
-
-
-def _count_jsonl_findings(jsonl_path: Path) -> tuple[int, int]:
-    """Return (violation_count, compliance_count) from a dimension's JSONL.
-
-    Tolerant: malformed lines are skipped silently.
-    """
-    if not jsonl_path.is_file():
-        return 0, 0
-    violations = 0
-    compliance = 0
-    try:
-        with jsonl_path.open(encoding="utf-8") as fh:
-            for line in fh:
-                stripped = line.strip()
-                if not stripped:
-                    continue
-                try:
-                    obj = json.loads(stripped)
-                except json.JSONDecodeError:
-                    continue
-                t = obj.get("t")
-                if t == "violation":
-                    violations += 1
-                elif t == "compliance":
-                    compliance += 1
-    except OSError:
-        pass
-    return violations, compliance
 
 
 def _active_agents(evidence_dir: Path, dim_id: str) -> int:
@@ -279,7 +253,7 @@ def build_scan_progress(
         estimate_meta = dim_estimates.get(dim_id)
         estimate_reason = estimate_meta["reason"] if estimate_meta else None
 
-        v, c = _count_jsonl_findings(evidence_dir / f"{dim_id}_evidence.jsonl")
+        tally = tally_unique_findings(evidence_dir / f"{dim_id}_evidence.jsonl")
         elapsed = _dim_elapsed_s(dim_id, run_dir, d_state)
         budget = pool_budget_s if (d_state == "running" and pool_budget_s and pool_budget_s > 0) else None
         active = _active_agents(evidence_dir, dim_id) if d_state == "running" else 0
@@ -288,8 +262,9 @@ def build_scan_progress(
             id=dim_id,
             state=d_state,
             files=files,
-            violations=v,
-            compliance=c,
+            violations=tally.violations,
+            compliance=tally.compliance,
+            duplicates=tally.duplicates,
             elapsed_s=elapsed,
             budget_s=budget,
             active_agents=active,
