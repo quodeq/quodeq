@@ -3,6 +3,8 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { MIN_SUBAGENTS, MAX_SUBAGENTS } from '../../../constants.js';
 import ServerStatus from './ServerStatus.jsx';
 import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
+import ConsoleButton from '../../../components/ConsoleButton.jsx';
+import { useOllamaLog } from '../ollama-log/OllamaLogContext.js';
 
 function ModelSelector({ value, models, onChange }) {
   const needsModel = !value;
@@ -19,6 +21,7 @@ function ModelSelector({ value, models, onChange }) {
 
 export default function OllamaTab({ state, update }) {
   const { getOllamaModels, testOllamaConcurrency } = useApi();
+  const ollamaLog = useOllamaLog();
   const [models, setModels] = useState([]);
   const [modelsError, setModelsError] = useState(null);
   const [testing, setTesting] = useState(false);
@@ -44,7 +47,13 @@ export default function OllamaTab({ state, update }) {
 
   return (
     <>
-      <ServerStatus />
+      <div className="settings-server-row">
+        <ServerStatus />
+        <ConsoleButton
+          open={ollamaLog.open}
+          onToggle={() => (ollamaLog.open ? ollamaLog.closeLog() : ollamaLog.openLog())}
+        />
+      </div>
       {modelsError && <div className="settings-row"><span className="settings-error">{modelsError}</span></div>}
       <div className="settings-row">
         <div className="settings-row-label">

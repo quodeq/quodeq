@@ -360,6 +360,58 @@
   overflow-y: auto;
 }
 
+/* Eval-log window: the side-pane body has its own overflow scroller
+   (designed for markdown reports). For the console we want the shell
+   itself to fill the slot and own the scroll, with the body acting as
+   a transparent flex container. */
+.side-pane-window__body:has(> .console-shell) {
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  /* Theme-aware override: in light themes the console should match the
+     surrounding surface, not the always-dark `--color-console-bg`. The
+     other places that use the console class (Settings server-log panel)
+     keep the dark default because they don't sit under this selector. */
+  --color-console-bg: var(--color-surface-alt);
+  --color-console-text: var(--color-text);
+}
+
+.side-pane-window__body > .console-shell {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  /* min-height: 0 on the flex chain is essential — without it the
+     scroller's height matches content, breaking overflow:auto and
+     making the follow-to-bottom write a no-op. */
+  min-height: 0;
+  /* Inside the slot we don't need our own border/radius/shadow — the
+     side-pane window already provides framing. */
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.side-pane-window__body > .console-shell .console-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  /* Reserve space below the last line so the floating follow button doesn't
+     sit on top of in-progress output. */
+  padding-bottom: 48px;
+}
+
+/* During a side-pane drag (outer or inner divider), skip layout/paint of
+   the log lines. Each LogLine has a ResizeObserver that re-measures text
+   width on every pixel of width change — at hundreds of lines that's the
+   dominant cost during drag. `content-visibility: hidden` makes the
+   browser skip the entire subtree, including RO callbacks for descendants.
+   The scroller box keeps its flex-determined size, so the slot doesn't
+   collapse; lines reappear as soon as the drag ends. */
+:root[data-pane-resizing] .side-pane-window__body > .console-shell .console-scroll {
+  content-visibility: hidden;
+}
+
 /* Keep the older .console-output class working for the read-only server
    console panel in Settings, which still uses it directly. */
 .console-output {
@@ -439,18 +491,38 @@
 
 .console-log-line {
   font-family: var(--font-mono);
-  font-size: 0.82rem;
-  line-height: 1.65;
+  font-size: 0.75rem;
+  line-height: 1.55;
   color: var(--color-console-text);
   white-space: pre-wrap;
   word-break: break-word;
   content-visibility: auto;
-  contain-intrinsic-size: auto 22px;
+  contain-intrinsic-size: auto 20px;
+  /* Allow the user to select / copy log text and right-click for the
+     browser's native menu. Many ancestors disable selection by default;
+     setting it explicitly here ensures the lines stay grabbable. */
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.console-log-link {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+  text-underline-offset: 2px;
+  /* The line itself uses cursor:text for selection; restore the pointer
+     for the link so the click target is obvious. */
+  cursor: pointer;
+}
+
+.console-log-link:hover {
+  text-decoration-color: var(--color-accent);
 }
 
 .console-log-empty {
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   font-style: italic;
   color: color-mix(in srgb, var(--color-console-text) 60%, transparent);
 }
@@ -2649,8 +2721,8 @@
 .scan-progress__caret { transition: transform 0.18s, color 0.15s; }
 
 /* Detail toggle: a real button next to the console toggle. Same visual
-   language as .scan-progress__console-btn (ghost border, accent on
-   hover, accent fill when open) so the two read as a paired cluster. */
+   language as .console-button (ghost border, accent on hover, accent fill
+   when open) so the two read as a paired cluster. */
 .scan-progress__detail-toggle {
   display: inline-flex;
   align-items: center;
@@ -2711,47 +2783,6 @@
   border-bottom: 1px solid var(--color-border-soft, var(--color-border));
 }
 
-.scan-progress__console-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  position: relative;
-  border-radius: 2px;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
-}
-.scan-progress__console-btn:hover {
-  color: var(--color-accent);
-  background: var(--color-surface-alt);
-  border-color: var(--color-border);
-}
-.scan-progress__console-btn:focus-visible {
-  outline: 1px solid var(--color-accent);
-  outline-offset: 1px;
-}
-.scan-progress__console-btn--open {
-  color: var(--color-accent);
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-}
-.scan-progress__console-btn--open:hover {
-  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
-}
-.scan-progress__console-icon { width: 14px; height: 14px; }
-.scan-progress__console-caret { font-size: 10px; line-height: 1; }
-.scan-progress__console-dot {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-accent);
-}
 
 .scan-progress__bar-wrap {
   display: flex;

@@ -70,7 +70,11 @@
   gap: 8px;
   padding: 0 12px;
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface-alt);
+  /* Header sits on top of either the markdown body (white surface) or the
+     console body (surface-alt). Mix in some text color so the bar reads
+     as a distinct strip in both cases without going so dark it competes
+     with content. */
+  background: color-mix(in srgb, var(--color-text) 8%, var(--color-surface-alt));
 }
 .side-pane-window__title {
   flex: 1 1 auto;
@@ -81,6 +85,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: 0.01em;
 }
 .side-pane-window__actions {
   display: flex;
@@ -183,6 +188,24 @@
   /* Scope reflow of the markdown subtree to itself so width changes from
      a divider drag can't propagate layout work into siblings. */
   contain: layout;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  /* Make report text explicitly selectable / copyable. By default the
+     browser allows it, but several side-pane ancestors set user-select
+     elsewhere — pin it here so there's no surprise when a future ancestor
+     turns selection off. */
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.side-pane-md a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+  text-underline-offset: 2px;
+}
+.side-pane-md a:hover {
+  text-decoration-color: var(--color-accent);
 }
 .side-pane-md h1,
 .side-pane-md h2 {
@@ -248,6 +271,14 @@
      unless given the same hint. */
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+/* Most report tables have a long-text first column (file paths, finding
+   titles) followed by a few narrow numeric columns. Give the first column
+   half the table width so paths wrap less aggressively without affecting
+   row heights. */
+.side-pane-md th:first-child,
+.side-pane-md td:first-child {
+  width: 50%;
 }
 .side-pane-md th *,
 .side-pane-md td * {
