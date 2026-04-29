@@ -16,6 +16,7 @@ if sys.platform != "win32":
 
 from quodeq.analysis.mcp.enrichment import enrich_code
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
+from quodeq.data.ports.findings import FindingsRepository
 
 _FINDING_SCHEMA_VERSION = 1
 
@@ -94,6 +95,7 @@ class FindingsRouter:
         context: CompiledContext | None = None,
         seen_store: DeduplicationStore | None = None,
         file_reader: FileReader | None = None,
+        findings_repo: FindingsRepository | None = None,
     ):
         ctx = context or CompiledContext()
         self._fh = output_fh
@@ -104,6 +106,7 @@ class FindingsRouter:
         self._seen: DeduplicationStore = seen_store if seen_store is not None else set()
         self._work_dir = ctx.work_dir
         self._read_file = file_reader or _default_read_file
+        self._findings_repo = findings_repo
         self.counter = 0
 
     def _enrich(self, args: dict, finding: dict) -> None:
@@ -141,5 +144,11 @@ class FindingsRouter:
 
         line = json.dumps(finding) + "\n"
         _locked_write(self._fh, line)
+        if self._findings_repo is not None:
+            try:
+                self._findings_repo.insert_finding(finding)
+            except Exception:  # noqa: BLE001 — SQLite must never break JSONL durability
+                # Dual-write is a safety net during rollout. JSONL is the truth.
+                pass
         self.counter += 1
         return f"Finding #{self.counter} recorded.", False
