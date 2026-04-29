@@ -11,4 +11,5 @@ export function useApi() {
   return useContext(ApiContext);
 }
 
+export { ApiContext };
 export default ApiContext;
