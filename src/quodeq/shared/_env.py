@@ -7,7 +7,17 @@ from pathlib import Path
 
 from quodeq.shared._config import _get_config
 
+_DEFAULT_QUODEQ_ROOT = Path.home() / ".quodeq"
 _DEFAULT_EVALUATIONS_DIR = Path.home() / ".quodeq" / "evaluations"
+
+
+def get_quodeq_root(env: dict[str, str] | None = None) -> Path:
+    """Return the root directory for Quodeq state (default: ~/.quodeq).
+
+    Override via the ``QUODEQ_HOME`` environment variable.
+    """
+    raw = (env or os.environ).get("QUODEQ_HOME")
+    return Path(raw) if raw else _DEFAULT_QUODEQ_ROOT
 
 
 def get_ai_provider(env: dict[str, str] | None = None) -> str:
