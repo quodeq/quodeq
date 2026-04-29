@@ -234,41 +234,54 @@ def run_events_generator(
     *,
     last_event_id: int = 0,
     tick_seconds: float | None = None,
+    heartbeat_seconds: float | None = None,
 ) -> Iterator[str]:
     """Yield SSE frames observing run_dir.
 
     tick_seconds overrides QUODEQ_SSE_TICK_MS for tests (use 0.0 to drain
     immediately without sleeping).
+    heartbeat_seconds overrides the 15s :keepalive interval for tests.
+
+    The try/finally is defensive: today no per-stream resources persist
+    between ticks (every helper opens and closes its own DB / file handle),
+    so cleanup is a no-op. The block exists so a future change that adds
+    a longer-lived resource has a place to release it.
     """
     sleep_s = tick_seconds if tick_seconds is not None else (_TICK_MS / 1000.0)
+    heartbeat_s = heartbeat_seconds if heartbeat_seconds is not None else _HEARTBEAT_S
     state = WatcherState(last_event_id=last_event_id)
     last_emit_at = time.monotonic()
     yield ":keepalive\n\n"
 
-    while True:
-        events, state = compute_tick(run_dir, state)
-        terminal_state = ""
-        for event_type, payload, event_id in events:
-            yield sse_line(payload, event=event_type, event_id=event_id)
-            last_emit_at = time.monotonic()
-            if event_type == "status":
-                done, terminal = _is_terminal(payload)
-                if done:
-                    terminal_state = terminal
+    try:
+        while True:
+            events, state = compute_tick(run_dir, state)
+            terminal_state = ""
+            for event_type, payload, event_id in events:
+                yield sse_line(payload, event=event_type, event_id=event_id)
+                last_emit_at = time.monotonic()
+                if event_type == "status":
+                    done, terminal = _is_terminal(payload)
+                    if done:
+                        terminal_state = terminal
 
-        if terminal_state:
-            yield sse_line(
-                json.dumps({"state": terminal_state}, separators=(",", ":")),
-                event="done",
-            )
-            return
+            if terminal_state:
+                yield sse_line(
+                    json.dumps({"state": terminal_state}, separators=(",", ":")),
+                    event="done",
+                )
+                return
 
-        if time.monotonic() - last_emit_at >= _HEARTBEAT_S:
-            yield ":keepalive\n\n"
-            last_emit_at = time.monotonic()
+            if time.monotonic() - last_emit_at >= heartbeat_s:
+                yield ":keepalive\n\n"
+                last_emit_at = time.monotonic()
 
-        if sleep_s > 0:
-            time.sleep(sleep_s)
-        else:
-            # tick_seconds=0.0 means "drain once and exit" for tests.
-            return
+            if sleep_s > 0:
+                time.sleep(sleep_s)
+            else:
+                # tick_seconds=0.0 means "drain once and exit" for tests.
+                return
+    finally:
+        # Reserved for future cleanup of long-lived per-stream resources.
+        # Currently a no-op because each tick opens and closes its own handles.
+        pass

@@ -265,3 +265,31 @@ def test_run_events_generator_handles_already_terminal_run(tmp_path: Path):
     assert any("event: done" in f for f in non_keepalive)
     # Generator terminates (we got the full list).
     assert non_keepalive[-1].startswith("id: ") or "event: done" in non_keepalive[-1]
+
+
+def test_run_events_generator_emits_heartbeat_when_quiet(tmp_path: Path):
+    """When no events fire for heartbeat_seconds, emit a :keepalive comment."""
+    import time as _time
+    from quodeq.api._run_event_stream import run_events_generator
+
+    _write_status(tmp_path, state="running")
+    gen = run_events_generator(
+        tmp_path,
+        last_event_id=0,
+        tick_seconds=0.001,
+        heartbeat_seconds=0.0,  # always due — every quiet tick should emit one
+    )
+
+    # Collect a small batch: initial keepalive + status frame + at least one
+    # additional :keepalive (because the next tick has no new events).
+    frames: list[str] = []
+    deadline = _time.monotonic() + 1.0
+    for frame in gen:
+        frames.append(frame)
+        if frames.count(":keepalive\n\n") >= 2:
+            break
+        if _time.monotonic() > deadline:
+            break  # safety guard so the test never hangs
+
+    keepalives = [f for f in frames if f == ":keepalive\n\n"]
+    assert len(keepalives) >= 2, f"expected >=2 keepalives, got: {frames!r}"
