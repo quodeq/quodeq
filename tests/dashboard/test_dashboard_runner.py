@@ -9,7 +9,7 @@ from quodeq.dashboard.runner import BuildConfig, DashboardConfig, ServerConfig, 
 
 from tests.conftest import DummyProcess
 
-_TEST_PORT = 4173
+_TEST_PORT = 7863
 
 
 def _make_config(tmp_path: Path, **overrides) -> DashboardConfig:

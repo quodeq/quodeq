@@ -22,13 +22,13 @@ def test_second_instance_sends_reload(tmp_path: Path):
 
     ctrl2 = InstanceController(sock_path)
     assert ctrl2.try_acquire() is False
-    ctrl2.send_reload("http://localhost:8001")
+    ctrl2.send_reload("http://localhost:7863")
 
     # Give the listener thread time to process
     time.sleep(0.2)
     ctrl1.shutdown()
 
-    assert received == ["http://localhost:8001"]
+    assert received == ["http://localhost:7863"]
 
 
 def test_stale_socket_is_cleaned_up(tmp_path: Path):

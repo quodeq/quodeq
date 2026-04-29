@@ -2,8 +2,9 @@
 set -euo pipefail
 # Quodeq macOS launcher — starts the dashboard and opens the browser.
 
-# Default ports for the Vite preview server range.
-_DEFAULT_PORTS="4173 4174 4175"
+# Default port range for quodeq's dashboard. 7863 spells "QUOD" on a phone
+# keypad and isn't claimed by common dev tooling.
+_DEFAULT_PORTS="7863 7864 7865"
 
 # macOS .app bundles don't inherit the user's shell PATH.
 if [ -f "$HOME/.zprofile" ]; then source "$HOME/.zprofile" 2>/dev/null; fi
@@ -20,7 +21,6 @@ fi
 export PATH="$PATH:$HOME/.local/bin:$_HOMEBREW_BIN"
 
 # If dashboard is already running, just open the browser.
-# Ports 4173-4175 are the Vite preview server default range.
 QUODEQ_PORTS="${QUODEQ_PORTS:-$_DEFAULT_PORTS}"
 for PORT in $QUODEQ_PORTS; do
     if curl -s --max-time 3 "http://127.0.0.1:$PORT/api/health" 2>/dev/null | grep -q '"ok"'; then

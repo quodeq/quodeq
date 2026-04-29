@@ -6,7 +6,7 @@ from quodeq.dashboard._api_spawn import spawn_action_api
 
 from tests.conftest import DummyProcess
 
-_TEST_PORT = 8001
+_TEST_PORT = 7863
 _TEST_HOST = "127.0.0.1"
 _TEST_DASHBOARD_PORT = 3000
 _TEST_API_PORT = 9000
