@@ -16,9 +16,14 @@ _HEARTBEAT_FMT = (
     "  [{dimension}] {mins}m{secs:02d}s | "
     "{active} active ({total_agents} total) | "
     "{taken} files taken ({remaining} left) | "
-    "{findings} findings ({duplicates} dup) | "
+    "{findings} findings{dup_seg} | "
     "{violations} violations · {compliance} compliance"
 )
+
+
+def _format_dup_segment(duplicates: int) -> str:
+    """Render the ``(N dup)`` suffix only when there's actual overlap to surface."""
+    return f" ({duplicates} dup)" if duplicates > 0 else ""
 
 
 @dataclass
@@ -69,7 +74,7 @@ def heartbeat_loop(
                 taken=taken,
                 remaining=remaining,
                 findings=tally.total,
-                duplicates=tally.duplicates,
+                dup_seg=_format_dup_segment(tally.duplicates),
                 violations=tally.violations,
                 compliance=tally.compliance,
             ))

@@ -8,6 +8,15 @@ from pathlib import Path
 
 from flask import Flask, Response, current_app, jsonify, request
 
+# Lines containing this marker are kept in run.log for forensics but suppressed
+# from the dashboard's live console — they're per-minute resource snapshots
+# (rss / fds / threads / ollama RSS) and clutter the operator-facing view.
+_CONSOLE_HIDDEN_MARKERS: tuple[str, ...] = ("[resources]",)
+
+
+def _is_visible_log_line(line: str) -> bool:
+    return not any(marker in line for marker in _CONSOLE_HIDDEN_MARKERS)
+
 
 def _resolve_run_log(job_id: str) -> tuple[Path | None, int]:
     """Return (log_path, status_hint). status_hint is 0 on success, HTTP code on error."""
@@ -38,7 +47,7 @@ def _read_tail(log_path: Path, since: int) -> tuple[list[str], int]:
             return [], since  # no complete line yet
         text = text[: last_nl + 1]
     consumed = len(text.encode("utf-8"))
-    lines = text.splitlines()
+    lines = [ln for ln in text.splitlines() if _is_visible_log_line(ln)]
     return lines, since + consumed
 
 
@@ -79,7 +88,8 @@ def _sse_generator(log_path: Path, initial_offset: int, is_done):
             if complete:
                 for line in complete.splitlines():
                     offset += len(line.encode("utf-8")) + 1  # +1 for '\n'
-                    yield _sse_line(line, event_id=offset)
+                    if _is_visible_log_line(line):
+                        yield _sse_line(line, event_id=offset)
         if is_done():
             # Emit done frame without a data field so parsers don't see an empty data entry.
             done_parts = []
