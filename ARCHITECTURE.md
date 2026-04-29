@@ -56,7 +56,8 @@ Each evaluation has a directory under `~/.quodeq/evaluations/<project_uuid>/<run
 | `.heartbeat` | CLI (`shared/run_heartbeat.py`) | Empty file whose mtime is the liveness signal. Touched every 5s while `state ∈ {running, finalizing}`. |
 | `.pid` | CLI (`_cli_evaluation.py`) | OS PID. Used by the cancel flow (`services/_external_jobs.py`) to deliver SIGTERM. |
 | `evidence/manifest.json` | Analysis engine | Scan inputs. Presence marks "a run was started." |
-| `evidence/<dim>_evidence.jsonl` | Subagent pool | Per-dimension findings stream. |
+| `evidence/<dim>_evidence.jsonl` | Subagent pool | **Durable findings log.** Append-only stream, source of truth. JSONL is human-readable, recoverable from any disk, and never deleted by the system. |
+| `evaluation.db` | Analysis pipeline (`FindingsRouter`) + scoring engine | **Indexed projection of the JSONL.** SQLite + FTS5. Dual-written alongside JSONL during analysis. The dashboard prefers it for queries when present; deleted-or-absent → loader falls back to JSONL/JSON. Rebuildable from JSONL at any time. Set `QUODEQ_DISABLE_SQLITE=1` to skip both the write and the read for instant rollback. |
 | `evaluation/<dim>.json` | Scoring engine | Per-dimension report (the UI's "report" artifact). |
 | `run.log` | CLI + dashboard subprocess | Verbatim stderr tee. Consumed by the live-terminal SSE endpoint and for historical replay. |
 | `scan.json` | Report assembly | Aggregate report (legacy lifecycle signal; superseded by `status.json`). |
