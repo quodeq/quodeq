@@ -29,8 +29,16 @@ def _ollama_log_path() -> Path | None:
 # per-request entries from the Gin HTTP framework. The request lines (which
 # show what quodeq is asking the model for) are the actionable signal; the
 # rest is noise for debugging-the-runtime, not debugging-your-evaluation.
+#
+# Quodeq also polls /api/version every few seconds as a health check —
+# those lines say nothing about the evaluation, just confirm the server
+# is up. Drop them to keep the stream focused on actual model traffic.
 def _is_gin_line(line: str) -> bool:
-    return "[GIN]" in line
+    if "[GIN]" not in line:
+        return False
+    if '"/api/version"' in line:
+        return False
+    return True
 
 
 def register_ollama_log_routes(app: Flask) -> None:
