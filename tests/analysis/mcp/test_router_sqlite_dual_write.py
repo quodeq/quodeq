@@ -44,3 +44,25 @@ def test_router_dedup_skips_both_writes(tmp_path: Path):
     assert dup is True
     assert fh.getvalue().count("\n") == 1
     assert repo.count_by_dimension() == {"dim": 1}
+
+
+def test_router_swallows_sqlite_errors_to_preserve_jsonl_durability(tmp_path: Path):
+    """Verify the load-bearing safety property: a failing FindingsRepository
+    must not break the router. JSONL must still be written and the call must
+    return successfully.
+    """
+
+    class _FailingRepo:
+        def insert_finding(self, finding):
+            raise RuntimeError("simulated SQLite failure")
+
+    fh = io.StringIO()
+    router = FindingsRouter(fh, findings_repo=_FailingRepo())
+
+    msg, dup = router.receive(_args())
+
+    # JSONL was written despite SQLite failing
+    assert fh.getvalue().count("\n") == 1
+    # Caller saw a normal success, not the exception
+    assert dup is False
+    assert "Finding #1 recorded." in msg

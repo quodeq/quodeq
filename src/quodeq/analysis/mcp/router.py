@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -18,6 +19,7 @@ from quodeq.analysis.mcp.enrichment import enrich_code
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
 from quodeq.data.ports.findings import FindingsRepository
 
+_logger = logging.getLogger(__name__)
 _FINDING_SCHEMA_VERSION = 1
 
 
@@ -149,6 +151,10 @@ class FindingsRouter:
                 self._findings_repo.insert_finding(finding)
             except Exception:  # noqa: BLE001 — SQLite must never break JSONL durability
                 # Dual-write is a safety net during rollout. JSONL is the truth.
-                pass
+                # Log so operators see broken SQLite sinks instead of silent data loss.
+                _logger.warning(
+                    "FindingsRouter: SQLite dual-write failed (JSONL succeeded)",
+                    exc_info=True,
+                )
         self.counter += 1
         return f"Finding #{self.counter} recorded.", False
