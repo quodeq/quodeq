@@ -1,18 +1,19 @@
-import { useMemo, useState, useEffect } from 'react';
-import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
+import { lazy, Suspense, useMemo, useState, useEffect } from 'react';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
-import ExplorerPage from './features/explorer/components/ExplorerPage.jsx';
-import FileDetailPage from './features/explorer/components/FileDetailPage.jsx';
-import PrincipleDetailPage from './features/explorer/components/PrincipleDetailPage.jsx';
-import FindingDetailPage from './features/explorer/components/FindingDetailPage.jsx';
-import ProjectsPage from './features/dashboard/components/ProjectsPage.jsx';
-import HistoryPage from './features/history/components/HistoryPage.jsx';
-import EvaluateScreen from './features/evaluation/components/EvaluateScreen.jsx';
-import SettingsPage from './features/settings/components/SettingsPage.jsx';
-import StandardsPage from './features/standards/StandardsPage.jsx';
-import ViolationsPage from './features/violations/components/ViolationsPage.jsx';
-import MapPage from './features/map/components/MapPage.jsx';
-import HelpPage from './features/help/components/HelpPage.jsx';
+
+const DashboardPage = lazy(() => import('./features/dashboard/components/DashboardPage.jsx'));
+const ExplorerPage = lazy(() => import('./features/explorer/components/ExplorerPage.jsx'));
+const FileDetailPage = lazy(() => import('./features/explorer/components/FileDetailPage.jsx'));
+const PrincipleDetailPage = lazy(() => import('./features/explorer/components/PrincipleDetailPage.jsx'));
+const FindingDetailPage = lazy(() => import('./features/explorer/components/FindingDetailPage.jsx'));
+const ProjectsPage = lazy(() => import('./features/dashboard/components/ProjectsPage.jsx'));
+const HistoryPage = lazy(() => import('./features/history/components/HistoryPage.jsx'));
+const EvaluateScreen = lazy(() => import('./features/evaluation/components/EvaluateScreen.jsx'));
+const SettingsPage = lazy(() => import('./features/settings/components/SettingsPage.jsx'));
+const StandardsPage = lazy(() => import('./features/standards/StandardsPage.jsx'));
+const ViolationsPage = lazy(() => import('./features/violations/components/ViolationsPage.jsx'));
+const MapPage = lazy(() => import('./features/map/components/MapPage.jsx'));
+const HelpPage = lazy(() => import('./features/help/components/HelpPage.jsx'));
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
 import { useApi } from './api/ApiContext.jsx';
 import LoadingScreen from './components/LoadingScreen.jsx';
@@ -425,7 +426,13 @@ export default function App() {
               onToggleTheme={toggleTheme}
             />
           }
-          content={<div className="tab-fade" key={activeTab}><MainContent activePage={activePage} props={contentProps} /></div>}
+          content={
+            <Suspense fallback={<LoadingScreen />}>
+              <div className="tab-fade" key={activeTab}>
+                <MainContent activePage={activePage} props={contentProps} />
+              </div>
+            </Suspense>
+          }
             />
           </OllamaLogProvider>
         </ServerLogProvider>
