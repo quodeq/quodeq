@@ -29,6 +29,7 @@ from quodeq.data.fs.report_parser.runs import (
     read_run_data,
     safe_read_dir,
 )
+from quodeq.data.ports.findings import FindingsRepository
 
 
 # --- Protocol (owned by the services layer) --------------------------------
@@ -53,7 +54,8 @@ class RunStorage(Protocol):
 
 
 __all__ = [
-    # Protocol
+    # Protocols
+    "FindingsRepository",
     "RunStorage",
     # Types
     "RunInfo",
