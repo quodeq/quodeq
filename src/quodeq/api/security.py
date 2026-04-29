@@ -77,8 +77,8 @@ def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: st
         if api_key:
             auth = request.headers.get("Authorization", "")
             if auth.startswith("Bearer ") and len(auth) > 11:
-                actor = f", actor=key:***{auth[-4:]}"
-        _logger.info("API: %s %s (remote_addr=%s%s)", request.method, request.path, request.remote_addr, actor)
+                actor = f" (actor=key:***{auth[-4:]})"
+        _logger.info("API: %s %s%s", request.method, request.path, actor)
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:
