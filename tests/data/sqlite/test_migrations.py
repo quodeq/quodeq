@@ -2,7 +2,6 @@ import sqlite3
 import pytest
 from quodeq.data.sqlite._migrations import (
     apply_evaluation_schema,
-    apply_index_schema,
     SchemaVersionError,
 )
 
@@ -40,12 +39,3 @@ def test_apply_evaluation_schema_rejects_newer_version():
     conn.execute("PRAGMA user_version = 99")
     with pytest.raises(SchemaVersionError):
         apply_evaluation_schema(conn)
-
-
-def test_apply_index_schema_creates_runs_table():
-    conn = sqlite3.connect(":memory:")
-    apply_index_schema(conn)
-    tables = {r[0] for r in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-    )}
-    assert "runs" in tables

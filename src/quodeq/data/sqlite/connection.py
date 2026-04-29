@@ -1,4 +1,4 @@
-"""Connection context managers for evaluation.db and index.db.
+"""Connection context manager for evaluation.db.
 
 Sets WAL mode, foreign keys, and a busy-timeout that tolerates concurrent
 sibling MCP server processes (mirrors the behavior of the existing JSONL
@@ -11,10 +11,9 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
-from quodeq.data.sqlite._migrations import apply_evaluation_schema, apply_index_schema
+from quodeq.data.sqlite._migrations import apply_evaluation_schema
 
 EVALUATION_DB_FILENAME = "evaluation.db"
-INDEX_DB_FILENAME = "index.db"
 _BUSY_TIMEOUT_MS = 5000
 
 
@@ -32,20 +31,6 @@ def open_evaluation_db(run_dir: Path) -> Iterator[sqlite3.Connection]:
     try:
         _configure(conn)
         apply_evaluation_schema(conn)
-        conn.commit()
-        yield conn
-    finally:
-        conn.close()
-
-
-@contextmanager
-def open_index_db(quodeq_root: Path) -> Iterator[sqlite3.Connection]:
-    quodeq_root.mkdir(parents=True, exist_ok=True)
-    path = quodeq_root / INDEX_DB_FILENAME
-    conn = sqlite3.connect(path)
-    try:
-        _configure(conn)
-        apply_index_schema(conn)
         conn.commit()
         yield conn
     finally:

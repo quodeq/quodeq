@@ -3,9 +3,7 @@ from pathlib import Path
 
 from quodeq.data.sqlite.connection import (
     open_evaluation_db,
-    open_index_db,
     EVALUATION_DB_FILENAME,
-    INDEX_DB_FILENAME,
 )
 
 
@@ -33,12 +31,3 @@ def test_open_evaluation_db_reopen_preserves_data(tmp_path: Path):
     with open_evaluation_db(tmp_path) as conn:
         n = conn.execute("SELECT COUNT(*) FROM findings").fetchone()[0]
         assert n == 1
-
-
-def test_open_index_db_creates_file_in_root(tmp_path: Path):
-    with open_index_db(tmp_path) as conn:
-        rows = conn.execute(
-            "SELECT name FROM sqlite_master WHERE name='runs'"
-        ).fetchall()
-        assert rows == [("runs",)]
-    assert (tmp_path / INDEX_DB_FILENAME).is_file()

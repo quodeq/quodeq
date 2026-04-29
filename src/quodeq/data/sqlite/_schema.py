@@ -1,4 +1,4 @@
-"""DDL strings for evaluation.db and index.db. Constants only — no logic."""
+"""DDL strings for evaluation.db. Constants only — no logic."""
 from __future__ import annotations
 
 EVALUATION_DDL = """
@@ -68,24 +68,6 @@ CREATE TABLE run_meta (
     key             TEXT PRIMARY KEY,
     value           TEXT NOT NULL
 );
-"""
-
-INDEX_DDL = """
-PRAGMA user_version = 1;
-
-CREATE TABLE runs (
-    project         TEXT NOT NULL,
-    run_id          TEXT NOT NULL,
-    branch          TEXT,
-    model           TEXT,
-    started_at      TEXT NOT NULL,
-    finished_at     TEXT,
-    state           TEXT NOT NULL,
-    db_path         TEXT NOT NULL,
-    PRIMARY KEY (project, run_id)
-);
-CREATE INDEX idx_runs_started ON runs(started_at DESC);
-CREATE INDEX idx_runs_project ON runs(project, started_at DESC);
 """
 
 SCHEMA_VERSION = 1
