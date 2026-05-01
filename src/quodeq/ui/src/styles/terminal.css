@@ -800,6 +800,14 @@
     border-top: 0;
     padding-top: 0;
   }
+  /* Compact drawer: let the whole sidebar scroll vertically if its
+     content exceeds the viewport. The base rule sets overflow:hidden,
+     which on short phones can cut off the footer (Server status / Help).
+     Limited to the pinned drawer; desktop's hover-expanded sidebar fits
+     by design and shouldn't show a scrollbar. */
+  .sidebar.sidebar--expanded.sidebar--pinned {
+    overflow-y: auto;
+  }
   .sidebar.sidebar--expanded.sidebar--pinned .sidebar-brand-text,
   .sidebar.sidebar--expanded.sidebar--pinned .sidebar-version,
   .sidebar.sidebar--expanded.sidebar--pinned .sidebar-section-label,
@@ -830,12 +838,21 @@
     padding: 0;
   }
   .sidebar:not(.sidebar--expanded):hover { width: 100% !important; }
-  .sidebar-header {
+  .sidebar:not(.sidebar--expanded) .sidebar-header {
     border-bottom: 0;
     border-right: 1px solid var(--color-border);
     padding: var(--term-space-2) var(--term-space-3);
   }
-  .sidebar-nav {
+  /* The next blocks (.sidebar-nav, .sidebar-nav-item, .sidebar-bottom/
+     footer/controls) describe the LEGACY horizontal icon-rail layout
+     for narrow viewports where the sidebar isn't the expanded drawer.
+     They MUST be scoped to .sidebar:not(.sidebar--expanded) — without
+     the scope they leak into the expanded mobile drawer (the "burger"
+     menu) and force its nav rows to flex-direction: row + overflow-x:
+     auto, which causes the drawer to look broken (items in horizontal
+     scroll, weird spacing). The expanded drawer keeps its own column
+     layout from the .sidebar.sidebar--expanded rules below. */
+  .sidebar:not(.sidebar--expanded) .sidebar-nav {
     flex-direction: row;
     flex-wrap: nowrap;
     gap: 0;
@@ -844,15 +861,15 @@
     flex: 1;
     min-width: 0;
   }
-  .sidebar-nav-item {
+  .sidebar:not(.sidebar--expanded) .sidebar-nav-item {
     flex-shrink: 0;
     padding: var(--term-space-2);
   }
   /* Horizontal nav: icon-only, keep badges. */
-  .sidebar-nav-item > span:not(.sidebar-nav-badge) {
+  .sidebar:not(.sidebar--expanded) .sidebar-nav-item > span:not(.sidebar-nav-badge) {
     display: none !important;
   }
-  .sidebar-nav-item {
+  .sidebar:not(.sidebar--expanded) .sidebar-nav-item {
     gap: 0;
     padding: var(--term-space-2) !important;
     width: 40px !important;
@@ -862,9 +879,9 @@
     justify-content: center;
   }
   /* Bottom-of-sidebar controls (help, theme toggle) inline into the row. */
-  .sidebar-bottom,
-  .sidebar-footer,
-  .sidebar-controls {
+  .sidebar:not(.sidebar--expanded) .sidebar-bottom,
+  .sidebar:not(.sidebar--expanded) .sidebar-footer,
+  .sidebar:not(.sidebar--expanded) .sidebar-controls {
     border-top: 0;
     padding: 0 var(--term-space-2);
     flex-direction: row;
