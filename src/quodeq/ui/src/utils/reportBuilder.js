@@ -241,3 +241,81 @@ export function buildOverviewReport(accumulated, accumulatedDimensions, projectN
 
   return lines.join('\n');
 }
+
+export function buildRunReport({ dashboard, runSummary, projectName }) {
+  const dimensions = dashboard?.dimensions || [];
+  const selectedRun = dashboard?.selectedRun || {};
+  const dateLabel = selectedRun.dateLabel || formatDate();
+  const runId = selectedRun.runId || '';
+  const numeric = runSummary?.numericAverage;
+  const score = numeric != null ? `${Math.round(parseFloat(numeric) * 10) / 10}/10` : '—';
+  const grade = runSummary?.overallGrade || '—';
+  const project = projectName || 'Run';
+  const ridSuffix = runId ? ` · **Run:** ${runId.slice(0, 8)}` : '';
+
+  const lines = [];
+  lines.push(`# ${project} run report`);
+  lines.push('');
+  lines.push(`**Date:** ${dateLabel}${ridSuffix} · **Overall Score:** ${score} ${grade}`);
+  lines.push('');
+
+  lines.push(...buildDimensionSummaryTable(dimensions));
+  lines.push(...buildTopOffendingFiles(dimensions));
+  lines.push(...buildCritMajorSection(dimensions));
+  lines.push(...buildOverviewSummarySection(runSummary || {}, dimensions));
+
+  return lines.join('\n');
+}
+
+function buildFileSummarySection(file, totalViolations, totalCompliance) {
+  const lines = [];
+  lines.push('## Summary');
+  lines.push('');
+  lines.push(`- **${totalViolations}** total violations (${file.critical || 0} critical, ${file.major || 0} major, ${file.minor || 0} minor)`);
+  lines.push(`- **${totalCompliance}** compliance findings`);
+  lines.push(`- **${file.dimensionsCount || 0}** dimension${file.dimensionsCount === 1 ? '' : 's'}`);
+  if (totalViolations && totalCompliance) {
+    lines.push(`- **Ratio:** 1:${Math.round(totalCompliance / totalViolations)}`);
+  }
+  lines.push('');
+  return lines;
+}
+
+function buildFileViolationsSection(file) {
+  const lines = [];
+  const allViolations = SEVERITY_ORDER.flatMap((sev) => file.violationsBySeverity?.[sev] || []);
+  lines.push(`## Violations (${allViolations.length})`);
+  lines.push('');
+  if (allViolations.length === 0) {
+    lines.push('No violations found.');
+    lines.push('');
+    return lines;
+  }
+  for (const sev of SEVERITY_ORDER) {
+    const vs = file.violationsBySeverity?.[sev] || [];
+    if (vs.length === 0) continue;
+    lines.push(`### ${sev.charAt(0).toUpperCase() + sev.slice(1)} (${vs.length})`);
+    lines.push('');
+    for (const v of vs) lines.push(formatViolationEntry(v));
+  }
+  return lines;
+}
+
+export function buildFileReport(file) {
+  const filePath = file?.file || 'unknown';
+  const totalViolations = file?.total || 0;
+  const totalCompliance = file?.compliance?.length || 0;
+  const date = formatDate();
+
+  const lines = [];
+  lines.push(`# File report`);
+  lines.push('');
+  lines.push(`**File:** \`${filePath}\` · **Date:** ${date}`);
+  lines.push('');
+
+  lines.push(...buildFileSummarySection(file, totalViolations, totalCompliance));
+  lines.push(...buildFileViolationsSection(file));
+  lines.push(...buildComplianceSection(file?.compliance || []));
+
+  return lines.join('\n');
+}
