@@ -25,6 +25,7 @@ import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { readVisibleStandardIds } from './utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
 import { SidePane, SidePaneProvider } from './features/side-pane/index.js';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.jsx';
 import { ServerLogProvider } from './features/settings/server-log/ServerLogProvider.jsx';
 import { OllamaLogProvider } from './features/settings/ollama-log/OllamaLogProvider.jsx';
@@ -364,6 +365,7 @@ export default function App() {
           : null);
 
   return (
+    <>
     <SidePaneProvider>
       <EvalLogProvider>
         <ServerLogProvider>
@@ -438,5 +440,7 @@ export default function App() {
         </ServerLogProvider>
       </EvalLogProvider>
     </SidePaneProvider>
+    {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+    </>
   );
 }
