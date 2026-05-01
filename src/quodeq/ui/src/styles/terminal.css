@@ -1018,6 +1018,18 @@
 .history-table .history-row--in-progress {
   background: color-mix(in srgb, var(--color-warn, #d29922) 6%, transparent);
 }
+
+/* Running run with no dimensions scored yet — clicking would land on an
+   empty dashboard, so signal "not ready" visually and intercept the click
+   to show a toast (see HistoryPage.NotReadyToast). */
+.history-table .history-row--not-ready {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+.history-table .history-row--not-ready:hover {
+  /* Don't add the usual hover lift — the row isn't actionable. */
+  background: color-mix(in srgb, var(--color-warn, #d29922) 6%, transparent);
+}
 .history-row__running {
   display: inline-flex;
   align-items: center;
