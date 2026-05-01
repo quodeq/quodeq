@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRunReport, buildFileReport, buildOverviewReport, buildDimensionReport } from './reportBuilder.js';
+import { buildRunReport, buildFileReport, buildOverviewReport, buildDimensionReport, buildPrincipleReport } from './reportBuilder.js';
 
 const dimensions = [
   {
@@ -88,6 +88,38 @@ test('buildFileReport includes file path and totals', () => {
 test('buildFileReport with no violations shows "No violations found"', () => {
   const file = { file: 'empty.js', total: 0, compliance: [], violationsBySeverity: {}, dimensionsCount: 1 };
   const md = buildFileReport(file);
+  assert.match(md, /No violations found\./);
+});
+
+test('buildPrincipleReport includes principle, score, findings, and violations', () => {
+  const md = buildPrincipleReport({
+    principle: 'Single Responsibility',
+    dimension: 'maintainability',
+    score: '6/10',
+    grade: 'C',
+    violations: [
+      { severity: 'critical', principle: 'Single Responsibility', title: 'Mega class', file: 'src/big.js', line: 10 },
+    ],
+    compliance: [{ principle: 'Single Responsibility', file: 'src/small.js', reason: 'small and focused' }],
+    principleData: { findings: 'Code lacks separation.', justification: 'Several god objects.' },
+    runId: 'abc12345',
+    dateLabel: '21 Apr 2025',
+  });
+  assert.match(md, /^# Single Responsibility report/);
+  assert.match(md, /\*\*Date:\*\* 21 Apr 2025/);
+  assert.match(md, /\*\*Run:\*\* abc12345/);
+  assert.match(md, /\*\*Dimension:\*\* maintainability/);
+  assert.match(md, /\*\*Score:\*\* 6\/10 C/);
+  assert.match(md, /## Findings/);
+  assert.match(md, /Code lacks separation\./);
+  assert.match(md, /## Justification/);
+  assert.match(md, /## Violations \(1\)/);
+  assert.match(md, /### Critical \(1\)/);
+  assert.match(md, /## Compliance Summary \(1\)/);
+});
+
+test('buildPrincipleReport with no violations shows "No violations found"', () => {
+  const md = buildPrincipleReport({ principle: 'X', violations: [], compliance: [], principleData: null });
   assert.match(md, /No violations found\./);
 });
 
