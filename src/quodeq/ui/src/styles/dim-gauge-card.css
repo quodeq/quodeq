@@ -120,9 +120,10 @@
   fill: var(--color-text-subtle);
 }
 .dim-gauge-card__insuf-line {
-  font: 11px ui-monospace, monospace;
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
   color: var(--color-text-subtle);
   text-align: center;
-  margin-top: 8px;
+  margin-top: var(--space-2);
   letter-spacing: 0.04em;
 }
