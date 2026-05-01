@@ -135,8 +135,8 @@ export default function PrinciplesRadial({
             key={`lab-${i}`}
             role={onPrincipleClick && !isInsuf ? 'button' : undefined}
             tabIndex={onPrincipleClick && !isInsuf ? 0 : undefined}
-            onClick={!isInsuf ? handleClick(p.name) : undefined}
-            onKeyDown={!isInsuf ? handleKey(p.name) : undefined}
+            onClick={onPrincipleClick && !isInsuf ? handleClick(p.name) : undefined}
+            onKeyDown={onPrincipleClick && !isInsuf ? handleKey(p.name) : undefined}
             className={`qd-radial__label-group${isInsuf ? ' qd-radial__label-group--insuf' : ''}`}
           >
             <text

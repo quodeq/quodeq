@@ -22,6 +22,8 @@ describe('PrinciplesRadial', () => {
     for (const p of ONE_INSUFFICIENT) {
       expect(screen.getByText(new RegExp(p.name, 'i'))).toBeInTheDocument();
     }
+    // The insufficient principle gets the literal text "insufficient" in its sub-label
+    expect(screen.getByText('insufficient')).toBeInTheDocument();
   });
 
   it('renders a filled polygon polyline when 3+ principles have evidence', () => {
