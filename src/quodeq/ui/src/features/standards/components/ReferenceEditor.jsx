@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
+import { standardsKeys } from '../../../api/queryKeys.js';
 
 const EDITABLE_REF_TYPES = ['cwe', 'book', 'url', 'other'];
 const BUILTIN_REF_TYPES = ['cwe', 'asvs', 'cert', 'cisq', 'wcag22'];
@@ -68,13 +70,19 @@ function CweFilterBar({ searchRef, query, setQuery, filterAbstraction, setFilter
 
 function CweBrowserModal({ onSelect, onClose }) {
   const { listCwes } = useApi();
-  const [cwes, setCwes] = useState([]);
-  const [cweError, setCweError] = useState(null);
   const [query, setQuery] = useState('');
   const [filterAbstraction, setFilterAbstraction] = useState('');
   const searchRef = useRef(null);
 
-  useEffect(() => { listCwes().then((data) => { setCwes(data); setCweError(null); }).catch(() => { setCwes([]); setCweError('Failed to load CWE list. Check your connection and try again.'); }); }, [listCwes]);
+  const { data: cwesData, error: cwesQueryError } = useQuery({
+    queryKey: standardsKeys.cwes(),
+    queryFn: () => listCwes(),
+  });
+  const cwes = cwesData || [];
+  const cweError = cwesQueryError
+    ? 'Failed to load CWE list. Check your connection and try again.'
+    : null;
+
   useEffect(() => { if (searchRef.current) searchRef.current.focus(); }, []);
 
   const filtered = useMemo(() => cwes.filter((c) => {
