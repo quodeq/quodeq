@@ -784,6 +784,16 @@
   .console-button,
   .server-status-pill__divider { display: none !important; }
 
+  /* Hide the side-pane itself in compact view. Without this, if a user
+     opens Report on desktop, then resizes to mobile, the body grid
+     collapses to 1fr and the side-pane stacks below the dashboard
+     (with no obvious way to close it because triggers are also hidden).
+     With display:none the pane is removed from layout entirely on
+     mobile; the registered window state is preserved in the SidePane
+     context, so resizing back to desktop restores the open Report
+     panel and the topbar Report button works as before. */
+  .side-pane { display: none !important; }
+
   /* Compact drawer: tighten the "current repo" (projects) block. It
      contains a single NavButton and on the drawer width the surrounding
      padding + divider make it read as having a lot more space than the
