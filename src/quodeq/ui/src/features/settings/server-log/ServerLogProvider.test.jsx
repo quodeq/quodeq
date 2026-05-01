@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SidePaneProvider } from '../../side-pane/index.js';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import { ServerLogProvider } from './ServerLogProvider.jsx';
@@ -20,20 +21,26 @@ function Probe() {
 }
 
 function renderWithProviders(ui) {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0, staleTime: 0 },
+      mutations: { retry: false },
+    },
+  });
   return render(
-    <SidePaneProvider>
-      <ServerLogProvider>{ui}</ServerLogProvider>
-    </SidePaneProvider>
+    <QueryClientProvider client={client}>
+      <SidePaneProvider>
+        <ServerLogProvider>{ui}</ServerLogProvider>
+      </SidePaneProvider>
+    </QueryClientProvider>
   );
 }
 
 describe('ServerLogProvider', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ lines: [] }) });
   });
   afterEach(() => {
-    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
