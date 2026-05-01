@@ -582,7 +582,11 @@
 .dimensions-grid {
   display: grid;
   gap: var(--space-3);
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  /* Cards stretch to share whatever width is left so the row stays full
+     before wrapping. They wrap to a new row only once each track would fall
+     below the 180px min — no half-empty rows just because a fixed max didn't
+     divide cleanly. */
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .dimension-card {
@@ -1447,18 +1451,25 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  font-family: var(--term-font-mono);
 }
 
 .offending-file-row {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  transition: background 0.12s, border-color 0.12s;
+  gap: var(--term-space-3);
+  padding: 10px var(--term-space-2);
+  border-bottom: var(--term-divider);
+  transition: background-color 0.12s;
+  /* Off-screen rows skip layout/paint natively. Same trick used by
+     `.vdetail-row` in evaluation.css. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 56px;
+}
+
+.offending-file-row:last-child {
+  border-bottom: 0;
 }
 
 .offending-file-row--clickable {
@@ -1466,8 +1477,13 @@
 }
 
 .offending-file-row--clickable:hover {
-  background: color-mix(in srgb, var(--color-accent) 7%, transparent);
-  border-color: color-mix(in srgb, var(--color-accent) 22%, transparent);
+  background: var(--color-surface-alt);
+}
+
+.offending-file-row--clickable:focus-visible {
+  outline: 0;
+  background: var(--color-surface-alt);
+  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 .offending-file-row--clickable:hover .offending-file-chevron {
@@ -1483,11 +1499,13 @@
 }
 
 .offending-file-total {
-  font-size: 0.88rem;
+  font-family: var(--term-font-mono);
+  font-size: 13px;
   font-weight: 700;
   color: var(--color-text);
   min-width: 22px;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .offending-file-info {
@@ -1499,10 +1517,11 @@
 }
 
 .offending-file-name {
-  font-size: 0.95rem;
-  font-weight: var(--weight-semibold, 600);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--text-sm);
+  font-weight: 400;
   color: var(--color-text);
-  letter-spacing: -0.005em;
+  letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1512,8 +1531,9 @@
 
 .offending-file-path {
   min-width: 0;
-  font-size: 0.75rem;
-  color: var(--color-text-subtle);
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1521,8 +1541,11 @@
 }
 
 .offending-file-dims {
-  font-size: 0.72rem;
-  color: var(--color-text-muted);
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--color-text-subtle);
+  text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1534,29 +1557,11 @@
 
 .offending-file-chevron {
   flex-shrink: 0;
-  font-size: 1.1rem;
-  color: var(--color-accent);
-  opacity: 0.3;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--color-text-muted);
+  opacity: 0.5;
   transition: opacity 0.12s, transform 0.12s;
-}
-
-.offending-show-more {
-  display: block;
-  width: 100%;
-  margin-top: 8px;
-  padding: 6px 0;
-  background: none;
-  border: none;
-  color: var(--color-accent);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  text-align: center;
-  opacity: 0.75;
-  transition: opacity 0.12s;
-}
-
-.offending-show-more:hover {
-  opacity: 1;
 }
 
 /* Diff summary section */

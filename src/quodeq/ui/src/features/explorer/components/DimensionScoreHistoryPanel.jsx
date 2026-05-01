@@ -1,5 +1,6 @@
 import { SectionLabel } from '../../../components/terminal/index.js';
 import { extractDimensionHistory } from '../../../components/DimensionSparkline.jsx';
+import { scoreGradeColorVar } from '../../../utils/formatters.js';
 
 const MAX = 16;
 
@@ -34,34 +35,39 @@ export default function DimensionScoreHistoryPanel({ trend = [], dimension }) {
   );
 }
 
+// Fixed visible scale matches the inline DimensionSparkline so bar heights
+// read consistently across both surfaces. The top of the chart always
+// represents 10/10 (the "100%" reference).
+const SCALE_MIN = 4;
+const SCALE_MAX = 10;
+
 function DimensionHistoryChart({ scores }) {
-  // Simple SVG bar+line chart, scaled 0..10. Latest is rightmost & highlighted.
   const W = 480;
   const H = 180;
   const PAD_X = 10;
+  const PAD_TOP = 10;
+  const PAD_BOT = 6;
   const GAP = 12;
   const barW = (W - PAD_X * 2 - GAP * (scores.length - 1)) / scores.length;
-  const yFor = (v) => H - 6 - (Math.max(0, Math.min(v, 10)) / 10) * (H - 16);
+  const yFor = (v) => {
+    const clipped = Math.max(SCALE_MIN, Math.min(SCALE_MAX, v));
+    const ratio = (clipped - SCALE_MIN) / (SCALE_MAX - SCALE_MIN);
+    return H - PAD_BOT - ratio * (H - PAD_TOP - PAD_BOT);
+  };
   const xFor = (i) => PAD_X + i * (barW + GAP);
-  const last = scores.length - 1;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: H }}>
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', minHeight: H, display: 'block' }}>
       {[0.25, 0.5, 0.75].map((p) => (
         <line key={p} x1="0" y1={H * p} x2={W} y2={H * p}
               stroke="var(--color-border)" strokeDasharray="2 3" strokeWidth="0.5" />
       ))}
+      {/* 100% reference at the top of the plot area */}
+      <line x1="0" y1={PAD_TOP} x2={W} y2={PAD_TOP}
+            stroke="var(--color-border)" strokeWidth="0.6" />
       {scores.map((v, i) => {
         const y = yFor(v);
-        const fill = i === last ? 'var(--color-accent)' : i >= scores.length - 3 ? '#c8b08c' : '#d8c8b0';
-        return <rect key={i} x={xFor(i)} y={y} width={barW} height={H - 6 - y} fill={fill} />;
+        return <rect key={i} x={xFor(i)} y={y} width={barW} height={H - PAD_BOT - y} fill={scoreGradeColorVar(v)} />;
       })}
-      <polyline
-        fill="none"
-        stroke="var(--color-accent)"
-        strokeWidth="1.8"
-        points={scores.map((v, i) => `${xFor(i) + barW / 2},${yFor(v)}`).join(' ')}
-      />
-      <circle cx={xFor(last) + barW / 2} cy={yFor(scores[last])} r="3" fill="var(--color-text)" />
     </svg>
   );
 }
