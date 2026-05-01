@@ -783,6 +783,23 @@
      end with an orphan vertical rule. */
   .console-button,
   .server-status-pill__divider { display: none !important; }
+
+  /* Compact drawer: tighten the "current repo" (projects) block. It
+     contains a single NavButton and on the drawer width the surrounding
+     padding + divider make it read as having a lot more space than the
+     page-nav rows below. Targets only the first sidebar-block (the
+     projects one) — page-nav and operate-nav dividers stay intact.
+     Desktop layout is unchanged. */
+  .sidebar.sidebar--expanded.sidebar--pinned .sidebar-block:first-of-type {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  .sidebar.sidebar--expanded.sidebar--pinned
+    .sidebar-block:first-of-type
+    + .sidebar-block {
+    border-top: 0;
+    padding-top: 0;
+  }
   .sidebar.sidebar--expanded.sidebar--pinned .sidebar-brand-text,
   .sidebar.sidebar--expanded.sidebar--pinned .sidebar-version,
   .sidebar.sidebar--expanded.sidebar--pinned .sidebar-section-label,
