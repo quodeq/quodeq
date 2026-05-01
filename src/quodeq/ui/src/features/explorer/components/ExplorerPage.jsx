@@ -117,9 +117,9 @@ function ViolationsByFileSection({ topFiles, onNavigate }) {
   );
 }
 
-export default function ExplorerPage({ project, dimension, runId, dateLabel, severityFilter, onNavigate, refreshSignal }) {
+export default function ExplorerPage({ project, dimension, runId, dateLabel, onNavigate, refreshSignal, trend = [] }) {
   const d = useExplorerData(project, dimension, runId, refreshSignal);
-  const [activeSevFilter, setActiveSevFilter] = useState(severityFilter || null);
+  const [activeSevFilter, setActiveSevFilter] = useState(null);
 
   // All hooks must run before any early returns (React hooks rules)
   const buildEvalPrincipal = useMemo(

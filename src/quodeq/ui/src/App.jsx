@@ -232,7 +232,17 @@ const ROUTE_RENDERERS = {
     );
   },
   'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
-  explorer: (params, props) => <ExplorerPage project={params.fromProject || props.navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} severityFilter={params.severity} onNavigate={props.navigation.handleNavigate} refreshSignal={props.dashboardData.dashboard} />,
+  explorer: (params, props) => (
+    <ExplorerPage
+      project={params.fromProject || props.navigation.selectedProject}
+      dimension={params.dimension}
+      runId={params.runId}
+      dateLabel={params.dateLabel}
+      onNavigate={props.navigation.handleNavigate}
+      refreshSignal={props.dashboardData.dashboard}
+      trend={props.dashboardData.dashboard?.trend || []}
+    />
+  ),
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} />,
   file: (params) => <FileDetailPage file={params.file} />,
   evalprinciple: renderEvalPrincipleDetail,
