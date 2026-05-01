@@ -9,8 +9,10 @@ import { SectionLabel } from '../../../components/terminal/index.js';
 const HERO_SCORE_CIRCLE_SIZE = 120;
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
+import { buildRunReport } from '../../../utils/reportBuilder.js';
 import { formatRunId, complianceRatio } from '../../../utils/formatters.js';
 import { withDimensionsStr } from '../../../utils/dimensionUtils.js';
+import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import buildRunSummary from '../buildRunSummary.js';
 
 // ---------------------------------------------------------------------------
@@ -127,13 +129,30 @@ function RunFileViolations({ runTopFiles, onFileClick }) {
   );
 }
 
-export default function RunOverviewPanel({ dashboard, selectedRunId, onDimensionClick, onFileClick }) {
+export default function RunOverviewPanel({ dashboard, selectedRunId, projectName, onDimensionClick, onFileClick }) {
   const runSummary = useMemo(() => buildRunSummary(dashboard?.dimensions), [dashboard]);
   const runTopFiles = useMemo(() => withDimensionsStr(buildTopOffendingFiles(dashboard?.dimensions || [])), [dashboard]);
   const runUniquePrinciples = useMemo(() => {
     const violations = (dashboard?.dimensions || []).flatMap((d) => d.violations || []);
     return new Set(violations.map((v) => v.principle).filter(Boolean)).size;
   }, [dashboard]);
+
+  const reportSpec = useMemo(() => {
+    if (!dashboard?.dimensions) return null;
+    const runId = dashboard?.selectedRun?.runId || selectedRunId || 'current';
+    const dateLabel = dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId) || 'run';
+    const buildMarkdown = () => buildRunReport({ dashboard, runSummary, projectName });
+    const filenameLabel = (dateLabel || runId).replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
+    return {
+      id: `report:run:${runId}`,
+      type: 'report',
+      title: `${dateLabel} report`,
+      render: () => <ReportContent markdown={buildMarkdown()} />,
+      copy: () => buildMarkdown(),
+      download: () => ({ filename: `run-${filenameLabel}-report.md`, body: buildMarkdown() }),
+    };
+  }, [dashboard, runSummary, selectedRunId, projectName]);
+  useRegisterWindowSpec('report', reportSpec);
 
   // Per-dimension deltas from the trend entry (same source the history rows use)
   const trendDeltas = useMemo(() => {

@@ -1,6 +1,7 @@
 import { memo, useState, useCallback, useMemo } from 'react';
 import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
+import { buildPrincipleReport } from '../../../utils/reportBuilder.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
 import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
@@ -8,6 +9,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
+import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 
 // Off-screen rows skip layout/paint via CSS `content-visibility: auto` on
 // `.vdetail-row` (see styles/explorer.css), so no JS virtualizer or
@@ -197,13 +199,33 @@ function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) {
 }
 
 const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
-  const { principleData, principle, score, grade } = evalPrincipal;
+  const { principleData, principle, score, grade, dimension, runId } = evalPrincipal;
 
   const {
     violations, compliance, violationsBySeverity,
     liveScore, liveGrade, activeSevFilter, setActiveSevFilter,
     handleDismiss, filteredViolations, liveSevCounts, displayedBySeverity,
   } = usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss);
+
+  const reportSpec = useMemo(() => {
+    if (!principle) return null;
+    const buildMarkdown = () => buildPrincipleReport({
+      principle, dimension,
+      score: liveScore ?? score, grade: liveGrade ?? grade,
+      violations: filteredViolations, violationsBySeverity: displayedBySeverity,
+      compliance, principleData, runId,
+    });
+    const slug = `${(dimension || 'dim')}-${principle}`.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
+    return {
+      id: `report:principle:${dimension || 'dim'}:${principle}:${runId || 'current'}`,
+      type: 'report',
+      title: `${principle} report`,
+      render: () => <ReportContent markdown={buildMarkdown()} />,
+      copy: () => buildMarkdown(),
+      download: () => ({ filename: `principle-${slug}-report.md`, body: buildMarkdown() }),
+    };
+  }, [principle, dimension, runId, score, grade, liveScore, liveGrade, filteredViolations, displayedBySeverity, compliance, principleData]);
+  useRegisterWindowSpec('report', reportSpec);
 
   return (
     <>

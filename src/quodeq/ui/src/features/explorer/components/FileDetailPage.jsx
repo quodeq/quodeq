@@ -1,12 +1,14 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildFilePlanText } from '../../../utils/planTextBuilders.js';
+import { buildFileReport } from '../../../utils/reportBuilder.js';
 import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
 import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
 import { ComplianceCard } from './EvalCards.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
+import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
@@ -125,6 +127,21 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
   const totalViolations = file.total || 0;
   const totalCompliance = file.compliance?.length || 0;
   const dimensionsCount = file.dimensionsCount || 0;
+
+  const reportSpec = useMemo(() => {
+    if (!file?.file) return null;
+    const buildMarkdown = () => buildFileReport(file);
+    const filenameLabel = file.file.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
+    return {
+      id: `report:file:${file.file}`,
+      type: 'report',
+      title: `${file.file.split('/').pop()} report`,
+      render: () => <ReportContent markdown={buildMarkdown()} />,
+      copy: () => buildMarkdown(),
+      download: () => ({ filename: `file-${filenameLabel}-report.md`, body: buildMarkdown() }),
+    };
+  }, [file]);
+  useRegisterWindowSpec('report', reportSpec);
 
   return (
     <>

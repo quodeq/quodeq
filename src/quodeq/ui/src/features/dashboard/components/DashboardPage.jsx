@@ -13,6 +13,7 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
       <RunOverviewPanel
         dashboard={dashboard}
         selectedRunId={selectedRunId}
+        projectName={projectInfo?.displayName || projectInfo?.name || selectedProject}
         onDimensionClick={onDimensionCardClick}
         onFileClick={onFileClick}
       />
