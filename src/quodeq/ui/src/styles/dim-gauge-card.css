@@ -39,10 +39,11 @@
 /* header row: name + trend */
 .dim-gauge-card__head {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-1);
   flex-wrap: nowrap;
+  min-height: 2.5em;
 }
 .dim-gauge-card__name {
   font-size: var(--text-sm);
@@ -51,9 +52,12 @@
   letter-spacing: 0.02em;
   min-width: 0;
   flex: 1 1 auto;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+  word-break: break-word;
 }
 .dim-gauge-card__head .trend-badge {
   flex: 0 0 auto;
