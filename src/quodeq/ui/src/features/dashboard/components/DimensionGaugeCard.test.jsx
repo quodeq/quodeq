@@ -24,7 +24,10 @@ describe('DimensionGaugeCard', () => {
       />,
     );
     expect(screen.getByText('—')).toBeInTheDocument();
-    expect(screen.getByText(/INSUFFICIENT/i)).toBeInTheDocument();
+    // The SVG grade text shows the uppercase word INSUFFICIENT
+    expect(screen.getByText('INSUFFICIENT')).toBeInTheDocument();
+    // The caption below the gauge shows the lowercase phrase
+    expect(screen.getByText('insufficient evidence')).toBeInTheDocument();
     // No VIOL meta line in insufficient state
     expect(screen.queryByText(/VIOL/)).toBeNull();
   });

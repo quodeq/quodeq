@@ -83,9 +83,10 @@ export default function DimensionGaugeCard({
                 strokeDasharray="3 4"
               />
               <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - 4}>—</text>
+              <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + 16}>INSUFFICIENT</text>
             </svg>
           </div>
-          <div className="dim-gauge-card__insuf-line">INSUFFICIENT — insufficient evidence</div>
+          <div className="dim-gauge-card__insuf-line">insufficient evidence</div>
         </>
       ) : (
         <>
