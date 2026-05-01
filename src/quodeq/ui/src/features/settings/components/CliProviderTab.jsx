@@ -1,6 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { MIN_SUBAGENTS, MAX_SUBAGENTS, DEFAULT_SUBAGENTS } from '../../../constants.js';
+import { settingsKeys } from '../../../api/queryKeys.js';
 import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import { STORAGE_KEY as POWER_KEY } from '../../evaluation/components/powerLevels.js';
 import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
@@ -31,7 +33,6 @@ function ModelSuggestInput({ label, value, suggestions, placeholder, onChange, r
 
 export default function CliProviderTab({ providerId, state, update }) {
   const { getKnownModels } = useApi();
-  const [suggestions, setSuggestions] = useState([]);
   const [power, setPower] = useState(() => {
     try { return Number(localStorage.getItem(POWER_KEY)) || DEFAULT_POWER_LEVEL; } catch { return DEFAULT_POWER_LEVEL; }
   });
@@ -41,11 +42,12 @@ export default function CliProviderTab({ providerId, state, update }) {
     try { localStorage.setItem(POWER_KEY, String(level)); } catch { /* */ }
   }
 
-  useEffect(() => {
-    getKnownModels()
-      .then((data) => setSuggestions(data[providerId] || []))
-      .catch(() => setSuggestions([]));
-  }, [providerId]);
+  const { data: knownModels } = useQuery({
+    queryKey: settingsKeys.knownModels(providerId),
+    queryFn: () => getKnownModels(),
+    enabled: !!providerId,
+  });
+  const suggestions = knownModels?.[providerId] || [];
 
   const { fast, balanced, thorough } = useMemo(() => {
     const f = [], b = [], t = [];
