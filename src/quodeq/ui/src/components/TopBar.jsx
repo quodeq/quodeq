@@ -10,30 +10,38 @@
  * Stateless; the parent passes the data it has.
  */
 import { useSidePane } from '../features/side-pane/index.js';
-import { FileTextIcon } from './CopyButton.jsx';
+import { FileTextIcon, SparkleIcon } from './CopyButton.jsx';
 
-function ReportToolbarButton() {
+function SidePaneSpecButton({ type, label, icon, modifier }) {
   const ctx = useSidePane();
-  const spec = ctx.getRegisteredSpec ? ctx.getRegisteredSpec('report') : null;
+  const spec = ctx.getRegisteredSpec ? ctx.getRegisteredSpec(type) : null;
   if (!spec) return null;
   const inDock = ctx.hasWindow(spec.id);
   const atCap = ctx.windows.length >= ctx.MAX_WINDOWS && !inDock;
   return (
     <button
       type="button"
-      className={`topbar-btn topbar-btn--report${inDock ? ' topbar-btn--report--open' : ''}`}
+      className={`topbar-btn topbar-btn--${modifier}${inDock ? ` topbar-btn--${modifier}--open` : ''}`}
       aria-pressed={inDock}
       disabled={atCap}
-      title={atCap ? 'Close a window to open another' : (inDock ? 'Close report' : 'Open report')}
+      title={atCap ? 'Close a window to open another' : (inDock ? `Close ${label.toLowerCase()}` : `Open ${label.toLowerCase()}`)}
       onClick={() => {
         if (inDock) ctx.removeWindow(spec.id);
         else ctx.addWindow(spec);
       }}
     >
-      <FileTextIcon />
-      <span>Report</span>
+      {icon}
+      <span>{label}</span>
     </button>
   );
+}
+
+function ReportToolbarButton() {
+  return <SidePaneSpecButton type="report" label="Report" icon={<FileTextIcon />} modifier="report" />;
+}
+
+function FixPlanToolbarButton() {
+  return <SidePaneSpecButton type="fixplan" label="Fix plan" icon={<SparkleIcon />} modifier="fixplan" />;
 }
 
 function Dot({ ok }) {
@@ -152,6 +160,7 @@ export default function TopBar({
             {effectiveDark ? <SunIcon /> : <MoonIcon />}
           </button>
         )}
+        <FixPlanToolbarButton />
         <ReportToolbarButton />
         {onEvaluate && (
           <button

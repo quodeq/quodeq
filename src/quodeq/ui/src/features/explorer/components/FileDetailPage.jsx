@@ -1,24 +1,18 @@
 import { memo, useMemo } from 'react';
-import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildFilePlanText } from '../../../utils/planTextBuilders.js';
 import { buildFileReport } from '../../../utils/reportBuilder.js';
 import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
-import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
+import { SparkleIcon } from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
 import { ComplianceCard } from './EvalCards.jsx';
-import { copyToClipboard } from '../../../utils/clipboard.js';
-import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
+import { useRegisterWindowSpec, ReportContent, useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
 
-function buildViolationPlanText(v) {
-  const title = [v.dimension, v.principle].filter(Boolean).join(' / ') || 'Violation';
-  return buildSingleViolationPlanText(v, title);
-}
-
 function ViolationCard({ v, index }) {
+  const { addWindow } = useSidePane();
   const { filePath, line } = parseFileRef(v.file, v.line);
   const filename = filePath ? filePath.split('/').pop() : null;
   const range = (v.endLine && v.endLine !== line) ? `${line}-${v.endLine}` : line;
@@ -34,12 +28,14 @@ function ViolationCard({ v, index }) {
         {filename && (
           <FileCopyBtn display={display} copyText={ref} />
         )}
-        <CopyButton
-          label="Fix plan"
+        <button
+          type="button"
           className="fix-plan-btn"
-          icon={<SparkleIcon />}
-          onClick={() => copyToClipboard(buildViolationPlanText(v))}
-        />
+          onClick={() => { const spec = violationFixPlanSpec(v); if (spec) addWindow(spec); }}
+        >
+          <SparkleIcon />
+          Fix plan
+        </button>
       </div>
       <div className="vlive-detail">
         {(v.title || v.reason) && (
@@ -143,18 +139,27 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
   }, [file]);
   useRegisterWindowSpec('report', reportSpec);
 
+  const fixPlanSpec = useMemo(() => {
+    if (!file?.file || (file.total || 0) === 0) return null;
+    const buildMarkdown = () => buildFilePlanText(file);
+    const filenameLabel = file.file.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
+    return {
+      id: `fixplan:file:${file.file}`,
+      type: 'fixplan',
+      title: `${file.file.split('/').pop()} fix plan`,
+      render: () => <ReportContent markdown={buildMarkdown()} />,
+      copy: () => buildMarkdown(),
+      download: () => ({ filename: `file-${filenameLabel}-fix-plan.md`, body: buildMarkdown() }),
+    };
+  }, [file]);
+  useRegisterWindowSpec('fixplan', fixPlanSpec);
+
   return (
     <>
       <section className="panel file-detail-summary-panel">
         <h3 className="file-detail-title">{file.file}</h3>
         <div className="file-detail-stats-row">
           <FileSeverityStats file={file} totalViolations={totalViolations} totalCompliance={totalCompliance} dimensionsCount={dimensionsCount} />
-          <CopyButton
-            label="Full fix plan"
-            className="fix-plan-btn-header"
-            icon={<SparkleIcon />}
-            onClick={() => copyToClipboard(buildFilePlanText(file))}
-          />
         </div>
       </section>
 

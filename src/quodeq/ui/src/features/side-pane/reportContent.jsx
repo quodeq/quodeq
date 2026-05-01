@@ -13,9 +13,9 @@ const components = {
   ),
 };
 
-export function ReportContent({ markdown }) {
+export function ReportContent({ markdown, emptyMessage = 'No content yet.' }) {
   if (!markdown || !markdown.trim()) {
-    return <p className="side-pane-md side-pane-md--empty">No content for this report yet.</p>;
+    return <p className="side-pane-md side-pane-md--empty">{emptyMessage}</p>;
   }
   return (
     <div className="side-pane-md">

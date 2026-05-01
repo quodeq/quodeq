@@ -1,11 +1,11 @@
 import { useRef } from 'react';
 import { parseFileRef } from '../../../utils/formatters.js';
-import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
+import { SparkleIcon } from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
-import { copyToClipboard } from '../../../utils/clipboard.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import usePretextHeight from '../../../hooks/usePretextHeight.js';
+import { useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
@@ -79,7 +79,8 @@ function ViolationDetail({ item }) {
   );
 }
 
-export function EvalViolationCard({ v, principle, buildViolationPlanText, index, onDismiss }) {
+export function EvalViolationCard({ v, principle, index, onDismiss }) {
+  const { addWindow } = useSidePane();
   const { filename, ref, display } = useFileInfo(v.file, v.line, v.endLine);
   return (
     <div
@@ -90,12 +91,14 @@ export function EvalViolationCard({ v, principle, buildViolationPlanText, index,
         <SevBadge level={v.severity} format="long" />
         <span className="vrow-label">[{v.principle || principle}]</span>
         {filename && <FileCopyBtn display={display} copyText={ref} />}
-        <CopyButton
-          label="Fix plan"
+        <button
+          type="button"
           className="fix-plan-btn"
-          icon={<SparkleIcon />}
-          onClick={() => copyToClipboard(buildViolationPlanText(v))}
-        />
+          onClick={() => { const spec = violationFixPlanSpec(v, v.principle || principle); if (spec) addWindow(spec); }}
+        >
+          <SparkleIcon />
+          Fix plan
+        </button>
         {onDismiss && (
           <button
             type="button"

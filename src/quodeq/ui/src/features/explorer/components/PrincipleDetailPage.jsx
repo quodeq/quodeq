@@ -1,10 +1,7 @@
 import { memo, useState, useCallback, useMemo } from 'react';
-import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { buildPrincipleReport } from '../../../utils/reportBuilder.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
-import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
-import { copyToClipboard } from '../../../utils/clipboard.js';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
@@ -16,7 +13,7 @@ import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 // "Show all" pagination is needed. Rows render naturally inside the app's
 // existing scroll container.
 
-function ViolationListSection({ violationsBySeverity, principle, buildViolationPlanText, onDismiss }) {
+function ViolationListSection({ violationsBySeverity, principle, onDismiss }) {
   return EVAL_SEVERITY_ORDER.map((sev) => {
     const vs = violationsBySeverity[sev];
     if (!vs || vs.length === 0) return null;
@@ -29,7 +26,6 @@ function ViolationListSection({ violationsBySeverity, principle, buildViolationP
               key={`${v.file || 'nofile'}:${v.line ?? 'noline'}:${idx}`}
               v={v}
               principle={principle}
-              buildViolationPlanText={buildViolationPlanText}
               index={idx}
               onDismiss={onDismiss}
             />
@@ -59,10 +55,6 @@ function ComplianceListSection({ compliance, principle }) {
   );
 }
 
-function buildViolationPlanText(v, principle) {
-  return buildSingleViolationPlanText(v, principle, { reqRefs: v.reqRefs, reqFallback: v.req || undefined });
-}
-
 function SevBadgeRow({ sevCounts }) {
   if (!(sevCounts.critical || sevCounts.major || sevCounts.minor)) return null;
   return (
@@ -74,7 +66,7 @@ function SevBadgeRow({ sevCounts }) {
   );
 }
 
-function PrincipleHeader({ data, onCopyPlan }) {
+function PrincipleHeader({ data }) {
   const { principle, score, grade, violations, compliance, sevCounts } = data;
   const scoreDisplay = score ? String(score).replace('/10', '') : '—';
   const ratioDisplay = (compliance.length > 0 && violations.length > 0)
@@ -92,14 +84,6 @@ function PrincipleHeader({ data, onCopyPlan }) {
               : <span className={`chip small ${gradeColorClass(grade)}`}>{grade || '—'}</span>
           }
         />
-        {violations.length > 0 && (
-          <CopyButton
-            label="Full fix plan"
-            className="fix-plan-btn-header"
-            icon={<SparkleIcon />}
-            onClick={onCopyPlan}
-          />
-        )}
       </div>
       <StatStrip bordered>
         <Stat label="SCORE" value={scoreDisplay} />
@@ -227,11 +211,25 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
   }, [principle, dimension, runId, score, grade, liveScore, liveGrade, filteredViolations, displayedBySeverity, compliance, principleData]);
   useRegisterWindowSpec('report', reportSpec);
 
+  const fixPlanSpec = useMemo(() => {
+    if (!principle || filteredViolations.length === 0) return null;
+    const buildMarkdown = () => buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData);
+    const slug = `${(dimension || 'dim')}-${principle}`.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
+    return {
+      id: `fixplan:principle:${dimension || 'dim'}:${principle}:${runId || 'current'}`,
+      type: 'fixplan',
+      title: `${principle} fix plan`,
+      render: () => <ReportContent markdown={buildMarkdown()} />,
+      copy: () => buildMarkdown(),
+      download: () => ({ filename: `principle-${slug}-fix-plan.md`, body: buildMarkdown() }),
+    };
+  }, [principle, dimension, runId, violations, violationsBySeverity, principleData, filteredViolations.length]);
+  useRegisterWindowSpec('fixplan', fixPlanSpec);
+
   return (
     <>
       <PrincipleHeader
         data={{ principle, score: liveScore ?? score, grade: liveGrade ?? grade, violations: filteredViolations, compliance, sevCounts: liveSevCounts }}
-        onCopyPlan={() => copyToClipboard(buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData))}
       />
       <PrincipleContext principleData={principleData} />
       {filteredViolations.length > 0 && (
@@ -240,7 +238,6 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
       <ViolationListSection
         violationsBySeverity={displayedBySeverity}
         principle={principle}
-        buildViolationPlanText={(v) => buildViolationPlanText(v, principle)}
         onDismiss={handleDismiss}
       />
       <ComplianceListSection compliance={compliance} principle={principle} />
