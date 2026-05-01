@@ -1,4 +1,4 @@
-import { useMemo, lazy, Suspense } from 'react';
+import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { gradeLabel, scoreColorClass } from '../../../utils/formatters.js';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
@@ -10,6 +10,9 @@ import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards } from '../../../utils/scoreFiltering.js';
 import { TermHeader } from '../../../components/terminal/index.js';
 import FittedText from '../../../components/FittedText.jsx';
+
+const TOAST_DISMISS_MS = 2600;
+const NOT_READY_MESSAGE = 'No standards fully evaluated yet. Try again once the first one finishes.';
 
 // Only outright failures are hidden. Cancelled runs may still have written
 // per-dim evaluation files (the dashboard's overview reads them and shows
@@ -87,7 +90,22 @@ function buildInProgressStubs(availableRuns, trend) {
   const trendIds = new Set((trend || []).map((e) => e.runId));
   return (availableRuns || [])
     .filter((r) => r.status === 'in_progress' && !trendIds.has(r.runId))
-    .map((r) => ({ runId: r.runId, dateLabel: r.dateLabel, dateISO: null, status: 'in_progress' }));
+    // hasScoredDims=false: this run is running but no dimension has finished
+    // scoring yet. Clicking would land on an empty dashboard, so the row is
+    // rendered as not-yet-ready.
+    .map((r) => ({ runId: r.runId, dateLabel: r.dateLabel, dateISO: null, status: 'in_progress', hasScoredDims: false }));
+}
+
+function NotReadyToast({ message, onDismiss }) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, TOAST_DISMISS_MS);
+    return () => clearTimeout(timer);
+  }, [message, onDismiss]);
+  return (
+    <div className="job-error-toast" role="status" onClick={onDismiss}>
+      {message}
+    </div>
+  );
 }
 
 /**
@@ -96,7 +114,7 @@ function buildInProgressStubs(availableRuns, trend) {
  *
  *   [ DATE ][ TIME ][ GRADE ][ SCORE ][ Δ ][ DIMENSIONS (flex) ]
  */
-function HistoryRow({ className = '', onClick, cells, onDelete }) {
+function HistoryRow({ className = '', onClick, cells, onDelete, title }) {
   const common = `history-row ${className}`.trim();
   const isHeader = className.includes('history-row--header');
   function handleDeleteClick(e) {
@@ -104,7 +122,7 @@ function HistoryRow({ className = '', onClick, cells, onDelete }) {
     onDelete?.();
   }
   return (
-    <div className={common} onClick={onClick} role={onClick ? 'button' : 'row'} tabIndex={onClick ? 0 : undefined}>
+    <div className={common} onClick={onClick} role={onClick ? 'button' : 'row'} tabIndex={onClick ? 0 : undefined} title={title}>
       <div className="history-row__col history-row__col--date">{cells.date}</div>
       <div className="history-row__col history-row__col--time">{cells.time}</div>
       <div className="history-row__col history-row__col--grade">{cells.grade}</div>
@@ -133,7 +151,7 @@ function HistoryRow({ className = '', onClick, cells, onDelete }) {
   );
 }
 
-function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRunClick, onDeleteRun }) {
+function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRunClick, onDeleteRun, onNotReadyClick }) {
   return (
     <section className="history-evaluations panel">
       <div className="history-evaluations__header">
@@ -155,11 +173,17 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
           const isInProgress = entry.status === 'in_progress';
           if (isInProgress) {
             const { date } = formatDateParts(new Date().toISOString());
+            // Stubs (hasScoredDims === false) have no completed standards yet
+            // and would land on an empty dashboard. Block the click and tell
+            // the user to wait. Running runs that ARE in trend (i.e. already
+            // have at least one scored dim) remain clickable.
+            const notReady = entry.hasScoredDims === false;
             return (
               <HistoryRow
                 key={entry.runId}
-                className="history-row--in-progress"
-                onClick={() => onRunClick(entry.runId)}
+                className={`history-row--in-progress${notReady ? ' history-row--not-ready' : ''}`}
+                onClick={notReady ? () => onNotReadyClick() : () => onRunClick(entry.runId)}
+                title={notReady ? NOT_READY_MESSAGE : undefined}
                 cells={{
                   date,
                   time: (
@@ -171,7 +195,7 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
                   grade: <span className="history-row__muted">—</span>,
                   score: <span className="history-row__muted">—</span>,
                   delta: <span className="history-delta history-delta--muted">—</span>,
-                  dims: <span className="history-row__muted">in progress</span>,
+                  dims: <span className="history-row__muted">{notReady ? 'no scores yet' : 'in progress'}</span>,
                 }}
               />
             );
@@ -224,6 +248,14 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
   const { onRunClick, onRunChange, onDeleteRun } = callbacks;
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
   const inProgressStubs = useMemo(() => buildInProgressStubs(availableRuns, trend), [availableRuns, trend]);
+  // Toast state for clicks on running runs that have no scored dimensions yet.
+  // toastKey forces remount so consecutive clicks restart the auto-dismiss timer.
+  const [toastKey, setToastKey] = useState(0);
+  const [toastVisible, setToastVisible] = useState(false);
+  const handleNotReadyClick = () => {
+    setToastVisible(true);
+    setToastKey((k) => k + 1);
+  };
   const statusByRunId = useMemo(() => {
     const map = new Map();
     (availableRuns || []).forEach((r) => { if (r.runId) map.set(r.runId, r.status); });
@@ -274,7 +306,16 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
         statusByRunId={statusByRunId}
         onRunClick={onRunClick}
         onDeleteRun={onDeleteRun}
+        onNotReadyClick={handleNotReadyClick}
       />
+
+      {toastVisible && (
+        <NotReadyToast
+          key={toastKey}
+          message={NOT_READY_MESSAGE}
+          onDismiss={() => setToastVisible(false)}
+        />
+      )}
     </div>
   );
 }
