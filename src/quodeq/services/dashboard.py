@@ -52,6 +52,19 @@ def _run_dim_cache_max(override: int | None = None, env: dict[str, str] | None =
         return _DEFAULT_RUN_DIM_CACHE_MAX
 
 
+# Module-level shared cache for run-dimension data. Without this, every
+# dashboard request used a fresh cache (created in _make_run_dimension_fetcher
+# below), so re-fetching the same project's history (which collect_stale_dimensions
+# / _collect_previous_scores / build_accumulated_trend all walk) cost ~750ms
+# per request even on warm calls. The shared cache eliminates the cross-request
+# I/O without compromising the per-request consistency guarantees (the cache
+# is keyed by (reports_root, project, run_id) and runs are immutable once
+# finalized).
+#
+# Tests that need isolation can pass an explicit DashboardCacheConfig.
+_SHARED_RUN_DIM_CACHE, _SHARED_RUN_DIM_LOCK = OrderedDict(), threading.Lock()
+
+
 def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:
     """Create the default run-dimension LRU cache and its lock.
 
@@ -109,13 +122,17 @@ def _make_run_dimension_fetcher(
     lock: threading.Lock | None = None,
     max_size: int | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
-    """Return a cached fetcher for run dimension data (LRU, bounded)."""
-    _default = create_dimension_cache()
+    """Return a cached fetcher for run dimension data (LRU, bounded).
+
+    Defaults to the module-level shared cache so reads of the same run's
+    dimensions across requests reuse work. Tests pass explicit cache/lock to
+    isolate state.
+    """
     return make_lru_dimension_fetcher(
         reports_root,
         project,
-        cache if cache is not None else _default[0],
-        lock if lock is not None else _default[1],
+        cache if cache is not None else _SHARED_RUN_DIM_CACHE,
+        lock if lock is not None else _SHARED_RUN_DIM_LOCK,
         max_size if max_size is not None else _run_dim_cache_max(),
     )
 

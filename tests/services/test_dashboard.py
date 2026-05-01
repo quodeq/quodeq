@@ -174,6 +174,51 @@ class TestBuildDashboard:
             result = build_dashboard(str(tmp_path), "proj", "r-cancelled")
         assert result["selectedRun"]["runId"] == "r-cancelled"
 
+    def test_shared_run_dim_cache_persists_across_calls(self, tmp_path):
+        # Regression: _make_run_dimension_fetcher used to create a fresh LRU
+        # cache per call (via create_dimension_cache()), so dashboard requests
+        # paid the read_run_data cost on every call — even when the same run
+        # had been read seconds earlier. This test asserts that the second
+        # build_dashboard call hits the shared module-level cache for at
+        # least one historical run, demonstrably eliminating that I/O.
+        runs = [
+            RunInfo(run_id=f"r{i}", date_iso=f"2024-{i:02d}-01", date_label=f"2024-{i:02d}-01", status="complete")
+            for i in range(1, 6)
+        ]
+        dims = [_dim("security", "B", "7.0")]
+        summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
+
+        # Track every read_run_data call across both invocations.
+        read_calls: list[tuple[str, str]] = []
+
+        def tracked_read(_root, project, run_id):
+            read_calls.append((project, run_id))
+            return dims
+
+        # Reset the shared cache so this test starts from a clean state.
+        from quodeq.services.dashboard import _SHARED_RUN_DIM_CACHE
+        _SHARED_RUN_DIM_CACHE.clear()
+
+        with (
+            patch("quodeq.services.dashboard.list_runs", return_value=runs),
+            patch("quodeq.services._cache.read_run_data", side_effect=tracked_read),
+            patch("quodeq.services.dashboard.read_run_data", side_effect=tracked_read),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            build_dashboard(str(tmp_path), "proj-shared", "r3")
+            calls_after_first = len(read_calls)
+            build_dashboard(str(tmp_path), "proj-shared", "r3")
+            calls_after_second = len(read_calls)
+
+        # If the cache were per-request (the bug), the second call would do
+        # ~the same number of reads as the first. With the shared cache, the
+        # second call's reads via _make_run_dimension_fetcher are eliminated.
+        assert calls_after_second < calls_after_first * 2, (
+            f"Expected shared cache to reduce reads on second call. "
+            f"After 1st: {calls_after_first}, after 2nd: {calls_after_second} "
+            f"(would be {calls_after_first * 2} with no caching)"
+        )
+
     def test_does_not_crash_when_cancelled_runs_precede_selected(self, tmp_path):
         # Regression: build_dashboard formerly raised IndexError when the
         # selected complete run had cancelled/failed runs above it in the
