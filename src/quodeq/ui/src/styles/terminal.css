@@ -1793,6 +1793,8 @@
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
+  min-height: 28px;
+  box-sizing: border-box;
   border: 1px solid var(--color-border);
   border-radius: var(--term-radius);
   font-size: 12px;
@@ -1844,12 +1846,20 @@
   font-family: inherit;
   font-size: 12px;
   font-weight: 500;
+  /* Same line-height as .topbar-pill so the inner content box matches —
+     keeps row heights identical across pill / button / icon-button. */
+  line-height: 1.4;
+  /* Lock all topbar controls to the same outer height regardless of
+     content (text vs icon). 28px = 12px font * 1.4 line-height + 4px+4px
+     padding + 2x 1px border, rounded. */
+  min-height: 28px;
   padding: 4px 10px;
   background: transparent;
   color: var(--color-text);
   border: 1px solid var(--color-border);
   border-radius: var(--term-radius);
   cursor: pointer;
+  box-sizing: border-box;
   transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
 }
 .topbar-btn:hover {
