@@ -1,142 +1,44 @@
-import React, { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
-import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
-import { gradeColorClass, complianceRatio } from '../../../utils/formatters.js';
-import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
+import { complianceRatio } from '../../../utils/formatters.js';
+import { buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { buildDimensionReport } from '../../../utils/reportBuilder.js';
-import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { useExplorerData, buildEvalPrincipalFn } from './explorerDataHooks.js';
-import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
+import {
+  TermHeader,
+  Stat,
+  SevBadge,
+  SectionLabel,
+} from '../../../components/terminal/index.js';
+import PrinciplesRadial from './PrinciplesRadial.jsx';
+import PrinciplesCardsRow from './PrinciplesCardsRow.jsx';
+import DimensionScoreHistoryPanel from './DimensionScoreHistoryPanel.jsx';
+import StatGrid2x2 from './StatGrid2x2.jsx';
 
-function DimensionOverview({ data, stats, onNavigate }) {
-  const { evalData, runId, dateLabel, allViolations } = data;
-  const { overallGrade, severityCounts, totalCompliant, topFiles, uniquePrinciples, principleGrades } = stats;
-  const scoreDisplay = overallGrade?.score?.replace('/10', '') || '—';
-  const sevBadges = (severityCounts.critical || severityCounts.major || severityCounts.minor) ? (
-    <span className="principle-detail-sev-row">
-      {severityCounts.critical > 0 && <SevBadge level="critical" count={severityCounts.critical} />}
-      {severityCounts.major > 0    && <SevBadge level="major" count={severityCounts.major} />}
-      {severityCounts.minor > 0    && <SevBadge level="minor" count={severityCounts.minor} />}
-    </span>
-  ) : null;
-
-  return (
-    <section className="dimension-overview dimension-overview--terminal">
-      <div className="dimension-overview__top">
-        <TermHeader
-          name={`${evalData.dimension}.overview`}
-          sub={dateLabel || runId || null}
-        />
-      </div>
-      <StatStrip bordered>
-        <Stat label="SCORE"      value={scoreDisplay}                                      hint={overallGrade?.grade || null} />
-        <Stat label="VIOLATIONS" value={allViolations.length}                              hint={sevBadges} />
-        <Stat label="COMPLIANCE" value={totalCompliant} />
-        <Stat label="RATIO"      value={complianceRatio(allViolations.length, totalCompliant)} />
-        <Stat label="FILES"      value={topFiles.length} />
-        <Stat label="PRINCIPLES" value={uniquePrinciples} />
-      </StatStrip>
-    </section>
-  );
+function buildRadialPrinciples(principleGrades) {
+  return (principleGrades || []).map((pg) => {
+    const score = parseFloat(pg.score);
+    const hasEvidence = (pg.grade || '').toLowerCase() !== 'insufficient'
+      && !Number.isNaN(score);
+    return { name: pg.principle, score: hasEvidence ? score : null, hasEvidence };
+  });
 }
 
-function PrincipleGradeRow({ pg, onNavigate, buildEvalPrincipal }) {
-  const handleClick = () => onNavigate && onNavigate('evalprinciple', { evalPrincipal: buildEvalPrincipal(pg.principle) });
-  return (
-    <li
-      key={pg.principle}
-      className="exec-summary-row exec-summary-row--clickable"
-      onClick={handleClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } }}
-    >
-      <span className="exec-summary-principle">{pg.principle}</span>
-      {pg.grade === 'Insufficient' ? (
-        <span className="exec-summary-insufficient">Not enough evidence</span>
-      ) : (
-        <>
-          {pg.score && (
-            <span className="exec-summary-score">
-              {pg.score.replace('/10', '')}<span className="exec-summary-score-denom">/10</span>
-            </span>
-          )}
-          <span className={`chip small ${gradeColorClass(pg.grade)}`}>{pg.grade || '—'}</span>
-        </>
-      )}
-      <span className="exec-summary-chevron">›</span>
-    </li>
-  );
-}
-
-function PrinciplesList({ evalData, principleGrades, onNavigate, buildEvalPrincipal }) {
-  if (principleGrades.length === 0) return null;
-  const dim = (evalData.dimension || '').toLowerCase();
-  return (
-    <>
-      <SectionLabel>{`principles.${dim} · ${principleGrades.length}`}</SectionLabel>
-      <section className="panel eval-summary-panel">
-        <ul className="exec-summary-list">
-          {principleGrades.map((pg) => (
-            <PrincipleGradeRow key={pg.principle} pg={pg} onNavigate={onNavigate} buildEvalPrincipal={buildEvalPrincipal} />
-          ))}
-        </ul>
-      </section>
-    </>
-  );
-}
-
-function ViolationsByPrincipleSection({ allViolations, onNavigate, buildEvalPrincipal }) {
-  if (allViolations.length === 0) return null;
-  return (
-    <>
-      <SectionLabel>violations_by_principle · {allViolations.length}</SectionLabel>
-      <section className="panel wide-panel offending-panel">
-        <ViolationsByPrincipleTable
-          violations={allViolations}
-          onPrincipleClick={(p) => onNavigate && onNavigate('evalprinciple', { evalPrincipal: buildEvalPrincipal(p.principle) })}
-        />
-      </section>
-    </>
-  );
-}
-
-function ViolationsByFileSection({ topFiles, onNavigate }) {
-  if (topFiles.length === 0) return null;
-  return (
-    <>
-      <SectionLabel>violations_by_file · {topFiles.length}</SectionLabel>
-      <section className="panel wide-panel offending-panel">
-        <TopOffendingFilesTable
-          files={topFiles}
-          onFileClick={(f) => onNavigate && onNavigate('file', { file: f })}
-        />
-      </section>
-    </>
-  );
-}
-
-export default function ExplorerPage({ project, dimension, runId, dateLabel, onNavigate, refreshSignal, trend = [] }) {
+export default function ExplorerPage({
+  project,
+  dimension,
+  runId,
+  dateLabel,
+  onNavigate,
+  refreshSignal,
+  trend = [],
+}) {
   const d = useExplorerData(project, dimension, runId, refreshSignal);
-  const [activeSevFilter, setActiveSevFilter] = useState(null);
 
-  // All hooks must run before any early returns (React hooks rules)
   const buildEvalPrincipal = useMemo(
     () => d.evalData ? buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple, project, runId) : () => ({}),
     [d.evalData, d.complianceByPrinciple, project, runId]
-  );
-  const filteredViolations = useMemo(
-    () => activeSevFilter
-      ? d.allViolations.filter(v => (v.severity || 'minor') === activeSevFilter)
-      : d.allViolations,
-    [d.allViolations, activeSevFilter]
-  );
-  const filteredTopFiles = useMemo(
-    () => activeSevFilter
-      ? buildTopOffendingFiles(filteredViolations)
-      : d.topFiles,
-    [filteredViolations, activeSevFilter, d.topFiles]
   );
 
   const reportSpec = useMemo(() => {
@@ -145,7 +47,7 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
     const buildMarkdown = () => buildDimensionReport({
       evalData: d.evalData,
       principleGrades: d.principleGrades || [],
-      allViolations: filteredViolations,
+      allViolations: d.allViolations,
       overallGrade: d.overallGrade,
       dateLabel,
       runId,
@@ -158,13 +60,13 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
       copy: () => buildMarkdown(),
       download: () => ({ filename: `${dim}-report.md`, body: buildMarkdown() }),
     };
-  }, [d.evalData, d.principleGrades, filteredViolations, d.overallGrade, dateLabel, runId]);
+  }, [d.evalData, d.principleGrades, d.allViolations, d.overallGrade, dateLabel, runId]);
   useRegisterWindowSpec('report', reportSpec);
 
   const fixPlanSpec = useMemo(() => {
-    if (!d.evalData || filteredViolations.length === 0) return null;
+    if (!d.evalData || d.allViolations.length === 0) return null;
     const dim = (d.evalData.dimension || 'unknown').toLowerCase();
-    const buildMarkdown = () => buildDimensionPlanFromViolations(d.evalData.dimension, filteredViolations);
+    const buildMarkdown = () => buildDimensionPlanFromViolations(d.evalData.dimension, d.allViolations);
     return {
       id: `fixplan:dimension:${dim}:${runId ?? 'current'}`,
       type: 'fixplan',
@@ -173,24 +75,92 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
       copy: () => buildMarkdown(),
       download: () => ({ filename: `${dim}-fix-plan.md`, body: buildMarkdown() }),
     };
-  }, [d.evalData, filteredViolations, runId]);
+  }, [d.evalData, d.allViolations, runId]);
   useRegisterWindowSpec('fixplan', fixPlanSpec);
 
   if (d.loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
   if (d.error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;
   if (!d.evalData) return <div className="empty-state"><h2>No data found</h2></div>;
 
+  const dim = String(d.evalData.dimension || '').toLowerCase();
+  const radialPrinciples = buildRadialPrinciples(d.principleGrades);
+  const onPrincipleClick = (name) => onNavigate?.('evalprinciple', { evalPrincipal: buildEvalPrincipal(name) });
+
+  const overallScoreNum = parseFloat(d.overallGrade?.score);
+  const sev = d.severityCounts;
+
   return (
     <>
-      <DimensionOverview
-        data={{ evalData: d.evalData, runId, dateLabel, allViolations: filteredViolations }}
-        stats={{ overallGrade: d.overallGrade, severityCounts: d.severityCounts, totalCompliant: d.totalCompliant, topFiles: filteredTopFiles, uniquePrinciples: d.uniquePrinciples, principleGrades: d.principleGrades }}
-        onNavigate={onNavigate}
+      <TermHeader name={`${dim}.overview`} sub={dateLabel || runId || null} />
+
+      <div className="qd-top-grid">
+        <div className="qd-top-left">
+          <StatGrid2x2>
+            <Stat
+              label="SCORE"
+              value={Number.isNaN(overallScoreNum) ? '—' : overallScoreNum.toFixed(1)}
+              hint={d.overallGrade?.grade ? `grade ${d.overallGrade.grade}` : null}
+            />
+            <Stat
+              label="VIOLATIONS"
+              value={d.allViolations.length}
+              hint={(sev.critical || sev.major || sev.minor) ? (
+                <span className="principle-detail-sev-row">
+                  {sev.critical > 0 && <SevBadge level="critical" count={sev.critical} />}
+                  {sev.major    > 0 && <SevBadge level="major"    count={sev.major} />}
+                  {sev.minor    > 0 && <SevBadge level="minor"    count={sev.minor} />}
+                </span>
+              ) : null}
+            />
+            <Stat
+              label="COMPLIANCE"
+              value={d.totalCompliant}
+              hint={`passing / ${d.totalCompliant + d.allViolations.length} checks`}
+            />
+            <Stat
+              label="RATIO"
+              value={complianceRatio(d.allViolations.length, d.totalCompliant)}
+              hint="compliance : violations"
+            />
+          </StatGrid2x2>
+
+          <DimensionScoreHistoryPanel trend={trend} dimension={d.evalData.dimension} />
+        </div>
+
+        <div className="qd-top-right">
+          <section className="panel" aria-label="Principles radial">
+            <div className="run-history-panel__header">
+              <SectionLabel>principles_radial · {radialPrinciples.length}</SectionLabel>
+              <span className="run-history-panel__stats">SCALE 0–10</span>
+            </div>
+            <div className="qd-radial">
+              <PrinciplesRadial
+                principles={radialPrinciples}
+                onPrincipleClick={onPrincipleClick}
+              />
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div className="qd-section-banner" style={{ '--qd-cards-count': radialPrinciples.length }}>
+        <SectionLabel>{`principles · ${radialPrinciples.length}`}</SectionLabel>
+      </div>
+      <PrinciplesCardsRow
+        principles={d.principleGrades || []}
+        onPrincipleClick={onPrincipleClick}
       />
-      <SeverityFilterPills counts={d.severityCounts} activeFilter={activeSevFilter} onFilterChange={setActiveSevFilter} />
-      <PrinciplesList evalData={d.evalData} principleGrades={d.principleGrades} onNavigate={onNavigate} buildEvalPrincipal={buildEvalPrincipal} />
-      <ViolationsByPrincipleSection allViolations={filteredViolations} onNavigate={onNavigate} buildEvalPrincipal={buildEvalPrincipal} />
-      <ViolationsByFileSection topFiles={filteredTopFiles} onNavigate={onNavigate} />
+
+      <div className="qd-section-banner">
+        <SectionLabel>{`violations_by_file · ${d.topFiles.length}`}</SectionLabel>
+        <span className="run-history-panel__stats">SORTED BY SEVERITY</span>
+      </div>
+      <section className="panel wide-panel offending-panel">
+        <TopOffendingFilesTable
+          files={d.topFiles}
+          onFileClick={(f) => onNavigate?.('file', { file: f })}
+        />
+      </section>
     </>
   );
 }
