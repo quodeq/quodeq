@@ -68,11 +68,6 @@
   font-family: var(--term-font-mono);
   padding: var(--term-space-3) 0;
 }
-.term-stat-strip--bordered {
-  border: var(--term-border);
-  border-radius: var(--term-radius);
-  padding: var(--term-space-3);
-}
 /* cards variant: each <Stat> renders as its own bordered card with a subtle
    surface fill so the top row reads as a band of chrome rather than bare page.
    Vertical padding is deliberately generous so the large numeric value has
@@ -135,9 +130,9 @@
 .term-flag-pill {
   appearance: none;
   font-family: var(--term-font-mono);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1;
-  padding: var(--term-space-2) 10px;
+  padding: var(--term-space-1) var(--term-space-2);
   background: transparent;
   color: var(--color-text-muted);
   border: 1px solid var(--color-border);
@@ -523,19 +518,27 @@
 
 /* ------------------------------------------------------------
    Shared severity filter pill row (used by SeverityFilterPills)
-   Severity-coloured flags use --term-sev-accent when active.
+   Severity-toned pills use the matching --color-sev-<level>-text accent.
    ------------------------------------------------------------ */
 .term-flag-row {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: var(--term-space-2);
   margin: 0 0 var(--term-space-3);
 }
-.term-flag-sev .term-flag-pill {
-  color: var(--term-sev-accent, var(--color-text-muted));
-  border-color: color-mix(in srgb, var(--term-sev-accent, var(--color-border)) 40%, transparent);
+.term-flag-pill--critical { --term-sev-accent: var(--color-sev-critical-text); }
+.term-flag-pill--major    { --term-sev-accent: var(--color-sev-major-text); }
+.term-flag-pill--minor    { --term-sev-accent: var(--color-sev-minor-text); }
+.term-flag-pill--critical,
+.term-flag-pill--major,
+.term-flag-pill--minor {
+  color: var(--term-sev-accent);
+  border-color: color-mix(in srgb, var(--term-sev-accent) 40%, transparent);
 }
-.term-flag-sev .term-flag-pill--active {
+.term-flag-pill--critical.term-flag-pill--active,
+.term-flag-pill--major.term-flag-pill--active,
+.term-flag-pill--minor.term-flag-pill--active {
   background: var(--term-sev-accent);
   color: var(--color-on-accent);
   border-color: var(--term-sev-accent);
@@ -603,7 +606,7 @@
 .vdetail-row--terminal.vdetail-row--critical  { --vrow-accent: var(--color-sev-critical-text); }
 .vdetail-row--terminal.vdetail-row--major     { --vrow-accent: var(--color-sev-major-text); }
 .vdetail-row--terminal.vdetail-row--minor     { --vrow-accent: var(--color-sev-minor-text); }
-.vdetail-row--terminal.vdetail-row--compliant { --vrow-accent: var(--color-success); }
+.vdetail-row--terminal.vdetail-row--compliant { --vrow-accent: var(--color-grade-top-text); }
 
 .vdetail-row--terminal .vdetail-row-main {
   display: flex;
@@ -618,11 +621,12 @@
   font-family: var(--term-font-mono);
 }
 
-/* Compliance green badge mirrors SevBadge styling */
+/* Compliance badge mirrors SevBadge styling, uses the "excellent" grade
+   accent so it matches the row's left-border line. */
 .term-sev-badge--compliant {
-  color: var(--color-success);
-  background: color-mix(in srgb, var(--color-success) 6%, transparent);
-  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
+  color: var(--color-grade-top-text);
+  background: color-mix(in srgb, var(--color-grade-top-text) 10%, transparent);
+  border-color: color-mix(in srgb, var(--color-grade-top-text) 45%, transparent);
 }
 
 /* ---------- Terminal detail (REASON / DETAIL) ---------- */
@@ -927,7 +931,7 @@
 
 /* ------------------------------------------------------------
    Unified panel chrome — .run-history-panel, .dim-score-panel,
-   and .top-findings in terminal mode share the same outer
+   and .qd-cards-panel in terminal mode share the same outer
    aesthetic: thin 1px border, 2px radius, subtle surface bg,
    no shadow. The inner "banner" headers sit in a slightly
    lighter/darker band (surface-alt) to matches the mockup's
@@ -935,7 +939,6 @@
    ------------------------------------------------------------ */
 .run-history-panel--terminal,
 .dim-score-panel--terminal,
-.top-findings,
 .quality-dimensions,
 .qd-cards-panel {
   border: 1px solid var(--color-border) !important;
@@ -949,7 +952,6 @@
 /* Shared banner header — sits flush to the panel's top edge, has its own
    contrast tint, and a bottom divider. Used in all three overview panels. */
 .run-history-panel--terminal .run-history-panel__header,
-.top-findings__head,
 .quality-dimensions__head,
 .qd-cards-panel__head,
 .dim-score-panel--terminal .dim-score-panel__header {
@@ -968,7 +970,6 @@
   text-transform: uppercase;
 }
 .run-history-panel--terminal .run-history-panel__header .term-section-label,
-.top-findings__head .term-section-label,
 .quality-dimensions__head .term-section-label,
 .qd-cards-panel__head .term-section-label {
   padding: 0;
@@ -976,7 +977,6 @@
 
 /* Panel body padding — all content under the banner uses consistent padding */
 .run-history-panel--terminal > *:not(.run-history-panel__header),
-.top-findings > *:not(.top-findings__head),
 .quality-dimensions > *:not(.quality-dimensions__head),
 .qd-cards-panel > *:not(.qd-cards-panel__head),
 .dim-score-panel--terminal > *:not(.dim-score-panel__header) {
@@ -1346,44 +1346,6 @@
   padding: 0 0 var(--term-space-2);
 }
 /* .dim-score-panel__header inherits banner styling from the shared rule */
-
-/* ------------------------------------------------------------
-   TopFindings — overview summary table (SEV / DIM / PRINCIPLE /
-   FILE:LINE / CWE / TITLE). Wraps the shared GridTable primitive
-   with a titled header row.
-   ------------------------------------------------------------ */
-.top-findings {
-  margin: 0 0 var(--term-space-4);
-  font-family: var(--term-font-mono);
-}
-/* .top-findings__head inherits banner styling from the shared rule */
-
-/* Let the grid-table inside top-findings handle its own inner padding so
-   rows align with the banner text above. Undo the generic body-padding
-   applied by the unified panel-body rule. */
-.top-findings > :not(.top-findings__head) {
-  padding: var(--term-space-2) 0 !important;
-}
-.top-findings .term-grid__row {
-  padding-left: var(--term-space-3);
-  padding-right: var(--term-space-3);
-}
-.top-findings .term-grid__row--header {
-  /* Column header row — lives inside the body, sits flush under the banner */
-  padding-top: var(--term-space-1);
-  padding-bottom: var(--term-space-1);
-}
-.top-findings__meta {
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  font-variant-numeric: tabular-nums;
-}
-.top-findings__cwe {
-  color: var(--color-sev-critical-text);
-  font-variant-numeric: tabular-nums;
-}
 
 .finding-detail-breadcrumb {
   font-family: var(--term-font-mono);

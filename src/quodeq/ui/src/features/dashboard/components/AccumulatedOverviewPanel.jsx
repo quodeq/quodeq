@@ -5,7 +5,9 @@ import { formatRunId, gradeLetter, complianceRatio, extDisplayName } from '../..
 import { collapseByDay, collectDayDimensions } from '../../../utils/dailyGrouping.js';
 const RunHistoryPanel = lazy(() => import('./RunHistoryPanel.jsx'));
 import DimensionScorePanel from './DimensionScorePanel.jsx';
-import TopFindings from './TopFindings.jsx';
+import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
+import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
+import { withDimensionsStr } from '../../../utils/dimensionUtils.js';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
@@ -181,6 +183,11 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const { onRunClick, onDimensionClick, onNavigate } = callbacks;
   const { currentOverviewRun, selectedDayDimNames, filteredDailyTrend, filteredTrend, filteredDimensions, filteredAccumulated, filteredStats } = useAccumulatedComputations(data);
 
+  const topFiles = useMemo(
+    () => withDimensionsStr(buildTopOffendingFiles(filteredDimensions || [])),
+    [filteredDimensions]
+  );
+
   const reportProjectName =
     data.projectInfo?.displayName
     || data.projectInfo?.name
@@ -230,20 +237,18 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
         selectedDayDimNames={selectedDayDimNames}
       />
 
-      <TopFindings
-        dimensions={filteredDimensions}
-        onFindingClick={(f) => {
-          if (onNavigate) {
-            onNavigate('finding', {
-              finding: f,
-              dimension: f._dim,
-              principle: f.principle,
-            });
-          } else if (onDimensionClick) {
-            onDimensionClick({ dimension: f._dim, fromRunId: filteredStats.lastRun.runId, fromDateLabel: filteredStats.lastRun.date });
-          }
-        }}
-      />
+      {topFiles.length > 0 && (
+        <section className="qd-cards-panel offending-panel" aria-label="Violations by file">
+          <div className="qd-cards-panel__head">
+            <SectionLabel>{`violations_by_file · ${topFiles.length}`}</SectionLabel>
+            <span className="run-history-panel__stats">SORTED BY SEVERITY</span>
+          </div>
+          <TopOffendingFilesTable
+            files={topFiles}
+            onFileClick={onNavigate ? (f) => onNavigate('file', { file: f }) : undefined}
+          />
+        </section>
+      )}
     </>
   );
 }

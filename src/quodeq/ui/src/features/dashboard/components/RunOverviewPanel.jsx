@@ -1,14 +1,12 @@
 import { useMemo } from 'react';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
-import ScoreCircle from '../../../components/ScoreCircle.jsx';
 import DimensionGaugeCard from './DimensionGaugeCard.jsx';
-import { SectionLabel } from '../../../components/terminal/index.js';
+import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 
-const HERO_SCORE_CIRCLE_SIZE = 120;
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { buildRunReport } from '../../../utils/reportBuilder.js';
-import { formatRunId, complianceRatio } from '../../../utils/formatters.js';
+import { formatRunId, gradeLetter, complianceRatio } from '../../../utils/formatters.js';
 import { withDimensionsStr } from '../../../utils/dimensionUtils.js';
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import buildRunSummary from '../buildRunSummary.js';
@@ -42,57 +40,55 @@ function RunDimensionsGrid({ dimensions, selectedRunId, dateLabel, onDimensionCl
 // Run-specific overview panel
 // ---------------------------------------------------------------------------
 
-function StatsGrid({ runSummary, runTopFiles, runUniquePrinciples }) {
+function SeverityBadgeRow({ severity }) {
+  const sev = severity || {};
+  if (!(sev.critical || sev.major || sev.minor)) return null;
   return (
-    <div className="acc-eval-stats-row">
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Violations</span>
-        <span className="acc-eval-stat-value">{runSummary.totalViolations || 0}</span>
-        <div className="acc-eval-tags">
-          {(runSummary.severity?.critical || 0) > 0 && <span className="severity-tag critical">{runSummary.severity.critical} crit</span>}
-          {(runSummary.severity?.major || 0) > 0 && <span className="severity-tag major">{runSummary.severity.major} maj</span>}
-          {(runSummary.severity?.minor || 0) > 0 && <span className="severity-tag minor">{runSummary.severity.minor} min</span>}
-        </div>
-      </div>
-      <div className="acc-eval-stats-divider" />
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Ratio</span>
-        <span className="acc-eval-stat-value">{complianceRatio(runSummary.totalViolations || 0, runSummary.totalCompliance || 0)}</span>
-      </div>
-      <div className="acc-eval-stats-divider" />
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Files</span>
-        <span className="acc-eval-stat-value">{runTopFiles.length}</span>
-      </div>
-      <div className="acc-eval-stats-divider" />
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Principles</span>
-        <span className="acc-eval-stat-value">{runUniquePrinciples}</span>
-      </div>
-      <div className="acc-eval-stats-divider" />
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Dimensions</span>
-        <span className="acc-eval-stat-value">{runSummary.dimensionCount || 0}</span>
-      </div>
-    </div>
+    <span className="acc-eval-sev-row">
+      {sev.critical > 0 && <SevBadge level="critical" count={sev.critical} format="count-abbr" />}
+      {sev.major > 0    && <SevBadge level="major"    count={sev.major}    format="count-abbr" />}
+      {sev.minor > 0    && <SevBadge level="minor"    count={sev.minor}    format="count-abbr" />}
+    </span>
   );
 }
 
-function RunHeroSection({ dashboard, selectedRunId, stats }) {
-  const { runSummary, runTopFiles, runUniquePrinciples } = stats;
+function RunHeroSection({ dashboard, selectedRunId, runSummary }) {
+  const dateLabel = dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId);
+  const scoreNum = parseFloat(runSummary.numericAverage);
+  const scoreDisplay = isNaN(scoreNum) ? '—' : scoreNum.toFixed(1);
+  const grade = runSummary.overallGrade;
+  const violations = runSummary.totalViolations || 0;
+  const compliance = runSummary.totalCompliance || 0;
+  const totalChecks = violations + compliance;
+  const ratio = complianceRatio(violations, compliance);
+
   return (
-    <section className="acc-eval-panel panel">
-      <div className="acc-eval-top">
-        <span className="acc-eval-date">{dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId)}</span>
+    <section className="acc-eval-panel acc-eval-panel--terminal">
+      <div className="acc-eval-panel__top">
+        <TermHeader name="run" sub={dateLabel} />
       </div>
-      <div className="acc-eval-golden">
-        <div className="acc-eval-circle-col">
-          <ScoreCircle score={runSummary.numericAverage} grade={runSummary.overallGrade} size={HERO_SCORE_CIRCLE_SIZE} />
-        </div>
-        <div className="acc-eval-stats-col">
-          <StatsGrid runSummary={runSummary} runTopFiles={runTopFiles} runUniquePrinciples={runUniquePrinciples} />
-        </div>
-      </div>
+      <StatStrip cards>
+        <Stat
+          label="SCORE"
+          value={scoreDisplay}
+          hint={grade ? `grade ${gradeLetter(grade)}` : null}
+        />
+        <Stat
+          label="VIOLATIONS"
+          value={violations}
+          hint={<SeverityBadgeRow severity={runSummary.severity} />}
+        />
+        <Stat
+          label="COMPLIANCE"
+          value={compliance}
+          hint={totalChecks > 0 ? `passing / ${totalChecks} checks` : null}
+        />
+        <Stat
+          label="RATIO"
+          value={ratio}
+          hint="compliance : violations"
+        />
+      </StatStrip>
     </section>
   );
 }
@@ -100,27 +96,19 @@ function RunHeroSection({ dashboard, selectedRunId, stats }) {
 function RunFileViolations({ runTopFiles, onFileClick }) {
   if (runTopFiles.length === 0) return null;
   return (
-    <>
-      <div className="section-header">
-        <h3 className="section-title">Violations by File</h3>
-        <span className="section-count">{runTopFiles.length} files</span>
+    <section className="qd-cards-panel offending-panel" aria-label="Violations by file">
+      <div className="qd-cards-panel__head">
+        <SectionLabel>{`violations_by_file · ${runTopFiles.length}`}</SectionLabel>
+        <span className="run-history-panel__stats">SORTED BY SEVERITY</span>
       </div>
-      <section className="panel wide-panel offending-panel">
-        <div className="trend-table-wrap">
-          <TopOffendingFilesTable files={runTopFiles} onFileClick={onFileClick} />
-        </div>
-      </section>
-    </>
+      <TopOffendingFilesTable files={runTopFiles} onFileClick={onFileClick} />
+    </section>
   );
 }
 
 export default function RunOverviewPanel({ dashboard, selectedRunId, projectName, onDimensionClick, onFileClick }) {
   const runSummary = useMemo(() => buildRunSummary(dashboard?.dimensions), [dashboard]);
   const runTopFiles = useMemo(() => withDimensionsStr(buildTopOffendingFiles(dashboard?.dimensions || [])), [dashboard]);
-  const runUniquePrinciples = useMemo(() => {
-    const violations = (dashboard?.dimensions || []).flatMap((d) => d.violations || []);
-    return new Set(violations.map((v) => v.principle).filter(Boolean)).size;
-  }, [dashboard]);
 
   const reportSpec = useMemo(() => {
     if (!dashboard?.dimensions) return null;
@@ -182,7 +170,7 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, projectName
         <div className="run-overview-spinner"><LoadingScreen /></div>
       ) : (
         <>
-          <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} stats={{ runSummary, runTopFiles, runUniquePrinciples }} />
+          <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} runSummary={runSummary} />
           <section className="quality-dimensions" aria-label="Quality dimensions">
             <div className="quality-dimensions__head">
               <SectionLabel>quality_dimensions · {dimCount}</SectionLabel>
