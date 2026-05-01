@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useDashboard } from '../features/dashboard/hooks/useDashboard.js';
+import { usePrefetchAdjacentRuns } from '../features/dashboard/hooks/usePrefetchAdjacentRuns.js';
 import { buildDailyRuns } from '../utils/dailyGrouping.js';
 import { useServerHealth } from './useServerHealth.js';
 import { useNavStack } from './useNavStack.js';
@@ -97,13 +98,14 @@ export function useAppState() {
   } = projectBundle;
   const settings = useAppSettings();
   const effectiveRun = activePage.page === 'history-run' ? historySelectedRun : selectedRun;
-  const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, error, availableRuns, refreshDashboard } = useDashboard({ selectedProject, selectedRun: effectiveRun });
+  const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, refreshDashboard } = useDashboard({ selectedProject, selectedRun: effectiveRun });
   const { dailyRuns: rawDailyRuns, headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => ({
     dailyRuns: buildDailyRuns(availableRuns, dashboard?.trend || []),
     ...computeDerivedState(accumulated, dashboard, selectedProject, projects),
   }), [availableRuns, dashboard, accumulated, selectedProject, projects]);
   const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, activePage.page, setSelectedRun);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: visibleDailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
+  const prefetchHandlers = usePrefetchAdjacentRuns({ selectedProject, availableRuns: visibleDailyRuns, overviewRunIndex });
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
 
   // Refresh all dashboard data (including latestAccumulated) when an evaluation finishes
@@ -128,8 +130,8 @@ export function useAppState() {
     serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navTab,
     projects, projectsLoaded, selectedProject, selectedRun, handleProjectChange, handleNavigate,
     handleDeleteProject, handleExportProject, handleRelocateProject,
-    dashboard, accumulated, latestAccumulated, rescoreLookup, loading, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex,
-    currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect,
+    dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex,
+    currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect, prefetchHandlers,
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
     historySelectedRun, setHistorySelectedRun,
     evalLifecycle, settings, activeTab, showProjectHeader, showRunNav, refreshDashboard,

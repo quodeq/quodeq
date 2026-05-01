@@ -13,6 +13,10 @@ export function useDashboard({ selectedProject, selectedRun }) {
     queryFn: () => getDashboard(selectedProject, selectedRun),
     enabled: !!selectedProject,
     staleTime: 60_000,
+    // Keep showing the previous run's data while a new run loads — instant
+    // perceived navigation. isFetching toggles true during the background
+    // fetch, which the page reads to show a subtle indicator.
+    placeholderData: (prev) => prev,
   });
 
   const {
@@ -40,6 +44,10 @@ export function useDashboard({ selectedProject, selectedRun }) {
     latestAccumulated: latestScores?.accumulated || null,
     rescoreLookup: {},
     loading: dashboardQuery.isLoading || scoresLoading,
+    // True during background refetch when we already have placeholder data
+    // (e.g. user switched to a different run). Page shows a subtle
+    // shimmer/dim instead of the full loading screen.
+    isFetching: dashboardQuery.isFetching,
     error: dashboardQuery.isError
       ? "Failed to load dashboard data. Check your connection and try refreshing."
       : (scoresError || null),

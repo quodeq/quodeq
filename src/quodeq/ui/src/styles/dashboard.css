@@ -23,6 +23,12 @@
   animation: dashboard-fadein 400ms ease;
 }
 
+/* Subtle "background refetch in progress" — used while placeholderData
+   shows the previous run's content during a run switch. */
+.dashboard-refreshing {
+  opacity: 0.7;
+}
+
 @keyframes dashboard-fadein {
   from { opacity: 0; }
   to { opacity: 1; }

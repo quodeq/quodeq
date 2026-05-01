@@ -21,6 +21,8 @@ export function useProjectScores({ selectedProject, selectedRun }) {
     queryFn: () => getProjectScores(selectedProject, asOf),
     enabled: !!selectedProject,
     staleTime: 60_000,
+    // Keep prior scores visible while switching runs — see useDashboard for rationale.
+    placeholderData: (prev) => prev,
   });
 
   const latestQuery = useQuery({
@@ -28,6 +30,7 @@ export function useProjectScores({ selectedProject, selectedRun }) {
     queryFn: () => getProjectScores(selectedProject),
     enabled: !!selectedProject,
     staleTime: 60_000,
+    placeholderData: (prev) => prev,
   });
 
   const availableRuns = useMemo(() => {
