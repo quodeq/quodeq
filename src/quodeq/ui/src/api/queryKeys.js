@@ -31,3 +31,17 @@ export const systemKeys = {
   health: () => ["system", "health"],
   ollama: () => ["system", "ollama"],
 };
+
+export const standardsKeys = {
+  all: () => ["standards"],
+  list: () => ["standards", "list"],
+  library: () => ["standards", "library"],
+  cwes: () => ["standards", "cwes"],
+};
+
+export const settingsKeys = {
+  all: () => ["settings"],
+  aiClients: () => ["settings", "aiClients"],
+  knownModels: (providerId) => ["settings", "knownModels", providerId],
+  ollamaModels: () => ["settings", "ollamaModels"],
+};

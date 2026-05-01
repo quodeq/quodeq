@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { evaluationKeys, projectKeys, systemKeys } from "./queryKeys";
+import { evaluationKeys, projectKeys, systemKeys, standardsKeys, settingsKeys } from "./queryKeys";
 
 describe("query key factories", () => {
   it("evaluationKeys.evaluation returns the run-scope prefix", () => {
@@ -44,5 +44,29 @@ describe("query key factories", () => {
 
   it("systemKeys.ollama is the global ollama key", () => {
     expect(systemKeys.ollama()).toEqual(["system", "ollama"]);
+  });
+
+  it("standardsKeys.list points to the standards list", () => {
+    expect(standardsKeys.list()).toEqual(["standards", "list"]);
+  });
+
+  it("standardsKeys.library points to the standards library", () => {
+    expect(standardsKeys.library()).toEqual(["standards", "library"]);
+  });
+
+  it("standardsKeys.cwes points to the CWE list", () => {
+    expect(standardsKeys.cwes()).toEqual(["standards", "cwes"]);
+  });
+
+  it("settingsKeys.aiClients points to the AI client list", () => {
+    expect(settingsKeys.aiClients()).toEqual(["settings", "aiClients"]);
+  });
+
+  it("settingsKeys.knownModels embeds the providerId", () => {
+    expect(settingsKeys.knownModels("openai")).toEqual(["settings", "knownModels", "openai"]);
+  });
+
+  it("settingsKeys.ollamaModels is the local Ollama model list key", () => {
+    expect(settingsKeys.ollamaModels()).toEqual(["settings", "ollamaModels"]);
   });
 });
