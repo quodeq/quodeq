@@ -40,16 +40,17 @@ async function tryFindPort(candidates, baseUrl) {
 }
 
 export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = SERVER_BASE_URL } = {}) {
-  // Local override pinned to a specific dataUpdatedAt. setServerConnected(true)
-  // optimistically clears the disconnect overlay; once a fresh poll comes
-  // in (newer dataUpdatedAt) the override is dropped and the query value wins.
-  const [override, setOverride] = useState(null);
+  // Local state is the source of truth for callers. The query side-effects
+  // it on each poll resolution. setServerConnected(true) lets the reconnect
+  // overlay optimistically clear the disconnected state until the next poll.
+  const [connected, setConnected] = useState(true);
 
-  const { data, dataUpdatedAt } = useQuery({
+  useQuery({
     queryKey: systemKeys.health(),
     queryFn: async () => {
       try {
         await getHealth();
+        setConnected(true);
         return true;
       } catch {
         const currentPort = typeof window !== 'undefined' ? window.location.port : '';
@@ -61,8 +62,10 @@ export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = SERVER
           window.location.href = `${baseUrl}:${foundPort}`;
           // Treat redirect as still-connected to avoid an overlay flash
           // before the page navigates away.
+          setConnected(true);
           return true;
         }
+        setConnected(false);
         return false;
       }
     },
@@ -71,12 +74,8 @@ export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = SERVER
   });
 
   const setServerConnected = useCallback((next) => {
-    setOverride({ value: Boolean(next), at: Date.now() });
+    setConnected(Boolean(next));
   }, []);
 
-  // The override wins only while it is newer than the latest poll.
-  const overrideActive = override !== null && override.at > dataUpdatedAt;
-  const effective = overrideActive ? override.value : (data ?? true);
-
-  return [effective, setServerConnected];
+  return [connected, setServerConnected];
 }
