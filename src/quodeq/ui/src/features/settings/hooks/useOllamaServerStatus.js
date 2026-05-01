@@ -1,37 +1,34 @@
-import { useEffect, useRef, useState } from 'react';
+/**
+ * useOllamaServerStatus — TanStack Query poll for Ollama daemon status.
+ *
+ * Polls every 5s and reports { status: 'online' | 'offline', address }.
+ * A fetch rejection is treated as offline.
+ */
+import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
+import { systemKeys } from '../../../api/queryKeys.js';
 
 const POLL_MS = 5000;
 
 export function useOllamaServerStatus() {
   const { getOllamaStatus } = useApi();
-  const [state, setState] = useState(null);
-  const timerRef = useRef(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const { data } = useQuery({
+    queryKey: systemKeys.ollama(),
+    queryFn: async () => {
+      try {
+        const result = await getOllamaStatus();
+        if (result?.running) {
+          return { status: 'online', address: result.address ?? null };
+        }
+        return { status: 'offline', address: null };
+      } catch {
+        return { status: 'offline', address: null };
+      }
+    },
+    refetchInterval: POLL_MS,
+    refetchOnWindowFocus: false,
+  });
 
-    function tick() {
-      getOllamaStatus()
-        .then((data) => {
-          if (cancelled) return;
-          if (data?.running) {
-            setState({ status: 'online', address: data.address ?? null });
-          } else {
-            setState({ status: 'offline', address: null });
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setState({ status: 'offline', address: null });
-        });
-    }
-    tick();
-    timerRef.current = setInterval(tick, POLL_MS);
-    return () => {
-      cancelled = true;
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [getOllamaStatus]);
-
-  return state;
+  return data ?? null;
 }
