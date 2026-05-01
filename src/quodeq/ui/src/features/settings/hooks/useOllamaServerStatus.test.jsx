@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ApiContext } from '../../../api/ApiContext.jsx';
 import { useOllamaServerStatus } from './useOllamaServerStatus.js';
 
@@ -15,16 +16,23 @@ function Probe() {
 }
 
 function renderWithApi(getOllamaStatus) {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0, staleTime: 0 },
+      mutations: { retry: false },
+    },
+  });
   return render(
-    <ApiContext.Provider value={{ getOllamaStatus }}>
-      <Probe />
-    </ApiContext.Provider>
+    <QueryClientProvider client={client}>
+      <ApiContext.Provider value={{ getOllamaStatus }}>
+        <Probe />
+      </ApiContext.Provider>
+    </QueryClientProvider>
   );
 }
 
 describe('useOllamaServerStatus', () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+  afterEach(() => { vi.restoreAllMocks(); });
 
   it('returns null until the first poll resolves', () => {
     const get = vi.fn(() => new Promise(() => {}));
@@ -36,22 +44,25 @@ describe('useOllamaServerStatus', () => {
   it('returns online status with address when poll succeeds', async () => {
     const get = vi.fn().mockResolvedValue({ running: true, address: 'localhost:11434' });
     renderWithApi(get);
-    await act(async () => { await Promise.resolve(); });
-    expect(screen.getByTestId('status')).toHaveTextContent('online');
+    await waitFor(() => {
+      expect(screen.getByTestId('status')).toHaveTextContent('online');
+    });
     expect(screen.getByTestId('address')).toHaveTextContent('localhost:11434');
   });
 
   it('returns offline status when running=false', async () => {
     const get = vi.fn().mockResolvedValue({ running: false });
     renderWithApi(get);
-    await act(async () => { await Promise.resolve(); });
-    expect(screen.getByTestId('status')).toHaveTextContent('offline');
+    await waitFor(() => {
+      expect(screen.getByTestId('status')).toHaveTextContent('offline');
+    });
   });
 
   it('returns offline when the API call rejects', async () => {
     const get = vi.fn().mockRejectedValue(new Error('boom'));
     renderWithApi(get);
-    await act(async () => { await Promise.resolve(); });
-    expect(screen.getByTestId('status')).toHaveTextContent('offline');
+    await waitFor(() => {
+      expect(screen.getByTestId('status')).toHaveTextContent('offline');
+    });
   });
 });

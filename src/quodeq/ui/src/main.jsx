@@ -4,6 +4,8 @@ import App from './App.jsx';
 import './styles/index.css';
 import { resolveDataTheme } from './utils/themeResolver.js';
 import { ApiProvider } from './api/ApiContext.jsx';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './api/queryClient.js';
 
 const LS_THEME = 'cc-theme';
 const LS_THEME_MODE = 'cc-theme-mode';
@@ -81,5 +83,9 @@ window.addEventListener('pywebviewready', markWebview);
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Root element #root not found in DOM');
 createRoot(rootEl).render(
-  <React.StrictMode><ApiProvider><App /></ApiProvider></React.StrictMode>
+  <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <ApiProvider><App /></ApiProvider>
+    </QueryClientProvider>
+  </React.StrictMode>
 );

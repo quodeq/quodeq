@@ -1,40 +1,46 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
+import { standardsKeys } from '../../../api/queryKeys.js';
 
 export const STANDARD_TYPES = { BUILTIN: 'builtin', QUODEQ: 'quodeq', COMMUNITY: 'community', CUSTOM: 'custom' };
 
 export function useStandards() {
   const { listStandards, deleteStandard, duplicateStandard } = useApi();
-  const [standards, setStandards] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState(null);
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: standardsKeys.list(),
+    queryFn: () => listStandards(),
+  });
+
+  const standards = data || [];
 
   const refresh = useCallback(() => {
-    setLoading(true);
-    listStandards()
-      .then((data) => { setStandards(data); setError(null); })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => { refresh(); }, [refresh]);
+    queryClient.invalidateQueries({ queryKey: standardsKeys.list() });
+    return refetch();
+  }, [queryClient, refetch]);
 
   const handleDelete = useCallback(async (id) => {
     try {
       await deleteStandard(id);
-      refresh();
+      setMutationError(null);
+      await refresh();
     } catch (err) {
-      setError(err.message || 'Failed to delete standard');
+      setMutationError(err.message || 'Failed to delete standard');
     }
-  }, [refresh]);
+  }, [deleteStandard, refresh]);
+
   const handleDuplicate = useCallback(async (id, newId) => {
     try {
       await duplicateStandard(id, newId);
-      refresh();
+      setMutationError(null);
+      await refresh();
     } catch (err) {
-      setError(err.message || 'Failed to duplicate standard');
+      setMutationError(err.message || 'Failed to duplicate standard');
     }
-  }, [refresh]);
+  }, [duplicateStandard, refresh]);
 
   const grouped = useMemo(() => {
     const g = {
@@ -49,5 +55,15 @@ export function useStandards() {
     return g;
   }, [standards]);
 
-  return { standards, grouped, loading, error, refresh, handleDelete, handleDuplicate };
+  const combinedError = mutationError || (error ? error.message : null);
+
+  return {
+    standards,
+    grouped,
+    loading: isLoading,
+    error: combinedError,
+    refresh,
+    handleDelete,
+    handleDuplicate,
+  };
 }

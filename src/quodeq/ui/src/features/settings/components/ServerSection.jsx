@@ -1,40 +1,33 @@
-import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
 import { useServerLog } from '../server-log/ServerLogContext.js';
+import { systemKeys } from '../../../api/queryKeys.js';
 
 const HEALTH_POLL_MS = 10000;
 
-function ping() {
-  return fetch('/api/health?_t=' + Date.now())
-    .then((r) => r.ok ? r.json() : null)
-    .catch(() => null);
+async function ping() {
+  try {
+    const res = await fetch('/api/health?_t=' + Date.now());
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.ok ? data : null;
+  } catch {
+    return null;
+  }
 }
 
-
 export default function ServerSection() {
-  const [health, setHealth] = useState(null);
-  const [status, setStatus] = useState('checking');
-  const healthTimerRef = useRef(null);
-  const cancelledRef = useRef(false);
   const serverLog = useServerLog();
 
-  // Health polling
-  useEffect(() => {
-    cancelledRef.current = false;
+  const { data: health, isLoading } = useQuery({
+    queryKey: [...systemKeys.health(), 'settings-detail'],
+    queryFn: ping,
+    refetchInterval: HEALTH_POLL_MS,
+    refetchOnWindowFocus: false,
+  });
 
-    function tick() {
-      ping().then((d) => {
-        if (cancelledRef.current) return;
-        if (d?.ok) { setHealth(d); setStatus('online'); }
-        else { setHealth(null); setStatus('offline'); }
-        healthTimerRef.current = setTimeout(tick, HEALTH_POLL_MS);
-      });
-    }
-    tick();
-
-    return () => { cancelledRef.current = true; clearTimeout(healthTimerRef.current); };
-  }, []);
+  const status = isLoading && !health ? 'checking' : (health ? 'online' : 'offline');
 
   return (
     <section className="panel settings-section">

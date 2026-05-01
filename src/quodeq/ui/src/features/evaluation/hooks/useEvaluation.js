@@ -1,176 +1,60 @@
-import { useEffect, useRef, useState } from 'react';
-import { useApi } from '../../../api/ApiContext.jsx';
-import { ACTIVE_PROVIDER_KEY, providerKey, DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET } from '../../../constants.js';
-import { confirmDialog } from '../../../utils/confirmDialog.js';
-import { useRunEventStream } from './useRunEventStream.js';
+/**
+ * useEvaluation — evaluation lifecycle hook backed by TanStack Query.
+ *
+ * Exposes:
+ *   { job, jobError, liveViolations, startEvaluation, clearJob, cancelEvaluation }
+ *
+ * Data sources:
+ *   - statusQuery: ['evaluation', jobId, 'status'] — fetched via api.getEvaluation
+ *     and updated by useRunEventStream when VITE_USE_SSE_EVENTS=true.
+ *   - findingsQuery: ['evaluation', jobId, 'findings'] — under SSE, populated
+ *     entirely by useRunEventStream's setQueryData writes (queryFn is a no-op).
+ *     Under polling, fetched via per-dimension getDimensionEval calls.
+ *
+ * Mutations:
+ *   - startMutation: api.startEvaluation -> seeds status cache on success.
+ *   - cancelMutation: api.cancelEvaluation -> invalidates the run subtree.
+ *
+ * Out of scope (vs. legacy hook):
+ *   - Auto-resume of CLI-started external runs via listEvaluations on mount.
+ *     Restore in a follow-up if required by user reports.
+ */
+import { useCallback, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useApi } from "../../../api/ApiContext.jsx";
+import { confirmDialog } from "../../../utils/confirmDialog.js";
+import { useRunEventStream } from "./useRunEventStream.js";
+import { evaluationKeys } from "../../../api/queryKeys.js";
+import {
+  ACTIVE_PROVIDER_KEY,
+  providerKey,
+  DEFAULT_MAX_SUBAGENTS,
+  DEFAULT_POOL_BUDGET,
+} from "../../../constants.js";
 
-const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === 'true';
-
-const DIMENSION_POLL_INITIAL_MS = 2000;
-const DIMENSION_POLL_MAX_MS = 8000;
-const JOB_POLL_INITIAL_MS = 1500;
-const MAX_DIM_POLL_FAILURES = 10;
-const POLL_CONCURRENCY = 4;
-const POLL_BACKOFF_FACTOR = 1.5;
-const DEFAULT_OLLAMA_SUBAGENTS = '1';
+const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === "true";
+const JOB_POLL_MS = 1500;
+const DIM_POLL_MS = 2000;
+const DEFAULT_OLLAMA_SUBAGENTS = "1";
 const DEFAULT_CLI_SUBAGENTS = String(DEFAULT_MAX_SUBAGENTS);
-const DEFAULT_OLLAMA_BUDGET = '0';
+const DEFAULT_OLLAMA_BUDGET = "0";
 const DEFAULT_CLI_BUDGET = String(DEFAULT_POOL_BUDGET);
 
-function stopTimer(ref) {
-  if (ref.current) {
-    clearInterval(ref.current);
-    ref.current = null;
-  }
-}
-
-async function pollSingleDimension(dim, project, runId, refs, setLiveViolations, getDimensionEval) {
-  try {
-    const data = await getDimensionEval(project, runId, dim);
-    refs.dimFailCount[dim] = 0;
-    if (data?.violations) {
-      setLiveViolations(prev => ({ ...prev, [dim]: data.violations }));
-      if (!data.partial) {
-        refs.partialDimensions.delete(dim);
-      }
-    }
-  } catch (err) {
-    console.debug('Dimension poll failed:', dim, err);
-    const fails = (refs.dimFailCount[dim] || 0) + 1;
-    refs.dimFailCount[dim] = fails;
-    if (fails > MAX_DIM_POLL_FAILURES) refs.partialDimensions.delete(dim);
-  }
-}
-
-function handleJobUpdate(updated, refs, setJob, callbacks) {
-  setJob((prev) => ({ ...updated, repo: prev?.repo }));
-  // Track the latest known dimension list so external (CLI-launched) runs
-  // surface every dimension in the live feed. Local runs already have it
-  // populated via parseDimensions(payload); for external runs the list
-  // arrives via the polled job. Write through to both the persistent ref
-  // and the local closure copy so a polling restart doesn't lose it.
-  if (updated.dimensions?.length) {
-    refs.requestedDimensions = updated.dimensions;
-    if (refs.requestedDimensionsRef) {
-      refs.requestedDimensionsRef.current = updated.dimensions;
-    }
-  }
-  if (updated.phase === 'analyzing' && updated.currentDimension) {
-    refs.partialDimensions.add(updated.currentDimension);
-  }
-  const hasOutput = updated.outputProject && updated.outputRunId;
-  const isAnalyzing = updated.phase === 'analyzing' || updated.phase === 'scoring' || updated.status !== 'running';
-  const canPollDims = hasOutput && isAnalyzing;
-  // Seed partialDimensions on reconnect. When the dashboard is restarted
-  // while a scan is running, the CLI-launched job reports phase=analyzing
-  // but currentDimension is often null (the pipeline-level phase setter
-  // does not know which dimension the worker pool is on right now), so
-  // the block above adds nothing to partialDimensions. Without any
-  // dimensions queued, startDimPolling spins with no work and the Live
-  // Violations panel stays empty. If we're analyzing and know the list
-  // of requested dimensions, seed them all — pollSingleDimension will
-  // remove each one from the set as soon as its status comes back
-  // non-partial.
-  if (isAnalyzing
-      && refs.partialDimensions.size === 0
-      && refs.requestedDimensions.length) {
-    for (const dim of refs.requestedDimensions) {
-      refs.partialDimensions.add(dim);
-    }
-  }
-  if (updated.status !== 'running') {
-    callbacks.stopPolling();
-    if (canPollDims && !refs.dimPollingStarted) {
-      refs.dimPollingStarted = true;
-      callbacks.startDimPolling(updated.outputProject, updated.outputRunId);
-    }
-  } else if (canPollDims && !refs.dimPollingStarted) {
-    refs.dimPollingStarted = true;
-    callbacks.startDimPolling(updated.outputProject, updated.outputRunId);
-  }
-}
-
-async function pollPartialDimensions(partialDimensionsRef, project, runId, refs, setLiveViolations, getDimensionEval) {
-  const partial = [...partialDimensionsRef.current];
-  if (!partial.length) return false;
-  let hadErrors = false;
-  for (let i = 0; i < partial.length; i += POLL_CONCURRENCY) {
-    const batch = partial.slice(i, i + POLL_CONCURRENCY);
-    const results = await Promise.allSettled(
-      batch.map((dim) => pollSingleDimension(dim, project, runId, refs, setLiveViolations, getDimensionEval))
-    );
-    if (results.some((r) => r.status === 'rejected')) hadErrors = true;
-  }
-  return hadErrors;
-}
-
-function createDimensionPoller(dimPollRef, dimFailCountRef, partialDimensionsRef, setLiveViolations, getDimensionEval) {
-  return function startDimensionPolling(project, runId) {
-    stopTimer(dimPollRef);
-    dimFailCountRef.current = {};
-    let delay = DIMENSION_POLL_INITIAL_MS;
-    const refs = { dimFailCount: dimFailCountRef.current, partialDimensions: partialDimensionsRef.current };
-    function scheduleNext() {
-      dimPollRef.current = setTimeout(async () => {
-        const anyFailed = await pollPartialDimensions(partialDimensionsRef, project, runId, refs, setLiveViolations, getDimensionEval);
-        delay = anyFailed ? Math.min(delay * POLL_BACKOFF_FACTOR, DIMENSION_POLL_MAX_MS) : DIMENSION_POLL_INITIAL_MS;
-        scheduleNext();
-      }, delay);
-    }
-    scheduleNext();
-  };
-}
-
-function createJobPoller(refs, setters, startDimensionPolling, getEvaluation) {
-  const { poll: pollRef, dimPoll: dimPollRef, requestedDimensions: requestedDimensionsRef, partialDimensions: partialDimensionsRef } = refs;
-  const { setJob, setJobError } = setters;
-  return function startPolling(jobId) {
-    if (SSE_ENABLED) return;
-    stopTimer(pollRef);
-    const localRefs = {
-      requestedDimensions: requestedDimensionsRef.current,
-      partialDimensions: partialDimensionsRef.current,
-      requestedDimensionsRef,
-      dimPollingStarted: false,
-    };
-    const callbacks = {
-      stopPolling: () => stopTimer(pollRef),
-      startDimPolling: startDimensionPolling,
-    };
-    pollRef.current = setInterval(async () => {
-      try {
-        const updated = await getEvaluation(jobId);
-        handleJobUpdate(updated, localRefs, setJob, callbacks);
-      } catch (err) {
-        setJob((prev) => prev ? { ...prev, status: 'lost' } : prev);
-        console.error('Poll error:', err);
-        setJobError('Evaluation polling failed');
-        stopTimer(pollRef);
-        stopTimer(dimPollRef);
-      }
-    }, JOB_POLL_INITIAL_MS);
-  };
-}
-
 /**
- * Build the evaluation payload from provider settings.
- * Throws if the orchestrator model is not configured.
+ * Merge per-provider Settings (provider, model, subagents, budget, etc.)
+ * from localStorage into the start-evaluation payload. Mirrors the legacy
+ * useEvaluation behavior; throws a user-facing error if no provider/model
+ * is configured.
  */
 function preparePayload(payload, storage = localStorage) {
-  const activeProvider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
-  if (!activeProvider) throw new Error('No provider selected. Go to Settings to configure one.');
-
+  const activeProvider = storage.getItem(ACTIVE_PROVIDER_KEY) || "";
+  if (!activeProvider) throw new Error("No provider selected. Go to Settings to configure one.");
   const get = (key) => storage.getItem(providerKey(activeProvider, key));
-
-  const model = get('model');
-  if (!model) throw new Error('No model selected. Go to Settings and select one.');
-
-  const defaultSubagents = ['ollama'].includes(activeProvider) ? DEFAULT_OLLAMA_SUBAGENTS : DEFAULT_CLI_SUBAGENTS;
-  const subagents = parseInt(get('subagents') || defaultSubagents, 10);
-
-  const defaultBudget = ['ollama'].includes(activeProvider) ? DEFAULT_OLLAMA_BUDGET : DEFAULT_CLI_BUDGET;
-  const poolBudget = parseInt(get('pool-budget') || defaultBudget, 10);
-
+  const model = get("model");
+  if (!model) throw new Error("No model selected. Go to Settings and select one.");
+  const isOllama = activeProvider === "ollama";
+  const subagents = parseInt(get("subagents") || (isOllama ? DEFAULT_OLLAMA_SUBAGENTS : DEFAULT_CLI_SUBAGENTS), 10);
+  const poolBudget = parseInt(get("pool-budget") || (isOllama ? DEFAULT_OLLAMA_BUDGET : DEFAULT_CLI_BUDGET), 10);
   const result = {
     ...payload,
     aiCmd: activeProvider,
@@ -178,162 +62,132 @@ function preparePayload(payload, storage = localStorage) {
     maxSubagents: subagents,
     poolBudget,
   };
-  if (get('per-dimension') === 'true') result.perDimension = true;
-  if (get('verify') === 'false') result.verifyFindings = false;
+  if (get("per-dimension") === "true") result.perDimension = true;
+  if (get("verify") === "false") result.verifyFindings = false;
   return result;
-}
-
-function parseDimensions(payload) {
-  const rawDims = payload.dimensions ?? [];
-  return typeof rawDims === 'string' ? rawDims.split(',').map(d => d.trim()).filter(Boolean) : rawDims;
-}
-
-function resetRefs(liveViolationsRef, requestedDimensionsRef, partialDimensionsRef, dimFailCountRef) {
-  liveViolationsRef.current = {};
-  requestedDimensionsRef.current = [];
-  partialDimensionsRef.current = new Set();
-  dimFailCountRef.current = {};
-}
-
-function useEvalRefs() {
-  return {
-    pollRef: useRef(null),
-    dimPollRef: useRef(null),
-    requestedDimensionsRef: useRef([]),
-    liveViolationsRef: useRef({}),
-    partialDimensionsRef: useRef(new Set()),
-    dimFailCountRef: useRef({}),
-  };
-}
-
-function useResumeRunning(setJob, startPolling, pollRef, dimPollRef, listEvaluations) {
-  useEffect(() => {
-    if (SSE_ENABLED) return undefined;
-    listEvaluations()
-      .then((jobs) => {
-        const running = jobs.find((j) => j.status === 'running');
-        if (running) {
-          setJob(running);
-          startPolling(running.jobId);
-        }
-      })
-      .catch((err) => console.warn('Failed to fetch running evaluations:', err));
-    return () => {
-      stopTimer(pollRef);
-      stopTimer(dimPollRef);
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only: resume any running eval; startPolling is stable (defined outside render cycle via refs)
-}
-
-function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPolling, { startEvaluation, cancelEvaluation }) {
-  async function startEvaluationJob(payload) {
-    setJobError('');
-    refs.requestedDimensionsRef.current = parseDimensions(payload);
-    refs.liveViolationsRef.current = {};
-    refs.partialDimensionsRef.current = new Set();
-    setLiveViolations({});
-    try {
-      if (Array.isArray(payload.dimensions) && payload.dimensions.length === 0) {
-        throw new Error('Select at least one dimension.');
-      }
-      const prepared = preparePayload(payload);
-      const created = await startEvaluation(prepared);
-      setJob({ ...created, repo: prepared.repo });
-      startPolling(created.jobId);
-    } catch (err) {
-      console.error('Start error:', err);
-      setJobError(err.message?.startsWith('No ') || err.message?.startsWith('Select ') ? err.message : 'Failed to start evaluation');
-    }
-  }
-
-  function clearJob() {
-    stopTimer(refs.pollRef); stopTimer(refs.dimPollRef);
-    setJob(null); setJobError(''); setLiveViolations({});
-    resetRefs(refs.liveViolationsRef, refs.requestedDimensionsRef, refs.partialDimensionsRef, refs.dimFailCountRef);
-  }
-
-  async function cancelEvaluationJob(jobId) {
-    if (!jobId) return;
-    const result = await confirmDialog({
-      title: 'Cancel evaluation?',
-      message: 'Stop the running scan. Findings collected so far will be saved for the next incremental run.',
-      confirmLabel: 'Cancel evaluation',
-      cancelLabel: 'Keep running',
-      variant: 'danger',
-      checkboxLabel: 'Discard collected findings',
-      checkboxHint: 'Force a full rescan next time instead of resuming from this run.',
-    });
-    if (!result || !result.ok) return;
-    try {
-      await cancelEvaluation(jobId, { discard: result.checked });
-      clearJob();
-    } catch (err) {
-      console.error('Cancel error:', err);
-      setJobError('Failed to cancel evaluation');
-    }
-  }
-
-  return { startEvaluationJob, clearJob, cancelEvaluationJob };
-}
-
-function usePollingSetup(refs, setJob, setJobError, setLiveViolations, { getDimensionEval, getEvaluation, listEvaluations }) {
-  const startDimensionPolling = createDimensionPoller(refs.dimPollRef, refs.dimFailCountRef, refs.partialDimensionsRef, setLiveViolations, getDimensionEval);
-  const startPolling = createJobPoller(
-    { poll: refs.pollRef, dimPoll: refs.dimPollRef, requestedDimensions: refs.requestedDimensionsRef, partialDimensions: refs.partialDimensionsRef },
-    { setJob, setJobError },
-    startDimensionPolling,
-    getEvaluation,
-  );
-  useResumeRunning(setJob, startPolling, refs.pollRef, refs.dimPollRef, listEvaluations);
-  return startPolling;
 }
 
 export function useEvaluation() {
   const api = useApi();
-  const { startEvaluation, getEvaluation, cancelEvaluation, getDimensionEval, listEvaluations } = api;
-  const [job, setJob] = useState(null);
-  const [jobError, setJobError] = useState('');
-  const [liveViolations, setLiveViolations] = useState({});
-  const refs = useEvalRefs();
+  const queryClient = useQueryClient();
+  const [jobId, setJobId] = useState(null);
+  const [jobError, setJobError] = useState(null);
 
-  // Hooks must run unconditionally (Rules of Hooks). When the SSE flag is off
-  // we pass null so useRunEventStream stays inert; when on, we feed it the
-  // current job id so it subscribes to /events for that run.
-  const sse = useRunEventStream(SSE_ENABLED ? job?.jobId ?? null : null);
+  // SSE side-effect — writes status/dimensions/findings into cache.
+  // No-op when VITE_USE_SSE_EVENTS is off; refetchInterval below covers.
+  useRunEventStream(jobId);
 
-  // Mirror SSE status frames into the same `job` state the polling path
-  // populates, so downstream consumers (useEvaluationLifecycle, dashboards)
-  // see an identical shape regardless of transport.
-  useEffect(() => {
-    if (!SSE_ENABLED) return;
-    if (!sse.status) return;
-    setJob((prev) => ({ ...(prev || {}), ...sse.status, repo: prev?.repo }));
-  }, [sse.status]);
+  // --- Status (the "job" object) ---------------------------------------
+  const statusQuery = useQuery({
+    queryKey: jobId ? evaluationKeys.status(jobId) : ["evaluation", "_none_", "status"],
+    queryFn: () => api.getEvaluation(jobId),
+    enabled: !!jobId,
+    staleTime: SSE_ENABLED ? Infinity : 0,
+    refetchInterval: SSE_ENABLED ? false : JOB_POLL_MS,
+  });
 
-  // Group SSE findings by dimension into the liveViolations shape consumers
-  // already render. Each finding is expected to carry a `dimension` key; we
-  // tolerate missing dimensions by bucketing under '_'.
-  useEffect(() => {
-    if (!SSE_ENABLED) return;
-    if (!sse.findings || sse.findings.length === 0) return;
-    const grouped = {};
-    for (const f of sse.findings) {
-      const key = f?.dimension || '_';
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(f);
+  const job = statusQuery.data || null;
+
+  // --- Findings (a flat list, then grouped into liveViolations) --------
+  // Under SSE the cache is filled by useRunEventStream; queryFn is a no-op.
+  // Under polling, fetch each dimension's eval and flatten violations.
+  const findingsQuery = useQuery({
+    queryKey: jobId ? evaluationKeys.findings(jobId) : ["evaluation", "_none_", "findings"],
+    queryFn: async () => {
+      if (SSE_ENABLED) return [];
+      if (!job?.outputProject || !job?.outputRunId || !job?.dimensions?.length) {
+        return [];
+      }
+      const results = await Promise.all(
+        job.dimensions.map((d) =>
+          api.getDimensionEval(job.outputProject, job.outputRunId, d)
+            .then((data) => (data?.violations || []).map((v) => ({ ...v, dimension: d })))
+            .catch(() => []),
+        ),
+      );
+      return results.flat();
+    },
+    enabled: !!jobId && (SSE_ENABLED || !!job?.outputProject),
+    staleTime: SSE_ENABLED ? Infinity : 0,
+    refetchInterval: SSE_ENABLED ? false : DIM_POLL_MS,
+  });
+
+  // Group findings into the legacy { [dim]: [violations] } shape.
+  const findings = findingsQuery.data || [];
+  const liveViolations = {};
+  for (const f of findings) {
+    const dim = f.dimension || "_";
+    (liveViolations[dim] ??= []).push(f);
+  }
+
+  // --- Mutations -------------------------------------------------------
+  const startMutation = useMutation({
+    mutationFn: (input) => {
+      // preparePayload throws on missing provider/model — let the error
+      // propagate to onError so jobError gets set with a useful message.
+      const prepared = preparePayload(input);
+      return api.startEvaluation(prepared).then((created) => ({
+        ...created,
+        repo: prepared.repo,
+      }));
+    },
+    onSuccess: (created) => {
+      setJobError(null);
+      setJobId(created.jobId);
+      queryClient.setQueryData(evaluationKeys.status(created.jobId), created);
+    },
+    onError: (err) => {
+      const msg = err?.message || "Failed to start evaluation.";
+      setJobError(
+        msg.startsWith("No ") || msg.startsWith("Select ") ? msg : "Failed to start evaluation",
+      );
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: ({ discard } = {}) => api.cancelEvaluation(jobId, { discard }),
+    onSuccess: () => {
+      if (jobId) {
+        queryClient.invalidateQueries({ queryKey: evaluationKeys.evaluation(jobId) });
+      }
+    },
+  });
+
+  const startEvaluation = useCallback(
+    (input) => startMutation.mutateAsync(input),
+    [startMutation],
+  );
+
+  const cancelEvaluation = useCallback(async () => {
+    const result = await confirmDialog({
+      title: "Cancel evaluation?",
+      message: "The run will stop. Findings collected so far are kept by default.",
+      checkboxLabel: "Discard collected findings",
+      confirmLabel: "Cancel evaluation",
+      cancelLabel: "Keep running",
+      variant: "danger",
+    });
+    if (!result || !result.ok) return;
+    cancelMutation.mutate({ discard: result.checked });
+  }, [cancelMutation]);
+
+  const clearJob = useCallback(() => {
+    if (jobId) {
+      // Drop cached entries so a future Start with a different jobId
+      // doesn't carry stale findings/status into view (gcTime would
+      // otherwise hold them for 5 minutes).
+      queryClient.removeQueries({ queryKey: evaluationKeys.evaluation(jobId) });
     }
-    setLiveViolations(grouped);
-  }, [sse.findings]);
-
-  const startPolling = usePollingSetup(refs, setJob, setJobError, setLiveViolations, { getDimensionEval, getEvaluation, listEvaluations });
-  useEffect(() => { refs.liveViolationsRef.current = liveViolations; }, [liveViolations]);
-
-  const { startEvaluationJob, clearJob, cancelEvaluationJob } = useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPolling, { startEvaluation, cancelEvaluation });
+    setJobId(null);
+    setJobError(null);
+  }, [jobId, queryClient]);
 
   return {
-    job, jobError, liveViolations,
-    startEvaluation: startEvaluationJob,
+    job,
+    jobError,
+    liveViolations,
+    startEvaluation,
     clearJob,
-    cancelEvaluation: () => cancelEvaluationJob(job?.jobId),
+    cancelEvaluation,
   };
 }

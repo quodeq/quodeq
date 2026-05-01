@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { scanPath } from '../../../api/index.js';
+import { projectKeys } from '../../../api/queryKeys.js';
 
 /**
  * Fetch scan data for a project ID or a raw local path.
@@ -7,44 +8,25 @@ import { scanPath } from '../../../api/index.js';
  * Returns { scanData, loading, error }.
  */
 export function useScanData(projectId, localPath) {
-  const [scanData, setScanData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const target = projectId || localPath || null;
+  const { data, isLoading, error } = useQuery({
+    queryKey: projectId
+      ? [...projectKeys.project(projectId), 'scan']
+      : ['project', 'scan-path', localPath || ''],
+    queryFn: async ({ signal }) => {
+      if (projectId) {
+        const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/scan`, { signal });
+        if (!res.ok) throw new Error(`Scan failed: ${res.status}`);
+        return res.json();
+      }
+      return scanPath(localPath);
+    },
+    enabled: !!target,
+  });
 
-  useEffect(() => {
-    const target = projectId || localPath;
-    if (!target) {
-      setScanData(null);
-      return;
-    }
-
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-
-    const fetchPromise = projectId
-      ? fetch(`/api/projects/${encodeURIComponent(projectId)}/scan`, { signal: controller.signal }).then((res) => {
-          if (!res.ok) throw new Error(`Scan failed: ${res.status}`);
-          return res.json();
-        })
-      : scanPath(localPath);
-
-    fetchPromise
-      .then((data) => {
-        if (!controller.signal.aborted) {
-          setScanData(data);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted) {
-          setError(err.message);
-          setLoading(false);
-        }
-      });
-
-    return () => { controller.abort(); };
-  }, [projectId, localPath]);
-
-  return { scanData, loading, error };
+  return {
+    scanData: data ?? null,
+    loading: !!target && isLoading,
+    error: error ? error.message : null,
+  };
 }
