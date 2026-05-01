@@ -59,11 +59,3 @@ export function useProjectScores({ selectedProject, selectedRun }) {
     refreshScores,
   };
 }
-
-// Deprecation shim — Task 9 removes its last consumer (useDashboard.js).
-export function clearScoresCache(_project) {
-  // eslint-disable-next-line no-console
-  console.warn(
-    "clearScoresCache is deprecated; use queryClient.invalidateQueries(projectKeys.project(project)).",
-  );
-}

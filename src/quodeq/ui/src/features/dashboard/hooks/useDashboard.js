@@ -47,11 +47,3 @@ export function useDashboard({ selectedProject, selectedRun }) {
     refreshDashboard,
   };
 }
-
-// Deprecation shim — kept for backward-compat with any leftover callers.
-export function clearDashboardCache(_project) {
-  // eslint-disable-next-line no-console
-  console.warn(
-    "clearDashboardCache is deprecated; use queryClient.invalidateQueries(projectKeys.project(project)).",
-  );
-}
