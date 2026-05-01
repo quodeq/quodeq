@@ -3,13 +3,19 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { EvalLogContext } from '../eval-log/EvalLogContext.js';
 import ScanProgress from './ScanProgress.jsx';
+import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 
 vi.mock('../../../api/index.js', () => ({
   getEvaluationProgress: vi.fn(() => Promise.resolve({ dimensions: [], totalElapsedS: 0 })),
 }));
 
 function withEvalLog(ui, ctx) {
-  return render(<EvalLogContext.Provider value={ctx}>{ui}</EvalLogContext.Provider>);
+  const QC = withQueryClient();
+  return render(
+    <QC>
+      <EvalLogContext.Provider value={ctx}>{ui}</EvalLogContext.Provider>
+    </QC>,
+  );
 }
 
 const baseJob = { jobId: 'job-1', status: 'running', logs: [] };

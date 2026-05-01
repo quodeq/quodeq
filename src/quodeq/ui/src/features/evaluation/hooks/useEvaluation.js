@@ -172,9 +172,15 @@ export function useEvaluation() {
   }, [cancelMutation]);
 
   const clearJob = useCallback(() => {
+    if (jobId) {
+      // Drop cached entries so a future Start with a different jobId
+      // doesn't carry stale findings/status into view (gcTime would
+      // otherwise hold them for 5 minutes).
+      queryClient.removeQueries({ queryKey: evaluationKeys.evaluation(jobId) });
+    }
     setJobId(null);
     setJobError(null);
-  }, []);
+  }, [jobId, queryClient]);
 
   return {
     job,

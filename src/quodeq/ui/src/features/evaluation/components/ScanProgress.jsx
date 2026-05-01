@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { getEvaluationProgress } from '../../../api/index.js';
+import { evaluationKeys } from '../../../api/queryKeys.js';
 import { useEvalLog } from '../eval-log/EvalLogContext.js';
 import { CONSOLE_DOT_DISMISSED_KEY } from '../../../constants.js';
 import { pct, computeOverallProgress } from './scanProgressTotals.js';
@@ -132,7 +134,6 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   const isFailed = status === 'failed';
   const isLost = status === 'lost';
 
-  const [progress, setProgress] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [showDot, setShowDot] = useState(() => {
     if (hasEvaluations) return false;
@@ -140,31 +141,19 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   });
   const evalLog = useEvalLog();
   const consoleOpen = evalLog.activeJobId === jobId;
-  const timerRef = useRef(null);
   const isTerminal = TERMINAL_STATES.has(status);
 
-  useEffect(() => {
-    if (!jobId) return undefined;
-    let stopped = false;
-
-    async function tick() {
-      try {
-        const data = await getEvaluationProgress(jobId);
-        if (!stopped) setProgress(data);
-      } catch {
-        /* progress is best-effort */
-      }
-    }
-
-    tick();
-    if (!isTerminal) {
-      timerRef.current = setInterval(tick, POLL_INTERVAL_MS);
-    }
-    return () => {
-      stopped = true;
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [jobId, isTerminal]);
+  const progressQuery = useQuery({
+    queryKey: jobId ? [...evaluationKeys.evaluation(jobId), 'progress'] : ['evaluation', '_none_', 'progress'],
+    queryFn: () => getEvaluationProgress(jobId),
+    enabled: !!jobId,
+    refetchInterval: isTerminal ? false : POLL_INTERVAL_MS,
+    staleTime: 0,
+    retry: false,
+  });
+  // Best-effort: surface the last successful payload, ignore errors silently
+  // (progress is purely informational and should never block the UI).
+  const progress = progressQuery.data ?? null;
 
   useEffect(() => {
     if (evalLog.activeJobId === jobId) {
