@@ -115,3 +115,15 @@
   font-style: italic;
   text-align: center;
 }
+
+.dim-gauge-card__gauge--insuf .dim-gauge-card__score {
+  fill: var(--color-text-subtle);
+}
+.dim-gauge-card__insuf-line {
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  color: var(--color-text-subtle);
+  text-align: center;
+  margin-top: var(--space-2);
+  letter-spacing: 0.04em;
+}

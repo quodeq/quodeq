@@ -6,6 +6,12 @@ import { memo, useState } from 'react';
 
 const DEFAULT_PAGE_SIZE = 20;
 
+function basenameOf(filepath) {
+  if (!filepath) return '';
+  const idx = filepath.lastIndexOf('/');
+  return idx >= 0 ? filepath.slice(idx + 1) : filepath;
+}
+
 const TopOffendingFilesTable = memo(function TopOffendingFilesTable({ files, onFileClick, pageSize = DEFAULT_PAGE_SIZE }) {
   const [showAll, setShowAll] = useState(false);
   const displayFiles = showAll ? (files || []) : (files || []).slice(0, pageSize);
@@ -25,6 +31,7 @@ const TopOffendingFilesTable = memo(function TopOffendingFilesTable({ files, onF
             title={f.file}
           >
             <div className="offending-file-info">
+              <span className="offending-file-name">{basenameOf(f.file)}</span>
               <span className="offending-file-path">{f.file}</span>
               {f.dimensionsStr && (
                 <span className="offending-file-dims">{f.dimensionsStr}</span>

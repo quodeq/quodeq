@@ -39,6 +39,7 @@ export default function DimensionGaugeCard({
   evaluatedToday = true,
   dateLabel,
   selectedRunId,
+  isInsufficient = false,
 }) {
   const { value: scoreDisplay } = splitScore(item.overallScore);
   const scoreNum = parseFloat(item.overallScore);
@@ -71,42 +72,62 @@ export default function DimensionGaugeCard({
         {delta !== null && delta !== undefined && <TrendBadge delta={delta} />}
       </div>
 
-      <div className="dim-gauge-card__gauge" aria-hidden="true">
-        <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
-          <circle
-            className="dim-gauge-card__ring-bg"
-            cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
-            strokeWidth={RING_STROKE}
-          />
-          <circle
-            className="dim-gauge-card__ring-fill"
-            cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
-            strokeWidth={RING_STROKE}
-            stroke={ringColor}
-            strokeDasharray={RING_CIRC}
-            strokeDashoffset={dashOffset}
-            transform={`rotate(-90 ${RING_CX} ${RING_CY})`}
-          />
-          <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - 4}>
-            {scoreDisplay}
-          </text>
-          {gradeWord && (
-            <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + 16}>
-              {gradeWord}
-            </text>
-          )}
-        </svg>
-      </div>
+      {isInsufficient ? (
+        <>
+          <div className="dim-gauge-card__gauge dim-gauge-card__gauge--insuf" aria-hidden="true">
+            <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
+              <circle
+                className="dim-gauge-card__ring-bg"
+                cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
+                strokeWidth={RING_STROKE}
+                strokeDasharray="3 4"
+              />
+              <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - 4}>—</text>
+              <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + 16}>INSUFFICIENT</text>
+            </svg>
+          </div>
+          <div className="dim-gauge-card__insuf-line">insufficient evidence</div>
+        </>
+      ) : (
+        <>
+          <div className="dim-gauge-card__gauge" aria-hidden="true">
+            <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
+              <circle
+                className="dim-gauge-card__ring-bg"
+                cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
+                strokeWidth={RING_STROKE}
+              />
+              <circle
+                className="dim-gauge-card__ring-fill"
+                cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
+                strokeWidth={RING_STROKE}
+                stroke={ringColor}
+                strokeDasharray={RING_CIRC}
+                strokeDashoffset={dashOffset}
+                transform={`rotate(-90 ${RING_CX} ${RING_CY})`}
+              />
+              <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - 4}>
+                {scoreDisplay}
+              </text>
+              {gradeWord && (
+                <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + 16}>
+                  {gradeWord}
+                </text>
+              )}
+            </svg>
+          </div>
 
-      <div className="dim-gauge-card__meta">
-        VIOL · {violationCount} · {ratio}
-      </div>
+          <div className="dim-gauge-card__meta">
+            VIOL · {violationCount} · {ratio}
+          </div>
 
-      <div className="dim-gauge-card__sev-row">
-        {(sev.critical ?? 0) > 0 && <SevBadge level="critical" count={sev.critical} format="count-abbr" />}
-        {(sev.major ?? 0)    > 0 && <SevBadge level="major"    count={sev.major}    format="count-abbr" />}
-        {(sev.minor ?? 0)    > 0 && <SevBadge level="minor"    count={sev.minor}    format="count-abbr" />}
-      </div>
+          <div className="dim-gauge-card__sev-row">
+            {(sev.critical ?? 0) > 0 && <SevBadge level="critical" count={sev.critical} format="count-abbr" />}
+            {(sev.major ?? 0)    > 0 && <SevBadge level="major"    count={sev.major}    format="count-abbr" />}
+            {(sev.minor ?? 0)    > 0 && <SevBadge level="minor"    count={sev.minor}    format="count-abbr" />}
+          </div>
+        </>
+      )}
 
       {!evaluatedToday && dateText && (
         <div className="dim-gauge-card__stale-label">Older run · {dateText}</div>

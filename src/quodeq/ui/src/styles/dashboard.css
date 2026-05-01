@@ -1494,11 +1494,30 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
 
-.offending-file-info .offending-file-dims {
-  margin-top: 2px;
+.offending-file-name {
+  font-size: 0.95rem;
+  font-weight: var(--weight-semibold, 600);
+  color: var(--color-text);
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  transition: color 0.12s;
+}
+
+.offending-file-path {
+  min-width: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
 }
 
 .offending-file-dims {
@@ -1509,19 +1528,7 @@
   text-overflow: ellipsis;
 }
 
-.offending-file-path {
-  min-width: 0;
-  font-size: 0.85rem;
-  font-weight: var(--weight-medium);
-  color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: left;
-  transition: color 0.12s;
-}
-
-.offending-file-row--clickable:hover .offending-file-path {
+.offending-file-row--clickable:hover .offending-file-name {
   color: var(--color-accent);
 }
 
