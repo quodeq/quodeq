@@ -17,14 +17,15 @@ function SidePaneSpecButton({ type, label, icon, modifier }) {
   const spec = ctx.getRegisteredSpec ? ctx.getRegisteredSpec(type) : null;
   if (!spec) return null;
   const inDock = ctx.hasWindow(spec.id);
-  const atCap = ctx.windows.length >= ctx.MAX_WINDOWS && !inDock;
+  // Don't disable when at cap — let the click flow through addWindow so the
+  // provider's at-cap toast fires. A silently-disabled button gives no
+  // feedback about why nothing happens.
   return (
     <button
       type="button"
       className={`topbar-btn topbar-btn--${modifier}${inDock ? ` topbar-btn--${modifier}--open` : ''}`}
       aria-pressed={inDock}
-      disabled={atCap}
-      title={atCap ? 'Close a window to open another' : (inDock ? `Close ${label.toLowerCase()}` : `Open ${label.toLowerCase()}`)}
+      title={inDock ? `Close ${label.toLowerCase()}` : `Open ${label.toLowerCase()}`}
       onClick={() => {
         if (inDock) ctx.removeWindow(spec.id);
         else ctx.addWindow(spec);
