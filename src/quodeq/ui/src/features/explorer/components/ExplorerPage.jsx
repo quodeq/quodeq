@@ -25,6 +25,37 @@ function buildRadialPrinciples(principleGrades) {
   });
 }
 
+/**
+ * Enrich each principleGrade with the per-principle counts that
+ * DimensionGaugeCard expects: total violations, compliance count, and a
+ * severity histogram. The data comes from the same evalData we already
+ * have — no extra API call.
+ */
+function buildEnrichedPrinciples(principleGrades, allViolations, complianceByPrinciple) {
+  const violationsByPrinciple = new Map();
+  for (const v of allViolations || []) {
+    const key = v.principle;
+    if (!key) continue;
+    if (!violationsByPrinciple.has(key)) violationsByPrinciple.set(key, []);
+    violationsByPrinciple.get(key).push(v);
+  }
+  return (principleGrades || []).map((pg) => {
+    const vs = violationsByPrinciple.get(pg.principle) || [];
+    const severity = { critical: 0, major: 0, minor: 0 };
+    for (const v of vs) {
+      const s = (v.severity || 'minor').toLowerCase();
+      if (severity[s] !== undefined) severity[s]++;
+    }
+    const compliance = complianceByPrinciple?.get?.(pg.principle) || [];
+    return {
+      ...pg,
+      violationCount: vs.length,
+      complianceCount: compliance.length,
+      severity,
+    };
+  });
+}
+
 export default function ExplorerPage({
   project,
   dimension,
@@ -84,6 +115,7 @@ export default function ExplorerPage({
 
   const dim = String(d.evalData.dimension || '').toLowerCase();
   const radialPrinciples = buildRadialPrinciples(d.principleGrades);
+  const enrichedPrinciples = buildEnrichedPrinciples(d.principleGrades, d.allViolations, d.complianceByPrinciple);
   const onPrincipleClick = (name) => onNavigate?.('evalprinciple', { evalPrincipal: buildEvalPrincipal(name) });
 
   const overallScoreNum = parseFloat(d.overallGrade?.score);
@@ -128,7 +160,7 @@ export default function ExplorerPage({
         </div>
 
         <div className="qd-top-right">
-          <section className="panel" aria-label="Principles radial">
+          <section className="run-history-panel--terminal panel" aria-label="Principles radial">
             <div className="run-history-panel__header">
               <SectionLabel>principles_radial · {radialPrinciples.length}</SectionLabel>
               <span className="run-history-panel__stats">SCALE 0–10</span>
@@ -143,19 +175,21 @@ export default function ExplorerPage({
         </div>
       </div>
 
-      <div className="qd-section-banner">
-        <SectionLabel>{`principles · ${radialPrinciples.length}`}</SectionLabel>
-      </div>
-      <PrinciplesCardsRow
-        principles={d.principleGrades || []}
-        onPrincipleClick={onPrincipleClick}
-      />
+      <section className="qd-cards-panel" aria-label="Principles">
+        <div className="qd-cards-panel__head">
+          <SectionLabel>{`principles · ${radialPrinciples.length}`}</SectionLabel>
+        </div>
+        <PrinciplesCardsRow
+          principles={enrichedPrinciples}
+          onPrincipleClick={onPrincipleClick}
+        />
+      </section>
 
-      <div className="qd-section-banner">
-        <SectionLabel>{`violations_by_file · ${d.topFiles.length}`}</SectionLabel>
-        <span className="run-history-panel__stats">SORTED BY SEVERITY</span>
-      </div>
-      <section className="panel wide-panel offending-panel">
+      <section className="qd-cards-panel offending-panel" aria-label="Violations by file">
+        <div className="qd-cards-panel__head">
+          <SectionLabel>{`violations_by_file · ${d.topFiles.length}`}</SectionLabel>
+          <span className="run-history-panel__stats">SORTED BY SEVERITY</span>
+        </div>
         <TopOffendingFilesTable
           files={d.topFiles}
           onFileClick={(f) => onNavigate?.('file', { file: f })}

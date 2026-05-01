@@ -1,10 +1,13 @@
-// Props: { files, onFileClick, pageSize = 20 }
-// Table of top offending files by violation count with pagination.
+// Props: { files, onFileClick }
+// Terminal-styled list of top offending files by violation count.
 // onFileClick is called with the file object when a row is clicked.
+//
+// Off-screen rows skip layout/paint via CSS `content-visibility: auto` on
+// `.offending-file-row`, so the full list renders without a "Show all"
+// pagination control.
 
-import { memo, useState } from 'react';
-
-const DEFAULT_PAGE_SIZE = 20;
+import { memo } from 'react';
+import { SevBadge } from '../../../components/terminal/index.js';
 
 function basenameOf(filepath) {
   if (!filepath) return '';
@@ -12,53 +15,37 @@ function basenameOf(filepath) {
   return idx >= 0 ? filepath.slice(idx + 1) : filepath;
 }
 
-const TopOffendingFilesTable = memo(function TopOffendingFilesTable({ files, onFileClick, pageSize = DEFAULT_PAGE_SIZE }) {
-  const [showAll, setShowAll] = useState(false);
-  const displayFiles = showAll ? (files || []) : (files || []).slice(0, pageSize);
-  const hasMore = (files || []).length > pageSize;
-
+const TopOffendingFilesTable = memo(function TopOffendingFilesTable({ files, onFileClick }) {
+  const list = files || [];
   return (
-    <>
-      <ul className="offending-file-list">
-        {displayFiles.map((f, idx) => (
-          <li
-            key={idx}
-            className={`offending-file-row${onFileClick ? ' offending-file-row--clickable' : ''}`}
-            onClick={onFileClick ? () => onFileClick(f) : undefined}
-            role={onFileClick ? 'button' : undefined}
-            tabIndex={onFileClick ? 0 : undefined}
-            onKeyDown={onFileClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFileClick(f); } } : undefined}
-            title={f.file}
-          >
-            <div className="offending-file-info">
-              <span className="offending-file-name">{basenameOf(f.file)}</span>
-              <span className="offending-file-path">{f.file}</span>
-              {f.dimensionsStr && (
-                <span className="offending-file-dims">{f.dimensionsStr}</span>
-              )}
-            </div>
-            <strong className="offending-file-total">{f.total}</strong>
-            <span className="offending-file-tags">
-              {f.critical > 0 && (
-                <span className="severity-tag critical">{f.critical} critical</span>
-              )}
-              {f.major > 0 && (
-                <span className="severity-tag major">{f.major} major</span>
-              )}
-              {f.minor > 0 && (
-                <span className="severity-tag minor">{f.minor} minor</span>
-              )}
-            </span>
-            {onFileClick && <span className="offending-file-chevron">›</span>}
-          </li>
-        ))}
-      </ul>
-      {hasMore && (
-        <button className="offending-show-more" onClick={() => setShowAll(v => !v)}>
-          {showAll ? 'Show less' : `Show all ${files.length} files`}
-        </button>
-      )}
-    </>
+    <ul className="offending-file-list">
+      {list.map((f, idx) => (
+        <li
+          key={idx}
+          className={`offending-file-row${onFileClick ? ' offending-file-row--clickable' : ''}`}
+          onClick={onFileClick ? () => onFileClick(f) : undefined}
+          role={onFileClick ? 'button' : undefined}
+          tabIndex={onFileClick ? 0 : undefined}
+          onKeyDown={onFileClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFileClick(f); } } : undefined}
+          title={f.file}
+        >
+          <div className="offending-file-info">
+            <span className="offending-file-name">{basenameOf(f.file)}</span>
+            <span className="offending-file-path">{f.file}</span>
+            {f.dimensionsStr && (
+              <span className="offending-file-dims">{f.dimensionsStr}</span>
+            )}
+          </div>
+          <strong className="offending-file-total">{f.total}</strong>
+          <span className="offending-file-tags">
+            {f.critical > 0 && <SevBadge level="critical" count={f.critical} format="count-abbr" />}
+            {f.major > 0 && <SevBadge level="major" count={f.major} format="count-abbr" />}
+            {f.minor > 0 && <SevBadge level="minor" count={f.minor} format="count-abbr" />}
+          </span>
+          {onFileClick && <span className="offending-file-chevron">›</span>}
+        </li>
+      ))}
+    </ul>
   );
 });
 
