@@ -1,85 +1,114 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
-import { useRunEventStream } from './useRunEventStream.js';
+import { describe, it, expect, beforeEach } from "vitest";
+import { renderHook, act, waitFor } from "@testing-library/react";
+import { useQuery } from "@tanstack/react-query";
+import { useRunEventStream } from "./useRunEventStream";
+import { evaluationKeys } from "../../../api/queryKeys.js";
+import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
 
 class MockEventSource {
   constructor(url) {
     this.url = url;
     this.listeners = {};
-    this.closed = false;
     MockEventSource.last = this;
   }
   addEventListener(event, handler) {
     if (!this.listeners[event]) this.listeners[event] = [];
     this.listeners[event].push(handler);
   }
-  close() {
-    this.closed = true;
-  }
+  close() { this.closed = true; }
   emit(event, data) {
     (this.listeners[event] || []).forEach((h) =>
-      h({ data: JSON.stringify(data), lastEventId: data?.id })
+      h({ data: JSON.stringify(data), lastEventId: data?.id }),
     );
   }
 }
 
-describe('useRunEventStream', () => {
-  let originalEventSource;
+function renderStreamAndQuery(jobId, key) {
+  const wrapper = withQueryClient();
+  return renderHook(
+    () => {
+      useRunEventStream(jobId);
+      return useQuery({
+        queryKey: key,
+        queryFn: () => null,
+        enabled: !!jobId,
+      });
+    },
+    { wrapper },
+  );
+}
+
+describe("useRunEventStream (cache-writer)", () => {
   beforeEach(() => {
-    originalEventSource = globalThis.EventSource;
-    globalThis.EventSource = MockEventSource;
+    global.EventSource = MockEventSource;
     MockEventSource.last = null;
   });
-  afterEach(() => {
-    globalThis.EventSource = originalEventSource;
+
+  it("opens an EventSource against the events endpoint when SSE is enabled", () => {
+    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    renderStreamAndQuery("job-123", evaluationKeys.status("job-123"));
+    expect(MockEventSource.last.url).toBe("/api/evaluations/job-123/events");
   });
 
-  it('opens an EventSource against the run-events endpoint', () => {
-    const { result } = renderHook(() => useRunEventStream('job-123'));
-    expect(MockEventSource.last.url).toBe('/api/evaluations/job-123/events');
-    expect(result.current.connected).toBe(true);
-  });
-
-  it('updates status state when status event arrives', () => {
-    const { result } = renderHook(() => useRunEventStream('job-123'));
+  it("writes status events into evaluationKeys.status cache slot", async () => {
+    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    const { result } = renderStreamAndQuery("job-1", evaluationKeys.status("job-1"));
     act(() => {
-      MockEventSource.last.emit('status', { state: 'running', phase: 'analyzing' });
+      MockEventSource.last.emit("status", { state: "running", phase: "analyzing" });
     });
-    expect(result.current.status).toEqual({ state: 'running', phase: 'analyzing' });
-  });
-
-  it('appends new findings as finding events arrive', () => {
-    const { result } = renderHook(() => useRunEventStream('job-123'));
-    act(() => {
-      MockEventSource.last.emit('finding', { id: 1, practice_id: 'P1', verdict: 'violation' });
-      MockEventSource.last.emit('finding', { id: 2, practice_id: 'P2', verdict: 'violation' });
-    });
-    expect(result.current.findings).toHaveLength(2);
-    expect(result.current.findings[0].practice_id).toBe('P1');
-  });
-
-  it('tracks completed dimensions', () => {
-    const { result } = renderHook(() => useRunEventStream('job-123'));
-    act(() => {
-      MockEventSource.last.emit('dimension-completed', { dimension: 'security', score: 90 });
-    });
-    expect(result.current.completedDimensions).toEqual({
-      security: { dimension: 'security', score: 90 },
+    await waitFor(() => {
+      expect(result.current.data).toEqual({ state: "running", phase: "analyzing" });
     });
   });
 
-  it('sets done flag and closes the stream on done event', () => {
-    const { result } = renderHook(() => useRunEventStream('job-123'));
+  it("appends finding events into evaluationKeys.findings cache slot", async () => {
+    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    const { result } = renderStreamAndQuery("job-1", evaluationKeys.findings("job-1"));
     act(() => {
-      MockEventSource.last.emit('done', { state: 'done' });
+      MockEventSource.last.emit("finding", { id: 1, practice_id: "P1" });
+      MockEventSource.last.emit("finding", { id: 2, practice_id: "P2" });
     });
-    expect(result.current.done).toBe(true);
+    await waitFor(() => {
+      expect(result.current.data).toEqual([
+        { id: 1, practice_id: "P1" },
+        { id: 2, practice_id: "P2" },
+      ]);
+    });
+  });
+
+  it("writes dimension-completed events as a map keyed by dimension", async () => {
+    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    const { result } = renderStreamAndQuery("job-1", evaluationKeys.dimensions("job-1"));
+    act(() => {
+      MockEventSource.last.emit("dimension-completed", {
+        dimension: "security", score: 90,
+      });
+    });
+    await waitFor(() => {
+      expect(result.current.data).toEqual({
+        security: { dimension: "security", score: 90 },
+      });
+    });
+  });
+
+  it("closes the source on done event", async () => {
+    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    renderStreamAndQuery("job-1", evaluationKeys.status("job-1"));
+    act(() => {
+      MockEventSource.last.emit("done", { state: "done" });
+    });
     expect(MockEventSource.last.closed).toBe(true);
   });
 
-  it('returns null status when jobId is empty', () => {
-    const { result } = renderHook(() => useRunEventStream(''));
-    expect(result.current.status).toBeNull();
+  it("does not open EventSource when jobId is empty", () => {
+    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    renderStreamAndQuery("", evaluationKeys.status(""));
+    expect(MockEventSource.last).toBeNull();
+  });
+
+  it("is a no-op when VITE_USE_SSE_EVENTS is not 'true'", () => {
+    import.meta.env.VITE_USE_SSE_EVENTS = "false";
+    renderStreamAndQuery("job-1", evaluationKeys.status("job-1"));
     expect(MockEventSource.last).toBeNull();
   });
 });
