@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useLibrary } from '../hooks/useLibrary.js';
 
 function LibraryCard({ standard, onImport, importing }) {
@@ -37,10 +37,7 @@ function LibraryCard({ standard, onImport, importing }) {
 }
 
 export default function LibraryBrowser({ onClose, onImported }) {
-  const { libraryStandards, loading, error, fetchLibrary, importStandard } = useLibrary();
-
-  useEffect(() => { fetchLibrary(); }, [fetchLibrary]);
-
+  const { libraryStandards, loading, error, importStandard } = useLibrary();
   const [importError, setImportError] = useState(null);
 
   const handleImport = async (file) => {
