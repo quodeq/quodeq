@@ -9,6 +9,41 @@
  *
  * Stateless; the parent passes the data it has.
  */
+import { useSidePane } from '../features/side-pane/index.js';
+import { FileTextIcon, SparkleIcon } from './CopyButton.jsx';
+
+function SidePaneSpecButton({ type, label, icon, modifier }) {
+  const ctx = useSidePane();
+  const spec = ctx.getRegisteredSpec ? ctx.getRegisteredSpec(type) : null;
+  if (!spec) return null;
+  const inDock = ctx.hasWindow(spec.id);
+  // Don't disable when at cap — let the click flow through addWindow so the
+  // provider's at-cap toast fires. A silently-disabled button gives no
+  // feedback about why nothing happens.
+  return (
+    <button
+      type="button"
+      className={`topbar-btn topbar-btn--${modifier}${inDock ? ` topbar-btn--${modifier}--open` : ''}`}
+      aria-pressed={inDock}
+      title={inDock ? `Close ${label.toLowerCase()}` : `Open ${label.toLowerCase()}`}
+      onClick={() => {
+        if (inDock) ctx.removeWindow(spec.id);
+        else ctx.addWindow(spec);
+      }}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function ReportToolbarButton() {
+  return <SidePaneSpecButton type="report" label="Report" icon={<FileTextIcon />} modifier="report" />;
+}
+
+function FixPlanToolbarButton() {
+  return <SidePaneSpecButton type="fixplan" label="Fix plan" icon={<SparkleIcon />} modifier="fixplan" />;
+}
 
 function Dot({ ok }) {
   return <span className={`topbar-dot ${ok ? 'topbar-dot--ok' : 'topbar-dot--err'}`} aria-hidden="true" />;
@@ -34,7 +69,7 @@ function BackIcon() {
 
 function MoonIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
     </svg>
   );
@@ -42,7 +77,7 @@ function MoonIcon() {
 
 function SunIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="4" />
       <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
     </svg>
@@ -56,7 +91,6 @@ export default function TopBar({
   serverUrl,
   provider,
   model,
-  onReport,
   onEvaluate,
   evaluating = false,
   onProviderClick,
@@ -73,7 +107,7 @@ export default function TopBar({
   onToggleTheme,
 }) {
   return (
-    <header className="topbar">
+    <header className="topbar pywebview-drag-region">
       {/* Compact-mode back button. Hidden entirely at the root of the
           nav stack — showing a disabled arrow adds visual noise without
           giving the user anything to click. */}
@@ -95,6 +129,21 @@ export default function TopBar({
       <div className="topbar-spacer" />
 
       <div className="topbar-actions">
+        <FixPlanToolbarButton />
+        <ReportToolbarButton />
+
+        {onToggleTheme && (
+          <button
+            type="button"
+            className="topbar-btn topbar-btn--icon topbar-btn--theme"
+            onClick={onToggleTheme}
+            aria-label={effectiveDark ? 'Switch to light theme' : 'Switch to dark theme'}
+            title={effectiveDark ? 'Switch to light theme' : 'Switch to dark theme'}
+          >
+            {effectiveDark ? <SunIcon /> : <MoonIcon />}
+          </button>
+        )}
+
         {(provider || model) && (
           onProviderClick ? (
             <button
@@ -116,22 +165,6 @@ export default function TopBar({
           )
         )}
 
-        {onReport && (
-          <button type="button" className="topbar-btn" onClick={onReport}>
-            Report
-          </button>
-        )}
-        {onToggleTheme && (
-          <button
-            type="button"
-            className="topbar-btn topbar-btn--icon topbar-btn--theme"
-            onClick={onToggleTheme}
-            aria-label={effectiveDark ? 'Switch to light theme' : 'Switch to dark theme'}
-            title={effectiveDark ? 'Switch to light theme' : 'Switch to dark theme'}
-          >
-            {effectiveDark ? <SunIcon /> : <MoonIcon />}
-          </button>
-        )}
         {onEvaluate && (
           <button
             type="button"

@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 
 from quodeq.analysis.prompts._template import load_template
+from quodeq.analysis.prompts.builder import _load_evaluation_rules
 from quodeq.config.prompt_templates import render_template
 
 _log = logging.getLogger(__name__)
@@ -22,10 +23,10 @@ Each finding must be a JSON object with these fields:
     "line": integer - line number
     "severity": string - "critical", "major", or "minor"
     "w": string - short title of the finding
-    "reason": string - why this is a violation or compliance
+    "reason": string - 1–3 sentences: what the quoted code does wrong AS WRITTEN, plus the concrete impact
+    "snippet": string - offending code copied VERBATIM from the source (one or a few contiguous lines, exact characters)
   Optional:
     "end_line": integer - last line if multi-line
-    "snippet": string - code snippet
     "scope": string - "file", "class", or "module"
 """
 
@@ -62,7 +63,7 @@ def assemble_api_prompt(
 ) -> str:
     """Assemble a complete evaluation prompt for the API runner."""
     template = load_template(template_name="api_prompt.md")
-    rules = load_template(template_name="evaluation_rules.md")
+    rules = _load_evaluation_rules()
     files_block = _build_files_block(source_files, repo_root=repo_root)
     return render_template(template, {
         "DIMENSION": dimension,

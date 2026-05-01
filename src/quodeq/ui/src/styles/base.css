@@ -1059,6 +1059,8 @@ textarea:focus {
   gap: var(--space-4);
   min-width: 0;
   width: 100%;
+  container-type: inline-size;
+  container-name: settings;
 }
 
 .brand-carousel {
@@ -1081,7 +1083,7 @@ textarea:focus {
   gap: var(--space-5);
 }
 
-@media (max-width: 900px) {
+@container settings (max-width: 900px) {
   .settings-grid {
     grid-template-columns: 1fr;
   }
@@ -1659,14 +1661,55 @@ textarea:focus {
 .server-dot--offline { background: #f87171; }
 .server-dot--unknown { background: var(--color-text-muted); }
 
-.server-status {
+.server-status-pill {
+  display: flex;
+  align-items: stretch;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin: var(--space-3) var(--space-5);
+}
+
+.server-status-pill__status {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  margin: var(--space-3) var(--space-5);
-  border-radius: var(--radius-md);
   font-size: var(--text-xs);
+  min-width: 0;
+}
+
+.server-status-pill__divider {
+  width: 1px;
+  background: var(--color-border);
+  flex: 0 0 auto;
+}
+
+/* The ConsoleButton has its own border/radius/padding — drop those when
+   it sits inside the pill so the outer surface owns the framing, but
+   keep the hover background so the right segment lights up on hover. */
+.server-status-pill .console-button {
+  border: none;
+  border-radius: 0;
+  padding: 0 var(--space-3);
+  align-self: stretch;
+}
+
+.server-details {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  /* The pill above has vertical margin; align the details caption with the
+     pill's horizontal padding and give it a small bottom padding so it
+     doesn't read as glued to the pill's underside. */
+  padding: 0 var(--space-5) var(--space-3);
+}
+
+.server-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .server-status--online {
@@ -1712,29 +1755,55 @@ textarea:focus {
   cursor: not-allowed;
 }
 
-/* Server console */
-.server-console-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: var(--space-3) var(--space-4);
-  margin: 0 var(--space-4);
-  cursor: pointer;
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-  border-top: 1px solid var(--color-border);
-  user-select: none;
-}
-
-.server-console-toggle:hover {
-  color: var(--color-text);
-}
-
-.server-console-toggle .console-chevron {
-  margin-left: auto;
+/* Shared console toggle button (evaluation cards, server, Ollama) */
+.console-button {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.console-button:hover {
+  color: var(--color-accent);
+  background: var(--color-surface-alt);
+  border-color: var(--color-border);
+}
+
+.console-button:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.console-button__icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.console-button__label {
+  font-family: var(--term-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.console-button__dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
 }
 
 .server-console-actions {

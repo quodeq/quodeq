@@ -13,6 +13,7 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
       <RunOverviewPanel
         dashboard={dashboard}
         selectedRunId={selectedRunId}
+        projectName={projectInfo?.displayName || projectInfo?.name || selectedProject}
         onDimensionClick={onDimensionCardClick}
         onFileClick={onFileClick}
       />
@@ -69,7 +70,7 @@ function useDashboardHandlers(onNavigate, dashboard) {
 }
 
 export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
-  const { selectedProject, selectedRun, projects = [], dashboard, accumulated, loading, error, availableRuns = [], dailyRuns, overviewRunIndex = 0 } = data;
+  const { selectedProject, selectedRun, projects = [], dashboard, accumulated, loading, isFetching, error, availableRuns = [], dailyRuns, overviewRunIndex = 0 } = data;
   const projectInfo = projects.find((p) => (p.id || p.name) === selectedProject) || null;
   const { onNavigate, onRunSelect } = callbacks;
   const [focusedDimension, setFocusedDimension] = useState(null);
@@ -93,9 +94,14 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   }
 
   const isLoading = loading && !dashboard;
+  // True while a *background* fetch is running but we're already showing
+  // data (placeholderData kept the previous run on screen during a switch).
+  // The page dims itself slightly so the user sees "still working" without
+  // the jarring full-screen LoadingScreen.
+  const isRefreshing = isFetching && !!dashboard && !isLoading;
 
   return (
-    <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : 'dashboard-ready'}`}>
+    <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : 'dashboard-ready'}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
       {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
       {isLoading && <LoadingScreen />}
       {dashboard && (

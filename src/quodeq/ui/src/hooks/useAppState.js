@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useDashboard } from '../features/dashboard/hooks/useDashboard.js';
+import { usePrefetchAdjacentRuns } from '../features/dashboard/hooks/usePrefetchAdjacentRuns.js';
 import { buildDailyRuns } from '../utils/dailyGrouping.js';
 import { useServerHealth } from './useServerHealth.js';
 import { useNavStack } from './useNavStack.js';
@@ -64,7 +65,7 @@ function useProjects({ onNoProjects }) {
 }
 
 function useAppNavigation() {
-  const [serverConnected, setServerConnected] = useServerHealth();
+  const [serverConnected, setServerConnected, serverVersion] = useServerHealth();
   const { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab } = useNavStack();
   const projectBundle = useProjects({ onNoProjects: () => navTab('evaluate') });
   const { selectedRun, setSelectedRun, handleRunChange } = projectBundle;
@@ -74,7 +75,7 @@ function useAppNavigation() {
     if (page === 'history-run' && params.runId) setHistorySelectedRun(params.runId);
     navPush({ page, ...params });
   }
-  return { serverConnected, setServerConnected, navStack, activePage, navPush, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun };
+  return { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPush, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun };
 }
 
 export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRunIndex) {
@@ -89,21 +90,33 @@ export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRun
 
 export function useAppState() {
   const nav = useAppNavigation();
-  const { serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
+  const { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
   const {
     projects, projectsLoaded, setProjects, selectedProject,
     selectedRun, setSelectedRun, loadProjects, handleProjectChange,
     selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject,
   } = projectBundle;
   const settings = useAppSettings();
-  const effectiveRun = activePage.page === 'history-run' ? historySelectedRun : selectedRun;
-  const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, error, availableRuns, refreshDashboard } = useDashboard({ selectedProject, selectedRun: effectiveRun });
+  const isHistoryRun = activePage.page === 'history-run';
+  const isHistoryTab = activePage.page === 'history';
+  const effectiveRun = isHistoryRun ? historySelectedRun : selectedRun;
+  // History views (the History tab and its run-detail page) show specific
+  // past runs in a comparison-oriented mental model — flashing the previous
+  // run's data via placeholderData is confusing. Overview navigation, by
+  // contrast, benefits from the instant swap because consecutive runs are
+  // usually nearly identical.
+  const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, refreshDashboard } = useDashboard({
+    selectedProject,
+    selectedRun: effectiveRun,
+    keepPlaceholder: !isHistoryRun && !isHistoryTab,
+  });
   const { dailyRuns: rawDailyRuns, headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => ({
     dailyRuns: buildDailyRuns(availableRuns, dashboard?.trend || []),
     ...computeDerivedState(accumulated, dashboard, selectedProject, projects),
   }), [availableRuns, dashboard, accumulated, selectedProject, projects]);
   const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, activePage.page, setSelectedRun);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: visibleDailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
+  const prefetchHandlers = usePrefetchAdjacentRuns({ selectedProject, availableRuns: visibleDailyRuns, overviewRunIndex });
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
 
   // Refresh all dashboard data (including latestAccumulated) when an evaluation finishes
@@ -125,11 +138,11 @@ export function useAppState() {
   const showRunNav = activeTab === TAB_OVERVIEW && showProjectHeader && visibleDailyRuns.length > 0 && navStack.length === 1;
 
   return {
-    serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navTab,
+    serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navTab,
     projects, projectsLoaded, selectedProject, selectedRun, handleProjectChange, handleNavigate,
     handleDeleteProject, handleExportProject, handleRelocateProject,
-    dashboard, accumulated, latestAccumulated, rescoreLookup, loading, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex,
-    currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect,
+    dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex,
+    currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect, prefetchHandlers,
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
     historySelectedRun, setHistorySelectedRun,
     evalLifecycle, settings, activeTab, showProjectHeader, showRunNav, refreshDashboard,

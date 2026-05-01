@@ -125,3 +125,16 @@ def get_index_db_path(default: str | None = None, env: dict[str, str] | None = N
     if "QUODEQ_INDEX_DB_PATH" in environ:
         return environ["QUODEQ_INDEX_DB_PATH"]
     return default or str(_DEFAULT_INDEX_DB_PATH)
+
+
+_SQLITE_DISABLE_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def sqlite_disabled() -> bool:
+    """Return True when QUODEQ_DISABLE_SQLITE is set to a truthy value.
+
+    Operator kill switch for the SQLite findings store. When True, the
+    analysis pipeline only writes JSONL and read paths only consult JSONL/JSON.
+    """
+    raw = os.environ.get("QUODEQ_DISABLE_SQLITE", "")
+    return raw.strip().lower() in _SQLITE_DISABLE_TRUTHY

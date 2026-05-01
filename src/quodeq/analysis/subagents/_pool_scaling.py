@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from collections import OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from math import ceil
@@ -36,7 +37,8 @@ class EvidencePaths:
     dimension_key: str
 
 
-_cached_file_queues: dict[Path, WorkQueue] = {}
+_QUEUE_CACHE_MAX_SIZE = 64
+_cached_file_queues: OrderedDict[Path, WorkQueue] = OrderedDict()
 
 
 def get_queue(queue: WorkQueue | None, queue_path: Path) -> WorkQueue:
@@ -44,14 +46,19 @@ def get_queue(queue: WorkQueue | None, queue_path: Path) -> WorkQueue:
 
     When *queue* is None a ``FileQueue`` is constructed from *queue_path*.
     The result is cached by path so repeated calls avoid rebuilding the queue.
+    The cache is bounded (LRU): in long-running sessions that touch many
+    distinct queue paths, the oldest entry is evicted once the cap is hit.
     """
     if queue is not None:
         return queue
     cached = _cached_file_queues.get(queue_path)
     if cached is not None:
+        _cached_file_queues.move_to_end(queue_path)
         return cached
     fq: WorkQueue = FileQueue(queue_path)
     _cached_file_queues[queue_path] = fq
+    if len(_cached_file_queues) > _QUEUE_CACHE_MAX_SIZE:
+        _cached_file_queues.popitem(last=False)
     return fq
 
 

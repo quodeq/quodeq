@@ -1,8 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { MIN_SUBAGENTS, MAX_SUBAGENTS } from '../../../constants.js';
-import ServerStatus from './ServerStatus.jsx';
+import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
+import { useOllamaServerStatus } from '../hooks/useOllamaServerStatus.js';
 import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
+import { useOllamaLog } from '../ollama-log/OllamaLogContext.js';
+import { settingsKeys } from '../../../api/queryKeys.js';
 
 function ModelSelector({ value, models, onChange }) {
   const needsModel = !value;
@@ -19,17 +23,19 @@ function ModelSelector({ value, models, onChange }) {
 
 export default function OllamaTab({ state, update }) {
   const { getOllamaModels, testOllamaConcurrency } = useApi();
-  const [models, setModels] = useState([]);
-  const [modelsError, setModelsError] = useState(null);
+  const ollamaLog = useOllamaLog();
+  const ollamaStatus = useOllamaServerStatus();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [testError, setTestError] = useState(null);
 
-  useEffect(() => {
-    getOllamaModels()
-      .then((data) => { setModels(data); setModelsError(null); })
-      .catch(() => { setModels([]); setModelsError('Failed to load Ollama models. Check that Ollama is running.'); });
-  }, []);
+  const { data: models = [], error: modelsQueryError } = useQuery({
+    queryKey: settingsKeys.ollamaModels(),
+    queryFn: () => getOllamaModels(),
+  });
+  const modelsError = modelsQueryError
+    ? 'Failed to load Ollama models. Check that Ollama is running.'
+    : null;
 
   const runTest = async () => {
     if (!state.model) return;
@@ -44,7 +50,17 @@ export default function OllamaTab({ state, update }) {
 
   return (
     <>
-      <ServerStatus />
+      <ServerStatusPill
+        status={ollamaStatus?.status ?? 'offline'}
+        address={ollamaStatus?.address}
+        offlineMessage={
+          <span>
+            Server offline — Run <code>ollama serve</code> or open the Ollama app
+          </span>
+        }
+        onToggleConsole={() => (ollamaLog.open ? ollamaLog.closeLog() : ollamaLog.openLog())}
+        consoleOpen={ollamaLog.open}
+      />
       {modelsError && <div className="settings-row"><span className="settings-error">{modelsError}</span></div>}
       <div className="settings-row">
         <div className="settings-row-label">

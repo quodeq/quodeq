@@ -1,12 +1,21 @@
 """Log-stream routes — SSE live stream + plain JSON fallback for /api/jobs/<id>/logs."""
 from __future__ import annotations
 
-import os
-import time
 from http import HTTPStatus
 from pathlib import Path
 
 from flask import Flask, Response, current_app, jsonify, request
+
+from quodeq.api._sse_log_helpers import sse_tail_generator as _sse_tail_generator
+
+# Lines containing this marker are kept in run.log for forensics but suppressed
+# from the dashboard's live console — they're per-minute resource snapshots
+# (rss / fds / threads / ollama RSS) and clutter the operator-facing view.
+_CONSOLE_HIDDEN_MARKERS: tuple[str, ...] = ("[resources]",)
+
+
+def _is_visible_log_line(line: str) -> bool:
+    return not any(marker in line for marker in _CONSOLE_HIDDEN_MARKERS)
 
 
 def _resolve_run_log(job_id: str) -> tuple[Path | None, int]:
@@ -38,57 +47,9 @@ def _read_tail(log_path: Path, since: int) -> tuple[list[str], int]:
             return [], since  # no complete line yet
         text = text[: last_nl + 1]
     consumed = len(text.encode("utf-8"))
-    lines = text.splitlines()
+    lines = [ln for ln in text.splitlines() if _is_visible_log_line(ln)]
     return lines, since + consumed
 
-
-_POLL_MS = int(os.environ.get("QUODEQ_LOG_STREAM_POLL_MS", "100"))
-_MAX_WAIT_S = int(os.environ.get("QUODEQ_LOG_STREAM_MAX_WAIT_S", "10"))
-
-
-def _sse_line(data: str, event: str | None = None, event_id: int | None = None) -> str:
-    parts = []
-    if event_id is not None:
-        parts.append(f"id: {event_id}\n")
-    if event is not None:
-        parts.append(f"event: {event}\n")
-    # Escape CR so one log line is one SSE frame.
-    parts.append(f"data: {data}\n\n")
-    return "".join(parts)
-
-
-def _sse_generator(log_path: Path, initial_offset: int, is_done):
-    """Yield SSE frames by tailing *log_path* starting at *initial_offset*."""
-    offset = initial_offset
-    waited_ms = 0
-    yield ":keepalive\n\n"  # Flask test-client needs at least one byte
-    while True:
-        if not log_path.exists():
-            if waited_ms >= _MAX_WAIT_S * 1000:
-                yield _sse_line("log file unavailable", event="error")
-                return
-            time.sleep(_POLL_MS / 1000)
-            waited_ms += _POLL_MS
-            continue
-        with open(log_path, "rb") as fh:
-            fh.seek(offset)
-            raw = fh.read()
-        text = raw.decode("utf-8", errors="replace")
-        if text:
-            complete = text if text.endswith("\n") else text[: text.rfind("\n") + 1]
-            if complete:
-                for line in complete.splitlines():
-                    offset += len(line.encode("utf-8")) + 1  # +1 for '\n'
-                    yield _sse_line(line, event_id=offset)
-        if is_done():
-            # Emit done frame without a data field so parsers don't see an empty data entry.
-            done_parts = []
-            if offset:
-                done_parts.append(f"id: {offset}\n")
-            done_parts.append("event: done\n\n")
-            yield "".join(done_parts)
-            return
-        time.sleep(_POLL_MS / 1000)
 
 
 def register_log_stream_routes(app: Flask) -> None:
@@ -128,9 +89,38 @@ def register_log_stream_routes(app: Flask) -> None:
                 and getattr(provider, "is_job_complete", lambda _: False)(job_id)
             )
         )
+        run_dir = log_path.parent
+
+        def terminal_state() -> str:
+            # In-memory job (internal runs) carries the most up-to-date status
+            # before the runner has flushed status.json — prefer it.
+            if provider is not None and hasattr(provider, "_jobs"):
+                store = getattr(provider._jobs, "_store", None)
+                if store is not None:
+                    job = store.get(job_id)
+                    if job is not None and job.status in {"done", "failed", "cancelled"}:
+                        return job.status
+            # Fall back to the on-disk status.json the runner writes on exit.
+            status_path = run_dir / "status.json"
+            if status_path.exists():
+                try:
+                    import json
+                    data = json.loads(status_path.read_text())
+                    state = data.get("state")
+                    if isinstance(state, str):
+                        return state
+                except (OSError, ValueError):
+                    pass
+            return "completed"
 
         resp = Response(
-            _sse_generator(log_path, initial_offset, is_done),
+            _sse_tail_generator(
+                log_path,
+                initial_offset,
+                is_done=is_done,
+                line_filter=_is_visible_log_line,
+                terminal_state=terminal_state,
+            ),
             mimetype="text/event-stream",
         )
         resp.headers["Cache-Control"] = "no-cache"

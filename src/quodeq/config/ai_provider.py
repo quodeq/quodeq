@@ -11,6 +11,7 @@ from quodeq.shared.utils import get_ai_provider
 
 _AI_PROVIDER_EXPORT_PREFIX = "export AI_PROVIDER="
 _OWNER_RW_PERMS = 0o600
+_API_KEY_FORBIDDEN_CHARS = ("\n", "\r", "\0")
 
 PROVIDERS = {
     "claude": ("ANTHROPIC_API_KEY", "claude"),
@@ -53,6 +54,10 @@ def _write_env(paths: ConfigPaths, provider: str, api_key_var: str, api_key_valu
         f"export AI_PROVIDER={provider}",
     ]
     if api_key_value:
+        # Reject control characters that would let a malformed input append
+        # extra `export …` lines to the env file.
+        if any(ch in api_key_value for ch in _API_KEY_FORBIDDEN_CHARS):
+            raise ValueError("API key contains forbidden control characters")
         # SECURITY: The raw API key value is written to the env file in
         # cleartext because it must be sourced by subprocesses at runtime.
         # The file is created with mode 0600 (owner read/write only) via

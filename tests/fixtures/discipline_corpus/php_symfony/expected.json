@@ -1,0 +1,11 @@
+{
+  "matches": [
+    "php_symfony"
+  ],
+  "primary": "php_symfony",
+  "language": "php",
+  "not_matches": [
+    "php_laravel",
+    "php_backend"
+  ]
+}

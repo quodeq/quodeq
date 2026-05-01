@@ -18,6 +18,7 @@ from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.api.routes import _reports_dir
 from quodeq.services.base import ActionProvider
 from quodeq.services.evaluation_mixin import _score_completed_evidence
+from quodeq.services.scan_progress import build_scan_progress, progress_to_dict
 
 _logger = logging.getLogger(__name__)
 
@@ -100,20 +101,54 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
                 _logger.debug("Could not score cancelled dimension for %s: %s", job_id, exc)
         return jsonify(to_camel_dict(job))
 
+    @app.get("/api/evaluations/<job_id>/progress")
+    def get_evaluation_progress(job_id: str) -> Response | tuple[Response, int]:
+        """Return live progress for a scan (works for internal and external runs)."""
+        run_dir = provider.get_log_run_dir(job_id) if hasattr(provider, "get_log_run_dir") else None
+        if run_dir is None:
+            body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+        # Pool budget for the running dim's bar — only available for jobs the
+        # JobManager started; external runs surface no budget metadata.
+        pool_budget_s: int | None = None
+        snapshot = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
+        if snapshot is not None:
+            options = getattr(snapshot, "options", None) or {}
+            raw = options.get("poolBudget") if isinstance(options, dict) else None
+            if isinstance(raw, int) and raw > 0:
+                pool_budget_s = raw
+        progress = build_scan_progress(job_id, run_dir, pool_budget_s=pool_budget_s)
+        if progress is None:
+            body, status = error_response("Run not ready", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+        return jsonify(to_camel_dict(progress_to_dict(progress)))
+
     @app.delete("/api/evaluations/<job_id>")
     def cancel_or_delete_evaluation(job_id: str) -> Response | tuple[Response, int]:
-        """DELETE on a running job cancels it. DELETE on a finished job removes it from history."""
+        """DELETE on a running job cancels it. DELETE on a finished job removes it from history.
+
+        Query: ``?discard=true`` on a running job also wipes the in-flight
+        dim queue + fingerprint snapshots so the next run treats the work
+        as never-happened (forces a full rescan for any dim that didn't
+        finish scoring on its own).
+        """
         snapshot = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
         if snapshot is None:
             body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         if snapshot.status == "running":
-            _logger.info("cancel_evaluation: job_id=%s, remote_addr=%s", job_id, request.remote_addr)
-            ok = provider.cancel_evaluation(job_id, reports_dir=_reports_dir())
+            discard = request.args.get("discard", "").lower() == "true"
+            _logger.info(
+                "cancel_evaluation: job_id=%s, discard=%s, remote_addr=%s",
+                job_id, discard, request.remote_addr,
+            )
+            ok = provider.cancel_evaluation(
+                job_id, reports_dir=_reports_dir(), discard_partial=discard,
+            )
             if not ok:
                 body, status = error_response("Could not cancel job", HTTPStatus.CONFLICT, "CONFLICT")
                 return jsonify(body), status
-            return jsonify({"ok": True, "action": "cancelled"})
+            return jsonify({"ok": True, "action": "cancelled", "discarded": discard})
         _logger.info("delete_evaluation: job_id=%s, remote_addr=%s", job_id, request.remote_addr)
         ok = provider.delete_evaluation(job_id, reports_dir=_reports_dir())
         if not ok:

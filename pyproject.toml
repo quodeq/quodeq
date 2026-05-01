@@ -1,6 +1,6 @@
 [project]
 name = "quodeq"
-version = "1.0.7"
+version = "1.0.8"
 description = "Source code quality evaluation platform powered by AI"
 readme = "README.md"
 license = "MIT"

@@ -52,10 +52,42 @@ class _Finding(BaseModel):
     req: str = Field(description="Requirement ID (e.g. P-TIM-1, S-CON-3)")
     t: _FindingType = Field(description="violation or compliance")
     file: str = Field(description="File path relative to repo root")
-    line: int = Field(default=0, description="Line number")
+    line: int = Field(description="1-indexed line number of the offending expression. MUST be > 0.", gt=0)
+    end_line: int | None = Field(
+        default=None,
+        description=(
+            "Last line of the offending span. Set this whenever the violation "
+            "spans more than one line — both for structural issues (long "
+            "function, nesting depth) and for multi-line expressions or "
+            "blocks. Omit only when the issue is genuinely a single line. "
+            "The server reads the actual source to render the highlighted "
+            "snippet from line..end_line; getting end_line right is what "
+            "makes the highlight readable."
+        ),
+    )
     severity: _Severity = Field(default=_Severity.minor)
     w: str = Field(description="Short title of the finding")
-    reason: str = Field(default="", description="Why this is a violation or compliance")
+    snippet: str = Field(
+        description=(
+            "Offending code copied VERBATIM from the source file — exact "
+            "characters, no paraphrase, no summarisation. One or a few "
+            "contiguous lines: quote enough that the issue is self-evident, "
+            "no padding. The number of lines in `snippet` must match the "
+            "span from `line` to `end_line` (so end_line - line + 1 == "
+            "snippet line count). Required. If you cannot quote the code, "
+            "drop the finding."
+        ),
+        min_length=1,
+    )
+    reason: str = Field(
+        description=(
+            "1–3 sentences: state what the quoted code does wrong AS WRITTEN, "
+            "and name the concrete impact (what breaks, who is affected, or "
+            "what attack/failure it enables). "
+            "No hedging ('could', 'might', 'should consider', 'if X were larger')."
+        ),
+        min_length=1,
+    )
 
 
 class _Findings(BaseModel):
@@ -101,13 +133,15 @@ def _salvage_partial_findings(raw_json: str) -> list[dict]:
 
 
 def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
-    """Call LLM via Instructor — returns validated finding dicts."""
+    """Call LLM via Instructor — returns validated finding dicts.
+
+    The OpenAI client owns an httpx connection pool whose sockets count
+    against the process FD limit. Without an explicit close, a long scan
+    (one call per file) accumulates pools until macOS's 256-FD soft cap
+    aborts the dimension with EMFILE on the next queue read.
+    """
     if config.api_base and config.api_base != _OLLAMA_DEFAULT_BASE:
         validate_url_safe(config.api_base, allow_private=True)
-    client = instructor.from_openai(
-        openai.OpenAI(base_url=config.api_base, api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY),
-        mode=instructor.Mode.JSON,
-    )
 
     extra_body: dict = {"reasoning_effort": "none"}
     ctx_size = config.context_size
@@ -122,7 +156,7 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
         model=config.model,
         response_model=_Findings,
         messages=[
-            {"role": "system", "content": "You are a code quality evaluator."},
+            {"role": "system", "content": "You are a code quality evaluator. Quote the offending code into `snippet` VERBATIM from the source — one or a few contiguous lines, exact characters, no paraphrase. Set `end_line` to match the last line of the snippet. In `reason`, state what the code does wrong and the concrete impact in 1–3 sentences. Empty `findings` is a valid answer."},
             {"role": "user", "content": prompt},
         ],
         temperature=config.temperature,
@@ -133,24 +167,49 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
         create_kwargs["max_tokens"] = config.max_tokens
 
     _log.debug("Calling %s model=%s via Instructor", config.api_base, config.model)
-    try:
-        result = client.chat.completions.create(**create_kwargs)
-        _log.debug("Instructor returned %d findings", len(result.findings))
-        return [f.model_dump() for f in result.findings]
-    except Exception as exc:
-        # Try to salvage valid findings from the malformed response
-        raw = str(exc)
-        salvaged = _salvage_partial_findings(raw)
-        if salvaged:
-            _log.warning("Instructor validation failed — salvaged %d findings from malformed response", len(salvaged))
-            return salvaged
-        _log.warning("Instructor validation failed — no findings salvaged: %s", str(exc)[:200])
-        return []
+    with openai.OpenAI(
+        base_url=config.api_base,
+        api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY,
+    ) as oa_client:
+        client = instructor.from_openai(oa_client, mode=instructor.Mode.JSON)
+        try:
+            result = client.chat.completions.create(**create_kwargs)
+            _log.debug("Instructor returned %d findings", len(result.findings))
+            return [f.model_dump() for f in result.findings]
+        except Exception as exc:
+            # Try to salvage valid findings from the malformed response
+            raw = str(exc)
+            salvaged = _salvage_partial_findings(raw)
+            if salvaged:
+                _log.debug("Instructor validation failed — salvaged %d findings from malformed response", len(salvaged))
+                return salvaged
+            _log.debug("Instructor validation failed — no findings salvaged: %s", str(exc)[:200])
+            return []
 
 
 # ---------------------------------------------------------------------------
 # Enrichment and path resolution
 # ---------------------------------------------------------------------------
+
+def _infer_end_line(findings: list[dict]) -> None:
+    """Derive end_line from snippet line count when the model omits it.
+
+    Small local models often skip end_line, which collapses the dashboard
+    highlight to a single line even when the model quoted several lines into
+    snippet. If snippet has N>1 lines and end_line is unset, assume the span
+    runs from line to line+N-1.
+    """
+    for f in findings:
+        if f.get("end_line"):
+            continue
+        snippet = f.get("snippet") or ""
+        line = f.get("line") or 0
+        if line <= 0 or not snippet:
+            continue
+        n = snippet.count("\n") + 1
+        if n > 1:
+            f["end_line"] = line + n - 1
+
 
 def _enrich_findings(
     findings: list[dict],
@@ -159,6 +218,7 @@ def _enrich_findings(
     work_dir: Path | None,
 ) -> list[dict]:
     """Enrich findings through FindingsRouter (same as MCP path)."""
+    _infer_end_line(findings)
     if not compiled_dir:
         return findings
     try:

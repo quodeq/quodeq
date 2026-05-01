@@ -1,0 +1,10 @@
+{
+  "matches": [
+    "objectivec_ios"
+  ],
+  "primary": "objectivec_ios",
+  "language": "objective-c",
+  "not_matches": [
+    "mobile_ios"
+  ]
+}

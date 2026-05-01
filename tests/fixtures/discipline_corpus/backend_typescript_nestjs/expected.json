@@ -1,0 +1,12 @@
+{
+  "matches": [
+    "backend_typescript_nestjs"
+  ],
+  "primary": "backend_typescript_nestjs",
+  "language": "typescript",
+  "not_matches": [
+    "frontend_react",
+    "frontend_nextjs",
+    "nodejs"
+  ]
+}

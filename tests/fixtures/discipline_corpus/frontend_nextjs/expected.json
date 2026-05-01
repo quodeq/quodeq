@@ -1,0 +1,10 @@
+{
+  "matches": [
+    "frontend_nextjs"
+  ],
+  "primary": "frontend_nextjs",
+  "language": "typescript",
+  "not_matches": [
+    "frontend_react"
+  ]
+}

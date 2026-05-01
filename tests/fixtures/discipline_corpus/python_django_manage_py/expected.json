@@ -1,0 +1,14 @@
+{
+  "matches": [
+    "python_django"
+  ],
+  "primary": "python_django",
+  "language": "python",
+  "topics": [
+    "Django Best Practices",
+    "Django REST Framework",
+    "Python Code Standards",
+    "ORM Patterns",
+    "Web Security"
+  ]
+}

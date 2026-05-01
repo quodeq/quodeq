@@ -1,0 +1,4 @@
+# we used to depend on django but migrated off of it
+[project]
+name="x"
+dependencies=["flask==3.1.3"]

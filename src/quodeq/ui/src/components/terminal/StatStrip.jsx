@@ -12,17 +12,12 @@
  */
 /**
  * Container variants:
- *   default  — no chrome, children sit flush against the page.
- *   bordered — legacy: wraps the whole strip in a single border.
- *   cards    — each `<Stat>` is its own bordered card (the overview layout).
- *
- * `bordered` is kept for backward compatibility with consumers that want the
- * shared wrapper; new callers should prefer `cards`.
+ *   default — no chrome, children sit flush against the page.
+ *   cards   — each `<Stat>` is its own bordered card (the overview layout).
  */
-export function StatStrip({ children, bordered = false, cards = false }) {
+export function StatStrip({ children, cards = false }) {
   const classes = ['term-stat-strip'];
-  if (bordered) classes.push('term-stat-strip--bordered');
-  if (cards)    classes.push('term-stat-strip--cards');
+  if (cards) classes.push('term-stat-strip--cards');
   return <div className={classes.join(' ')}>{children}</div>;
 }
 

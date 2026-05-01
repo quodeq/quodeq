@@ -1,52 +1,47 @@
-## What to look for
+## Look for
 
-Look for TWO types of issues:
-1. **What the code does wrong** — bad patterns, vulnerabilities, anti-patterns
-2. **What the code is missing** — absent error handling, missing validation, no logging, no retry logic, missing abstractions
+Bad patterns, vulnerabilities, anti-patterns. Missing error handling, validation, logging, retries, abstractions.
 
-**Report BOTH violations AND compliance** — scoring uses the ratio between them. For every principle where you find violations, actively look for files that DO follow the standard and report compliance.
+Report BOTH violations AND compliance. Scoring is a ratio. For every principle with violations, also look for compliant files.
 
-**Be thorough** — a single file can have multiple violations of the same requirement. Report each occurrence separately. For example, a class with 5 methods that don't belong = 5 separate findings, not 1.
+Report each occurrence separately. 5 misplaced methods = 5 findings.
 
-**Avoid false positives** — a string/number literal inside a constant definition or enum is NOT a magic literal; a long function that only registers routes with no extractable logic is not always splittable; duplicated test setup code may be intentional. If the code IS the remediation for the issue, it is not a violation.
+NOT a violation: literal inside a constant/enum definition; long function that only registers routes; duplicated test setup; code that IS the remediation for the issue; the flagged line or its neighbour already contains the guard (`escapeHtml`, `length` check, null guard, `try`/`catch`); algorithm-intrinsic complexity (force-directed layout, MST, per-frame trig); count equals limit (`max 5` is `> 5`, not `>= 5`).
 
-## Evidence requirement
+## Evidence
 
-Every violation must cite code that is directly visible in the provided source.
+Code must be visible in source.
 
-- Quote the specific expression, statement, or call that IS the problem in the `snippet` field.
-- Do NOT infer violations from imports, function names, file paths, module layout, or the *absence* of code — unless a requirement explicitly demands that the missing code be present in this file.
-- If you cannot point to a concrete line where the problem manifests, do not flag it.
-- Speculative concerns ("this could be vulnerable to X", "this might allow Y", "should consider Z") are NOT violations. Only report issues you can prove from the code shown.
+DROP if you can only point to absence, imports, paths, or module layout (unless the requirement explicitly demands the missing code be present in this file).
+
+DROP speculative concerns: "could", "might", "should consider".
 
 ## Severity
 
-For violations:
-- **critical** — An exploitable vulnerability or production-breaking bug with clear, demonstrable impact visible in the code. Examples: SQL injection with user-controlled input reaching a raw query; hardcoded secret committed to source; authentication bypass; data loss on a code path that will execute in production. Do NOT use `critical` for missing best-practice controls, hardening gaps, defense-in-depth concerns, or hypothetical attack scenarios — those are `major` or `minor`. If you cannot describe a concrete attack or failure that this code enables right now, it is not critical.
-- **major** — Significant quality issue or real security weakness that should be fixed, but not directly exploitable or production-breaking as-is.
-- **minor** — Style issue, minor inefficiency, or improvement opportunity.
+- **critical** — Exploitable vulnerability or production-breaking bug, demonstrable from code as-is. SQL injection with user input reaching raw query; hardcoded secret; auth bypass; data loss on a real path. Hardening gaps, defense-in-depth, hypotheticals → NOT critical.
+- **major** — Real quality or security issue. Should be fixed. Not directly exploitable.
+- **minor** — Real defect in the quoted code: style violation, measurable inefficiency, concrete improvement. NOT a fallback for findings that fail the higher bar.
 
-For compliance — use the same severity to indicate the importance of what's done right:
-- **critical** — Security best practice correctly implemented, safe data handling
-- **major** — Significant quality pattern properly followed
-- **minor** — Good style, naming, or minor best practice followed
+Compliance uses the same scale to mark importance of what's done right.
 
-## Test file severity ceiling
+## Test files
 
-If the file being analyzed is a test file, `minor` is the maximum allowed severity — never report `critical` or `major` on a test file. Use your judgment to decide: if the file's purpose is to test or describe behavior of other code (test fixtures, mock setups, test configs, spec files in any language), cap it at `minor`.
+Test file → max severity `minor`. Never `critical`/`major` on tests, fixtures, mocks, or specs.
 
-Why: test files routinely contain patterns that look vulnerable (`eval(x)`, hardcoded secrets, path-traversal payloads, SQL strings) *on purpose* — they exist to verify the scanner catches those patterns. Flagging the fixture itself as critical produces noise, not signal. A genuine exploitable issue in a test still shows up as `minor`, which is enough for a reviewer to investigate.
+Test files contain `eval(x)`, secrets, path-traversal payloads on purpose. A real issue surfaces as `minor`; that's enough.
 
-## Severity self-check
+## Self-check (every finding, including minor)
 
-Before finalizing ANY violation, verify:
+1. **Evidence** — Quote the problem line. Only "missing"/"absent" → drop.
+2. **Concrete** — State the problem about the quoted code and name the concrete impact (what breaks, who is affected, or what attack/failure it enables).
+3. **No hedging** — No "could", "might", "may", "should consider", "if X were larger", "if async", "in a hot path". Describe what the line does wrong AS WRITTEN.
+4. **Impact** — Name the observable consequence. "Could be slow under load" without a profile is speculation.
 
-1. **Evidence**: Can you quote the exact line of code that IS the problem? If you can only point to what's *missing* or *absent*, drop the finding.
-2. **Concreteness**: Can you state the problem in one specific sentence that refers to the quoted code? Vague concerns ("might not be safe", "could be improved") do not pass.
+For `critical`/`major` also:
 
-Additionally for `critical` and `major`:
+5. **Attack/failure** — Describe specific attack or failure this code enables as written. Hedge words → `minor` only if 1–4 hold; else drop.
+6. **Reachable** — Production code path. Tests, examples, dev scaffolding are not `critical`.
 
-3. **Attack/failure scenario**: Can you describe, in one sentence, a specific attack or failure this code enables *as written*? If your reasoning uses "could", "might", "may", or "should consider" — downgrade to `minor`.
-4. **Reachability**: Does this code execute in a realistic production path? Code in test files, examples, or dev-only scaffolding is not `critical`.
+**Decision**: 1–4 fail → DROP entirely. 5–6 fail → `minor` only if 1–4 hold, else drop. `minor` is not a fallback bucket.
 
-If checks 1–2 fail, omit the finding. If checks 3–4 fail, downgrade to `minor` or omit. Being wrong on severity hurts the report more than missing a true positive at a lower severity.
+Fewer sharper findings beats long reports padded with speculation.

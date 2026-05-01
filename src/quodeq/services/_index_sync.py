@@ -92,26 +92,25 @@ def _upsert_from_status(
     if status is None:
         return
     job_id = status.get("job_id") or f"ext-{run_id}"
-    with db:
-        db.execute(
-            _UPSERT_SQL,
-            (
-                job_id,
-                project_uuid,
-                run_id,
-                str(run_dir),
-                status.get("state", "running"),
-                status.get("phase"),
-                status.get("current_dimension"),
-                status.get("started_at", ""),
-                status.get("updated_at", ""),
-                status.get("finalized_at"),
-                _heartbeat_iso(run_dir),
-                status.get("pid"),
-                status.get("exit_reason"),
-                _status_mtime_ns(run_dir),
-            ),
-        )
+    db.execute(
+        _UPSERT_SQL,
+        (
+            job_id,
+            project_uuid,
+            run_id,
+            str(run_dir),
+            status.get("state", "running"),
+            status.get("phase"),
+            status.get("current_dimension"),
+            status.get("started_at", ""),
+            status.get("updated_at", ""),
+            status.get("finalized_at"),
+            _heartbeat_iso(run_dir),
+            status.get("pid"),
+            status.get("exit_reason"),
+            _status_mtime_ns(run_dir),
+        ),
+    )
 
 
 def _sync_legacy_run(
@@ -150,17 +149,16 @@ def _sync_legacy_run(
     from datetime import datetime, timezone
     started_iso = datetime.fromtimestamp(started_ts, tz=timezone.utc).isoformat(timespec="seconds")
 
-    with db:
-        db.execute(
-            _UPSERT_SQL,
-            (
-                job_id, project_uuid, run_id, str(run_dir),
-                state, None, None,
-                started_iso, started_iso, started_iso if state in _TERMINAL_STATE_VALUES else None,
-                None, None, exit_reason,
-                0,
-            ),
-        )
+    db.execute(
+        _UPSERT_SQL,
+        (
+            job_id, project_uuid, run_id, str(run_dir),
+            state, None, None,
+            started_iso, started_iso, started_iso if state in _TERMINAL_STATE_VALUES else None,
+            None, None, exit_reason,
+            0,
+        ),
+    )
 
 
 def _check_stale_and_promote(
@@ -201,7 +199,8 @@ def _check_stale_and_promote(
             pid=pid if isinstance(pid, int) else None,
             exit_reason="stale_detected",
         )
-        _upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+        with db:
+            _upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
         return True
 
     return False

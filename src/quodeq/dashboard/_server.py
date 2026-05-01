@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import signal
 import subprocess
 import sys
@@ -92,6 +93,17 @@ def _serve_and_wait(
 
     def _handle_tstp(_signum, _frame) -> None:
         _stop_children()
+        # Ctrl+Z sends SIGTSTP to the whole foreground process group, so a
+        # wrapper like `uv run quodeq dashboard` is also stopped at this
+        # point. We're about to exit, but if we leave the wrapper in the
+        # stopped state it will never notice our exit (a stopped process
+        # can't reap children) and will linger as an orphan in `T` state
+        # after the terminal closes. Resume the parent so it wakes up,
+        # sees us exit, and tears itself down cleanly.
+        try:
+            os.kill(os.getppid(), signal.SIGCONT)
+        except OSError:
+            pass
         sys.exit(0)
 
     if hasattr(signal, "SIGTSTP"):

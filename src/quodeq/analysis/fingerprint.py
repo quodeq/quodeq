@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.analysis.subagents.verify import resolve_evidence_paths
+from quodeq.config.paths import default_paths
 from quodeq.data.fs.report_parser.runs import list_runs
 from quodeq.shared.validation import validate_path_segment
 
@@ -62,6 +63,55 @@ def _hash_standards(standards_dir: Path, dimension: str) -> str | None:
     return _hash_file(compiled)
 
 
+# Prompts in this set, when changed, force a full re-analysis because they
+# carry the rules that classify a finding (what counts as a violation, what
+# doesn't). Other prompt files are framing/scaffolding — a change to those
+# still flows into the next run's prompts naturally, but doesn't invalidate
+# carry-forward findings produced under the same rules.
+_RULES_BEARING_PROMPTS: frozenset[str] = frozenset({"evaluation_rules.md"})
+
+
+def _hash_prompts_map(prompts_dir: Path | None = None) -> dict[str, str]:
+    """Per-file SHA-256 of every *.md prompt under *prompts_dir*.
+
+    Stored in fingerprints so future runs can decide selectively whether a
+    prompt change is the kind that should invalidate carry-forward (a
+    rules-bearing file in ``_RULES_BEARING_PROMPTS``) versus the kind that
+    shouldn't (framing, runner-specific instructions).
+    """
+    if prompts_dir is None:
+        prompts_dir = default_paths().prompts_dir
+    if prompts_dir is None or not prompts_dir.is_dir():
+        return {}
+    out: dict[str, str] = {}
+    for path in sorted(prompts_dir.glob("*.md")):
+        h = _hash_file(path)
+        if h:
+            out[path.name] = h
+    return out
+
+
+def _hash_prompts(prompts_dir: Path | None = None) -> str | None:
+    """Legacy single-string hash of all prompts concatenated.
+
+    Retained so fingerprints written before the per-file split can still
+    be compared against the current prompt state (back-compat read path).
+    New fingerprints use ``_hash_prompts_map``.
+    """
+    if prompts_dir is None:
+        prompts_dir = default_paths().prompts_dir
+    if prompts_dir is None or not prompts_dir.is_dir():
+        return None
+    h = hashlib.sha256()
+    for path in sorted(prompts_dir.glob("*.md")):
+        per_file = _hash_file(path)
+        if per_file is None:
+            continue
+        h.update(path.name.encode())
+        h.update(per_file.encode())
+    return h.hexdigest()
+
+
 def build_fingerprint(src: Path, files: list[str], dimension: str, standards_dir: Path | None, *, analyzed_files: set[str] | None = None) -> dict:
     """Build a fingerprint for the current evaluation state."""
     file_hashes = {}
@@ -69,11 +119,14 @@ def build_fingerprint(src: Path, files: list[str], dimension: str, standards_dir
         h = _hash_file(src / f)
         if h:
             file_hashes[f] = h
+    prompts_map = _hash_prompts_map() or None
     return {
         "dimension": dimension,
         "git_commit": _get_git_commit(src),
         "file_hashes": file_hashes,
         "standards_checksum": _hash_standards(standards_dir, dimension) if standards_dir else None,
+        # Per-file map; readers handle the legacy single-string format too.
+        "prompts_checksum": prompts_map,
         "analyzed_files": sorted(analyzed_files) if analyzed_files else [],
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
@@ -99,13 +152,41 @@ def load_fingerprint(evidence_dir: Path, dimension: str) -> dict | None:
         return None
 
 
+def _queue_taken_files(evidence_dir: Path, dimension: str) -> set[str]:
+    """Read files that were dispatched to agents from a dim's queue.json.
+
+    Returns the union of files appearing in any taken batch. Empty set if the
+    queue is missing or unreadable. Used to salvage analyzed_files from runs
+    that crashed or were cancelled before the fingerprint was finalized.
+    """
+    path = evidence_dir / f"{dimension}_queue.json"
+    if not path.is_file():
+        return set()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return set()
+    taken = data.get("taken") if isinstance(data, dict) else None
+    if not isinstance(taken, list):
+        return set()
+    out: set[str] = set()
+    for entry in taken:
+        files = entry.get("files") if isinstance(entry, dict) else None
+        if isinstance(files, list):
+            out.update(f for f in files if isinstance(f, str))
+    return out
+
+
 def find_previous_fingerprint(
     evidence_dir: Path, dimension: str,
 ) -> tuple[dict | None, Path | None]:
     """Find the fingerprint and evidence dir from the most recent previous run.
 
     Walks the run history to find the latest run (other than the current one)
-    that has a fingerprint for the given dimension.
+    that has a fingerprint for the given dimension. Crash/cancel salvage:
+    when the previous run died before finalising, its `analyzed_files` set
+    is stale — we union in whatever files the queue actually dispatched so
+    the catch-up loop doesn't keep re-sweeping work that already happened.
     """
     paths_info = resolve_evidence_paths(evidence_dir)
     if not paths_info:
@@ -116,12 +197,18 @@ def find_previous_fingerprint(
         if run_info.run_id == current_run_id:
             continue
         run_dir = reports_base / project_uuid / run_info.run_id
-        # Only carry forward from runs that completed (have a scored report)
-        eval_report = run_dir / "evaluation" / f"{dimension}.json"
-        if not eval_report.is_file():
-            continue
         prev_evidence = run_dir / "evidence"
         fp = load_fingerprint(prev_evidence, dimension)
-        if fp:
-            return fp, prev_evidence
+        if not fp:
+            continue
+        # Augment analyzed_files with anything the queue dispatched. For
+        # cleanly finalised runs this is a no-op (queue.taken ⊆ analyzed_files
+        # already). For crashed/cancelled runs it salvages partial work.
+        queue_analyzed = _queue_taken_files(prev_evidence, dimension)
+        if queue_analyzed:
+            current_analyzed = set(fp.get("analyzed_files") or [])
+            merged = current_analyzed | queue_analyzed
+            if merged != current_analyzed:
+                fp["analyzed_files"] = sorted(merged)
+        return fp, prev_evidence
     return None, None

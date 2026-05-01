@@ -23,11 +23,25 @@ _TPL_EVALUATION_RULES = "EVALUATION_RULES"
 
 
 def _load_evaluation_rules() -> str:
-    """Load shared evaluation rules from evaluation_rules.md."""
-    try:
-        return load_template(template_name="evaluation_rules.md")
-    except (OSError, FileNotFoundError):
-        return ""
+    """Load shared evaluation rules + reporting format.
+
+    Concatenates two prompt files into the same template slot. They are
+    kept apart on disk so the incremental cache can treat them
+    differently:
+
+    - evaluation_rules.md is rules-bearing (in ``_RULES_BEARING_PROMPTS``)
+      — anything that decides what counts as a violation. Edits force a
+      full re-analysis.
+    - finding_format.md is reporting/quoting/phrasing discipline. Edits
+      do NOT invalidate carry-forward.
+    """
+    parts: list[str] = []
+    for name in ("evaluation_rules.md", "finding_format.md"):
+        try:
+            parts.append(load_template(template_name=name))
+        except (OSError, FileNotFoundError):
+            continue
+    return "\n\n".join(p for p in parts if p)
 
 
 def render_previous_findings_section(findings: list[dict]) -> str:

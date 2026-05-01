@@ -39,6 +39,7 @@ def _mock_findings_model():
             line=2,
             severity=_Severity.critical,
             w="Hardcoded password",
+            snippet='password = "admin123"',
             reason="Password stored as plaintext string literal",
         ),
     ])

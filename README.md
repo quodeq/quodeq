@@ -6,7 +6,7 @@
 </p>
 
 <h2 align="center">AI-powered code quality and security scanner</h2>
-<p align="center"><strong>v1.0.7</strong></p>
+<p align="center"><strong>v1.0.8</strong></p>
 <p align="center">
   <a href="https://github.com/quodeq/quodeq/actions/workflows/test.yml"><img src="https://github.com/quodeq/quodeq/actions/workflows/test.yml/badge.svg" alt="Tests" /></a>
   <a href="https://github.com/quodeq/quodeq/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
@@ -98,7 +98,7 @@ ollama serve    # runs in the background
 quodeq
 ```
 
-The dashboard opens at `http://127.0.0.1:4173`. Use **Settings → AI Provider** to select the one you installed in step 3, then **Evaluate** to point at a project and start your first scan.
+The dashboard opens at `http://127.0.0.1:7863`. Use **Settings → AI Provider** to select the one you installed in step 3, then **Evaluate** to point at a project and start your first scan.
 
 If the native window doesn't show up (common on Linux without GTK), run `quodeq --browser` instead.
 

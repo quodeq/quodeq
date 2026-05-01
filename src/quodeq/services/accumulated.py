@@ -11,6 +11,7 @@ from quodeq.services.ports import RunInfo, list_runs
 from quodeq.core.types import DimensionResult
 from quodeq.shared.utils import _env_int
 from quodeq.services._cache import make_lru_dimension_fetcher
+from quodeq.services.dim_resolution import is_eligible_for_default_view
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
 from quodeq.services._fs_projects import find_children as _find_children
 
@@ -66,12 +67,31 @@ def _compute_result(
     reports_root: Path, project: str, all_run_infos: list[RunInfo],
     cache_config: AccumulatedCacheConfig | None,
 ) -> _AccumulatedResult:
-    """Load run data and compute trends, severity, and scores."""
-    runs = [r.run_id for r in all_run_infos]
+    """Load run data and compute trends, severity, and scores.
+
+    Cancelled/failed runs are excluded from the per-dim "latest" pick so the
+    overview cards don't quietly mix partial-run scores (e.g. inflated 9.x
+    from a dim the model only finished a fraction of) with stable scores
+    from older complete runs. ``in_progress`` runs ARE included so dims
+    that have already produced a scored evaluation file (eval/<dim>.json)
+    surface in the cards as soon as they finish — users shouldn't have to
+    wait for the umbrella run to finalise before seeing those results.
+    If every run on file is partial (fresh project, all attempts crashed),
+    fall back to all runs so the dashboard isn't blank.
+
+    The eligibility predicate is the shared
+    ``dim_resolution.is_eligible_for_default_view`` rule, used by both this
+    call site and ``dashboard._resolve_selected_run`` so the headline and
+    cards always read from the same set of runs.
+    """
+    complete_run_infos = [r for r in all_run_infos if is_eligible_for_default_view(r.status)]
+    if not complete_run_infos:
+        complete_run_infos = all_run_infos
+    runs = [r.run_id for r in complete_run_infos]
     _cache, _lock, _max = _resolve_cache(cache_config)
     get_run_data = make_lru_dimension_fetcher(reports_root, project, _cache, _lock, _max)
     latest_by_dim, prev_occurrence, prev_run_latest = _read_all_run_data(
-        reports_root, project, all_run_infos, runs, get_run_data,
+        reports_root, project, complete_run_infos, runs, get_run_data,
     )
     all_dims = filter_dismissed_from_dimensions(list(latest_by_dim.values()), reports_root / project)
     dims_with_trend = _compute_accumulated_trends(all_dims, prev_occurrence)

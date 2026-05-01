@@ -1,120 +1,33 @@
-import { useState, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
+import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
+import { useServerLog } from '../server-log/ServerLogContext.js';
+import { systemKeys } from '../../../api/queryKeys.js';
 
 const HEALTH_POLL_MS = 10000;
-const LOG_POLL_MS = 2000;
-const MAX_LOG_LINES = 500;
-const CONSOLE_POPUP_WIDTH = 800;
-const CONSOLE_POPUP_HEIGHT = 500;
-const ISO_TIME_START = 11;
-const ISO_TIME_END = 19;
 
-/**
- * Open a path in either pywebview's native browser or a regular browser popup.
- * Centralises the pywebview branch so callers don't need to check manually.
- */
-function openUrl(path, { width, height } = {}) {
-  if (window.pywebview?.api?.open_browser) {
-    window.pywebview.api.open_browser(path);
-  } else {
-    const features = width && height ? `width=${width},height=${height}` : '';
-    window.open(window.location.origin + path, '_blank', features);
+async function ping() {
+  try {
+    const res = await fetch('/api/health?_t=' + Date.now());
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.ok ? data : null;
+  } catch {
+    return null;
   }
-}
-
-function ping() {
-  return fetch('/api/health?_t=' + Date.now())
-    .then((r) => r.ok ? r.json() : null)
-    .catch(() => null);
-}
-
-function ConsoleIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"
-      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="1" y="2" width="14" height="12" rx="2" />
-      <polyline points="4.5,6.5 7,9 4.5,11.5" />
-      <line x1="9" y1="11" x2="12" y2="11" />
-    </svg>
-  );
 }
 
 export default function ServerSection() {
-  const [health, setHealth] = useState(null);
-  const [status, setStatus] = useState('checking');
-  const [consoleOpen, setConsoleOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [logLines, setLogLines] = useState([]);
-  const sinceRef = useRef(-1);
-  const logRef = useRef(null);
-  const healthTimerRef = useRef(null);
-  const logTimerRef = useRef(null);
-  const cancelledRef = useRef(false);
+  const serverLog = useServerLog();
 
-  // Health polling
-  useEffect(() => {
-    cancelledRef.current = false;
+  const { data: health, isLoading } = useQuery({
+    queryKey: [...systemKeys.health(), 'settings-detail'],
+    queryFn: ping,
+    refetchInterval: HEALTH_POLL_MS,
+    refetchOnWindowFocus: false,
+  });
 
-    function tick() {
-      ping().then((d) => {
-        if (cancelledRef.current) return;
-        if (d?.ok) { setHealth(d); setStatus('online'); }
-        else { setHealth(null); setStatus('offline'); }
-        healthTimerRef.current = setTimeout(tick, HEALTH_POLL_MS);
-      });
-    }
-    tick();
-
-    return () => { cancelledRef.current = true; clearTimeout(healthTimerRef.current); };
-  }, []);
-
-  // Log polling — only when console is open
-  useEffect(() => {
-    if (!consoleOpen || status !== 'online') {
-      clearTimeout(logTimerRef.current);
-      return;
-    }
-
-    let active = true;
-
-    function pollLogs() {
-      const url = '/api/logs' + (sinceRef.current >= 0 ? '?since=' + sinceRef.current : '');
-      fetch(url)
-        .then((r) => r.ok ? r.json() : null)
-        .then((data) => {
-          if (!active || !data) return;
-          if (data.lines.length) {
-            setLogLines((prev) => {
-              const next = [...prev, ...data.lines];
-              return next.length > MAX_LOG_LINES ? next.slice(-MAX_LOG_LINES) : next;
-            });
-            sinceRef.current = data.lines[data.lines.length - 1].index;
-          }
-          logTimerRef.current = setTimeout(pollLogs, LOG_POLL_MS);
-        })
-        .catch(() => {
-          if (active) logTimerRef.current = setTimeout(pollLogs, LOG_POLL_MS);
-        });
-    }
-    pollLogs();
-
-    return () => { active = false; clearTimeout(logTimerRef.current); };
-  }, [consoleOpen, status]);
-
-  // Auto-scroll
-  useEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight;
-    }
-  }, [logLines]);
-
-  function handlePopOut() {
-    openUrl('/logs', { width: CONSOLE_POPUP_WIDTH, height: CONSOLE_POPUP_HEIGHT });
-  }
-
-  function handleClear() {
-    setLogLines([]);
-  }
+  const status = isLoading && !health ? 'checking' : (health ? 'online' : 'offline');
 
   return (
     <section className="panel settings-section">
@@ -122,75 +35,26 @@ export default function ServerSection() {
         <SectionLabel marker="▶">Server</SectionLabel>
       </div>
 
-      <div className={`server-status ${status === 'online' ? 'server-status--online' : 'server-status--offline'}`}>
-        <span className={`server-dot ${status === 'online' ? 'server-dot--online' : 'server-dot--offline'}`} />
-        <span>
-          {status === 'online' && 'Running'}
-          {status === 'offline' && 'Connection lost'}
-          {status === 'checking' && 'Checking...'}
-        </span>
-        {status === 'online' && health?.address && <span className="server-address">{health.address}</span>}
-      </div>
+      <ServerStatusPill
+        status={status === 'online' ? 'online' : 'offline'}
+        address={health?.address}
+        offlineMessage={
+          status === 'checking'
+            ? <span>Checking…</span>
+            : <span>Connection lost</span>
+        }
+        onToggleConsole={() => (serverLog.open ? serverLog.closeLog() : serverLog.openLog())}
+        consoleOpen={serverLog.open}
+      />
 
-      {/* Server details (port, PID, version) are intentionally available
-          for this local-only development tool to aid debugging. They are
-          hidden by default behind a toggle to avoid casual disclosure. */}
       {status === 'online' && health && (
-        <div className="settings-row">
-          <div className="settings-row-label">
-            <span
-              className="settings-label"
-              role="button"
-              tabIndex={0}
-              style={{ cursor: 'pointer' }}
-              onClick={() => setDetailsOpen((o) => !o)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailsOpen((o) => !o); } }}
-            >
-              Details {detailsOpen ? '\u25BE' : '\u25B8'}
-            </span>
-            {detailsOpen && (
-              <span className="settings-description">
-                Port <strong>{health.port}</strong> &middot; PID <strong>{health.pid}</strong> &middot; v{health.version}
-              </span>
-            )}
-          </div>
+        <div className="server-details">
+          Port <strong>{health.port}</strong>
+          {' · '}
+          PID <strong>{health.pid}</strong>
+          {' · '}
+          v{health.version}
         </div>
-      )}
-
-      {status === 'online' && (
-        <>
-          <div
-            className="server-console-toggle"
-            role="button"
-            tabIndex={0}
-            onClick={() => setConsoleOpen((o) => !o)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConsoleOpen((o) => !o); } }}
-            aria-label={consoleOpen ? 'Hide console' : 'Show console'}
-          >
-            <ConsoleIcon />
-            <span>Console</span>
-            <span className="console-chevron">{consoleOpen ? '\u25BE' : '\u25B8'}</span>
-          </div>
-
-          {consoleOpen && (
-            <div className="server-console-wrap">
-              <div className="console-output" ref={logRef}>
-                <pre>
-                  {logLines.length
-                    ? logLines.map((e) => {
-                        const ts = e.timestamp ? e.timestamp.slice(ISO_TIME_START, ISO_TIME_END) : '';
-                        return `[${ts}] ${e.line}`;
-                      }).join('\n')
-                    : 'No logs yet\u2026'}
-                </pre>
-              </div>
-              <div className="server-console-actions">
-                <button onClick={handlePopOut}>Pop out</button>
-                <button onClick={handleClear}>Clear</button>
-              </div>
-            </div>
-          )}
-        </>
       )}
 
       {status === 'offline' && (

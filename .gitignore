@@ -12,6 +12,7 @@ __pycache__/
 evaluations/
 
 docs/
+specs/
 reports/
 src/tmp/
 .idea/

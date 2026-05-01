@@ -1,0 +1,6 @@
+[package]
+name = "x"
+version = "0.1.0"
+[dependencies]
+actix-web = "4"
+tokio = { version = "1", features = ["full"] }

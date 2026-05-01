@@ -180,3 +180,58 @@ class TestComputeAccumulated:
         result = compute_accumulated(str(reports_root), "proj", None)
         assert "severity" in result["summary"]
         assert "critical" in result["summary"]["severity"]
+
+    def test_excludes_cancelled_run_from_per_dim_latest(self, tmp_path: Path):
+        # The newer run is cancelled — its per-dim eval files exist but
+        # represent partial work that doesn't agree with the headline. The
+        # accumulated cards should pick from the older complete run instead,
+        # so the headline (averaged from the same dims) matches the cards.
+        reports_root = _setup_project(tmp_path, "proj", [
+            ("run2", [_dim("security", "9.5", "A"), _dim("maintainability", "9.5", "A")]),
+            ("run1", [_dim("security", "7.0", "B"), _dim("maintainability", "8.0", "B")]),
+        ])
+        # Mark run2 as cancelled by writing status.json.
+        (reports_root / "proj" / "run2" / "status.json").write_text(
+            json.dumps({"state": "cancelled"}),
+        )
+        result = compute_accumulated(str(reports_root), "proj", None)
+        assert result is not None
+        scores = {d["dimension"]: d["overallScore"] for d in result["dimensions"]}
+        # Both should fall through to run1 (the latest complete run), not run2.
+        assert scores == {"security": "7.0", "maintainability": "8.0"}
+        assert result["summary"]["numericAverage"] == 7.5  # avg(7.0, 8.0)
+
+    def test_includes_in_progress_run_for_dims_already_scored(self, tmp_path: Path):
+        # A dim that produced an eval file inside an in-progress run is
+        # trustworthy — its score should surface in the cards immediately,
+        # not wait for the umbrella run to finalise. (Without this, users
+        # see today's freshly-completed dim as "Older run · Apr 25" because
+        # the still-running umbrella excluded today's partial state.)
+        reports_root = _setup_project(tmp_path, "proj", [
+            ("run2", [_dim("usability", "9.5", "A")]),
+            ("run1", [_dim("usability", "7.0", "B"), _dim("flexibility", "6.0", "C")]),
+        ])
+        # Mark run2 as still in progress.
+        (reports_root / "proj" / "run2" / "status.json").write_text(
+            json.dumps({"state": "running"}),
+        )
+        result = compute_accumulated(str(reports_root), "proj", None)
+        assert result is not None
+        scores = {d["dimension"]: d["overallScore"] for d in result["dimensions"]}
+        # usability picked up from in-progress run2 (the freshest score for
+        # that dim); flexibility falls through to run1.
+        assert scores == {"usability": "9.5", "flexibility": "6.0"}
+
+    def test_falls_back_when_all_runs_cancelled(self, tmp_path: Path):
+        # If every run is cancelled (fresh project, all attempts crashed), we
+        # still want to render *something* rather than a blank dashboard, so
+        # the filter falls back to all runs.
+        reports_root = _setup_project(tmp_path, "proj", [
+            ("run1", [_dim("security", "6.0", "C")]),
+        ])
+        (reports_root / "proj" / "run1" / "status.json").write_text(
+            json.dumps({"state": "cancelled"}),
+        )
+        result = compute_accumulated(str(reports_root), "proj", None)
+        assert result is not None
+        assert result["dimensions"][0]["overallScore"] == "6.0"

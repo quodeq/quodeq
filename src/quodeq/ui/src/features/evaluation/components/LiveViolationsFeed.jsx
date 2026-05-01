@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
 import { parseFileRef } from '../../../utils/formatters.js';
@@ -8,6 +8,25 @@ const ANIM_MAX_DELAY_MS = 400;
 
 function severityOrder(s) {
   return s === 'critical' ? 0 : s === 'major' ? 1 : 2;
+}
+
+/**
+ * Track the most recent activity timestamp per dimension so we can sort
+ * "latest active first". The ref persists across renders; we update it
+ * whenever a dim's violation count changes.
+ */
+function useDimensionActivity(liveViolations) {
+  const lastActivityRef = useRef({});
+  const prevCountsRef = useRef({});
+  const now = Date.now();
+  for (const [dim, vs] of Object.entries(liveViolations || {})) {
+    const len = (vs || []).length;
+    if (prevCountsRef.current[dim] !== len) {
+      prevCountsRef.current[dim] = len;
+      lastActivityRef.current[dim] = now;
+    }
+  }
+  return lastActivityRef.current;
 }
 
 function ViolationDetail({ v }) {
@@ -79,38 +98,74 @@ function ViolationLiveRow({ violation, index }) {
   );
 }
 
-export default function LiveViolationsFeed({ liveViolations }) {
-  const dims = Object.keys(liveViolations ?? {});
-  const totalCount = dims.reduce((sum, d) => sum + (liveViolations[d]?.length ?? 0), 0);
+function DimensionGroup({ dim, violations, open, onToggle }) {
+  const count = violations.length;
+  return (
+    <div className={`vlive-dimension-group${open ? '' : ' vlive-dimension-group--collapsed'}`}>
+      <button
+        type="button"
+        className="vlive-dimension-label"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
+        <span className={`vlive-dimension-caret${open ? ' vlive-dimension-caret--open' : ''}`} aria-hidden="true">▸</span>
+        <span className="vlive-dimension-name">{dim}</span>
+        <span className="vlive-dimension-count">{count}</span>
+      </button>
+      {open && violations.map((v, i) => (
+        <ViolationLiveRow key={`${dim}-${v.file}-${v.principle}-${String(v.line ?? '')}`} violation={v} index={i} />
+      ))}
+    </div>
+  );
+}
 
-  const sortedByDim = useMemo(() => {
-    const result = {};
-    for (const dim of Object.keys(liveViolations ?? {})) {
-      result[dim] = [...(liveViolations[dim] ?? [])].sort((a, b) =>
-        severityOrder(a.severity) - severityOrder(b.severity)
-      );
-    }
-    return result;
+export default function LiveViolationsFeed({ liveViolations }) {
+  // Per-dim activity timestamps power "latest active dimension on top".
+  const lastActivity = useDimensionActivity(liveViolations);
+
+  const orderedDims = useMemo(() => {
+    return Object.entries(liveViolations ?? {})
+      .map(([dim, vs]) => ({
+        dim,
+        violations: [...(vs ?? [])].sort((a, b) => severityOrder(a.severity) - severityOrder(b.severity)),
+      }))
+      .filter(({ violations }) => violations.length > 0)
+      .sort((a, b) => (lastActivity[b.dim] ?? 0) - (lastActivity[a.dim] ?? 0));
+    // lastActivity is a ref's current value — it's intentionally not in deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveViolations]);
 
+  // Single-open-at-a-time accordion. The topmost (most recently active) dim
+  // auto-expands; whenever the topmost changes — i.e. a new dimension starts
+  // producing violations — the previous one collapses and the new one opens.
+  // The user can still click any header to switch which one is open.
+  const [openDim, setOpenDim] = useState(null);
+  const topDim = orderedDims[0]?.dim;
+  const prevTopRef = useRef(null);
+  useEffect(() => {
+    if (topDim && prevTopRef.current !== topDim) {
+      prevTopRef.current = topDim;
+      setOpenDim(topDim);
+    }
+  }, [topDim]);
+
+  const totalCount = orderedDims.reduce((sum, d) => sum + d.violations.length, 0);
   if (!totalCount) return null;
 
   return (
     <div className="vlive-feed">
       <div className="vlive-counter">
-        {totalCount} violation{totalCount !== 1 ? 's' : ''} found across {dims.length} dimension{dims.length !== 1 ? 's' : ''}
+        {totalCount} violation{totalCount !== 1 ? 's' : ''} found across {orderedDims.length} dimension{orderedDims.length !== 1 ? 's' : ''}
       </div>
-      {dims.map(dim => {
-        const violations = sortedByDim[dim] || [];
-        return (
-          <div key={dim} className="vlive-dimension-group">
-            <div className="vlive-dimension-label">{dim}</div>
-            {violations.map((v, i) => (
-              <ViolationLiveRow key={`${dim}-${v.file}-${v.principle}-${String(v.line ?? '')}`} violation={v} index={i} />
-            ))}
-          </div>
-        );
-      })}
+      {orderedDims.map(({ dim, violations }) => (
+        <DimensionGroup
+          key={dim}
+          dim={dim}
+          violations={violations}
+          open={openDim === dim}
+          onToggle={() => setOpenDim((cur) => (cur === dim ? null : dim))}
+        />
+      ))}
     </div>
   );
 }

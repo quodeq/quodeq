@@ -117,8 +117,10 @@ def test_sse_replays_existing_content(tmp_path, app) -> None:
     assert resp.status_code == HTTPStatus.OK
     assert resp.content_type.startswith("text/event-stream")
     events = _collect_sse(resp)
-    data_events = [e for e in events if "data" in e]
-    assert [e["data"] for e in data_events] == ["alpha", "beta"]
+    # `done` events also carry a `data:` line (the terminal state); filter
+    # them out when asserting on the streamed log lines.
+    line_events = [e for e in events if "data" in e and e.get("event") != "done"]
+    assert [e["data"] for e in line_events] == ["alpha", "beta"]
     assert any(e.get("event") == "done" for e in events)
 
 
@@ -128,8 +130,8 @@ def test_sse_respects_last_event_id(tmp_path, app) -> None:
     resp = client.get("/api/jobs/job-sse-2-done/logs/stream",
                       headers={"Last-Event-ID": str(len("alpha\n"))})
     events = _collect_sse(resp)
-    data_events = [e for e in events if "data" in e]
-    assert [e["data"] for e in data_events] == ["beta", "gamma"]
+    line_events = [e for e in events if "data" in e and e.get("event") != "done"]
+    assert [e["data"] for e in line_events] == ["beta", "gamma"]
 
 
 def test_sse_404_on_missing_log(tmp_path, app) -> None:
@@ -139,3 +141,35 @@ def test_sse_404_on_missing_log(tmp_path, app) -> None:
     client = app.test_client()
     resp = client.get("/api/jobs/job-sse-3/logs/stream")
     assert resp.status_code == HTTPStatus.NOT_FOUND
+
+
+def test_plain_logs_filters_resources_lines(tmp_path, app) -> None:
+    """Resource snapshots stay in run.log for forensics but never reach the dashboard."""
+    content = (
+        "[INFO] [security] 0m10s | 1 active | 5 files taken\n"
+        "[INFO] [resources] elapsed=1m00s rss=120MB threads=5 fds=8 ollama=200MB\n"
+        "[INFO] [security] 0m20s | 1 active | 9 files taken\n"
+    )
+    _seed_run(tmp_path, app, "job-filter", content)
+    client = app.test_client()
+    data = client.get("/api/jobs/job-filter/logs").get_json()
+    assert all("[resources]" not in line for line in data["lines"])
+    assert any("[security]" in line for line in data["lines"])
+    # Offset must still advance past the suppressed line so the next poll
+    # doesn't replay it.
+    assert data["nextOffset"] == len(content)
+
+
+def test_sse_filters_resources_lines(tmp_path, app) -> None:
+    content = (
+        "[INFO] [security] 0m10s | running\n"
+        "[INFO] [resources] elapsed=1m00s rss=120MB threads=5 fds=8 ollama=200MB\n"
+        "[INFO] [security] 0m20s | running\n"
+    )
+    _seed_run(tmp_path, app, "job-sse-filter-done", content)
+    client = app.test_client()
+    resp = client.get("/api/jobs/job-sse-filter-done/logs/stream")
+    events = _collect_sse(resp)
+    payloads = [e["data"] for e in events if "data" in e]
+    assert all("[resources]" not in line for line in payloads)
+    assert any("[security]" in line for line in payloads)

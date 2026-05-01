@@ -23,6 +23,12 @@
   animation: dashboard-fadein 400ms ease;
 }
 
+/* Subtle "background refetch in progress" — used while placeholderData
+   shows the previous run's content during a run switch. */
+.dashboard-refreshing {
+  opacity: 0.7;
+}
+
 @keyframes dashboard-fadein {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -69,189 +75,6 @@
   flex-direction: column;
   gap: 20px;
   margin-bottom: 28px;
-}
-
-.acc-eval-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.acc-eval-label {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.explorer-dimension-title {
-  font-size: var(--text-xl);
-  font-weight: var(--weight-semibold);
-  color: var(--color-text);
-  letter-spacing: -0.01em;
-  text-transform: capitalize;
-}
-
-.acc-eval-date {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-}
-
-/* ── Golden-split layout ─────────────────────────────── */
-
-.acc-eval-golden {
-  display: flex;
-  gap: 24px;
-  align-items: center;
-}
-
-.acc-eval-circle-col {
-  flex: 0 0 38.2%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.acc-eval-stats-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.acc-eval-stats-row {
-  display: flex;
-  align-items: stretch;
-}
-
-.acc-eval-stats-row .acc-eval-stat-block { flex: 1; }
-
-.acc-eval-stats-divider {
-  width: 1px;
-  background: var(--color-border);
-  margin: 0 16px;
-}
-
-.acc-eval-ratio-sublabel {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  margin-top: 4px;
-}
-
-/* ── Compact variant (Explorer dimension overview) ──── */
-
-.compact-stats-row {
-  display: flex;
-  align-items: center;
-  padding: 0 0 16px;
-}
-
-.compact-score-col {
-  flex: 0 0 15%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.compact-score-value {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--color-text);
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.compact-score-grade {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  color: var(--color-text-muted);
-  text-transform: capitalize;
-}
-
-.compact-metrics-col {
-  flex: 1;
-  display: flex;
-  align-items: center;
-}
-
-.compact-metrics-col .acc-eval-stat-block {
-  flex: 1;
-  align-items: center;
-}
-
-.acc-eval-panel--compact .acc-eval-stat-value { font-size: 1.1rem; }
-.acc-eval-panel--compact { margin-bottom: var(--space-3); }
-
-.acc-eval-mini-stats {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.acc-eval-mini-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.acc-eval-mini-stat-label {
-  font-size: 0.65rem;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.acc-eval-mini-stat-value {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--color-text);
-  font-variant-numeric: tabular-nums;
-}
-
-.acc-eval-stat-block {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.acc-eval-stat-label {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.acc-eval-stat-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-text);
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.acc-eval-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
-}
-
-/* ── Responsive ─────────────────────────────────────── */
-
-@media (max-width: 480px) {
-  .acc-eval-golden {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .acc-eval-circle-col {
-    flex: none;
-    align-self: center;
-  }
 }
 
 /* --- Trend Section --- */
@@ -576,7 +399,11 @@
 .dimensions-grid {
   display: grid;
   gap: var(--space-3);
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  /* Cards stretch to share whatever width is left so the row stays full
+     before wrapping. They wrap to a new row only once each track would fall
+     below the 180px min — no half-empty rows just because a fixed max didn't
+     divide cleanly. */
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .dimension-card {
@@ -1435,115 +1262,43 @@
   white-space: pre-wrap;
 }
 
-.offending-file-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.offending-file-cell {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.offending-file-row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  transition: background 0.12s, border-color 0.12s;
-}
-
-.offending-file-row--clickable {
-  cursor: pointer;
-}
-
-.offending-file-row--clickable:hover {
-  background: color-mix(in srgb, var(--color-accent) 7%, transparent);
-  border-color: color-mix(in srgb, var(--color-accent) 22%, transparent);
-}
-
-.offending-file-row--clickable:hover .offending-file-chevron {
-  opacity: 1;
-  transform: translateX(2px);
-}
-
-.offending-file-tags {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.offending-file-total {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: var(--color-text);
-  min-width: 22px;
-  text-align: right;
-}
-
-.offending-file-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
   min-width: 0;
 }
 
-.offending-file-info .offending-file-dims {
-  margin-top: 2px;
+.offending-file-name {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  color: var(--color-text);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.12s;
 }
 
-.offending-file-dims {
-  font-size: 0.72rem;
+.offending-file-path {
+  font-family: var(--term-font-mono);
+  font-size: 10px;
   color: var(--color-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.offending-file-path {
-  min-width: 0;
-  font-size: 0.85rem;
-  font-weight: var(--weight-medium);
-  color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: left;
-  transition: color 0.12s;
-}
-
-.offending-file-row--clickable:hover .offending-file-path {
+.term-grid__row--clickable:hover .offending-file-name {
   color: var(--color-accent);
 }
 
-.offending-file-chevron {
-  flex-shrink: 0;
-  font-size: 1.1rem;
-  color: var(--color-accent);
-  opacity: 0.3;
-  transition: opacity 0.12s, transform 0.12s;
-}
-
-.offending-show-more {
-  display: block;
-  width: 100%;
-  margin-top: 8px;
-  padding: 6px 0;
-  background: none;
-  border: none;
-  color: var(--color-accent);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  text-align: center;
-  opacity: 0.75;
-  transition: opacity 0.12s;
-}
-
-.offending-show-more:hover {
-  opacity: 1;
+.offending-file-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
 }
 
 /* Diff summary section */

@@ -1,14 +1,20 @@
-// Props: { currentRun, isLatest, isOldest, onPrev, onNext, onLatest, onView }
-// Prev/next/latest navigation buttons + current run display + optional "View run" button
-// currentRun: string (e.g. '20260228' or 'latest')
+// Props: { currentRun, isLatest, isOldest, actions: { onPrev, onNext, onLatest, onView, onPrevHover, onNextHover, onLatestHover } }
+// Prev/next/latest navigation buttons + current run display + optional "View run" button.
+// Hover handlers (onPrevHover, etc.) are optional — when wired they prefetch the
+// adjacent run's dashboard so the click feels instant.
 
-export default function RunNavigator({ currentRun, isLatest, isOldest, actions: { onPrev, onNext, onLatest, onView } = {} }) {
+export default function RunNavigator({
+  currentRun, isLatest, isOldest,
+  actions: { onPrev, onNext, onLatest, onView, onPrevHover, onNextHover, onLatestHover } = {},
+}) {
   return (
     <div className="run-navigator">
       <button
         type="button"
         className="run-nav-action run-nav-action--primary"
         onClick={onLatest}
+        onMouseEnter={onLatestHover}
+        onFocus={onLatestHover}
         disabled={isLatest}
         title="Go to latest run"
       >
@@ -20,6 +26,8 @@ export default function RunNavigator({ currentRun, isLatest, isOldest, actions: 
           type="button"
           className="run-nav-btn"
           onClick={onPrev}
+          onMouseEnter={onPrevHover}
+          onFocus={onPrevHover}
           disabled={isOldest}
           aria-label="Older evaluation"
           title="Older evaluation"
@@ -31,6 +39,8 @@ export default function RunNavigator({ currentRun, isLatest, isOldest, actions: 
           type="button"
           className="run-nav-btn"
           onClick={onNext}
+          onMouseEnter={onNextHover}
+          onFocus={onNextHover}
           disabled={isLatest}
           aria-label="Newer evaluation"
           title="Newer evaluation"

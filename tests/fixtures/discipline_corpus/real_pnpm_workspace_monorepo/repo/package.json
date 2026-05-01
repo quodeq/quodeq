@@ -1,0 +1,1 @@
+{"name":"workspace-root","private":true,"workspaces":["packages/*"],"devDependencies":{"typescript":"^5.0.0","prettier":"^3.0.0"}}

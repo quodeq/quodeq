@@ -1,0 +1,17 @@
+{
+  "matches": [
+    "python_ml_pytorch"
+  ],
+  "primary": "python_ml_pytorch",
+  "language": "python",
+  "topics": [
+    "PyTorch Best Practices",
+    "Training Loop Patterns",
+    "Reproducibility",
+    "Experiment Tracking",
+    "Python Code Standards"
+  ],
+  "not_matches": [
+    "python_fullstack"
+  ]
+}

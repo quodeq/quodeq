@@ -19,6 +19,8 @@ export default defineConfig({
         manualChunks: {
           'vendor-react': ['react', 'react-dom'],
           'vendor-d3': ['d3-hierarchy'],
+          'vendor-markdown': ['react-markdown', 'remark-gfm'],
+          'vendor-tanstack-query': ['@tanstack/react-query', '@tanstack/react-query-devtools'],
         },
       },
     },

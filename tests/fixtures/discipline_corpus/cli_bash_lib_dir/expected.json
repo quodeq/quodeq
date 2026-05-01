@@ -1,0 +1,7 @@
+{
+  "matches": [
+    "cli_bash"
+  ],
+  "primary": "cli_bash",
+  "language": "bash"
+}

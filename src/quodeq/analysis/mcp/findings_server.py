@@ -18,6 +18,7 @@ from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import read_message, dispatch as _dispatch
 from quodeq.engine._ref_utils import load_compiled_refs as _load_compiled_refs
 from quodeq.core.standards.refs import load_compiled_requirements as _load_compiled_requirements
+from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
 # Re-export public API so existing imports keep working.
 from quodeq.analysis.mcp.router import (  # noqa: F401
@@ -69,7 +70,7 @@ def main() -> None:
 
     try:
         with open(sa.findings_file, "a") as findings_fh:
-            router = FindingsRouter(findings_fh, context=ctx)
+            router = _build_router(findings_fh, Path(sa.findings_file), ctx)
             while True:
                 msg = read_message()
                 if msg is None:
@@ -84,6 +85,18 @@ def main() -> None:
     except OSError as exc:
         sys.stderr.write(f"Cannot open findings file {sa.findings_file}: {exc}\n")
         sys.exit(1)
+
+
+def _build_router(findings_fh, findings_path: Path, ctx: CompiledContext) -> FindingsRouter:
+    """Construct a FindingsRouter wired to dual-write into the run's evaluation.db.
+
+    The findings_path is `<run_dir>/evidence/<dim>_evidence.jsonl`, so the run
+    directory is its grandparent. SqliteFindingsRepository creates / opens
+    `<run_dir>/evaluation.db` lazily on first insert.
+    """
+    run_dir = Path(findings_path).parent.parent
+    repo = SqliteFindingsRepository(run_dir)
+    return FindingsRouter(findings_fh, context=ctx, findings_repo=repo)
 
 
 if __name__ == "__main__":

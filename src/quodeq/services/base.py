@@ -86,8 +86,18 @@ class EvaluationActions(Protocol):
         """Return current status of an evaluation job."""
         ...
 
-    def cancel_evaluation(self, job_id: str, reports_dir: str | None = None) -> bool:
-        """Cancel a running evaluation job. Return True on success."""
+    def cancel_evaluation(
+        self, job_id: str, reports_dir: str | None = None,
+        *, discard_partial: bool = False,
+    ) -> bool:
+        """Cancel a running evaluation job. Return True on success.
+
+        When ``discard_partial`` is True, any in-flight dim's
+        ``<dim>_queue.json`` and ``<dim>_fingerprint.json`` are deleted so
+        the next run cannot resume from this run's partial state. Dims that
+        already produced ``evaluation/<dim>.json`` are preserved — only
+        unfinished ones are wiped.
+        """
         ...
 
     def list_evaluations(

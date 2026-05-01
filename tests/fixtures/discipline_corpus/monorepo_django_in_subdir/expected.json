@@ -1,0 +1,6 @@
+{
+  "recursive": true,
+  "matches": [
+    "python_django"
+  ]
+}

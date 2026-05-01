@@ -1,0 +1,1 @@
+<project><groupId>com.x</groupId><artifactId>parent</artifactId><packaging>pom</packaging><modules><module>service-a</module><module>service-b</module></modules><dependencies><dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId></dependency></dependencies></project>

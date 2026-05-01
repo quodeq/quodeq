@@ -48,15 +48,15 @@ def check_cloud_connection(
         return {"success": False, "error": "Cannot connect to private/internal network addresses"}
 
     try:
-        client = _create_client(api_base, api_key)
-        start = time.monotonic()
-        client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": "hi"}],
-            max_tokens=1,
-        )
-        latency = int((time.monotonic() - start) * 1000)
-        return {"success": True, "model": model, "latency_ms": latency}
+        with _create_client(api_base, api_key) as client:
+            start = time.monotonic()
+            client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": "hi"}],
+                max_tokens=1,
+            )
+            latency = int((time.monotonic() - start) * 1000)
+            return {"success": True, "model": model, "latency_ms": latency}
     except Exception as exc:
         _log.debug("Cloud connection check failed: %s", exc)
         # Surface the exception type and HTTP status codes without leaking

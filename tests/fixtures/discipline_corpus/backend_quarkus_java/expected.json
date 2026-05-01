@@ -1,0 +1,10 @@
+{
+  "matches": [
+    "backend_quarkus_java"
+  ],
+  "primary": "backend_quarkus_java",
+  "language": "java",
+  "not_matches": [
+    "backend_springboot_java"
+  ]
+}

@@ -136,7 +136,7 @@ class TestStaticDistDefaulted:
         reports = tmp_path / "reports"
         reports.mkdir(parents=True, exist_ok=True)
         return DashboardConfig(
-            server=ServerConfig(port=4173),
+            server=ServerConfig(port=7863),
             build=BuildConfig(open_browser=False, no_build=no_build, reinstall=False),
             reports_dir=reports,
             static_dist=static,
@@ -162,7 +162,7 @@ class TestStaticDistDefaulted:
         monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *a, **k: None)
         monkeypatch.setattr(
             runner, "_ensure_action_api",
-            lambda *a, **k: ("http://127.0.0.1:4173", DummyProcess()),
+            lambda *a, **k: ("http://127.0.0.1:7863", DummyProcess()),
         )
         monkeypatch.setattr(_server_mod, "serve_and_wait", lambda *a: None)
 
@@ -186,7 +186,7 @@ class TestStaticDistDefaulted:
         monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *a, **k: None)
         monkeypatch.setattr(
             runner, "_ensure_action_api",
-            lambda *a, **k: ("http://127.0.0.1:4173", DummyProcess()),
+            lambda *a, **k: ("http://127.0.0.1:7863", DummyProcess()),
         )
         monkeypatch.setattr(_server_mod, "serve_and_wait", lambda *a: None)
 
@@ -195,7 +195,7 @@ class TestStaticDistDefaulted:
 
     def test_cli_sets_defaulted_flag(self):
         from quodeq.dashboard.cli import parse_args
-        config = parse_args(["--port", "4173"])
+        config = parse_args(["--port", "7863"])
         assert config.static_dist_defaulted is True
 
     def test_cli_explicit_clears_defaulted_flag(self, tmp_path):

@@ -1,18 +1,19 @@
-import { useMemo, useState, useEffect } from 'react';
-import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
+import { lazy, Suspense, useMemo, useState, useEffect } from 'react';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
-import ExplorerPage from './features/explorer/components/ExplorerPage.jsx';
-import FileDetailPage from './features/explorer/components/FileDetailPage.jsx';
-import PrincipleDetailPage from './features/explorer/components/PrincipleDetailPage.jsx';
-import FindingDetailPage from './features/explorer/components/FindingDetailPage.jsx';
-import ProjectsPage from './features/dashboard/components/ProjectsPage.jsx';
-import HistoryPage from './features/history/components/HistoryPage.jsx';
-import EvaluateScreen from './features/evaluation/components/EvaluateScreen.jsx';
-import SettingsPage from './features/settings/components/SettingsPage.jsx';
-import StandardsPage from './features/standards/StandardsPage.jsx';
-import ViolationsPage from './features/violations/components/ViolationsPage.jsx';
-import MapPage from './features/map/components/MapPage.jsx';
-import HelpPage from './features/help/components/HelpPage.jsx';
+
+const DashboardPage = lazy(() => import('./features/dashboard/components/DashboardPage.jsx'));
+const ExplorerPage = lazy(() => import('./features/explorer/components/ExplorerPage.jsx'));
+const FileDetailPage = lazy(() => import('./features/explorer/components/FileDetailPage.jsx'));
+const PrincipleDetailPage = lazy(() => import('./features/explorer/components/PrincipleDetailPage.jsx'));
+const FindingDetailPage = lazy(() => import('./features/explorer/components/FindingDetailPage.jsx'));
+const ProjectsPage = lazy(() => import('./features/dashboard/components/ProjectsPage.jsx'));
+const HistoryPage = lazy(() => import('./features/history/components/HistoryPage.jsx'));
+const EvaluateScreen = lazy(() => import('./features/evaluation/components/EvaluateScreen.jsx'));
+const SettingsPage = lazy(() => import('./features/settings/components/SettingsPage.jsx'));
+const StandardsPage = lazy(() => import('./features/standards/StandardsPage.jsx'));
+const ViolationsPage = lazy(() => import('./features/violations/components/ViolationsPage.jsx'));
+const MapPage = lazy(() => import('./features/map/components/MapPage.jsx'));
+const HelpPage = lazy(() => import('./features/help/components/HelpPage.jsx'));
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
 import { useApi } from './api/ApiContext.jsx';
 import LoadingScreen from './components/LoadingScreen.jsx';
@@ -23,6 +24,11 @@ import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { readVisibleStandardIds } from './utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
+import { SidePane, SidePaneProvider } from './features/side-pane/index.js';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.jsx';
+import { ServerLogProvider } from './features/settings/server-log/ServerLogProvider.jsx';
+import { OllamaLogProvider } from './features/settings/ollama-log/OllamaLogProvider.jsx';
 
 const NO_PROJECT_TABS = ['evaluate', 'standards', 'settings', 'help'];
 
@@ -226,7 +232,17 @@ const ROUTE_RENDERERS = {
     );
   },
   'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
-  explorer: (params, props) => <ExplorerPage project={params.fromProject || props.navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} severityFilter={params.severity} onNavigate={props.navigation.handleNavigate} refreshSignal={props.dashboardData.dashboard} />,
+  explorer: (params, props) => (
+    <ExplorerPage
+      project={params.fromProject || props.navigation.selectedProject}
+      dimension={params.dimension}
+      runId={params.runId}
+      dateLabel={params.dateLabel}
+      onNavigate={props.navigation.handleNavigate}
+      refreshSignal={props.dashboardData.dashboard}
+      trend={props.dashboardData.dashboard?.trend || []}
+    />
+  ),
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} />,
   file: (params) => <FileDetailPage file={params.file} />,
   evalprinciple: renderEvalPrincipleDetail,
@@ -282,6 +298,7 @@ function AppShell({ sidebar, header, content }) {
             {content}
           </main>
         </div>
+        <SidePane />
       </div>
     </div>
   );
@@ -290,7 +307,7 @@ function AppShell({ sidebar, header, content }) {
 export default function App() {
   const { dismissFinding } = useApi();
   const state = useAppState();
-  const APP_VERSION = '1.0.6';
+  const APP_VERSION = state.serverVersion;
   const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const sidebarProvider = (typeof localStorage !== 'undefined' && localStorage.getItem(ACTIVE_PROVIDER_KEY)) || null;
@@ -327,7 +344,7 @@ export default function App() {
   const contentProps = {
     dashboardData: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
-      dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, error: state.error,
+      dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
       availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
       selectedDisplayName: state.selectedDisplayName,
     },
@@ -338,6 +355,7 @@ export default function App() {
       handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject,
       historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
       currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
+      prefetchHandlers: state.prefetchHandlers,
     },
     evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
@@ -358,66 +376,82 @@ export default function App() {
           : null);
 
   return (
-    <AppShell
-      sidebar={
-        <Sidebar
-          activeTab={activeTab}
-          onNavTab={navTab}
-          hasEvaluations={state.projects.length > 0}
-          projectInfo={{
-            displayName: resolvedDisplayName,
-            meta: state.headerMeta,
-          }}
-          version={APP_VERSION}
-          violationsCount={filteredAccumulated?.summary?.totalViolations ?? state.accumulated?.summary?.totalViolations ?? null}
-          historyCount={filteredTrend.length || state.dashboard?.trend?.length || null}
-          lastEvalAt={state.accumulated?.summary?.lastEvaluatedAt || state.accumulated?.summary?.createdAt || null}
-          serverConnected={state.serverConnected}
-          isPinned={sidebarPinned}
-          onPinChange={setSidebarPinned}
-          mobileExtras={(
-            <div className="sidebar-mobile-extras__grid">
-              {(sidebarProvider || sidebarModel) && (
-                <div className="sidebar-status-row">
-                  <span className="sidebar-status-label">Provider</span>
-                  <span className="sidebar-status-value">
-                    {sidebarProvider || '\u2014'}
-                    {sidebarModel && <>&nbsp;·&nbsp;<span style={{ opacity: 0.7 }}>{sidebarModel}</span></>}
-                  </span>
+    <>
+    <SidePaneProvider>
+      <EvalLogProvider>
+        <ServerLogProvider>
+          <OllamaLogProvider>
+            <AppShell
+          sidebar={
+            <Sidebar
+              activeTab={activeTab}
+              onNavTab={navTab}
+              hasEvaluations={state.projects.length > 0}
+              projectInfo={{
+                displayName: resolvedDisplayName,
+                meta: state.headerMeta,
+              }}
+              version={APP_VERSION}
+              violationsCount={filteredAccumulated?.summary?.totalViolations ?? state.accumulated?.summary?.totalViolations ?? null}
+              historyCount={filteredTrend.length || state.dashboard?.trend?.length || null}
+              lastEvalAt={state.accumulated?.summary?.lastEvaluatedAt || state.accumulated?.summary?.createdAt || null}
+              serverConnected={state.serverConnected}
+              isPinned={sidebarPinned}
+              onPinChange={setSidebarPinned}
+              mobileExtras={(
+                <div className="sidebar-mobile-extras__grid">
+                  {(sidebarProvider || sidebarModel) && (
+                    <div className="sidebar-status-row">
+                      <span className="sidebar-status-label">Provider</span>
+                      <span className="sidebar-status-value">
+                        {sidebarProvider || '\u2014'}
+                        {sidebarModel && <>&nbsp;·&nbsp;<span style={{ opacity: 0.7 }}>{sidebarModel}</span></>}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
-        />
-      }
-      header={
-        <TopBar
-          projectName={resolvedDisplayName}
-          activeTab={activeTab}
-          serverConnected={state.serverConnected}
-          serverUrl={state.serverHealth?.url || null}
-          provider={sidebarProvider}
-          model={sidebarModel}
-          onReport={null}
-          onEvaluate={state.projects?.length > 0 ? (() => navTab('evaluate')) : null}
-          evaluating={state.evalLifecycle?.job?.status === 'running'}
-          onProviderClick={() => navTab('settings')}
-          onMenuToggle={() => setSidebarPinned((v) => !v)}
-          breadcrumb={
-            <NavBreadcrumb
-              stack={navStack}
-              onBack={navPop}
-              onGoTo={navGoTo}
             />
           }
-          mobileTitle={navStack.length ? navLabelFor(navStack[navStack.length - 1]) : (activeTab || '')}
-          canGoBack={navStack.length > 1}
-          onBack={navPop}
-          effectiveDark={effectiveDark}
-          onToggleTheme={toggleTheme}
-        />
-      }
-      content={<div className="tab-fade" key={activeTab}><MainContent activePage={activePage} props={contentProps} /></div>}
-    />
+          header={
+            <TopBar
+              projectName={resolvedDisplayName}
+              activeTab={activeTab}
+              serverConnected={state.serverConnected}
+              serverUrl={state.serverHealth?.url || null}
+              provider={sidebarProvider}
+              model={sidebarModel}
+              onEvaluate={state.projects?.length > 0 ? (() => navTab('evaluate')) : null}
+              evaluating={state.evalLifecycle?.job?.status === 'running'}
+              onProviderClick={() => navTab('settings')}
+              onMenuToggle={() => setSidebarPinned((v) => !v)}
+              breadcrumb={
+                <NavBreadcrumb
+                  stack={navStack}
+                  onBack={navPop}
+                  onGoTo={navGoTo}
+                />
+              }
+              mobileTitle={navStack.length ? navLabelFor(navStack[navStack.length - 1]) : (activeTab || '')}
+              canGoBack={navStack.length > 1}
+              onBack={navPop}
+              effectiveDark={effectiveDark}
+              onToggleTheme={toggleTheme}
+            />
+          }
+          content={
+            <Suspense fallback={<LoadingScreen />}>
+              <div className="tab-fade" key={activeTab}>
+                <MainContent activePage={activePage} props={contentProps} />
+              </div>
+            </Suspense>
+          }
+            />
+          </OllamaLogProvider>
+        </ServerLogProvider>
+      </EvalLogProvider>
+    </SidePaneProvider>
+    {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+    </>
   );
 }

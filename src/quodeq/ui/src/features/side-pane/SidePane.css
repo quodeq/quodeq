@@ -1,0 +1,312 @@
+/* ── Pane container ───────────────────────────────────── */
+.side-pane {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: 0;
+  overflow: visible;
+  min-width: 0;
+  margin-left: 0;
+}
+
+/* ── Left-edge resize gutter (between main column and pane) ─────────── */
+/* The full 8px area is the drag hit zone; the visible rail is a subtle 1px
+   seam in the middle of that zone, thickening to 3px on hover/drag. Same
+   pattern the old ReportPane used. */
+.side-pane__divider {
+  position: absolute;
+  top: 0;
+  left: -8px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 1;
+  background: transparent;
+}
+.side-pane__divider::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1px;
+  height: 100%;
+  background: var(--color-border);
+  transition: background 120ms ease, width 120ms ease;
+}
+.side-pane__divider:hover::after,
+.side-pane__divider--dragging::after {
+  width: 3px;
+}
+
+/* ── Window slot ─────────────────────────────────────── */
+.side-pane-window-slot {
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+  /* Isolate the slot's layout + paint from siblings: while one slot
+     resizes (between-window splitter drag) the browser doesn't have
+     to relayout / repaint the markdown body of the adjacent slots. */
+  contain: layout paint;
+}
+.side-pane-window {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  contain: layout paint;
+}
+
+/* ── Window header ───────────────────────────────────── */
+.side-pane-window__header {
+  flex: 0 0 auto;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--color-border);
+  /* Header sits on top of either the markdown body (white surface) or the
+     console body (surface-alt). Mix in some text color so the bar reads
+     as a distinct strip in both cases without going so dark it competes
+     with content. */
+  background: color-mix(in srgb, var(--color-text) 8%, var(--color-surface-alt));
+}
+.side-pane-window__title {
+  flex: 1 1 auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+.side-pane-window__actions {
+  display: flex;
+  gap: 4px;
+}
+.side-pane-window__icon-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text-muted);
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+.side-pane-window__icon-btn:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+.side-pane-window__icon-btn--ok,
+.side-pane-window__icon-btn--ok:hover {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+/* ── Window body ─────────────────────────────────────── */
+.side-pane-window__body {
+  flex: 1 1 auto;
+  /* Reserve scrollbar space always so an inter-window resize doesn't
+     toggle the scrollbar in/out and trigger a content reflow. */
+  overflow-y: scroll;
+  padding: 12px 16px;
+  line-height: 1.55;
+  /* Thinner scrollbars across the whole side-pane subtree (≈half of the
+     macOS default). `scrollbar-width: thin` is the standard CSS hook;
+     ::-webkit-scrollbar gives fine control on WKWebView. */
+  scrollbar-width: thin;
+}
+.side-pane-window__body::-webkit-scrollbar,
+.side-pane-md pre::-webkit-scrollbar,
+.side-pane-md .md-table-wrap::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+/* Grow the scrollbar when the user hovers the scrollable element so it's
+   easier to grab. WebKit doesn't transition scrollbar width, so this is
+   an instant snap, but visually it just feels like the macOS overlay
+   scrollbar swelling on touch. */
+.side-pane-window__body:hover::-webkit-scrollbar,
+.side-pane-md pre:hover::-webkit-scrollbar,
+.side-pane-md .md-table-wrap:hover::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+.side-pane-window__body::-webkit-scrollbar-track,
+.side-pane-md pre::-webkit-scrollbar-track,
+.side-pane-md .md-table-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+.side-pane-window__body::-webkit-scrollbar-thumb,
+.side-pane-md pre::-webkit-scrollbar-thumb,
+.side-pane-md .md-table-wrap::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-text) 22%, transparent);
+  border-radius: 4px;
+}
+.side-pane-window__body::-webkit-scrollbar-thumb:hover,
+.side-pane-md pre::-webkit-scrollbar-thumb:hover,
+.side-pane-md .md-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-text) 38%, transparent);
+}
+
+.side-pane-window__error {
+  color: var(--color-danger, #fca5a5);
+  font-style: italic;
+}
+
+/* Skeleton shown while the slide-in animation runs, before the heavy
+   body content (markdown) mounts. Matches the deferred-mount pattern
+   from the original ReportPane. */
+.side-pane-window__body-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 4px;
+}
+.side-pane-window__body-skeleton > span {
+  display: block;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--color-surface-alt);
+  opacity: 0.6;
+}
+.side-pane-window__body-skeleton > span:nth-child(1) { width: 55%; height: 18px; }
+.side-pane-window__body-skeleton > span:nth-child(2) { width: 90%; }
+.side-pane-window__body-skeleton > span:nth-child(3) { width: 75%; }
+
+/* ── Markdown content (.side-pane-md) ──────────────── */
+.side-pane-md {
+  /* Scope reflow of the markdown subtree to itself so width changes from
+     a divider drag can't propagate layout work into siblings. */
+  contain: layout;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  /* Make report text explicitly selectable / copyable. By default the
+     browser allows it, but several side-pane ancestors set user-select
+     elsewhere — pin it here so there's no surprise when a future ancestor
+     turns selection off. */
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.side-pane-md a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+  text-underline-offset: 2px;
+}
+.side-pane-md a:hover {
+  text-decoration-color: var(--color-accent);
+}
+.side-pane-md h1,
+.side-pane-md h2 {
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 4px;
+  margin-top: 16px;
+}
+.side-pane-md h1:first-child,
+.side-pane-md h2:first-child { margin-top: 0; }
+.side-pane-md code {
+  background: var(--color-surface-alt);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  /* Long unbroken paths inside inline <code> (e.g. file refs in tables)
+     would otherwise paint past their container in WKWebView. Force a
+     break at any character if needed. */
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  /* `min-width: 0` lets the inline-code box actually shrink below the
+     intrinsic width of its content inside table-layout:fixed cells. */
+  min-width: 0;
+}
+.side-pane-md pre {
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 12px;
+  /* `scroll` + `scrollbar-gutter: stable` avoids the auto-scrollbar toggle
+     that fires extra layout passes per pointermove when the column width
+     changes. WKWebView is especially expensive at scrollbar-driven layout. */
+  overflow-x: scroll;
+  scrollbar-gutter: stable;
+}
+.side-pane-md pre > code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+.side-pane-md .md-table-wrap {
+  overflow-x: scroll;
+  scrollbar-gutter: stable;
+  margin: 12px 0;
+}
+.side-pane-md table {
+  border-collapse: collapse;
+  width: 100%;
+  /* `fixed` locks column widths from the first row so the browser doesn't
+     re-measure every cell to redistribute widths on each pointermove. */
+  table-layout: fixed;
+  font-size: 0.9em;
+}
+.side-pane-md th,
+.side-pane-md td {
+  border: 1px solid var(--color-border);
+  padding: 6px 10px;
+  text-align: left;
+  /* With table-layout: fixed, long unbroken strings (e.g. deep file paths)
+     would otherwise overflow into the next column. Allow breaks anywhere
+     so paths wrap inside their cell. Also applied to descendants because
+     inline elements like <code> are treated as a single unbreakable token
+     unless given the same hint. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+/* Most report tables have a long-text first column (file paths, finding
+   titles) followed by a few narrow numeric columns. Give the first column
+   half the table width so paths wrap less aggressively without affecting
+   row heights. */
+.side-pane-md th:first-child,
+.side-pane-md td:first-child {
+  width: 50%;
+}
+.side-pane-md th *,
+.side-pane-md td * {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.side-pane-md tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.02);
+}
+.side-pane-md blockquote {
+  border-left: 3px solid var(--color-accent);
+  margin: 12px 0;
+  padding: 0 12px;
+  color: var(--color-text-muted);
+}
+.side-pane-md--empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* ── Between-windows resizer ─────────────────────────── */
+.side-pane__row-divider {
+  flex: 0 0 4px;
+  background: var(--color-border);
+  cursor: row-resize;
+  opacity: 0.4;
+  transition: opacity 120ms ease;
+}
+.side-pane__row-divider:hover {
+  opacity: 0.85;
+}

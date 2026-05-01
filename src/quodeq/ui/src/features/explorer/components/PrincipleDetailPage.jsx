@@ -1,20 +1,19 @@
 import { memo, useState, useCallback, useMemo } from 'react';
-import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
-import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
-import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
-import { copyToClipboard } from '../../../utils/clipboard.js';
+import { buildPrincipleReport } from '../../../utils/reportBuilder.js';
+import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeLetter } from '../../../utils/formatters.js';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
+import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 
 // Off-screen rows skip layout/paint via CSS `content-visibility: auto` on
 // `.vdetail-row` (see styles/explorer.css), so no JS virtualizer or
 // "Show all" pagination is needed. Rows render naturally inside the app's
 // existing scroll container.
 
-function ViolationListSection({ violationsBySeverity, principle, buildViolationPlanText, onDismiss }) {
+function ViolationListSection({ violationsBySeverity, principle, onDismiss }) {
   return EVAL_SEVERITY_ORDER.map((sev) => {
     const vs = violationsBySeverity[sev];
     if (!vs || vs.length === 0) return null;
@@ -27,7 +26,6 @@ function ViolationListSection({ violationsBySeverity, principle, buildViolationP
               key={`${v.file || 'nofile'}:${v.line ?? 'noline'}:${idx}`}
               v={v}
               principle={principle}
-              buildViolationPlanText={buildViolationPlanText}
               index={idx}
               onDismiss={onDismiss}
             />
@@ -57,10 +55,6 @@ function ComplianceListSection({ compliance, principle }) {
   );
 }
 
-function buildViolationPlanText(v, principle) {
-  return buildSingleViolationPlanText(v, principle, { reqRefs: v.reqRefs, reqFallback: v.req || undefined });
-}
-
 function SevBadgeRow({ sevCounts }) {
   if (!(sevCounts.critical || sevCounts.major || sevCounts.minor)) return null;
   return (
@@ -72,35 +66,24 @@ function SevBadgeRow({ sevCounts }) {
   );
 }
 
-function PrincipleHeader({ data, onCopyPlan }) {
+function PrincipleHeader({ data }) {
   const { principle, score, grade, violations, compliance, sevCounts } = data;
   const scoreDisplay = score ? String(score).replace('/10', '') : '—';
   const ratioDisplay = (compliance.length > 0 && violations.length > 0)
     ? `1:${Math.round(compliance.length / violations.length)}`
     : '—';
 
+  const scoreHint = grade === 'Insufficient'
+    ? 'not enough evidence'
+    : grade ? `grade ${gradeLetter(grade)}` : null;
+
   return (
     <section className="principle-detail-header principle-detail-header--terminal">
       <div className="principle-detail-header__top">
-        <TermHeader
-          name={`${principle}.detail`}
-          sub={
-            grade === 'Insufficient'
-              ? 'not enough evidence'
-              : <span className={`chip small ${gradeColorClass(grade)}`}>{grade || '—'}</span>
-          }
-        />
-        {violations.length > 0 && (
-          <CopyButton
-            label="Full fix plan"
-            className="fix-plan-btn-header"
-            icon={<SparkleIcon />}
-            onClick={onCopyPlan}
-          />
-        )}
+        <TermHeader name={`${principle}.detail`} />
       </div>
-      <StatStrip bordered>
-        <Stat label="SCORE" value={scoreDisplay} />
+      <StatStrip cards>
+        <Stat label="SCORE" value={scoreDisplay} hint={scoreHint} />
         <Stat label="VIOLATIONS" value={violations.length} hint={<SevBadgeRow sevCounts={sevCounts} />} />
         <Stat label="COMPLIANCE" value={compliance.length} />
         <Stat label="RATIO" value={ratioDisplay} hint="compliance : violations" />
@@ -197,7 +180,7 @@ function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) {
 }
 
 const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
-  const { principleData, principle, score, grade } = evalPrincipal;
+  const { principleData, principle, score, grade, dimension, runId } = evalPrincipal;
 
   const {
     violations, compliance, violationsBySeverity,
@@ -205,23 +188,65 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
     handleDismiss, filteredViolations, liveSevCounts, displayedBySeverity,
   } = usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss);
 
+  const reportSpec = useMemo(() => {
+    if (!principle) return null;
+    const buildMarkdown = () => buildPrincipleReport({
+      principle, dimension,
+      score: liveScore ?? score, grade: liveGrade ?? grade,
+      violations: filteredViolations, violationsBySeverity: displayedBySeverity,
+      compliance, principleData, runId,
+    });
+    const slug = `${(dimension || 'dim')}-${principle}`.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
+    return {
+      id: `report:principle:${dimension || 'dim'}:${principle}:${runId || 'current'}`,
+      type: 'report',
+      title: `${principle} report`,
+      render: () => <ReportContent markdown={buildMarkdown()} />,
+      copy: () => buildMarkdown(),
+      download: () => ({ filename: `principle-${slug}-report.md`, body: buildMarkdown() }),
+    };
+  }, [principle, dimension, runId, score, grade, liveScore, liveGrade, filteredViolations, displayedBySeverity, compliance, principleData]);
+  useRegisterWindowSpec('report', reportSpec);
+
+  const fixPlanSpec = useMemo(() => {
+    if (!principle || filteredViolations.length === 0) return null;
+    const buildMarkdown = () => buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData);
+    const slug = `${(dimension || 'dim')}-${principle}`.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
+    return {
+      id: `fixplan:principle:${dimension || 'dim'}:${principle}:${runId || 'current'}`,
+      type: 'fixplan',
+      title: `${principle} fix plan`,
+      render: () => <ReportContent markdown={buildMarkdown()} />,
+      copy: () => buildMarkdown(),
+      download: () => ({ filename: `principle-${slug}-fix-plan.md`, body: buildMarkdown() }),
+    };
+  }, [principle, dimension, runId, violations, violationsBySeverity, principleData, filteredViolations.length]);
+  useRegisterWindowSpec('fixplan', fixPlanSpec);
+
   return (
     <>
       <PrincipleHeader
         data={{ principle, score: liveScore ?? score, grade: liveGrade ?? grade, violations: filteredViolations, compliance, sevCounts: liveSevCounts }}
-        onCopyPlan={() => copyToClipboard(buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData))}
       />
       <PrincipleContext principleData={principleData} />
-      {filteredViolations.length > 0 && (
-        <SeverityFilterPills counts={liveSevCounts} activeFilter={activeSevFilter} onFilterChange={setActiveSevFilter} />
+      {(filteredViolations.length > 0 || compliance.length > 0) && (
+        <SeverityFilterPills
+          counts={liveSevCounts}
+          complianceCount={compliance.length}
+          activeFilter={activeSevFilter}
+          onFilterChange={setActiveSevFilter}
+        />
       )}
-      <ViolationListSection
-        violationsBySeverity={displayedBySeverity}
-        principle={principle}
-        buildViolationPlanText={(v) => buildViolationPlanText(v, principle)}
-        onDismiss={handleDismiss}
-      />
-      <ComplianceListSection compliance={compliance} principle={principle} />
+      {activeSevFilter !== 'compliance' && (
+        <ViolationListSection
+          violationsBySeverity={displayedBySeverity}
+          principle={principle}
+          onDismiss={handleDismiss}
+        />
+      )}
+      {(!activeSevFilter || activeSevFilter === 'all' || activeSevFilter === 'compliance') && (
+        <ComplianceListSection compliance={compliance} principle={principle} />
+      )}
     </>
   );
 });

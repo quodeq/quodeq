@@ -7,9 +7,11 @@ from pathlib import Path
 import pytest
 
 from quodeq.analysis.subagents.jsonl_utils import (
+    FindingTally,
     dedup_jsonl_lines,
     deduplicate_jsonl,
     merge_jsonl,
+    tally_unique_findings,
 )
 
 
@@ -152,3 +154,55 @@ class TestMergeJsonl:
         output = tmp_path / "merged.jsonl"
         merge_jsonl([], output)
         assert output.read_text().strip() == ""
+
+
+# ---------------------------------------------------------------------------
+# tally_unique_findings
+# ---------------------------------------------------------------------------
+
+class TestTallyUniqueFindings:
+    def test_missing_file_returns_empty(self, tmp_path):
+        assert tally_unique_findings(tmp_path / "missing.jsonl") == FindingTally()
+
+    def test_counts_violations_and_compliance(self, tmp_path):
+        p = tmp_path / "ev.jsonl"
+        p.write_text(
+            json.dumps({"p": "P1", "file": "a.py", "line": 1, "t": "violation"}) + "\n"
+            + json.dumps({"p": "P2", "file": "b.py", "line": 2, "t": "compliance"}) + "\n"
+        )
+        tally = tally_unique_findings(p)
+        assert tally.violations == 1
+        assert tally.compliance == 1
+        assert tally.duplicates == 0
+        assert tally.total == 2
+
+    def test_dedups_repeats_into_duplicate_count(self, tmp_path):
+        p = tmp_path / "ev.jsonl"
+        line = json.dumps({"p": "P1", "file": "a.py", "line": 1, "t": "violation"})
+        p.write_text("\n".join([line] * 4) + "\n")
+        tally = tally_unique_findings(p)
+        assert tally.violations == 1
+        assert tally.duplicates == 3
+        assert tally.total == 1
+
+    def test_skips_malformed_and_blank_lines(self, tmp_path):
+        p = tmp_path / "ev.jsonl"
+        p.write_text(
+            "not-json\n"
+            "\n"
+            + json.dumps({"p": "P1", "file": "a.py", "line": 1, "t": "violation"}) + "\n"
+        )
+        tally = tally_unique_findings(p)
+        assert tally.violations == 1
+        assert tally.duplicates == 0
+
+    def test_unknown_t_is_dedupped_but_not_classified(self, tmp_path):
+        """Lines with ``t`` other than violation/compliance still occupy a key,
+        so a repeat counts as a duplicate — but neither counter advances."""
+        p = tmp_path / "ev.jsonl"
+        line = json.dumps({"p": "P1", "file": "a.py", "line": 1, "t": "info"})
+        p.write_text(line + "\n" + line + "\n")
+        tally = tally_unique_findings(p)
+        assert tally.violations == 0
+        assert tally.compliance == 0
+        assert tally.duplicates == 1

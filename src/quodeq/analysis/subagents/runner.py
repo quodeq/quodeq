@@ -79,7 +79,13 @@ def _prepare_findings_and_queue(
     config: RunConfig, dc: _DimensionContext,
 ) -> _PoolExecutionParams:
     """Load previous findings, partition by fingerprint, and create the file queue."""
-    prev_findings = _load_and_filter_previous(config, dc.dim_id, dc.evidence_dir)
+    # Clean scan (incremental=False) means "ignore everything from before",
+    # not "re-verify everything from before". Skip the loader so prior
+    # findings don't get inlined into prompts as needs_verify entries.
+    if config.options.incremental:
+        prev_findings = _load_and_filter_previous(config, dc.dim_id, dc.evidence_dir)
+    else:
+        prev_findings = []
     carry_forward: list[dict] = []
     needs_verify: list[dict] = []
     if prev_findings:
@@ -98,6 +104,17 @@ def _prepare_findings_and_queue(
     queue_path = dc.evidence_dir / f"{dc.dim_id}_queue.json"
     files_per_agent = _compute_files_per_agent(len(dc.files))
     FileQueue(queue_path, dc.files, max_files_per_agent=files_per_agent)
+    # Persist a fingerprint *now* — before any agent runs — so a crash or
+    # cancel mid-dim doesn't void the file_hashes / standards baseline.
+    # `analyzed_files` carries forward whatever the previous run analyzed
+    # (it'll be augmented by queue.taken on read in find_previous_fingerprint).
+    prev_fp_for_seed, _ = find_previous_fingerprint(dc.evidence_dir, dc.dim_id)
+    seed_analyzed = set(prev_fp_for_seed.get("analyzed_files", [])) if prev_fp_for_seed else set()
+    initial_fp = build_fingerprint(
+        config.src, dc.files, dc.dim_id, config.standards_dir,
+        analyzed_files=seed_analyzed or None,
+    )
+    save_fingerprint(initial_fp, dc.evidence_dir)
     log_info(f"  [{dc.idx}/{dc.ctx.total}] {dc.dim_id} -- {len(dc.files)} files queued, {len(inline_findings)} inline findings")
 
     return _PoolExecutionParams(

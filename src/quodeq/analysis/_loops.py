@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 from copy import copy
 from dataclasses import replace
 from collections.abc import Callable
@@ -13,6 +15,22 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.engine._runner_markers import emit_marker
 # NOTE: logging in inner layer — tracked for middleware extraction
 from quodeq.shared.logging import log_info, log_warning
+
+
+def _silence_broken_stdout() -> None:
+    """Redirect stdout/stderr to /dev/null after a BrokenPipeError.
+
+    Once the parent has closed its end of the pipe every subsequent write to
+    stdout/stderr raises BrokenPipeError. The actual analysis work (evidence
+    files, MCP calls, etc.) doesn't depend on those streams — only logging
+    does. Swapping the streams to /dev/null lets remaining dimensions run.
+    """
+    try:
+        devnull = open(os.devnull, "w")  # noqa: SIM115 — long-lived
+        sys.stdout = devnull
+        sys.stderr = devnull
+    except OSError:
+        pass
 
 
 def check_zero_findings(
@@ -59,22 +77,81 @@ def run_incremental_loop(
         log_result_fn: Callback to log a completed dimension result.
     """
     result: dict[str, Evidence] = {}
+    log_info(f"[loop] incremental: {len(dimensions)} dim(s) to process: {', '.join(dimensions)}")
     for idx, dimension in enumerate(dimensions, 1):
+        log_info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
         emit_marker("analyzing", dimension=dimension)
         log_info(f"\u2192 [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
+        ev: Evidence | None = None
         try:
             ev = run_dimension_incremental(config, dimension, idx, ctx)
+        except BrokenPipeError:
+            _silence_broken_stdout()
+            ev = None
         except (OSError, KeyError, ValueError, RuntimeError) as exc:
             log_warning(f"[{idx}/{ctx.total}] {dimension} \u2014 incremental failed: {exc}, falling back to full")
             fallback_options = copy(config.options)
             fallback_options.incremental_file_filter = None
             fallback_config = replace(config, options=fallback_options)
-            ev = process_fn(fallback_config, dimension, idx, ctx)
+            try:
+                ev = process_fn(fallback_config, dimension, idx, ctx)
+            except BrokenPipeError:
+                _silence_broken_stdout()
+                ev = None
+        except Exception as exc:  # noqa: BLE001
+            # Loop-level diagnostic: an unanticipated exception class would
+            # otherwise propagate up silently and the lifecycle would treat
+            # it as failed without saying which dim. Log + swallow + continue
+            # so subsequent dims still run; the surfaced log line gives us
+            # the trail we need next time this happens.
+            log_warning(
+                f"[loop] {dimension} \u2014 unexpected exception "
+                f"{type(exc).__name__}: {exc} \u2014 skipping dim, continuing loop",
+            )
+            ev = None
+        # log_result_fn / on_dimension_done are caller-provided (e.g., the
+        # dashboard's scoring callback). Wrap them too \u2014 an exception in a
+        # callback shouldn't drop the next iteration on the floor.
         if ev:
-            log_result_fn(ev, dimension, idx, ctx.total)
-            result[dimension] = ev
-            if on_dimension_done:
-                on_dimension_done(dimension, ev)
+            try:
+                log_result_fn(ev, dimension, idx, ctx.total)
+                result[dimension] = ev
+                if on_dimension_done:
+                    on_dimension_done(dimension, ev)
+            except BrokenPipeError:
+                # Stdout pipe to parent died mid-callback. Silence stdout/
+                # stderr, then retry the callback once: scoring callbacks like
+                # ``_score_dimension`` write evaluation/<dim>.json to disk and
+                # are idempotent (overwrite). The previous "result kept"
+                # message was misleading \u2014 only the in-memory Evidence stayed,
+                # the persistent file write was lost with the exception.
+                _silence_broken_stdout()
+                result.setdefault(dimension, ev)
+                if on_dimension_done:
+                    try:
+                        on_dimension_done(dimension, ev)
+                        log_warning(
+                            f"[loop] {dimension} \u2014 callback broken pipe, "
+                            f"retried after silencing stdout, result persisted",
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        log_warning(
+                            f"[loop] {dimension} \u2014 callback retry after broken pipe raised "
+                            f"{type(exc).__name__}: {exc} \u2014 result NOT persisted, continuing loop",
+                        )
+                else:
+                    log_warning(f"[loop] {dimension} \u2014 callback broken pipe, no retry needed, continuing loop")
+            except Exception as exc:  # noqa: BLE001
+                log_warning(
+                    f"[loop] {dimension} \u2014 callback raised "
+                    f"{type(exc).__name__}: {exc} \u2014 result kept, continuing loop",
+                )
+                result.setdefault(dimension, ev)
+        log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (ev={'set' if ev else 'None'})")
+    log_info(
+        f"[loop] incremental finished: processed {len(result)} of {len(dimensions)} dim(s) "
+        f"({', '.join(result) if result else 'none'})",
+    )
     check_zero_findings(
         result, config.source_file_count,
         incremental_filter_active=config.options.incremental_file_filter is not None
@@ -99,19 +176,70 @@ def run_per_dimension_loop(
     """
     result: dict[str, Evidence] = {}
     skipped_count = 0
+    log_info(f"[loop] per-dimension: {len(dimensions)} dim(s) to process: {', '.join(dimensions)}")
     for idx, dimension in enumerate(dimensions, 1):
+        log_info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
+        ev: Evidence | None = None
         try:
             ev = process_fn(config, dimension, idx, ctx)
+        except BrokenPipeError:
+            _silence_broken_stdout()
+            skipped_count += 1
+            log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: broken pipe)")
+            continue
         except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
             log_warning(f"[{idx}/{ctx.total}] {dimension} \u2014 failed: {exc}")
             skipped_count += 1
+            log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: {type(exc).__name__})")
+            continue
+        except Exception as exc:  # noqa: BLE001
+            # Don't let an exotic exception class drop the rest of the loop
+            # silently. Log + count as skipped + continue so we get the trail.
+            log_warning(
+                f"[loop] {dimension} — unexpected exception "
+                f"{type(exc).__name__}: {exc} — skipping dim, continuing loop",
+            )
+            skipped_count += 1
+            log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: unexpected)")
             continue
         if ev is None:
             skipped_count += 1
+            log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: ev=None)")
             continue
-        result[dimension] = ev
-        if on_dimension_done:
-            on_dimension_done(dimension, ev)
+        try:
+            result[dimension] = ev
+            if on_dimension_done:
+                on_dimension_done(dimension, ev)
+        except BrokenPipeError:
+            # Stdout pipe to parent died mid-callback. Silence stdout/stderr,
+            # then retry the callback once so the scoring side effects
+            # (evaluation/<dim>.json) actually land on disk. See the matching
+            # block in run_incremental_loop for rationale.
+            _silence_broken_stdout()
+            if on_dimension_done:
+                try:
+                    on_dimension_done(dimension, ev)
+                    log_warning(
+                        f"[loop] {dimension} — callback broken pipe, "
+                        f"retried after silencing stdout, result persisted",
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log_warning(
+                        f"[loop] {dimension} — callback retry after broken pipe raised "
+                        f"{type(exc).__name__}: {exc} — result NOT persisted, continuing loop",
+                    )
+            else:
+                log_warning(f"[loop] {dimension} — callback broken pipe, no retry needed, continuing loop")
+        except Exception as exc:  # noqa: BLE001
+            log_warning(
+                f"[loop] {dimension} — callback raised "
+                f"{type(exc).__name__}: {exc} — result kept, continuing loop",
+            )
+        log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (ev=set)")
+    log_info(
+        f"[loop] per-dimension finished: processed {len(result)} of {len(dimensions)} dim(s) "
+        f"({', '.join(result) if result else 'none'}, {skipped_count} skipped)",
+    )
     check_zero_findings(
         result, config.source_file_count, skipped_count,
         incremental_filter_active=config.options.incremental_file_filter is not None

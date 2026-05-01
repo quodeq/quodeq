@@ -1,0 +1,10 @@
+{
+  "matches": [
+    "backend_swift_vapor"
+  ],
+  "primary": "backend_swift_vapor",
+  "language": "swift",
+  "not_matches": [
+    "mobile_ios"
+  ]
+}
