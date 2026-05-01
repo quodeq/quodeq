@@ -772,8 +772,17 @@
   .topbar-breadcrumb-slot { display: none !important; }
   .topbar-pill,
   .topbar-btn--evaluate,
-  .topbar-btn--theme { display: none !important; }
+  .topbar-btn--theme,
+  .topbar-btn--report { display: none !important; }
   .topbar-actions { gap: var(--term-space-1); }
+  /* Compact view: hide all side-pane triggers. The pane itself is too
+     narrow to be useful below 900px, and without triggers users can't
+     open it (it stays at 0 width as long as no window is registered).
+     Affects ConsoleButton (in ScanProgress + ServerStatusPill). The
+     divider inside ServerStatusPill is hidden too so the pill doesn't
+     end with an orphan vertical rule. */
+  .console-button,
+  .server-status-pill__divider { display: none !important; }
   .sidebar.sidebar--expanded.sidebar--pinned .sidebar-brand-text,
   .sidebar.sidebar--expanded.sidebar--pinned .sidebar-version,
   .sidebar.sidebar--expanded.sidebar--pinned .sidebar-section-label,
