@@ -213,15 +213,31 @@ def _compute_dashboard_payload(
     # Exclude cancelled/failed runs — they produce misleading points on the
     # history chart. They remain visible in availableRuns for the UI.
     scoreable_runs = [r for r in runs if r.status not in ("cancelled", "failed")]
-    history_runs = scoreable_runs[:max(_MAX_HISTORY_RUNS, ctx.index + 1)]
+    # Re-find the selected run's index inside scoreable_runs. ctx.index is
+    # the index in the full unfiltered run list, which can exceed
+    # len(history_runs) when cancelled/failed runs sit above the selected
+    # run. Passing the wrong index to collect_stale_dimensions /
+    # _collect_previous_scores caused IndexError on history_runs[newer_idx].
+    selected_in_scoreable = next(
+        (i for i, r in enumerate(scoreable_runs) if r.run_id == ctx.run.run_id),
+        None,
+    )
+    if selected_in_scoreable is None:
+        # Selected run was cancelled/failed (so it's not in scoreable_runs).
+        # Treat the entire scoreable history as "older" runs relative to it.
+        history_runs = scoreable_runs[:_MAX_HISTORY_RUNS]
+        history_index = len(history_runs)
+    else:
+        history_runs = scoreable_runs[:max(_MAX_HISTORY_RUNS, selected_in_scoreable + 1)]
+        history_index = selected_in_scoreable
     get_run_dimensions = _make_run_dimension_fetcher(
         reports_root, project, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
     )
     previous_by_dimension = _collect_previous_scores(
-        history_runs, ctx.index, selected_dim_names, get_run_dimensions,
+        history_runs, history_index, selected_dim_names, get_run_dimensions,
     )
     stale_dimensions, stale_previous_by_dimension = collect_stale_dimensions(
-        history_runs, ctx.index, selected_dim_names, get_run_dimensions,
+        history_runs, history_index, selected_dim_names, get_run_dimensions,
     )
     return _DashboardPayload(
         selected_summary=ctx.summary,
