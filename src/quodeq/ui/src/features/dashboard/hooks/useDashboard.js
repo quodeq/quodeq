@@ -4,7 +4,20 @@ import { useApi } from "../../../api/ApiContext.jsx";
 import { useProjectScores } from "../../../hooks/useProjectScores.js";
 import { projectKeys } from "../../../api/queryKeys.js";
 
-export function useDashboard({ selectedProject, selectedRun }) {
+/**
+ * @param {{
+ *   selectedProject: string,
+ *   selectedRun: string,
+ *   keepPlaceholder?: boolean,
+ * }} opts
+ *
+ * keepPlaceholder (default true): when switching runs, keep the previous
+ * run's data on screen during the background fetch. Great for Overview
+ * navigation where consecutive runs are similar. Set false in contexts
+ * where stale data is misleading (e.g. History run details, where users
+ * compare specific runs and the flash of previous data confuses them).
+ */
+export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = true }) {
   const { getDashboard } = useApi();
   const queryClient = useQueryClient();
 
@@ -16,7 +29,8 @@ export function useDashboard({ selectedProject, selectedRun }) {
     // Keep showing the previous run's data while a new run loads — instant
     // perceived navigation. isFetching toggles true during the background
     // fetch, which the page reads to show a subtle indicator.
-    placeholderData: (prev) => prev,
+    // Disabled when keepPlaceholder=false (History run details).
+    placeholderData: keepPlaceholder ? (prev) => prev : undefined,
   });
 
   const {
@@ -25,7 +39,7 @@ export function useDashboard({ selectedProject, selectedRun }) {
     loading: scoresLoading,
     error: scoresError,
     availableRuns,
-  } = useProjectScores({ selectedProject, selectedRun });
+  } = useProjectScores({ selectedProject, selectedRun, keepPlaceholder });
 
   const dashboardWithTrend = useMemo(() => {
     if (!dashboardQuery.data) return null;

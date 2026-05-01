@@ -97,8 +97,19 @@ export function useAppState() {
     selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject,
   } = projectBundle;
   const settings = useAppSettings();
-  const effectiveRun = activePage.page === 'history-run' ? historySelectedRun : selectedRun;
-  const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, refreshDashboard } = useDashboard({ selectedProject, selectedRun: effectiveRun });
+  const isHistoryRun = activePage.page === 'history-run';
+  const isHistoryTab = activePage.page === 'history';
+  const effectiveRun = isHistoryRun ? historySelectedRun : selectedRun;
+  // History views (the History tab and its run-detail page) show specific
+  // past runs in a comparison-oriented mental model — flashing the previous
+  // run's data via placeholderData is confusing. Overview navigation, by
+  // contrast, benefits from the instant swap because consecutive runs are
+  // usually nearly identical.
+  const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, refreshDashboard } = useDashboard({
+    selectedProject,
+    selectedRun: effectiveRun,
+    keepPlaceholder: !isHistoryRun && !isHistoryTab,
+  });
   const { dailyRuns: rawDailyRuns, headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => ({
     dailyRuns: buildDailyRuns(availableRuns, dashboard?.trend || []),
     ...computeDerivedState(accumulated, dashboard, selectedProject, projects),

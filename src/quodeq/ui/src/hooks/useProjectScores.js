@@ -12,7 +12,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getProjectScores } from "../api/index.js";
 import { projectKeys } from "../api/queryKeys.js";
 
-export function useProjectScores({ selectedProject, selectedRun }) {
+/**
+ * @param {{
+ *   selectedProject: string,
+ *   selectedRun: string,
+ *   keepPlaceholder?: boolean,
+ * }} opts
+ *
+ * keepPlaceholder (default true): see useDashboard for rationale.
+ */
+export function useProjectScores({ selectedProject, selectedRun, keepPlaceholder = true }) {
   const queryClient = useQueryClient();
   const asOf = selectedRun && selectedRun !== "latest" ? selectedRun : null;
 
@@ -22,7 +31,7 @@ export function useProjectScores({ selectedProject, selectedRun }) {
     enabled: !!selectedProject,
     staleTime: 60_000,
     // Keep prior scores visible while switching runs — see useDashboard for rationale.
-    placeholderData: (prev) => prev,
+    placeholderData: keepPlaceholder ? (prev) => prev : undefined,
   });
 
   const latestQuery = useQuery({
@@ -30,6 +39,8 @@ export function useProjectScores({ selectedProject, selectedRun }) {
     queryFn: () => getProjectScores(selectedProject),
     enabled: !!selectedProject,
     staleTime: 60_000,
+    // Latest scores are project-wide (no per-run swap), so prev-data
+    // flashing isn't a concern — keep placeholder unconditionally.
     placeholderData: (prev) => prev,
   });
 
