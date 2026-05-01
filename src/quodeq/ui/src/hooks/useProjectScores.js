@@ -1,141 +1,69 @@
 /**
  * useProjectScores -- single hook for all score data.
  *
- * Fetches from the unified /scores endpoint which returns pre-rescored data.
- * No client-side rescore calls. One source of truth consumed by Overview,
- * History, Explorer, etc.
+ * Two queries: scores at a specific run (when asOf is set), plus latest
+ * scores. TanStack Query handles caching, abort, and refresh.
+ *
+ * To force a refresh after a mutation (dismiss/restore), call:
+ *   queryClient.invalidateQueries({ queryKey: projectKeys.project(p) });
  */
-
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getProjectScores } from '../api/index.js';
-
-const REFRESH_DEBOUNCE_MS = 300;
-
-// Cache by (project, asOf) to avoid refetching on view changes.
-// Cleared by clearScoresCache() when mutations happen (dismiss/restore).
-const MAX_CACHE_SIZE = 100;
-const _cache = new Map();
-function _cacheKey(project, asOf) { return `${project}\0${asOf || 'all'}`; }
-
-export function clearScoresCache(project) {
-  if (project) {
-    for (const key of [..._cache.keys()]) {
-      if (key.startsWith(project + '\0')) _cache.delete(key);
-    }
-  } else {
-    _cache.clear();
-  }
-}
-
-/**
- * @param {{ selectedProject: string, selectedRun: string }} opts
- * @returns {{
- *   scores: { accumulated: Object, trend: Array, availableRuns: Array } | null,
- *   latestScores: { accumulated: Object, trend: Array, availableRuns: Array } | null,
- *   loading: boolean,
- *   error: string | null,
- *   availableRuns: Array,
- *   refreshScores: () => void,
- * }}
- */
-function fetchRunScoresEffect(selectedProject, selectedRun, setScores, setLoading, setError) {
-  if (!selectedProject) { setScores(null); setError(null); return; }
-  const asOf = selectedRun && selectedRun !== 'latest' ? selectedRun : null;
-  const key = _cacheKey(selectedProject, asOf);
-  const cached = _cache.get(key);
-  if (cached) {
-    setScores(cached);
-    setLoading(false);
-    return;
-  }
-
-  let active = true;
-  setLoading(true);
-  getProjectScores(selectedProject, asOf)
-    .then((data) => {
-      if (!active) return;
-      if (_cache.size >= MAX_CACHE_SIZE) _cache.delete(_cache.keys().next().value);
-      _cache.set(key, data);
-      setScores(data);
-    })
-    .catch(() => { if (active) setError('Failed to load score data. Check your connection and try refreshing.'); })
-    .finally(() => { if (active) setLoading(false); });
-  return () => { active = false; };
-}
-
-function fetchLatestScoresEffect(selectedProject, setLatestScores) {
-  if (!selectedProject) { setLatestScores(null); return; }
-  const key = _cacheKey(selectedProject, null);
-  const cached = _cache.get(key);
-  if (cached) {
-    setLatestScores(cached);
-    return;
-  }
-
-  let active = true;
-  getProjectScores(selectedProject)
-    .then((data) => {
-      if (!active) return;
-      if (_cache.size >= MAX_CACHE_SIZE) _cache.delete(_cache.keys().next().value);
-      _cache.set(key, data);
-      setLatestScores(data);
-    })
-    .catch(() => {}); // non-fatal for latest
-  return () => { active = false; };
-}
-
-function syncScoresOnChange(prevProjectRef, prevRunRef, selectedProject, selectedRun, setScores, setLatestScores, setError) {
-  if (prevProjectRef.current !== selectedProject) {
-    prevProjectRef.current = selectedProject;
-    prevRunRef.current = selectedRun;
-    setScores(null);
-    setLatestScores(null);
-    setError(null);
-  } else if (prevRunRef.current !== selectedRun) {
-    prevRunRef.current = selectedRun;
-    const asOf = selectedRun && selectedRun !== 'latest' ? selectedRun : null;
-    const cached = _cache.get(_cacheKey(selectedProject, asOf));
-    if (cached) setScores(cached);
-  }
-}
+import { useCallback, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getProjectScores } from "../api/index.js";
+import { projectKeys } from "../api/queryKeys.js";
 
 export function useProjectScores({ selectedProject, selectedRun }) {
-  const [scores, setScores] = useState(null);
-  const [latestScores, setLatestScores] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const queryClient = useQueryClient();
+  const asOf = selectedRun && selectedRun !== "latest" ? selectedRun : null;
 
-  const prevProjectRef = useRef(selectedProject);
-  const prevRunRef = useRef(selectedRun);
-  syncScoresOnChange(prevProjectRef, prevRunRef, selectedProject, selectedRun, setScores, setLatestScores, setError);
+  const scoresQuery = useQuery({
+    queryKey: projectKeys.scores(selectedProject || "_none_", asOf),
+    queryFn: () => getProjectScores(selectedProject, asOf),
+    enabled: !!selectedProject,
+    staleTime: 60_000,
+  });
 
-  useEffect(() => {
-    return fetchRunScoresEffect(selectedProject, selectedRun, setScores, setLoading, setError);
-  }, [selectedProject, selectedRun, refreshKey]);
-
-  useEffect(() => {
-    return fetchLatestScoresEffect(selectedProject, setLatestScores);
-  }, [selectedProject, refreshKey]);
+  const latestQuery = useQuery({
+    queryKey: projectKeys.scores(selectedProject || "_none_", null),
+    queryFn: () => getProjectScores(selectedProject),
+    enabled: !!selectedProject,
+    staleTime: 60_000,
+  });
 
   const availableRuns = useMemo(() => {
-    // Prefer availableRuns from the scores payload (includes in_progress runs not in trend).
-    // Fall back to deriving from trend entries (which only contain completed runs).
-    const fromPayload = scores?.availableRuns || latestScores?.availableRuns;
+    const fromPayload =
+      scoresQuery.data?.availableRuns || latestQuery.data?.availableRuns;
     if (fromPayload && fromPayload.length > 0) return fromPayload;
-    const trend = scores?.trend || latestScores?.trend || [];
-    if (trend.length === 0) return [];
-    return trend.map((row) => ({ runId: row.runId, dateLabel: row.dateLabel || row.runId, status: 'complete' }));
-  }, [scores, latestScores]);
+    const trend = scoresQuery.data?.trend || latestQuery.data?.trend || [];
+    return trend.map((row) => ({
+      runId: row.runId,
+      dateLabel: row.dateLabel || row.runId,
+      status: "complete",
+    }));
+  }, [scoresQuery.data, latestQuery.data]);
 
-  const refreshTimerRef = useRef(null);
   const refreshScores = useCallback(() => {
-    clearScoresCache(selectedProject);
-    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-    refreshTimerRef.current = setTimeout(() => setRefreshKey((k) => k + 1), REFRESH_DEBOUNCE_MS);
-  }, [selectedProject]);
+    if (!selectedProject) return;
+    queryClient.invalidateQueries({ queryKey: projectKeys.project(selectedProject) });
+  }, [queryClient, selectedProject]);
 
-  useEffect(() => () => { if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current); }, []);
+  return {
+    scores: scoresQuery.data ?? null,
+    latestScores: latestQuery.data ?? null,
+    loading: scoresQuery.isLoading || latestQuery.isLoading,
+    error:
+      (scoresQuery.isError || latestQuery.isError)
+        ? "Failed to load score data. Check your connection and try refreshing."
+        : null,
+    availableRuns,
+    refreshScores,
+  };
+}
 
-  return { scores, latestScores, loading, error, availableRuns, refreshScores };
+// Deprecation shim — Task 9 removes its last consumer (useDashboard.js).
+export function clearScoresCache(_project) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    "clearScoresCache is deprecated; use queryClient.invalidateQueries(projectKeys.project(project)).",
+  );
 }
