@@ -1,7 +1,7 @@
 import { memo, useState, useCallback, useMemo } from 'react';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { buildPrincipleReport } from '../../../utils/reportBuilder.js';
-import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
+import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeLetter } from '../../../utils/formatters.js';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
@@ -73,20 +73,17 @@ function PrincipleHeader({ data }) {
     ? `1:${Math.round(compliance.length / violations.length)}`
     : '—';
 
+  const scoreHint = grade === 'Insufficient'
+    ? 'not enough evidence'
+    : grade ? `grade ${gradeLetter(grade)}` : null;
+
   return (
     <section className="principle-detail-header principle-detail-header--terminal">
       <div className="principle-detail-header__top">
-        <TermHeader
-          name={`${principle}.detail`}
-          sub={
-            grade === 'Insufficient'
-              ? 'not enough evidence'
-              : <span className={`chip small ${gradeColorClass(grade)}`}>{grade || '—'}</span>
-          }
-        />
+        <TermHeader name={`${principle}.detail`} />
       </div>
-      <StatStrip bordered>
-        <Stat label="SCORE" value={scoreDisplay} />
+      <StatStrip cards>
+        <Stat label="SCORE" value={scoreDisplay} hint={scoreHint} />
         <Stat label="VIOLATIONS" value={violations.length} hint={<SevBadgeRow sevCounts={sevCounts} />} />
         <Stat label="COMPLIANCE" value={compliance.length} />
         <Stat label="RATIO" value={ratioDisplay} hint="compliance : violations" />
@@ -232,15 +229,24 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
         data={{ principle, score: liveScore ?? score, grade: liveGrade ?? grade, violations: filteredViolations, compliance, sevCounts: liveSevCounts }}
       />
       <PrincipleContext principleData={principleData} />
-      {filteredViolations.length > 0 && (
-        <SeverityFilterPills counts={liveSevCounts} activeFilter={activeSevFilter} onFilterChange={setActiveSevFilter} />
+      {(filteredViolations.length > 0 || compliance.length > 0) && (
+        <SeverityFilterPills
+          counts={liveSevCounts}
+          complianceCount={compliance.length}
+          activeFilter={activeSevFilter}
+          onFilterChange={setActiveSevFilter}
+        />
       )}
-      <ViolationListSection
-        violationsBySeverity={displayedBySeverity}
-        principle={principle}
-        onDismiss={handleDismiss}
-      />
-      <ComplianceListSection compliance={compliance} principle={principle} />
+      {activeSevFilter !== 'compliance' && (
+        <ViolationListSection
+          violationsBySeverity={displayedBySeverity}
+          principle={principle}
+          onDismiss={handleDismiss}
+        />
+      )}
+      {(!activeSevFilter || activeSevFilter === 'all' || activeSevFilter === 'compliance') && (
+        <ComplianceListSection compliance={compliance} principle={principle} />
+      )}
     </>
   );
 });

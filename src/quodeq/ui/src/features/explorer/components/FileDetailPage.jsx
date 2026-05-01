@@ -1,11 +1,13 @@
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { buildFilePlanText } from '../../../utils/planTextBuilders.js';
 import { buildFileReport } from '../../../utils/reportBuilder.js';
-import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
+import { SEVERITY_ORDER, parseFileRef, complianceRatio } from '../../../utils/formatters.js';
 import { SparkleIcon } from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
+import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { ComplianceCard } from './EvalCards.jsx';
+import { TermHeader, StatStrip, Stat, SevBadge } from '../../../components/terminal/index.js';
 import { useRegisterWindowSpec, ReportContent, useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
@@ -61,43 +63,47 @@ function ViolationCard({ v, index }) {
   );
 }
 
-function FileSeverityStats({ file, totalViolations, totalCompliance, dimensionsCount }) {
+function FileSevBadgeRow({ file }) {
+  if (!(file.critical || file.major || file.minor)) return null;
   return (
-    <div className="file-detail-stats">
-      {file.critical > 0 && (
-        <span className="file-detail-stat severity-tag critical">{file.critical} critical</span>
-      )}
-      {file.major > 0 && (
-        <span className="file-detail-stat severity-tag major">{file.major} major</span>
-      )}
-      {file.minor > 0 && (
-        <span className="file-detail-stat severity-tag minor">{file.minor} minor</span>
-      )}
-      {(file.critical > 0 || file.major > 0 || file.minor > 0) && <span className="file-detail-stat-sep">·</span>}
-      <span className="file-detail-stat">
-        <strong>{totalViolations}</strong> violations
-      </span>
-      {totalCompliance > 0 && (
-        <>
-          <span className="file-detail-stat-sep">·</span>
-          <span className="file-detail-stat">
-            <strong>{totalCompliance}</strong> compliance
-          </span>
-          {totalViolations > 0 && (
-            <>
-              <span className="file-detail-stat-sep">·</span>
-              <span className="file-detail-stat">
-                <strong>1:{Math.round(totalCompliance / totalViolations)}</strong> ratio
-              </span>
-            </>
-          )}
-        </>
-      )}
-      <span className="file-detail-stat-sep">·</span>
-      <span className="file-detail-stat">
-        <strong>{dimensionsCount}</strong> {dimensionsCount === 1 ? 'dimension' : 'dimensions'}
-      </span>
-    </div>
+    <span className="principle-detail-sev-row">
+      {file.critical > 0 && <SevBadge level="critical" count={file.critical} format="count-abbr" />}
+      {file.major    > 0 && <SevBadge level="major"    count={file.major}    format="count-abbr" />}
+      {file.minor    > 0 && <SevBadge level="minor"    count={file.minor}    format="count-abbr" />}
+    </span>
+  );
+}
+
+function FileHeader({ file, totalViolations, totalCompliance, dimensionsCount }) {
+  const totalChecks = totalViolations + totalCompliance;
+  const ratio = complianceRatio(totalViolations, totalCompliance);
+  return (
+    <section className="principle-detail-header principle-detail-header--terminal">
+      <div className="principle-detail-header__top">
+        <TermHeader name={`${file.file}.detail`} />
+      </div>
+      <StatStrip cards>
+        <Stat
+          label="VIOLATIONS"
+          value={totalViolations}
+          hint={<FileSevBadgeRow file={file} />}
+        />
+        <Stat
+          label="COMPLIANCE"
+          value={totalCompliance}
+          hint={totalChecks > 0 ? `passing / ${totalChecks} checks` : null}
+        />
+        <Stat
+          label="RATIO"
+          value={ratio}
+          hint="compliance : violations"
+        />
+        <Stat
+          label="DIMENSIONS"
+          value={dimensionsCount}
+        />
+      </StatStrip>
+    </section>
   );
 }
 
@@ -123,6 +129,17 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
   const totalViolations = file.total || 0;
   const totalCompliance = file.compliance?.length || 0;
   const dimensionsCount = file.dimensionsCount || 0;
+  const [activeFilter, setActiveFilter] = useState(null);
+
+  const sevCounts = {
+    critical: file.critical || 0,
+    major:    file.major    || 0,
+    minor:    file.minor    || 0,
+  };
+  const distinctSeverities = SEVERITY_ORDER.filter((s) => sevCounts[s] > 0).length;
+  const showFilters = distinctSeverities > 1 || (distinctSeverities >= 1 && totalCompliance > 0);
+  const showCompliance = !activeFilter || activeFilter === 'all' || activeFilter === 'compliance';
+  const showViolations = activeFilter !== 'compliance';
 
   const reportSpec = useMemo(() => {
     if (!file?.file) return null;
@@ -156,18 +173,28 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
 
   return (
     <>
-      <section className="panel file-detail-summary-panel">
-        <h3 className="file-detail-title">{file.file}</h3>
-        <div className="file-detail-stats-row">
-          <FileSeverityStats file={file} totalViolations={totalViolations} totalCompliance={totalCompliance} dimensionsCount={dimensionsCount} />
-        </div>
-      </section>
+      <FileHeader
+        file={file}
+        totalViolations={totalViolations}
+        totalCompliance={totalCompliance}
+        dimensionsCount={dimensionsCount}
+      />
 
-      {SEVERITY_ORDER.map((sev) => (
-        <SeverityGroup key={sev} sev={sev} violations={file.violationsBySeverity?.[sev] || []} />
-      ))}
+      {showFilters && (
+        <SeverityFilterPills
+          counts={sevCounts}
+          complianceCount={totalCompliance}
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+        />
+      )}
 
-      {totalCompliance > 0 && (
+      {showViolations && SEVERITY_ORDER.map((sev) => {
+        if (activeFilter && activeFilter !== 'all' && activeFilter !== sev) return null;
+        return <SeverityGroup key={sev} sev={sev} violations={file.violationsBySeverity?.[sev] || []} />;
+      })}
+
+      {showCompliance && totalCompliance > 0 && (
         <div>
           <div className="violation-group-header">
             <span className="violation-group-title">Compliance</span>
