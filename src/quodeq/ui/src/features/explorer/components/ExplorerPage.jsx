@@ -143,7 +143,7 @@ export default function ExplorerPage({
         </div>
       </div>
 
-      <div className="qd-section-banner" style={{ '--qd-cards-count': radialPrinciples.length }}>
+      <div className="qd-section-banner">
         <SectionLabel>{`principles · ${radialPrinciples.length}`}</SectionLabel>
       </div>
       <PrinciplesCardsRow

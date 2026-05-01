@@ -100,15 +100,24 @@ export default function PrinciplesRadial({
         />
       )}
       {/* Plotted vertices */}
-      {points.map(([x, y], idx) => (
-        <circle
-          key={`v-${idx}`}
-          className="qd-radial__vert"
-          cx={x}
-          cy={y}
-          r={VERT_RADIUS}
-        />
-      ))}
+      {points.map(([x, y], idx) => {
+        const name = plotted[idx].name;
+        return (
+          <circle
+            key={`v-${idx}`}
+            className="qd-radial__vert"
+            cx={x}
+            cy={y}
+            r={VERT_RADIUS}
+            role={onPrincipleClick ? 'button' : undefined}
+            tabIndex={onPrincipleClick ? 0 : undefined}
+            aria-label={onPrincipleClick ? `drill into ${name}` : undefined}
+            onClick={onPrincipleClick ? handleClick(name) : undefined}
+            onKeyDown={onPrincipleClick ? handleKey(name) : undefined}
+            style={onPrincipleClick ? { cursor: 'pointer' } : undefined}
+          />
+        );
+      })}
       {/* Insufficient axis markers (small dashed dot near centre) */}
       {principles.map((p, i) => {
         if (p.hasEvidence) return null;

@@ -66,4 +66,14 @@ describe('PrinciplesRadial', () => {
     await user.click(screen.getByText(/reusability/i));
     expect(onClick).toHaveBeenCalledWith('reusability');
   });
+
+  it('calls onPrincipleClick with the principle name when a vertex circle is clicked', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const { container } = render(<PrinciplesRadial principles={FIVE_FULL} onPrincipleClick={onClick} />);
+    const verts = container.querySelectorAll('circle.qd-radial__vert');
+    expect(verts.length).toBe(5);
+    await user.click(verts[0]); // first plotted vertex = first principle in FIVE_FULL = modifiability
+    expect(onClick).toHaveBeenCalledWith('modifiability');
+  });
 });

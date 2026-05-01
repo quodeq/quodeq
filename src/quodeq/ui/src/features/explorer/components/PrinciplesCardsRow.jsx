@@ -21,7 +21,10 @@ function principleToItem(p) {
 
 export default function PrinciplesCardsRow({ principles = [], onPrincipleClick }) {
   return (
-    <div className="qd-cards-row">
+    <div
+      className="qd-cards-row"
+      style={{ '--qd-cards-count': Math.max(1, principles.length) }}
+    >
       {principles.map((p) => {
         const isInsufficient = (p.grade || '').toLowerCase() === 'insufficient';
         const item = principleToItem(p);
