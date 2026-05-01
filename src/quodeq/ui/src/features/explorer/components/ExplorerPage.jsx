@@ -10,7 +10,7 @@ import { useExplorerData, buildEvalPrincipalFn } from './explorerDataHooks.js';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 
 function DimensionOverview({ data, stats, onNavigate }) {
-  const { evalData, runId, dateLabel } = data;
+  const { evalData, runId, dateLabel, allViolations } = data;
   const { overallGrade, severityCounts, totalCompliant, topFiles, uniquePrinciples, principleGrades } = stats;
   const scoreDisplay = overallGrade?.score?.replace('/10', '') || '—';
   const sevBadges = (severityCounts.critical || severityCounts.major || severityCounts.minor) ? (
@@ -183,7 +183,7 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, sev
   return (
     <>
       <DimensionOverview
-        data={{ evalData: d.evalData, runId, dateLabel }}
+        data={{ evalData: d.evalData, runId, dateLabel, allViolations: filteredViolations }}
         stats={{ overallGrade: d.overallGrade, severityCounts: d.severityCounts, totalCompliant: d.totalCompliant, topFiles: filteredTopFiles, uniquePrinciples: d.uniquePrinciples, principleGrades: d.principleGrades }}
         onNavigate={onNavigate}
       />
