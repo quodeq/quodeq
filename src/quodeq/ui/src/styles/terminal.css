@@ -936,7 +936,8 @@
 .run-history-panel--terminal,
 .dim-score-panel--terminal,
 .top-findings,
-.quality-dimensions {
+.quality-dimensions,
+.qd-cards-panel {
   border: 1px solid var(--color-border) !important;
   border-radius: var(--term-radius) !important;
   box-shadow: none !important;
@@ -950,6 +951,7 @@
 .run-history-panel--terminal .run-history-panel__header,
 .top-findings__head,
 .quality-dimensions__head,
+.qd-cards-panel__head,
 .dim-score-panel--terminal .dim-score-panel__header {
   display: flex;
   align-items: baseline;
@@ -967,7 +969,8 @@
 }
 .run-history-panel--terminal .run-history-panel__header .term-section-label,
 .top-findings__head .term-section-label,
-.quality-dimensions__head .term-section-label {
+.quality-dimensions__head .term-section-label,
+.qd-cards-panel__head .term-section-label {
   padding: 0;
 }
 
@@ -975,6 +978,7 @@
 .run-history-panel--terminal > *:not(.run-history-panel__header),
 .top-findings > *:not(.top-findings__head),
 .quality-dimensions > *:not(.quality-dimensions__head),
+.qd-cards-panel > *:not(.qd-cards-panel__head),
 .dim-score-panel--terminal > *:not(.dim-score-panel__header) {
   padding: var(--term-space-3);
 }

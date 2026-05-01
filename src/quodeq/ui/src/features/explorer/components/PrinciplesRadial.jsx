@@ -12,11 +12,14 @@
  *   - 3+ plotted: a filled <polyline> (with implicit-close fill) connecting
  *     plotted vertices in axis order; insufficient axes produce stroke gaps.
  */
+import { scoreGradeColorVar } from '../../../utils/formatters.js';
 const RING_LEVELS = [0.2, 0.4, 0.6, 0.8, 1.0]; // fraction of max
-const LABEL_OFFSET = 16;     // svg units beyond the outer ring
-const SUB_OFFSET   = 28;     // sub-label offset (score below name)
+const LABEL_OFFSET = 18;     // svg units beyond the outer ring (name baseline)
 const VERT_RADIUS = 3.2;
 const INSUF_RADIUS = 3.0;
+// Horizontal padding around the plot so long principle names don't clip.
+const VIEWBOX_PAD_X = 140;
+const VIEWBOX_PAD_Y = 24;
 
 function axisAngles(n) {
   // First axis at 12 o'clock, then clockwise.
@@ -31,11 +34,25 @@ function ringPoints(angles, r) {
   return angles.map((a) => polar(a, r).join(',')).join(' ');
 }
 
+// Greedy word-wrap so long principle names break onto a second line instead of
+// running off the SVG. `maxChars` is a coarse character budget per line.
+function wrapLines(words, maxChars) {
+  const lines = [];
+  let current = '';
+  for (const w of words) {
+    if (!current) { current = w; continue; }
+    if (current.length + 1 + w.length <= maxChars) current = `${current} ${w}`;
+    else { lines.push(current); current = w; }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [''];
+}
+
 export default function PrinciplesRadial({
   principles = [],
   scaleMax = 10,
   size = 400,
-  outerRadius = 160,
+  outerRadius = 200,
   onPrincipleClick,
 }) {
   const n = principles.length;
@@ -50,11 +67,14 @@ export default function PrinciplesRadial({
     return polar(p.angle, r);
   });
 
-  const polylineFill = plotted.length >= 3 ? 'rgba(181,84,58,0.16)' : 'none';
+  const polylineFill = plotted.length >= 3
+    ? 'color-mix(in srgb, var(--color-accent) 18%, transparent)'
+    : 'none';
+  const isClosed = plotted.length >= 3 && plotted.length === principles.length;
   const showPolyline = plotted.length >= 2;
 
   const half = size / 2;
-  const viewBox = `${-half} ${-half - 10} ${size} ${size + 20}`;
+  const viewBox = `${-half - VIEWBOX_PAD_X} ${-half - VIEWBOX_PAD_Y} ${size + VIEWBOX_PAD_X * 2} ${size + VIEWBOX_PAD_Y * 2}`;
 
   const handleClick = (name) => () => onPrincipleClick && onPrincipleClick(name);
   const handleKey = (name) => (e) => {
@@ -96,7 +116,9 @@ export default function PrinciplesRadial({
         <polyline
           className="qd-radial__poly"
           fill={polylineFill}
-          points={points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ')}
+          points={(isClosed ? [...points, points[0]] : points)
+            .map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`)
+            .join(' ')}
         />
       )}
       {/* Plotted vertices */}
@@ -133,12 +155,16 @@ export default function PrinciplesRadial({
           />
         );
       })}
-      {/* Labels */}
+      {/* Labels — name and score share an anchor point on a label ring just
+          outside the plot. Score is always rendered on the line below the name
+          via a tspan(dy), so the two never collide regardless of axis angle. */}
       {principles.map((p, i) => {
         const [x, y] = polar(angles[i], outerRadius + LABEL_OFFSET);
-        const [sx, sy] = polar(angles[i], outerRadius + SUB_OFFSET);
         const isInsuf = !p.hasEvidence;
-        const anchor = Math.cos(angles[i]) > 0.2 ? 'start' : Math.cos(angles[i]) < -0.2 ? 'end' : 'middle';
+        const cosA = Math.cos(angles[i]);
+        const anchor = cosA > 0.2 ? 'start' : cosA < -0.2 ? 'end' : 'middle';
+        const words = p.name.toUpperCase().split(/\s+/);
+        const lines = wrapLines(words, 14);
         return (
           <g
             key={`lab-${i}`}
@@ -154,15 +180,17 @@ export default function PrinciplesRadial({
               y={y}
               textAnchor={anchor}
             >
-              {p.name.toUpperCase()}
-            </text>
-            <text
-              className={`qd-radial__lab-sub${isInsuf ? ' qd-radial__lab-sub--insuf' : ''}`}
-              x={sx}
-              y={sy}
-              textAnchor={anchor}
-            >
-              {isInsuf ? 'insufficient' : p.score?.toFixed(1)}
+              {lines.map((line, li) => (
+                <tspan key={li} x={x} dy={li === 0 ? 0 : '1.15em'}>{line}</tspan>
+              ))}
+              <tspan
+                className={`qd-radial__lab-sub${isInsuf ? ' qd-radial__lab-sub--insuf' : ''}`}
+                x={x}
+                dy="1.25em"
+                style={isInsuf ? undefined : { fill: scoreGradeColorVar(p.score) }}
+              >
+                {isInsuf ? 'insufficient' : p.score?.toFixed(1)}
+              </tspan>
             </text>
           </g>
         );
