@@ -9,13 +9,8 @@
  * summary. If the user wants the principle's full list, there's already the
  * PrincipleDetailPage route.
  */
-import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { TermHeader, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 import { EvalViolationCard } from './EvalCards.jsx';
-
-function buildPlanText(v, principle) {
-  return buildSingleViolationPlanText(v, principle, { reqRefs: v?.reqRefs, reqFallback: v?.req || undefined });
-}
 
 export default function FindingDetailPage({ finding, principle, dimension, onDismiss }) {
   if (!finding) {
@@ -48,7 +43,6 @@ export default function FindingDetailPage({ finding, principle, dimension, onDis
         <EvalViolationCard
           v={finding}
           principle={principle || finding.principle}
-          buildViolationPlanText={(v) => buildPlanText(v, principle || finding.principle)}
           index={0}
           onDismiss={onDismiss}
         />

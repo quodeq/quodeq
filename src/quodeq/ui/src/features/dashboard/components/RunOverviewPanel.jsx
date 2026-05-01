@@ -1,13 +1,11 @@
 import { useMemo } from 'react';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
-import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import ScoreCircle from '../../../components/ScoreCircle.jsx';
 import DimensionGaugeCard from './DimensionGaugeCard.jsx';
 import { SectionLabel } from '../../../components/terminal/index.js';
 
 const HERO_SCORE_CIRCLE_SIZE = 120;
-import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { buildRunReport } from '../../../utils/reportBuilder.js';
 import { formatRunId, complianceRatio } from '../../../utils/formatters.js';
@@ -86,19 +84,6 @@ function RunHeroSection({ dashboard, selectedRunId, stats }) {
     <section className="acc-eval-panel panel">
       <div className="acc-eval-top">
         <span className="acc-eval-date">{dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId)}</span>
-        {(dashboard?.dimensions || []).some((d) => (d.violations?.length || 0) > 0) && (
-          <CopyButton
-            label="Full fix plan"
-            className="fix-plan-btn-header"
-            icon={<SparkleIcon />}
-            onClick={() => {
-              const allViolations = (dashboard.dimensions || []).flatMap(
-                (d) => (d.violations || []).map((v) => ({ ...v, dimension: d.dimension }))
-              );
-              copyToClipboard(buildDimensionPlanFromViolations(dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId), allViolations));
-            }}
-          />
-        )}
       </div>
       <div className="acc-eval-golden">
         <div className="acc-eval-circle-col">
@@ -153,6 +138,28 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, projectName
     };
   }, [dashboard, runSummary, selectedRunId, projectName]);
   useRegisterWindowSpec('report', reportSpec);
+
+  const fixPlanSpec = useMemo(() => {
+    const dims = dashboard?.dimensions || [];
+    const hasViolations = dims.some((d) => (d.violations?.length || 0) > 0);
+    if (!hasViolations) return null;
+    const runId = dashboard?.selectedRun?.runId || selectedRunId || 'current';
+    const dateLabel = dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId) || 'run';
+    const filenameLabel = (dateLabel || runId).replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
+    const buildMarkdown = () => {
+      const allViolations = dims.flatMap((d) => (d.violations || []).map((v) => ({ ...v, dimension: d.dimension })));
+      return buildDimensionPlanFromViolations(dateLabel, allViolations);
+    };
+    return {
+      id: `fixplan:run:${runId}`,
+      type: 'fixplan',
+      title: `${dateLabel} fix plan`,
+      render: () => <ReportContent markdown={buildMarkdown()} />,
+      copy: () => buildMarkdown(),
+      download: () => ({ filename: `run-${filenameLabel}-fix-plan.md`, body: buildMarkdown() }),
+    };
+  }, [dashboard, selectedRunId]);
+  useRegisterWindowSpec('fixplan', fixPlanSpec);
 
   // Per-dimension deltas from the trend entry (same source the history rows use)
   const trendDeltas = useMemo(() => {

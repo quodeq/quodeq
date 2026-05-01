@@ -1,9 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
-import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { gradeColorClass, complianceRatio } from '../../../utils/formatters.js';
-import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { buildDimensionReport } from '../../../utils/reportBuilder.js';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
@@ -30,16 +28,6 @@ function DimensionOverview({ data, stats, onNavigate }) {
           name={`${evalData.dimension}.overview`}
           sub={dateLabel || runId || null}
         />
-        <div className="dimension-overview__actions">
-          {allViolations.length > 0 && (
-            <CopyButton
-              label="Full fix plan"
-              className="fix-plan-btn-header"
-              icon={<SparkleIcon />}
-              onClick={() => copyToClipboard(buildDimensionPlanFromViolations(evalData.dimension, allViolations))}
-            />
-          )}
-        </div>
       </div>
       <StatStrip bordered>
         <Stat label="SCORE"      value={scoreDisplay}                                      hint={overallGrade?.grade || null} />
@@ -172,6 +160,21 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, sev
     };
   }, [d.evalData, d.principleGrades, filteredViolations, d.overallGrade, dateLabel, runId]);
   useRegisterWindowSpec('report', reportSpec);
+
+  const fixPlanSpec = useMemo(() => {
+    if (!d.evalData || filteredViolations.length === 0) return null;
+    const dim = (d.evalData.dimension || 'unknown').toLowerCase();
+    const buildMarkdown = () => buildDimensionPlanFromViolations(d.evalData.dimension, filteredViolations);
+    return {
+      id: `fixplan:dimension:${dim}:${runId ?? 'current'}`,
+      type: 'fixplan',
+      title: `${dim} fix plan`,
+      render: () => <ReportContent markdown={buildMarkdown()} />,
+      copy: () => buildMarkdown(),
+      download: () => ({ filename: `${dim}-fix-plan.md`, body: buildMarkdown() }),
+    };
+  }, [d.evalData, filteredViolations, runId]);
+  useRegisterWindowSpec('fixplan', fixPlanSpec);
 
   if (d.loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
   if (d.error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;
