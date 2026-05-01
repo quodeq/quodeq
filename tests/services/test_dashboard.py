@@ -173,3 +173,31 @@ class TestBuildDashboard:
         ):
             result = build_dashboard(str(tmp_path), "proj", "r-cancelled")
         assert result["selectedRun"]["runId"] == "r-cancelled"
+
+    def test_does_not_crash_when_cancelled_runs_precede_selected(self, tmp_path):
+        # Regression: build_dashboard formerly raised IndexError when the
+        # selected complete run had cancelled/failed runs above it in the
+        # full list, because ctx.index (full-list index) was passed to
+        # collect_stale_dimensions / _collect_previous_scores along with
+        # `history_runs` (filtered list of scoreable runs only). When
+        # ctx.index >= len(history_runs), `history_runs[newer_idx]` blew up.
+        cancelled_top = [
+            RunInfo(run_id=f"c{i}", date_iso="2024-03-01", date_label="2024-03-01", status="cancelled")
+            for i in range(5)
+        ]
+        selected = RunInfo(run_id="r-selected", date_iso="2024-02-15", date_label="2024-02-15", status="complete")
+        complete_below = [
+            RunInfo(run_id=f"c-below-{i}", date_iso="2024-02-01", date_label="2024-02-01", status="complete")
+            for i in range(2)
+        ]
+        runs = cancelled_top + [selected] + complete_below
+        dims = [_dim("security", "B", "7.0")]
+        summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
+        with (
+            patch("quodeq.services.dashboard.list_runs", return_value=runs),
+            patch("quodeq.services.dashboard.read_run_data", return_value=dims),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            # Must not raise.
+            result = build_dashboard(str(tmp_path), "proj", "r-selected")
+        assert result["selectedRun"]["runId"] == "r-selected"
