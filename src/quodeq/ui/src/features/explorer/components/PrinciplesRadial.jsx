@@ -50,7 +50,10 @@ export default function PrinciplesRadial({
     return polar(p.angle, r);
   });
 
-  const polylineFill = plotted.length >= 3 ? 'rgba(181,84,58,0.16)' : 'none';
+  const polylineFill = plotted.length >= 3
+    ? 'color-mix(in srgb, var(--color-accent) 18%, transparent)'
+    : 'none';
+  const isClosed = plotted.length >= 3 && plotted.length === principles.length;
   const showPolyline = plotted.length >= 2;
 
   const half = size / 2;
@@ -96,7 +99,9 @@ export default function PrinciplesRadial({
         <polyline
           className="qd-radial__poly"
           fill={polylineFill}
-          points={points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ')}
+          points={(isClosed ? [...points, points[0]] : points)
+            .map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`)
+            .join(' ')}
         />
       )}
       {/* Plotted vertices */}

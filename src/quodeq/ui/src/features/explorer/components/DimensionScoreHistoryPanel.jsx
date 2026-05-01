@@ -35,13 +35,19 @@ export default function DimensionScoreHistoryPanel({ trend = [], dimension }) {
 }
 
 function DimensionHistoryChart({ scores }) {
-  // Simple SVG bar+line chart, scaled 0..10. Latest is rightmost & highlighted.
+  // Bar+line chart auto-scaled to the data range so bars fill the panel.
   const W = 480;
   const H = 180;
   const PAD_X = 10;
   const GAP = 12;
   const barW = (W - PAD_X * 2 - GAP * (scores.length - 1)) / scores.length;
-  const yFor = (v) => H - 6 - (Math.max(0, Math.min(v, 10)) / 10) * (H - 16);
+  const lo = Math.min(...scores);
+  const hi = Math.max(...scores);
+  const range = Math.max(hi - lo, 0.5); // avoid divide-by-zero when all equal
+  const padding = range * 0.15;
+  const yMin = Math.max(0, lo - padding);
+  const yMax = Math.min(10, hi + padding);
+  const yFor = (v) => H - 6 - ((Math.max(yMin, Math.min(v, yMax)) - yMin) / (yMax - yMin)) * (H - 16);
   const xFor = (i) => PAD_X + i * (barW + GAP);
   const last = scores.length - 1;
   return (
