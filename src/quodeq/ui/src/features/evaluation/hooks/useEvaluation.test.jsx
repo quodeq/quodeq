@@ -30,6 +30,9 @@ describe("useEvaluation", () => {
     fakeApi.listEvaluations.mockResolvedValue([]);
     // Default: SSE off — refetchInterval path
     import.meta.env.VITE_USE_SSE_EVENTS = "false";
+    // preparePayload reads localStorage; seed a working provider+model.
+    localStorage.setItem("cc-active-provider", "ollama");
+    localStorage.setItem("cc-ollama-model", "llama3.1");
   });
 
   it("returns the documented public shape", () => {
@@ -82,5 +85,29 @@ describe("useEvaluation", () => {
       wrapper: makeWrapper(),
     });
     expect(result.current.liveViolations).toEqual({});
+  });
+
+  it("startEvaluation merges Settings (provider/model/subagents) from localStorage", async () => {
+    fakeApi.startEvaluation.mockResolvedValue({ jobId: "j3", status: "pending", dimensions: [] });
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await act(async () => {
+      await result.current.startEvaluation({ repo: "x", dimensions: ["security"] });
+    });
+    expect(fakeApi.startEvaluation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repo: "x",
+        aiCmd: "ollama",
+        aiModel: "llama3.1",
+      }),
+    );
+  });
+
+  it("startEvaluation surfaces a useful error when no provider is configured", async () => {
+    localStorage.removeItem("cc-active-provider");
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await expect(
+      result.current.startEvaluation({ repo: "x", dimensions: [] }),
+    ).rejects.toThrow(/provider/i);
+    await waitFor(() => expect(result.current.jobError).toMatch(/provider/i));
   });
 });

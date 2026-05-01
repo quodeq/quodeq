@@ -25,10 +25,47 @@ import { useApi } from "../../../api/ApiContext.jsx";
 import { confirmDialog } from "../../../utils/confirmDialog.js";
 import { useRunEventStream } from "./useRunEventStream.js";
 import { evaluationKeys } from "../../../api/queryKeys.js";
+import {
+  ACTIVE_PROVIDER_KEY,
+  providerKey,
+  DEFAULT_MAX_SUBAGENTS,
+  DEFAULT_POOL_BUDGET,
+} from "../../../constants.js";
 
 const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === "true";
 const JOB_POLL_MS = 1500;
 const DIM_POLL_MS = 2000;
+const DEFAULT_OLLAMA_SUBAGENTS = "1";
+const DEFAULT_CLI_SUBAGENTS = String(DEFAULT_MAX_SUBAGENTS);
+const DEFAULT_OLLAMA_BUDGET = "0";
+const DEFAULT_CLI_BUDGET = String(DEFAULT_POOL_BUDGET);
+
+/**
+ * Merge per-provider Settings (provider, model, subagents, budget, etc.)
+ * from localStorage into the start-evaluation payload. Mirrors the legacy
+ * useEvaluation behavior; throws a user-facing error if no provider/model
+ * is configured.
+ */
+function preparePayload(payload, storage = localStorage) {
+  const activeProvider = storage.getItem(ACTIVE_PROVIDER_KEY) || "";
+  if (!activeProvider) throw new Error("No provider selected. Go to Settings to configure one.");
+  const get = (key) => storage.getItem(providerKey(activeProvider, key));
+  const model = get("model");
+  if (!model) throw new Error("No model selected. Go to Settings and select one.");
+  const isOllama = activeProvider === "ollama";
+  const subagents = parseInt(get("subagents") || (isOllama ? DEFAULT_OLLAMA_SUBAGENTS : DEFAULT_CLI_SUBAGENTS), 10);
+  const poolBudget = parseInt(get("pool-budget") || (isOllama ? DEFAULT_OLLAMA_BUDGET : DEFAULT_CLI_BUDGET), 10);
+  const result = {
+    ...payload,
+    aiCmd: activeProvider,
+    aiModel: model,
+    maxSubagents: subagents,
+    poolBudget,
+  };
+  if (get("per-dimension") === "true") result.perDimension = true;
+  if (get("verify") === "false") result.verifyFindings = false;
+  return result;
+}
 
 export function useEvaluation() {
   const api = useApi();
@@ -85,17 +122,30 @@ export function useEvaluation() {
 
   // --- Mutations -------------------------------------------------------
   const startMutation = useMutation({
-    mutationFn: (input) => api.startEvaluation(input),
+    mutationFn: (input) => {
+      // preparePayload throws on missing provider/model — let the error
+      // propagate to onError so jobError gets set with a useful message.
+      const prepared = preparePayload(input);
+      return api.startEvaluation(prepared).then((created) => ({
+        ...created,
+        repo: prepared.repo,
+      }));
+    },
     onSuccess: (created) => {
       setJobError(null);
       setJobId(created.jobId);
       queryClient.setQueryData(evaluationKeys.status(created.jobId), created);
     },
-    onError: (err) => setJobError(err?.message || "Failed to start evaluation."),
+    onError: (err) => {
+      const msg = err?.message || "Failed to start evaluation.";
+      setJobError(
+        msg.startsWith("No ") || msg.startsWith("Select ") ? msg : "Failed to start evaluation",
+      );
+    },
   });
 
   const cancelMutation = useMutation({
-    mutationFn: () => api.cancelEvaluation(jobId),
+    mutationFn: ({ discard } = {}) => api.cancelEvaluation(jobId, { discard }),
     onSuccess: () => {
       if (jobId) {
         queryClient.invalidateQueries({ queryKey: evaluationKeys.evaluation(jobId) });
@@ -109,9 +159,16 @@ export function useEvaluation() {
   );
 
   const cancelEvaluation = useCallback(async () => {
-    const ok = await confirmDialog("Cancel this evaluation?");
-    if (!ok) return;
-    cancelMutation.mutate();
+    const result = await confirmDialog({
+      title: "Cancel evaluation?",
+      message: "The run will stop. Findings collected so far are kept by default.",
+      checkboxLabel: "Discard collected findings",
+      confirmLabel: "Cancel evaluation",
+      cancelLabel: "Keep running",
+      variant: "danger",
+    });
+    if (!result || !result.ok) return;
+    cancelMutation.mutate({ discard: result.checked });
   }, [cancelMutation]);
 
   const clearJob = useCallback(() => {
