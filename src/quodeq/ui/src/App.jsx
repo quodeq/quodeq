@@ -297,7 +297,7 @@ function AppShell({ sidebar, header, content }) {
 export default function App() {
   const { dismissFinding } = useApi();
   const state = useAppState();
-  const APP_VERSION = '1.0.6';
+  const APP_VERSION = state.serverVersion;
   const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const sidebarProvider = (typeof localStorage !== 'undefined' && localStorage.getItem(ACTIVE_PROVIDER_KEY)) || null;

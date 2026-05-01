@@ -65,7 +65,7 @@ function useProjects({ onNoProjects }) {
 }
 
 function useAppNavigation() {
-  const [serverConnected, setServerConnected] = useServerHealth();
+  const [serverConnected, setServerConnected, serverVersion] = useServerHealth();
   const { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab } = useNavStack();
   const projectBundle = useProjects({ onNoProjects: () => navTab('evaluate') });
   const { selectedRun, setSelectedRun, handleRunChange } = projectBundle;
@@ -75,7 +75,7 @@ function useAppNavigation() {
     if (page === 'history-run' && params.runId) setHistorySelectedRun(params.runId);
     navPush({ page, ...params });
   }
-  return { serverConnected, setServerConnected, navStack, activePage, navPush, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun };
+  return { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPush, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun };
 }
 
 export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRunIndex) {
@@ -90,7 +90,7 @@ export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRun
 
 export function useAppState() {
   const nav = useAppNavigation();
-  const { serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
+  const { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
   const {
     projects, projectsLoaded, setProjects, selectedProject,
     selectedRun, setSelectedRun, loadProjects, handleProjectChange,
@@ -138,7 +138,7 @@ export function useAppState() {
   const showRunNav = activeTab === TAB_OVERVIEW && showProjectHeader && visibleDailyRuns.length > 0 && navStack.length === 1;
 
   return {
-    serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navTab,
+    serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navTab,
     projects, projectsLoaded, selectedProject, selectedRun, handleProjectChange, handleNavigate,
     handleDeleteProject, handleExportProject, handleRelocateProject,
     dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex,

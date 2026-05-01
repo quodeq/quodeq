@@ -44,13 +44,15 @@ export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = SERVER
   // it on each poll resolution. setServerConnected(true) lets the reconnect
   // overlay optimistically clear the disconnected state until the next poll.
   const [connected, setConnected] = useState(true);
+  const [version, setVersion] = useState(null);
 
   useQuery({
     queryKey: systemKeys.health(),
     queryFn: async () => {
       try {
-        await getHealth();
+        const data = await getHealth();
         setConnected(true);
+        if (data?.version) setVersion(data.version);
         return true;
       } catch {
         const currentPort = typeof window !== 'undefined' ? window.location.port : '';
@@ -77,5 +79,5 @@ export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = SERVER
     setConnected(Boolean(next));
   }, []);
 
-  return [connected, setServerConnected];
+  return [connected, setServerConnected, version];
 }
