@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import EvaluationForm from './EvaluationForm.jsx';
 import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
@@ -89,10 +88,30 @@ function ErrorToast({ message, onDismiss }) {
   );
 }
 
+function NoProjectSelected({ onGoToProjects }) {
+  return (
+    <div className="panel evaluate-panel evaluate-no-project">
+      <SectionLabel>no_project_selected</SectionLabel>
+      <p className="evaluate-no-project__hint">
+        Add or pick a project from Projects to run an evaluation.
+      </p>
+      {onGoToProjects && (
+        <button
+          type="button"
+          className="evaluate-no-project__cta"
+          onClick={onGoToProjects}
+        >
+          Go to Projects
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
   const { selectedProject, projectInfo } = context;
-  const { onStart: onStartEvaluation, onDismiss, onCancel } = actions;
+  const { onStart: onStartEvaluation, onDismiss, onCancel, onGoToProjects } = actions;
   const [toastKey, setToastKey] = useState(0);
   const [toastVisible, setToastVisible] = useState(false);
 
@@ -115,11 +134,8 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
           <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={wrappedOnStart} disabled={false} />
         )}
 
-        {!job && (
-          <div className="panel evaluate-panel">
-            <SectionLabel>{selectedProject ? 'evaluate_new_repository' : 'evaluate_repository'}</SectionLabel>
-            <EvaluationForm onStart={wrappedOnStart} disabled={false} selectedProject={projectInfo} />
-          </div>
+        {!job && !selectedProject && (
+          <NoProjectSelected onGoToProjects={onGoToProjects} />
         )}
 
         <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={onDismiss} onCancel={onCancel} hasEvaluations={!!selectedProject} />

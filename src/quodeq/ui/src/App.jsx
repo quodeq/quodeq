@@ -7,6 +7,7 @@ const FileDetailPage = lazy(() => import('./features/explorer/components/FileDet
 const PrincipleDetailPage = lazy(() => import('./features/explorer/components/PrincipleDetailPage.jsx'));
 const FindingDetailPage = lazy(() => import('./features/explorer/components/FindingDetailPage.jsx'));
 const ProjectsPage = lazy(() => import('./features/dashboard/components/ProjectsPage.jsx'));
+const AddProjectModal = lazy(() => import('./features/dashboard/components/AddProjectModal.jsx'));
 const HistoryPage = lazy(() => import('./features/history/components/HistoryPage.jsx'));
 const EvaluateScreen = lazy(() => import('./features/evaluation/components/EvaluateScreen.jsx'));
 const SettingsPage = lazy(() => import('./features/settings/components/SettingsPage.jsx'));
@@ -30,7 +31,10 @@ import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.
 import { ServerLogProvider } from './features/settings/server-log/ServerLogProvider.jsx';
 import { OllamaLogProvider } from './features/settings/ollama-log/OllamaLogProvider.jsx';
 
-const NO_PROJECT_TABS = ['evaluate', 'standards', 'settings', 'help'];
+// Tabs that are reachable with zero projects. `projects` is in here so a
+// fresh-install user can land on Projects and add their first one without
+// hitting the "no analyzed projects yet" wall.
+const NO_PROJECT_TABS = ['projects', 'evaluate', 'standards', 'settings', 'help'];
 
 /**
  * Returns whether the app is currently rendering dark, taking the saved
@@ -59,7 +63,7 @@ function useEffectiveDark(themeMode) {
  * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string }} props
  * @returns {JSX.Element}
  */
-function EvaluateCase({ serverHealth, evaluation, selectedProject, projects }) {
+function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onGoToProjects }) {
   const { connected, setConnected } = serverHealth;
   const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
   const projectInfo = projects?.find(p => (p.id || p.name) === selectedProject) || null;
@@ -69,7 +73,7 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject, projects }) {
       <EvaluateScreen
         evaluation={{ job, jobError, liveViolations }}
         context={{ selectedProject, projectInfo }}
-        actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation }}
+        actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation, onGoToProjects }}
       />
     </>
   );
@@ -243,7 +247,7 @@ const ROUTE_RENDERERS = {
       trend={props.dashboardData.dashboard?.trend || []}
     />
   ),
-  evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} />,
+  evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} onGoToProjects={() => props.navigation.navTab('projects')} />,
   file: (params) => <FileDetailPage file={params.file} />,
   evalprinciple: renderEvalPrincipleDetail,
   'eval-principle-detail': renderEvalPrincipleDetail,
@@ -260,7 +264,7 @@ const ROUTE_RENDERERS = {
     />
   ),
   settings: (params, props) => <SettingsCase settings={props.settings} />,
-  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject }} />,
+  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject }} />,
   standards: () => <StandardsPage />,
   help: () => <HelpPage />,
 };
@@ -275,7 +279,19 @@ function MainContent({ activePage, props }) {
     const projects = props.navigation?.projects;
     if (!projects || projects.length === 0) {
       if (!props.navigation?.projectsLoaded) return <LoadingScreen />;
-      return <section className="empty-state"><h2>No analyzed projects yet</h2><p>Run an evaluation to get started.</p></section>;
+      return (
+        <section className="empty-state">
+          <h2>No analyzed projects yet</h2>
+          <p>Add a project to get started.</p>
+          <button
+            type="button"
+            className="empty-state__cta"
+            onClick={() => props.navigation.navTab('projects')}
+          >
+            Go to Projects
+          </button>
+        </section>
+      );
     }
   }
   const renderer = ROUTE_RENDERERS[page];
@@ -310,6 +326,7 @@ export default function App() {
   const APP_VERSION = state.serverVersion;
   const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
   const [sidebarPinned, setSidebarPinned] = useState(false);
+  const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
   const sidebarProvider = (typeof localStorage !== 'undefined' && localStorage.getItem(ACTIVE_PROVIDER_KEY)) || null;
   const sidebarModel = sidebarProvider && typeof localStorage !== 'undefined'
     ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
@@ -356,6 +373,7 @@ export default function App() {
       historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
       currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
       prefetchHandlers: state.prefetchHandlers,
+      onAddProject: () => setIsAddProjectOpen(true),
     },
     evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
@@ -444,6 +462,14 @@ export default function App() {
               <div className="tab-fade" key={activeTab}>
                 <MainContent activePage={activePage} props={contentProps} />
               </div>
+              <AddProjectModal
+                open={isAddProjectOpen}
+                onClose={() => setIsAddProjectOpen(false)}
+                onStart={(payload) => {
+                  state.evalLifecycle.handleStartEvaluation(payload);
+                  navTab('evaluate');
+                }}
+              />
             </Suspense>
           }
             />
