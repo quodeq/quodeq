@@ -4,13 +4,21 @@
 
 import { request } from './request.js';
 
+// The dismissed list is per-project user data: a single response with all
+// entries is fine for any realistic project (a few thousand at most). Ask
+// for the server-side hard cap to avoid the API's default page size.
+const DISMISSED_REQUEST_LIMIT = 5000;
+
 /**
  * List dismissed findings for a project.
  * @param {string} projectId - Project identifier
  * @returns {Promise<Array>} Dismissed findings array
  */
 export async function listDismissedFindings(projectId) {
-  return request(`/findings/dismissed?project=${encodeURIComponent(projectId)}`);
+  return request(
+    `/findings/dismissed?project=${encodeURIComponent(projectId)}`
+    + `&limit=${DISMISSED_REQUEST_LIMIT}`,
+  );
 }
 
 /**
