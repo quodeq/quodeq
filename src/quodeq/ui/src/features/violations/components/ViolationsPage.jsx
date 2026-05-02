@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { listDismissedFindings, restoreFinding, restoreAllFindings } from '../../../api/index.js';
 import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../utils/visibleStandards.js';
 import { readCachedState, writeCachedState, resetCachedScope } from '../../../utils/pageStateCache.js';
 import { buildFileTree, treeNodeToFileObj, HeatGridView } from '../../map/viz/index.js';
 import DimensionHeatGridView from './DimensionHeatGridView.jsx';
 import DismissedSubTab from './DismissedSubTab.jsx';
 import { TermHeader, SevBadge, FlagPill } from '../../../components/terminal/index.js';
+import { useDismissedFindings } from './useDismissedFindings.js';
 
 const MAX_TREE_DEPTH = 64;
 
@@ -91,39 +91,6 @@ function FileSubTab({ dimensions, onFileClick, currentPath, setCurrentPath }) {
       <HeatGridView node={currentNode} onDrillDown={setCurrentPath} onFileClick={handleFileClick} onCellClick={handleCellClick} variant="flat" />
     </>
   );
-}
-
-function useDismissedFindings(selectedProject, onRefresh, setRestoreError) {
-  const [dismissed, setDismissed] = useState([]);
-
-  useEffect(() => {
-    if (!selectedProject) return;
-    listDismissedFindings(selectedProject).then(setDismissed).catch(() => setDismissed([]));
-  }, [selectedProject]);
-
-  const handleRestore = useCallback(async (d) => {
-    try {
-      await restoreFinding(selectedProject, { req: d.req, file: d.file, line: d.line });
-      setDismissed((prev) => prev.filter((item) => !(item.req === d.req && item.file === d.file && item.line === d.line)));
-      onRefresh?.();
-    } catch (err) {
-      console.error('Failed to restore finding:', err);
-      setRestoreError?.('Failed to restore finding. Please try again.');
-    }
-  }, [selectedProject, onRefresh, setRestoreError]);
-
-  const handleRestoreAll = useCallback(async () => {
-    try {
-      await restoreAllFindings(selectedProject);
-      setDismissed([]);
-      onRefresh?.();
-    } catch (err) {
-      console.error('Failed to restore all findings:', err);
-      setRestoreError?.('Failed to restore all findings. Please try again.');
-    }
-  }, [selectedProject, onRefresh, setRestoreError]);
-
-  return { dismissed, handleRestore, handleRestoreAll };
 }
 
 function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, initialSubTab, initialFilePath }) {
