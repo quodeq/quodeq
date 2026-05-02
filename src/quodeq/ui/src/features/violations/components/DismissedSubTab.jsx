@@ -4,7 +4,7 @@ function dismissedLabel(d) {
   return d.principle || d.dimension || (d.req ?? '?');
 }
 
-function DismissedCard({ d, onRestore }) {
+function DismissedCard({ d, onRestore, onDelete }) {
   return (
     <div className="dismissed-card">
       <div className="dismissed-card-top">
@@ -13,6 +13,7 @@ function DismissedCard({ d, onRestore }) {
         <span className="dismissed-label">[{dismissedLabel(d)}]</span>
         <span className="dismissed-file">{d.file}:{d.line}</span>
         <button type="button" className="restore-btn" onClick={() => onRestore(d)}>Restore</button>
+        <button type="button" className="delete-btn" onClick={() => onDelete(d)}>Delete</button>
       </div>
       {(d.reason || d.title) && (
         <div className="dismissed-detail">
@@ -47,7 +48,7 @@ function DismissedCard({ d, onRestore }) {
   );
 }
 
-export default function DismissedSubTab({ dismissed, onRestore, onRestoreAll }) {
+export default function DismissedSubTab({ dismissed, onRestore, onRestoreAll, onDelete, onDeleteAll }) {
   if (dismissed.length === 0) {
     return <p className="empty-state">No dismissed findings.</p>;
   }
@@ -57,14 +58,24 @@ export default function DismissedSubTab({ dismissed, onRestore, onRestoreAll }) 
         <h3 className="section-title">Dismissed Findings</h3>
         <span className="section-count">{dismissed.length} findings · not included in scoring</span>
         {dismissed.length > 1 && (
-          <button type="button" className="restore-btn" style={{ marginLeft: 'auto' }} onClick={onRestoreAll}>
-            Restore all
-          </button>
+          <>
+            <button type="button" className="restore-btn" style={{ marginLeft: 'auto' }} onClick={onRestoreAll}>
+              Restore all
+            </button>
+            <button type="button" className="delete-btn" onClick={onDeleteAll}>
+              Delete all
+            </button>
+          </>
         )}
       </div>
       <div className="dismissed-list-inner">
         {dismissed.map((d) => (
-          <DismissedCard key={`${d.req}-${d.file}-${d.line}`} d={d} onRestore={onRestore} />
+          <DismissedCard
+            key={`${d.req}-${d.file}-${d.line}`}
+            d={d}
+            onRestore={onRestore}
+            onDelete={onDelete}
+          />
         ))}
       </div>
     </>

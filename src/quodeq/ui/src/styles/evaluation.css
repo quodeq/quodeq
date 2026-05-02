@@ -2728,6 +2728,26 @@
   border-color: var(--color-accent);
   background: rgba(88, 166, 255, 0.08);
 }
+.dismissed-card-top .delete-btn {
+  margin-left: 6px;
+}
+.delete-btn {
+  font-size: 0.7rem;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-danger, #da3633);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 150ms ease;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.delete-btn:hover {
+  border-color: var(--color-danger, #da3633);
+  background: rgba(218, 54, 51, 0.08);
+}
 
 /* ─── ScanProgress ─── */
 .scan-progress {
