@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
+from quodeq.shared.constants import _DEFAULT_TIME_LIMIT
 
 HeartbeatCallback = Callable[[int, dict], None]
 
@@ -29,7 +29,9 @@ class AnalysisConfig:
     ai_model: str | None = None
     max_turns: int | None = _DEFAULT_MAX_TURNS
     max_duration: int | None = _DEFAULT_MAX_DURATION
-    pool_budget: int = _DEFAULT_POOL_BUDGET
+    time_limit: int = _DEFAULT_TIME_LIMIT
+    deadline_at: float | None = None
+    """Absolute monotonic-clock deadline for the whole run. None = unlimited."""
     compiled_dir: Path | None = None
     dimension: str | None = None
     queue_path: Path | None = None

@@ -57,8 +57,10 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         help="Skip post-analysis verification pass",
     )
     parser.add_argument(
-        "--pool-budget", type=int, default=None,
-        help="Total time budget for agent pool in seconds (default: 600)",
+        "--time-limit", "--pool-budget",
+        dest="pool_budget", type=int, default=None,
+        help="Total evaluation time limit in seconds (0 = unlimited; default: 600). "
+             "--pool-budget is a deprecated alias.",
     )
     parser.add_argument(
         "--no-consolidated", action="store_true",
@@ -152,10 +154,10 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     review_parser.add_argument(
-        "--pool-budget",
-        type=int,
-        dest="pool_budget",
-        help="Total time budget in seconds for the evaluation (default: 300)",
+        "--time-limit", "--pool-budget",
+        dest="pool_budget", type=int,
+        help="Total time budget in seconds for the evaluation (default: 300). "
+             "--pool-budget is a deprecated alias.",
     )
     review_parser.add_argument(
         "--output",

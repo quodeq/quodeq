@@ -179,7 +179,7 @@ class TestBuildRunConfig:
         assert config.options.dimensions == ["security", "reliability"]
         assert config.options.max_turns == 10
         assert config.options.max_duration == 300
-        assert config.options.pool_budget == 120
+        assert config.options.time_limit == 120
         assert config.options.incremental is True
         assert config.options.verify_findings is False
         assert config.standards_dir is None
@@ -236,7 +236,8 @@ class TestBuildRunConfig:
         config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env=env)
         assert config.options.max_turns == 50
         assert config.options.max_duration == 900
-        assert config.options.pool_budget == 300
+        # Legacy QUODEQ_POOL_BUDGET still routes into time_limit via the env-var fallback.
+        assert config.options.time_limit == 300
 
 
 # ---------------------------------------------------------------------------

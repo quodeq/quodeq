@@ -47,6 +47,9 @@ def _config() -> MagicMock:
     cfg.source_file_count = 100
     cfg.options.incremental_file_filter = None
     cfg.options.skip_scoring = True
+    # Default: no run-level deadline (would otherwise be a MagicMock and
+    # break the numeric comparison in the loop's deadline guard).
+    cfg.options.deadline_at = None
     return cfg
 
 

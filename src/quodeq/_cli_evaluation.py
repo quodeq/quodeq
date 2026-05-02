@@ -11,6 +11,7 @@ import argparse
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
@@ -51,6 +52,33 @@ _logger = logging.getLogger(__name__)
 _ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
 _ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
 _ENV_POOL_BUDGET = "QUODEQ_POOL_BUDGET"
+_ENV_TIME_LIMIT = "QUODEQ_TIME_LIMIT"
+
+
+def _resolve_time_limit(args: argparse.Namespace, env: dict[str, str] | None = None) -> int | None:
+    """Resolve the run-level time limit from CLI args or env.
+
+    Precedence: explicit CLI flag > QUODEQ_TIME_LIMIT > legacy QUODEQ_POOL_BUDGET.
+    Emits a one-line deprecation warning when the legacy CLI flag or env var is
+    the source of the value.
+    """
+    src_env = env or os.environ
+    if getattr(args, "pool_budget", None) is not None:
+        # argparse stores both --time-limit and --pool-budget on the same dest;
+        # detect deprecated form by scanning the original argv.
+        if any(a == "--pool-budget" or a.startswith("--pool-budget=") for a in sys.argv[1:]):
+            sys.stderr.write(
+                "warning: --pool-budget is deprecated, use --time-limit instead\n"
+            )
+        return args.pool_budget
+    if src_env.get(_ENV_TIME_LIMIT) is not None:
+        return _env_int(_ENV_TIME_LIMIT, None, env=env)
+    if src_env.get(_ENV_POOL_BUDGET) is not None:
+        sys.stderr.write(
+            f"warning: {_ENV_POOL_BUDGET} is deprecated, use {_ENV_TIME_LIMIT} instead\n"
+        )
+        return _env_int(_ENV_POOL_BUDGET, None, env=env)
+    return None
 
 
 def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -> int | None:
@@ -205,7 +233,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
             subagent_model=subagent_model_val,
             verify_findings=not _no_verify(args, env=env),
             consolidated=consolidated,
-            pool_budget=args.pool_budget if args.pool_budget is not None else _env_int(_ENV_POOL_BUDGET, None, env=env),
+            time_limit=_resolve_time_limit(args, env=env),
             incremental=args.incremental,
             incremental_file_filter=incremental_file_filter,
             dry_run=getattr(args, "dry_run", False),
@@ -264,6 +292,17 @@ def _run_pipeline_with_cleanup(
                     # (the UI gates dim-polling on phase in
                     # {analyzing, scoring}).
                     lifecycle.set_phase("analyzing")
+                    # Record the run-level deadline so the dashboard countdown
+                    # has it (visible immediately in status.json and SSE).
+                    # Resolve from CLI args OR env vars — dashboard runs pass
+                    # QUODEQ_TIME_LIMIT via env, not the CLI flag.
+                    budget_s = _resolve_time_limit(args)
+                    if budget_s is not None and budget_s > 0:
+                        from datetime import datetime, timedelta, timezone
+                        deadline_iso = (
+                            datetime.now(timezone.utc) + timedelta(seconds=budget_s)
+                        ).isoformat()
+                        lifecycle.set_deadline(deadline_iso)
                     result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
                     # run_full writes per-dimension reports as each dimension
                     # completes, so by the time it returns scoring is already

@@ -2967,3 +2967,18 @@
 .scan-progress__budget--overrun { color: var(--color-sev-critical-text, #f85149); }
 .scan-progress__partial  { color: var(--color-warn, #d29922); text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; }
 .scan-progress__dim-reason { color: var(--color-warn, #d29922); font-style: italic; }
+
+.eval-countdown {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+  color: var(--color-accent);
+  margin-right: 0.75rem;
+  letter-spacing: 0.04em;
+}
+.eval-countdown--idle {
+  color: var(--color-text-muted);
+}
+.eval-countdown--alert {
+  color: var(--color-danger);
+}

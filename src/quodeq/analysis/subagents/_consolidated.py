@@ -7,7 +7,7 @@ from typing import Any
 
 from quodeq.analysis._types import RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig
-from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
+from quodeq.shared.constants import _DEFAULT_TIME_LIMIT
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence_by_dimension
 from quodeq.analysis.subagents.file_queue import FileQueue
@@ -43,7 +43,7 @@ def _build_consolidated_config(
 ) -> AnalysisConfig:
     """Build AnalysisConfig for consolidated mode."""
     subagent_model = config.options.subagent_model or _default_subagent_model() or config.options.ai_model
-    pool_budget_val = config.options.pool_budget
+    time_limit_val = config.options.time_limit
     return AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
@@ -52,7 +52,8 @@ def _build_consolidated_config(
         ai_model=subagent_model,
         dimension=",".join(dimensions),
         max_files_per_agent=files_per_agent,
-        pool_budget=pool_budget_val if pool_budget_val is not None else _DEFAULT_POOL_BUDGET,
+        time_limit=time_limit_val if time_limit_val is not None else _DEFAULT_TIME_LIMIT,
+        deadline_at=config.options.deadline_at,
     )
 
 

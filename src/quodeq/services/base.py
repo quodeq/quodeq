@@ -9,6 +9,7 @@ from quodeq.core.types import JobSnapshot, ViolationSummary
 from quodeq.shared.constants import (  # noqa: F401 — re-export for backward compat
     _DEFAULT_MAX_SUBAGENTS,
     _DEFAULT_POOL_BUDGET,
+    _DEFAULT_TIME_LIMIT,
 )
 
 
@@ -23,7 +24,7 @@ class EvaluationOptions:
     subagent_model: str | None = None
     verify_findings: bool = True
     max_subagents: int = _DEFAULT_MAX_SUBAGENTS
-    pool_budget: int = _DEFAULT_POOL_BUDGET
+    time_limit: int = _DEFAULT_TIME_LIMIT
     incremental: bool = False
     per_dimension: bool = False
     branch: str | None = None

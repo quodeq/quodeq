@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.incremental import identify_backfill_files
-from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
+from quodeq.shared.constants import _DEFAULT_TIME_LIMIT
 # NOTE: logging in inner layer — tracked for middleware extraction
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
@@ -101,12 +101,12 @@ def run_backfill_phase(
     if not backfill_candidates:
         return backfill_taken
 
-    pool_budget = config.options.pool_budget
-    unlimited = pool_budget is not None and pool_budget <= 0
+    time_limit = config.options.time_limit
+    unlimited = time_limit is not None and time_limit <= 0
 
     if not unlimited:
         elapsed = time.monotonic() - backfill.phase_start
-        total_budget = pool_budget or _DEFAULT_POOL_BUDGET
+        total_budget = time_limit or _DEFAULT_TIME_LIMIT
         remaining_budget = max(0, total_budget - int(elapsed))
 
         if remaining_budget < _min_backfill_budget_s():
@@ -123,7 +123,7 @@ def run_backfill_phase(
     original_options = config.options
     config.options = copy(original_options)
     config.options.incremental_file_filter = set(backfill_candidates)
-    config.options.pool_budget = remaining_budget
+    config.options.time_limit = remaining_budget
     config.options.verify_findings = False
     # Deferred import: circular dependency _dimension_ops → _incremental_evidence → _backfill
     from quodeq.analysis._dimension_ops import _process_single_dimension

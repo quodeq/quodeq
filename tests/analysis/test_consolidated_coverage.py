@@ -26,8 +26,9 @@ class _MockOptions:
     analysis_budget: str | None = None
     max_turns: int | None = None
     max_duration: int | None = None
-    pool_budget: int | None = None
+    time_limit: int | None = None
     max_subagents: int = 3
+    deadline_at: float | None = None
 
 
 @dataclass
@@ -79,18 +80,18 @@ class TestBuildConsolidatedConfig:
             ac = _build_consolidated_config(config, ["security"], 5)
         assert ac.ai_model == "opus-3"
 
-    def test_pool_budget_default(self):
-        config = _MockRunConfig(options=_MockOptions(pool_budget=None))
+    def test_time_limit_default(self):
+        config = _MockRunConfig(options=_MockOptions(time_limit=None))
         with patch("quodeq.analysis.subagents._consolidated._default_subagent_model", return_value=None):
             ac = _build_consolidated_config(config, ["security"], 5)
-        # Should use _DEFAULT_POOL_BUDGET
-        assert ac.pool_budget > 0
+        # Should use _DEFAULT_TIME_LIMIT
+        assert ac.time_limit > 0
 
-    def test_pool_budget_custom(self):
-        config = _MockRunConfig(options=_MockOptions(pool_budget=1200))
+    def test_time_limit_custom(self):
+        config = _MockRunConfig(options=_MockOptions(time_limit=1200))
         with patch("quodeq.analysis.subagents._consolidated._default_subagent_model", return_value=None):
             ac = _build_consolidated_config(config, ["security"], 5)
-        assert ac.pool_budget == 1200
+        assert ac.time_limit == 1200
 
     def test_includes_compiled_dir(self, tmp_path):
         config = _MockRunConfig()

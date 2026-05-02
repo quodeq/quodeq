@@ -113,13 +113,13 @@ class TestDispatchMiniVerify:
         mock_pool.return_value = [{"ok": True}]
         evidence_dir = tmp_path / "evidence"
         evidence_dir.mkdir()
-        opts = AnalysisOptions(max_subagents=10, pool_budget=9999)
+        opts = AnalysisOptions(max_subagents=10, time_limit=9999)
         config = RunConfig(src=tmp_path, language="python", options=opts)
         result = _dispatch_mini_verify(config, "security", evidence_dir, [{"file": "a.py"}])
         assert result == [{"ok": True}]
         actual_config = mock_pool.call_args[0][0]
         assert actual_config.options.max_subagents <= _MINI_VERIFY_MAX_AGENTS
-        assert actual_config.options.pool_budget <= _MINI_VERIFY_MAX_TIMEOUT
+        assert actual_config.options.time_limit <= _MINI_VERIFY_MAX_TIMEOUT
 
 
 # ---------------------------------------------------------------------------

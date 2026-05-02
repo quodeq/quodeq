@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from quodeq.core.types import JobSnapshot
-from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_POOL_BUDGET
+from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_TIME_LIMIT
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import is_valid_repo_url
 from quodeq.core.evidence.parser import parse_jsonl_to_evidence, EvidenceContext
@@ -170,8 +170,8 @@ class FsEvaluationMixin:
             built_env["SUBAGENT_MODEL"] = subagent_model
         if not options.verify_findings:
             built_env["QUODEQ_NO_VERIFY"] = "1"
-        if options.pool_budget != _DEFAULT_POOL_BUDGET:
-            built_env["QUODEQ_POOL_BUDGET"] = str(options.pool_budget)
+        if options.time_limit != _DEFAULT_TIME_LIMIT:
+            built_env["QUODEQ_TIME_LIMIT"] = str(options.time_limit)
         if options.per_dimension:
             built_env["QUODEQ_NO_CONSOLIDATE"] = "1"
         if options.context_size > 0:

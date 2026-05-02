@@ -15,6 +15,7 @@ class JobSnapshot:
     output_project: str | None = None
     output_run_id: str | None = None
     phase: str | None = None
+    deadline_at: str | None = None
     current_dimension: str | None = None
     dimensions: list[str] | None = None
     error: str | None = None

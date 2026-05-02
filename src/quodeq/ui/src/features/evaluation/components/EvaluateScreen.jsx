@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
-import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
+import CountdownTimer from './CountdownTimer.jsx';
+import { ACTIVE_PROVIDER_KEY, DEFAULT_TIME_LIMIT_S, providerKey } from '../../../constants.js';
 import { TermHeader, SectionLabel } from '../../../components/terminal/index.js';
 
 const TOAST_DISMISS_TIMEOUT_MS = 5000;
@@ -49,10 +50,24 @@ function ActiveProviderBadge({ storage = localStorage }) {
   );
 }
 
-function EvaluateHeader() {
+function readBudgetSeconds(storage = localStorage) {
+  const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  if (!provider) return 0;
+  // Read new key first; fall back to legacy 'pool-budget' for back-compat.
+  const raw = storage.getItem(providerKey(provider, 'time-limit'))
+    ?? storage.getItem(providerKey(provider, 'pool-budget'));
+  if (raw === null || raw === undefined) return provider === 'ollama' ? 0 : DEFAULT_TIME_LIMIT_S;
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function EvaluateHeader({ job }) {
   // Page title stays steady ("evaluate"); the live "in progress / failed /
   // done" state is carried by the JobHeader card title below to avoid
   // doubling the same status on screen.
+  const deadlineAt = job?.deadlineAt ?? null;
+  const phase = job?.phase ?? job?.status ?? null;
+  const budgetSeconds = readBudgetSeconds();
   return (
     <header className="evaluate-header evaluate-header--terminal">
       <div className="evaluate-header__left">
@@ -61,7 +76,10 @@ function EvaluateHeader() {
           sub="run a comprehensive code quality evaluation on any repository"
         />
       </div>
-      <ActiveProviderBadge />
+      <div className="evaluate-header__right">
+        <CountdownTimer deadlineAt={deadlineAt} budgetSeconds={budgetSeconds} phase={phase} />
+        <ActiveProviderBadge />
+      </div>
     </header>
   );
 }
@@ -127,7 +145,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
 
   return (
     <section className="evaluate-screen">
-      <EvaluateHeader />
+      <EvaluateHeader job={job} />
 
       <div className="evaluate-content">
         {!job && selectedProject && (
