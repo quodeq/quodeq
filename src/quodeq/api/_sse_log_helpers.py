@@ -8,6 +8,21 @@ from pathlib import Path
 _POLL_MS = int(os.environ.get("QUODEQ_LOG_STREAM_POLL_MS", "100"))
 _MAX_WAIT_S = int(os.environ.get("QUODEQ_LOG_STREAM_MAX_WAIT_S", "10"))
 
+# Per-tick byte cap on the SSE tail read. Caps a runaway log file from blowing
+# out RAM in a single read; remaining bytes are served on the next tick.
+_DEFAULT_TAIL_MAX_BYTES = 1 * 1024 * 1024  # 1 MiB
+
+
+def _tail_max_bytes() -> int:
+    raw = os.environ.get("QUODEQ_LOG_TAIL_MAX_BYTES")
+    if not raw:
+        return _DEFAULT_TAIL_MAX_BYTES
+    try:
+        value = int(raw)
+    except ValueError:
+        return _DEFAULT_TAIL_MAX_BYTES
+    return value if value > 0 else _DEFAULT_TAIL_MAX_BYTES
+
 
 def sse_line(data: str, event: str | None = None, event_id: int | None = None) -> str:
     parts = []
@@ -51,7 +66,7 @@ def sse_tail_generator(
             continue
         with open(log_path, "rb") as fh:
             fh.seek(offset)
-            raw = fh.read()
+            raw = fh.read(_tail_max_bytes())
         text = raw.decode("utf-8", errors="replace")
         if text:
             complete = text if text.endswith("\n") else text[: text.rfind("\n") + 1]

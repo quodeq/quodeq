@@ -1,6 +1,7 @@
 """Log-stream routes — SSE live stream + plain JSON fallback for /api/jobs/<id>/logs."""
 from __future__ import annotations
 
+import os
 from http import HTTPStatus
 from pathlib import Path
 
@@ -12,6 +13,22 @@ from quodeq.api._sse_log_helpers import sse_tail_generator as _sse_tail_generato
 # from the dashboard's live console — they're per-minute resource snapshots
 # (rss / fds / threads / ollama RSS) and clutter the operator-facing view.
 _CONSOLE_HIDDEN_MARKERS: tuple[str, ...] = ("[resources]",)
+
+# Per-poll byte cap: a single tail read will not pull more than this many bytes
+# into memory in one shot. The remaining bytes will be served on the next poll.
+# Caps a runaway log file from blowing out RAM on read.
+_DEFAULT_TAIL_MAX_BYTES = 1 * 1024 * 1024  # 1 MiB
+
+
+def _tail_max_bytes() -> int:
+    raw = os.environ.get("QUODEQ_LOG_TAIL_MAX_BYTES")
+    if not raw:
+        return _DEFAULT_TAIL_MAX_BYTES
+    try:
+        value = int(raw)
+    except ValueError:
+        return _DEFAULT_TAIL_MAX_BYTES
+    return value if value > 0 else _DEFAULT_TAIL_MAX_BYTES
 
 
 def _is_visible_log_line(line: str) -> bool:
@@ -39,7 +56,7 @@ def _read_tail(log_path: Path, since: int) -> tuple[list[str], int]:
     """
     with open(log_path, "rb") as fh:
         fh.seek(since)
-        raw = fh.read()
+        raw = fh.read(_tail_max_bytes())
     text = raw.decode("utf-8", errors="replace")
     if not text.endswith("\n"):
         last_nl = text.rfind("\n")
