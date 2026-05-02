@@ -1,6 +1,7 @@
 """Worker logic: building agent configs and running single subagents."""
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,8 +39,7 @@ def build_agent_config(
     # before the run-level deadline. Without this, a respawn near the
     # deadline gets a fresh full-length cap and extends the run.
     if bc.deadline_at is not None:
-        import time as _time
-        remaining = max(1, int(bc.deadline_at - _time.monotonic()))
+        remaining = max(1, int(bc.deadline_at - time.monotonic()))
         agent_dur = min(agent_dur, remaining)
     elif bc.pool_budget and bc.pool_budget > 0:
         # Legacy clamp: kept for runs without a deadline. A later task will

@@ -43,3 +43,15 @@ def test_agent_max_duration_unclamped_when_no_deadline(tmp_path):
     )
     ac, _, _ = build_agent_config(0, base, _wctx(tmp_path))
     assert ac.max_duration == 600
+
+
+def test_agent_max_duration_floored_when_deadline_passed(tmp_path):
+    base = AnalysisConfig(
+        jsonl_file=tmp_path / "x.jsonl",
+        ai_cmd="claude",
+        ai_model="claude-opus-4-7",
+        max_duration=600,
+        deadline_at=time.monotonic() - 30,  # 30s in the past
+    )
+    ac, _, _ = build_agent_config(0, base, _wctx(tmp_path))
+    assert ac.max_duration == 1
