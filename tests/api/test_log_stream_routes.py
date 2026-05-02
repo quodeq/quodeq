@@ -134,13 +134,132 @@ def test_sse_respects_last_event_id(tmp_path, app) -> None:
     assert [e["data"] for e in line_events] == ["beta", "gamma"]
 
 
-def test_sse_404_on_missing_log(tmp_path, app) -> None:
+def test_sse_waits_when_run_log_missing_then_emits_done(tmp_path, app) -> None:
+    """run_dir exists, run.log doesn't — the job is still preparing.
+
+    The stream must not 404 (which would close the EventSource and leave
+    the dashboard's console pane showing "stream disconnected" forever).
+    Instead it stays open and emits ``event: done`` once the job ends.
+    """
     run_dir = tmp_path / "empty"
     run_dir.mkdir()
-    app.config["_provider"].map["job-sse-3"] = run_dir
+    # The fake provider's is_job_complete returns True for ids ending in
+    # "-done", so the generator terminates on the first iteration.
+    app.config["_provider"].map["job-prep-done"] = run_dir
     client = app.test_client()
-    resp = client.get("/api/jobs/job-sse-3/logs/stream")
-    assert resp.status_code == HTTPStatus.NOT_FOUND
+    resp = client.get("/api/jobs/job-prep-done/logs/stream")
+    assert resp.status_code == HTTPStatus.OK
+    assert resp.content_type.startswith("text/event-stream")
+    events = _collect_sse(resp)
+    line_events = [e for e in events if "data" in e and e.get("event") != "done"]
+    assert line_events == []
+    assert any(e.get("event") == "done" for e in events)
+
+
+def test_sse_410_for_unknown_job(tmp_path, app) -> None:
+    """A jobId the provider can't resolve and that JobManager doesn't know
+    about must still be rejected — we don't want a typo'd id to pin a
+    polling thread open indefinitely."""
+    client = app.test_client()
+    resp = client.get("/api/jobs/job-unknown/logs/stream")
+    assert resp.status_code in (HTTPStatus.NOT_FOUND, HTTPStatus.GONE)
+
+
+def test_sse_waits_for_preparing_internal_job(tmp_path, app) -> None:
+    """Internal jobs registered with JobManager have no run_dir until the
+    runner emits the report_path marker. The SSE stream stays open
+    during that preparing window even though get_log_run_dir returns
+    None, and emits ``event: done`` when the in-memory job flips to a
+    terminal state."""
+    class FakeJob:
+        def __init__(self, status: str) -> None:
+            self.status = status
+
+    class FakeStore:
+        def __init__(self, job: FakeJob) -> None:
+            self._job = job
+
+        def get(self, _job_id: str) -> FakeJob:
+            return self._job
+
+    class JobsHolder:
+        def __init__(self, store: FakeStore) -> None:
+            self._store = store
+
+    job = FakeJob("running")
+    provider = app.config["_provider"]
+    provider._jobs = JobsHolder(FakeStore(job))
+
+    # Flip the job to "done" on the second is_job_complete call so the
+    # generator first sees an active preparing job (path None, not done)
+    # and on the next tick gets the done frame.
+    calls = [0]
+    original_is_done = provider.is_job_complete
+
+    def is_done(job_id: str) -> bool:
+        calls[0] += 1
+        if calls[0] >= 2:
+            job.status = "done"
+            return True
+        return original_is_done(job_id)
+
+    provider.is_job_complete = is_done
+
+    client = app.test_client()
+    resp = client.get("/api/jobs/internal-prep/logs/stream")
+    assert resp.status_code == HTTPStatus.OK
+    events = _collect_sse(resp)
+    assert any(e.get("event") == "done" for e in events)
+
+
+def test_sse_streams_log_after_it_appears(tmp_path, app) -> None:
+    """When run.log materializes mid-stream (the runner finally emitted
+    the report_path marker and JobManager flushed the buffered preparing
+    output), the generator picks it up and emits the lines."""
+    run_dir = tmp_path / "appears"
+    run_dir.mkdir()
+    log_path = run_dir / "run.log"
+
+    # Job is in JobManager's in-memory store so _is_preparing_job
+    # accepts the request even though get_log_run_dir initially says
+    # "no run dir yet" (mirrors the pre-marker reality).
+    class FakeJob:
+        status = "running"
+
+    class FakeStore:
+        def get(self, _job_id):
+            return FakeJob()
+
+    class JobsHolder:
+        _store = FakeStore()
+
+    provider = app.config["_provider"]
+    provider._jobs = JobsHolder()
+
+    # First call (from the route's _resolve_run_log) returns None, so
+    # the route falls through to _is_preparing_job and opens the SSE
+    # response. From the second call onward (generator's lazy resolver)
+    # the run dir is "available" and run.log gets seeded — that's the
+    # exact moment the dashboard's preparing burst arrives in real life.
+    calls = [0]
+
+    def get_log_run_dir(_job_id):
+        calls[0] += 1
+        if calls[0] == 1:
+            return None
+        if calls[0] == 2:
+            log_path.write_text("preparing-line-1\npreparing-line-2\n")
+        return run_dir
+
+    provider.get_log_run_dir = get_log_run_dir
+
+    client = app.test_client()
+    resp = client.get("/api/jobs/job-appears-done/logs/stream")
+    assert resp.status_code == HTTPStatus.OK
+    events = _collect_sse(resp)
+    line_events = [e for e in events if "data" in e and e.get("event") != "done"]
+    assert [e["data"] for e in line_events] == ["preparing-line-1", "preparing-line-2"]
+    assert any(e.get("event") == "done" for e in events)
 
 
 def test_plain_logs_filters_resources_lines(tmp_path, app) -> None:
