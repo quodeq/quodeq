@@ -21,7 +21,6 @@ from quodeq.analysis.subagents._pool_scaling import (
     should_respawn,
 )
 from quodeq.analysis.subagents.file_queue import WorkQueue
-from quodeq.shared.logging import log_warning as _log_warn
 
 _SCOUT_BUDGET_FRACTION = 0.5
 
@@ -75,17 +74,9 @@ def immediate_loop(ctx: LoopContext) -> None:
     for _ in range(ctx.n_agents):
         ctx.submit_fn()
     while ctx.futures:
-        # Check pool budget — cancel all running agents if exceeded
-        if ctx.max_duration > 0:
-            elapsed = time.monotonic() - ctx.pool_start
-            if elapsed >= ctx.max_duration:
-                _log_warn(
-                    f"  Pool budget ({ctx.max_duration:.0f}s) exceeded "
-                    f"-- cancelling {len(ctx.futures)} remaining agents"
-                )
-                for future in list(ctx.futures):
-                    future.cancel()
-                break
+        # No deadline-kill here: Future.cancel() is a no-op for running
+        # threads. Enforcement is the spawn-gate in should_respawn() plus
+        # the per-agent max_duration clamp set in build_agent_config().
         done = collect_done(ctx.futures, ctx.finished, ctx.results, ev_paths)
         if not done:
             time.sleep(_FUTURE_POLL_INTERVAL_S)
