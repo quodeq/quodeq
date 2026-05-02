@@ -106,7 +106,7 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, 
   };
 
   const [restoreError, setRestoreError] = useState(null);
-  const { dismissed, handleRestore, handleRestoreAll } = useDismissedFindings(selectedProject, onRefresh, setRestoreError);
+  const { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll } = useDismissedFindings(selectedProject, onRefresh, setRestoreError);
 
   const visibleDimensions = useMemo(() => {
     const visibleSet = new Set(readVisibleStandardIds());
@@ -127,7 +127,8 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, 
 
   return {
     activeSubTab, setActiveSubTab, dismissed,
-    handleRestore, handleRestoreAll, restoreError, visibleDimensions,
+    handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
+    restoreError, visibleDimensions,
     summary, topFilesCount, uniquePrinciples,
     fileCurrentPath, setFileCurrentPath,
   };
@@ -146,7 +147,11 @@ function SevInline({ severity }) {
 }
 
 function ViolationsSubTabContent(props) {
-  const { activeSubTab, visibleDimensions, dismissed, callbacks, fileCurrentPath, setFileCurrentPath, handleRestore, handleRestoreAll } = props;
+  const {
+    activeSubTab, visibleDimensions, dismissed, callbacks,
+    fileCurrentPath, setFileCurrentPath,
+    handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
+  } = props;
   if (activeSubTab === 'file') {
     return <FileSubTab dimensions={visibleDimensions} onFileClick={callbacks.onFileClick} currentPath={fileCurrentPath} setCurrentPath={setFileCurrentPath} />;
   }
@@ -155,7 +160,15 @@ function ViolationsSubTabContent(props) {
   }
   if (activeSubTab === 'dismissed') {
     return dismissed.length > 0
-      ? <DismissedSubTab dismissed={dismissed} onRestore={handleRestore} onRestoreAll={handleRestoreAll} />
+      ? (
+        <DismissedSubTab
+          dismissed={dismissed}
+          onRestore={handleRestore}
+          onRestoreAll={handleRestoreAll}
+          onDelete={handleDelete}
+          onDeleteAll={handleDeleteAll}
+        />
+      )
       : <p className="empty-state">No dismissed violations.</p>;
   }
   return null;
@@ -186,7 +199,8 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
 
   const {
     activeSubTab, setActiveSubTab, dismissed,
-    handleRestore, handleRestoreAll, restoreError, visibleDimensions,
+    handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
+    restoreError, visibleDimensions,
     summary, topFilesCount, uniquePrinciples,
     fileCurrentPath, setFileCurrentPath,
   } = useViolationsData({
@@ -226,6 +240,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
         activeSubTab={activeSubTab} visibleDimensions={visibleDimensions} dismissed={dismissed}
         callbacks={callbacks} fileCurrentPath={fileCurrentPath} setFileCurrentPath={setFileCurrentPath}
         handleRestore={handleRestore} handleRestoreAll={handleRestoreAll}
+        handleDelete={handleDelete} handleDeleteAll={handleDeleteAll}
       />
     </div>
   );
