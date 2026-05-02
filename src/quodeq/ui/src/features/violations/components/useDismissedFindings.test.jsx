@@ -1,6 +1,5 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, act, waitFor } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { useDismissedFindings } from './useDismissedFindings.js';
 
@@ -19,12 +18,6 @@ import {
 const sampleA = { req: 'A1', file: 'a.py', line: 10, severity: 'minor' };
 const sampleB = { req: 'B1', file: 'b.py', line: 20, severity: 'major' };
 
-function HookHarness({ project, onRefresh, setRestoreError, onState }) {
-  const state = useDismissedFindings(project, onRefresh, setRestoreError);
-  React.useEffect(() => { onState(state); }, [state, onState]);
-  return null;
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -35,21 +28,13 @@ describe('useDismissedFindings — restore handlers', () => {
     restoreFinding.mockResolvedValueOnce({ ok: true });
     const onRefresh = vi.fn();
     const setRestoreError = vi.fn();
-    let latest;
-    render(
-      <HookHarness
-        project="proj"
-        onRefresh={onRefresh}
-        setRestoreError={setRestoreError}
-        onState={(s) => { latest = s; }}
-      />,
-    );
-    await waitFor(() => expect(latest.dismissed).toHaveLength(2));
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
 
-    await act(async () => { await latest.handleRestore(sampleA); });
+    await act(async () => { await result.current.handleRestore(sampleA); });
 
     expect(restoreFinding).toHaveBeenCalledWith('proj', { req: 'A1', file: 'a.py', line: 10 });
-    expect(latest.dismissed).toEqual([sampleB]);
+    expect(result.current.dismissed).toEqual([sampleB]);
     expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(setRestoreError).not.toHaveBeenCalled();
   });
@@ -59,21 +44,13 @@ describe('useDismissedFindings — restore handlers', () => {
     restoreFinding.mockRejectedValueOnce(new Error('boom'));
     const onRefresh = vi.fn();
     const setRestoreError = vi.fn();
-    let latest;
-    render(
-      <HookHarness
-        project="proj"
-        onRefresh={onRefresh}
-        setRestoreError={setRestoreError}
-        onState={(s) => { latest = s; }}
-      />,
-    );
-    await waitFor(() => expect(latest.dismissed).toHaveLength(1));
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
 
-    await act(async () => { await latest.handleRestore(sampleA); });
+    await act(async () => { await result.current.handleRestore(sampleA); });
 
     expect(setRestoreError).toHaveBeenCalledWith('Failed to restore finding. Please try again.');
-    expect(latest.dismissed).toEqual([sampleA]);
+    expect(result.current.dismissed).toEqual([sampleA]);
     expect(onRefresh).not.toHaveBeenCalled();
   });
 
@@ -82,21 +59,13 @@ describe('useDismissedFindings — restore handlers', () => {
     restoreAllFindings.mockResolvedValueOnce({ ok: true, restored: 2 });
     const onRefresh = vi.fn();
     const setRestoreError = vi.fn();
-    let latest;
-    render(
-      <HookHarness
-        project="proj"
-        onRefresh={onRefresh}
-        setRestoreError={setRestoreError}
-        onState={(s) => { latest = s; }}
-      />,
-    );
-    await waitFor(() => expect(latest.dismissed).toHaveLength(2));
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
 
-    await act(async () => { await latest.handleRestoreAll(); });
+    await act(async () => { await result.current.handleRestoreAll(); });
 
     expect(restoreAllFindings).toHaveBeenCalledWith('proj');
-    expect(latest.dismissed).toEqual([]);
+    expect(result.current.dismissed).toEqual([]);
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 });
