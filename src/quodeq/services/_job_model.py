@@ -40,6 +40,7 @@ class Job:
     output_project: str | None = None
     output_run_id: str | None = None
     phase: str | None = None
+    deadline_at: str | None = None
     current_dimension: str | None = None
     dimensions: list[str] | None = None
 
@@ -79,6 +80,7 @@ class Job:
             output_project=self.output_project,
             output_run_id=self.output_run_id,
             phase=self.phase,
+            deadline_at=self.deadline_at,
             current_dimension=self.current_dimension,
             dimensions=self.dimensions,
         )
@@ -168,6 +170,7 @@ def _job_to_json(job: Job) -> dict:
         "output_project": job.output_project,
         "output_run_id": job.output_run_id,
         "phase": job.phase,
+        "deadline_at": job.deadline_at,
         "current_dimension": job.current_dimension,
         "dimensions": job.dimensions,
     }
@@ -187,6 +190,7 @@ def _job_from_json(data: dict) -> Job:
         output_project=data.get("output_project"),
         output_run_id=data.get("output_run_id"),
         phase=data.get("phase"),
+        deadline_at=data.get("deadline_at"),
         current_dimension=data.get("current_dimension"),
         dimensions=data.get("dimensions"),
     )

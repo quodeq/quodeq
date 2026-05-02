@@ -66,6 +66,8 @@ def _run_dimension_analysis(
         ac_kwargs["max_duration"] = config.options.max_duration
     if config.options.pool_budget is not None:
         ac_kwargs["pool_budget"] = config.options.pool_budget
+    if config.options.deadline_at is not None:
+        ac_kwargs["deadline_at"] = config.options.deadline_at
     run_analysis(
         work_dir=config.src,
         prompt=prompt,

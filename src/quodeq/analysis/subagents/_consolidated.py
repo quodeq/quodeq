@@ -53,6 +53,7 @@ def _build_consolidated_config(
         dimension=",".join(dimensions),
         max_files_per_agent=files_per_agent,
         pool_budget=pool_budget_val if pool_budget_val is not None else _DEFAULT_POOL_BUDGET,
+        deadline_at=config.options.deadline_at,
     )
 
 

@@ -28,6 +28,7 @@ class _MockOptions:
     max_duration: int | None = None
     pool_budget: int | None = None
     max_subagents: int = 3
+    deadline_at: float | None = None
 
 
 @dataclass

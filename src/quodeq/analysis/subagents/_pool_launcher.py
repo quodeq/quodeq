@@ -94,6 +94,7 @@ def _launch_pool(
         ai_model=subagent_model,
         max_files_per_agent=params.max_files_per_agent,
         pool_budget=pool_budget,
+        deadline_at=config.options.deadline_at,
     )
     n_agents = config.options.max_subagents
 
