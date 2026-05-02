@@ -17,6 +17,7 @@ from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import read_message, dispatch as _dispatch
 from quodeq.engine._ref_utils import load_compiled_refs as _load_compiled_refs
+from quodeq.context.project_shape import detect_shape
 from quodeq.core.standards.refs import load_compiled_requirements as _load_compiled_requirements
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
@@ -41,12 +42,16 @@ def _build_compiled_context(sa: ServerArgs) -> CompiledContext:
             for req_id in dim_reqs:
                 req_to_dim[req_id] = dim
 
+    work_dir = Path(sa.work_dir) if sa.work_dir else None
+    project_shape = detect_shape(work_dir) if work_dir is not None else None
+
     return CompiledContext(
         compiled_refs=compiled_refs or {},
         compiled_reqs=compiled_reqs or {},
         req_to_dim=req_to_dim,
         dimension=sa.dimension,
-        work_dir=Path(sa.work_dir) if sa.work_dir else None,
+        work_dir=work_dir,
+        project_shape=project_shape,
     )
 
 

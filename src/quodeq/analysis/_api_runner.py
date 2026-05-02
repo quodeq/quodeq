@@ -22,6 +22,7 @@ import openai
 from pydantic import BaseModel, Field
 
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
+from quodeq.context.project_shape import detect_shape
 from quodeq.core.standards.refs import load_compiled_requirements
 from quodeq.engine._ref_utils import load_compiled_refs
 from quodeq.shared.url_validation import validate_url_safe
@@ -224,11 +225,13 @@ def _enrich_findings(
     try:
         compiled_refs = load_compiled_refs(compiled_dir, dimension) or {}
         compiled_reqs = load_compiled_requirements(compiled_dir, dimension) or {}
+        project_shape = detect_shape(work_dir) if work_dir is not None else None
         ctx = CompiledContext(
             compiled_refs=compiled_refs,
             compiled_reqs=compiled_reqs,
             dimension=dimension,
             work_dir=work_dir,
+            project_shape=project_shape,
         )
 
         buf = io.StringIO()

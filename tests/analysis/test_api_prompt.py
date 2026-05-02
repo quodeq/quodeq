@@ -111,3 +111,39 @@ class TestAssembleApiPrompt:
             repo_root=tmp_path,
         )
         assert "(role:" not in prompt
+
+    def test_includes_project_shape_when_detected(self, tmp_path, standards_text):
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "x"\nversion = "0.1.0"\ndependencies = ["pywebview"]\n'
+        )
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "main.py").write_text("def main():\n    pass\n")
+        prompt = assemble_api_prompt(
+            source_files=[src / "main.py"],
+            standards_text=standards_text,
+            dimension="performance",
+            repo_name="test-repo",
+            repo_root=tmp_path,
+        )
+        assert "## Project Shape" in prompt
+        assert "deployment=desktop" in prompt
+        assert "single_user=true" in prompt
+        # The desktop note should warn the LLM about hosted-service findings.
+        assert "thread blocking" in prompt
+
+    def test_omits_project_shape_when_unknown(self, tmp_path, standards_text):
+        """No manifests at the root means no shape briefing — we don't want
+        to plant a wrong assumption in the LLM's head."""
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "main.py").write_text("def main():\n    pass\n")
+        prompt = assemble_api_prompt(
+            source_files=[src / "main.py"],
+            standards_text=standards_text,
+            dimension="performance",
+            repo_name="test-repo",
+            repo_root=tmp_path,
+        )
+        assert "## Project Shape" not in prompt
+        assert "{{PROJECT_SHAPE}}" not in prompt
