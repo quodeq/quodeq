@@ -42,6 +42,7 @@ class LoopContext:
     dimension_key: str
     submit_fn: Callable[[], None]
     max_files_per_agent: int | None = None
+    deadline_at: float | None = None
 
 
 def scout_loop(ctx: LoopContext) -> None:
@@ -54,7 +55,10 @@ def scout_loop(ctx: LoopContext) -> None:
     ctx.submit_fn()
     while ctx.futures:
         done = collect_done(ctx.futures, ctx.finished, ctx.results, ev_paths)
-        scale_ctx = ScaleUpContext(ctx.queue, ctx.queue_path, ctx.submit_fn)
+        scale_ctx = ScaleUpContext(
+            ctx.queue, ctx.queue_path, ctx.submit_fn,
+            deadline_at=ctx.deadline_at,
+        )
         state.scout_done = maybe_scale_up(
             done, state, ctx.n_agents, ctx.max_files_per_agent,
             scale_ctx,
@@ -64,7 +68,10 @@ def scout_loop(ctx: LoopContext) -> None:
             continue
         if state.scout_done:
             for _ in done:
-                if should_respawn(ctx.queue, ctx.queue_path, ctx.pool_start, ctx.max_duration):
+                if should_respawn(
+                    ctx.queue, ctx.queue_path, ctx.pool_start, ctx.max_duration,
+                    deadline_at=ctx.deadline_at,
+                ):
                     ctx.submit_fn()
 
 
@@ -82,5 +89,8 @@ def immediate_loop(ctx: LoopContext) -> None:
             time.sleep(_FUTURE_POLL_INTERVAL_S)
             continue
         for _ in done:
-            if should_respawn(ctx.queue, ctx.queue_path, ctx.pool_start, ctx.max_duration):
+            if should_respawn(
+                ctx.queue, ctx.queue_path, ctx.pool_start, ctx.max_duration,
+                deadline_at=ctx.deadline_at,
+            ):
                 ctx.submit_fn()

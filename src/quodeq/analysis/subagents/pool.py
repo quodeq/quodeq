@@ -115,6 +115,7 @@ class SubagentPool:
                     evidence_dir=self._evidence_dir, dimension_key=self._dimension_key,
                     submit_fn=lambda: self._submit_agent(pool),
                     max_files_per_agent=self._base_config.max_files_per_agent,
+                    deadline_at=self._base_config.deadline_at,
                 )
                 if self._scout_first:
                     scout_loop(ctx)
