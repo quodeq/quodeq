@@ -5,6 +5,15 @@
  */
 import { useApi } from '../api/ApiContext.jsx';
 
+// Strip filesystem-unfriendly characters so a project name like
+// "foo/bar" or "..\\evil" can't influence the download path.
+function sanitizeFilename(name) {
+  return String(name || '')
+    .replace(/[/\\:*?"<>|\x00-\x1f]+/g, '_')
+    .replace(/^\.+/, '_')
+    .slice(0, 100) || 'project';
+}
+
 export function useProjectActions({ projects, selectedProject, handleProjectChange, loadProjects }) {
   const { deleteProject, getProjectExportUrl, relocateProject } = useApi();
   async function handleDeleteProject(projectId) {
@@ -20,7 +29,7 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
 
   function handleExportProject(projectId) {
     const proj = projects.find((p) => (p.id || p.name) === projectId);
-    const filename = `${proj?.name || projectId}.zip`;
+    const filename = `${sanitizeFilename(proj?.name || projectId)}.zip`;
     // PyWebView: native Save dialog, fetches server-side
     if (window.pywebview?.api?.download_url) {
       window.pywebview.api.download_url(`/api/projects/${encodeURIComponent(projectId)}/export`, filename);

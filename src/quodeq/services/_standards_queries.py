@@ -11,6 +11,7 @@ from quodeq.services._standards_io import (
     count_principles_and_requirements, get_builtin_weight, is_builtin_id,
     load_cwe_entries,
 )
+from quodeq.shared.validation import validate_path_segment
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,12 @@ def list_custom(evaluators_dir: Path, read_json: Callable) -> list[StandardMeta]
 
 def get_standard(standard_id: str, evaluators_dir: Path, compiled_dir: Path,
                  dimensions_file: Path, read_json: Callable) -> StandardDetail:
-    """Return full detail for a single standard, checking custom then built-in."""
+    """Return full detail for a single standard, checking custom then built-in.
+
+    Validates *standard_id* up-front so a path-traversal segment ('../foo')
+    cannot reach the filesystem join below.
+    """
+    validate_path_segment(standard_id)
     custom_path = evaluators_dir / f"{standard_id}.json"
     if custom_path.is_file():
         return build_detail(read_json(custom_path))
