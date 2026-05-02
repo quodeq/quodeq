@@ -9,6 +9,8 @@ You MUST evaluate EVERY principle group — not just the first ones.
 
 {{STANDARDS_TEXT}}
 
+{{PROJECT_SHAPE}}
+
 ## Source Files
 
 {{FILES_BLOCK}}

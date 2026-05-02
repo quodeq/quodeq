@@ -12,6 +12,7 @@ from quodeq.analysis.prompts._template import load_template
 from quodeq.analysis.prompts.builder import _load_evaluation_rules
 from quodeq.config.prompt_templates import render_template
 from quodeq.context.path_role import Role, path_role
+from quodeq.context.project_shape import Deployment, ProjectShape, detect_shape
 
 _log = logging.getLogger(__name__)
 
@@ -66,6 +67,44 @@ def _build_files_block(source_files: list[Path], repo_root: Path | None = None) 
     return "\n\n".join(parts)
 
 
+def _format_shape_block(shape: ProjectShape) -> str:
+    """Render a project-shape briefing for the LLM, or empty when unknown.
+
+    Skipped for ``UNKNOWN`` deployments: the heuristics didn't fire and we
+    don't want to plant a wrong assumption in the model's head.
+    """
+    if shape.deployment is Deployment.UNKNOWN:
+        return ""
+    parts: list[str] = [f"deployment={shape.deployment.value}",
+                        f"single_user={'true' if shape.is_single_user else 'false'}"]
+    if shape.runtime_langs:
+        parts.append(f"runtime={'+'.join(shape.runtime_langs)}")
+    if shape.web_frameworks:
+        parts.append(f"web_frameworks={'+'.join(shape.web_frameworks)}")
+    if shape.ui_lang:
+        parts.append(f"ui={shape.ui_lang}")
+    summary = ", ".join(parts)
+
+    note = ""
+    if shape.deployment is Deployment.DESKTOP and shape.is_single_user:
+        note = (
+            " This is a single-user desktop tool, not a hosted multi-tenant"
+            " service. Treat findings about thread blocking, distributed"
+            " state, concurrent callers, and rate limiting with skepticism."
+        )
+    elif shape.deployment is Deployment.LIBRARY:
+        note = (
+            " This is a library, not an end-user application. API stability"
+            " and backwards compatibility matter more than user-facing UX."
+        )
+    elif shape.deployment is Deployment.CLI and shape.is_single_user:
+        note = (
+            " This is a single-user CLI, not a hosted service. Concurrent"
+            " caller and multi-tenant findings rarely apply."
+        )
+    return f"## Project Shape\n\n**{summary}**.{note}"
+
+
 def assemble_api_prompt(
     *,
     source_files: list[Path],
@@ -73,15 +112,25 @@ def assemble_api_prompt(
     dimension: str,
     repo_name: str,
     repo_root: Path | None = None,
+    project_shape: ProjectShape | None = None,
 ) -> str:
-    """Assemble a complete evaluation prompt for the API runner."""
+    """Assemble a complete evaluation prompt for the API runner.
+
+    *project_shape* is computed from *repo_root* when not supplied; pass an
+    explicit shape to skip detection (e.g. when a cached shape is being
+    reused across dimensions).
+    """
     template = load_template(template_name="api_prompt.md")
     rules = _load_evaluation_rules()
     files_block = _build_files_block(source_files, repo_root=repo_root)
+    if project_shape is None and repo_root is not None:
+        project_shape = detect_shape(repo_root)
+    shape_block = _format_shape_block(project_shape) if project_shape else ""
     return render_template(template, {
         "DIMENSION": dimension,
         "REPO_NAME": repo_name,
         "STANDARDS_TEXT": standards_text,
+        "PROJECT_SHAPE": shape_block,
         "EVALUATION_RULES": rules,
         "FINDING_SCHEMA": _FINDING_SCHEMA,
         "FILES_BLOCK": files_block,

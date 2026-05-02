@@ -114,6 +114,57 @@ class TestFindingsRouter:
         written = json.loads(findings_file.read_text().strip())
         assert "confidence" not in written
 
+    def test_shape_downweights_hosted_service_finding_on_desktop_app(self, tmp_path: Path) -> None:
+        from quodeq.context.project_shape import Deployment, ProjectShape
+        findings_file = tmp_path / "findings.jsonl"
+        shape = ProjectShape(deployment=Deployment.DESKTOP, is_single_user=True)
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(
+                fh, CompiledContext(project_shape=shape),
+            )
+            router.receive({
+                "p": "P1", "t": "violation", "d": "perf",
+                "w": "Concurrent callers can corrupt shared state",
+                "reason": "Multiple concurrent callers will race.",
+                "file": "src/main.py", "line": 5,
+            })
+        written = json.loads(findings_file.read_text().strip())
+        assert written["confidence"] == 40
+
+    def test_shape_does_not_downweight_unrelated_finding(self, tmp_path: Path) -> None:
+        from quodeq.context.project_shape import Deployment, ProjectShape
+        findings_file = tmp_path / "findings.jsonl"
+        shape = ProjectShape(deployment=Deployment.DESKTOP, is_single_user=True)
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(
+                fh, CompiledContext(project_shape=shape),
+            )
+            router.receive({
+                "p": "P1", "t": "violation", "d": "perf",
+                "w": "Quadratic loop", "reason": "Nested for-loops over the same list.",
+                "file": "src/main.py", "line": 5,
+            })
+        written = json.loads(findings_file.read_text().strip())
+        assert "confidence" not in written
+
+    def test_shape_does_not_downweight_for_web_service(self, tmp_path: Path) -> None:
+        from quodeq.context.project_shape import Deployment, ProjectShape
+        findings_file = tmp_path / "findings.jsonl"
+        shape = ProjectShape(deployment=Deployment.WEB_SERVICE, is_single_user=False)
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(
+                fh, CompiledContext(project_shape=shape),
+            )
+            router.receive({
+                "p": "P1", "t": "violation", "d": "perf",
+                "w": "Concurrent callers can corrupt shared state",
+                "reason": "Multiple concurrent callers will race.",
+                "file": "src/main.py", "line": 5,
+            })
+        written = json.loads(findings_file.read_text().strip())
+        # Web service: the hosted-service finding stays at full confidence.
+        assert "confidence" not in written
+
 
 class TestGetNextFiles:
     def test_tools_list_includes_get_next_files(self, tmp_path: Path) -> None:

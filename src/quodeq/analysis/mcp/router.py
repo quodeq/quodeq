@@ -18,6 +18,7 @@ if sys.platform != "win32":
 from quodeq.analysis.mcp.enrichment import enrich_code
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
 from quodeq.context.path_role import NON_PROD_ROLES, path_role
+from quodeq.context.project_shape import Deployment, ProjectShape
 from quodeq.data.ports.findings import FindingsRepository
 from quodeq.shared._env import sqlite_disabled
 
@@ -25,6 +26,20 @@ _logger = logging.getLogger(__name__)
 _FINDING_SCHEMA_VERSION = 1
 _NON_PROD_DOWNWEIGHT = 50  # confidence applied to violations on non-prod paths
                            # when the LLM didn't already lower it.
+_SHAPE_DOWNWEIGHT = 40  # confidence applied when the finding clearly assumes
+                        # a hosted multi-tenant service but the project shape
+                        # says single-user desktop / CLI / library.
+
+_HOSTED_SERVICE_KEYWORDS: tuple[str, ...] = (
+    "concurrent caller", "concurrent callers", "concurrent request",
+    "concurrent requests", "thread block", "blocks the thread",
+    "blocks thread", "blocks the event loop", "blocks the request thread",
+    "distributed state", "distributed system", "distributed lock",
+    "multi-tenant", "multitenant", "tenant isolation",
+    "rate limit", "rate-limit", "rate limiting",
+    "ddos", "denial of service", "denial-of-service",
+    "horizontal scaling", "horizontal scale",
+)
 
 
 def _apply_path_role_downweight(finding: dict[str, object]) -> None:
@@ -45,6 +60,45 @@ def _apply_path_role_downweight(finding: dict[str, object]) -> None:
         finding["confidence"] = _NON_PROD_DOWNWEIGHT
 
 
+def _shape_irrelevant_to_hosted_service(shape: ProjectShape | None) -> bool:
+    """True when the project clearly isn't a hosted multi-tenant service."""
+    if shape is None:
+        return False
+    if shape.deployment in (Deployment.DESKTOP, Deployment.LIBRARY):
+        return True
+    if shape.deployment is Deployment.CLI and shape.is_single_user:
+        return True
+    return False
+
+
+def _apply_shape_downweight(
+    finding: dict[str, object], shape: ProjectShape | None,
+) -> None:
+    """Downweight findings that clearly assume a hosted service when the
+    project is desktop / CLI / library.
+
+    Matches keywords inside the finding's reason / title. The keyword list
+    is generic across languages; it isn't tied to any one framework or
+    project. Like the path-role downweight, this only fires when the LLM
+    didn't already lower confidence.
+    """
+    if finding.get("t") != "violation":
+        return
+    if not _shape_irrelevant_to_hosted_service(shape):
+        return
+    haystack_parts: list[str] = []
+    for key in ("reason", "w", "title"):
+        val = finding.get(key)
+        if isinstance(val, str):
+            haystack_parts.append(val.lower())
+    haystack = " ".join(haystack_parts)
+    if not any(kw in haystack for kw in _HOSTED_SERVICE_KEYWORDS):
+        return
+    existing = finding.get("confidence")
+    if existing is None or existing == 100:
+        finding["confidence"] = _SHAPE_DOWNWEIGHT
+
+
 @dataclass
 class CompiledContext:
     """Grouped compiled-standards data for finding enrichment."""
@@ -53,6 +107,7 @@ class CompiledContext:
     req_to_dim: dict[str, str] = field(default_factory=dict)
     dimension: str | None = None
     work_dir: Path | None = None
+    project_shape: ProjectShape | None = None
 
 
 @runtime_checkable
@@ -129,6 +184,7 @@ class FindingsRouter:
         self._req_to_dim = ctx.req_to_dim
         self._seen: DeduplicationStore = seen_store if seen_store is not None else set()
         self._work_dir = ctx.work_dir
+        self._project_shape = ctx.project_shape
         self._read_file = file_reader or _default_read_file
         self._findings_repo = findings_repo
         self.counter = 0
@@ -166,6 +222,7 @@ class FindingsRouter:
         self._enrich(args, finding)
         enrich_code(finding, self._work_dir, self._read_file)
         _apply_path_role_downweight(finding)
+        _apply_shape_downweight(finding, self._project_shape)
 
         line = json.dumps(finding) + "\n"
         _locked_write(self._fh, line)
