@@ -85,3 +85,29 @@ class TestAssembleApiPrompt:
         )
         assert isinstance(prompt, str)
         assert len(prompt) > 0
+
+    def test_labels_test_file_with_role(self, tmp_path, standards_text):
+        tests_dir = tmp_path / "tests"
+        tests_dir.mkdir()
+        (tests_dir / "test_main.py").write_text("def test_x():\n    assert True\n")
+        prompt = assemble_api_prompt(
+            source_files=[tests_dir / "test_main.py"],
+            standards_text=standards_text,
+            dimension="maintainability",
+            repo_name="test-repo",
+            repo_root=tmp_path,
+        )
+        assert "tests/test_main.py (role: test)" in prompt
+
+    def test_omits_role_label_for_prod_files(self, tmp_path, standards_text):
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "server.py").write_text("def hello():\n    pass\n")
+        prompt = assemble_api_prompt(
+            source_files=[src / "server.py"],
+            standards_text=standards_text,
+            dimension="maintainability",
+            repo_name="test-repo",
+            repo_root=tmp_path,
+        )
+        assert "(role:" not in prompt

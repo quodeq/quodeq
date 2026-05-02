@@ -302,6 +302,30 @@
   font-variant-numeric: tabular-nums;
 }
 
+.low-confidence-group {
+  margin-top: var(--space-5);
+}
+
+.low-confidence-group-header {
+  background: none;
+  border: none;
+  padding: 0;
+  width: 100%;
+  cursor: pointer;
+  color: var(--color-text-subtle);
+  text-align: left;
+}
+
+.low-confidence-group-header:hover .violation-group-title {
+  color: var(--color-text);
+}
+
+.low-confidence-group-hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+  font-style: italic;
+}
+
 /* --- File Picker Dialog --- */
 .dialog-backdrop {
   position: fixed;

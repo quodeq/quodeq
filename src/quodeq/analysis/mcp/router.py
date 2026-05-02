@@ -17,11 +17,32 @@ if sys.platform != "win32":
 
 from quodeq.analysis.mcp.enrichment import enrich_code
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
+from quodeq.context.path_role import NON_PROD_ROLES, path_role
 from quodeq.data.ports.findings import FindingsRepository
 from quodeq.shared._env import sqlite_disabled
 
 _logger = logging.getLogger(__name__)
 _FINDING_SCHEMA_VERSION = 1
+_NON_PROD_DOWNWEIGHT = 50  # confidence applied to violations on non-prod paths
+                           # when the LLM didn't already lower it.
+
+
+def _apply_path_role_downweight(finding: dict[str, object]) -> None:
+    """Lower a finding's confidence to 50 when it lives on a non-prod path.
+
+    Skipped when the LLM emitted an explicit confidence below the default of
+    100 (we trust the model's own self-doubt over a coarse path heuristic)
+    and for compliance findings (downweighting "this code is fine" makes
+    no sense).
+    """
+    if finding.get("t") != "violation":
+        return
+    role = path_role(finding.get("file"))
+    if role not in NON_PROD_ROLES:
+        return
+    existing = finding.get("confidence")
+    if existing is None or existing == 100:
+        finding["confidence"] = _NON_PROD_DOWNWEIGHT
 
 
 @dataclass
@@ -144,6 +165,7 @@ class FindingsRouter:
         finding.update({k: v for k, v in args.items() if v is not None})
         self._enrich(args, finding)
         enrich_code(finding, self._work_dir, self._read_file)
+        _apply_path_role_downweight(finding)
 
         line = json.dumps(finding) + "\n"
         _locked_write(self._fh, line)
