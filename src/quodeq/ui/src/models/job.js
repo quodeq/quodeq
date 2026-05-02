@@ -13,6 +13,7 @@
  * @property {string[]}      logs
  * @property {string|null}   startedAt
  * @property {string|null}   endedAt
+ * @property {string|null}   deadlineAt     - ISO-8601 wall-clock deadline for the run; null when unlimited or not yet set
  * @property {number|null}   exitCode
  * @property {string|null}   error
  * @property {'internal'|'external'} source  - 'internal' = launched from dashboard; 'external' = CLI/CI
@@ -38,6 +39,7 @@ export function createJob(raw) {
     logs:             raw.logs ?? [],
     startedAt:        raw.startedAt ?? null,
     endedAt:          raw.endedAt ?? null,
+    deadlineAt:       raw.deadlineAt ?? null,
     exitCode:         raw.exitCode ?? null,
     error:            raw.error ?? null,
     source:           raw.source ?? 'internal',
