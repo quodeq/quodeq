@@ -22,13 +22,22 @@ from quodeq.services.scan_progress import build_scan_progress, progress_to_dict
 
 _logger = logging.getLogger(__name__)
 
+# Cap on /api/evaluations ?limit= so a client cannot ask the server to materialize
+# an unbounded list. limit=0 still means "no client cap" but we clamp the actual
+# value the provider sees. 1000 is well above any realistic dashboard query.
+_EVALUATIONS_LIST_HARD_CAP = 1000
+
 
 def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_rate_store: object | None = None) -> None:
     """Register evaluation listing and creation routes."""
 
     @app.get("/api/evaluations")
     def list_evaluations() -> Response:
-        limit = request.args.get("limit", 0, type=int)
+        raw_limit = request.args.get("limit", 0, type=int)
+        if raw_limit <= 0 or raw_limit > _EVALUATIONS_LIST_HARD_CAP:
+            limit = _EVALUATIONS_LIST_HARD_CAP
+        else:
+            limit = raw_limit
         state_arg = request.args.get("state", "").strip()
         states = {s for s in (v.strip() for v in state_arg.split(",")) if s} or None
         items = provider.list_evaluations(limit=limit, reports_dir=_reports_dir(), states=states)
