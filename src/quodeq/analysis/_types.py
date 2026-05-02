@@ -30,6 +30,7 @@ class AnalysisOptions:
     verify_findings: bool = True
     consolidated: bool = True
     pool_budget: int | None = None
+    deadline_at: float | None = None
     incremental: bool = False
     incremental_file_filter: set[str] | None = None
     dry_run: bool = False
