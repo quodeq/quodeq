@@ -9,7 +9,6 @@ from quodeq.services.dismissed import dismiss_finding, load_dismissed, restore_f
 from quodeq.shared.utils import get_evaluations_dir
 from quodeq.shared.validation import validate_path_segment
 
-_DEFAULT_DISMISSED_LIMIT = 500
 _MAX_DISMISSED_LIMIT = 5000
 
 
@@ -33,7 +32,9 @@ def register_findings_routes(app: Flask) -> None:
         project = request.args.get("project", "")
         if not project:
             return jsonify([])
-        raw_limit = request.args.get("limit", _DEFAULT_DISMISSED_LIMIT, type=int)
+        # No limit param → return everything (capped at the hard maximum).
+        # An explicit limit is clamped to [1, _MAX_DISMISSED_LIMIT].
+        raw_limit = request.args.get("limit", _MAX_DISMISSED_LIMIT, type=int)
         limit = max(1, min(raw_limit, _MAX_DISMISSED_LIMIT))
         offset = max(0, request.args.get("offset", 0, type=int))
         items = load_dismissed(
