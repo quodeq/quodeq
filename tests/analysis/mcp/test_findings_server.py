@@ -21,6 +21,24 @@ def test_build_router_wires_sqlite_repo_with_run_dir(tmp_path: Path):
     assert router._findings_repo._run_dir == tmp_path / "run-1"
 
 
+def test_build_router_loads_precedent_fingerprints_from_project_dir(tmp_path: Path):
+    import json
+
+    from quodeq.context.precedent import fingerprint
+
+    # Layout: <project_dir>/<run_dir>/evidence/<dim>_evidence.jsonl
+    project_dir = tmp_path
+    findings_path = project_dir / "run-1" / "evidence" / "security_evidence.jsonl"
+    findings_path.parent.mkdir(parents=True)
+    (project_dir / "dismissed.json").write_text(json.dumps([
+        {"req": "S-CON-1", "snippet": "password = 'secret'"},
+    ]))
+
+    router = _build_router(io.StringIO(), findings_path, CompiledContext())
+
+    assert fingerprint("S-CON-1", "password = 'secret'") in router._precedent_fingerprints
+
+
 def test_build_router_emits_findings_to_both_jsonl_and_sqlite(tmp_path: Path):
     findings_path = tmp_path / "run-1" / "evidence" / "timeliness_evidence.jsonl"
     findings_path.parent.mkdir(parents=True)
