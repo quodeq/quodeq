@@ -39,6 +39,10 @@ class Judgment:
     title: str = ""
     context: str = ""
     scope: str = ""
+    # 0-100 confidence score the scanner attaches to this finding. 100 means
+    # "no reason to doubt." Subsequent slices of the context-enricher plan
+    # populate values < 100 to downweight known false-positive patterns.
+    confidence: int = 100
 
     def __post_init__(self) -> None:
         if not self.practice_id:

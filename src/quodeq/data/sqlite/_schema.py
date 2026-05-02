@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 EVALUATION_DDL = """
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;
 
 CREATE TABLE findings (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,6 +23,10 @@ CREATE TABLE findings (
     scope           TEXT NOT NULL DEFAULT '',
     req_refs_json   TEXT,
     dedup_key       TEXT NOT NULL UNIQUE,
+    -- per-finding confidence in [0, 100]; default 100 means "scanner is fully
+    -- sure this is real." Slice 1 of the context-enricher plan adds this column;
+    -- subsequent slices write < 100 to downweight false-positive patterns.
+    confidence      INTEGER NOT NULL DEFAULT 100,
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -70,4 +74,4 @@ CREATE TABLE run_meta (
 );
 """
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2

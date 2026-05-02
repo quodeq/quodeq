@@ -12,5 +12,9 @@ def test_evaluation_ddl_includes_fts5():
     assert "content='findings'" in _schema.EVALUATION_DDL
 
 
-def test_evaluation_ddl_sets_user_version_1():
-    assert "PRAGMA user_version = 1" in _schema.EVALUATION_DDL
+def test_evaluation_ddl_sets_user_version_to_schema_version():
+    assert f"PRAGMA user_version = {_schema.SCHEMA_VERSION}" in _schema.EVALUATION_DDL
+
+
+def test_evaluation_ddl_includes_confidence_column():
+    assert "confidence" in _schema.EVALUATION_DDL
