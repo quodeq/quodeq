@@ -264,6 +264,15 @@ def _run_pipeline_with_cleanup(
                     # (the UI gates dim-polling on phase in
                     # {analyzing, scoring}).
                     lifecycle.set_phase("analyzing")
+                    # Record the run-level deadline so the dashboard countdown
+                    # has it (visible immediately in status.json and SSE).
+                    budget_s = getattr(args, "pool_budget", None)
+                    if budget_s is not None and budget_s > 0:
+                        from datetime import datetime, timedelta, timezone
+                        deadline_iso = (
+                            datetime.now(timezone.utc) + timedelta(seconds=budget_s)
+                        ).isoformat()
+                        lifecycle.set_deadline(deadline_iso)
                     result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
                     # run_full writes per-dimension reports as each dimension
                     # completes, so by the time it returns scoring is already

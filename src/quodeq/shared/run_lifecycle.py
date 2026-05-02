@@ -65,6 +65,7 @@ class RunLifecycleContext:
         self._current_state = RunState.PENDING
         self._phase: str | None = None
         self._current_dimension: str | None = None
+        self._deadline_at: str | None = None
         self._heartbeat = HeartbeatThread(run_dir, interval=heartbeat_interval)
         self._resources = ResourceSampler()
         self._previous_handlers: dict[int, Any] = {}
@@ -132,6 +133,11 @@ class RunLifecycleContext:
         self._current_dimension = current_dimension
         self._write(self._current_state)
 
+    def set_deadline(self, deadline_at: str | None) -> None:
+        """Record the run-level deadline. Visible immediately in status.json."""
+        self._deadline_at = deadline_at
+        self._write(self._current_state)
+
     # ---- Internals ---------------------------------------------------------
 
     def _transition(self, new_state: RunState, *, exit_reason: str | None = None) -> None:
@@ -149,6 +155,7 @@ class RunLifecycleContext:
             phase=self._phase,
             current_dimension=self._current_dimension,
             exit_reason=exit_reason,
+            deadline_at=self._deadline_at,
         )
 
     def _install_signal_handlers(self) -> None:
@@ -172,6 +179,7 @@ class RunLifecycleContext:
                 phase=self._phase,
                 current_dimension=self._current_dimension,
                 exit_reason=f"signal_{name}",
+                deadline_at=self._deadline_at,
             )
             self._current_state = RunState.CANCELLED
             raise SystemExit(128 + signum)
@@ -211,6 +219,7 @@ class RunLifecycleContext:
             phase=self._phase,
             current_dimension=self._current_dimension,
             exit_reason="atexit_unfinalized",
+            deadline_at=self._deadline_at,
         )
 
     def _deregister_atexit(self) -> None:

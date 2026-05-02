@@ -21,7 +21,7 @@ from typing import Any
 
 _logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 STATUS_FILENAME = "status.json"
 
 
@@ -81,6 +81,7 @@ def write_status(
     pid: int | None = None,
     exit_reason: str | None = None,
     finalized_at: str | None = None,
+    deadline_at: str | None = None,
 ) -> None:
     """Atomically write status.json with *state* and metadata.
 
@@ -104,6 +105,7 @@ def write_status(
         "dimensions": dimensions,
         "pid": pid,
         "exit_reason": exit_reason,
+        "deadline_at": deadline_at,
     }
     body = json.dumps(payload, indent=2)
     tmp_path = run_dir / (STATUS_FILENAME + ".tmp")
