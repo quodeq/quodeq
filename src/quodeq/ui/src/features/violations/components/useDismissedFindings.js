@@ -31,5 +31,16 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
     }
   }, [selectedProject, onRefresh, setRestoreError]);
 
-  return { dismissed, handleRestore, handleRestoreAll };
+  const handleDelete = useCallback(async (d) => {
+    try {
+      await restoreFinding(selectedProject, { req: d.req, file: d.file, line: d.line });
+      setDismissed((prev) => prev.filter((item) => !(item.req === d.req && item.file === d.file && item.line === d.line)));
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to delete finding:', err);
+      setRestoreError?.('Failed to delete finding. Please try again.');
+    }
+  }, [selectedProject, onRefresh, setRestoreError]);
+
+  return { dismissed, handleRestore, handleRestoreAll, handleDelete };
 }

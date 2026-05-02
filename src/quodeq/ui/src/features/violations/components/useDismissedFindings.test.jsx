@@ -69,3 +69,36 @@ describe('useDismissedFindings — restore handlers', () => {
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('useDismissedFindings — handleDelete', () => {
+  it('removes the matching entry on success and calls onRefresh (mirrors restore on disk, distinct error message)', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
+    restoreFinding.mockResolvedValueOnce({ ok: true });
+    const onRefresh = vi.fn();
+    const setRestoreError = vi.fn();
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
+
+    await act(async () => { await result.current.handleDelete(sampleA); });
+
+    expect(restoreFinding).toHaveBeenCalledWith('proj', { req: 'A1', file: 'a.py', line: 10 });
+    expect(result.current.dismissed).toEqual([sampleB]);
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(setRestoreError).not.toHaveBeenCalled();
+  });
+
+  it('reports a delete-specific error and leaves state unchanged on failure', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA]);
+    restoreFinding.mockRejectedValueOnce(new Error('boom'));
+    const onRefresh = vi.fn();
+    const setRestoreError = vi.fn();
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
+
+    await act(async () => { await result.current.handleDelete(sampleA); });
+
+    expect(setRestoreError).toHaveBeenCalledWith('Failed to delete finding. Please try again.');
+    expect(result.current.dismissed).toEqual([sampleA]);
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+});
