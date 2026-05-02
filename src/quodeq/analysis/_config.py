@@ -30,6 +30,8 @@ class AnalysisConfig:
     max_turns: int | None = _DEFAULT_MAX_TURNS
     max_duration: int | None = _DEFAULT_MAX_DURATION
     pool_budget: int = _DEFAULT_POOL_BUDGET
+    deadline_at: float | None = None
+    """Absolute monotonic-clock deadline for the whole run. None = unlimited."""
     compiled_dir: Path | None = None
     dimension: str | None = None
     queue_path: Path | None = None

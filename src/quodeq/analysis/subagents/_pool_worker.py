@@ -33,9 +33,17 @@ def build_agent_config(
     jsonl_file = wctx.evidence_dir / f"{wctx.dimension_key}_evidence.jsonl"
     stream_file = wctx.evidence_dir / f"{wctx.dimension_key}_{agent_id}.stream"
     bc = base_config
-    # Cap per-agent duration to pool budget so agents can't outlive the pool
     agent_dur = bc.max_duration or _DEFAULT_MAX_DURATION_S
-    if bc.pool_budget and bc.pool_budget > 0:
+    # Clamp to remaining budget so the last in-flight agent dies on or
+    # before the run-level deadline. Without this, a respawn near the
+    # deadline gets a fresh full-length cap and extends the run.
+    if bc.deadline_at is not None:
+        import time as _time
+        remaining = max(1, int(bc.deadline_at - _time.monotonic()))
+        agent_dur = min(agent_dur, remaining)
+    elif bc.pool_budget and bc.pool_budget > 0:
+        # Legacy clamp: kept for runs without a deadline. A later task will
+        # retire pool_budget entirely.
         agent_dur = min(agent_dur, bc.pool_budget)
     ac = AnalysisConfig(
         jsonl_file=jsonl_file, analysis_budget=bc.analysis_budget,
