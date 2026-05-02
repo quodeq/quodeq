@@ -233,7 +233,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
             subagent_model=subagent_model_val,
             verify_findings=not _no_verify(args, env=env),
             consolidated=consolidated,
-            pool_budget=_resolve_time_limit(args, env=env),
+            time_limit=_resolve_time_limit(args, env=env),
             incremental=args.incremental,
             incremental_file_filter=incremental_file_filter,
             dry_run=getattr(args, "dry_run", False),

@@ -29,7 +29,7 @@ class AnalysisOptions:
     ai_model: str | None = None
     verify_findings: bool = True
     consolidated: bool = True
-    pool_budget: int | None = None
+    time_limit: int | None = None
     deadline_at: float | None = None
     incremental: bool = False
     incremental_file_filter: set[str] | None = None

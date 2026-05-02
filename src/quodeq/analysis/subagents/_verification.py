@@ -89,7 +89,7 @@ def _dispatch_mini_verify(
 
     mini_config = copy(config)
     mini_options = copy(config.options)
-    mini_options.pool_budget = timeout
+    mini_options.time_limit = timeout
     mini_options.max_subagents = min(_MINI_VERIFY_MAX_AGENTS, config.options.max_subagents)
     mini_config.options = mini_options
 

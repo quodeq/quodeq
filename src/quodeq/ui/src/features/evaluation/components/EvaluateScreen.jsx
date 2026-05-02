@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
 import CountdownTimer from './CountdownTimer.jsx';
-import { ACTIVE_PROVIDER_KEY, DEFAULT_POOL_BUDGET, providerKey } from '../../../constants.js';
+import { ACTIVE_PROVIDER_KEY, DEFAULT_TIME_LIMIT_S, providerKey } from '../../../constants.js';
 import { TermHeader, SectionLabel } from '../../../components/terminal/index.js';
 
 const TOAST_DISMISS_TIMEOUT_MS = 5000;
@@ -53,8 +53,10 @@ function ActiveProviderBadge({ storage = localStorage }) {
 function readBudgetSeconds(storage = localStorage) {
   const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
   if (!provider) return 0;
-  const raw = storage.getItem(providerKey(provider, 'pool-budget'));
-  if (raw === null) return provider === 'ollama' ? 0 : DEFAULT_POOL_BUDGET;
+  // Read new key first; fall back to legacy 'pool-budget' for back-compat.
+  const raw = storage.getItem(providerKey(provider, 'time-limit'))
+    ?? storage.getItem(providerKey(provider, 'pool-budget'));
+  if (raw === null || raw === undefined) return provider === 'ollama' ? 0 : DEFAULT_TIME_LIMIT_S;
   const parsed = parseInt(raw, 10);
   return Number.isFinite(parsed) ? parsed : 0;
 }

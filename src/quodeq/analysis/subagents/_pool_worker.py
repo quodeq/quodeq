@@ -41,10 +41,10 @@ def build_agent_config(
     if bc.deadline_at is not None:
         remaining = max(1, int(bc.deadline_at - time.monotonic()))
         agent_dur = min(agent_dur, remaining)
-    elif bc.pool_budget and bc.pool_budget > 0:
+    elif bc.time_limit and bc.time_limit > 0:
         # Legacy clamp: kept for runs without a deadline. A later task will
-        # retire pool_budget entirely.
-        agent_dur = min(agent_dur, bc.pool_budget)
+        # retire this branch entirely.
+        agent_dur = min(agent_dur, bc.time_limit)
     ac = AnalysisConfig(
         jsonl_file=jsonl_file, analysis_budget=bc.analysis_budget,
         heartbeat_interval=bc.heartbeat_interval, heartbeat_callback=bc.heartbeat_callback,

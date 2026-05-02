@@ -22,7 +22,7 @@ def test_agent_max_duration_clamped_to_remaining_budget(tmp_path):
         ai_cmd="claude",
         ai_model="claude-opus-4-7",
         max_duration=600,         # 10 min per-agent baseline
-        pool_budget=600,          # 10 min total budget (legacy field, still used)
+        time_limit=600,           # 10 min total time limit (legacy clamp branch)
         deadline_at=now + 90,     # only 90s left until deadline
     )
     ac, _, _ = build_agent_config(0, base, _wctx(tmp_path))
@@ -38,7 +38,7 @@ def test_agent_max_duration_unclamped_when_no_deadline(tmp_path):
         ai_cmd="claude",
         ai_model="claude-opus-4-7",
         max_duration=600,
-        pool_budget=0,            # unlimited
+        time_limit=0,             # unlimited
         deadline_at=None,
     )
     ac, _, _ = build_agent_config(0, base, _wctx(tmp_path))

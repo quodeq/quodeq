@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 import pytest
 
 from quodeq.core.types import JobSnapshot
-from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_POOL_BUDGET
+from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_TIME_LIMIT
 from quodeq.services.evaluation_mixin import (
     FsEvaluationMixin,
     SubprocessDispatcher,
@@ -126,17 +126,17 @@ class TestBuildEvalEnv:
         env = m._build_eval_env("/repo", opts, env={})
         assert "QUODEQ_NO_VERIFY" not in env
 
-    def test_custom_pool_budget(self):
+    def test_custom_time_limit(self):
         m = self._mixin()
-        opts = EvaluationOptions(pool_budget=1200)
+        opts = EvaluationOptions(time_limit=1200)
         env = m._build_eval_env("/repo", opts, env={})
-        assert env["QUODEQ_POOL_BUDGET"] == "1200"
+        assert env["QUODEQ_TIME_LIMIT"] == "1200"
 
-    def test_default_pool_budget_not_set(self):
+    def test_default_time_limit_not_set(self):
         m = self._mixin()
-        opts = EvaluationOptions(pool_budget=_DEFAULT_POOL_BUDGET)
+        opts = EvaluationOptions(time_limit=_DEFAULT_TIME_LIMIT)
         env = m._build_eval_env("/repo", opts, env={})
-        assert "QUODEQ_POOL_BUDGET" not in env
+        assert "QUODEQ_TIME_LIMIT" not in env
 
     def test_per_dimension(self):
         m = self._mixin()

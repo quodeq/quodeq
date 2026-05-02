@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { ACTIVE_PROVIDER_KEY, DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET } from '../../../constants.js';
+import { ACTIVE_PROVIDER_KEY, DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT_S } from '../../../constants.js';
 import useProviderSettings from '../hooks/useProviderSettings.js';
 import { classifyProvider } from './providerUtils.js';
 import OllamaTab from './OllamaTab.jsx';
@@ -8,14 +8,16 @@ import CliProviderTab from './CliProviderTab.jsx';
 import CloudProviderTab from './CloudProviderTab.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 
-const CLI_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), 'pool-budget': String(DEFAULT_POOL_BUDGET) };
+const CLI_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), 'time-limit': String(DEFAULT_TIME_LIMIT_S) };
 const DEFAULT_PROVIDER_ORDER = 50;
 
 const MIGRATION_DONE_KEY = 'cc-provider-tabs-migrated';
 const LEGACY_AI_CMD_KEY = 'cc-ai-cmd';
 const LEGACY_SETTING_MIGRATIONS = {
   'cc-max-subagents': 'subagents',
-  'cc-pool-budget': 'pool-budget',
+  // Legacy global key — migrate to provider-scoped 'time-limit' suffix.
+  'cc-pool-budget': 'time-limit',
+  'cc-time-limit': 'time-limit',
   'cc-per-dimension': 'per-dimension',
   'cc-ai-model': 'model',
 };

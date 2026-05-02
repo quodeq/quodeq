@@ -117,16 +117,20 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
         if run_dir is None:
             body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
-        # Pool budget for the running dim's bar — only available for jobs the
+        # Time limit for the running dim's bar — only available for jobs the
         # JobManager started; external runs surface no budget metadata.
-        pool_budget_s: int | None = None
+        time_limit_s: int | None = None
         snapshot = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
         if snapshot is not None:
             options = getattr(snapshot, "options", None) or {}
-            raw = options.get("poolBudget") if isinstance(options, dict) else None
+            # Read new key first; fall back to legacy `poolBudget` for back-compat.
+            raw = (
+                options.get("timeLimit", options.get("poolBudget"))
+                if isinstance(options, dict) else None
+            )
             if isinstance(raw, int) and raw > 0:
-                pool_budget_s = raw
-        progress = build_scan_progress(job_id, run_dir, pool_budget_s=pool_budget_s)
+                time_limit_s = raw
+        progress = build_scan_progress(job_id, run_dir, time_limit_s=time_limit_s)
         if progress is None:
             body, status = error_response("Run not ready", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status

@@ -36,20 +36,20 @@ class TestPrioritizationInFileQueue:
         assert taken[0] == "src/auth.py"
 
 
-class TestPoolBudgetFlow:
-    def test_pool_budget_from_analysis_options(self, tmp_path):
-        """Verify pool_budget on AnalysisConfig is used by SubagentPool."""
+class TestTimeLimitFlow:
+    def test_time_limit_from_analysis_options(self, tmp_path):
+        """Verify time_limit on AnalysisConfig is used by SubagentPool."""
         queue_path = tmp_path / "queue.json"
         FileQueue(queue_path, ["f.py"])
 
-        ac = AnalysisConfig(pool_budget=120, max_duration=1800, max_files_per_agent=50)
+        ac = AnalysisConfig(time_limit=120, max_duration=1800, max_files_per_agent=50)
         pool = SubagentPool(
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
             options=PoolOptions(n_agents=1, prompt="test", dimension="security"),
             config=ac,
         )
 
-        # Pool budget should be 120 (custom), not 600 (default)
-        assert pool._base_config.pool_budget == 120
-        # Per-agent duration should still be 1800, not affected by pool_budget
+        # Time limit should be 120 (custom), not 600 (default)
+        assert pool._base_config.time_limit == 120
+        # Per-agent duration should still be 1800, not affected by time_limit
         assert pool._base_config.max_duration == 1800

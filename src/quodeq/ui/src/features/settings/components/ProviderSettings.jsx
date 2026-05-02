@@ -1,11 +1,11 @@
-import { DEFAULT_POOL_BUDGET } from '../../../constants.js';
+import { DEFAULT_TIME_LIMIT_S } from '../../../constants.js';
 
 const SECONDS_PER_MINUTE = 60;
 const DEFAULT_TIME_LIMIT_MINUTES = '10';
 
 export function TimeLimitSetting({ state, update }) {
-  const poolBudget = parseInt(state['pool-budget'] || '0', 10);
-  const unlimited = poolBudget === 0;
+  const timeLimit = parseInt(state['time-limit'] || '0', 10);
+  const unlimited = timeLimit === 0;
 
   return (
     <div className="settings-row">
@@ -15,18 +15,18 @@ export function TimeLimitSetting({ state, update }) {
       </div>
       <div className="settings-budget-control">
         <div className="settings-pill-group">
-          <button type="button" className={`settings-pill${unlimited ? ' settings-pill--active' : ''}`} onClick={() => update('pool-budget', '0')} aria-pressed={unlimited}>Unlimited</button>
-          <button type="button" className={`settings-pill${!unlimited ? ' settings-pill--active' : ''}`} onClick={() => update('pool-budget', String(DEFAULT_POOL_BUDGET))} aria-pressed={!unlimited}>Limited</button>
+          <button type="button" className={`settings-pill${unlimited ? ' settings-pill--active' : ''}`} onClick={() => update('time-limit', '0')} aria-pressed={unlimited}>Unlimited</button>
+          <button type="button" className={`settings-pill${!unlimited ? ' settings-pill--active' : ''}`} onClick={() => update('time-limit', String(DEFAULT_TIME_LIMIT_S))} aria-pressed={!unlimited}>Limited</button>
         </div>
         <input
           type="number"
           className="settings-model-input"
           min={1}
           max={SECONDS_PER_MINUTE}
-          value={unlimited ? '' : Math.round(poolBudget / SECONDS_PER_MINUTE)}
+          value={unlimited ? '' : Math.round(timeLimit / SECONDS_PER_MINUTE)}
           placeholder={unlimited ? '\u221E' : 'min'}
           disabled={unlimited}
-          onChange={(e) => update('pool-budget', String(parseInt(e.target.value || DEFAULT_TIME_LIMIT_MINUTES, 10) * SECONDS_PER_MINUTE))}
+          onChange={(e) => update('time-limit', String(parseInt(e.target.value || DEFAULT_TIME_LIMIT_MINUTES, 10) * SECONDS_PER_MINUTE))}
         />
       </div>
     </div>

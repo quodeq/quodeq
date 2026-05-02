@@ -93,7 +93,7 @@ def _run_dimensions(
     # Set the run-level deadline once, just before the dim loop starts.
     # Skipped for dry runs (already returned above), unlimited budget, or
     # when an outer caller (tests) has pre-set deadline_at.
-    budget_s = config.options.pool_budget
+    budget_s = config.options.time_limit
     if config.options.deadline_at is None and budget_s is not None and budget_s > 0:
         config.options.deadline_at = time.monotonic() + budget_s
         deadline_iso = (
