@@ -582,6 +582,11 @@
   min-width: 0;
   flex: 1;
 }
+.evaluate-header--terminal .evaluate-header__right {
+  display: flex;
+  align-items: center;
+  gap: var(--term-space-2);
+}
 .evaluate-header--terminal .term-header {
   margin: 0;
 }
