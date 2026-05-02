@@ -58,6 +58,37 @@
   padding: 24px;
 }
 
+/* ── No-project-selected state on the Evaluate tab ── */
+
+.evaluate-no-project {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.evaluate-no-project__hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.evaluate-no-project__cta {
+  padding: 8px 16px;
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.evaluate-no-project__cta:hover {
+  background: color-mix(in srgb, var(--color-accent) 80%, var(--color-text));
+}
+
 
 .form-group {
   display: flex;

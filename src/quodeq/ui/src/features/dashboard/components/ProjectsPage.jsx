@@ -245,20 +245,50 @@ function useRelocateDialog(onRelocate) {
   return { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate };
 }
 
+function EmptyProjectsCTA({ onAddProject }) {
+  return (
+    <div className="projects-empty projects-empty--cta">
+      <h3 className="projects-empty__title">Add your first project</h3>
+      <p className="projects-empty__hint">
+        Point quodeq at a local repository or paste a Git URL to get started.
+      </p>
+      <button
+        type="button"
+        className="projects-empty__cta-btn"
+        onClick={onAddProject}
+      >
+        + Add project
+      </button>
+    </div>
+  );
+}
+
 export default function ProjectsPage({ projects = [], selectedProject, actions }) {
-  const { onSelect, onDelete, onExport, onRelocate } = actions;
+  const { onSelect, onDelete, onExport, onRelocate, onAddProject } = actions;
   const { children, roots } = useMemo(() => computeProjectTree(projects), [projects]);
   const [confirming, setConfirming] = useState(null);
   const relocateActions = useRelocateDialog(onRelocate);
 
   return (
     <section className="projects-page projects-page--terminal">
-      <TermHeader
-        name="repositories"
-        sub={`${projects.length} ${projects.length === 1 ? 'repository' : 'repositories'} evaluated`}
-      />
+      <div className="projects-page__header">
+        <TermHeader
+          name="repositories"
+          sub={`${projects.length} ${projects.length === 1 ? 'repository' : 'repositories'} evaluated`}
+        />
+        {projects.length > 0 && onAddProject && (
+          <button
+            type="button"
+            className="projects-page__add-btn"
+            onClick={onAddProject}
+            aria-label="Add project"
+          >
+            + Add project
+          </button>
+        )}
+      </div>
       {projects.length === 0 ? (
-        <div className="projects-empty"><p>No projects yet. Run an evaluation to get started.</p></div>
+        <EmptyProjectsCTA onAddProject={onAddProject} />
       ) : (
         <div className="projects-cards">
           {roots.map((p) => (
