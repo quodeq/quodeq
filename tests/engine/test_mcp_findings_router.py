@@ -147,6 +147,74 @@ class TestFindingsRouter:
         written = json.loads(findings_file.read_text().strip())
         assert "confidence" not in written
 
+    def test_precedent_match_downweights_to_25(self, tmp_path: Path) -> None:
+        from quodeq.context.precedent import fingerprint
+        findings_file = tmp_path / "findings.jsonl"
+        snippet = "password = 'hunter2'"
+        fp = fingerprint("S-CON-1", snippet)
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(
+                fh, CompiledContext(precedent_fingerprints={fp}),
+            )
+            router.receive({
+                "p": "Confidentiality", "t": "violation", "d": "security",
+                "req": "S-CON-1", "w": "Hardcoded credential",
+                "snippet": snippet,
+                "file": "src/main.py", "line": 5,
+            })
+        written = json.loads(findings_file.read_text().strip())
+        assert written["confidence"] == 25
+
+    def test_precedent_miss_keeps_full_confidence(self, tmp_path: Path) -> None:
+        findings_file = tmp_path / "findings.jsonl"
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(
+                fh, CompiledContext(precedent_fingerprints={"some-other-fp"}),
+            )
+            router.receive({
+                "p": "P1", "t": "violation", "d": "security",
+                "req": "S-CON-1", "w": "Hardcoded credential",
+                "snippet": "password = 'hunter2'",
+                "file": "src/main.py", "line": 5,
+            })
+        written = json.loads(findings_file.read_text().strip())
+        assert "confidence" not in written
+
+    def test_precedent_does_not_downweight_compliance(self, tmp_path: Path) -> None:
+        from quodeq.context.precedent import fingerprint
+        findings_file = tmp_path / "findings.jsonl"
+        snippet = "password = 'hunter2'"
+        fp = fingerprint("S-CON-1", snippet)
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(
+                fh, CompiledContext(precedent_fingerprints={fp}),
+            )
+            router.receive({
+                "p": "P1", "t": "compliance", "d": "security",
+                "req": "S-CON-1", "w": "OK",
+                "snippet": snippet, "file": "src/main.py", "line": 5,
+            })
+        written = json.loads(findings_file.read_text().strip())
+        assert "confidence" not in written
+
+    def test_precedent_respects_llm_emitted_confidence(self, tmp_path: Path) -> None:
+        from quodeq.context.precedent import fingerprint
+        findings_file = tmp_path / "findings.jsonl"
+        snippet = "password = 'hunter2'"
+        fp = fingerprint("S-CON-1", snippet)
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(
+                fh, CompiledContext(precedent_fingerprints={fp}),
+            )
+            router.receive({
+                "p": "P1", "t": "violation", "d": "security",
+                "req": "S-CON-1", "w": "Hardcoded credential",
+                "snippet": snippet, "file": "src/main.py", "line": 5,
+                "confidence": 60,
+            })
+        written = json.loads(findings_file.read_text().strip())
+        assert written["confidence"] == 60
+
     def test_shape_does_not_downweight_for_web_service(self, tmp_path: Path) -> None:
         from quodeq.context.project_shape import Deployment, ProjectShape
         findings_file = tmp_path / "findings.jsonl"

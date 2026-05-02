@@ -6,6 +6,7 @@ service emits a confidence multiplier on top of the LLM's verdict; nothing
 is suppressed.
 """
 from quodeq.context.path_role import NON_PROD_ROLES, Role, path_role
+from quodeq.context.precedent import fingerprint, load_precedent_fingerprints
 from quodeq.context.project_shape import Deployment, ProjectShape, detect_shape
 
 __all__ = [
@@ -14,5 +15,7 @@ __all__ = [
     "ProjectShape",
     "Role",
     "detect_shape",
+    "fingerprint",
+    "load_precedent_fingerprints",
     "path_role",
 ]
