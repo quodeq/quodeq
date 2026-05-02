@@ -10,8 +10,8 @@ export function TimeLimitSetting({ state, update }) {
   return (
     <div className="settings-row">
       <div className="settings-row-label">
-        <span className="settings-label">Analysis time limit</span>
-        <span className="settings-description">Max time per dimension. Unlimited runs until all files processed.</span>
+        <span className="settings-label">Total time limit</span>
+        <span className="settings-description">Stops the evaluation after this duration. Completed dimensions are scored. Any dimension still running is partial. Remaining dimensions are skipped.</span>
       </div>
       <div className="settings-budget-control">
         <div className="settings-pill-group">
