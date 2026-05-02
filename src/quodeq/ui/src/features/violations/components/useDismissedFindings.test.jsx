@@ -9,11 +9,17 @@ vi.mock('../../../api/index.js', () => ({
   restoreAllFindings: vi.fn(),
 }));
 
+vi.mock('../../../utils/confirmDialog.js', () => ({
+  confirmDialog: vi.fn(),
+}));
+
 import {
   listDismissedFindings,
   restoreFinding,
   restoreAllFindings,
 } from '../../../api/index.js';
+
+import { confirmDialog } from '../../../utils/confirmDialog.js';
 
 const sampleA = { req: 'A1', file: 'a.py', line: 10, severity: 'minor' };
 const sampleB = { req: 'B1', file: 'b.py', line: 20, severity: 'major' };
@@ -98,6 +104,62 @@ describe('useDismissedFindings — handleDelete', () => {
     await act(async () => { await result.current.handleDelete(sampleA); });
 
     expect(setRestoreError).toHaveBeenCalledWith('Failed to delete finding. Please try again.');
+    expect(result.current.dismissed).toEqual([sampleA]);
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+});
+
+describe('useDismissedFindings — handleDeleteAll', () => {
+  it('opens the confirmation dialog and clears state when the user confirms', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
+    confirmDialog.mockResolvedValueOnce(true);
+    restoreAllFindings.mockResolvedValueOnce({ ok: true, restored: 2 });
+    const onRefresh = vi.fn();
+    const setRestoreError = vi.fn();
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
+
+    await act(async () => { await result.current.handleDeleteAll(); });
+
+    expect(confirmDialog).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'danger',
+      title: 'Delete dismissed findings?',
+      confirmLabel: 'Delete',
+      message: expect.stringContaining('permanently delete those 2 findings'),
+    }));
+    expect(restoreAllFindings).toHaveBeenCalledWith('proj');
+    expect(result.current.dismissed).toEqual([]);
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing when the user cancels the confirmation dialog', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
+    confirmDialog.mockResolvedValueOnce(false);
+    const onRefresh = vi.fn();
+    const setRestoreError = vi.fn();
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
+
+    await act(async () => { await result.current.handleDeleteAll(); });
+
+    expect(confirmDialog).toHaveBeenCalledTimes(1);
+    expect(restoreAllFindings).not.toHaveBeenCalled();
+    expect(result.current.dismissed).toEqual([sampleA, sampleB]);
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  it('reports a delete-specific error if restoreAllFindings fails after confirmation', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA]);
+    confirmDialog.mockResolvedValueOnce(true);
+    restoreAllFindings.mockRejectedValueOnce(new Error('boom'));
+    const onRefresh = vi.fn();
+    const setRestoreError = vi.fn();
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
+
+    await act(async () => { await result.current.handleDeleteAll(); });
+
+    expect(setRestoreError).toHaveBeenCalledWith('Failed to delete all findings. Please try again.');
     expect(result.current.dismissed).toEqual([sampleA]);
     expect(onRefresh).not.toHaveBeenCalled();
   });

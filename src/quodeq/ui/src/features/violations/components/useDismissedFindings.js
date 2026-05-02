@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listDismissedFindings, restoreFinding, restoreAllFindings } from '../../../api/index.js';
+import { confirmDialog } from '../../../utils/confirmDialog.js';
 
 export function useDismissedFindings(selectedProject, onRefresh, setRestoreError) {
   const [dismissed, setDismissed] = useState([]);
@@ -42,5 +43,25 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
     }
   }, [selectedProject, onRefresh, setRestoreError]);
 
-  return { dismissed, handleRestore, handleRestoreAll, handleDelete };
+  const handleDeleteAll = useCallback(async () => {
+    const count = dismissed.length;
+    const ok = await confirmDialog({
+      title: 'Delete dismissed findings?',
+      message: `Are you sure you want to permanently delete those ${count} findings? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await restoreAllFindings(selectedProject);
+      setDismissed([]);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to delete all findings:', err);
+      setRestoreError?.('Failed to delete all findings. Please try again.');
+    }
+  }, [selectedProject, onRefresh, setRestoreError, dismissed.length]);
+
+  return { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll };
 }
