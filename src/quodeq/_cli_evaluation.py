@@ -294,7 +294,9 @@ def _run_pipeline_with_cleanup(
                     lifecycle.set_phase("analyzing")
                     # Record the run-level deadline so the dashboard countdown
                     # has it (visible immediately in status.json and SSE).
-                    budget_s = getattr(args, "pool_budget", None)
+                    # Resolve from CLI args OR env vars — dashboard runs pass
+                    # QUODEQ_TIME_LIMIT via env, not the CLI flag.
+                    budget_s = _resolve_time_limit(args)
                     if budget_s is not None and budget_s > 0:
                         from datetime import datetime, timedelta, timezone
                         deadline_iso = (
