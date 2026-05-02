@@ -67,6 +67,53 @@ class TestFindingsRouter:
         written = json.loads(findings_file.read_text().strip())
         assert "req_refs" not in written
 
+    def test_violation_on_test_file_gets_downweighted(self, tmp_path: Path) -> None:
+        findings_file = tmp_path / "findings.jsonl"
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(fh)
+            router.receive({
+                "p": "P1", "t": "violation", "d": "perf",
+                "w": "Slow", "file": "tests/test_server.py", "line": 10,
+            })
+        written = json.loads(findings_file.read_text().strip())
+        assert written["confidence"] == 50
+
+    def test_violation_on_prod_path_keeps_full_confidence(self, tmp_path: Path) -> None:
+        findings_file = tmp_path / "findings.jsonl"
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(fh)
+            router.receive({
+                "p": "P1", "t": "violation", "d": "perf",
+                "w": "Slow", "file": "src/server.py", "line": 10,
+            })
+        written = json.loads(findings_file.read_text().strip())
+        assert "confidence" not in written  # default 100 stays implicit
+
+    def test_llm_emitted_low_confidence_is_preserved(self, tmp_path: Path) -> None:
+        """If the LLM already lowered confidence, the path-role downweight
+        does not overwrite it."""
+        findings_file = tmp_path / "findings.jsonl"
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(fh)
+            router.receive({
+                "p": "P1", "t": "violation", "d": "perf",
+                "w": "Slow", "file": "tests/test_server.py", "line": 10,
+                "confidence": 25,
+            })
+        written = json.loads(findings_file.read_text().strip())
+        assert written["confidence"] == 25
+
+    def test_compliance_finding_is_not_downweighted(self, tmp_path: Path) -> None:
+        findings_file = tmp_path / "findings.jsonl"
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(fh)
+            router.receive({
+                "p": "P1", "t": "compliance", "d": "perf",
+                "w": "OK", "file": "tests/test_server.py", "line": 10,
+            })
+        written = json.loads(findings_file.read_text().strip())
+        assert "confidence" not in written
+
 
 class TestGetNextFiles:
     def test_tools_list_includes_get_next_files(self, tmp_path: Path) -> None:

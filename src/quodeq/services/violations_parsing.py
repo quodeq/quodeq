@@ -82,8 +82,20 @@ def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, l
         req_refs=req_refs,
         context=obj.get("context"),
         scope=obj.get("scope"),
+        confidence=_coerce_confidence(obj.get("confidence")),
     ))
     return replace(entry, dimension=obj.get("d", dimension), violation_type=obj.get("vt"))
+
+
+def _coerce_confidence(value: object, default: int = 100) -> int:
+    """Clamp a JSONL confidence to [0, 100]; missing/non-int → *default*."""
+    if value is None:
+        return default
+    try:
+        coerced = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(0, min(100, coerced))
 
 
 # ---------------------------------------------------------------------------

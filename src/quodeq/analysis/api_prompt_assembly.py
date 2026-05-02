@@ -11,6 +11,7 @@ from pathlib import Path
 from quodeq.analysis.prompts._template import load_template
 from quodeq.analysis.prompts.builder import _load_evaluation_rules
 from quodeq.config.prompt_templates import render_template
+from quodeq.context.path_role import Role, path_role
 
 _log = logging.getLogger(__name__)
 
@@ -40,6 +41,18 @@ def _read_file_safe(path: Path) -> str | None:
         return None
 
 
+def _role_label(display_path: str) -> str:
+    """Return a `(role: <role>)` suffix for non-prod paths, empty otherwise.
+
+    Tells the LLM the surrounding code's purpose so it can tone down findings
+    that don't matter outside production code (e.g. brittle test fixtures).
+    """
+    role = path_role(display_path)
+    if role is Role.PROD:
+        return ""
+    return f" (role: {role.value})"
+
+
 def _build_files_block(source_files: list[Path], repo_root: Path | None = None) -> str:
     """Build the source files block for the prompt."""
     parts: list[str] = []
@@ -49,7 +62,7 @@ def _build_files_block(source_files: list[Path], repo_root: Path | None = None) 
             continue
         display_path = str(path.relative_to(repo_root)) if repo_root else path.name
         numbered = "\n".join(f"{i+1:4d} | {line}" for i, line in enumerate(content.splitlines()))
-        parts.append(f"### {display_path}\n```\n{numbered}\n```")
+        parts.append(f"### {display_path}{_role_label(display_path)}\n```\n{numbered}\n```")
     return "\n\n".join(parts)
 
 

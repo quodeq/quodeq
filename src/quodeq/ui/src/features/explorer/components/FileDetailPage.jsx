@@ -9,6 +9,7 @@ import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { ComplianceCard } from './EvalCards.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge } from '../../../components/terminal/index.js';
 import { useRegisterWindowSpec, ReportContent, useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
+import LowConfidenceGroup, { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
@@ -141,6 +142,21 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
   const showCompliance = !activeFilter || activeFilter === 'all' || activeFilter === 'compliance';
   const showViolations = activeFilter !== 'compliance';
 
+  const { lowConfidenceViolations, highConfidenceBySeverity } = useMemo(() => {
+    const low = [];
+    const high = {};
+    for (const sev of SEVERITY_ORDER) {
+      const bucket = file.violationsBySeverity?.[sev] || [];
+      const highBucket = [];
+      for (const v of bucket) {
+        if (isLowConfidence(v)) low.push(v);
+        else highBucket.push(v);
+      }
+      high[sev] = highBucket;
+    }
+    return { lowConfidenceViolations: low, highConfidenceBySeverity: high };
+  }, [file.violationsBySeverity]);
+
   const reportSpec = useMemo(() => {
     if (!file?.file) return null;
     const buildMarkdown = () => buildFileReport(file);
@@ -191,8 +207,15 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
 
       {showViolations && SEVERITY_ORDER.map((sev) => {
         if (activeFilter && activeFilter !== 'all' && activeFilter !== sev) return null;
-        return <SeverityGroup key={sev} sev={sev} violations={file.violationsBySeverity?.[sev] || []} />;
+        return <SeverityGroup key={sev} sev={sev} violations={highConfidenceBySeverity[sev] || []} />;
       })}
+
+      {showViolations && (!activeFilter || activeFilter === 'all') && (
+        <LowConfidenceGroup
+          violations={lowConfidenceViolations}
+          renderViolation={(v, idx) => <ViolationCard key={`lc-${idx}`} v={v} index={idx} />}
+        />
+      )}
 
       {showCompliance && totalCompliance > 0 && (
         <div>
