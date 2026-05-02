@@ -213,7 +213,7 @@ from typing import Iterator
 from quodeq.api._sse_log_helpers import sse_line
 
 _TICK_MS = int(os.environ.get("QUODEQ_SSE_TICK_MS", "250"))
-_HEARTBEAT_S = 15.0
+_HEARTBEAT_S = float(os.environ.get("QUODEQ_SSE_HEARTBEAT_S", "15"))
 _TERMINAL_STATES = frozenset({"done", "failed", "cancelled"})
 
 

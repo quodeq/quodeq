@@ -4,8 +4,10 @@ Each function handles one JSON-RPC method and returns the response dict.
 """
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
+from quodeq import __version__
 from quodeq.analysis.mcp.jsonrpc_io import _JSONRPC_VERSION, send as _send, ok as _ok
 from quodeq.analysis.mcp.schemas import (
     _DEFAULT_FILE_BATCH_SIZE,
@@ -24,8 +26,20 @@ if TYPE_CHECKING:
 _JSONRPC_METHOD_NOT_FOUND = -32601
 _MCP_DEFAULT_PROTOCOL_VERSION = "2024-11-05"
 _SERVER_NAME = "quodeq-findings"
-_SERVER_VERSION = "1.0.0"
-_MAX_FILE_BATCH_SIZE = 1000
+_SERVER_VERSION = __version__ or "0.0.0"
+_DEFAULT_MAX_FILE_BATCH_SIZE = 1000
+
+
+def _max_file_batch_size() -> int:
+    """Return the per-call file-batch ceiling, honouring QUODEQ_MCP_MAX_BATCH."""
+    raw = os.environ.get("QUODEQ_MCP_MAX_BATCH")
+    if not raw:
+        return _DEFAULT_MAX_FILE_BATCH_SIZE
+    try:
+        value = int(raw)
+    except ValueError:
+        return _DEFAULT_MAX_FILE_BATCH_SIZE
+    return value if value > 0 else _DEFAULT_MAX_FILE_BATCH_SIZE
 
 
 def handle_initialize(request_id: object, msg: dict) -> dict:
@@ -78,7 +92,7 @@ def handle_tools_call(
         count = args.get("count", _DEFAULT_FILE_BATCH_SIZE)
         if not isinstance(count, int) or count < 1:
             count = _DEFAULT_FILE_BATCH_SIZE
-        count = min(count, _MAX_FILE_BATCH_SIZE)
+        count = min(count, _max_file_batch_size())
         files = queue.take(count, agent_id=agent_id)
         if not files:
             return _ok(request_id, {
