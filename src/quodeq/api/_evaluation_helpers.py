@@ -23,6 +23,16 @@ _MAX_POOL_BUDGET = 3600
 _MAX_CONTEXT_SIZE = 2_000_000
 
 
+def _coerce_int(value: object, default: int) -> int:
+    """Return int(*value*) when convertible, else *default*. Never raises."""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _sanitize_url(url: str) -> str:
     """Remove embedded credentials from a URL for safe logging/error messages."""
     return _CREDENTIALS_RE.sub(r"\1***@", url)
@@ -47,9 +57,9 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
 def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     """Construct and validate EvaluationOptions from the request payload."""
     from quodeq.services.base import EvaluationOptions  # deferred: avoid circular import at module level
-    max_subagents_raw = payload.get("maxSubagents", _DEFAULT_MAX_SUBAGENTS)
-    max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, int(max_subagents_raw)))
-    pool_budget_raw = int(payload.get("poolBudget", _DEFAULT_POOL_BUDGET))
+    max_subagents_raw = _coerce_int(payload.get("maxSubagents"), _DEFAULT_MAX_SUBAGENTS)
+    max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, max_subagents_raw))
+    pool_budget_raw = _coerce_int(payload.get("poolBudget"), _DEFAULT_POOL_BUDGET)
     pool_budget = 0 if pool_budget_raw == 0 else max(_MIN_POOL_BUDGET, min(_MAX_POOL_BUDGET, pool_budget_raw))
     ai_model = payload.get("aiModel") or None
     subagent_model = payload.get("subagentModel") or ai_model  # default to orchestrator
@@ -65,7 +75,7 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
         pool_budget=pool_budget,
         incremental=bool(payload.get("incremental", False)),
         per_dimension=bool(payload.get("perDimension", False)),
-        context_size=max(0, min(_MAX_CONTEXT_SIZE, int(payload.get("contextSize", 0)))),
+        context_size=max(0, min(_MAX_CONTEXT_SIZE, _coerce_int(payload.get("contextSize"), 0))),
         branch=payload.get("branch") or None,
         scope_path=payload.get("scopePath") or None,
     )

@@ -109,20 +109,25 @@ def read_state(path: Path) -> dict:
 
 
 def write_state(state: dict, path: Path) -> None:
-    """Atomic write: temp file in the same directory, then rename."""
+    """Atomic write: temp file in the same directory, then rename.
+
+    Uses try/finally with a sentinel so cleanup runs on any exit path —
+    including SIGINT/SystemExit — without swallowing those signals.
+    """
     parent = path.parent
     parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(dir=str(parent), suffix=".tmp", prefix=".queue_")
+    cleanup_tmp: str | None = tmp_path
     try:
         with os.fdopen(fd, "w") as f:
             json.dump(state, f)
             f.flush()
             os.fsync(f.fileno())
         os.rename(tmp_path, str(path))
-    except BaseException:
-        # Clean up temp file on any failure
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        raise
+        cleanup_tmp = None  # ownership transferred to final path
+    finally:
+        if cleanup_tmp is not None:
+            try:
+                os.unlink(cleanup_tmp)
+            except OSError:
+                pass

@@ -3,12 +3,39 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 
 from quodeq.api._rate_limit_store import InMemoryRateLimitStore, RateLimitStore
 
 _logger = logging.getLogger(__name__)
 
 _KNOWN_BACKENDS = {"memory", "file"}
+_DEFAULT_RATE_LIMIT_FILE = "/tmp/quodeq_rate_limits.json"
+
+
+def _validated_rate_limit_path(raw: str) -> str:
+    """Reject obviously-unsafe rate-limit file paths from the env.
+
+    Falls back to the default if *raw* is empty, relative, or resolves to a
+    location with parent-traversal components. Symlink resolution is
+    deliberately not strict (the file may not exist yet on first run).
+    """
+    if not raw:
+        return _DEFAULT_RATE_LIMIT_FILE
+    try:
+        candidate = Path(raw)
+        if not candidate.is_absolute():
+            raise ValueError("path must be absolute")
+        resolved = candidate.resolve(strict=False)
+        if ".." in resolved.parts:
+            raise ValueError("path contains parent-directory traversal")
+    except (OSError, ValueError) as exc:
+        _logger.warning(
+            "Ignoring unsafe QUODEQ_RATE_LIMIT_FILE=%r (%s); using default %s",
+            raw, exc, _DEFAULT_RATE_LIMIT_FILE,
+        )
+        return _DEFAULT_RATE_LIMIT_FILE
+    return str(resolved)
 
 
 def create_rate_limit_store(env: dict[str, str] | None = None) -> RateLimitStore:
@@ -30,7 +57,7 @@ def create_rate_limit_store(env: dict[str, str] | None = None) -> RateLimitStore
 
     if backend == "file":
         from quodeq.api._rate_limit_file_store import FileRateLimitStore
-        path = environ.get("QUODEQ_RATE_LIMIT_FILE", "/tmp/quodeq_rate_limits.json")
+        path = _validated_rate_limit_path(environ.get("QUODEQ_RATE_LIMIT_FILE", ""))
         _logger.info("Using file-based rate-limit store at %s", path)
         return FileRateLimitStore(path)
 

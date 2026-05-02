@@ -42,9 +42,23 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     if not new_path:
         body, status = error_response("Path is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
         return jsonify(body), status
-    if ".." in new_path or not Path(new_path).is_absolute():
+    try:
+        # Reject literal '..' segments in user input — even if they resolve
+        # to a fine canonical path, accepting them silently transforms what
+        # the user typed into something different. Then resolve and verify
+        # the canonical form is still absolute and traversal-free.
+        if ".." in Path(new_path).parts:
+            raise ValueError("path contains parent-directory segment")
+        candidate = Path(new_path)
+        if not candidate.is_absolute():
+            raise ValueError("path must be absolute")
+        resolved = candidate.resolve(strict=False)
+        if not resolved.is_absolute() or ".." in resolved.parts:
+            raise ValueError("path resolves to a non-canonical location")
+    except (OSError, ValueError):
         body, status = error_response("Invalid path", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
         return jsonify(body), status
+    new_path = str(resolved)
     _logger.info("update_project_path: project=%s, remote_addr=%s", project, request.remote_addr)
     ok = provider.update_project_path(reports_dir(), project, new_path)
     if not ok:
