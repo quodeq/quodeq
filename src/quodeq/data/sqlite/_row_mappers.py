@@ -16,6 +16,21 @@ def _dedup_key(practice_id: str, file: str, line: int, verdict: str) -> str:
     return f"{practice_id}|{file}|{line}|{verdict}"
 
 
+def _coerce_confidence(value: Any, default: int = 100) -> int:
+    """Clamp *value* to [0, 100]; fall back to *default* for missing/non-int."""
+    if value is None:
+        return default
+    try:
+        coerced = int(value)
+    except (TypeError, ValueError):
+        return default
+    if coerced < 0:
+        return 0
+    if coerced > 100:
+        return 100
+    return coerced
+
+
 def finding_dict_to_row(finding: dict[str, Any]) -> dict[str, Any]:
     """Translate a FindingsRouter wire dict into a row dict ready for SQL bind."""
     practice_id = finding.get("p", "")
@@ -41,6 +56,7 @@ def finding_dict_to_row(finding: dict[str, Any]) -> dict[str, Any]:
         "scope": finding.get("scope", "") or "",
         "req_refs_json": json.dumps(refs) if refs is not None else None,
         "dedup_key": _dedup_key(practice_id, file, line, verdict),
+        "confidence": _coerce_confidence(finding.get("confidence")),
     }
 
 
@@ -64,6 +80,7 @@ def judgment_to_row(j: Judgment) -> dict[str, Any]:
         "scope": j.scope,
         "req_refs_json": json.dumps(j.req_refs) if j.req_refs is not None else None,
         "dedup_key": _dedup_key(j.practice_id, j.file, j.line, j.verdict),
+        "confidence": _coerce_confidence(getattr(j, "confidence", 100)),
     }
 
 
@@ -87,4 +104,5 @@ def row_to_judgment(row: dict[str, Any]) -> Judgment:
         title=row.get("title", ""),
         context=row.get("context", ""),
         scope=row.get("scope", ""),
+        confidence=_coerce_confidence(row.get("confidence")),
     )

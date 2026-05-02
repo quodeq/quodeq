@@ -153,6 +153,7 @@ def _judgment_as_dict(judgment: Any, finding_id: int) -> dict[str, Any]:
         "title": judgment.title,
         "reason": judgment.reason,
         "snippet": judgment.snippet,
+        "confidence": getattr(judgment, "confidence", 100),
     }
 
 
@@ -175,7 +176,7 @@ def _read_new_findings(
             cur = conn.execute(
                 "SELECT id, practice_id, dimension, requirement, verdict, severity, "
                 "file, line, end_line, title, reason, snippet, "
-                "violation_type, context, scope, req_refs_json "
+                "violation_type, context, scope, req_refs_json, confidence "
                 "FROM findings WHERE id > ? ORDER BY id LIMIT ?",
                 (last_event_id, _findings_batch_size()),
             )
