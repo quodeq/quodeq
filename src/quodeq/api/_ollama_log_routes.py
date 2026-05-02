@@ -14,9 +14,14 @@ from quodeq.api._sse_log_helpers import sse_tail_generator
 def _ollama_log_path() -> Path | None:
     """Return the platform's Ollama server log path, or None if not present.
 
-    macOS / Linux: ~/.ollama/logs/server.log
-    Windows: %LOCALAPPDATA%/Ollama/server.log
+    Resolution order:
+      1. ``QUODEQ_OLLAMA_LOG`` env var (explicit override for non-default installs)
+      2. macOS / Linux: ~/.ollama/logs/server.log
+      3. Windows: %LOCALAPPDATA%/Ollama/server.log
     """
+    override = os.environ.get("QUODEQ_OLLAMA_LOG")
+    if override:
+        return Path(override)
     if sys.platform == "win32":
         local_app = os.environ.get("LOCALAPPDATA")
         if not local_app:

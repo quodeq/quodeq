@@ -11,11 +11,31 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from quodeq.data.sqlite.connection import EVALUATION_DB_FILENAME
+
+_DEFAULT_FINDINGS_BATCH = 500
+"""Per-tick cap on findings pulled from SQLite for the SSE stream.
+
+Bounds the initial-snapshot burst (and any post-disconnect catch-up) so a run
+with tens of thousands of findings cannot OOM the API process. Subsequent
+ticks resume from the highest id returned via the SSE Last-Event-ID mechanism.
+"""
+
+
+def _findings_batch_size() -> int:
+    raw = os.environ.get("QUODEQ_SSE_FINDINGS_BATCH")
+    if not raw:
+        return _DEFAULT_FINDINGS_BATCH
+    try:
+        value = int(raw)
+    except ValueError:
+        return _DEFAULT_FINDINGS_BATCH
+    return value if value > 0 else _DEFAULT_FINDINGS_BATCH
 
 
 def serialize_status_event(status: dict[str, Any]) -> str:
@@ -139,7 +159,11 @@ def _judgment_as_dict(judgment: Any, finding_id: int) -> dict[str, Any]:
 def _read_new_findings(
     run_dir: Path, last_event_id: int,
 ) -> list[tuple[int, dict[str, Any]]]:
-    """Return (id, judgment_dict) pairs for findings whose id > last_event_id."""
+    """Return (id, judgment_dict) pairs for findings whose id > last_event_id.
+
+    Caps the result at ``_findings_batch_size()`` rows per call. Subsequent
+    ticks pick up the remainder via the highest id returned.
+    """
     db_path = run_dir / EVALUATION_DB_FILENAME
     if not db_path.is_file():
         return []
@@ -152,8 +176,8 @@ def _read_new_findings(
                 "SELECT id, practice_id, dimension, requirement, verdict, severity, "
                 "file, line, end_line, title, reason, snippet, "
                 "violation_type, context, scope, req_refs_json "
-                "FROM findings WHERE id > ? ORDER BY id",
-                (last_event_id,),
+                "FROM findings WHERE id > ? ORDER BY id LIMIT ?",
+                (last_event_id, _findings_batch_size()),
             )
             cols = [c[0] for c in cur.description]
             for row in cur.fetchall():
@@ -213,7 +237,7 @@ from typing import Iterator
 from quodeq.api._sse_log_helpers import sse_line
 
 _TICK_MS = int(os.environ.get("QUODEQ_SSE_TICK_MS", "250"))
-_HEARTBEAT_S = 15.0
+_HEARTBEAT_S = float(os.environ.get("QUODEQ_SSE_HEARTBEAT_S", "15"))
 _TERMINAL_STATES = frozenset({"done", "failed", "cancelled"})
 
 

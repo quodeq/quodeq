@@ -63,15 +63,32 @@ def _key(entry: dict) -> tuple:
     return (entry.get("req", ""), entry.get("file", ""), entry.get("line", 0))
 
 
-def load_dismissed(project_dir: Path) -> list[dict]:
-    """Load dismissed findings for a project. Returns empty list if none."""
+def load_dismissed(
+    project_dir: Path,
+    *,
+    offset: int = 0,
+    limit: int | None = None,
+) -> list[dict]:
+    """Load dismissed findings for a project. Returns empty list if none.
+
+    *offset* and *limit* let API callers slice the result without first
+    materializing the full list. The on-disk file is still read in full
+    (it's a small per-project JSON), but the returned slice is bounded.
+    """
     path = _dismissed_path(project_dir)
     if not path.exists():
         return []
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        items = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return []
+    if not isinstance(items, list):
+        return []
+    if offset <= 0 and limit is None:
+        return items
+    start = max(0, offset)
+    end = start + limit if limit is not None and limit >= 0 else None
+    return items[start:end]
 
 
 def dismiss_finding(project_dir: Path, finding: dict) -> None:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json as _json
+import os
 import time
 from copy import copy
 from dataclasses import dataclass
@@ -15,7 +16,23 @@ from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
 from quodeq.shared.logging import log_debug, log_info
 
 
-_MIN_BACKFILL_BUDGET_S = 60
+_DEFAULT_MIN_BACKFILL_BUDGET_S = 60
+
+
+def _min_backfill_budget_s() -> int:
+    """Return the minimum remaining-budget threshold to start a backfill phase.
+
+    Honours QUODEQ_MIN_BACKFILL_BUDGET_S; falls back to the default on any
+    parse error or non-positive value.
+    """
+    raw = os.environ.get("QUODEQ_MIN_BACKFILL_BUDGET_S")
+    if not raw:
+        return _DEFAULT_MIN_BACKFILL_BUDGET_S
+    try:
+        value = int(raw)
+    except ValueError:
+        return _DEFAULT_MIN_BACKFILL_BUDGET_S
+    return value if value > 0 else _DEFAULT_MIN_BACKFILL_BUDGET_S
 
 
 @dataclass
@@ -92,7 +109,7 @@ def run_backfill_phase(
         total_budget = pool_budget or _DEFAULT_POOL_BUDGET
         remaining_budget = max(0, total_budget - int(elapsed))
 
-        if remaining_budget < _MIN_BACKFILL_BUDGET_S:
+        if remaining_budget < _min_backfill_budget_s():
             log_info(f"  [{dimension}] Backfill: {len(backfill_candidates)} unevaluated files, but no budget remaining")
             return backfill_taken
         log_info(

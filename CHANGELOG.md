@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.0.8] - 2026-05-02
+
+### Features
+- **Side-pane workspace**: multi-window dock replaces the single Report pane. Open the markdown Report or any fix plan for a run/file/dimension in a draggable side pane, with a log viewer for evaluation, server and Ollama streams.
+- **Live updates over SSE**: dashboard subscribes to `/api/evaluations/<jobId>/events` for status, dimension and finding events instead of polling. Snapshot + tail reconnect via finding id.
+- **Indexed findings store**: per-run SQLite projection of the JSONL (`evaluation.db`) for instant filters and detail-page lookups across multi-thousand finding runs. JSONL stays the durable truth; `QUODEQ_DISABLE_SQLITE` kill switch.
+- **Live scan progress**: collapsible per-dimension breakdown, per-dim time estimates, pool autoscale, and partial-work salvage when a run is cancelled or a subagent crashes.
+- **Resource observability**: per-run sampler logs RSS, FDs, threads and Ollama process state every 60 s for diagnosing long scans.
+- **Explorer redesign**: dimension overview rebuilt around terminal-polish cards; file, principle and dimension detail pages now share a unified header.
+- **Clean scan toggle**: incremental and clean modes collapse into a single switch, with carry-forward gated on the flag.
+- **In-dashboard Markdown report viewer**: renders the run report with react-markdown and remark-gfm; download saves the file via the native dialog.
+
+### Improvements
+- **TanStack Query migration**: dashboard reads/writes go through TanStack Query. Instant run-switch via shared cache, placeholderData and prefetch.
+- **Bundle splitting**: markdown vendor chunk and lazy route pages cut initial JS for the dashboard.
+- **Side-pane performance**: deferred body mount, memoized renders, `contain` + `content-visibility` during resize, and smooth splitter drag via direct DOM writes.
+- **Run-index batching**: upserts are batched and standards grouping is memoized.
+- **Prompt tuning**: 4 evaluation prompts shortened by ~42% with no behavior change. Minor-severity bar tightened to drop hedged or speculative findings.
+- **Centralized scoring view**: a single `scoring_view` package and shared trust predicate cover accumulated, dashboard and per-dim resolution.
+- **Settings + console polish**: tidier provider rows and console actions.
+- **CI nightly**: timeout raised to 720 minutes to fit a full reanalysis.
+
+### Fixes
+- **OpenAI FD leak that aborted long scans**: plugged, with surface cleanups bundled in.
+- **BrokenPipeError handling**: scoring callback now retries to persist `evaluation/<dim>.json`. Loops no longer silently drop dimensions when the callback raises.
+- **Incremental cache invalidation**: prompt fingerprint splits rules from non-rules edits so non-rules tweaks don't blow the cache. Prompt content is now part of the fingerprint.
+- **Run salvage**: `files_read` and `source_file_count` populated from queue / `scan.json` when a scan is interrupted mid-flight.
+- **History list**: in-progress rows clean up correctly, cancelled-but-partial runs render with a `partial` chip, clicking a still-running row with no scored dimensions is blocked, History tabs no longer show stale data via `placeholderData`.
+- **Overview**: defaults per-dim cards and headline to the latest complete run, while still including in-progress runs where appropriate.
+- **Window drag and topbar**: pywebview drag region on the topbar, controls reordered and standardized in height, compact drawer no longer leaks the icon rail or repo block. Sidebar version reads from server health instead of a hardcoded constant.
+- **Confirm dialog**: hardened against XSS via DOM-based construction with a `variant` prop.
+- **Detection corpus rebuilt**: project classification produces correct labels.
+- **Analysis polish**: finding highlight widens to the full violation span, api-runner schema tightened to ground model findings, clean scan ignores prior findings instead of re-verifying them.
+- **Resource utilization**: env-file injection capped, LRU cache and MCP child caps enforced, console virtualization tightened.
+- **At-cap toast**: triggers from the toolbar Report and Fix-plan paths. Em-dash dropped from the message.
+
 ## [1.0.7] — 2026-04-25
 
 ### Features
