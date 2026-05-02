@@ -204,7 +204,7 @@ export default function ConsoleLogViewer({ logs }) {
     <div className="console-shell">
       <div className="console-scroll" ref={scrollRef}>
         {cleanedLogs.length === 0 ? (
-          <div className="console-log-empty">Waiting for output\u2026</div>
+          <div className="console-log-empty">Waiting for output…</div>
         ) : (
           cleanedLogs.map((line, i) => <LogLine key={i} text={line} />)
         )}
