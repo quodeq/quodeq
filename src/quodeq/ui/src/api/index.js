@@ -271,3 +271,31 @@ export function scanPath(dirPath) {
 }
 
 // Standards and findings APIs are re-exported at the top of this file.
+
+// Note: uses raw fetch (not the shared request() wrapper) so the wizard can
+// read err.status and err.existingProjectId on a 409 duplicate response —
+// request() throws plain Error and discards both. Refactoring request() to
+// enrich errors is a separate concern.
+/**
+ * Register a new project without starting an evaluation.
+ * Used by the onboarding wizard's Repo & Scan step.
+ *
+ * @param {{ repo: string, branch?: string, scopePath?: string, discipline?: string }} payload
+ * @returns {Promise<{ projectId: string, scanData: object }>}
+ * @throws {Error & { status: number, existingProjectId?: string }} on non-2xx
+ */
+export async function registerProject(payload) {
+  const res = await fetch('/api/projects', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(body.error || `registerProject failed (${res.status})`);
+    err.status = res.status;
+    if (body.existingProjectId) err.existingProjectId = body.existingProjectId;
+    throw err;
+  }
+  return body;
+}
