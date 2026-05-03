@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState, useEffect } from 'react';
+import { lazy, Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
 
 const DashboardPage = lazy(() => import('./features/dashboard/components/DashboardPage.jsx'));
@@ -352,20 +352,27 @@ export default function App() {
   const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [wizardEntry, setWizardEntry] = useState(null);
+  // Auto-open is a once-per-session decision. Without this guard, closing the
+  // wizard sets wizardEntry → null, which re-fires this effect and re-opens
+  // the wizard immediately because projects.length is still 0. The user's
+  // close action (X, Maybe later, or Start evaluation) is the signal that the
+  // auto-open job is done for this page load.
+  const autoOpenedRef = useRef(false);
 
   // Auto-open wizard on first paint when there are no projects and the user
   // has not explicitly skipped. The skip flag only suppresses auto-open — it
   // never blocks "Add a project" or "Take the tour" buttons.
   useEffect(() => {
+    if (autoOpenedRef.current) return;
     if (!state.projectsLoaded) return;
-    if (state.projects.length > 0) return;
-    if (wizardEntry !== null) return;
+    if (state.projects.length > 0) { autoOpenedRef.current = true; return; }
     let skipped = false;
     try { skipped = localStorage.getItem('quodeq_onboarding_skipped') === 'true'; } catch { /* ignore */ }
+    autoOpenedRef.current = true;
     if (!skipped) {
       setWizardEntry({ startStep: 'welcome', isFirstProject: true });
     }
-  }, [state.projectsLoaded, state.projects.length, wizardEntry]);
+  }, [state.projectsLoaded, state.projects.length]);
 
   const sidebarProvider = (typeof localStorage !== 'undefined' && localStorage.getItem(ACTIVE_PROVIDER_KEY)) || null;
   const sidebarModel = sidebarProvider && typeof localStorage !== 'undefined'
