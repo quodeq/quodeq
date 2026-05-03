@@ -67,7 +67,7 @@ function useProjects({ onNoProjects }) {
 function useAppNavigation() {
   const [serverConnected, setServerConnected, serverVersion] = useServerHealth();
   const { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab } = useNavStack();
-  const projectBundle = useProjects({ onNoProjects: () => navTab('evaluate') });
+  const projectBundle = useProjects({ onNoProjects: () => { /* wizard handles fresh-user UX in App.jsx */ } });
   const { selectedRun, setSelectedRun, handleRunChange } = projectBundle;
   const [historySelectedRun, setHistorySelectedRun] = useState('latest');
   function handleNavigate(page, params = {}) {

@@ -15,6 +15,8 @@ const StandardsPage = lazy(() => import('./features/standards/StandardsPage.jsx'
 const ViolationsPage = lazy(() => import('./features/violations/components/ViolationsPage.jsx'));
 const MapPage = lazy(() => import('./features/map/components/MapPage.jsx'));
 const HelpPage = lazy(() => import('./features/help/components/HelpPage.jsx'));
+const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
+import EmptyStateWithTour from './features/onboarding/components/EmptyStateWithTour.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
 import { useApi } from './api/ApiContext.jsx';
 import LoadingScreen from './components/LoadingScreen.jsx';
@@ -310,17 +312,10 @@ function MainContent({ activePage, props }) {
     if (!projects || projects.length === 0) {
       if (!props.navigation?.projectsLoaded) return <LoadingScreen />;
       return (
-        <section className="empty-state">
-          <h2>No analyzed projects yet</h2>
-          <p>Add a project to get started.</p>
-          <button
-            type="button"
-            className="empty-state__cta"
-            onClick={() => props.navigation.navTab('projects')}
-          >
-            Go to Projects
-          </button>
-        </section>
+        <EmptyStateWithTour
+          onAdd={() => props.navigation.onAddProject()}
+          onTour={() => props.navigation.onTakeTour()}
+        />
       );
     }
   }
@@ -356,7 +351,22 @@ export default function App() {
   const APP_VERSION = state.serverVersion;
   const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
   const [sidebarPinned, setSidebarPinned] = useState(false);
-  const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
+  const [wizardEntry, setWizardEntry] = useState(null);
+
+  // Auto-open wizard on first paint when there are no projects and the user
+  // has not explicitly skipped. The skip flag only suppresses auto-open — it
+  // never blocks "Add a project" or "Take the tour" buttons.
+  useEffect(() => {
+    if (!state.projectsLoaded) return;
+    if (state.projects.length > 0) return;
+    if (wizardEntry !== null) return;
+    let skipped = false;
+    try { skipped = localStorage.getItem('quodeq_onboarding_skipped') === 'true'; } catch { /* ignore */ }
+    if (!skipped) {
+      setWizardEntry({ startStep: 'welcome', isFirstProject: true });
+    }
+  }, [state.projectsLoaded, state.projects.length, wizardEntry]);
+
   const sidebarProvider = (typeof localStorage !== 'undefined' && localStorage.getItem(ACTIVE_PROVIDER_KEY)) || null;
   const sidebarModel = sidebarProvider && typeof localStorage !== 'undefined'
     ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
@@ -405,7 +415,8 @@ export default function App() {
       historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
       currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
       prefetchHandlers: state.prefetchHandlers,
-      onAddProject: () => setIsAddProjectOpen(true),
+      onAddProject: () => setWizardEntry({ startStep: 'repo-scan', isFirstProject: state.projects.length === 0 }),
+      onTakeTour: () => setWizardEntry({ startStep: 'welcome', isFirstProject: true }),
     },
     evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
@@ -495,13 +506,36 @@ export default function App() {
                 <MainContent activePage={activePage} props={contentProps} />
               </div>
               <AddProjectModal
-                open={isAddProjectOpen}
-                onClose={() => setIsAddProjectOpen(false)}
+                open={false}
+                onClose={() => {}}
                 onStart={(payload) => {
                   state.evalLifecycle.handleStartEvaluation(payload);
                   navTab('evaluate');
                 }}
               />
+              {wizardEntry && (
+                <OnboardingWizard
+                  entry={wizardEntry}
+                  onClose={({ saved, projectId }) => {
+                    setWizardEntry(null);
+                    if (saved && projectId) {
+                      state.refreshDashboard?.();
+                    }
+                  }}
+                  onLaunch={({ projectId, provider, standardIds, totalTimeLimitS }) => {
+                    setWizardEntry(null);
+                    const payload = {
+                      repo: state.projects.find((p) => (p.id || p.name) === projectId)?.repository || projectId,
+                      dimensions: standardIds,
+                    };
+                    if (provider?.id) payload.aiCmd = provider.id;
+                    if (provider?.model) payload.aiModel = provider.model;
+                    if (totalTimeLimitS) payload.timeLimit = totalTimeLimitS;
+                    state.evalLifecycle.handleStartEvaluation(payload);
+                    navTab('evaluate');
+                  }}
+                />
+              )}
             </Suspense>
           }
             />
