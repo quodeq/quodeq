@@ -15,15 +15,9 @@ vi.mock('../../api/index.js', async () => {
       { id: 'std-a', name: 'Security 101', description: 'Common checks' },
       { id: 'std-b', name: 'Code style', description: 'Formatting' },
     ]),
+    getProviderConfigs: vi.fn().mockResolvedValue({}),
   };
 });
-
-vi.mock('./hooks/useProviderDetection.js', () => ({
-  useProviderDetection: () => ({
-    status: 'detected',
-    preselection: { id: 'codex-cli', classification: 'cli', model: 'gpt-5.2-codex' },
-  }),
-}));
 
 // ScanProgress depends on <EvalLogProvider> which is not in the wizard tree —
 // for this integration test we render a simple stub instead.
@@ -31,10 +25,23 @@ vi.mock('../evaluation/components/ScanProgress.jsx', () => ({
   default: () => <div data-testid="scan-progress-stub" />,
 }));
 
+// ProviderTabs is the same component the Settings page uses — heavy and not
+// the unit under test here. Stub it; the wizard reads provider+model from
+// localStorage anyway, which we seed below.
+vi.mock('../settings/components/ProviderTabs.jsx', () => ({
+  default: () => <div data-testid="provider-tabs-stub" />,
+}));
+
 import OnboardingWizard from './components/OnboardingWizard.jsx';
 
 describe('Onboarding integration — happy path', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    // Seed an active provider so the Provider step's Continue is enabled
+    // when the user reaches it (otherwise the wizard can't advance).
+    localStorage.setItem('cc-active-provider', 'codex');
+    localStorage.setItem('cc-codex-model', 'gpt-5.2-codex');
+  });
 
   it('walks Welcome → Repo & Scan → Provider → Standard & Launch and emits onLaunch', async () => {
     const onLaunch = vi.fn();
@@ -52,8 +59,10 @@ describe('Onboarding integration — happy path', () => {
     await waitFor(() => expect(screen.getByText(/we found:/i)).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /continue → set up evaluation/i }));
 
-    // Provider — pre-recommended view should be visible
-    expect(await screen.findByText(/codex cli/i)).toBeInTheDocument();
+    // Provider — embedded ProviderTabs (stubbed); the active provider/model
+    // comes from localStorage and the summary line shows it.
+    expect(await screen.findByTestId('provider-tabs-stub')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: /^continue$/i })).not.toBeDisabled());
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
     // Standard & Launch
@@ -64,32 +73,24 @@ describe('Onboarding integration — happy path', () => {
     await waitFor(() => expect(onLaunch).toHaveBeenCalled());
     expect(onLaunch.mock.calls[0][0].standardIds).toEqual(['std-a']);
     expect(onLaunch.mock.calls[0][0].projectId).toBe('uuid-9');
-    expect(onLaunch.mock.calls[0][0].provider.id).toBe('codex-cli');
+    expect(onLaunch.mock.calls[0][0].provider.id).toBe('codex');
+    expect(onLaunch.mock.calls[0][0].provider.model).toBe('gpt-5.2-codex');
   });
 });
 
-describe('Onboarding integration — no provider detected', () => {
+describe('Onboarding integration — no provider configured', () => {
   beforeEach(() => localStorage.clear());
 
-  it('opens Provider step in comparison view and lets user pick Cloud', async () => {
-    vi.resetModules();
-    vi.doMock('./hooks/useProviderDetection.js', () => ({
-      useProviderDetection: () => ({ status: 'none', preselection: null }),
-    }));
-    const { default: OnboardingWizardLocal } = await import('./components/OnboardingWizard.jsx');
-
+  it('Continue is disabled until a provider/model is set in localStorage', async () => {
     const onLaunch = vi.fn();
-    render(<OnboardingWizardLocal
+    render(<OnboardingWizard
       entry={{ startStep: 'provider', isFirstProject: false }}
       onLaunch={onLaunch}
       onClose={() => {}}
     />);
 
-    // Comparison view should be visible (the three card headings render).
-    expect(await screen.findByRole('heading', { name: /local cli/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /cloud api/i })).toBeInTheDocument();
-
-    // Continue is disabled because no model is selected.
+    expect(await screen.findByTestId('provider-tabs-stub')).toBeInTheDocument();
+    expect(screen.getByText(/pick a provider tab below/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^continue$/i })).toBeDisabled();
   });
 });

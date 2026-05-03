@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { registerProject, listStandards } from '../../../api/index.js';
 import { useWizardState } from '../hooks/useWizardState.js';
-import { useProviderDetection } from '../hooks/useProviderDetection.js';
 import { saveDraft, clearDraft } from '../hooks/useWizardDraft.js';
 import StepProgress from './StepProgress.jsx';
 import WelcomeStep from './steps/WelcomeStep.jsx';
@@ -24,7 +23,6 @@ function visibleSteps(_currentStep, _isFirstProject, providerConfigured) {
 export default function OnboardingWizard({ entry, onClose, onLaunch }) {
   const initialStep = entry.startStep || 'welcome';
   const wizard = useWizardState({ initial: { step: initialStep, isFirstProject: entry.isFirstProject ?? true } });
-  const detection = useProviderDetection();
   const [standards, setStandards] = useState([]);
 
   // Fetch standards once when the step that needs them is reachable.
@@ -43,17 +41,6 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
       totalTimeLimitS: wizard.state.totalTimeLimitS,
     });
   }, [wizard.state.step, wizard.state.repo, wizard.state.provider, wizard.state.providerView, wizard.state.standardIds, wizard.state.totalTimeLimitS]);
-
-  // Apply pre-detected provider as the default selection on entering Provider.
-  useEffect(() => {
-    if (wizard.state.step === 'provider' && detection.status === 'detected' && !wizard.state.provider.id) {
-      wizard.setProvider({
-        id: detection.preselection.id,
-        classification: detection.preselection.classification,
-        model: detection.preselection.model,
-      });
-    }
-  }, [wizard.state.step, detection.status, detection.preselection]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!entry.presetProjectId) return;
@@ -147,7 +134,6 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
         <ProviderStep
           state={wizard.state}
           actions={wizard}
-          detection={detection}
           onContinue={nextStep}
           onBack={prevStep}
         />

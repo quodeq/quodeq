@@ -1,106 +1,100 @@
-const TIME_LIMIT_PRESETS = [
-  { label: '5 min', seconds: 300 },
-  { label: '10 min', seconds: 600 },
-  { label: '30 min', seconds: 1800 },
-  { label: '1 hour', seconds: 3600 },
-  { label: 'No limit', seconds: 0 },
-];
+import { useEffect, useState } from 'react';
+import ProviderTabs from '../../../settings/components/ProviderTabs.jsx';
+import { getProviderConfigs } from '../../../../api/index.js';
+import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../../constants.js';
 
 const PROVIDER_LABELS = {
-  'codex-cli': 'Codex CLI',
-  'claude-code': 'Claude Code',
+  claude: 'Claude Code',
+  codex: 'Codex CLI',
+  gemini: 'Gemini CLI',
   ollama: 'Ollama',
+  openrouter: 'OpenRouter',
   openai: 'OpenAI',
   anthropic: 'Anthropic',
 };
 
-function PreRecommendedView({ state, actions, detection }) {
-  const id = state.provider.id || detection.preselection?.id;
-  const label = PROVIDER_LABELS[id] || id;
-  return (
-    <div className="onboarding-provider-summary">
-      <p>✓ <strong>{label}</strong> detected — using <code>{state.provider.model || detection.preselection?.model || '(default)'}</code></p>
-      <p className="onboarding-provider-summary__note">
-        Runs through your subscription. No extra per-token charge from quodeq, subject to your plan's monthly quota.
-      </p>
-      <button
-        type="button"
-        className="link-btn"
-        aria-expanded={false}
-        onClick={() => actions.setProviderView('comparison')}
-      >
-        Change provider
-      </button>
-    </div>
-  );
-}
-
-function ComparisonView({ state, actions }) {
-  const cards = [
-    { id: 'local-cli', heading: 'Local CLI', body: 'Codex CLI / Claude Code on your machine. Billed via your subscription, within your plan\'s quota.' },
-    { id: 'local-api', heading: 'Local API (Ollama)', body: 'Free, fully on-device. Speed depends on your hardware.' },
-    { id: 'cloud', heading: 'Cloud API', body: 'OpenAI / Anthropic direct, billed per token from your API account.' },
-  ];
-  return (
-    <div className="onboarding-provider-cards">
-      {cards.map((c) => (
-        <div key={c.id} className="onboarding-provider-card" onClick={() => actions.setProvider({ id: c.id, classification: c.id })}>
-          <h3>{c.heading}</h3>
-          <p>{c.body}</p>
-        </div>
-      ))}
-    </div>
-  );
+function readActiveProviderState() {
+  try {
+    const id = localStorage.getItem(ACTIVE_PROVIDER_KEY) || null;
+    if (!id) return { id: null, model: null };
+    const model = localStorage.getItem(providerKey(id, 'model')) || null;
+    return { id, model };
+  } catch {
+    return { id: null, model: null };
+  }
 }
 
 /**
  * ProviderStep
  *
- * Two views:
- *  - Pre-recommended: single panel showing the auto-detected provider with a "Change provider" link.
- *  - Comparison: three cards (Local CLI, Local API, Cloud API) for explicit selection.
+ * Reuses the same `<ProviderTabs />` component the Settings page renders,
+ * so the picker is identical: one pill per installed provider (uninstalled
+ * providers shown disabled with install hints), the appropriate per-provider
+ * tab below (CLI / Ollama / Cloud), and the time-limit + advanced settings
+ * inside each tab.
  *
- * Below the active view a chip row exposes the Evaluation time limit preset.
- * The Continue button is gated until a provider is selected with a valid model.
+ * The wizard reads the active provider+model from localStorage (which
+ * ProviderTabs writes into) and gates Continue until both are set.
  */
-export default function ProviderStep({ state, actions, detection, onContinue, onBack }) {
-  const showPreRecommended = state.providerView === 'pre-recommended' && detection.status === 'detected';
-  const continueDisabled = !state.provider.id || !state.provider.model;
+export default function ProviderStep({ state, actions, onContinue, onBack }) {
+  const [providerConfigs, setProviderConfigs] = useState({});
+  // Mirror localStorage so Continue updates as the user picks a provider/model.
+  const [activeProvider, setActiveProvider] = useState(readActiveProviderState);
+
+  useEffect(() => {
+    getProviderConfigs().then(setProviderConfigs).catch(() => setProviderConfigs({}));
+  }, []);
+
+  // Poll localStorage for changes — ProviderTabs / its children write directly,
+  // and the `storage` event only fires for cross-tab writes. A short interval
+  // is enough; the picker is interactive and the user is on the screen.
+  useEffect(() => {
+    const tick = () => setActiveProvider(readActiveProviderState());
+    const interval = setInterval(tick, 400);
+    window.addEventListener('storage', tick);
+    return () => { clearInterval(interval); window.removeEventListener('storage', tick); };
+  }, []);
+
+  const continueDisabled = !activeProvider.id || !activeProvider.model;
+
+  function handleContinue() {
+    if (continueDisabled) return;
+    actions.setProvider({
+      id: activeProvider.id,
+      model: activeProvider.model,
+      classification: state.provider.classification || null,
+    });
+    onContinue();
+  }
+
+  const summary = activeProvider.id
+    ? (
+      <p className="onboarding-provider-active">
+        Selected: <strong>{PROVIDER_LABELS[activeProvider.id] || activeProvider.id}</strong>
+        {activeProvider.model && <> · <code>{activeProvider.model}</code></>}
+      </p>
+    )
+    : (
+      <p className="onboarding-provider-active onboarding-provider-active--empty">
+        Pick a provider tab below and choose a model to continue.
+      </p>
+    );
+
   return (
     <div className="onboarding-step onboarding-step--provider">
       <h2>How will quodeq's AI run?</h2>
       <p className="onboarding-step__pitch">
-        quodeq sends source files to an AI model for review. Where the model runs determines speed, cost, and what leaves your machine.
+        quodeq sends source files to an AI model for review. Pick the provider you want to use — uninstalled providers are shown disabled with install hints.
       </p>
 
-      {showPreRecommended
-        ? <PreRecommendedView state={state} actions={actions} detection={detection} />
-        : <ComparisonView state={state} actions={actions} />}
+      {summary}
 
-      <fieldset className="onboarding-time-limit">
-        <legend>Evaluation time limit</legend>
-        <div className="onboarding-time-limit__chips" role="radiogroup">
-          {TIME_LIMIT_PRESETS.map((p) => (
-            <label key={p.seconds} className={state.totalTimeLimitS === p.seconds ? 'chip chip--selected' : 'chip'}>
-              <input
-                type="radio"
-                name="time-limit"
-                value={p.seconds}
-                checked={state.totalTimeLimitS === p.seconds}
-                onChange={() => actions.setTimeLimit(p.seconds)}
-                aria-label={p.label}
-              />
-              {p.label}
-            </label>
-          ))}
-        </div>
-        <p className="onboarding-time-limit__hint">
-          Caps how long the whole evaluation can run. Lift this once you've calibrated time vs cost on your project.
-        </p>
-      </fieldset>
+      <div className="onboarding-provider-tabs-host">
+        <ProviderTabs providerConfigs={providerConfigs} />
+      </div>
 
       <div className="onboarding-step__actions">
-        <button type="button" className="btn-primary" disabled={continueDisabled} onClick={onContinue}>Continue</button>
+        <button type="button" className="btn-primary" disabled={continueDisabled} onClick={handleContinue}>Continue</button>
         <button type="button" className="btn-secondary" onClick={onBack}>Back</button>
       </div>
     </div>

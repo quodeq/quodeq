@@ -182,6 +182,26 @@
 }
 .link-btn:hover { opacity: 0.8; }
 
+.onboarding-provider-active {
+  background: color-mix(in srgb, var(--color-accent, #10b981) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent, #10b981) 40%, var(--color-border, #334155));
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 16px;
+  font-size: 0.9rem;
+  color: var(--color-text, #e2e8f0);
+}
+.onboarding-provider-active--empty {
+  background: transparent;
+  border-style: dashed;
+  color: var(--color-text-muted, #94a3b8);
+}
+.onboarding-provider-tabs-host { margin: 0 0 16px; }
+/* Tighter wrapping inside the wizard (the embedded settings panel has its
+   own horizontal padding intended for a wider page). */
+.onboarding-provider-tabs-host .panel { background: transparent; border: 0; padding: 0; }
+.onboarding-provider-tabs-host .panel-header { display: none; }
+
 .onboarding-provider-summary {
   background: var(--color-surface, #1e293b);
   border-radius: 6px;

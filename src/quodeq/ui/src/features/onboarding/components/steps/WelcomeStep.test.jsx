@@ -7,7 +7,7 @@ describe('WelcomeStep', () => {
   it('renders the welcome headline and pitch', () => {
     render(<WelcomeStep onStart={() => {}} onSkip={() => {}} />);
     expect(screen.getByRole('heading', { name: /welcome to quodeq/i })).toBeInTheDocument();
-    expect(screen.getByText(/audit code quality/i)).toBeInTheDocument();
+    expect(screen.getByText(/audit your code/i)).toBeInTheDocument();
   });
 
   it('calls onStart when Get started is clicked', () => {
@@ -26,8 +26,8 @@ describe('WelcomeStep', () => {
 
   it('renders the three preview rows', () => {
     render(<WelcomeStep onStart={() => {}} onSkip={() => {}} />);
-    expect(screen.getByText(/connect repo/i)).toBeInTheDocument();
-    expect(screen.getByText(/pick ai provider/i)).toBeInTheDocument();
+    expect(screen.getByText(/connect a repository/i)).toBeInTheDocument();
+    expect(screen.getByText(/pick an ai provider/i)).toBeInTheDocument();
     expect(screen.getByText(/pick a standard/i)).toBeInTheDocument();
   });
 });
