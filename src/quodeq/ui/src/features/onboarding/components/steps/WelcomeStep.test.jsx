@@ -4,10 +4,9 @@ import '@testing-library/jest-dom/vitest';
 import WelcomeStep from './WelcomeStep.jsx';
 
 describe('WelcomeStep', () => {
-  it('renders the welcome headline and pitch', () => {
+  it('renders the welcome headline', () => {
     render(<WelcomeStep onStart={() => {}} onSkip={() => {}} />);
     expect(screen.getByRole('heading', { name: /welcome to quodeq/i })).toBeInTheDocument();
-    expect(screen.getByText(/audit your code/i)).toBeInTheDocument();
   });
 
   it('calls onStart when Get started is clicked', () => {

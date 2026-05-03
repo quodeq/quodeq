@@ -39,17 +39,6 @@
   font-size: 0.95rem;
 }
 .onboarding-step--welcome { text-align: center; }
-.onboarding-welcome__brand {
-  display: flex;
-  justify-content: center;
-  margin: 0 0 24px;
-  filter: drop-shadow(0 4px 24px color-mix(in srgb, var(--color-accent, #10b981) 40%, transparent));
-}
-.onboarding-welcome__brand svg { overflow: visible; }
-.onboarding-welcome__mark-chevron { fill: var(--logo-chevron); }
-.onboarding-welcome__mark-q { fill: var(--logo-q); }
-.onboarding-welcome__mark-needle { fill: var(--logo-needle); }
-.onboarding-welcome__mark-needle-dark { fill: var(--logo-needle-dark); }
 .onboarding-welcome__title {
   font-size: 2.25rem;
   margin: 0 0 16px;
