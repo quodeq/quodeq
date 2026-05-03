@@ -80,7 +80,7 @@ export default function RepoScanStep({ state, actions, createProject, onContinue
         )}
         {sub === 'scanned' && (
           <>
-            <button type="button" className="btn-primary" onClick={onContinue}>Continue → set up evaluation</button>
+            <button type="button" className="btn-primary" onClick={onContinue}>Continue</button>
             <button type="button" className="btn-secondary" onClick={onCancel}>Save and finish setup later</button>
           </>
         )}

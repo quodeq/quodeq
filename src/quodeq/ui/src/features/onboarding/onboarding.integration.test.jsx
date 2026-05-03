@@ -57,7 +57,7 @@ describe('Onboarding integration — happy path', () => {
     fireEvent.change(screen.getByPlaceholderText(/git@github.com/i), { target: { value: '/local/path' } });
     fireEvent.click(screen.getByRole('button', { name: /scan repository/i }));
     await waitFor(() => expect(screen.getByText(/we found:/i)).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /continue → set up evaluation/i }));
+    fireEvent.click(screen.getAllByRole('button', { name: /^continue$/i })[0]);
 
     // Provider — embedded ProviderTabs (stubbed); the active provider/model
     // comes from localStorage and the summary line shows it.
