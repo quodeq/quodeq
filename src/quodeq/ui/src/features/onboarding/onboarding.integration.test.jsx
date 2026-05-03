@@ -56,7 +56,9 @@ describe('Onboarding integration — happy path', () => {
     expect(screen.getByRole('heading', { name: /add a repository/i })).toBeInTheDocument();
     fireEvent.change(screen.getByPlaceholderText(/git@github.com/i), { target: { value: '/local/path' } });
     fireEvent.click(screen.getByRole('button', { name: /scan repository/i }));
-    await waitFor(() => expect(screen.getByText(/we found:/i)).toBeInTheDocument());
+    // Scanned-state stat tile — total_files=7 from the mock. Use getAllByText
+    // because '7' also appears as a language count in the pill row.
+    await waitFor(() => expect(screen.getAllByText('7').length).toBeGreaterThan(0));
     fireEvent.click(screen.getAllByRole('button', { name: /^continue$/i })[0]);
 
     // Provider — embedded ProviderTabs (stubbed); the active provider/model

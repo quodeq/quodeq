@@ -59,20 +59,41 @@ export default function RepoScanStep({ state, actions, createProject, onContinue
         </div>
       )}
 
-      {sub === 'scanned' && (
-        <div className="onboarding-scan-summary">
-          <h3>We found:</h3>
-          <p><strong>{state.scan?.total_files ?? 0} files</strong> in {Object.keys(state.scan?.languages || {}).length} languages</p>
-          {Object.keys(state.scan?.languages || {}).length > 0 && (
-            <ul className="onboarding-scan-summary__langs">
-              {Object.entries(state.scan.languages).slice(0, 5).map(([lang, count]) => (
-                <li key={lang}>{lang}: {count}</li>
-              ))}
-            </ul>
-          )}
-          <p>{state.scan?.branches?.length || 0} branches detected</p>
-        </div>
-      )}
+      {sub === 'scanned' && (() => {
+        const totalFiles = state.scan?.total_files ?? 0;
+        const langs = state.scan?.languages || {};
+        const langCount = Object.keys(langs).length;
+        const branchCount = state.scan?.branches?.length ?? 0;
+        const topLangs = Object.entries(langs).sort((a, b) => b[1] - a[1]).slice(0, 8);
+        return (
+          <div className="onboarding-scan-summary">
+            <div className="onboarding-scan-summary__stats">
+              <div className="onboarding-scan-summary__stat">
+                <span className="onboarding-scan-summary__stat-value">{totalFiles}</span>
+                <span className="onboarding-scan-summary__stat-label">{totalFiles === 1 ? 'file' : 'files'}</span>
+              </div>
+              <div className="onboarding-scan-summary__stat">
+                <span className="onboarding-scan-summary__stat-value">{langCount}</span>
+                <span className="onboarding-scan-summary__stat-label">{langCount === 1 ? 'language' : 'languages'}</span>
+              </div>
+              <div className="onboarding-scan-summary__stat">
+                <span className="onboarding-scan-summary__stat-value">{branchCount}</span>
+                <span className="onboarding-scan-summary__stat-label">{branchCount === 1 ? 'branch' : 'branches'}</span>
+              </div>
+            </div>
+            {topLangs.length > 0 && (
+              <div className="onboarding-scan-summary__langs">
+                {topLangs.map(([lang, count]) => (
+                  <span key={lang} className="onboarding-scan-summary__lang-pill">
+                    <span className="onboarding-scan-summary__lang-name">{lang}</span>
+                    <span className="onboarding-scan-summary__lang-count">{count}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="onboarding-step__actions">
         {sub === 'idle' && (

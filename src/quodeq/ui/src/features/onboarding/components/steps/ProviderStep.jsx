@@ -63,17 +63,20 @@ export default function ProviderStep({ state, actions, onContinue, onBack }) {
   const continueDisabled = !activeProvider.id || !activeProvider.model;
 
   function handleContinue() {
-    if (continueDisabled) return;
+    // Read fresh from localStorage at click time — the polled `activeProvider`
+    // can lag the user's last interaction by up to one polling interval.
+    const fresh = readActiveProviderState();
+    if (!fresh.id || !fresh.model) return;
     actions.setProvider({
-      id: activeProvider.id,
-      model: activeProvider.model,
+      id: fresh.id,
+      model: fresh.model,
       classification: state.provider.classification || null,
     });
     // Sync the per-provider time-limit (set inside the embedded ProviderTabs)
     // into the wizard state so the Standard & Launch summary and the eventual
     // eval-start payload reflect what the user actually picked.
-    if (activeProvider.timeLimitS !== null) {
-      actions.setTimeLimit(activeProvider.timeLimitS);
+    if (fresh.timeLimitS !== null) {
+      actions.setTimeLimit(fresh.timeLimitS);
     }
     onContinue();
   }
