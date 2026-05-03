@@ -2602,6 +2602,15 @@
   font-weight: bold;
 }
 
+/* Text-content variant of .folder-nav-btn — used by the "Create" button in
+   the new-folder row, where the fixed 36px square clips the label. */
+.folder-nav-btn--text {
+  width: auto;
+  padding: 0 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
 /* ── Dismissed findings section ─────────────────────── */
 .dismissed-bar {
   display: flex;
