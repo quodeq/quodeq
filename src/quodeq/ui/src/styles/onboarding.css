@@ -186,4 +186,3 @@
 .onboarding-standard-card:hover { border-color: var(--color-accent, #10b981); }
 .onboarding-standard-card--selected { border-color: var(--color-accent, #10b981); }
 .onboarding-standard-card p { margin: 4px 0 0; font-size: 0.85rem; color: var(--color-text-muted, #94a3b8); }
-.onboarding-standard-card__name::before { content: attr(data-name); }

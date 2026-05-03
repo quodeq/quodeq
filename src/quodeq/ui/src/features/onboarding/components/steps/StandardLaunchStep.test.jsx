@@ -47,6 +47,9 @@ describe('StandardLaunchStep', () => {
     render(<StandardLaunchStep state={baseState({ standardIds: new Set(['std-a']) })} actions={{ toggleStandard: noop }} standards={standards} onLaunch={noop} onCancel={noop} onBack={noop} />);
     expect(screen.getByText(/codex-cli/i)).toBeInTheDocument();
     expect(screen.getByText(/gpt-5.2-codex/i)).toBeInTheDocument();
-    expect(screen.getByText(/security 101/i)).toBeInTheDocument();
+    // "Security 101" appears in both the summary strip and the card list,
+    // so assert at least one match rather than a single one.
+    const matches = screen.getAllByText(/security 101/i);
+    expect(matches.length).toBeGreaterThanOrEqual(1);
   });
 });

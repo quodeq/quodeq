@@ -40,7 +40,7 @@ export default function StandardLaunchStep({ state, actions, standards, onLaunch
                 aria-label={s.name}
               />
               <div>
-                <strong data-name={s.name} className="onboarding-standard-card__name" />
+                <strong>{s.name}</strong>
                 <p>{s.description}</p>
               </div>
             </label>
