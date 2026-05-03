@@ -18,9 +18,10 @@ from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 _BLOCKED_SCAN_PATHS = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
+_EMPTY_SCAN: dict[str, object] = {"total_files": 0, "languages": {}, "branches": [], "modules": [], "file_tree": []}
 
 
-def _find_existing_project(reports_root: str, repo: str, discipline: str | None, scope_path: str | None) -> str | None:
+def _find_existing_project(reports_root: str, repo: str, scope_path: str | None) -> str | None:
     """Return an existing project UUID matching the given repo identity, or None.
 
     Walks the reports directory looking for a project whose
@@ -29,7 +30,11 @@ def _find_existing_project(reports_root: str, repo: str, discipline: str | None,
     """
     from quodeq.shared.utils import is_repo_url, project_name_from_repo
 
-    repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
+    try:
+        is_url = is_repo_url(repo)
+    except ValueError:
+        return None
+    repo_resolved = repo if is_url else str(Path(repo).resolve())
     expected_name = project_name_from_repo(repo)
     reports_path = Path(reports_root)
     if not reports_path.is_dir():
@@ -258,10 +263,16 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         discipline = data.get("discipline") or None
         reports_root = reports_dir()
 
+        try:
+            is_url = is_repo_url(repo)
+        except ValueError:
+            body, status = error_response("Invalid repo URL", HTTPStatus.BAD_REQUEST, "INVALID_REPO_URL")
+            return jsonify(body), status
+
         # For local repos, fail fast if the path doesn't exist — registering
         # a project for a missing directory would leave an orphan UUID dir
         # behind that the caller has no way to recover from.
-        if not is_repo_url(repo):
+        if not is_url:
             local_candidate = Path(repo)
             if not local_candidate.exists() or not local_candidate.is_dir():
                 body, status = error_response(
@@ -273,7 +284,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
         # Pre-flight: detect duplicates by walking existing project
         # directories. Returns None if no match.
-        existing = _find_existing_project(reports_root, repo, discipline, scope_path)
+        existing = _find_existing_project(reports_root, repo, scope_path)
         if existing is not None:
             return (
                 jsonify({"error": "Project already exists", "existingProjectId": existing}),
@@ -313,9 +324,9 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             try:
                 scan_data = json.loads(scan_path.read_text())
             except (json.JSONDecodeError, OSError):
-                scan_data = {"total_files": 0, "languages": {}, "branches": [], "modules": [], "file_tree": []}
+                scan_data = dict(_EMPTY_SCAN)
         else:
-            scan_data = {"total_files": 0, "languages": {}, "branches": [], "modules": [], "file_tree": []}
+            scan_data = dict(_EMPTY_SCAN)
 
         return jsonify({"projectId": project_uuid, "scanData": scan_data})
 
