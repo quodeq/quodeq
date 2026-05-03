@@ -20,12 +20,13 @@ const baseState = (over = {}) => ({
   provider: { id: null, classification: null, model: null },
   ...over,
 });
-const baseActions = { setProvider: vi.fn() };
+const baseActions = { setProvider: vi.fn(), setTimeLimit: vi.fn() };
 
 describe('ProviderStep', () => {
   beforeEach(() => {
     localStorage.clear();
     baseActions.setProvider.mockReset();
+    baseActions.setTimeLimit.mockReset();
   });
 
   it('renders the embedded ProviderTabs and the empty-active hint when nothing is selected', () => {
@@ -61,5 +62,24 @@ describe('ProviderStep', () => {
       classification: null,
     });
     expect(onContinue).toHaveBeenCalledTimes(1);
+  });
+
+  it('Continue propagates the per-provider time-limit (Unlimited = 0) into wizard state', async () => {
+    localStorage.setItem('cc-active-provider', 'ollama');
+    localStorage.setItem('cc-ollama-model', 'gemma4:26b');
+    localStorage.setItem('cc-ollama-time-limit', '0');
+    render(<ProviderStep state={baseState()} actions={baseActions} onContinue={noop} onBack={noop} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: /^continue$/i })).not.toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
+    expect(baseActions.setTimeLimit).toHaveBeenCalledWith(0);
+  });
+
+  it('Continue does not call setTimeLimit when the per-provider time-limit is unset', async () => {
+    localStorage.setItem('cc-active-provider', 'codex');
+    localStorage.setItem('cc-codex-model', 'gpt-5.2-codex');
+    render(<ProviderStep state={baseState()} actions={baseActions} onContinue={noop} onBack={noop} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: /^continue$/i })).not.toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
+    expect(baseActions.setTimeLimit).not.toHaveBeenCalled();
   });
 });

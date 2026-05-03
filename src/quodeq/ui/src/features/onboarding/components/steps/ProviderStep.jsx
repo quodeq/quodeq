@@ -16,11 +16,16 @@ const PROVIDER_LABELS = {
 function readActiveProviderState() {
   try {
     const id = localStorage.getItem(ACTIVE_PROVIDER_KEY) || null;
-    if (!id) return { id: null, model: null };
+    if (!id) return { id: null, model: null, timeLimitS: null };
     const model = localStorage.getItem(providerKey(id, 'model')) || null;
-    return { id, model };
+    // ProviderTabs persists time-limit per provider as a stringified number of
+    // seconds. Treat 0 as unlimited; missing key falls back to null so the
+    // wizard's existing default applies.
+    const tlRaw = localStorage.getItem(providerKey(id, 'time-limit'));
+    const timeLimitS = tlRaw === null ? null : Number.parseInt(tlRaw, 10);
+    return { id, model, timeLimitS: Number.isFinite(timeLimitS) ? timeLimitS : null };
   } catch {
-    return { id: null, model: null };
+    return { id: null, model: null, timeLimitS: null };
   }
 }
 
@@ -64,6 +69,12 @@ export default function ProviderStep({ state, actions, onContinue, onBack }) {
       model: activeProvider.model,
       classification: state.provider.classification || null,
     });
+    // Sync the per-provider time-limit (set inside the embedded ProviderTabs)
+    // into the wizard state so the Standard & Launch summary and the eventual
+    // eval-start payload reflect what the user actually picked.
+    if (activeProvider.timeLimitS !== null) {
+      actions.setTimeLimit(activeProvider.timeLimitS);
+    }
     onContinue();
   }
 
