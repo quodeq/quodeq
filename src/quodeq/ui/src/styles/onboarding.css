@@ -1,0 +1,22 @@
+.step-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0 16px;
+}
+.step-progress__label {
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  color: var(--color-text-muted, #94a3b8);
+}
+.step-progress__track {
+  height: 3px;
+  background: var(--color-border, #334155);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.step-progress__fill {
+  height: 100%;
+  background: var(--color-accent, #10b981);
+  transition: width 200ms ease;
+}
