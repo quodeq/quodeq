@@ -20,6 +20,55 @@ _logger = logging.getLogger(__name__)
 _BLOCKED_SCAN_PATHS = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
 
 
+def _find_existing_project(reports_root: str, repo: str, discipline: str | None, scope_path: str | None) -> str | None:
+    """Return an existing project UUID matching the given repo identity, or None.
+
+    Walks the reports directory looking for a project whose
+    ``repository_info.json`` matches the resolved repo path/url, project name
+    and (optional) scope_path. Pure read-only check — never mutates state.
+    """
+    from quodeq.shared.utils import is_repo_url, project_name_from_repo
+
+    repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
+    expected_name = project_name_from_repo(repo)
+    reports_path = Path(reports_root)
+    if not reports_path.is_dir():
+        return None
+    for child in reports_path.iterdir():
+        if not child.is_dir():
+            continue
+        info_file = child / "repository_info.json"
+        if not info_file.exists():
+            continue
+        try:
+            data = json.loads(info_file.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+        if data.get("name") != expected_name:
+            continue
+        if data.get("path") != repo_resolved:
+            continue
+        if (data.get("scopePath") or None) != (scope_path or None):
+            continue
+        return child.name
+    return None
+
+
+def _rollback_new_dirs(reports_root: str, before: set[str]) -> None:
+    """Delete any project directories created since *before* was captured."""
+    import shutil
+
+    reports_path = Path(reports_root)
+    if not reports_path.is_dir():
+        return
+    after = {p.name for p in reports_path.iterdir() if p.is_dir()}
+    for new in after - before:
+        try:
+            shutil.rmtree(reports_path / new, ignore_errors=True)
+        except OSError:
+            pass
+
+
 def _handle_delete_project(provider: ActionProvider) -> Response | tuple[Response, int]:
     """Handle DELETE /api/projects/<project>."""
     project = request.view_args["project"]
@@ -181,6 +230,94 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
         result = scan_project(project_path, output_dir=project_dir)
         return jsonify(dataclasses.asdict(result))
+
+    @app.post("/api/projects")
+    def create_project() -> Response | tuple[Response, int]:
+        """Register a new project (clone + scan) without starting an evaluation.
+
+        Body: ``{ repo, branch?, scopePath?, discipline? }``
+
+        Returns:
+            200 ``{ projectId, scanData }`` on success.
+            409 ``{ existingProjectId }`` when a project for the same repo
+                identity already exists.
+            400 with rollback when the repo input is invalid (missing or a
+                local path that does not exist).
+            500 with rollback when scan/registration fails unexpectedly.
+        """
+        from quodeq.services.evaluation_mixin import _register_project
+        from quodeq.shared.utils import is_repo_url
+
+        data = request.get_json(silent=True) or {}
+        repo = (data.get("repo") or "").strip()
+        if not repo:
+            body, status = error_response("repo is required", HTTPStatus.BAD_REQUEST, "MISSING_REPO")
+            return jsonify(body), status
+
+        scope_path = data.get("scopePath") or None
+        discipline = data.get("discipline") or None
+        reports_root = reports_dir()
+
+        # For local repos, fail fast if the path doesn't exist — registering
+        # a project for a missing directory would leave an orphan UUID dir
+        # behind that the caller has no way to recover from.
+        if not is_repo_url(repo):
+            local_candidate = Path(repo)
+            if not local_candidate.exists() or not local_candidate.is_dir():
+                body, status = error_response(
+                    "Local repo path does not exist or is not a directory",
+                    HTTPStatus.BAD_REQUEST,
+                    "INVALID_REPO",
+                )
+                return jsonify(body), status
+
+        # Pre-flight: detect duplicates by walking existing project
+        # directories. Returns None if no match.
+        existing = _find_existing_project(reports_root, repo, discipline, scope_path)
+        if existing is not None:
+            return (
+                jsonify({"error": "Project already exists", "existingProjectId": existing}),
+                HTTPStatus.CONFLICT,
+            )
+
+        # Capture the set of project directories present before registration
+        # so we can roll back any directory created during a failed scan.
+        reports_root_path = Path(reports_root)
+        before = (
+            {p.name for p in reports_root_path.iterdir() if p.is_dir()}
+            if reports_root_path.is_dir()
+            else set()
+        )
+
+        try:
+            project_uuid = _register_project(repo, discipline, reports_root, scope_path=scope_path)
+        except (FileNotFoundError, ValueError) as exc:
+            _rollback_new_dirs(reports_root, before)
+            body, status = error_response(str(exc), HTTPStatus.BAD_REQUEST, "INVALID_REPO")
+            return jsonify(body), status
+        except Exception as exc:  # pragma: no cover — unexpected scan/clone failure
+            _rollback_new_dirs(reports_root, before)
+            body, status = error_response(
+                f"Registration failed: {exc}",
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                "REGISTRATION_FAILED",
+            )
+            return jsonify(body), status
+
+        # Read the scan that ``_register_project`` just produced (local) or
+        # synthesise a stub (online — clone-on-demand happens at evaluation
+        # time so the scan file may not yet exist).
+        scan_path = Path(reports_root) / project_uuid / "scan.json"
+        scan_data: dict[str, object]
+        if scan_path.exists():
+            try:
+                scan_data = json.loads(scan_path.read_text())
+            except (json.JSONDecodeError, OSError):
+                scan_data = {"total_files": 0, "languages": {}, "branches": [], "modules": [], "file_tree": []}
+        else:
+            scan_data = {"total_files": 0, "languages": {}, "branches": [], "modules": [], "file_tree": []}
+
+        return jsonify({"projectId": project_uuid, "scanData": scan_data})
 
     @app.post("/api/scan")
     def scan_path() -> Response | tuple[Response, int]:
