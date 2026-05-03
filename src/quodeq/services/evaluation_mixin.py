@@ -107,11 +107,13 @@ def _scan_parent_project(project_dir: Path, reports_path: Path, repo_path: Path)
         pass
 
 
-def _register_project(repo: str, discipline: str | None, reports_dir: str, scope_path: str | None = None) -> None:
+def _register_project(repo: str, discipline: str | None, reports_dir: str, scope_path: str | None = None) -> str:
     """Resolve/register project and run a scan for local projects.
 
     For scoped evaluations, registers parent first, scans it, then registers
     the child so both exist with scan data before the evaluation starts.
+
+    Returns the project's UUID.
     """
     repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
     project_name = project_name_from_repo(repo)
@@ -123,6 +125,12 @@ def _register_project(repo: str, discipline: str | None, reports_dir: str, scope
         ProjectIdentity(project_name, repo_resolved, discipline, location, scope_path=scope_path),
     )
 
+    # Mark this project as needing onboarding completion (Phase 2 of the
+    # onboarding wizard). The field is set to `null` on first registration
+    # and rewritten to an ISO-8601 timestamp the first time an evaluation
+    # successfully starts against this project (see _mark_onboarding_completed).
+    _ensure_onboarding_field(reports_path / project_uuid)
+
     # Scan local projects so file lists are available immediately
     if location == _LOCATION_LOCAL:
         repo_path = Path(repo_resolved)
@@ -132,6 +140,28 @@ def _register_project(repo: str, discipline: str | None, reports_dir: str, scope
             # For scoped projects, also scan the parent using the parent UUID from repo info
             if scope_path:
                 _scan_parent_project(project_dir, reports_path, repo_path)
+
+    return project_uuid
+
+
+def _ensure_onboarding_field(project_dir: Path) -> None:
+    """Add `onboardingCompletedAt: null` to repository_info.json if absent.
+
+    Called from `_register_project` so newly-registered projects start with the
+    field set to null. Existing projects without the field get a backfill on
+    read (see `_backfill_onboarding_field` in routes_project_data.py).
+    """
+    info_path = project_dir / "repository_info.json"
+    if not info_path.exists():
+        return
+    try:
+        data = json.loads(info_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return
+    if "onboardingCompletedAt" in data:
+        return
+    data["onboardingCompletedAt"] = None
+    info_path.write_text(json.dumps(data, indent=2))
 
 
 class FsEvaluationMixin:
