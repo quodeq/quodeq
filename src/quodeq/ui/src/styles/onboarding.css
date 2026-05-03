@@ -20,3 +20,35 @@
   background: var(--color-accent, #10b981);
   transition: width 200ms ease;
 }
+.onboarding-step {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+.onboarding-welcome__title {
+  font-size: 1.6rem;
+  margin: 0 0 12px;
+}
+.onboarding-welcome__pitch {
+  color: var(--color-text-muted, #94a3b8);
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+.onboarding-welcome__preview {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.onboarding-welcome__preview li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+}
+.onboarding-welcome__actions {
+  display: flex;
+  gap: 12px;
+}
