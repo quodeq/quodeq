@@ -63,9 +63,7 @@ export default function WelcomeStep({ onStart, onSkip }) {
       </div>
       <h1 className="onboarding-welcome__title">Welcome to <span className="onboarding-welcome__title-accent">quodeq</span></h1>
       <p className="onboarding-welcome__pitch">
-        Audit code quality against the standards you care about.
-        <br />
-        Let's set up your first project — takes about two minutes.
+        Audit your code against the standards that matter — quodeq scans your repository locally, evaluates it with AI, and shows you what to fix.
       </p>
       <ul className="onboarding-welcome__preview">
         {previews.map((p, i) => (

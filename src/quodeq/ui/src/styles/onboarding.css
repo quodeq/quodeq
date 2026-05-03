@@ -24,6 +24,19 @@
   max-width: 560px;
   margin: 0 auto;
   padding: 32px 24px;
+  width: 100%;
+}
+.onboarding-step h2 {
+  font-size: 1.6rem;
+  margin: 0 0 8px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.onboarding-step__pitch {
+  color: var(--color-text-muted, #94a3b8);
+  margin: 0 0 24px;
+  line-height: 1.55;
+  font-size: 0.95rem;
 }
 .onboarding-step--welcome { text-align: center; }
 .onboarding-welcome__brand {
@@ -141,7 +154,22 @@
 .onboarding-step__actions {
   display: flex;
   gap: 12px;
-  margin-top: 16px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.onboarding-step__actions .btn-primary,
+.onboarding-step__actions .btn-secondary {
+  padding: 12px 22px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  min-height: 44px;
+}
+/* On Repo & Scan step, the primary action stretches to match the form's width */
+.onboarding-step--repo-scan .onboarding-step__actions { flex-direction: column; align-items: stretch; }
+.onboarding-step--repo-scan .onboarding-step__actions .btn-primary,
+.onboarding-step--repo-scan .onboarding-step__actions .btn-secondary {
+  width: 100%;
+  justify-content: center;
 }
 .link-btn {
   background: none;
