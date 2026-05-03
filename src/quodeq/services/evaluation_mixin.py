@@ -149,7 +149,7 @@ def _ensure_onboarding_field(project_dir: Path) -> None:
 
     Called from `_register_project` so newly-registered projects start with the
     field set to null. Existing projects without the field get a backfill on
-    read (see `_backfill_onboarding_field` in routes_project_data.py).
+    read (see `_backfill_onboarding_field` in _fs_project_helpers.py).
     """
     info_path = project_dir / "repository_info.json"
     if not info_path.exists():

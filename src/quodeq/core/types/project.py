@@ -38,3 +38,4 @@ class ProjectEntry:
     scan_date: str | None = None
     total_files: int | None = None
     analyzed_files: int | None = None
+    onboarding_completed_at: str | None = None

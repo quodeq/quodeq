@@ -118,6 +118,10 @@ def test_get_projects_backfills_onboarding_field_for_legacy_projects(app_client,
         "createdAt": "2025-12-01T00:00:00Z",
         "location": "local",
     }))
+    # Add a minimal run so the project surfaces in the listing.
+    run_dir = legacy_dir / "2025-12-01_00-00-00"
+    (run_dir / "evidence").mkdir(parents=True)
+    (run_dir / "evidence" / "manifest.json").write_text(json.dumps({"language_stats": {}}))
 
     with _patch_home(home):
         resp = c.get("/api/projects", headers=_ORIGIN)
@@ -127,3 +131,17 @@ def test_get_projects_backfills_onboarding_field_for_legacy_projects(app_client,
     data = json.loads(info.read_text())
     assert "onboardingCompletedAt" in data
     assert data["onboardingCompletedAt"] == "2025-12-01T00:00:00Z"
+
+    # The field should also surface in the API response so the UI can
+    # decide whether to auto-open the wizard without re-reading disk.
+    body = resp.get_json()
+    projects = body["projects"] if isinstance(body, dict) else body
+    target = next(
+        (
+            p for p in projects
+            if p.get("id") == legacy_id or p.get("name") == "legacy-project"
+        ),
+        None,
+    )
+    assert target is not None, f"legacy project not in response: {projects}"
+    assert target.get("onboardingCompletedAt") == "2025-12-01T00:00:00Z"
