@@ -9,13 +9,20 @@
  * end-to-end at integration-test time (Task 18) rather than in isolation.
  */
 
+// Onboarding-side IDs differ from the server's ai_providers.json IDs.
+const CLI_SERVER_ID = { 'codex-cli': 'codex', 'claude-code': 'claude' };
+
 async function detectCliProvider(id) {
-  // TODO: replace with the real probe from features/settings/components.
-  // CliProviderTab.jsx currently uses `useApi` + react-query (settingsKeys)
-  // rather than exposing a standalone detection helper. When that helper is
-  // extracted, swap this stub for a delegating call.
-  // Expected shape: { id, classification: 'cli', detected: boolean, defaultModel: string | null }
-  return { id, classification: 'cli', detected: false };
+  const serverId = CLI_SERVER_ID[id] || id;
+  try {
+    const res = await fetch('/api/ai-clients', { method: 'GET' });
+    if (!res.ok) return { id, classification: 'cli', detected: false, defaultModel: null };
+    const data = await res.json();
+    const detected = (data.clients || []).some((c) => c.id === serverId && c.type === 'cli');
+    return { id, classification: 'cli', detected, defaultModel: null };
+  } catch {
+    return { id, classification: 'cli', detected: false, defaultModel: null };
+  }
 }
 
 async function detectOllamaDaemon() {
