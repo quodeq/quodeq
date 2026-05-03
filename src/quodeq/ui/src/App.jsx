@@ -522,12 +522,14 @@ export default function App() {
                       state.refreshDashboard?.();
                     }
                   }}
-                  onLaunch={({ projectId, provider, standardIds, totalTimeLimitS }) => {
+                  onLaunch={({ projectId, repo, scopePath, branch, provider, standardIds, totalTimeLimitS }) => {
                     setWizardEntry(null);
                     const payload = {
-                      repo: state.projects.find((p) => (p.id || p.name) === projectId)?.repository || projectId,
+                      repo: repo || projectId,
                       dimensions: standardIds,
                     };
+                    if (scopePath) payload.scopePath = scopePath;
+                    if (branch) payload.branch = branch;
                     if (provider?.id) payload.aiCmd = provider.id;
                     if (provider?.model) payload.aiModel = provider.model;
                     if (totalTimeLimitS) payload.timeLimit = totalTimeLimitS;

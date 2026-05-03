@@ -87,6 +87,9 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
     clearDraft();
     onLaunch({
       projectId: wizard.state.projectId,
+      repo: wizard.state.repo.value,
+      scopePath: wizard.state.repo.scopePath || null,
+      branch: wizard.state.repo.branch || null,
       provider: wizard.state.provider,
       standardIds,
       totalTimeLimitS: wizard.state.totalTimeLimitS,
