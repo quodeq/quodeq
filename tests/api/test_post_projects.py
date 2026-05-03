@@ -101,3 +101,29 @@ def test_post_projects_writes_onboarding_field_null(app_client):
     data = json.loads(info_path.read_text())
     assert "onboardingCompletedAt" in data
     assert data["onboardingCompletedAt"] is None
+
+
+def test_get_projects_backfills_onboarding_field_for_legacy_projects(app_client, tmp_path):
+    c, home, _ = app_client
+    # Manually create a "legacy" project record without onboardingCompletedAt
+    reports_root = home / "evaluations"
+    reports_root.mkdir(parents=True, exist_ok=True)
+    legacy_id = "legacy-uuid-1234"
+    legacy_dir = reports_root / legacy_id
+    legacy_dir.mkdir()
+    info = legacy_dir / "repository_info.json"
+    info.write_text(json.dumps({
+        "name": "legacy-project",
+        "repository": "/some/legacy/path",
+        "createdAt": "2025-12-01T00:00:00Z",
+        "location": "local",
+    }))
+
+    with _patch_home(home):
+        resp = c.get("/api/projects", headers=_ORIGIN)
+    assert resp.status_code == 200
+
+    # The on-disk file should now have onboardingCompletedAt populated.
+    data = json.loads(info.read_text())
+    assert "onboardingCompletedAt" in data
+    assert data["onboardingCompletedAt"] == "2025-12-01T00:00:00Z"

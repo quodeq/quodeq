@@ -69,6 +69,48 @@ def _rollback_new_dirs(reports_root: str, before: set[str]) -> None:
             pass
 
 
+def _backfill_onboarding_field(project_dir: Path) -> dict | None:
+    """Add ``onboardingCompletedAt`` to ``repository_info.json`` if missing.
+
+    Returns the (possibly modified) data dict, or ``None`` if the file is
+    missing or unreadable. Persists the change back to disk when a backfill
+    happens. Treats absence of the field as already-onboarded — backfills to
+    the project's existing ``createdAt`` timestamp, falling back to "now".
+    """
+    info_path = project_dir / "repository_info.json"
+    if not info_path.exists():
+        return None
+    try:
+        data = json.loads(info_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+    if "onboardingCompletedAt" in data:
+        return data
+    from datetime import datetime, timezone
+    data["onboardingCompletedAt"] = data.get("createdAt") or datetime.now(timezone.utc).isoformat()
+    try:
+        info_path.write_text(json.dumps(data, indent=2))
+    except OSError:
+        pass
+    return data
+
+
+def _backfill_all_legacy_projects(reports_root: str) -> None:
+    """Walk *reports_root* and lazily backfill ``onboardingCompletedAt``.
+
+    Pure side-effect helper invoked from the project-list handler so older
+    projects (created before the wizard shipped) don't trigger the wizard
+    auto-open. Failures on individual projects are silently ignored.
+    """
+    reports_path = Path(reports_root)
+    if not reports_path.is_dir():
+        return
+    for child in reports_path.iterdir():
+        if not child.is_dir() or child.name.startswith("."):
+            continue
+        _backfill_onboarding_field(child)
+
+
 def _handle_delete_project(provider: ActionProvider) -> Response | tuple[Response, int]:
     """Handle DELETE /api/projects/<project>."""
     project = request.view_args["project"]
@@ -150,6 +192,10 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     @app.get("/api/projects")
     def list_projects() -> Response:
         """Return all projects with optional ``?limit=N&offset=M`` pagination."""
+        # Lazy backfill: ensure legacy project records have an
+        # ``onboardingCompletedAt`` field so the wizard never auto-opens for
+        # already-onboarded projects.
+        _backfill_all_legacy_projects(reports_dir())
         result = provider.list_projects(reports_dir())
         projects = result.get("projects", [])
         offset = request.args.get("offset", 0, type=int)
