@@ -55,6 +55,18 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
     }
   }, [wizard.state.step, detection.status, detection.preselection]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!entry.presetProjectId) return;
+    // Fetch the project's scan data so the resume flow shows the same summary.
+    fetch(`/api/projects/${encodeURIComponent(entry.presetProjectId)}/scan`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((scan) => {
+        if (!scan) return;
+        wizard.succeedScan(entry.presetProjectId, scan);
+      })
+      .catch(() => { /* tolerate scan fetch failure */ });
+  }, [entry.presetProjectId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const providerConfigured = Boolean(wizard.state.provider.id && wizard.state.provider.model);
   const visible = useMemo(
     () => visibleSteps(wizard.state.step, wizard.state.isFirstProject, providerConfigured),
