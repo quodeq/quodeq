@@ -23,7 +23,6 @@ export function providerKey(providerId, setting) {
 export const SETTINGS_DOT_DISMISSED_KEY = 'quodeq-settings-dot-dismissed';
 export const EVALUATE_DOT_DISMISSED_KEY = 'quodeq-evaluate-dot-dismissed';
 export const CONSOLE_DOT_DISMISSED_KEY = 'quodeq-console-dot-dismissed';
-export const SETTINGS_TOAST_SEEN_KEY = 'quodeq-settings-toast-seen';
 
 export const VISIBLE_STANDARDS_STORAGE_KEY = 'quodeq-visible-standards';
 export const DEFAULT_VISIBLE_STANDARDS = [
