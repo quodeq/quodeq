@@ -169,7 +169,7 @@ export default function Sidebar({
       <nav className="sidebar-nav sidebar-block">
         <NavButton
           id="projects"
-          label={repoName || 'no project'}
+          label={repoName || 'project'}
           icon={ICON_FOLDER}
           activeTab={activeTab}
           onNavTab={handleNav}
