@@ -51,14 +51,14 @@ export default function StandardLaunchStep({ state, actions, standards, onLaunch
       <div className="onboarding-step__actions">
         <button
           type="button"
-          className="btn btn--primary"
+          className="btn-primary"
           disabled={selectedIds.length === 0}
           onClick={() => onLaunch(selectedIds)}
         >
           Start evaluation
         </button>
-        <button type="button" className="btn btn--ghost" onClick={onBack}>Back</button>
-        <button type="button" className="btn btn--ghost" onClick={onCancel}>Save and finish setup later</button>
+        <button type="button" className="btn-secondary" onClick={onBack}>Back</button>
+        <button type="button" className="btn-secondary" onClick={onCancel}>Save and finish setup later</button>
       </div>
     </div>
   );

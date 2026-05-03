@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { RepoInput } from '../../../evaluation/components/EvaluationForm.jsx';
 import ScanProgress from '../../../evaluation/components/ScanProgress.jsx';
+import FolderBrowser from '../../../evaluation/components/FolderBrowser.jsx';
 
 export default function RepoScanStep({ state, actions, createProject, onContinue, onCancel }) {
   const sub = state.repoScanSubState;
+  const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
 
   async function handleSubmit() {
     if (!state.repo.value) return;
@@ -13,6 +16,11 @@ export default function RepoScanStep({ state, actions, createProject, onContinue
     } catch (err) {
       actions.failScan({ message: err.message, status: err.status, existingProjectId: err.existingProjectId });
     }
+  }
+
+  function handleFolderSelect(path) {
+    actions.setRepo({ value: path, source: 'local' });
+    setFolderBrowserOpen(false);
   }
 
   return (
@@ -27,7 +35,7 @@ export default function RepoScanStep({ state, actions, createProject, onContinue
           repo={state.repo.value}
           onRepoChange={(value) => actions.setRepo({ value, source: 'url' })}
           onClear={() => actions.setRepo({ value: '' })}
-          onBrowse={() => actions.setRepo({ source: 'local' })}
+          onBrowse={() => setFolderBrowserOpen(true)}
         />
         {sub === 'scanned' && (
           <button type="button" className="link-btn" onClick={actions.resetScan}>Edit repository</button>
@@ -45,8 +53,8 @@ export default function RepoScanStep({ state, actions, createProject, onContinue
         <div className="onboarding-scan-error" role="alert">
           <p>{state.scanError?.message || 'Scan failed.'}</p>
           <div className="onboarding-step__actions">
-            <button type="button" className="btn" onClick={handleSubmit}>Try again</button>
-            <button type="button" className="btn btn--ghost" onClick={actions.resetScan}>Edit repository</button>
+            <button type="button" className="btn-primary" onClick={handleSubmit}>Try again</button>
+            <button type="button" className="btn-secondary" onClick={actions.resetScan}>Edit repository</button>
           </div>
         </div>
       )}
@@ -68,15 +76,25 @@ export default function RepoScanStep({ state, actions, createProject, onContinue
 
       <div className="onboarding-step__actions">
         {sub === 'idle' && (
-          <button type="button" className="btn btn--primary" onClick={handleSubmit} disabled={!state.repo.value}>Scan repository</button>
+          <button type="button" className="btn-primary" onClick={handleSubmit} disabled={!state.repo.value}>Scan repository</button>
         )}
         {sub === 'scanned' && (
           <>
-            <button type="button" className="btn btn--primary" onClick={onContinue}>Continue → set up evaluation</button>
-            <button type="button" className="btn btn--ghost" onClick={onCancel}>Save and finish setup later</button>
+            <button type="button" className="btn-primary" onClick={onContinue}>Continue → set up evaluation</button>
+            <button type="button" className="btn-secondary" onClick={onCancel}>Save and finish setup later</button>
           </>
         )}
       </div>
+
+      {folderBrowserOpen && (
+        <FolderBrowser
+          onSelect={handleFolderSelect}
+          onClose={() => setFolderBrowserOpen(false)}
+          title="Select Folder or File"
+          confirmText="Use this path"
+          showFiles
+        />
+      )}
     </div>
   );
 }

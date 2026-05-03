@@ -12,14 +12,14 @@ export default function EmptyStateWithTour({ onAdd, onTour }) {
       <div className="empty-state__actions">
         <button
           type="button"
-          className="btn btn--primary"
+          className="btn-primary"
           onClick={() => { clearSkip(); onAdd(); }}
         >
           Add a project
         </button>
         <button
           type="button"
-          className="btn btn--ghost"
+          className="btn-secondary"
           onClick={() => { clearSkip(); onTour(); }}
         >
           Take the tour
