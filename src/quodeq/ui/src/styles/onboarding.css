@@ -206,3 +206,15 @@
   cursor: pointer;
   line-height: 1;
 }
+
+.resume-setup-badge {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid #f59e0b;
+  color: #f59e0b;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.resume-setup-badge:hover { background: rgba(245, 158, 11, 0.25); }

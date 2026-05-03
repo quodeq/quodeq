@@ -296,7 +296,7 @@ const ROUTE_RENDERERS = {
     />
   ),
   settings: (params, props) => <SettingsCase settings={props.settings} />,
-  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject }} />,
+  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onResumeSetup: props.navigation.onResumeSetup }} />,
   standards: () => <StandardsPage />,
   help: () => <HelpPage />,
 };
@@ -417,6 +417,11 @@ export default function App() {
       prefetchHandlers: state.prefetchHandlers,
       onAddProject: () => setWizardEntry({ startStep: 'repo-scan', isFirstProject: state.projects.length === 0 }),
       onTakeTour: () => setWizardEntry({ startStep: 'welcome', isFirstProject: true }),
+      onResumeSetup: (projectId) => setWizardEntry({
+        startStep: 'provider',
+        isFirstProject: false,
+        presetProjectId: projectId,
+      }),
     },
     evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
