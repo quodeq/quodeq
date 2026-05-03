@@ -67,3 +67,29 @@ describe('Onboarding integration — happy path', () => {
     expect(onLaunch.mock.calls[0][0].provider.id).toBe('codex-cli');
   });
 });
+
+describe('Onboarding integration — no provider detected', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('opens Provider step in comparison view and lets user pick Cloud', async () => {
+    vi.resetModules();
+    vi.doMock('./hooks/useProviderDetection.js', () => ({
+      useProviderDetection: () => ({ status: 'none', preselection: null }),
+    }));
+    const { default: OnboardingWizardLocal } = await import('./components/OnboardingWizard.jsx');
+
+    const onLaunch = vi.fn();
+    render(<OnboardingWizardLocal
+      entry={{ startStep: 'provider', isFirstProject: false }}
+      onLaunch={onLaunch}
+      onClose={() => {}}
+    />);
+
+    // Comparison view should be visible (the three card headings render).
+    expect(await screen.findByRole('heading', { name: /local cli/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /cloud api/i })).toBeInTheDocument();
+
+    // Continue is disabled because no model is selected.
+    expect(screen.getByRole('button', { name: /^continue$/i })).toBeDisabled();
+  });
+});
