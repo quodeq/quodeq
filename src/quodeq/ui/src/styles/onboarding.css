@@ -52,3 +52,51 @@
   display: flex;
   gap: 12px;
 }
+
+.onboarding-form-locked input,
+.onboarding-form-locked button:not(.link-btn) {
+  pointer-events: none;
+  opacity: 0.6;
+}
+.onboarding-scan-progress { margin: 16px 0; }
+.onboarding-scan-progress__hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #94a3b8);
+  margin: 6px 0 0;
+}
+.onboarding-scan-error {
+  background: rgba(218, 54, 51, 0.08);
+  border: 1px solid var(--color-danger, #da3633);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 16px 0;
+}
+.onboarding-scan-summary {
+  background: var(--color-card-bg, #1e293b);
+  border-radius: 6px;
+  padding: 14px;
+  margin: 16px 0;
+}
+.onboarding-scan-summary__langs {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #94a3b8);
+}
+.onboarding-step__actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+.link-btn {
+  background: none;
+  border: 0;
+  color: var(--color-link, #60a5fa);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px 0;
+}

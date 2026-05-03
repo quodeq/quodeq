@@ -8,7 +8,7 @@ import { useScanData } from '../hooks/useScanData.js';
 
 const FOLDER_MARGIN_BOTTOM = 8;
 
-function RepoInput({ repo, onRepoChange, onClear, onBrowse }) {
+export function RepoInput({ repo, onRepoChange, onClear, onBrowse }) {
   return (
     <div className="form-group">
       <label htmlFor="eval-form-repo">Repository</label>
