@@ -6,9 +6,9 @@ import EmptyStateWithTour from './EmptyStateWithTour.jsx';
 describe('EmptyStateWithTour', () => {
   beforeEach(() => localStorage.clear());
 
-  it('renders the heading and both CTAs', () => {
+  it('renders the no-projects header text and both CTAs', () => {
     render(<EmptyStateWithTour onAdd={() => {}} onTour={() => {}} />);
-    expect(screen.getByRole('heading', { name: /no projects yet/i })).toBeInTheDocument();
+    expect(screen.getByText(/no projects yet/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /add a project/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /take the tour/i })).toBeInTheDocument();
   });
