@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { registerProject, listStandards } from '../../../api/index.js';
 import { useWizardState } from '../hooks/useWizardState.js';
 import { saveDraft, clearDraft } from '../hooks/useWizardDraft.js';
+import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import StepProgress from './StepProgress.jsx';
 import WelcomeStep from './steps/WelcomeStep.jsx';
 import RepoScanStep from './steps/RepoScanStep.jsx';
@@ -26,8 +27,14 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
   const [standards, setStandards] = useState([]);
 
   // Fetch standards once when the step that needs them is reachable.
+  // Filter to the user's visible-standards setting so the picker matches
+  // what's enabled in the Standards tab. Lowercase both sides because the
+  // default list and the storage payload use lowercase ids.
   useEffect(() => {
-    listStandards().then(setStandards).catch(() => setStandards([]));
+    const visibleSet = new Set(readVisibleStandardIds().map((id) => (id || '').toLowerCase()));
+    listStandards()
+      .then((all) => setStandards(all.filter((s) => visibleSet.has((s.id || '').toLowerCase()))))
+      .catch(() => setStandards([]));
   }, []);
 
   // Persist a draft on every step transition or relevant state change.

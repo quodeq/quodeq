@@ -41,6 +41,9 @@ describe('Onboarding integration — happy path', () => {
     // when the user reaches it (otherwise the wizard can't advance).
     localStorage.setItem('cc-active-provider', 'codex');
     localStorage.setItem('cc-codex-model', 'gpt-5.2-codex');
+    // The wizard filters standards by the user's visible-standards setting
+    // (matches the Standards tab). Seed both mock ids so the picker shows them.
+    localStorage.setItem('quodeq-visible-standards', JSON.stringify(['std-a', 'std-b']));
   });
 
   it('walks Welcome → Repo & Scan → Provider → Standard & Launch and emits onLaunch', async () => {
