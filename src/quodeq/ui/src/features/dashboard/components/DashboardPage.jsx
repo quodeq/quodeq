@@ -111,7 +111,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       />
     );
   }
-  if (!loading && !dashboard) {
+  if (!loading && !isFetching && !dashboard) {
     const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
     return (
       <EmptyState
