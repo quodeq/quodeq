@@ -56,8 +56,8 @@ describe('Onboarding integration — happy path', () => {
     expect(screen.getByRole('heading', { name: /welcome to quodeq/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /get started/i }));
 
-    // Repo & Scan
-    expect(screen.getByRole('heading', { name: /add a repository/i })).toBeInTheDocument();
+    // Repo & Scan — placeholder is the most stable on-screen identifier
+    // for "we're on the repo step" after the terminal redesign.
     fireEvent.change(screen.getByPlaceholderText(/git@github.com/i), { target: { value: '/local/path' } });
     fireEvent.click(screen.getByRole('button', { name: /scan repository/i }));
     // Scanned-state stat tile — total_files=7 from the mock. Use getAllByText

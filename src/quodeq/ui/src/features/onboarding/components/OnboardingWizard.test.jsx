@@ -29,6 +29,6 @@ describe('OnboardingWizard', () => {
 
   it('skipping welcome via startStep="repo-scan" mounts the RepoScan step directly', () => {
     render(<OnboardingWizard entry={{ startStep: 'repo-scan', isFirstProject: false }} onClose={() => {}} onLaunch={() => {}} />);
-    expect(screen.getByRole('heading', { name: /add a repository/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/git@github.com/i)).toBeInTheDocument();
   });
 });
