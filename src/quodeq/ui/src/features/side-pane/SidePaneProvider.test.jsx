@@ -184,4 +184,32 @@ describe('SidePaneProvider', () => {
     fireEvent.click(screen.getByText('r'));
     expect(screen.getByTestId('count')).toHaveTextContent('0');
   });
+
+  describe('showToast', () => {
+    function ToastProbe() {
+      const { showToast } = useSidePane();
+      return (
+        <button onClick={() => showToast('blocked: try again later')}>fire</button>
+      );
+    }
+
+    it('renders a toast with the given message when fired', () => {
+      render(<SidePaneProvider><ToastProbe /></SidePaneProvider>);
+      expect(screen.queryByText('blocked: try again later')).toBeNull();
+      fireEvent.click(screen.getByText('fire'));
+      expect(screen.getByText('blocked: try again later')).toBeInTheDocument();
+    });
+
+    it('is exposed as part of the context value (no-op when called with empty)', () => {
+      function NoMessageProbe() {
+        const { showToast } = useSidePane();
+        return <button onClick={() => showToast('')}>fire-empty</button>;
+      }
+      render(<SidePaneProvider><NoMessageProbe /></SidePaneProvider>);
+      // No throw, no toast rendered
+      fireEvent.click(screen.getByText('fire-empty'));
+      // The toast role is "status" — assert none exists.
+      expect(screen.queryByRole('status')).toBeNull();
+    });
+  });
 });

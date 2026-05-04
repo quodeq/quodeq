@@ -219,7 +219,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
   return (
     <div className="panel evaluate-panel">
       <div className="panel-header">
-        <h3>Re-evaluate <span className="re-eval-project-name">{info.name || project}</span></h3>
+        <h3>Evaluate <span className="re-eval-project-name">{info.name || project}</span></h3>
       </div>
 
       <div className="evaluate-form-large">

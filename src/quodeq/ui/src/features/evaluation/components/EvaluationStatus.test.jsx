@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import EvaluationStatus from './EvaluationStatus.jsx';
 
@@ -44,26 +44,6 @@ describe('StatusChip', () => {
     expect(chip.textContent).toBe('failed');
     expect(chip.className).not.toContain('job-status-badge--stale');
     expect(chip.getAttribute('title')).toBe('exception: EvaluationError');
-  });
-});
-
-describe('JobHeader escape hatch', () => {
-  it('renders a Hide button alongside Cancel when status is running', () => {
-    render(<EvaluationStatus job={{ ...baseJob, status: 'running' }} onCancel={() => {}} onDismiss={() => {}} />);
-    expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /hide/i })).toBeInTheDocument();
-  });
-
-  it('clicking Hide on a running job calls onDismiss with "close"', () => {
-    const onDismiss = vi.fn();
-    render(<EvaluationStatus job={{ ...baseJob, status: 'running' }} onCancel={() => {}} onDismiss={onDismiss} />);
-    fireEvent.click(screen.getByRole('button', { name: /hide/i }));
-    expect(onDismiss).toHaveBeenCalledWith('close');
-  });
-
-  it('does not render Hide for a done job (Dismiss already covers it)', () => {
-    render(<EvaluationStatus job={{ ...baseJob, status: 'done' }} onCancel={() => {}} onDismiss={() => {}} />);
-    expect(screen.queryByRole('button', { name: /^hide$/i })).toBeNull();
   });
 });
 

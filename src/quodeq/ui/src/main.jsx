@@ -6,6 +6,7 @@ import { resolveDataTheme } from './utils/themeResolver.js';
 import { ApiProvider } from './api/ApiContext.jsx';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './api/queryClient.js';
+import { SidePaneProvider } from './features/side-pane/index.js';
 
 const LS_THEME = 'cc-theme';
 const LS_THEME_MODE = 'cc-theme-mode';
@@ -85,7 +86,11 @@ if (!rootEl) throw new Error('Root element #root not found in DOM');
 createRoot(rootEl).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ApiProvider><App /></ApiProvider>
+      <ApiProvider>
+        <SidePaneProvider>
+          <App />
+        </SidePaneProvider>
+      </ApiProvider>
     </QueryClientProvider>
   </React.StrictMode>
 );

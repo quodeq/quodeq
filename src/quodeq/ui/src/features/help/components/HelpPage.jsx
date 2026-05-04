@@ -135,8 +135,8 @@ function Evaluations() {
         <li><strong>Incremental scan</strong> detects changed files via git diff and only re-evaluates those. Previous findings for unchanged files are carried forward, making it significantly faster and cheaper. Enable the <em>Incremental</em> toggle before starting.</li>
       </ul>
 
-      <h3>Re-evaluate</h3>
-      <p>From the <strong>Evaluate</strong> tab, you can re-run an evaluation on an existing project. The new results appear as a new run in the history, allowing you to track quality over time.</p>
+      <h3>Evaluate an existing project</h3>
+      <p>From the <strong>Evaluate</strong> tab, you can run a new evaluation on an existing project. The results appear as a new run in the history, allowing you to track quality over time.</p>
     </section>
   );
 }

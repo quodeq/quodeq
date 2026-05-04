@@ -26,7 +26,7 @@ import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { readVisibleStandardIds } from './utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
-import { SidePane, SidePaneProvider } from './features/side-pane/index.js';
+import { SidePane, useSidePane } from './features/side-pane/index.js';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.jsx';
 import { ServerLogProvider } from './features/settings/server-log/ServerLogProvider.jsx';
@@ -359,6 +359,8 @@ export default function App() {
   // auto-open job is done for this page load.
   const autoOpenedRef = useRef(false);
 
+  const { showToast } = useSidePane();
+
   // While an evaluation is running we block any path that would open the
   // onboarding wizard or start a second evaluation — only one job may be in
   // flight at a time.
@@ -442,17 +444,23 @@ export default function App() {
       prefetchHandlers: state.prefetchHandlers,
       onAddProject: () => {
         if (isEvaluating) {
-          console.warn('[onboarding] add-project ignored — evaluation in progress');
+          showToast('An evaluation is in progress. Cancel it before adding a project.');
           return;
         }
         setWizardEntry({ startStep: 'repo-scan', isFirstProject: state.projects.length === 0 });
       },
       onTakeTour: () => {
-        if (isEvaluating) return;
+        if (isEvaluating) {
+          showToast('An evaluation is in progress. Cancel it before starting the tour.');
+          return;
+        }
         setWizardEntry({ startStep: 'welcome', isFirstProject: true });
       },
       onResumeSetup: (projectId) => {
-        if (isEvaluating) return;
+        if (isEvaluating) {
+          showToast('An evaluation is in progress. Cancel it before resuming setup.');
+          return;
+        }
         setWizardEntry({
           startStep: 'provider',
           isFirstProject: false,
@@ -481,7 +489,6 @@ export default function App() {
 
   return (
     <>
-    <SidePaneProvider>
       <EvalLogProvider>
         <ServerLogProvider>
           <OllamaLogProvider>
@@ -580,7 +587,6 @@ export default function App() {
           </OllamaLogProvider>
         </ServerLogProvider>
       </EvalLogProvider>
-    </SidePaneProvider>
     {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
     </>
   );

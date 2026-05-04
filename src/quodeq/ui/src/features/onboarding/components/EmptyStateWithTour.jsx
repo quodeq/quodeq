@@ -15,18 +15,18 @@ export default function EmptyStateWithTour({ onAdd, onTour, isEvaluating = false
       <div className="empty-state__actions">
         <button
           type="button"
-          className="term-btn--primary"
+          className={`term-btn--primary${isEvaluating ? ' is-disabled' : ''}`}
           onClick={() => { clearSkip(); onAdd(); }}
-          disabled={isEvaluating}
+          aria-disabled={isEvaluating || undefined}
           title={blockedTitle}
         >
           add a project
         </button>
         <button
           type="button"
-          className="term-btn--secondary"
+          className={`term-btn--secondary${isEvaluating ? ' is-disabled' : ''}`}
           onClick={() => { clearSkip(); onTour(); }}
-          disabled={isEvaluating}
+          aria-disabled={isEvaluating || undefined}
           title={blockedTitle}
         >
           take the tour
