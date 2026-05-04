@@ -182,6 +182,17 @@ export function useEvaluation() {
         queryClient.invalidateQueries({ queryKey: evaluationKeys.evaluation(jobId) });
       }
     },
+    onError: (err) => {
+      // The backend returns 409 when the job is no longer cancellable
+      // (process gone, status already terminal, etc.). Without this handler
+      // the user is trapped: status stays "running", Cancel does nothing
+      // visible. Surface the message and clear locally so the panel closes.
+      const msg = err?.message || "Could not cancel evaluation";
+      setJobError(msg);
+      const id = jobId;
+      if (id) queryClient.removeQueries({ queryKey: evaluationKeys.evaluation(id) });
+      setJobId(null);
+    },
   });
 
   const startEvaluation = useCallback(
