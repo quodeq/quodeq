@@ -71,8 +71,8 @@ describe('Onboarding integration — happy path', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /^continue$/i })).not.toBeDisabled());
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
-    // Standard & Launch
-    expect(screen.getByRole('heading', { name: /pick a standard/i })).toBeInTheDocument();
+    // Standard & Launch — pitch text is unchanged and uniquely identifies this step
+    expect(screen.getByText(/pick one for your first run/i)).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText(/security 101/i));
     fireEvent.click(screen.getByRole('button', { name: /start evaluation/i }));
 
