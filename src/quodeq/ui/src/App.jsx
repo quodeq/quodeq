@@ -35,6 +35,7 @@ import { OllamaLogProvider } from './features/settings/ollama-log/OllamaLogProvi
 // fresh-install user can land on Projects and add their first one without
 // hitting the "no analyzed projects yet" wall.
 const NO_PROJECT_TABS = ['projects', 'evaluate', 'standards', 'settings', 'help'];
+const SELF_HANDLED_EMPTY = new Set(['overview', 'map', 'violations', 'history']);
 
 /**
  * Returns whether the app is currently rendering dark, taking the saved
@@ -179,7 +180,16 @@ function ViolationsRoute({ params, props }) {
 
   return (
     <ViolationsPage
-      data={{ accumulated: acc, accumulatedDimensions: dims, selectedProject: props.navigation.selectedProject }}
+      data={{
+        accumulated: acc,
+        accumulatedDimensions: dims,
+        selectedProject: props.navigation.selectedProject,
+        projects: props.navigation.projects,
+        projectsLoaded: props.navigation.projectsLoaded,
+        projectName: props.dashboardData.selectedDisplayName,
+        loading: props.dashboardData.loading,
+        isFetching: props.dashboardData.isFetching,
+      }}
       callbacks={{
         onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
         onFileClick: (fileObj) => nav('file', { file: fileObj, sourceTab: 'violations' }),
@@ -192,6 +202,7 @@ function ViolationsRoute({ params, props }) {
         },
         onPrincipleClick: (principleObj) => navigateToPrinciple(principleObj),
         onRefresh: props.refreshDashboard,
+        onNavigate: nav,
       }}
       isDirectNav={props.navigation.navStackLength === 1}
       tabKey={params._tabKey || 0}
@@ -205,7 +216,21 @@ const ROUTE_RENDERERS = {
   map: (params, props) => {
     const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
     const isDirectNav = props.navigation.navStackLength === 1;
-    return <MapPage data={{ accumulated: acc, dashboard: props.dashboardData.dashboard, projectName: props.dashboardData.selectedDisplayName }} callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard }} isDirectNav={isDirectNav} tabKey={params._tabKey || 0} />;
+    return <MapPage
+      data={{
+        accumulated: acc,
+        dashboard: props.dashboardData.dashboard,
+        projectName: props.dashboardData.selectedDisplayName,
+        projects: props.navigation.projects,
+        projectsLoaded: props.navigation.projectsLoaded,
+        selectedProject: props.navigation.selectedProject,
+        loading: props.dashboardData.loading,
+        isFetching: props.dashboardData.isFetching,
+      }}
+      callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard }}
+      isDirectNav={isDirectNav}
+      tabKey={params._tabKey || 0}
+    />;
   },
   run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
   history: (params, props) => {
@@ -231,6 +256,11 @@ const ROUTE_RENDERERS = {
           onRunChange: props.navigation.setHistorySelectedRun,
           onRunDeleted: () => props.refreshDashboard?.(),
         }}
+        projects={props.navigation.projects}
+        projectsLoaded={props.navigation.projectsLoaded}
+        selectedProject={props.navigation.selectedProject}
+        loading={props.dashboardData.loading}
+        isFetching={props.dashboardData.isFetching}
         projectInfo={props.navigation.projects?.find((p) => (p.id || p.name) === props.navigation.selectedProject) || null}
       />
     );
@@ -275,7 +305,7 @@ const ROUTE_RENDERERS = {
  */
 function MainContent({ activePage, props }) {
   const { page, ...params } = activePage;
-  if (!NO_PROJECT_TABS.includes(page)) {
+  if (!NO_PROJECT_TABS.includes(page) && !SELF_HANDLED_EMPTY.has(page)) {
     const projects = props.navigation?.projects;
     if (!projects || projects.length === 0) {
       if (!props.navigation?.projectsLoaded) return <LoadingScreen />;
@@ -361,12 +391,14 @@ export default function App() {
   const contentProps = {
     dashboardData: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
+      projectsLoaded: state.projectsLoaded,
       dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
       availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
       selectedDisplayName: state.selectedDisplayName,
     },
     navigation: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
+      projectsLoaded: state.projectsLoaded,
       handleNavigate: state.handleNavigate, handleRunSelect: state.handleRunSelect,
       handleProjectChange: state.handleProjectChange, navTab, navStackLength: navStack.length,
       handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject,
