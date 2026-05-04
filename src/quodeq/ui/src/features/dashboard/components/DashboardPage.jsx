@@ -3,6 +3,7 @@ import DimensionCard from './DimensionCard.jsx';
 import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
+import EmptyState from '../../../components/EmptyState.jsx';
 
 function DashboardContent({ runMode, data, focus, callbacks }) {
   const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo } = data;
@@ -88,9 +89,38 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   const focusedDimensionData = useMemo(() => focusedDimension ? (dashboard?.dimensions || []).find((d) => d.dimension === focusedDimension) || null : null, [focusedDimension, dashboard]);
   const handlers = useDashboardHandlers(onNavigate, dashboard);
 
-  if (!projects || projects.length === 0) {
-    if (loading) return <LoadingScreen />;
-    return <section className="empty-state"><h2>No analyzed projects yet</h2><p>Run an evaluation to get started.</p></section>;
+  const { projectsLoaded } = data;
+  if (!projectsLoaded) return <LoadingScreen />;
+  if (projects.length === 0) {
+    return (
+      <EmptyState
+        title="No projects yet"
+        description="Run your first evaluation to start analyzing code quality."
+        actionLabel="Start evaluating"
+        onAction={() => onNavigate?.('evaluate')}
+      />
+    );
+  }
+  if (!selectedProject) {
+    return (
+      <EmptyState
+        title="No project selected"
+        description="Pick a project to view its overview."
+        actionLabel="Choose project"
+        onAction={() => onNavigate?.('projects')}
+      />
+    );
+  }
+  if (!loading && !dashboard) {
+    const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
+    return (
+      <EmptyState
+        title="No evaluations yet"
+        description={`Run an evaluation for ${projectName} to populate this page.`}
+        actionLabel="Start evaluation"
+        onAction={() => onNavigate?.('evaluate')}
+      />
+    );
   }
 
   const isLoading = loading && !dashboard;
