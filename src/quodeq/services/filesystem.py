@@ -225,9 +225,33 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         dims = data.get("dimensions")
         return dims if isinstance(dims, list) else None
 
+    @staticmethod
+    def _read_deadline_from_status(run_dir: Path) -> str | None:
+        """Read the `deadline_at` ISO string from status.json, or None if unavailable.
+
+        External (CLI) runs are not tracked by ``JobManager`` and so don't go
+        through the marker-parsing path that sets ``Job.deadline_at``. Reading
+        directly from status.json — which the run lifecycle writes via
+        ``write_status(deadline_at=...)`` — keeps the dashboard's countdown
+        timer ticking for external runs too.
+        """
+        import json as _json  # noqa: PLC0415
+        status_path = run_dir / "status.json"
+        if not status_path.is_file():
+            return None
+        try:
+            data = _json.loads(status_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        if not isinstance(data, dict):
+            return None
+        val = data.get("deadline_at")
+        return val if isinstance(val, str) else None
+
     def _run_row_to_snapshot(self, row: "_run_index.RunRow") -> JobSnapshot:
         logs: list[str] = []
         dimensions: list[str] | None = None
+        deadline_at: str | None = None
         if row.run_dir:
             run_dir_path = Path(row.run_dir)
             try:
@@ -238,6 +262,10 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
                 dimensions = self._read_dimensions_from_status(run_dir_path)
             except (OSError, ValueError):
                 dimensions = None
+            try:
+                deadline_at = self._read_deadline_from_status(run_dir_path)
+            except (OSError, ValueError):
+                deadline_at = None
         return JobSnapshot(
             job_id=row.job_id,
             status=row.state,
@@ -249,6 +277,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             output_project=row.project_uuid,
             output_run_id=row.run_id,
             phase=row.phase,
+            deadline_at=deadline_at,
             current_dimension=row.current_dimension,
             dimensions=dimensions,
             error=row.exit_reason,
