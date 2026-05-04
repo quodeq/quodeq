@@ -161,6 +161,28 @@ def _sync_legacy_run(
     )
 
 
+def _delete_orphan_non_terminal_rows(db: sqlite3.Connection) -> int:
+    """Remove non-terminal rows whose ``run_dir`` no longer exists on disk.
+
+    Without this sweep, an orphan row (e.g. left by a crashed test, a manually
+    deleted run dir, or a partial cleanup) stays as ``running`` forever:
+    ``_check_stale_and_promote`` reads ``.heartbeat`` from ``run_dir``, and an
+    unreadable heartbeat (no dir) provides no liveness signal, so the row is
+    never promoted. Terminal rows are left alone — users may prune old dirs
+    to save disk and the index is their only record.
+    """
+    placeholders = ", ".join("?" for _ in _TERMINAL_STATE_VALUES)
+    rows = db.execute(
+        f"SELECT job_id, run_dir FROM runs WHERE state NOT IN ({placeholders})",
+        tuple(_TERMINAL_STATE_VALUES),
+    ).fetchall()
+    orphan_ids = [job_id for job_id, run_dir in rows if not Path(run_dir).is_dir()]
+    if not orphan_ids:
+        return 0
+    db.executemany("DELETE FROM runs WHERE job_id = ?", [(j,) for j in orphan_ids])
+    return len(orphan_ids)
+
+
 def _check_stale_and_promote(
     db: sqlite3.Connection, run_dir: Path, *,
     project_uuid: str, run_id: str, stale_seconds: int = 30,

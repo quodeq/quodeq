@@ -1,8 +1,7 @@
-from pathlib import Path
-
 import pytest
 
 from quodeq.cli import build_parser
+from quodeq.shared.utils import get_evaluations_dir
 
 _TEST_REPO = "tmp/repo"
 _TEST_LANGUAGE = "python"
@@ -33,7 +32,10 @@ def test_evaluate_mode(parsed_evaluate_args):
 
 
 def test_evaluate_default_output(parsed_evaluate_args):
-    assert parsed_evaluate_args.output == str(Path.home() / ".quodeq" / "evaluations")
+    # The parser resolves the default via ``get_evaluations_dir()``, which
+    # honours ``QUODEQ_EVALUATIONS_DIR``. Compare against the same helper so
+    # the test stays correct under the autouse isolation fixture.
+    assert parsed_evaluate_args.output == get_evaluations_dir()
 
 
 def test_evaluate_no_prescan_default(parsed_evaluate_args):

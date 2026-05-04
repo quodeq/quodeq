@@ -5,6 +5,10 @@ import { useEvaluation } from "./useEvaluation";
 import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
 import { ApiProvider } from "../../../api/ApiContext.jsx";
 
+vi.mock("../../../utils/confirmDialog.js", () => ({
+  confirmDialog: vi.fn().mockResolvedValue({ ok: true, checked: false }),
+}));
+
 const fakeApi = {
   getEvaluation: vi.fn(),
   startEvaluation: vi.fn(),
@@ -100,6 +104,29 @@ describe("useEvaluation", () => {
         aiModel: "llama3.1",
       }),
     );
+  });
+
+  it("cancelEvaluation surfaces an error and clears the job when the API rejects", async () => {
+    fakeApi.startEvaluation.mockResolvedValue({
+      jobId: "j-stuck",
+      status: "running",
+      dimensions: [],
+    });
+    fakeApi.cancelEvaluation.mockRejectedValue(new Error("Could not cancel job"));
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await act(async () => {
+      await result.current.startEvaluation({ repo: "x", dimensions: [] });
+    });
+    await waitFor(() => expect(result.current.job?.jobId).toBe("j-stuck"));
+
+    await act(async () => {
+      await result.current.cancelEvaluation();
+    });
+
+    await waitFor(() => {
+      expect(result.current.jobError).toMatch(/cancel/i);
+      expect(result.current.job).toBeNull();
+    });
   });
 
   it("startEvaluation surfaces a useful error when no provider is configured", async () => {
