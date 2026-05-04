@@ -177,10 +177,9 @@ function ViolationsSubTabContent(props) {
 }
 
 export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
-  const { accumulatedDimensions, selectedProject } = data;
+  const { accumulatedDimensions = [], selectedProject } = data;
   const { projects = [], projectsLoaded, projectName, loading, isFetching } = data;
-  const { onNavigate } = callbacks;
-  const { onRefresh } = callbacks;
+  const { onNavigate, onRefresh } = callbacks;
 
   // Fresh tab click (tabKey changed) drops the cached navigation state so
   // the user lands at the default sub-tab / root path. Round-tripping
