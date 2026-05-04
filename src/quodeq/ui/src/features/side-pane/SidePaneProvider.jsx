@@ -77,6 +77,15 @@ export function SidePaneProvider({ children }) {
 
   const clearNotice = useCallback(() => setNotice(null), []);
 
+  // Generic snackbar trigger for callers outside the side-pane (e.g. the
+  // evaluation form's "select at least one standard" hint, or App.jsx's
+  // "an evaluation is in progress" block on Add Project). Reuses the same
+  // visual + auto-dismiss as the side-pane's own at-cap notice.
+  const showToast = useCallback((message) => {
+    if (!message) return;
+    setNotice({ message, key: Date.now() });
+  }, []);
+
   const addWindow = useCallback((spec) => {
     if (!spec || !spec.id) return;
     if (windows.some((w) => w.id === spec.id)) return;
@@ -175,8 +184,9 @@ export function SidePaneProvider({ children }) {
       addWindow, removeWindow, replaceWindow, toggleWindow, hasWindow, closeAll,
       setPaneWidth, MAX_WINDOWS,
       registerSpec, unregisterSpec, getRegisteredSpec,
+      showToast,
     }),
-    [windows, isOpen, paneWidth, addWindow, removeWindow, replaceWindow, toggleWindow, hasWindow, closeAll, setPaneWidth, registerSpec, unregisterSpec, getRegisteredSpec],
+    [windows, isOpen, paneWidth, addWindow, removeWindow, replaceWindow, toggleWindow, hasWindow, closeAll, setPaneWidth, registerSpec, unregisterSpec, getRegisteredSpec, showToast],
   );
 
   return (

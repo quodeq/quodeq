@@ -49,9 +49,8 @@ function JobHeader({ job, onDismiss, onCancel }) {
       </div>
       <div className="job-header-right">
         {isRunning && <button type="button" className="job-cancel-inline" onClick={onCancel}>Cancel</button>}
-        {isRunning && <button type="button" className="job-header-dismiss-btn" onClick={() => onDismiss('close')}>Hide</button>}
         {!isRunning && isDone && <button type="button" className="job-header-view-btn" onClick={() => onDismiss('view')}>View Results</button>}
-        {!isRunning && <button type="button" className="job-header-dismiss-btn" onClick={() => onDismiss('close')}>{isDone ? 'Dismiss' : 'Close'}</button>}
+        {!isRunning && <button type="button" className="job-header-dismiss-btn" onClick={() => onDismiss('close')}>Close</button>}
         <StatusChip status={job.status} exitReason={job.exitReason} />
       </div>
     </div>

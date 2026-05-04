@@ -260,6 +260,9 @@ function useRelocateDialog(onRelocate) {
 const EVAL_BLOCKED_TITLE = 'Cannot add a project while an evaluation is running';
 
 function EmptyProjectsCTA({ onAddProject, isEvaluating }) {
+  // The button stays clickable while evaluating so the handler can fire a
+  // snackbar explaining the block. ``aria-disabled`` + the visual muted class
+  // preserve the disabled affordance without swallowing the click.
   return (
     <div className="projects-empty projects-empty--cta">
       <h3 className="projects-empty__title">Add your first project</h3>
@@ -268,9 +271,9 @@ function EmptyProjectsCTA({ onAddProject, isEvaluating }) {
       </p>
       <button
         type="button"
-        className="projects-empty__cta-btn"
+        className={`projects-empty__cta-btn${isEvaluating ? ' is-disabled' : ''}`}
         onClick={onAddProject}
-        disabled={isEvaluating}
+        aria-disabled={isEvaluating || undefined}
         title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
       >
         + Add project
@@ -295,10 +298,10 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
         {projects.length > 0 && onAddProject && (
           <button
             type="button"
-            className="projects-page__add-btn"
+            className={`projects-page__add-btn${isEvaluating ? ' is-disabled' : ''}`}
             onClick={onAddProject}
             aria-label="Add project"
-            disabled={isEvaluating}
+            aria-disabled={isEvaluating || undefined}
             title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
           >
             + Add project

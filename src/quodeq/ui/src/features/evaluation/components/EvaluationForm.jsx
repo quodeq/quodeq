@@ -4,6 +4,9 @@ import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
 import DimensionSelector from './DimensionSelector.jsx';
 import BranchScopeSelector from './BranchScopeSelector.jsx';
 import { useScanData } from '../hooks/useScanData.js';
+import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
+
+const NO_STANDARDS_MESSAGE = 'Select at least one standard before evaluating.';
 
 
 const FOLDER_MARGIN_BOTTOM = 8;
@@ -61,7 +64,7 @@ function buildAndSubmit(onStart, formState) {
   setScopePath(null);
 }
 
-function useEvaluationForm(onStart) {
+function useEvaluationForm(onStart, onValidationFail) {
   const [repo, setRepo] = useState('');
   const { allDimensions, dimLoadError } = usePluginDimensions();
   const [selectedDims, setSelectedDims] = useState(new Set());
@@ -80,6 +83,10 @@ function useEvaluationForm(onStart) {
   const clearAll = () => setSelectedDims(new Set());
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (allDimensions.length > 0 && selectedDims.size === 0) {
+      onValidationFail?.(NO_STANDARDS_MESSAGE);
+      return;
+    }
     buildAndSubmit(onStart, { repo, selectedDims, branch, scopePath, setRepo, setSelectedDims, setBranch, setScopePath });
   };
   const handleFolderSelect = (path) => { setRepo(path); setFolderBrowserOpen(false); };
@@ -95,16 +102,20 @@ function useEvaluationForm(onStart) {
 }
 
 export default function EvaluationForm({ onStart, disabled, selectedProject }) {
+  const { showToast } = useSidePane();
   const {
     repo, setRepo, allDimensions, selectedDims, folderBrowserOpen, setFolderBrowserOpen,
     toggleDim, selectAll, clearAll, handleSubmit, handleFolderSelect, handleRepoClear, dimLoadError,
     branch, setBranch, scopePath, setScopePath,
-  } = useEvaluationForm(onStart);
+  } = useEvaluationForm(onStart, showToast);
 
   const isLocalRepo = !!repo && !repo.startsWith('http') && !repo.startsWith('git@') && !repo.includes('github.com');
   const { scanData } = useScanData(null, isLocalRepo ? repo : null);
 
-  const canSubmit = !disabled && !!repo && (allDimensions.length === 0 || selectedDims.size > 0);
+  // Submit stays clickable when no standards are selected so the snackbar
+  // can fire on click. ``disabled`` (the prop) covers the running state and
+  // the missing-repo case keeps the button greyed.
+  const canSubmit = !disabled && !!repo;
 
   return (
     <>
