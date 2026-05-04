@@ -1,3 +1,39 @@
+/* ──────────────────────────────────────────────────────────────
+   Onboarding-scoped terminal buttons.
+   Rendered inside the wizard, EmptyStateWithTour, and any future
+   surfaces aligned with the terminal aesthetic. The app-wide
+   `.btn-primary` / `.btn-secondary` are unchanged.
+   ────────────────────────────────────────────────────────────── */
+.term-btn--primary,
+.term-btn--secondary {
+  font-family: var(--term-font-mono);
+  font-size: 13px;
+  border-radius: var(--term-radius);
+  padding: var(--term-space-2) var(--term-space-3);
+  cursor: pointer;
+  transition: background 120ms ease;
+  background: transparent;
+}
+.term-btn--primary {
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+}
+.term-btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+.term-btn--secondary {
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+.term-btn--secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+.term-btn--primary:disabled,
+.term-btn--secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .step-progress {
   display: flex;
   flex-direction: column;
