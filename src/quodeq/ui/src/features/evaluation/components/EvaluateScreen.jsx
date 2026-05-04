@@ -7,37 +7,6 @@ import { TermHeader, SectionLabel } from '../../../components/terminal/index.js'
 
 const TOAST_DISMISS_TIMEOUT_MS = 5000;
 
-function EvaluateHelpSection() {
-  return (
-    <div className="panel evaluate-help-panel">
-      <SectionLabel>how_it_works</SectionLabel>
-      <div className="help-steps">
-        <div className="help-step">
-          <div className="step-number">1</div>
-          <div className="step-content">
-            <h4>Provide Repository</h4>
-            <p>Enter a GitHub URL, SSH path, or local filesystem path to the repository you want to evaluate.</p>
-          </div>
-        </div>
-        <div className="help-step">
-          <div className="step-number">2</div>
-          <div className="step-content">
-            <h4>Select Dimensions</h4>
-            <p>Choose which quality dimensions to analyze. Each dimension covers different aspects of code quality.</p>
-          </div>
-        </div>
-        <div className="help-step">
-          <div className="step-number">3</div>
-          <div className="step-content">
-            <h4>Review Results</h4>
-            <p>Once complete, view detailed findings, grades, and actionable recommendations in the Overview.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function ActiveProviderBadge({ storage = localStorage }) {
   const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
   const model = storage.getItem(providerKey(provider, 'model')) || '';
@@ -157,8 +126,6 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
         )}
 
         <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={onDismiss} onCancel={onCancel} hasEvaluations={!!selectedProject} />
-
-        {!job && <EvaluateHelpSection />}
       </div>
 
       {jobError && toastVisible && (

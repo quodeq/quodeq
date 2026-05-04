@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, ICON_SETTINGS, ICON_STANDARDS, ICON_HELP } from '../constants/navigation.jsx';
-import { ACTIVE_PROVIDER_KEY, providerKey, SETTINGS_DOT_DISMISSED_KEY, EVALUATE_DOT_DISMISSED_KEY } from '../constants.js';
 
 // Folder glyph for the REPOSITORY row — visually distinct from the list-style
 // ICON_PROJECTS so the repo context reads as a folder even on the collapsed rail.
@@ -9,38 +8,6 @@ const ICON_FOLDER = (
     <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
   </svg>
 );
-
-const SETUP_POLL_INTERVAL_MS = 2000;
-
-function useSetupStatus(hasEvaluations, storage = localStorage) {
-  const [status, setStatus] = useState({ needsSettings: false, readyToEvaluate: false });
-
-  useEffect(() => {
-    function check() {
-      if (hasEvaluations) {
-        setStatus({ needsSettings: false, readyToEvaluate: false });
-        return;
-      }
-      const settingsDismissed = storage.getItem(SETTINGS_DOT_DISMISSED_KEY);
-      const evaluateDismissed = storage.getItem(EVALUATE_DOT_DISMISSED_KEY);
-      const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
-      const model = provider ? storage.getItem(providerKey(provider, 'model')) || '' : '';
-      const configured = !!(provider && model);
-
-      const showSettings = !settingsDismissed;
-      setStatus({
-        needsSettings: showSettings,
-        readyToEvaluate: !showSettings && configured && !evaluateDismissed,
-      });
-    }
-    check();
-    window.addEventListener('storage', check);
-    const interval = setInterval(check, SETUP_POLL_INTERVAL_MS);
-    return () => { window.removeEventListener('storage', check); clearInterval(interval); };
-  }, [hasEvaluations]);
-
-  return status;
-}
 
 function Logo() {
   return (
@@ -65,7 +32,7 @@ function Logo() {
   );
 }
 
-function NavButton({ id, label, icon, activeTab, onNavTab, count, showDot }) {
+function NavButton({ id, label, icon, activeTab, onNavTab, count }) {
   return (
     <button
       type="button"
@@ -76,7 +43,6 @@ function NavButton({ id, label, icon, activeTab, onNavTab, count, showDot }) {
       {icon}
       <span className="sidebar-nav-label">{label}</span>
       {count != null && <span className="sidebar-nav-count">{count}</span>}
-      {showDot && <span className="sidebar-nav-dot" />}
     </button>
   );
 }
@@ -118,7 +84,6 @@ export default function Sidebar({
      stays tidy, and the drawer surfaces them here instead. */
   mobileExtras = null,
 }) {
-  const { needsSettings, readyToEvaluate } = useSetupStatus(hasEvaluations);
   const [internalPinned, setInternalPinned] = useState(false);
   const isPinned = controlledPinned != null ? controlledPinned : internalPinned;
   const setPinned = (next) => {
@@ -184,23 +149,7 @@ export default function Sidebar({
         </nav>
 
         <nav className="sidebar-nav sidebar-block">
-          <NavButton
-            id="evaluate"
-            label="evaluate"
-            icon={ICON_EVALUATE}
-            activeTab={activeTab}
-            onNavTab={(id) => { try { localStorage.setItem(EVALUATE_DOT_DISMISSED_KEY, '1'); } catch {} handleNav(id); }}
-            showDot={readyToEvaluate}
-          />
-          <NavButton id="standards" label="standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={handleNav} count={standardsCount} />
-          <NavButton
-            id="settings"
-            label="settings"
-            icon={ICON_SETTINGS}
-            activeTab={activeTab}
-            onNavTab={(id) => { try { localStorage.setItem(SETTINGS_DOT_DISMISSED_KEY, '1'); } catch {} handleNav(id); }}
-            showDot={needsSettings}
-          />
+          <NavButton id="evaluate" label="evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={handleNav} />
         </nav>
 
         <div className="sidebar-spacer" />
@@ -227,6 +176,8 @@ export default function Sidebar({
             )}
           </div>
           <div className="sidebar-nav sidebar-block sidebar-block--flush">
+            <NavButton id="standards" label="standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={handleNav} count={standardsCount} />
+            <NavButton id="settings" label="settings" icon={ICON_SETTINGS} activeTab={activeTab} onNavTab={handleNav} />
             <NavButton id="help" label="help" icon={ICON_HELP} activeTab={activeTab} onNavTab={handleNav} />
           </div>
         </div>
