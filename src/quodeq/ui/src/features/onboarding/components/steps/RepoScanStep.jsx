@@ -3,7 +3,7 @@ import { TermHeader, TermInput, StatStrip, Stat } from '../../../../components/t
 import ScanProgress from '../../../evaluation/components/ScanProgress.jsx';
 import FolderBrowser from '../../../evaluation/components/FolderBrowser.jsx';
 
-export default function RepoScanStep({ state, actions, createProject, getProjectInfo, onContinue, onCancel, stepIndex, stepTotal }) {
+export default function RepoScanStep({ state, actions, createProject, getProjectInfo, onContinue, onCancel, stepIndex = 0, stepTotal = 0 }) {
   const sub = state.repoScanSubState;
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
 
@@ -58,6 +58,7 @@ export default function RepoScanStep({ state, actions, createProject, getProject
           command="repo"
           value={state.repo.value}
           onChange={(value) => actions.setRepo({ value, source: 'url' })}
+          onSubmit={handleSubmit}
           placeholder="git@github.com:org/repo.git"
           ariaLabel="repository url or local path"
         />
