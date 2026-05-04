@@ -6,6 +6,8 @@ import {
 import { complianceRatio } from '../../../utils/formatters.js';
 import useMapPageState from './useMapPageState.js';
 import { TermHeader } from '../../../components/terminal/index.js';
+import EmptyState from '../../../components/EmptyState.jsx';
+import LoadingScreen from '../../../components/LoadingScreen.jsx';
 
 function getAppThemeInfo() {
   const attr = document.documentElement.getAttribute('data-theme') || '';
@@ -157,15 +159,61 @@ function MapVizContainer({ vizState, treeState, dimensions, callbacks, display }
   );
 }
 
+function MapEmpty({ sub, children }) {
+  return (
+    <div className="map-page map-page--terminal">
+      <TermHeader name="map" sub={sub} />
+      {children}
+    </div>
+  );
+}
+
 export default function MapPage(props) {
+  const { data = {}, callbacks = {} } = props;
+  const { projects = [], projectsLoaded, selectedProject, projectName, loading, isFetching } = data;
+  const { onNavigate } = callbacks;
+
+  // Call the hook unconditionally to keep hook order stable across renders.
+  // The hook tolerates missing data — `state.allDimensions` is `[]` when there
+  // is no project or no run data, which is exactly what we use for case C.
   const state = useMapPageState(props);
 
-  if (state.allDimensions.length === 0) {
+  if (!projectsLoaded) return <LoadingScreen />;
+  if (projects.length === 0) {
     return (
-      <div className="map-page map-page--terminal">
-        <TermHeader name="map" sub="no evaluation data · run an evaluation to populate" />
-        <div className="empty-state"><p>No evaluation data yet. Run an evaluation from the Evaluate tab.</p></div>
-      </div>
+      <MapEmpty sub="no projects yet">
+        <EmptyState
+          title="No projects yet"
+          description="Run your first evaluation to start analyzing code quality."
+          actionLabel="Start evaluating"
+          onAction={() => onNavigate?.('evaluate')}
+        />
+      </MapEmpty>
+    );
+  }
+  if (!selectedProject) {
+    return (
+      <MapEmpty sub="no project selected">
+        <EmptyState
+          title="No project selected"
+          description="Pick a project to view its map."
+          actionLabel="Choose project"
+          onAction={() => onNavigate?.('projects')}
+        />
+      </MapEmpty>
+    );
+  }
+  if (state.allDimensions.length === 0) {
+    if (loading || isFetching) return <LoadingScreen />;
+    return (
+      <MapEmpty sub="no evaluations yet">
+        <EmptyState
+          title="No evaluations yet"
+          description={`Run an evaluation for ${projectName || selectedProject} to populate this page.`}
+          actionLabel="Start evaluation"
+          onAction={() => onNavigate?.('evaluate')}
+        />
+      </MapEmpty>
     );
   }
 
