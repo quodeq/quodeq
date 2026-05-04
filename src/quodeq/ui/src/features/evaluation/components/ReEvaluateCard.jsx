@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
 import { useScanData } from '../hooks/useScanData.js';
+import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import BranchScopeSelector from './BranchScopeSelector.jsx';
 import CleanScanToggle from './CleanScanToggle.jsx';
 import DimensionSelector from './DimensionSelector.jsx';
 import FolderBrowser from './FolderBrowser.jsx';
+
+const NO_STANDARDS_MESSAGE = 'Select at least one standard before evaluating.';
 
 
 const BUTTON_ROW_GAP = '8px';
@@ -53,7 +56,7 @@ function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }
   return { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore };
 }
 
-function useDimensionSelection(allDimensions, info, branch, scopePath, onStart) {
+function useDimensionSelection(allDimensions, info, branch, scopePath, onStart, onValidationFail) {
   const [selectedDims, setSelectedDims] = useState(new Set());
   const [cleanScan, setCleanScan] = useState('off');
 
@@ -76,6 +79,10 @@ function useDimensionSelection(allDimensions, info, branch, scopePath, onStart) 
     return payload;
   };
   const handleScan = () => {
+    if (allDimensions.length > 0 && selectedDims.size === 0) {
+      onValidationFail?.(NO_STANDARDS_MESSAGE);
+      return;
+    }
     onStart(buildPayload());
     if (cleanScan === 'once') setCleanScan('off');
   };
@@ -88,6 +95,7 @@ function useReEvaluateCard(project, onStart, projectInfo) {
   const { getProjectInfo, relocateProject, cloneToLocal } = api;
   const { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo, { getProjectInfo, relocateProject });
   const { allDimensions } = usePluginDimensions();
+  const { showToast } = useSidePane();
   const [branch, setBranch] = useState(null);
   const [scopePath, setScopePath] = useState(null);
 
@@ -101,7 +109,7 @@ function useReEvaluateCard(project, onStart, projectInfo) {
   const { scanData } = useScanData(isLocal ? project : null);
 
   const { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan } =
-    useDimensionSelection(allDimensions, info, branch, scopePath, onStart);
+    useDimensionSelection(allDimensions, info, branch, scopePath, onStart, showToast);
 
   async function handleCloneToLocal(destination) {
     setCloneBrowserOpen(false);
