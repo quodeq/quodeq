@@ -197,6 +197,54 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             return None
         return self._run_row_to_snapshot(row)
 
+    def cancel_evaluation(
+        self, job_id: str, reports_dir: str | None = None,
+        *, discard_partial: bool = False,
+    ) -> bool:
+        """Cancel a running job. Falls back to ``stale_detected`` promotion
+        when SIGTERM has nothing to signal (PID dead).
+
+        The base mixin's ``cancel_evaluation`` returns False when the
+        underlying process is gone, which the route turns into 409 — leaving
+        the user stuck on an "Evaluation in Progress" panel that won't
+        progress. After verifying the snapshot was non-terminal, we promote
+        the index row to ``cancelled(stale_detected)`` so the UI flips out
+        of "running" and the user can close the panel. The row stays in the
+        index (history preserved) and findings on disk are not touched.
+        """
+        ok = super().cancel_evaluation(
+            job_id, reports_dir=reports_dir, discard_partial=discard_partial,
+        )
+        if ok:
+            return True
+
+        snapshot = self.get_evaluation_status(job_id, reports_dir=reports_dir)
+        if snapshot is None:
+            # The row is gone — either it never existed, or the orphan sweep
+            # inside ``sync_index`` removed it during ``super()``'s call. The
+            # user's intent ("stop this job") is satisfied: there's nothing
+            # running. Report success so the UI escapes the stuck panel.
+            return True
+        if snapshot.status != "running":
+            # Already terminal — preserve original contract (don't fabricate
+            # a state transition).
+            return False
+
+        from quodeq.services._index_sync import force_promote_to_cancelled_stale
+
+        run_dir: Path | None = None
+        if snapshot.output_project and snapshot.output_run_id and reports_dir:
+            candidate = Path(reports_dir) / snapshot.output_project / snapshot.output_run_id
+            if candidate.is_dir():
+                run_dir = candidate
+
+        db = self._open_index()
+        try:
+            with db:
+                return force_promote_to_cancelled_stale(db, job_id, run_dir=run_dir)
+        finally:
+            db.close()
+
     @staticmethod
     def _tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
         """Return the last *max_lines* lines from run.log. Cheap for normal logs."""

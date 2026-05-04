@@ -183,6 +183,70 @@ def _delete_orphan_non_terminal_rows(db: sqlite3.Connection) -> int:
     return len(orphan_ids)
 
 
+def force_promote_to_cancelled_stale(
+    db: sqlite3.Connection, job_id: str, *, run_dir: Path | None = None,
+) -> bool:
+    """Mark a non-terminal index row as ``cancelled(stale_detected)``.
+
+    Called from the cancel path when SIGTERM has nothing to signal (PID is
+    dead). The row stays in the index — history is preserved. State flips
+    to terminal so the dashboard no longer treats the job as live.
+
+    If *run_dir* is provided and exists, ``status.json`` is also rewritten
+    so the on-disk source of truth matches the index. Findings inside
+    ``run_dir`` are not touched.
+
+    Returns True if the row was promoted, False if it didn't exist or was
+    already terminal.
+    """
+    row = db.execute(
+        "SELECT state, project_uuid, run_id, started_at, phase, "
+        "current_dimension, pid FROM runs WHERE job_id = ?", (job_id,),
+    ).fetchone()
+    if row is None:
+        return False
+    state, project_uuid, run_id, started_at, phase, current_dimension, pid = row
+    if state in _TERMINAL_STATE_VALUES:
+        return False
+
+    # Prefer the FS path: write status.json and let the upsert sync the row.
+    if run_dir is not None and run_dir.is_dir():
+        try:
+            existing = read_status(run_dir) or {}
+            dimensions = existing.get("dimensions") or []
+            write_status(
+                run_dir,
+                state=RunState.CANCELLED,
+                job_id=job_id,
+                started_at=started_at or existing.get("started_at", ""),
+                dimensions=dimensions,
+                phase=phase,
+                current_dimension=current_dimension,
+                pid=pid if isinstance(pid, int) else None,
+                exit_reason="stale_detected",
+            )
+            _upsert_from_status(
+                db, run_dir, project_uuid=project_uuid, run_id=run_id,
+            )
+            return True
+        except (OSError, UnsupportedSchemaError) as exc:
+            _logger.warning(
+                "force-promote: status.json write failed for %s (%s); "
+                "falling back to index-only update", job_id, exc,
+            )
+            # Fall through to DB-only path.
+
+    # No run_dir on disk (full orphan): update the index row directly.
+    from datetime import datetime, timezone
+    now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    db.execute(
+        "UPDATE runs SET state = ?, exit_reason = ?, finalized_at = ?, "
+        "updated_at = ? WHERE job_id = ?",
+        ("cancelled", "stale_detected", now_iso, now_iso, job_id),
+    )
+    return True
+
+
 def _check_stale_and_promote(
     db: sqlite3.Connection, run_dir: Path, *,
     project_uuid: str, run_id: str, stale_seconds: int = 30,
