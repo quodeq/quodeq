@@ -608,6 +608,13 @@ textarea:focus {
   text-align: center;
 }
 
+.empty-state__icon {
+  margin-bottom: var(--space-3);
+  color: var(--color-text-muted);
+  display: flex;
+  justify-content: center;
+}
+
 .empty-state-btn {
   margin-top: var(--space-4);
   padding: var(--space-2) var(--space-5);
