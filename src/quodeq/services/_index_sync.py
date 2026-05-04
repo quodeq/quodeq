@@ -198,6 +198,9 @@ def _check_stale_and_promote(
             current_dimension=status.get("current_dimension"),
             pid=pid if isinstance(pid, int) else None,
             exit_reason="stale_detected",
+            # Preserve deadline_at across the stale → cancelled rewrite so
+            # downstream readers (filesystem snapshot builder) still see it.
+            deadline_at=status.get("deadline_at"),
         )
         with db:
             _upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
