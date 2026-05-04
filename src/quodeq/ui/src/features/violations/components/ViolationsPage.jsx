@@ -6,6 +6,8 @@ import DimensionHeatGridView from './DimensionHeatGridView.jsx';
 import DismissedSubTab from './DismissedSubTab.jsx';
 import { TermHeader, SevBadge, FlagPill } from '../../../components/terminal/index.js';
 import { useDismissedFindings } from './useDismissedFindings.js';
+import EmptyState from '../../../components/EmptyState.jsx';
+import LoadingScreen from '../../../components/LoadingScreen.jsx';
 
 const MAX_TREE_DEPTH = 64;
 
@@ -176,6 +178,8 @@ function ViolationsSubTabContent(props) {
 
 export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
   const { accumulatedDimensions, selectedProject } = data;
+  const { projects = [], projectsLoaded, projectName, loading, isFetching } = data;
+  const { onNavigate } = callbacks;
   const { onRefresh } = callbacks;
 
   // Fresh tab click (tabKey changed) drops the cached navigation state so
@@ -210,6 +214,49 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
     initialSubTab: cached.activeSubTab,
     initialFilePath: cached.fileCurrentPath,
   });
+
+  if (!projectsLoaded) return <LoadingScreen />;
+  if (projects.length === 0) {
+    return (
+      <div className="violations-page violations-page--terminal">
+        <TermHeader name="violations" sub="no projects yet" />
+        <EmptyState
+          title="No projects yet"
+          description="Run your first evaluation to start analyzing code quality."
+          actionLabel="Start evaluating"
+          onAction={() => onNavigate?.('evaluate')}
+        />
+      </div>
+    );
+  }
+  if (!selectedProject) {
+    return (
+      <div className="violations-page violations-page--terminal">
+        <TermHeader name="violations" sub="no project selected" />
+        <EmptyState
+          title="No project selected"
+          description="Pick a project to view its violations."
+          actionLabel="Choose project"
+          onAction={() => onNavigate?.('projects')}
+        />
+      </div>
+    );
+  }
+  const hasAnyDimensionData = (accumulatedDimensions || []).length > 0;
+  if (!hasAnyDimensionData) {
+    if (loading || isFetching) return <LoadingScreen />;
+    return (
+      <div className="violations-page violations-page--terminal">
+        <TermHeader name="violations" sub="no evaluations yet" />
+        <EmptyState
+          title="No evaluations yet"
+          description={`Run an evaluation for ${projectName || selectedProject} to populate this page.`}
+          actionLabel="Start evaluation"
+          onAction={() => onNavigate?.('evaluate')}
+        />
+      </div>
+    );
+  }
 
   const total = summary.totalViolations || 0;
   const subParts = [
