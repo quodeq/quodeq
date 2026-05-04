@@ -46,6 +46,14 @@ export function useEvaluationLifecycle({ settings, navigation, projects, storage
   }, [job]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleStartEvaluation(payload) {
+    // Hard guard: only one evaluation may run at a time. A second start
+    // request (e.g. user clicked through the onboarding wizard while a
+    // re-evaluation was already in flight on a different project) would
+    // otherwise overwrite the live job state and confuse the lifecycle.
+    if (job && job.status === 'running') {
+      console.warn('[evaluation] start request ignored — a job is already running');
+      return;
+    }
     const activeProvider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
     const get = (key) => storage.getItem(providerKey(activeProvider, key));
     // Ollama uses a single analysis model; CLI providers use tier-based selection.
