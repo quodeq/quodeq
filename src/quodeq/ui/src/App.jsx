@@ -7,7 +7,6 @@ const FileDetailPage = lazy(() => import('./features/explorer/components/FileDet
 const PrincipleDetailPage = lazy(() => import('./features/explorer/components/PrincipleDetailPage.jsx'));
 const FindingDetailPage = lazy(() => import('./features/explorer/components/FindingDetailPage.jsx'));
 const ProjectsPage = lazy(() => import('./features/dashboard/components/ProjectsPage.jsx'));
-const AddProjectModal = lazy(() => import('./features/dashboard/components/AddProjectModal.jsx'));
 const HistoryPage = lazy(() => import('./features/history/components/HistoryPage.jsx'));
 const EvaluateScreen = lazy(() => import('./features/evaluation/components/EvaluateScreen.jsx'));
 const SettingsPage = lazy(() => import('./features/settings/components/SettingsPage.jsx'));
@@ -550,14 +549,6 @@ export default function App() {
               <div className="tab-fade" key={activeTab}>
                 <MainContent activePage={activePage} props={contentProps} />
               </div>
-              <AddProjectModal
-                open={false}
-                onClose={() => {}}
-                onStart={(payload) => {
-                  state.evalLifecycle.handleStartEvaluation(payload);
-                  navTab('evaluate');
-                }}
-              />
               {wizardEntry && (
                 <OnboardingWizard
                   entry={wizardEntry}

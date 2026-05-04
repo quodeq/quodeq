@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import ProviderTabs from '../../../settings/components/ProviderTabs.jsx';
 import { getProviderConfigs } from '../../../../api/index.js';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../../constants.js';
+import { TermHeader } from '../../../../components/terminal/index.js';
 
 const PROVIDER_LABELS = {
   claude: 'Claude Code',
@@ -41,7 +42,7 @@ function readActiveProviderState() {
  * The wizard reads the active provider+model from localStorage (which
  * ProviderTabs writes into) and gates Continue until both are set.
  */
-export default function ProviderStep({ state, actions, onContinue, onBack }) {
+export default function ProviderStep({ state, actions, onContinue, onBack, stepIndex = 0, stepTotal = 0 }) {
   const [providerConfigs, setProviderConfigs] = useState({});
   // Mirror localStorage so Continue updates as the user picks a provider/model.
   const [activeProvider, setActiveProvider] = useState(readActiveProviderState);
@@ -96,7 +97,7 @@ export default function ProviderStep({ state, actions, onContinue, onBack }) {
 
   return (
     <div className="onboarding-step onboarding-step--provider">
-      <h2>How will quodeq's AI run?</h2>
+      <TermHeader name="provider" sub={`step ${stepIndex} of ${stepTotal} · pick an ai provider`} />
       <p className="onboarding-step__pitch">
         quodeq sends source files to an AI model for review. Pick the provider you want to use — uninstalled providers are shown disabled with install hints.
       </p>
@@ -108,8 +109,8 @@ export default function ProviderStep({ state, actions, onContinue, onBack }) {
       </div>
 
       <div className="onboarding-step__actions">
-        <button type="button" className="btn-primary" disabled={continueDisabled} onClick={handleContinue}>Continue</button>
-        <button type="button" className="btn-secondary" onClick={onBack}>Back</button>
+        <button type="button" className="term-btn--primary" disabled={continueDisabled} onClick={handleContinue}>continue</button>
+        <button type="button" className="term-btn--secondary" onClick={onBack}>back</button>
       </div>
     </div>
   );

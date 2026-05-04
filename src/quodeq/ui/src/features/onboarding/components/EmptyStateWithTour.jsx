@@ -1,3 +1,5 @@
+import { TermHeader } from '../../../components/terminal/index.js';
+
 const SKIPPED_STEPS_KEY = 'quodeq_onboarding_skipped';
 
 function clearSkip() {
@@ -8,26 +10,26 @@ export default function EmptyStateWithTour({ onAdd, onTour, isEvaluating = false
   const blockedTitle = isEvaluating ? 'Cannot add a project while an evaluation is running' : undefined;
   return (
     <section className="empty-state empty-state--with-tour">
-      <h2>No projects yet.</h2>
-      <p>Set up your first repository — quodeq scans it locally and runs an evaluation against the standards you pick.</p>
+      <TermHeader name="projects" sub="no projects yet" />
+      <p>set up your first repository — quodeq scans it locally and runs an evaluation against the standards you pick.</p>
       <div className="empty-state__actions">
         <button
           type="button"
-          className="btn-primary"
+          className="term-btn--primary"
           onClick={() => { clearSkip(); onAdd(); }}
           disabled={isEvaluating}
           title={blockedTitle}
         >
-          Add a project
+          add a project
         </button>
         <button
           type="button"
-          className="btn-secondary"
+          className="term-btn--secondary"
           onClick={() => { clearSkip(); onTour(); }}
           disabled={isEvaluating}
           title={blockedTitle}
         >
-          Take the tour
+          take the tour
         </button>
       </div>
     </section>

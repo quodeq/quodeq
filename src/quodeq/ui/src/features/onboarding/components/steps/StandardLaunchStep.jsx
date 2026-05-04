@@ -1,10 +1,12 @@
+import { TermHeader, StatStrip, Stat } from '../../../../components/terminal/index.js';
+
 function formatTimeLimit(seconds) {
   if (!seconds || seconds <= 0) return 'No limit';
   if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
   return `${Math.round(seconds / 3600)} h`;
 }
 
-export default function StandardLaunchStep({ state, actions, standards, onLaunch, onCancel, onBack }) {
+export default function StandardLaunchStep({ state, actions, standards, onLaunch, onCancel, onBack, stepIndex = 0, stepTotal = 0 }) {
   const inputType = state.isFirstProject ? 'radio' : 'checkbox';
   const selectedIds = Array.from(state.standardIds);
   const selectedNames = standards
@@ -14,19 +16,19 @@ export default function StandardLaunchStep({ state, actions, standards, onLaunch
 
   return (
     <div className="onboarding-step onboarding-step--standard-launch">
-      <h2>Pick {state.isFirstProject ? 'a standard' : 'one or more standards'}</h2>
+      <TermHeader name="standard" sub={`step ${stepIndex} of ${stepTotal} · pick one to start`} />
       <p className="onboarding-step__pitch">
         {state.isFirstProject
           ? 'Pick one for your first run. Smaller scope = faster, easier-to-read results. You can run more after.'
           : 'We recommend starting with one for new repos. You can pick more if you know what you want.'}
       </p>
 
-      <div className="onboarding-summary-strip">
-        <span><strong>Project:</strong> {state.projectId}</span>
-        <span><strong>Provider:</strong> {state.provider.id} · <code>{state.provider.model}</code></span>
-        <span><strong>Standard:</strong> {selectedNames || '—'}</span>
-        <span><strong>Time limit:</strong> {formatTimeLimit(state.totalTimeLimitS)}</span>
-      </div>
+      <StatStrip>
+        <Stat label="PROJECT" value={state.projectId || '—'} />
+        <Stat label="PROVIDER" value={state.provider.id || '—'} hint={state.provider.model || ''} />
+        <Stat label="STANDARD" value={selectedNames || '—'} />
+        <Stat label="TIME LIMIT" value={formatTimeLimit(state.totalTimeLimitS)} />
+      </StatStrip>
 
       <ul className="onboarding-standard-list">
         {standards.map((s) => (
@@ -51,13 +53,13 @@ export default function StandardLaunchStep({ state, actions, standards, onLaunch
       <div className="onboarding-step__actions">
         <button
           type="button"
-          className="btn-primary"
+          className="term-btn--primary"
           disabled={selectedIds.length === 0}
           onClick={() => onLaunch(selectedIds)}
         >
-          Start evaluation
+          start evaluation
         </button>
-        <button type="button" className="btn-secondary" onClick={onBack}>Back</button>
+        <button type="button" className="term-btn--secondary" onClick={onBack}>back</button>
       </div>
     </div>
   );

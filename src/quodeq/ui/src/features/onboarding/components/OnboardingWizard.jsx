@@ -3,7 +3,6 @@ import { registerProject, listStandards, getProjectInfo } from '../../../api/ind
 import { useWizardState } from '../hooks/useWizardState.js';
 import { saveDraft, clearDraft } from '../hooks/useWizardDraft.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
-import StepProgress from './StepProgress.jsx';
 import WelcomeStep from './steps/WelcomeStep.jsx';
 import RepoScanStep from './steps/RepoScanStep.jsx';
 import ProviderStep from './steps/ProviderStep.jsx';
@@ -116,12 +115,10 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
   }
 
   return (
-    <div className="onboarding-wizard" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
-      <button type="button" className="onboarding-wizard__close" aria-label="Close onboarding" onClick={handleClose}>×</button>
-
-      {wizard.state.step !== 'welcome' && (
-        <StepProgress current={currentIndex} total={visible.length} />
-      )}
+    <div className="onboarding-wizard" role="dialog" aria-modal="true" aria-label="onboarding">
+      <button type="button" className="onboarding-wizard__close" aria-label="Close onboarding" onClick={handleClose}>
+        <kbd className="onboarding-wizard__close-kbd">esc</kbd>
+      </button>
 
       {wizard.state.step === 'welcome' && (
         <WelcomeStep onStart={() => wizard.goToStep('repo-scan')} onSkip={handleSkipWelcome} />
@@ -135,6 +132,8 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
           getProjectInfo={getProjectInfo}
           onContinue={nextStep}
           onCancel={handleSavedExit}
+          stepIndex={currentIndex}
+          stepTotal={visible.length}
         />
       )}
 
@@ -144,6 +143,8 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
           actions={wizard}
           onContinue={nextStep}
           onBack={prevStep}
+          stepIndex={currentIndex}
+          stepTotal={visible.length}
         />
       )}
 
@@ -155,6 +156,8 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
           onLaunch={handleLaunch}
           onCancel={handleSavedExit}
           onBack={prevStep}
+          stepIndex={currentIndex}
+          stepTotal={visible.length}
         />
       )}
     </div>

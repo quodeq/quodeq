@@ -21,7 +21,7 @@ describe('RepoScanStep', () => {
       onCancel={noop}
     />);
     expect(screen.getByText('42')).toBeInTheDocument();
-    expect(screen.getByText('files')).toBeInTheDocument();
+    expect(screen.getByText('FILES')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /continue/i })).toBeInTheDocument();
   });
 

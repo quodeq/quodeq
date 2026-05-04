@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { RepoInput } from '../../../evaluation/components/EvaluationForm.jsx';
+import { TermHeader, TermInput, StatStrip, Stat } from '../../../../components/terminal/index.js';
 import ScanProgress from '../../../evaluation/components/ScanProgress.jsx';
 import FolderBrowser from '../../../evaluation/components/FolderBrowser.jsx';
 
-export default function RepoScanStep({ state, actions, createProject, getProjectInfo, onContinue, onCancel }) {
+export default function RepoScanStep({ state, actions, createProject, getProjectInfo, onContinue, onCancel, stepIndex = 0, stepTotal = 0 }) {
   const sub = state.repoScanSubState;
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
 
@@ -47,27 +47,38 @@ export default function RepoScanStep({ state, actions, createProject, getProject
 
   return (
     <div className="onboarding-step onboarding-step--repo-scan">
-      <h2>Add a repository</h2>
+      <TermHeader name="repo" sub={`step ${stepIndex} of ${stepTotal} · paste a url or local folder`} />
       <p className="onboarding-step__pitch">
         Paste a Git URL or pick a local folder. quodeq will scan it locally — no AI tokens used yet.
       </p>
 
-      <div className={sub === 'idle' ? '' : 'onboarding-form-locked'}>
-        <RepoInput
-          repo={state.repo.value}
-          onRepoChange={(value) => actions.setRepo({ value, source: 'url' })}
-          onClear={() => actions.setRepo({ value: '' })}
-          onBrowse={() => setFolderBrowserOpen(true)}
+      <div className={sub === 'idle' ? 'onboarding-repo-row' : 'onboarding-repo-row onboarding-form-locked'}>
+        <TermInput
+          prompt="$"
+          command="repo"
+          value={state.repo.value}
+          onChange={(value) => actions.setRepo({ value, source: 'url' })}
+          onSubmit={handleSubmit}
+          placeholder="git@github.com:org/repo.git"
+          ariaLabel="repository url or local path"
         />
-        {sub === 'scanned' && (
-          <button type="button" className="link-btn" onClick={actions.resetScan}>Edit repository</button>
-        )}
+        <button
+          type="button"
+          className="term-btn--secondary onboarding-repo-row__browse"
+          onClick={() => setFolderBrowserOpen(true)}
+          disabled={sub !== 'idle'}
+        >
+          local
+        </button>
       </div>
+      {sub === 'scanned' && (
+        <button type="button" className="onboarding-edit-link" onClick={actions.resetScan}>edit repository</button>
+      )}
 
       {sub === 'scanning' && (
         <div className="onboarding-scan-progress">
           <ScanProgress />
-          <p className="onboarding-scan-progress__hint">Cloning · Walking files · Detecting languages…</p>
+          <p className="onboarding-scan-progress__hint">cloning · walking files · detecting languages…</p>
         </div>
       )}
 
@@ -75,8 +86,8 @@ export default function RepoScanStep({ state, actions, createProject, getProject
         <div className="onboarding-scan-error" role="alert">
           <p>{state.scanError?.message || 'Scan failed.'}</p>
           <div className="onboarding-step__actions">
-            <button type="button" className="btn-primary" onClick={handleSubmit}>Try again</button>
-            <button type="button" className="btn-secondary" onClick={actions.resetScan}>Edit repository</button>
+            <button type="button" className="term-btn--primary" onClick={handleSubmit}>try again</button>
+            <button type="button" className="term-btn--secondary" onClick={actions.resetScan}>edit repository</button>
           </div>
         </div>
       )}
@@ -89,20 +100,11 @@ export default function RepoScanStep({ state, actions, createProject, getProject
         const topLangs = Object.entries(langs).sort((a, b) => b[1] - a[1]).slice(0, 8);
         return (
           <div className="onboarding-scan-summary">
-            <div className="onboarding-scan-summary__stats">
-              <div className="onboarding-scan-summary__stat">
-                <span className="onboarding-scan-summary__stat-value">{totalFiles}</span>
-                <span className="onboarding-scan-summary__stat-label">{totalFiles === 1 ? 'file' : 'files'}</span>
-              </div>
-              <div className="onboarding-scan-summary__stat">
-                <span className="onboarding-scan-summary__stat-value">{langCount}</span>
-                <span className="onboarding-scan-summary__stat-label">{langCount === 1 ? 'language' : 'languages'}</span>
-              </div>
-              <div className="onboarding-scan-summary__stat">
-                <span className="onboarding-scan-summary__stat-value">{branchCount}</span>
-                <span className="onboarding-scan-summary__stat-label">{branchCount === 1 ? 'branch' : 'branches'}</span>
-              </div>
-            </div>
+            <StatStrip cards>
+              <Stat label="FILES" value={totalFiles} />
+              <Stat label="LANGUAGES" value={langCount} />
+              <Stat label="BRANCHES" value={branchCount} />
+            </StatStrip>
             {topLangs.length > 0 && (
               <div className="onboarding-scan-summary__langs">
                 {topLangs.map(([lang, count]) => (
@@ -119,10 +121,10 @@ export default function RepoScanStep({ state, actions, createProject, getProject
 
       <div className="onboarding-step__actions">
         {sub === 'idle' && (
-          <button type="button" className="btn-primary" onClick={handleSubmit} disabled={!state.repo.value}>Scan repository</button>
+          <button type="button" className="term-btn--primary" onClick={handleSubmit} disabled={!state.repo.value}>scan repository</button>
         )}
         {sub === 'scanned' && (
-          <button type="button" className="btn-primary" onClick={onContinue}>Continue</button>
+          <button type="button" className="term-btn--primary" onClick={onContinue}>continue</button>
         )}
       </div>
 

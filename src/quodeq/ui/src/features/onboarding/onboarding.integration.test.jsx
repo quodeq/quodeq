@@ -56,8 +56,8 @@ describe('Onboarding integration — happy path', () => {
     expect(screen.getByRole('heading', { name: /welcome to quodeq/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /get started/i }));
 
-    // Repo & Scan
-    expect(screen.getByRole('heading', { name: /add a repository/i })).toBeInTheDocument();
+    // Repo & Scan — placeholder is the most stable on-screen identifier
+    // for "we're on the repo step" after the terminal redesign.
     fireEvent.change(screen.getByPlaceholderText(/git@github.com/i), { target: { value: '/local/path' } });
     fireEvent.click(screen.getByRole('button', { name: /scan repository/i }));
     // Scanned-state stat tile — total_files=7 from the mock. Use getAllByText
@@ -71,8 +71,8 @@ describe('Onboarding integration — happy path', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /^continue$/i })).not.toBeDisabled());
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
-    // Standard & Launch
-    expect(screen.getByRole('heading', { name: /pick a standard/i })).toBeInTheDocument();
+    // Standard & Launch — pitch text is unchanged and uniquely identifies this step
+    expect(screen.getByText(/pick one for your first run/i)).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText(/security 101/i));
     fireEvent.click(screen.getByRole('button', { name: /start evaluation/i }));
 
