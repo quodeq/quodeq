@@ -68,6 +68,10 @@ export default function Sidebar({
   activeTab,
   onNavTab,
   hasEvaluations,
+  /* When false, the project-data tabs (overview, violations, map, history)
+     are hidden from the sidebar — they have nothing useful to show until at
+     least one evaluation has completed for the selected project. */
+  showProjectTabs = true,
   projectInfo = null,
   version = null,
   violationsCount = null,
@@ -141,12 +145,14 @@ export default function Sidebar({
         />
       </nav>
 
-        <nav className="sidebar-nav sidebar-block">
-          <NavButton id="overview"   label="overview"   icon={ICON_OVERVIEW}   activeTab={activeTab} onNavTab={handleNav} />
-          <NavButton id="violations" label="violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={handleNav} count={violationsCount} />
-          <NavButton id="map"        label="map"        icon={ICON_MAP}        activeTab={activeTab} onNavTab={handleNav} />
-          <NavButton id="history"    label="history"    icon={ICON_HISTORY}    activeTab={activeTab} onNavTab={handleNav} count={historyCount} />
-        </nav>
+        {showProjectTabs && (
+          <nav className="sidebar-nav sidebar-block">
+            <NavButton id="overview"   label="overview"   icon={ICON_OVERVIEW}   activeTab={activeTab} onNavTab={handleNav} />
+            <NavButton id="violations" label="violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={handleNav} count={violationsCount} />
+            <NavButton id="map"        label="map"        icon={ICON_MAP}        activeTab={activeTab} onNavTab={handleNav} />
+            <NavButton id="history"    label="history"    icon={ICON_HISTORY}    activeTab={activeTab} onNavTab={handleNav} count={historyCount} />
+          </nav>
+        )}
 
         <nav className="sidebar-nav sidebar-block">
           <NavButton id="evaluate" label="evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={handleNav} />
