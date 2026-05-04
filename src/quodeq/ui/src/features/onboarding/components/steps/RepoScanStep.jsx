@@ -78,7 +78,7 @@ export default function RepoScanStep({ state, actions, createProject, getProject
       {sub === 'scanning' && (
         <div className="onboarding-scan-progress">
           <ScanProgress />
-          <p className="onboarding-scan-progress__hint">Cloning · Walking files · Detecting languages…</p>
+          <p className="onboarding-scan-progress__hint">cloning · walking files · detecting languages…</p>
         </div>
       )}
 

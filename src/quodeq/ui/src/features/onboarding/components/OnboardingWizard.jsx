@@ -115,7 +115,7 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
   }
 
   return (
-    <div className="onboarding-wizard" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+    <div className="onboarding-wizard" role="dialog" aria-modal="true" aria-label="onboarding">
       <button type="button" className="onboarding-wizard__close" aria-label="Close onboarding" onClick={handleClose}>
         <kbd className="onboarding-wizard__close-kbd">esc</kbd>
       </button>

@@ -549,7 +549,7 @@ export default function App() {
               <div className="tab-fade" key={activeTab}>
                 <MainContent activePage={activePage} props={contentProps} />
               </div>
-{wizardEntry && (
+              {wizardEntry && (
                 <OnboardingWizard
                   entry={wizardEntry}
                   onClose={({ saved, projectId }) => {

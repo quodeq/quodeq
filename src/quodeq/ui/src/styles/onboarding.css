@@ -231,6 +231,13 @@
   border-radius: var(--term-radius);
   padding: var(--term-space-2);
 }
+.onboarding-provider-tabs-host .panel {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+}
+.onboarding-provider-tabs-host .panel-header { display: none; }
 
 /* ──────────────────────────────────────────────────────────────
    Standard & Launch step
@@ -257,6 +264,7 @@
   color: var(--color-text);
   transition: border-color 120ms ease;
 }
+.onboarding-standard-card:hover { border-color: var(--color-text-muted); }
 .onboarding-standard-card--selected {
   border-color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 8%, transparent);
@@ -286,4 +294,21 @@
 .empty-state--with-tour .empty-state__actions {
   display: flex;
   gap: var(--term-space-2);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Resume-setup badge (ProjectsPage card, incomplete onboarding)
+   ────────────────────────────────────────────────────────────── */
+.resume-setup-badge {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-warn, #f59e0b) 15%, transparent);
+  border: 1px solid var(--color-warn, #f59e0b);
+  color: var(--color-warn, #f59e0b);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.resume-setup-badge:hover {
+  background: color-mix(in srgb, var(--color-warn, #f59e0b) 25%, transparent);
 }
