@@ -135,18 +135,52 @@ class _WindowApi:
             pass
 
     def _get_running_evaluation(self) -> dict | None:
-        """Return the first running evaluation job, or None."""
+        """Return the first non-stale running evaluation job, or None.
+
+        Cross-checks each running job's ``outputProject`` against the
+        ``/api/projects`` list. A "running" record whose project no
+        longer exists (e.g. the project was deleted, or the API was
+        restarted while a job was mid-scan) is treated as stale and
+        ignored — otherwise the close dialog would pop up on shutdown
+        even when the user has no actual evaluation in flight.
+
+        Any failure fetching the projects list falls back to the
+        previous behavior (returning the first running job), so a
+        transient endpoint glitch can't accidentally suppress the
+        dialog during a real evaluation.
+        """
         if not self._base_url:
             return None
         try:
             req = urllib.request.Request(f"{self._base_url}/api/evaluations")
             with urllib.request.urlopen(req, timeout=_EVAL_CHECK_TIMEOUT_S) as resp:
                 jobs = json.loads(resp.read())
-                for j in (jobs if isinstance(jobs, list) else []):
-                    if j.get("status") == "running":
-                        return j
         except Exception:
-            pass
+            return None
+        running = [
+            j for j in (jobs if isinstance(jobs, list) else [])
+            if isinstance(j, dict) and j.get("status") == "running"
+        ]
+        if not running:
+            return None
+        try:
+            projects_req = urllib.request.Request(f"{self._base_url}/api/projects")
+            with urllib.request.urlopen(projects_req, timeout=_EVAL_CHECK_TIMEOUT_S) as resp:
+                data = json.loads(resp.read())
+            projects = (
+                data.get("projects", []) if isinstance(data, dict)
+                else (data if isinstance(data, list) else [])
+            )
+            project_ids = {p.get("id") for p in projects if isinstance(p, dict)}
+        except Exception:
+            return running[0]
+        for j in running:
+            project = j.get("outputProject") or j.get("project")
+            # Jobs without an ``outputProject`` are very-early-phase
+            # evals that haven't registered an output yet — keep
+            # treating those as valid.
+            if not project or project in project_ids:
+                return j
         return None
 
     @staticmethod
