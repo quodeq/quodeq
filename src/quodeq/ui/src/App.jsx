@@ -374,6 +374,18 @@ export default function App() {
     }
   }, [state.projectsLoaded, state.projects.length]);
 
+  // Project-data tabs (overview/violations/map/history) only make sense once
+  // the selected project has at least one completed evaluation run. Until
+  // then, hide them from the sidebar and bounce the user to Evaluate if a
+  // cached activeTab lands them on a now-hidden tab.
+  const PROJECT_DATA_TABS = ['overview', 'violations', 'map', 'history'];
+  const hasCurrentProjectRuns = (selectedProjectInfo?.runsCount ?? 0) > 0;
+  useEffect(() => {
+    if (!hasCurrentProjectRuns && PROJECT_DATA_TABS.includes(state.activeTab)) {
+      state.navTab('evaluate');
+    }
+  }, [hasCurrentProjectRuns, state.activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const sidebarProvider = (typeof localStorage !== 'undefined' && localStorage.getItem(ACTIVE_PROVIDER_KEY)) || null;
   const sidebarModel = sidebarProvider && typeof localStorage !== 'undefined'
     ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
@@ -460,6 +472,7 @@ export default function App() {
               activeTab={activeTab}
               onNavTab={navTab}
               hasEvaluations={state.projects.length > 0}
+              showProjectTabs={hasCurrentProjectRuns}
               projectInfo={{
                 displayName: resolvedDisplayName,
                 meta: state.headerMeta,
