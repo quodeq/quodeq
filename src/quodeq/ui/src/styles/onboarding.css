@@ -53,6 +53,10 @@
   border: none;
   cursor: pointer;
   padding: 0;
+  color: var(--color-accent);
+}
+.onboarding-wizard__close:hover {
+  color: color-mix(in srgb, var(--color-accent) 80%, var(--color-text));
 }
 .onboarding-wizard__close-kbd {
   font-family: var(--term-font-mono);
