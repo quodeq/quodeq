@@ -379,9 +379,9 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
       <HistoryEmptyShell sub="no projects yet">
         <EmptyState
           title="No projects yet"
-          description="Run your first evaluation to start analyzing code quality."
-          actionLabel="Start evaluating"
-          onAction={() => onNavigate?.('evaluate')}
+          description="Add a project to start analyzing code quality."
+          actionLabel="Add a project"
+          onAction={() => onNavigate?.('projects')}
         />
       </HistoryEmptyShell>
     );
