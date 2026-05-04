@@ -296,7 +296,7 @@ const ROUTE_RENDERERS = {
     />
   ),
   settings: (params, props) => <SettingsCase settings={props.settings} />,
-  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onResumeSetup: props.navigation.onResumeSetup }} />,
+  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onResumeSetup: props.navigation.onResumeSetup }} />,
   standards: () => <StandardsPage />,
   help: () => <HelpPage />,
 };
@@ -315,6 +315,7 @@ function MainContent({ activePage, props }) {
         <EmptyStateWithTour
           onAdd={() => props.navigation.onAddProject()}
           onTour={() => props.navigation.onTakeTour()}
+          isEvaluating={props.navigation.isEvaluating}
         />
       );
     }
@@ -359,6 +360,11 @@ export default function App() {
   // auto-open job is done for this page load.
   const autoOpenedRef = useRef(false);
 
+  // While an evaluation is running we block any path that would open the
+  // onboarding wizard or start a second evaluation — only one job may be in
+  // flight at a time.
+  const isEvaluating = state.evalLifecycle?.job?.status === 'running';
+
   // Auto-open wizard on first paint when there are no projects and the user
   // has not explicitly skipped. The skip flag only suppresses auto-open — it
   // never blocks "Add a project" or "Take the tour" buttons.
@@ -366,13 +372,14 @@ export default function App() {
     if (autoOpenedRef.current) return;
     if (!state.projectsLoaded) return;
     if (state.projects.length > 0) { autoOpenedRef.current = true; return; }
+    if (isEvaluating) return;
     let skipped = false;
     try { skipped = localStorage.getItem('quodeq_onboarding_skipped') === 'true'; } catch { /* ignore */ }
     autoOpenedRef.current = true;
     if (!skipped) {
       setWizardEntry({ startStep: 'welcome', isFirstProject: true });
     }
-  }, [state.projectsLoaded, state.projects.length]);
+  }, [state.projectsLoaded, state.projects.length, isEvaluating]);
 
   const sidebarProvider = (typeof localStorage !== 'undefined' && localStorage.getItem(ACTIVE_PROVIDER_KEY)) || null;
   const sidebarModel = sidebarProvider && typeof localStorage !== 'undefined'
@@ -422,13 +429,26 @@ export default function App() {
       historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
       currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
       prefetchHandlers: state.prefetchHandlers,
-      onAddProject: () => setWizardEntry({ startStep: 'repo-scan', isFirstProject: state.projects.length === 0 }),
-      onTakeTour: () => setWizardEntry({ startStep: 'welcome', isFirstProject: true }),
-      onResumeSetup: (projectId) => setWizardEntry({
-        startStep: 'provider',
-        isFirstProject: false,
-        presetProjectId: projectId,
-      }),
+      onAddProject: () => {
+        if (isEvaluating) {
+          console.warn('[onboarding] add-project ignored — evaluation in progress');
+          return;
+        }
+        setWizardEntry({ startStep: 'repo-scan', isFirstProject: state.projects.length === 0 });
+      },
+      onTakeTour: () => {
+        if (isEvaluating) return;
+        setWizardEntry({ startStep: 'welcome', isFirstProject: true });
+      },
+      onResumeSetup: (projectId) => {
+        if (isEvaluating) return;
+        setWizardEntry({
+          startStep: 'provider',
+          isFirstProject: false,
+          presetProjectId: projectId,
+        });
+      },
+      isEvaluating,
     },
     evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },

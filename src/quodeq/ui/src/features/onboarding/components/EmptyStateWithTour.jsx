@@ -4,7 +4,8 @@ function clearSkip() {
   try { localStorage.removeItem(SKIPPED_STEPS_KEY); } catch { /* ignore */ }
 }
 
-export default function EmptyStateWithTour({ onAdd, onTour }) {
+export default function EmptyStateWithTour({ onAdd, onTour, isEvaluating = false }) {
+  const blockedTitle = isEvaluating ? 'Cannot add a project while an evaluation is running' : undefined;
   return (
     <section className="empty-state empty-state--with-tour">
       <h2>No projects yet.</h2>
@@ -14,6 +15,8 @@ export default function EmptyStateWithTour({ onAdd, onTour }) {
           type="button"
           className="btn-primary"
           onClick={() => { clearSkip(); onAdd(); }}
+          disabled={isEvaluating}
+          title={blockedTitle}
         >
           Add a project
         </button>
@@ -21,6 +24,8 @@ export default function EmptyStateWithTour({ onAdd, onTour }) {
           type="button"
           className="btn-secondary"
           onClick={() => { clearSkip(); onTour(); }}
+          disabled={isEvaluating}
+          title={blockedTitle}
         >
           Take the tour
         </button>

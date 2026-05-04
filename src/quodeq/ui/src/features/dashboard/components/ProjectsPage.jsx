@@ -257,7 +257,9 @@ function useRelocateDialog(onRelocate) {
   return { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate };
 }
 
-function EmptyProjectsCTA({ onAddProject }) {
+const EVAL_BLOCKED_TITLE = 'Cannot add a project while an evaluation is running';
+
+function EmptyProjectsCTA({ onAddProject, isEvaluating }) {
   return (
     <div className="projects-empty projects-empty--cta">
       <h3 className="projects-empty__title">Add your first project</h3>
@@ -268,6 +270,8 @@ function EmptyProjectsCTA({ onAddProject }) {
         type="button"
         className="projects-empty__cta-btn"
         onClick={onAddProject}
+        disabled={isEvaluating}
+        title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
       >
         + Add project
       </button>
@@ -275,7 +279,7 @@ function EmptyProjectsCTA({ onAddProject }) {
   );
 }
 
-export default function ProjectsPage({ projects = [], selectedProject, actions }) {
+export default function ProjectsPage({ projects = [], selectedProject, isEvaluating = false, actions }) {
   const { onSelect, onDelete, onExport, onRelocate, onAddProject, onResumeSetup } = actions;
   const { children, roots } = useMemo(() => computeProjectTree(projects), [projects]);
   const [confirming, setConfirming] = useState(null);
@@ -294,13 +298,15 @@ export default function ProjectsPage({ projects = [], selectedProject, actions }
             className="projects-page__add-btn"
             onClick={onAddProject}
             aria-label="Add project"
+            disabled={isEvaluating}
+            title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
           >
             + Add project
           </button>
         )}
       </div>
       {projects.length === 0 ? (
-        <EmptyProjectsCTA onAddProject={onAddProject} />
+        <EmptyProjectsCTA onAddProject={onAddProject} isEvaluating={isEvaluating} />
       ) : (
         <div className="projects-cards">
           {roots.map((p) => (
