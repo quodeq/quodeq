@@ -15,6 +15,7 @@ vi.mock('../../api/index.js', async () => {
       { id: 'std-a', name: 'Security 101', description: 'Common checks' },
       { id: 'std-b', name: 'Code style', description: 'Formatting' },
     ]),
+    getProjectInfo: vi.fn().mockResolvedValue({ id: 'uuid-9', runsCount: 0 }),
     getProviderConfigs: vi.fn().mockResolvedValue({}),
   };
 });
