@@ -75,11 +75,6 @@
   background: var(--color-surface, #1e293b);
   border: 1px solid var(--color-border, #334155);
   border-radius: 10px;
-  transition: border-color 180ms ease, transform 180ms ease;
-}
-.onboarding-welcome__preview li:hover {
-  border-color: color-mix(in srgb, var(--color-accent, #10b981) 50%, var(--color-border, #334155));
-  transform: translateX(2px);
 }
 .onboarding-welcome__icon {
   display: inline-flex;
@@ -304,9 +299,15 @@
   list-style: none;
   padding: 0;
   margin: 16px 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+.onboarding-standard-list li {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+}
+.onboarding-standard-list .onboarding-standard-card {
+  flex: 1;
 }
 .onboarding-standard-card {
   display: flex;
@@ -318,7 +319,10 @@
   transition: border-color 150ms ease;
 }
 .onboarding-standard-card:hover { border-color: var(--color-accent, #10b981); }
-.onboarding-standard-card--selected { border-color: var(--color-accent, #10b981); }
+.onboarding-standard-card--selected {
+  border-color: var(--color-accent, #10b981);
+  background: color-mix(in srgb, var(--color-accent, #10b981) 8%, transparent);
+}
 .onboarding-standard-card p { margin: 4px 0 0; font-size: 0.85rem; color: var(--color-text-muted, #94a3b8); }
 
 .onboarding-wizard {

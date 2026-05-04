@@ -58,7 +58,6 @@ export default function StandardLaunchStep({ state, actions, standards, onLaunch
           Start evaluation
         </button>
         <button type="button" className="btn-secondary" onClick={onBack}>Back</button>
-        <button type="button" className="btn-secondary" onClick={onCancel}>Save and finish setup later</button>
       </div>
     </div>
   );

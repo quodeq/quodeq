@@ -100,10 +100,7 @@ export default function RepoScanStep({ state, actions, createProject, onContinue
           <button type="button" className="btn-primary" onClick={handleSubmit} disabled={!state.repo.value}>Scan repository</button>
         )}
         {sub === 'scanned' && (
-          <>
-            <button type="button" className="btn-primary" onClick={onContinue}>Continue</button>
-            <button type="button" className="btn-secondary" onClick={onCancel}>Save and finish setup later</button>
-          </>
+          <button type="button" className="btn-primary" onClick={onContinue}>Continue</button>
         )}
       </div>
 
