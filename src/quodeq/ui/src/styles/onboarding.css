@@ -78,6 +78,8 @@
   border-radius: var(--term-radius);
   width: 100%;
   max-width: 640px;
+  max-height: calc(100vh - 2 * var(--term-space-4));
+  overflow-y: auto;
   padding: var(--term-space-4) var(--term-space-4) var(--term-space-3);
   font-family: var(--term-font-mono);
   color: var(--color-text);
@@ -242,6 +244,21 @@
 /* ──────────────────────────────────────────────────────────────
    Standard & Launch step
    ────────────────────────────────────────────────────────────── */
+
+/* The StatStrip default value size (28px) is calibrated for dashboard
+   score numerals. The wizard's summary strip carries prose content
+   (UUIDs, provider names, "5 min") — at 28px the row dominates and
+   breaks alignment. Scope down to terminal body size. */
+.onboarding-step--standard-launch .term-stat__value {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  word-break: break-all;
+}
+.onboarding-step--standard-launch .term-stat__hint {
+  font-size: 11px;
+}
+
 .onboarding-standard-list {
   list-style: none;
   padding: 0;
@@ -268,6 +285,12 @@
 .onboarding-standard-card--selected {
   border-color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+.onboarding-standard-card input[type="radio"],
+.onboarding-standard-card input[type="checkbox"] {
+  accent-color: var(--color-accent);
+  margin-top: 2px;
+  flex-shrink: 0;
 }
 .onboarding-standard-card p {
   margin: 4px 0 0;
