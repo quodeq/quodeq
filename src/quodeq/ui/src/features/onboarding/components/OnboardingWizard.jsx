@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { registerProject, listStandards } from '../../../api/index.js';
+import { registerProject, listStandards, getProjectInfo } from '../../../api/index.js';
 import { useWizardState } from '../hooks/useWizardState.js';
 import { saveDraft, clearDraft } from '../hooks/useWizardDraft.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
@@ -132,6 +132,7 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
           state={wizard.state}
           actions={wizard}
           createProject={registerProject}
+          getProjectInfo={getProjectInfo}
           onContinue={nextStep}
           onCancel={handleSavedExit}
         />

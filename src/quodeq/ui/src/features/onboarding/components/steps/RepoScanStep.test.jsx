@@ -73,4 +73,57 @@ describe('RepoScanStep', () => {
     await waitFor(() => expect(failScan).toHaveBeenCalled());
     expect(failScan.mock.calls[0][0].message).toBe('boom');
   });
+
+  it('409 with no evaluations on the existing project silently resumes into it', async () => {
+    const succeedScan = vi.fn();
+    const failScan = vi.fn();
+    const createProject = vi.fn().mockRejectedValue(
+      Object.assign(new Error('already added'), { status: 409, existingProjectId: 'uuid-existing' }),
+    );
+    const getProjectInfo = vi.fn().mockResolvedValue({ id: 'uuid-existing', runsCount: 0 });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ total_files: 12, languages: { py: 12 }, branches: ['main'], modules: [] }),
+    });
+    try {
+      render(<RepoScanStep
+        state={{ repoScanSubState: 'idle', repo: { value: '/some/path' } }}
+        actions={{ setRepo: noop, startScan: noop, succeedScan, failScan, resetScan: noop }}
+        createProject={createProject}
+        getProjectInfo={getProjectInfo}
+        onContinue={noop}
+        onCancel={noop}
+      />);
+      fireEvent.click(screen.getByRole('button', { name: /scan repository/i }));
+      await waitFor(() => expect(succeedScan).toHaveBeenCalled());
+      expect(succeedScan).toHaveBeenCalledWith('uuid-existing', expect.objectContaining({ total_files: 12 }));
+      expect(failScan).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('409 with evaluations on the existing project surfaces the error normally', async () => {
+    const succeedScan = vi.fn();
+    const failScan = vi.fn();
+    const createProject = vi.fn().mockRejectedValue(
+      Object.assign(new Error('already added'), { status: 409, existingProjectId: 'uuid-existing' }),
+    );
+    const getProjectInfo = vi.fn().mockResolvedValue({ id: 'uuid-existing', runsCount: 3 });
+    render(<RepoScanStep
+      state={{ repoScanSubState: 'idle', repo: { value: '/some/path' } }}
+      actions={{ setRepo: noop, startScan: noop, succeedScan, failScan, resetScan: noop }}
+      createProject={createProject}
+      getProjectInfo={getProjectInfo}
+      onContinue={noop}
+      onCancel={noop}
+    />);
+    fireEvent.click(screen.getByRole('button', { name: /scan repository/i }));
+    await waitFor(() => expect(failScan).toHaveBeenCalled());
+    expect(failScan.mock.calls[0][0]).toMatchObject({
+      status: 409,
+      existingProjectId: 'uuid-existing',
+    });
+    expect(succeedScan).not.toHaveBeenCalled();
+  });
 });

@@ -3,9 +3,27 @@ import { RepoInput } from '../../../evaluation/components/EvaluationForm.jsx';
 import ScanProgress from '../../../evaluation/components/ScanProgress.jsx';
 import FolderBrowser from '../../../evaluation/components/FolderBrowser.jsx';
 
-export default function RepoScanStep({ state, actions, createProject, onContinue, onCancel }) {
+export default function RepoScanStep({ state, actions, createProject, getProjectInfo, onContinue, onCancel }) {
   const sub = state.repoScanSubState;
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
+
+  // 409 + existingProjectId means a project was already registered for this
+  // repo. If it has no evaluations yet, silently resume into it — the user
+  // most likely abandoned an earlier onboarding attempt. If it does have
+  // evaluations, fall through to the normal error UI so the user can decide.
+  async function tryResumeExisting(existingProjectId) {
+    try {
+      const info = await getProjectInfo(existingProjectId);
+      if (info.runsCount > 0) return false;
+      const scanRes = await fetch(`/api/projects/${encodeURIComponent(existingProjectId)}/scan`);
+      if (!scanRes.ok) return false;
+      const scanData = await scanRes.json();
+      actions.succeedScan(existingProjectId, scanData);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   async function handleSubmit() {
     if (!state.repo.value) return;
@@ -14,6 +32,10 @@ export default function RepoScanStep({ state, actions, createProject, onContinue
       const { projectId, scanData } = await createProject({ repo: state.repo.value });
       actions.succeedScan(projectId, scanData);
     } catch (err) {
+      if (err.status === 409 && err.existingProjectId) {
+        const resumed = await tryResumeExisting(err.existingProjectId);
+        if (resumed) return;
+      }
       actions.failScan({ message: err.message, status: err.status, existingProjectId: err.existingProjectId });
     }
   }
