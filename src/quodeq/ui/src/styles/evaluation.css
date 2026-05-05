@@ -49,6 +49,21 @@
   font-size: 0.72rem;
 }
 
+/* Clickable variant — used on the Evaluate page header to navigate to settings. */
+button.eval-provider-badge--clickable {
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 120ms, background 120ms;
+}
+button.eval-provider-badge--clickable:hover {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface-alt));
+}
+button.eval-provider-badge--clickable:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
 .evaluate-content {
   display: grid;
   gap: 24px;
@@ -2830,6 +2845,33 @@
 }
 .term-meta-grid__value code {
   color: var(--color-text);
+  background: transparent;
+  padding: 0;
+  font-family: var(--term-font-mono);
+}
+
+/* ------------------------------------------------------------
+   evaluate-job-id-line — minimal mono row showing just the job
+   ID with a copy button. Replaces the old `term-meta-grid`
+   block that surfaced project / provider / repo redundantly.
+   ------------------------------------------------------------ */
+.evaluate-job-id-line {
+  display: flex;
+  align-items: center;
+  gap: var(--term-space-2);
+  padding: var(--term-space-2) 0;
+  margin-bottom: var(--term-space-3);
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+.evaluate-job-id-line__label {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.evaluate-job-id-line code {
+  color: var(--color-text-muted);
+  font-size: 11px;
   background: transparent;
   padding: 0;
   font-family: var(--term-font-mono);

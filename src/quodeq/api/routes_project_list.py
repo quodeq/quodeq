@@ -18,7 +18,7 @@ from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 _BLOCKED_SCAN_PATHS = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
-_EMPTY_SCAN: dict[str, object] = {"total_files": 0, "languages": {}, "branches": [], "modules": [], "file_tree": []}
+_EMPTY_SCAN: dict[str, object] = {"total_files": 0, "code_files": 0, "languages": {}, "branches": [], "modules": [], "file_tree": []}
 
 
 def _find_existing_project(reports_root: str, repo: str, scope_path: str | None) -> str | None:

@@ -1,17 +1,12 @@
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
 import ScanProgress from './ScanProgress.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
+import HelpHint from '../../../components/HelpHint.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
-import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 import { TermHeader } from '../../../components/terminal/index.js';
 import JobStatStrip from './JobStatStrip.jsx';
 
 const STATUS = { RUNNING: 'running', DONE: 'done', FAILED: 'failed', LOST: 'lost' };
-
-function deriveProjectName(repo) {
-  if (!repo) return null;
-  return repo.replace(/\.git$/, '').split(/[/\\]/).filter(Boolean).pop() || null;
-}
 
 function termNameForStatus(status) {
   if (status === STATUS.RUNNING) return 'evaluation_in_progress';
@@ -19,15 +14,6 @@ function termNameForStatus(status) {
   if (status === STATUS.FAILED)  return 'evaluation_failed';
   if (status === STATUS.LOST)    return 'evaluation_lost';
   return 'evaluation_cancelled';
-}
-
-function ExternalRunBadge() {
-  return (
-    <div className="term-meta-grid__item">
-      <span className="term-meta-grid__label">Source</span>
-      <span className="term-meta-grid__value">External</span>
-    </div>
-  );
 }
 
 function StatusPill({ status, exitReason }) {
@@ -41,15 +27,13 @@ function StatusPill({ status, exitReason }) {
   );
 }
 
-function JobProviderBadge() {
-  const provider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
-  const model = localStorage.getItem(providerKey(provider, 'model')) || '';
-  if (!provider) return null;
+function ActionsHelp() {
   return (
-    <div className="term-meta-grid__item">
-      <span className="term-meta-grid__label">AI Provider</span>
-      <span className="term-meta-grid__value">{provider}{model ? ` / ${model}` : ''}</span>
-    </div>
+    <HelpHint label="Job actions help">
+      <div><strong>Cancel</strong> — stop the running evaluation.</div>
+      <div><strong>View Results</strong> — open the completed run's full report.</div>
+      <div><strong>Close</strong> — dismiss this panel without affecting the run.</div>
+    </HelpHint>
   );
 }
 
@@ -60,6 +44,7 @@ function JobHeader({ job, onDismiss, onCancel }) {
     <div className="evaluate-panel__top evaluate-panel__top--row">
       <TermHeader name={termNameForStatus(job.status)} />
       <div className="evaluate-panel__top-actions">
+        <ActionsHelp />
         {isRunning && (
           <button type="button" className="term-btn term-btn--ghost" onClick={onCancel}>cancel</button>
         )}
@@ -71,36 +56,18 @@ function JobHeader({ job, onDismiss, onCancel }) {
         {!isRunning && (
           <button type="button" className="term-btn term-btn--secondary" onClick={() => onDismiss('close')}>close</button>
         )}
-        <StatusPill status={job.status} exitReason={job.exitReason} />
+        {!isRunning && <StatusPill status={job.status} exitReason={job.exitReason} />}
       </div>
     </div>
   );
 }
 
-function JobMeta({ job, projectName }) {
-  const isExternal = job.source === 'external';
+function JobIdLine({ jobId }) {
   return (
-    <div className="term-meta-grid">
-      {projectName && (
-        <div className="term-meta-grid__item">
-          <span className="term-meta-grid__label">Project</span>
-          <span className="term-meta-grid__value">{projectName}</span>
-        </div>
-      )}
-      {isExternal ? <ExternalRunBadge /> : <JobProviderBadge />}
-      <div className="term-meta-grid__item">
-        <span className="term-meta-grid__label">Job ID</span>
-        <div className="term-meta-grid__value">
-          <code>{job.jobId}</code>
-          <CopyButton aria-label="Copy job ID" onClick={() => copyToClipboard(job.jobId)} />
-        </div>
-      </div>
-      {job.repo && (
-        <div className="term-meta-grid__item term-meta-grid__item--full">
-          <span className="term-meta-grid__label">Repository</span>
-          <code className="term-meta-grid__value">{job.repo}</code>
-        </div>
-      )}
+    <div className="evaluate-job-id-line">
+      <span className="evaluate-job-id-line__label">job</span>
+      <code>{jobId}</code>
+      <CopyButton aria-label="Copy job ID" onClick={() => copyToClipboard(jobId)} />
     </div>
   );
 }
@@ -112,7 +79,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
     <div className="panel evaluate-panel--terminal">
       <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
       <JobStatStrip job={job} liveViolations={liveViolations} />
-      <JobMeta job={job} projectName={deriveProjectName(job.repo)} />
+      <JobIdLine jobId={job.jobId} />
       <ScanProgress job={job} hasEvaluations={hasEvaluations} />
       <LiveViolationsFeed liveViolations={liveViolations} />
     </div>
