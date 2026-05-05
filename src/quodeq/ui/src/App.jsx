@@ -385,14 +385,20 @@ export default function App() {
   // Project-data tabs (overview/violations/map/history) only make sense once
   // the selected project has at least one completed evaluation run. Until
   // then, hide them from the sidebar and bounce the user to Evaluate if a
-  // cached activeTab lands them on a now-hidden tab.
+  // cached activeTab lands them on a now-hidden tab. The guards below wait
+  // for /api/projects to resolve and for selectedProjectInfo to populate so
+  // the bouncer doesn't fire against the transient "no projects loaded yet"
+  // state on first paint and strand the user on Evaluate.
   const PROJECT_DATA_TABS = ['overview', 'violations', 'map', 'history'];
   const hasCurrentProjectRuns = (selectedProjectInfo?.runsCount ?? 0) > 0;
   useEffect(() => {
+    if (!state.projectsLoaded) return;
+    if (state.projects.length === 0) return;
+    if (!selectedProjectInfo) return;
     if (!hasCurrentProjectRuns && PROJECT_DATA_TABS.includes(state.activeTab)) {
       state.navTab('evaluate');
     }
-  }, [hasCurrentProjectRuns, state.activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.projectsLoaded, state.projects.length, selectedProjectInfo, hasCurrentProjectRuns, state.activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sidebarProvider = (typeof localStorage !== 'undefined' && localStorage.getItem(ACTIVE_PROVIDER_KEY)) || null;
   const sidebarModel = sidebarProvider && typeof localStorage !== 'undefined'
