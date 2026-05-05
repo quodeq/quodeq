@@ -3,7 +3,7 @@ import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
 import CountdownTimer from './CountdownTimer.jsx';
 import { ACTIVE_PROVIDER_KEY, DEFAULT_TIME_LIMIT_S, providerKey } from '../../../constants.js';
-import { TermHeader, SectionLabel } from '../../../components/terminal/index.js';
+import { TermHeader } from '../../../components/terminal/index.js';
 
 const TOAST_DISMISS_TIMEOUT_MS = 5000;
 
@@ -77,18 +77,20 @@ function ErrorToast({ message, onDismiss }) {
 
 function NoProjectSelected({ onGoToProjects }) {
   return (
-    <div className="panel evaluate-panel evaluate-no-project">
-      <SectionLabel>no_project_selected</SectionLabel>
+    <div className="panel evaluate-panel evaluate-panel--terminal evaluate-no-project">
+      <div className="evaluate-panel__top">
+        <TermHeader name="no_project" sub="pick or add a project to start" />
+      </div>
       <p className="evaluate-no-project__hint">
         Add or pick a project from Projects to run an evaluation.
       </p>
       {onGoToProjects && (
         <button
           type="button"
-          className="evaluate-no-project__cta"
+          className="term-btn term-btn--primary"
           onClick={onGoToProjects}
         >
-          Go to Projects
+          <span aria-hidden="true">▸</span> go to projects
         </button>
       )}
     </div>

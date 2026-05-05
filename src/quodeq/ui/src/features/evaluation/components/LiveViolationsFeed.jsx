@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
 import { parseFileRef } from '../../../utils/formatters.js';
+import { SectionLabel } from '../../../components/terminal/index.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 40;
 const ANIM_MAX_DELAY_MS = 400;
@@ -154,6 +155,7 @@ export default function LiveViolationsFeed({ liveViolations }) {
 
   return (
     <div className="vlive-feed">
+      {totalCount > 0 && <SectionLabel>{`live_violations · ${totalCount}`}</SectionLabel>}
       <div className="vlive-counter">
         {totalCount} violation{totalCount !== 1 ? 's' : ''} found across {orderedDims.length} dimension{orderedDims.length !== 1 ? 's' : ''}
       </div>

@@ -7,6 +7,7 @@ import BranchScopeSelector from './BranchScopeSelector.jsx';
 import CleanScanToggle from './CleanScanToggle.jsx';
 import DimensionSelector from './DimensionSelector.jsx';
 import FolderBrowser from './FolderBrowser.jsx';
+import { TermHeader } from '../../../components/terminal/index.js';
 
 const NO_STANDARDS_MESSAGE = 'Select at least one standard before evaluating.';
 
@@ -152,7 +153,7 @@ function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, handleU
         />
         <button
           type="button"
-          className="evaluate-submit-btn"
+          className="term-btn term-btn--primary"
           disabled={!urlInput.trim() || urlSaving}
           onClick={handleUrlRestore}
         >
@@ -203,12 +204,12 @@ function ActionButtons({ disabled, canStart, handleScan }) {
     <div style={buttonRowStyle}>
       <button
         type="button"
-        className="evaluate-submit-btn"
+        className="term-btn term-btn--primary"
         style={flexButtonStyle}
         disabled={!canStart}
         onClick={handleScan}
       >
-        {disabled ? 'Running...' : 'Scan'}
+        {disabled ? 'Running...' : (<><span aria-hidden="true">▸</span> scan</>)}
       </button>
     </div>
   );
@@ -225,14 +226,15 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
   const canStart = !disabled && !cloning && !info.pathMissing;
 
   return (
-    <div className="panel evaluate-panel">
-      <div className="panel-header">
-        <h3>Evaluate <span className="re-eval-project-name">{info.name || project}</span></h3>
+    <div className="panel evaluate-panel evaluate-panel--terminal">
+      <div className="evaluate-panel__top">
+        <TermHeader name="evaluate" sub={info.name || project} />
       </div>
 
       <div className="evaluate-form-large">
-        <div className="re-eval-repo-path">
-          <span className="re-eval-repo-label">{info.location === 'online' ? 'Remote' : 'Local'}</span>
+        <div className="re-eval-repo-path re-eval-repo-path--terminal">
+          <span className="re-eval-repo-path__arrow" aria-hidden="true">▸</span>
+          <span className="re-eval-repo-path__label">{info.location === 'online' ? 'remote' : 'local'}</span>
           <code>{info.path}</code>
         </div>
 
@@ -284,8 +286,10 @@ export default function ReEvaluateCard({ project, projectInfo, onStart, disabled
 
   if (error) return null;
   if (!info) return (
-    <div className="panel evaluate-panel">
-      <div className="panel-header"><h3>Loading project...</h3></div>
+    <div className="panel evaluate-panel evaluate-panel--terminal">
+      <div className="evaluate-panel__top">
+        <TermHeader name="evaluate" sub="loading project..." />
+      </div>
     </div>
   );
 
