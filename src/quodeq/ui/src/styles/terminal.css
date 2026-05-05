@@ -1635,6 +1635,14 @@
 .sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item.active {
   color: var(--color-accent);
 }
+/* Hide labels and count badges entirely when collapsed — leaving them at
+   opacity 0 still consumed flex width, which pushed the icon off centre and
+   let the count badge overlap glyphs that have content near the right edge
+   (e.g. the violations alert triangle). */
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-label,
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-count {
+  display: none !important;
+}
 .sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item::before {
   content: "";
   position: absolute;
