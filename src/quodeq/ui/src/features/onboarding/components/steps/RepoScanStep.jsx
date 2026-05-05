@@ -94,6 +94,7 @@ export default function RepoScanStep({ state, actions, createProject, getProject
 
       {sub === 'scanned' && (() => {
         const totalFiles = state.scan?.total_files ?? 0;
+        const codeFiles = state.scan?.code_files ?? 0;
         const langs = state.scan?.languages || {};
         const langCount = Object.keys(langs).length;
         const branchCount = state.scan?.branches?.length ?? 0;
@@ -101,7 +102,8 @@ export default function RepoScanStep({ state, actions, createProject, getProject
         return (
           <div className="onboarding-scan-summary">
             <StatStrip cards>
-              <Stat label="FILES" value={totalFiles} />
+              <Stat label="FILES" value={totalFiles} hint="all files in repo" />
+              <Stat label="CODE" value={codeFiles} hint="files the eval will analyse" />
               <Stat label="LANGUAGES" value={langCount} />
               <Stat label="BRANCHES" value={branchCount} />
             </StatStrip>

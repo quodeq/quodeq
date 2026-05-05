@@ -27,7 +27,7 @@ def _make_git_repo(path: Path) -> None:
 
 
 def test_scan_project_collects_files(tmp_path: Path) -> None:
-    """Scan should list all files and count them."""
+    """Scan should list all files and count them, splitting out code files."""
     from quodeq.services._fs_scan import scan_project
     project_dir = tmp_path / "repo"
     project_dir.mkdir()
@@ -37,9 +37,25 @@ def test_scan_project_collects_files(tmp_path: Path) -> None:
     result = scan_project(project_dir)
     assert isinstance(result, ScanData)
     assert result.total_files == 3
+    assert result.code_files == 2  # the two .py files; .md is not source code
     assert "app.py" in result.file_tree
     assert result.languages.get("py") == 2
     assert result.languages.get("md") == 1
+
+
+def test_scan_project_code_files_excludes_non_source(tmp_path: Path) -> None:
+    """code_files should count only extensions in the analysable source set."""
+    from quodeq.services._fs_scan import scan_project
+    project_dir = tmp_path / "repo"
+    project_dir.mkdir()
+    (project_dir / "app.kt").write_text("fun main() {}")
+    (project_dir / "build.gradle.kts").write_text("// gradle")
+    (project_dir / "config.json").write_text("{}")
+    (project_dir / "doc.md").write_text("# notes")
+    (project_dir / "image.webp").write_bytes(b"")
+    result = scan_project(project_dir)
+    assert result.total_files == 5
+    assert result.code_files == 2  # only .kt and .kts count
 
 
 def test_scan_project_lists_branches(tmp_path: Path) -> None:
