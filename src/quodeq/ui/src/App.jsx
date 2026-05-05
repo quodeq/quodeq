@@ -65,7 +65,7 @@ function useEffectiveDark(themeMode) {
  * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string }} props
  * @returns {JSX.Element}
  */
-function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onGoToProjects }) {
+function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onGoToProjects, onGoToSettings }) {
   const { connected, setConnected } = serverHealth;
   const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
   const projectInfo = projects?.find(p => (p.id || p.name) === selectedProject) || null;
@@ -75,7 +75,7 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onG
       <EvaluateScreen
         evaluation={{ job, jobError, liveViolations }}
         context={{ selectedProject, projectInfo }}
-        actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation, onGoToProjects }}
+        actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation, onGoToProjects, onGoToSettings }}
       />
     </>
   );
@@ -278,7 +278,7 @@ const ROUTE_RENDERERS = {
       trend={props.dashboardData.dashboard?.trend || []}
     />
   ),
-  evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} onGoToProjects={() => props.navigation.navTab('projects')} />,
+  evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />,
   file: (params) => <FileDetailPage file={params.file} />,
   evalprinciple: renderEvalPrincipleDetail,
   'eval-principle-detail': renderEvalPrincipleDetail,
