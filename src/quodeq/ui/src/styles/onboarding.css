@@ -11,6 +11,16 @@
   z-index: 1000;
   padding: var(--term-space-4);
 }
+.onboarding-wizard__panel-frame {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+}
+.onboarding-wizard__panel-frame > .onboarding-step {
+  max-width: none;
+}
 .onboarding-wizard__close {
   position: absolute;
   top: var(--term-space-3);
@@ -20,6 +30,7 @@
   cursor: pointer;
   padding: 0;
   color: var(--color-accent);
+  z-index: 2;
 }
 .onboarding-wizard__close:hover {
   color: color-mix(in srgb, var(--color-accent) 80%, var(--color-text));
