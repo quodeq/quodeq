@@ -235,3 +235,43 @@ class TestComputeAccumulated:
         result = compute_accumulated(str(reports_root), "proj", None)
         assert result is not None
         assert result["dimensions"][0]["overallScore"] == "6.0"
+
+    def test_falls_back_to_complete_when_in_progress_run_yields_no_dims(
+        self, tmp_path: Path, monkeypatch,
+    ):
+        # A fresh in-progress run on top of a previous complete run should
+        # not blank the overview cards if the in-progress run's eval state
+        # makes the eligible-set computation return zero dims (the user-
+        # observed "Evaluating..." regression). The fallback retries with
+        # complete runs only and surfaces the previous run's data.
+        import os
+        reports_root = _setup_project(tmp_path, "proj", [
+            ("run2", [_dim("performance", "9.5", "A")]),
+            ("run1", [_dim("performance", "8.3", "B")]),
+        ])
+        # `list_runs` derives in_progress from a live `.pid` file; the test
+        # process's own pid is guaranteed alive for the call.
+        (reports_root / "proj" / "run2" / ".pid").write_text(str(os.getpid()))
+
+        from quodeq.services import accumulated as acc_mod
+        real_build = acc_mod._build_accumulated_for_runs
+        calls: list[list[str]] = []
+
+        def fake_build(rroot, project, run_infos, cache_config):
+            statuses = [r.status for r in run_infos]
+            calls.append(statuses)
+            if "in_progress" in statuses:
+                return acc_mod._AccumulatedResult([], [], {
+                    "totalViolations": 0, "totalCompliance": 0,
+                    "critical": 0, "major": 0, "minor": 0,
+                }, None, None)
+            return real_build(rroot, project, run_infos, cache_config)
+
+        monkeypatch.setattr(acc_mod, "_build_accumulated_for_runs", fake_build)
+        result = compute_accumulated(str(reports_root), "proj", None)
+        assert result is not None
+        assert len(calls) == 2  # initial + fallback
+        assert "in_progress" in calls[0]
+        assert "in_progress" not in calls[1]
+        scores = {d["dimension"]: d["overallScore"] for d in result["dimensions"]}
+        assert scores == {"performance": "8.3"}

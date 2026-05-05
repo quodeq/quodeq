@@ -11,7 +11,7 @@ from quodeq.services.ports import RunInfo, list_runs
 from quodeq.core.types import DimensionResult
 from quodeq.shared.utils import _env_int
 from quodeq.services._cache import make_lru_dimension_fetcher
-from quodeq.services.dim_resolution import is_eligible_for_default_view
+from quodeq.services.dim_resolution import is_eligible_for_default_view, is_successful_run
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
 from quodeq.services._fs_projects import find_children as _find_children
 
@@ -83,15 +83,36 @@ def _compute_result(
     ``dim_resolution.is_eligible_for_default_view`` rule, used by both this
     call site and ``dashboard._resolve_selected_run`` so the headline and
     cards always read from the same set of runs.
+
+    Defensive fallback: if the eligible set yields zero scored dimensions
+    *and* it included a non-complete run, retry across complete runs only.
+    This kicks in when a fresh in-progress run is the newest entry but
+    hasn't produced any scored eval files yet (the overview would
+    otherwise go blank mid-evaluation, even though the previous complete
+    run's data is still on disk).
     """
-    complete_run_infos = [r for r in all_run_infos if is_eligible_for_default_view(r.status)]
-    if not complete_run_infos:
-        complete_run_infos = all_run_infos
-    runs = [r.run_id for r in complete_run_infos]
+    eligible_run_infos = [r for r in all_run_infos if is_eligible_for_default_view(r.status)]
+    if not eligible_run_infos:
+        eligible_run_infos = all_run_infos
+    result = _build_accumulated_for_runs(reports_root, project, eligible_run_infos, cache_config)
+
+    if not result.all_dimensions:
+        complete_only = [r for r in all_run_infos if is_successful_run(r.status)]
+        if complete_only and len(complete_only) < len(eligible_run_infos):
+            result = _build_accumulated_for_runs(reports_root, project, complete_only, cache_config)
+    return result
+
+
+def _build_accumulated_for_runs(
+    reports_root: Path, project: str, run_infos: list[RunInfo],
+    cache_config: AccumulatedCacheConfig | None,
+) -> _AccumulatedResult:
+    """Read run data and assemble the accumulated result for *run_infos*."""
+    runs = [r.run_id for r in run_infos]
     _cache, _lock, _max = _resolve_cache(cache_config)
     get_run_data = make_lru_dimension_fetcher(reports_root, project, _cache, _lock, _max)
     latest_by_dim, prev_occurrence, prev_run_latest = _read_all_run_data(
-        reports_root, project, complete_run_infos, runs, get_run_data,
+        reports_root, project, run_infos, runs, get_run_data,
     )
     all_dims = filter_dismissed_from_dimensions(list(latest_by_dim.values()), reports_root / project)
     dims_with_trend = _compute_accumulated_trends(all_dims, prev_occurrence)
