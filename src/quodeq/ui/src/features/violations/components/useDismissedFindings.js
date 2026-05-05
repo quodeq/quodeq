@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { listDismissedFindings, restoreFinding, restoreAllFindings } from '../../../api/index.js';
+import {
+  listDismissedFindings,
+  restoreFinding,
+  restoreAllFindings,
+  deleteFinding,
+  deleteAllFindings,
+} from '../../../api/index.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
 
 export function useDismissedFindings(selectedProject, onRefresh, setRestoreError) {
@@ -34,8 +40,18 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
 
   const handleDelete = useCallback(async (d) => {
     try {
-      await restoreFinding(selectedProject, { req: d.req, file: d.file, line: d.line });
-      setDismissed((prev) => prev.filter((item) => !(item.req === d.req && item.file === d.file && item.line === d.line)));
+      await deleteFinding(selectedProject, {
+        dimension: d.dimension,
+        principle: d.principle,
+        file: d.file,
+      });
+      // Sweep every dismissed entry that shares the same (dimension, principle, file),
+      // matching the backend sweep so the local list stays in sync without a refetch.
+      setDismissed((prev) => prev.filter((item) => !(
+        item.dimension === d.dimension
+        && item.principle === d.principle
+        && item.file === d.file
+      )));
       onRefresh?.();
     } catch (err) {
       console.error('Failed to delete finding:', err);
@@ -54,7 +70,7 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
     });
     if (!ok) return;
     try {
-      await restoreAllFindings(selectedProject);
+      await deleteAllFindings(selectedProject);
       setDismissed([]);
       onRefresh?.();
     } catch (err) {

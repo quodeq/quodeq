@@ -5,6 +5,7 @@ from pathlib import Path
 
 from flask import Flask, Response, abort, jsonify, request
 
+from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services.dismissed import dismiss_finding, load_dismissed, restore_finding, restore_all_findings
 from quodeq.shared.utils import get_evaluations_dir
 from quodeq.shared.validation import validate_path_segment
@@ -76,3 +77,24 @@ def register_findings_routes(app: Flask) -> None:
             return jsonify({"error": "project is required"}), 400
         count = restore_all_findings(_project_dir(_eval_dir(), project))
         return jsonify({"ok": True, "restored": count}), 200
+
+    @app.post("/api/findings/delete")
+    def delete() -> tuple[Response, int]:
+        body = request.get_json(silent=True) or {}
+        project = body.get("project", "")
+        dimension = body.get("dimension", "")
+        principle = body.get("principle", "")
+        file = body.get("file", "")
+        if not project or not dimension or not principle or not file:
+            return jsonify({"error": "project, dimension, principle, and file are required"}), 400
+        swept = delete_finding(_project_dir(_eval_dir(), project), body)
+        return jsonify({"ok": True, "swept": swept}), 200
+
+    @app.post("/api/findings/delete-all")
+    def delete_all() -> tuple[Response, int]:
+        body = request.get_json(silent=True) or {}
+        project = body.get("project", "")
+        if not project:
+            return jsonify({"error": "project is required"}), 400
+        count = delete_all_dismissed(_project_dir(_eval_dir(), project))
+        return jsonify({"ok": True, "deleted": count}), 200

@@ -12,6 +12,7 @@ from quodeq.core.types import DimensionResult
 from quodeq.shared.utils import _env_int
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services.dim_resolution import is_eligible_for_default_view, is_successful_run
+from quodeq.services.deleted import filter_deleted_from_dimensions
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
 from quodeq.services._fs_projects import find_children as _find_children
 
@@ -114,7 +115,9 @@ def _build_accumulated_for_runs(
     latest_by_dim, prev_occurrence, prev_run_latest = _read_all_run_data(
         reports_root, project, run_infos, runs, get_run_data,
     )
-    all_dims = filter_dismissed_from_dimensions(list(latest_by_dim.values()), reports_root / project)
+    project_dir = reports_root / project
+    all_dims = filter_dismissed_from_dimensions(list(latest_by_dim.values()), project_dir)
+    all_dims = filter_deleted_from_dimensions(all_dims, project_dir)
     dims_with_trend = _compute_accumulated_trends(all_dims, prev_occurrence)
     severity = _aggregate_severity_counts(all_dims)
     avg, prev_avg = _compute_accumulated_scores(all_dims, prev_run_latest)

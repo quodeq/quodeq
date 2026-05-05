@@ -92,11 +92,18 @@ def _score_all_principles(
     return principle_scores, principle_grades
 
 
-def _rescore_dimension(dim: DimensionResult, dismissed: set[tuple]) -> DimensionResult:
-    """Rescore a single dimension after filtering dismissed findings."""
+def _rescore_dimension(
+    dim: DimensionResult,
+    dismissed: set[tuple],
+    deleted: set[tuple] | None = None,
+) -> DimensionResult:
+    """Rescore a single dimension after filtering dismissed and deleted findings."""
+    deleted = deleted or set()
+    dim_id = dim.dimension or ""
     filtered_violations = [
         v for v in dim.violations
         if (v.req or "", v.file or "", v.line or 0) not in dismissed
+        and (dim_id, v.principle or "", v.file or "") not in deleted
     ]
     if len(filtered_violations) == len(dim.violations):
         return dim
@@ -127,12 +134,13 @@ def _rescore_dimension(dim: DimensionResult, dismissed: set[tuple]) -> Dimension
 def rescore_dimensions(
     dimensions: list[DimensionResult],
     dismissed_keys: set[tuple],
+    deleted_keys: set[tuple] | None = None,
 ) -> dict[str, Any]:
-    """Rescore all dimensions after filtering dismissed findings.
+    """Rescore all dimensions after filtering dismissed and deleted findings.
 
     Returns a dict with 'dimensions' (list of camelCase dicts) and 'summary' (camelCase dict).
     """
-    rescored = [_rescore_dimension(dim, dismissed_keys) for dim in dimensions]
+    rescored = [_rescore_dimension(dim, dismissed_keys, deleted_keys) for dim in dimensions]
     summary = summarize_dimensions(rescored)
     return {
         "dimensions": [to_camel_dict(d) for d in rescored],

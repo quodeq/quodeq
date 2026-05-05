@@ -14,7 +14,7 @@ import { createJob } from '../models/job.js';
 import { createProject } from '../models/project.js';
 import { request, BASE } from './request.js';
 
-export { listDismissedFindings, dismissFinding, restoreFinding, restoreAllFindings, getRescore } from './findings.js';
+export { listDismissedFindings, dismissFinding, restoreFinding, restoreAllFindings, getRescore, deleteFinding, deleteAllFindings } from './findings.js';
 export { listStandards, getStandard, createStandard, updateStandard, deleteStandard, duplicateStandard, listLibrary, listCwes, importFromLibrary, importStandard, exportStandard } from './standards.js';
 
 // ── Health ──────────────────────────────────────────────────────────────

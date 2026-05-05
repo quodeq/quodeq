@@ -22,6 +22,7 @@ from quodeq.services.dashboard import (
     _make_run_dimension_fetcher,
 )
 from quodeq.services._dashboard_trend import build_accumulated_trend
+from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.ports import RunInfo, list_runs
 from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
@@ -50,19 +51,22 @@ def _make_rescoring_fetcher(
     automatically gets rescored data.
     """
     base_fetcher = _make_run_dimension_fetcher(reports_root, project)
-    dismissed = dismissed_keys(reports_root / project)
-    if not dismissed:
+    project_dir = reports_root / project
+    dismissed = dismissed_keys(project_dir)
+    deleted = deleted_keys(project_dir)
+    if not dismissed and not deleted:
         return base_fetcher
 
     def rescoring_fetcher(run_id: str) -> list[DimensionResult]:
         dims = base_fetcher(run_id)
-        return [_rescore_dimension(d, dismissed) for d in dims]
+        return [_rescore_dimension(d, dismissed, deleted) for d in dims]
 
     return rescoring_fetcher
 
 
 def _rescore_runs_by_dimension(
-    dims: list[dict], reports_root: Path, project: str, dismissed: set[tuple],
+    dims: list[dict], reports_root: Path, project: str,
+    dismissed: set[tuple], deleted: set[tuple] | None = None,
 ) -> dict[str, dict]:
     """Rescore each unique run and return a map of dim_key -> rescored dict."""
     dim_to_run: dict[str, str] = {}
@@ -78,7 +82,7 @@ def _rescore_runs_by_dimension(
     for dim_key, run_id in dim_to_run.items():
         if run_id not in seen_runs:
             run_dims = fetcher(run_id)
-            result = rescore_dimensions(run_dims, dismissed)
+            result = rescore_dimensions(run_dims, dismissed, deleted)
             seen_runs[run_id] = {
                 (rd.get("dimension") or "").lower(): rd
                 for rd in result.get("dimensions", [])
@@ -120,15 +124,17 @@ def _rescore_accumulated_response(
     Filters dismissed violations from each dimension, recalculates scores,
     and recomputes the summary.
     """
-    dismissed = dismissed_keys(reports_root / project)
-    if not dismissed or not accumulated:
+    project_dir = reports_root / project
+    dismissed = dismissed_keys(project_dir)
+    deleted = deleted_keys(project_dir)
+    if (not dismissed and not deleted) or not accumulated:
         return accumulated
 
     dims = accumulated.get("dimensions", [])
     if not dims:
         return accumulated
 
-    rescored_by_dim = _rescore_runs_by_dimension(dims, reports_root, project, dismissed)
+    rescored_by_dim = _rescore_runs_by_dimension(dims, reports_root, project, dismissed, deleted)
     new_dims = _merge_rescored_dims(dims, rescored_by_dim)
 
     new_summary = recompute_summary(new_dims, accumulated.get("summary", {}))
