@@ -2177,3 +2177,39 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ------------------------------------------------------------
+   term-status-pill — mono outline pill used in the evaluation
+   job header (running / done / failed / lost / cancelled).
+   Replaces the legacy `.job-status-badge` chip.
+   ------------------------------------------------------------ */
+.term-status-pill {
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: var(--term-radius);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  text-transform: lowercase;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.term-status-pill--running   { color: var(--color-warning); }
+.term-status-pill--done,
+.term-status-pill--completed { color: var(--color-success); }
+.term-status-pill--failed,
+.term-status-pill--lost      { color: var(--color-sev-critical-text); }
+.term-status-pill--cancelled { color: var(--color-text-muted); }
+
+/* ------------------------------------------------------------
+   eval-job-stat-strip — small variant of <StatStrip cards>.
+   Wrap the strip in a <div class="eval-job-stat-strip"> to
+   shrink the cell padding and value font for the in-job header.
+   ------------------------------------------------------------ */
+.eval-job-stat-strip { margin-bottom: var(--term-space-3); }
+.eval-job-stat-strip .term-stat-strip--cards .term-stat {
+  padding: 10px 12px;
+}
+.eval-job-stat-strip .term-stat__value {
+  font-size: 18px;
+}
