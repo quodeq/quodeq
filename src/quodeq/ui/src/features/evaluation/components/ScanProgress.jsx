@@ -5,6 +5,7 @@ import { evaluationKeys } from '../../../api/queryKeys.js';
 import { useEvalLog } from '../eval-log/EvalLogContext.js';
 import { pct, computeOverallProgress } from './scanProgressTotals.js';
 import ConsoleButton from '../../../components/ConsoleButton.jsx';
+import { SectionLabel } from '../../../components/terminal/index.js';
 
 const POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATES = new Set(['done', 'failed', 'cancelled']);
@@ -186,6 +187,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
 
   return (
     <div className="scan-progress">
+      <SectionLabel>progress</SectionLabel>
       {errorBanner}
       <div className="scan-progress__row">
         <div className="scan-progress__bar-wrap">
