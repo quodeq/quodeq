@@ -14,6 +14,21 @@ function sumLiveViolations(liveViolations) {
   return Object.values(liveViolations).reduce((n, vs) => n + (vs?.length || 0), 0);
 }
 
+// Backend-reported elapsed (`progress.totalElapsedS`) lands on a few ticks
+// inside a poll, leaving the cell blank for the first second or two of a
+// run and silent for runs whose progress payload omits the field. Fall
+// back to the wall-clock delta from `job.startedAt` so the strip always
+// shows something live as soon as the job has started.
+function deriveElapsedS(progressElapsed, startedAt, endedAt, isTerminal) {
+  if (progressElapsed != null && Number.isFinite(progressElapsed)) return progressElapsed;
+  if (!startedAt) return null;
+  const start = Date.parse(startedAt);
+  if (Number.isNaN(start)) return null;
+  const end = isTerminal && endedAt ? Date.parse(endedAt) : Date.now();
+  if (Number.isNaN(end)) return null;
+  return Math.max(0, (end - start) / 1000);
+}
+
 export default function JobStatStrip({ job, liveViolations }) {
   const jobId = job?.jobId;
   const isTerminal = TERMINAL_STATES.has(job?.status);
@@ -30,10 +45,10 @@ export default function JobStatStrip({ job, liveViolations }) {
   const cells = useMemo(() => {
     if (!jobId) return [];
     const { takenFiles, totalFiles, overallPct } = computeOverallProgress(progress);
-    const elapsedS = progress?.totalElapsedS;
+    const elapsedS = deriveElapsedS(progress?.totalElapsedS, job?.startedAt, job?.endedAt, isTerminal);
     const liveCount = sumLiveViolations(liveViolations);
     return buildJobStatCells(job.status, { overallPct, takenFiles, totalFiles, elapsedS, liveCount });
-  }, [jobId, job?.status, progress, liveViolations]);
+  }, [jobId, job?.status, job?.startedAt, job?.endedAt, isTerminal, progress, liveViolations]);
 
   if (!jobId) return null;
 
