@@ -2131,3 +2131,49 @@
   .term-header__name { font-size: 17px; }
   .term-stat__value { font-size: 22px; }
 }
+
+/* ------------------------------------------------------------
+   term-btn — terminal-aesthetic buttons.
+   Originally introduced for the onboarding wizard, now used
+   across onboarding, evaluate, and any other terminal-styled
+   screen. Variants: --primary | --secondary | --ghost.
+   ------------------------------------------------------------ */
+.term-btn--primary,
+.term-btn--secondary,
+.term-btn--ghost {
+  font-family: var(--term-font-mono);
+  font-size: 13px;
+  border-radius: var(--term-radius);
+  padding: var(--term-space-2) var(--term-space-3);
+  cursor: pointer;
+  transition: background 120ms ease;
+  background: transparent;
+}
+.term-btn--primary {
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+}
+.term-btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+.term-btn--secondary {
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+.term-btn--secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+.term-btn--ghost {
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+.term-btn--ghost:hover:not(:disabled) {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+}
+.term-btn--primary:disabled,
+.term-btn--secondary:disabled,
+.term-btn--ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
