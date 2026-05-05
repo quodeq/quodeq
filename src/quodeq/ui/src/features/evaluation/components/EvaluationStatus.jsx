@@ -13,14 +13,6 @@ function deriveProjectName(repo) {
   return repo.replace(/\.git$/, '').split(/[/\\]/).filter(Boolean).pop() || null;
 }
 
-function statusTitle(status) {
-  if (status === STATUS.RUNNING) return 'Evaluation in Progress';
-  if (status === STATUS.DONE) return 'Evaluation Complete';
-  if (status === STATUS.FAILED) return 'Evaluation Failed';
-  if (status === STATUS.LOST) return 'Evaluation Lost';
-  return 'Evaluation Cancelled';
-}
-
 function termNameForStatus(status) {
   if (status === STATUS.RUNNING) return 'evaluation_in_progress';
   if (status === STATUS.DONE)    return 'evaluation_complete';
