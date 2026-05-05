@@ -24,19 +24,25 @@ def list_builtin(dimensions_file: Path, compiled_dir: Path,
     except (OSError, ValueError) as exc:
         logger.warning("Cannot read dimensions file: %s", exc)
         return []
-    return [build_builtin_meta(dim, *_count_compiled(dim["id"], compiled_dir, read_json))
-            for dim in data.get("applies", [])]
+    out: list[StandardMeta] = []
+    for dim in data.get("applies", []):
+        p_count, r_count, description = _read_compiled_meta(dim["id"], compiled_dir, read_json)
+        out.append(build_builtin_meta(dim, p_count, r_count, description))
+    return out
 
 
-def _count_compiled(dimension_id: str, compiled_dir: Path,
-                    read_json: Callable) -> tuple[int, int]:
+def _read_compiled_meta(dimension_id: str, compiled_dir: Path,
+                        read_json: Callable) -> tuple[int, int, str]:
+    """Return (principle_count, requirement_count, description) for *dimension_id*."""
     path = compiled_dir / f"{dimension_id}.json"
     if not path.is_file():
-        return 0, 0
+        return 0, 0, ""
     try:
-        return count_principles_and_requirements(read_json(path))
+        compiled = read_json(path)
     except (OSError, ValueError):
-        return 0, 0
+        return 0, 0, ""
+    p_count, r_count = count_principles_and_requirements(compiled)
+    return p_count, r_count, compiled.get("description", "")
 
 
 def list_custom(evaluators_dir: Path, read_json: Callable) -> list[StandardMeta]:

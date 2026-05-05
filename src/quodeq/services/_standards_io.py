@@ -55,9 +55,10 @@ def build_detail(data: dict, *, type_default: str = _TYPE_CUSTOM) -> StandardDet
 
 def build_builtin_detail(data: dict, standard_id: str, weight: float) -> StandardDetail:
     source = data.get("source", "") or ", ".join(data.get("sources", []))
+    description = data.get("description") or f"{data.get('name', standard_id)} standard"
     return StandardDetail(
         id=standard_id, name=data.get("name", standard_id),
-        description=f"{data.get('name', standard_id)} standard",
+        description=description,
         weight=weight, source=source,
         type=data.get("type", _TYPE_BUILTIN), managed=True,
         origin=None, origin_hash=None, principles=data.get("principles", []),
@@ -77,12 +78,20 @@ def build_custom_meta(data: dict, p_count: int, r_count: int) -> StandardMeta:
     )
 
 
-def build_builtin_meta(dim: dict, p_count: int, r_count: int) -> StandardMeta:
-    """Build a StandardMeta for a built-in dimension."""
+def build_builtin_meta(
+    dim: dict, p_count: int, r_count: int, description: str = "",
+) -> StandardMeta:
+    """Build a StandardMeta for a built-in dimension.
+
+    *description* is the description loaded from the compiled standard file,
+    when available. Falls back to a generic "{source} standard" label so
+    older compiled files without the field keep their historical meta text.
+    """
     did = _require_id(dim, "built-in dimension")
+    final_description = description or f'{dim.get("source", "Built-in")} standard'
     return StandardMeta(
         id=did, name=dim.get("iso_25010") or dim.get("name", did),
-        description=f'{dim.get("source", "Built-in")} standard',
+        description=final_description,
         weight=dim.get("weight", 1.0), source=dim.get("source", ""),
         type=dim.get("type", _TYPE_BUILTIN), managed=True,
         origin=None, origin_hash=None,

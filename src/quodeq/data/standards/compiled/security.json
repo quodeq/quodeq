@@ -1,6 +1,7 @@
 {
   "id": "security",
   "name": "Security",
+  "description": "How well the system protects information and behaviour so users and processes can only do what they are entitled to. Covers confidentiality, integrity, authentication, accountability, and resistance to misuse across the application surface.",
   "sources": [
     "iso25010",
     "cisq",

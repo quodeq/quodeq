@@ -182,8 +182,8 @@ export default function Sidebar({
             )}
           </div>
           <div className="sidebar-nav sidebar-block sidebar-block--flush">
-            <NavButton id="standards" label="standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={handleNav} count={standardsCount} />
             <NavButton id="settings" label="settings" icon={ICON_SETTINGS} activeTab={activeTab} onNavTab={handleNav} />
+            <NavButton id="standards" label="standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={handleNav} count={standardsCount} />
             <NavButton id="help" label="help" icon={ICON_HELP} activeTab={activeTab} onNavTab={handleNav} />
           </div>
         </div>
