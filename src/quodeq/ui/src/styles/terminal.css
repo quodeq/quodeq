@@ -1635,13 +1635,37 @@
 .sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item.active {
   color: var(--color-accent);
 }
-/* Hide labels and count badges entirely when collapsed — leaving them at
-   opacity 0 still consumed flex width, which pushed the icon off centre and
-   let the count badge overlap glyphs that have content near the right edge
-   (e.g. the violations alert triangle). */
+/* Animate the label / count collapse instead of using display:none. With
+   display:none the labels snapped out instantly, which jolted the icon
+   from "left of label" to "centre of rail" before the rail-width
+   transition had even started — the visible jump the user described.
+   Animating max-width (and the surrounding margin / padding / gap) in
+   sync with the existing opacity fade and the rail-width transition lets
+   the icon's position interpolate smoothly from left to centre as the
+   rail shrinks. */
+.sidebar.sidebar--expanded .sidebar-nav-label {
+  max-width: 200px;
+  transition: opacity 160ms ease, max-width 200ms ease;
+}
+.sidebar.sidebar--expanded .sidebar-nav-count {
+  max-width: 60px;
+  transition: opacity 160ms ease, max-width 200ms ease,
+              padding 200ms ease, margin 200ms ease;
+}
+.sidebar.sidebar--expanded .sidebar-nav-item {
+  transition: gap 200ms ease;
+}
 .sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-label,
 .sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-count {
-  display: none !important;
+  max-width: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  overflow: hidden !important;
+}
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item {
+  gap: 0 !important;
 }
 .sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item::before {
   content: "";
