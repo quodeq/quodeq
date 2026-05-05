@@ -88,6 +88,7 @@ def test_post_projects_online_url_returns_stub_scan(app_client, tmp_path):
     assert "projectId" in body
     assert body["scanData"] == {
         "total_files": 0,
+        "code_files": 0,
         "languages": {},
         "branches": [],
         "modules": [],

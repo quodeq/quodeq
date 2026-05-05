@@ -7,16 +7,29 @@ import { TermHeader } from '../../../components/terminal/index.js';
 
 const TOAST_DISMISS_TIMEOUT_MS = 5000;
 
-function ActiveProviderBadge({ storage = localStorage }) {
+function ActiveProviderBadge({ storage = localStorage, onClick }) {
   const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
   const model = storage.getItem(providerKey(provider, 'model')) || '';
   if (!provider) return null;
-  return (
-    <div className="eval-provider-badge">
+  const content = (
+    <>
       <span className="eval-provider-name">{provider}</span>
       {model && <span className="eval-provider-model">{model}</span>}
-    </div>
+    </>
   );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className="eval-provider-badge eval-provider-badge--clickable"
+        onClick={onClick}
+        title="Open provider settings"
+      >
+        {content}
+      </button>
+    );
+  }
+  return <div className="eval-provider-badge">{content}</div>;
 }
 
 function readBudgetSeconds(storage = localStorage) {
@@ -30,7 +43,7 @@ function readBudgetSeconds(storage = localStorage) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function EvaluateHeader({ job }) {
+function EvaluateHeader({ job, onGoToSettings }) {
   // Page title stays steady ("evaluate"); the live "in progress / failed /
   // done" state is carried by the JobHeader card title below to avoid
   // doubling the same status on screen.
@@ -47,7 +60,7 @@ function EvaluateHeader({ job }) {
       </div>
       <div className="evaluate-header__right">
         <CountdownTimer deadlineAt={deadlineAt} budgetSeconds={budgetSeconds} phase={phase} />
-        <ActiveProviderBadge />
+        <ActiveProviderBadge onClick={onGoToSettings} />
       </div>
     </header>
   );
@@ -100,7 +113,7 @@ function NoProjectSelected({ onGoToProjects }) {
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
   const { selectedProject, projectInfo } = context;
-  const { onStart: onStartEvaluation, onDismiss, onCancel, onGoToProjects } = actions;
+  const { onStart: onStartEvaluation, onDismiss, onCancel, onGoToProjects, onGoToSettings } = actions;
   const [toastKey, setToastKey] = useState(0);
   const [toastVisible, setToastVisible] = useState(false);
 
@@ -116,7 +129,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
 
   return (
     <section className="evaluate-screen">
-      <EvaluateHeader job={job} />
+      <EvaluateHeader job={job} onGoToSettings={onGoToSettings} />
 
       <div className="evaluate-content">
         {!job && selectedProject && (

@@ -53,15 +53,10 @@ describe('StatusPill', () => {
   });
 });
 
-describe('ExternalRunBadge', () => {
-  it('renders "External" when job.source is "external"', () => {
-    renderWithClient(<EvaluationStatus job={{ ...baseJob, source: 'external' }} />);
-    expect(screen.getByText('External')).toBeInTheDocument();
-  });
-
-  it('renders nothing for source="internal"', () => {
-    renderWithClient(<EvaluationStatus job={{ ...baseJob, source: 'internal' }} />);
-    expect(screen.queryByText('External')).toBeNull();
-    expect(screen.queryByText('Running outside the dashboard')).toBeNull();
+describe('JobIdLine', () => {
+  it('renders the job ID with a copy button', () => {
+    renderWithClient(<EvaluationStatus job={{ ...baseJob, jobId: 'job-123' }} />);
+    expect(screen.getByText('job-123')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /copy job id/i })).toBeInTheDocument();
   });
 });

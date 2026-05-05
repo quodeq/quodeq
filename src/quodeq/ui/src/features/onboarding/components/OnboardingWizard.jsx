@@ -116,53 +116,55 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
 
   return (
     <div className="onboarding-wizard" role="dialog" aria-modal="true" aria-label="onboarding">
-      <button type="button" className="onboarding-wizard__close" aria-label="Close onboarding" onClick={handleClose}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
+      <div className="onboarding-wizard__panel-frame">
+        <button type="button" className="onboarding-wizard__close" aria-label="Close onboarding" onClick={handleClose}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
 
-      {wizard.state.step === 'welcome' && (
-        <WelcomeStep onStart={() => wizard.goToStep('repo-scan')} onSkip={handleSkipWelcome} />
-      )}
+        {wizard.state.step === 'welcome' && (
+          <WelcomeStep onStart={() => wizard.goToStep('repo-scan')} onSkip={handleSkipWelcome} />
+        )}
 
-      {wizard.state.step === 'repo-scan' && (
-        <RepoScanStep
-          state={wizard.state}
-          actions={wizard}
-          createProject={registerProject}
-          getProjectInfo={getProjectInfo}
-          onContinue={nextStep}
-          onCancel={handleSavedExit}
-          stepIndex={currentIndex}
-          stepTotal={visible.length}
-        />
-      )}
+        {wizard.state.step === 'repo-scan' && (
+          <RepoScanStep
+            state={wizard.state}
+            actions={wizard}
+            createProject={registerProject}
+            getProjectInfo={getProjectInfo}
+            onContinue={nextStep}
+            onCancel={handleSavedExit}
+            stepIndex={currentIndex}
+            stepTotal={visible.length}
+          />
+        )}
 
-      {wizard.state.step === 'provider' && (
-        <ProviderStep
-          state={wizard.state}
-          actions={wizard}
-          onContinue={nextStep}
-          onBack={prevStep}
-          stepIndex={currentIndex}
-          stepTotal={visible.length}
-        />
-      )}
+        {wizard.state.step === 'provider' && (
+          <ProviderStep
+            state={wizard.state}
+            actions={wizard}
+            onContinue={nextStep}
+            onBack={prevStep}
+            stepIndex={currentIndex}
+            stepTotal={visible.length}
+          />
+        )}
 
-      {wizard.state.step === 'standard-launch' && (
-        <StandardLaunchStep
-          state={wizard.state}
-          actions={wizard}
-          standards={standards}
-          onLaunch={handleLaunch}
-          onCancel={handleSavedExit}
-          onBack={prevStep}
-          stepIndex={currentIndex}
-          stepTotal={visible.length}
-        />
-      )}
+        {wizard.state.step === 'standard-launch' && (
+          <StandardLaunchStep
+            state={wizard.state}
+            actions={wizard}
+            standards={standards}
+            onLaunch={handleLaunch}
+            onCancel={handleSavedExit}
+            onBack={prevStep}
+            stepIndex={currentIndex}
+            stepTotal={visible.length}
+          />
+        )}
+      </div>
     </div>
   );
 }
