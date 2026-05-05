@@ -1,6 +1,7 @@
 {
   "id": "maintainability",
   "name": "Maintainability",
+  "description": "How effectively the codebase can be modified by people who did not write it. Modularity, reusability, analysability, modifiability, and testability keep changes safe, fast, and predictable as the system grows.",
   "sources": [
     "iso25010",
     "cisq"

@@ -1,6 +1,7 @@
 {
   "id": "performance",
   "name": "Performance Efficiency",
+  "description": "How efficiently the system uses time, memory, and capacity for the work it does. Time behaviour, resource utilisation, and capacity headroom keep response times steady under expected and peak load.",
   "sources": [
     "iso25010",
     "cisq"

@@ -57,6 +57,57 @@
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
+.term-header__help {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.term-header__help-btn {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--color-text-muted);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--term-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0;
+  cursor: help;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.term-header__help-btn:hover,
+.term-header__help-btn:focus-visible {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  outline: none;
+}
+.term-header__help-tip {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: 360px;
+  padding: var(--term-space-2) var(--term-space-3);
+  background: var(--color-surface);
+  border: var(--term-border);
+  border-radius: var(--term-radius);
+  color: var(--color-text);
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: normal;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.term-header__help:hover .term-header__help-tip,
+.term-header__help-btn:focus-visible + .term-header__help-tip {
+  display: block;
+}
 
 /* ------------------------------------------------------------
    StatStrip: horizontal label/value cells

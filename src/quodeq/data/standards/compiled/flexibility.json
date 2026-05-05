@@ -1,6 +1,7 @@
 {
   "id": "flexibility",
   "name": "Flexibility",
+  "description": "How well the product adapts to new environments, scale, and integrations without rework. Adaptability, scalability, installability, and replaceability keep deployment and runtime contexts open as requirements evolve.",
   "sources": [
     "iso25010"
   ],

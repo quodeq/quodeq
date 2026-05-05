@@ -5,6 +5,7 @@ import { buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.j
 import { buildDimensionReport } from '../../../utils/reportBuilder.js';
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { useExplorerData, buildEvalPrincipalFn } from './explorerDataHooks.js';
+import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
 import {
   TermHeader,
   Stat,
@@ -66,6 +67,7 @@ export default function ExplorerPage({
   trend = [],
 }) {
   const d = useExplorerData(project, dimension, runId, refreshSignal);
+  const { standardDescription } = useStandardDescriptions(dimension);
 
   const buildEvalPrincipal = useMemo(
     () => d.evalData ? buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple, project, runId) : () => ({}),
@@ -123,7 +125,7 @@ export default function ExplorerPage({
 
   return (
     <>
-      <TermHeader name={`${dim}.overview`} sub={dateLabel || runId || null} />
+      <TermHeader name={dim} description={standardDescription} sub={dateLabel || runId || null} />
 
       <div className="qd-top-grid">
         <div className="qd-top-left">

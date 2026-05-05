@@ -1,6 +1,7 @@
 {
   "id": "usability",
   "name": "Usability",
+  "description": "How easy the product is to learn, operate, and recover from mistakes with. Appropriateness recognisability, learnability, operability, user error protection, and accessibility shape the everyday experience for real users.",
   "sources": [
     "iso25010",
     "wcag22"

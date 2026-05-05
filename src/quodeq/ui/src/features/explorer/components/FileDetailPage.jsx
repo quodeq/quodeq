@@ -81,7 +81,7 @@ function FileHeader({ file, totalViolations, totalCompliance, dimensionsCount })
   return (
     <section className="principle-detail-header principle-detail-header--terminal">
       <div className="principle-detail-header__top">
-        <TermHeader name={`${file.file}.detail`} />
+        <TermHeader name={file.file} />
       </div>
       <StatStrip cards>
         <Stat
