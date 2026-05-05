@@ -9,6 +9,7 @@
   "principles": [
     {
       "name": "Time Behaviour",
+      "description": "How fast the system responds and completes its work. The hot path avoids redundant work, batches I/O, and picks appropriate algorithms and data structures for the scale of input.",
       "source": "iso25010",
       "requirements": [
         {
@@ -198,6 +199,7 @@
     },
     {
       "name": "Resource Utilisation",
+      "description": "How carefully the system uses CPU, memory, network, and disk. Resources are bounded, released promptly, and never leaked or held longer than necessary.",
       "source": "iso25010",
       "requirements": [
         {
@@ -396,6 +398,7 @@
     },
     {
       "name": "Capacity",
+      "description": "How much load the system can handle before it degrades. Limits are explicit, work scales horizontally where possible, and back pressure protects the system from being swamped.",
       "source": "iso25010",
       "requirements": [
         {
