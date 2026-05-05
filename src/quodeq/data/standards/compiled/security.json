@@ -10,6 +10,7 @@
   "principles": [
     {
       "name": "Confidentiality",
+      "description": "Sensitive information is only readable by people and processes entitled to see it. Secrets stay out of source, logs, and error messages, and storage uses encryption appropriate for the data.",
       "source": "iso25010",
       "requirements": [
         {
@@ -868,6 +869,7 @@
     },
     {
       "name": "Integrity",
+      "description": "Data and behaviour are not altered in unauthorised or undetected ways. Inputs are validated, output encoding prevents injection, and modifications go through the rules the domain expects.",
       "source": "iso25010",
       "requirements": [
         {
@@ -1780,6 +1782,7 @@
     },
     {
       "name": "Non-repudiation",
+      "description": "Actions can be traced back to whoever performed them. Authenticated audit trails make it hard for a user or service to plausibly deny an operation later.",
       "source": "iso25010",
       "requirements": [
         {
@@ -1930,6 +1933,7 @@
     },
     {
       "name": "Accountability",
+      "description": "Every privileged operation is attributed to an identity and recorded in a way investigators can use. Logs, request IDs, and identity propagation across services make the trail navigable.",
       "source": "iso25010",
       "requirements": [
         {
@@ -2239,6 +2243,7 @@
     },
     {
       "name": "Authenticity",
+      "description": "The system can prove a claim of identity before granting access. Strong credentials, session handling, and verified API tokens stop impostors before any other check matters.",
       "source": "iso25010",
       "requirements": [
         {

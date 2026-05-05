@@ -8,6 +8,7 @@
   "principles": [
     {
       "name": "Adaptability",
+      "description": "The product runs in different environments without code changes. Configuration is externalised, platform-specific concerns are isolated, and locale and timezone are not hardcoded.",
       "source": "iso25010",
       "requirements": [
         {
@@ -74,6 +75,7 @@
     },
     {
       "name": "Scalability",
+      "description": "The product can grow to serve more work without a rewrite. Stateless request handling, queue-based dispatch, and replaceable storage keep horizontal scale on the table.",
       "source": "iso25010",
       "requirements": [
         {
@@ -140,6 +142,7 @@
     },
     {
       "name": "Installability",
+      "description": "A new operator can get the product running cleanly. Dependencies are pinned, build and run steps are documented, and system requirements are spelled out rather than assumed.",
       "source": "iso25010",
       "requirements": [
         {
@@ -206,6 +209,7 @@
     },
     {
       "name": "Replaceability",
+      "description": "A module or dependency can be swapped for another with similar contracts. Dependency inversion, versioned interfaces, and minimal lock-in keep substitutions cheap.",
       "source": "iso25010",
       "requirements": [
         {

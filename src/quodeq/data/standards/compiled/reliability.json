@@ -10,6 +10,7 @@
   "principles": [
     {
       "name": "Maturity",
+      "description": "How rarely the system fails under normal use. Higher maturity comes from tests, type checks, and disciplined error handling on every path so defects do not reach production.",
       "source": "iso25010",
       "requirements": [
         {
@@ -250,6 +251,7 @@
     },
     {
       "name": "Availability",
+      "description": "How often the system is operational and reachable when users need it. Availability suffers when single points of failure, slow startups, or unbounded resources take the system offline.",
       "source": "iso25010",
       "requirements": [
         {
@@ -355,6 +357,7 @@
     },
     {
       "name": "Fault Tolerance",
+      "description": "How well the system keeps working when something goes wrong. Errors are isolated, retries and timeouts are explicit, and a misbehaving dependency does not bring everything down.",
       "source": "iso25010",
       "requirements": [
         {
@@ -808,6 +811,7 @@
     },
     {
       "name": "Recoverability",
+      "description": "How quickly the system returns to a known good state after a failure. Backups, replayable state, idempotent operations, and predictable shutdown make recovery routine rather than heroic.",
       "source": "iso25010",
       "requirements": [
         {
