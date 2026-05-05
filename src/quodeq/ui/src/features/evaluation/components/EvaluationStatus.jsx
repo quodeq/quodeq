@@ -3,6 +3,8 @@ import ScanProgress from './ScanProgress.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
+import { TermHeader } from '../../../components/terminal/index.js';
+import JobStatStrip from './JobStatStrip.jsx';
 
 const STATUS = { RUNNING: 'running', DONE: 'done', FAILED: 'failed', LOST: 'lost' };
 
@@ -19,41 +21,31 @@ function statusTitle(status) {
   return 'Evaluation Cancelled';
 }
 
+function termNameForStatus(status) {
+  if (status === STATUS.RUNNING) return 'evaluation_in_progress';
+  if (status === STATUS.DONE)    return 'evaluation_complete';
+  if (status === STATUS.FAILED)  return 'evaluation_failed';
+  if (status === STATUS.LOST)    return 'evaluation_lost';
+  return 'evaluation_cancelled';
+}
+
 function ExternalRunBadge() {
   return (
-    <div className="job-meta-item">
-      <span className="job-meta-label">Source</span>
-      <span className="job-meta-value">External</span>
+    <div className="term-meta-grid__item">
+      <span className="term-meta-grid__label">Source</span>
+      <span className="term-meta-grid__value">External</span>
     </div>
   );
 }
 
-function StatusChip({ status, exitReason }) {
+function StatusPill({ status, exitReason }) {
   const isStale = status === 'cancelled' && typeof exitReason === 'string' && exitReason.startsWith('stale_');
   const text = isStale ? 'cancelled (stale)' : status;
-  const className = `job-status-badge ${status}${isStale ? ' job-status-badge--stale' : ''}`;
+  const className = `term-status-pill term-status-pill--${status}${isStale ? ' term-status-pill--stale' : ''}`;
   return (
     <span className={className} title={exitReason ?? ''}>
       {text}
     </span>
-  );
-}
-
-function JobHeader({ job, onDismiss, onCancel }) {
-  const isRunning = job.status === STATUS.RUNNING;
-  const isDone = job.status === STATUS.DONE;
-  return (
-    <div className="job-header">
-      <div className="job-header-left">
-        <h3>{statusTitle(job.status)}</h3>
-      </div>
-      <div className="job-header-right">
-        {isRunning && <button type="button" className="job-cancel-inline" onClick={onCancel}>Cancel</button>}
-        {!isRunning && isDone && <button type="button" className="job-header-view-btn" onClick={() => onDismiss('view')}>View Results</button>}
-        {!isRunning && <button type="button" className="job-header-dismiss-btn" onClick={() => onDismiss('close')}>Close</button>}
-        <StatusChip status={job.status} exitReason={job.exitReason} />
-      </div>
-    </div>
   );
 }
 
@@ -62,9 +54,33 @@ function JobProviderBadge() {
   const model = localStorage.getItem(providerKey(provider, 'model')) || '';
   if (!provider) return null;
   return (
-    <div className="job-meta-item">
-      <span className="job-meta-label">AI Provider</span>
-      <span className="job-meta-value">{provider}{model ? ` / ${model}` : ''}</span>
+    <div className="term-meta-grid__item">
+      <span className="term-meta-grid__label">AI Provider</span>
+      <span className="term-meta-grid__value">{provider}{model ? ` / ${model}` : ''}</span>
+    </div>
+  );
+}
+
+function JobHeader({ job, onDismiss, onCancel }) {
+  const isRunning = job.status === STATUS.RUNNING;
+  const isDone = job.status === STATUS.DONE;
+  return (
+    <div className="evaluate-panel__top evaluate-panel__top--row">
+      <TermHeader name={termNameForStatus(job.status)} />
+      <div className="evaluate-panel__top-actions">
+        {isRunning && (
+          <button type="button" className="term-btn term-btn--ghost" onClick={onCancel}>cancel</button>
+        )}
+        {!isRunning && isDone && (
+          <button type="button" className="term-btn term-btn--primary" onClick={() => onDismiss('view')}>
+            <span aria-hidden="true">▸</span> view results
+          </button>
+        )}
+        {!isRunning && (
+          <button type="button" className="term-btn term-btn--secondary" onClick={() => onDismiss('close')}>close</button>
+        )}
+        <StatusPill status={job.status} exitReason={job.exitReason} />
+      </div>
     </div>
   );
 }
@@ -72,25 +88,25 @@ function JobProviderBadge() {
 function JobMeta({ job, projectName }) {
   const isExternal = job.source === 'external';
   return (
-    <div className="job-meta">
+    <div className="term-meta-grid">
       {projectName && (
-        <div className="job-meta-item">
-          <span className="job-meta-label">Project</span>
-          <span className="job-meta-value">{projectName}</span>
+        <div className="term-meta-grid__item">
+          <span className="term-meta-grid__label">Project</span>
+          <span className="term-meta-grid__value">{projectName}</span>
         </div>
       )}
       {isExternal ? <ExternalRunBadge /> : <JobProviderBadge />}
-      <div className="job-meta-item job-meta-item--id">
-        <span className="job-meta-label">Job ID</span>
-        <div className="job-meta-id-row">
-          <code className="job-meta-code job-meta-code--muted">{job.jobId}</code>
+      <div className="term-meta-grid__item">
+        <span className="term-meta-grid__label">Job ID</span>
+        <div className="term-meta-grid__value">
+          <code>{job.jobId}</code>
           <CopyButton aria-label="Copy job ID" onClick={() => copyToClipboard(job.jobId)} />
         </div>
       </div>
       {job.repo && (
-        <div className="job-meta-item job-meta-item--full">
-          <span className="job-meta-label">Repository</span>
-          <code className="job-meta-code">{job.repo}</code>
+        <div className="term-meta-grid__item term-meta-grid__item--full">
+          <span className="term-meta-grid__label">Repository</span>
+          <code className="term-meta-grid__value">{job.repo}</code>
         </div>
       )}
     </div>
@@ -101,8 +117,9 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
   if (!job) return null;
 
   return (
-    <div className="panel evaluate-job-panel">
+    <div className="panel evaluate-panel--terminal">
       <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
+      <JobStatStrip job={job} liveViolations={liveViolations} />
       <JobMeta job={job} projectName={deriveProjectName(job.repo)} />
       <ScanProgress job={job} hasEvaluations={hasEvaluations} />
       <LiveViolationsFeed liveViolations={liveViolations} />
