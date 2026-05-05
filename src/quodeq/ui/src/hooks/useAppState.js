@@ -53,8 +53,8 @@ function computeDerivedState(accumulated, dashboard, selectedProject, projects) 
   return { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId };
 }
 
-function useProjects({ onNoProjects }) {
-  const projectState = useProjectState({ onNoProjects });
+function useProjects() {
+  const projectState = useProjectState();
   const projectActions = useProjectActions({
     projects: projectState.projects,
     selectedProject: projectState.selectedProject,
@@ -67,7 +67,7 @@ function useProjects({ onNoProjects }) {
 function useAppNavigation() {
   const [serverConnected, setServerConnected, serverVersion] = useServerHealth();
   const { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab } = useNavStack();
-  const projectBundle = useProjects({ onNoProjects: () => navTab('evaluate') });
+  const projectBundle = useProjects();
   const { selectedRun, setSelectedRun, handleRunChange } = projectBundle;
   const [historySelectedRun, setHistorySelectedRun] = useState('latest');
   function handleNavigate(page, params = {}) {

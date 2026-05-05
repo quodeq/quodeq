@@ -15,11 +15,11 @@
  *   - startMutation: api.startEvaluation -> seeds status cache on success.
  *   - cancelMutation: api.cancelEvaluation -> invalidates the run subtree.
  *
- * Out of scope (vs. legacy hook):
- *   - Auto-resume of CLI-started external runs via listEvaluations on mount.
- *     Restore in a follow-up if required by user reports.
+ * On mount, listEvaluations({states:['running']}) is called once to detect
+ * an in-flight run started outside this session (CLI, another window) so
+ * the dashboard can resume tracking it and route the user to the evaluate tab.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { confirmDialog } from "../../../utils/confirmDialog.js";
@@ -76,6 +76,21 @@ export function useEvaluation() {
   // SSE side-effect — writes status/dimensions/findings into cache.
   // No-op when VITE_USE_SSE_EVENTS is off; refetchInterval below covers.
   useRunEventStream(jobId);
+
+  // Resume tracking an in-flight run from a prior session (CLI-started or
+  // another dashboard window). Seeds the status cache so the running-job
+  // navigation in useEvaluationLifecycle fires without an extra round-trip.
+  useEffect(() => {
+    let cancelled = false;
+    api.listEvaluations({ states: ["running"] }).then((jobs) => {
+      if (cancelled || !jobs.length) return;
+      const first = jobs[0];
+      if (!first?.jobId) return;
+      queryClient.setQueryData(evaluationKeys.status(first.jobId), first);
+      setJobId(first.jobId);
+    }).catch((err) => console.warn("Failed to check for active evaluations:", err));
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Status (the "job" object) ---------------------------------------
   const statusQuery = useQuery({

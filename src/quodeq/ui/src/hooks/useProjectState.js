@@ -14,11 +14,8 @@ function readStoredProject(storage = localStorage) {
 }
 
 /** Resolve which project to select from a loaded list, migrating stale storage if needed. */
-function resolveInitialProject(list, currentProject, onChangeProject, onNoProjects, storage) {
-  if (list.length === 0) {
-    if (onNoProjects) onNoProjects();
-    return;
-  }
+function resolveInitialProject(list, currentProject, onChangeProject, storage) {
+  if (list.length === 0) return;
   const current = currentProject || readStoredProject(storage);
   const match = current && list.find((p) => (p.id || p.name) === current);
   if (!match) {
@@ -30,14 +27,11 @@ function resolveInitialProject(list, currentProject, onChangeProject, onNoProjec
 /**
  * Manages the selected project, run, and project list state.
  *
- * @param {Object} params
- * @param {Function} [params.onNoProjects] - Callback invoked when the loaded project list is empty
- *   (e.g. to redirect to the evaluate tab).
  * @returns {{ projects: Array, setProjects: Function, selectedProject: string, selectedRun: string,
  *   setSelectedRun: Function, loadProjects: Function, handleProjectChange: Function,
  *   handleRunChange: Function, selectProjectAndRun: Function }}
  */
-export function useProjectState({ onNoProjects, storage = localStorage }) {
+export function useProjectState({ storage = localStorage } = {}) {
   const { listProjects } = useApi();
   const [projects, setProjects] = useState([]);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
@@ -56,7 +50,7 @@ export function useProjectState({ onNoProjects, storage = localStorage }) {
   }, []);
 
   useEffect(() => {
-    loadProjects().then((list) => resolveInitialProject(list, selectedProject, handleProjectChange, onNoProjects, storage));
+    loadProjects().then((list) => resolveInitialProject(list, selectedProject, handleProjectChange, storage));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleProjectChange(name) {
