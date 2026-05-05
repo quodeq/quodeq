@@ -1623,10 +1623,53 @@
   background: var(--color-accent-soft);
   color: var(--color-accent);
 }
+
+/* Collapsed rail (no hover, not pinned): the row-wide background reads as a
+   square because the rail is narrow and the radius is small. Replace it with
+   a circular pill centred on the icon so the highlight wraps the glyph. */
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item {
+  position: relative;
+  justify-content: center !important;
+  background: transparent !important;
+}
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item.active {
+  color: var(--color-accent);
+}
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  transition: background 120ms ease;
+  z-index: 0;
+}
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item:hover::before {
+  background: var(--color-surface-alt);
+}
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item.active::before {
+  background: var(--color-accent-soft);
+}
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item > * {
+  position: relative;
+  z-index: 1;
+}
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item svg {
+  position: relative;
+  z-index: 1;
+}
 .sidebar.sidebar--expanded .sidebar-nav-label {
-  display: inline !important;
+  display: inline-block !important;
   flex: 1 1 auto;
+  min-width: 0;
   opacity: 1 !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sidebar.sidebar--expanded .sidebar-nav-count {
   font-size: 10px;
