@@ -10,6 +10,7 @@ from quodeq.data.fs.report_parser import parse_eval_from_json, parse_eval_markdo
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
 from quodeq.shared.utils import _env_int, read_text
 from quodeq.services.violation_context import ViolationContext  # noqa: F401 — re-export
+from quodeq.services.deleted import deleted_keys as _deleted_keys
 from quodeq.services.dismissed import dismissed_keys as _dismissed_keys
 from quodeq.services.violations_parsing import (
     parse_violations_from_evidence,
@@ -57,37 +58,50 @@ def _dismissed_key_for_violation(v: dict) -> tuple:
     return (req, raw_file, 0)
 
 
+def _deleted_key_for_violation(v: dict, dimension: str) -> tuple:
+    """Build a (dimension, principle, file) suppression key from a violation dict."""
+    raw_file = v.get("file", "")
+    if v.get("line") is None and ":" in raw_file:
+        raw_file = raw_file.rsplit(":", 1)[0]
+    return (dimension or "", v.get("principle", "") or "", raw_file)
+
+
 def _filter_dismissed_from_result(
     result: "ViolationResponse | dict[str, Any] | None",
     dkeys: "set[tuple]",
+    delkeys: "set[tuple] | None" = None,
+    dimension: str = "",
 ) -> "ViolationResponse | dict[str, Any] | None":
-    """Remove dismissed violations from any result format."""
-    if not result or not dkeys:
+    """Remove dismissed and permanently-deleted violations from any result format."""
+    if not result or (not dkeys and not delkeys):
         return result
     if isinstance(result, dict):
         if "violations" in result:
             result["violations"] = [
                 v for v in result["violations"]
                 if _dismissed_key_for_violation(v) not in dkeys
+                and (not delkeys or _deleted_key_for_violation(v, dimension) not in delkeys)
             ]
         for p in result.get("principles", []):
             if "violations" in p:
                 p["violations"] = [
                     v for v in p["violations"]
                     if _dismissed_key_for_violation(v) not in dkeys
+                    and (not delkeys or _deleted_key_for_violation(v, dimension) not in delkeys)
                 ]
     return result
 
 
 def _try_evidence_formats(
     base: Path, dimension: str, ctx: ViolationContext,
-    _exists, _stat, compiled_dir, dkeys: set[tuple],
+    _exists, _stat, compiled_dir, dkeys: set[tuple], delkeys: set[tuple],
 ) -> ViolationResponse | dict[str, Any] | None:
     """Try evidence file formats (JSON, JSONL, stream) as fallbacks."""
     evidence_path = base / "evidence" / f"{dimension}_evidence.json"
     if _exists(evidence_path):
         return _filter_dismissed_from_result(
             parse_violations_from_evidence(evidence_path, ctx), dkeys,
+            delkeys, dimension,
         )
 
     jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
@@ -95,7 +109,7 @@ def _try_evidence_formats(
     if _exists(jsonl_path) and _stat(jsonl_path).st_size > 0:
         return parse_violations_from_jsonl(
             jsonl_path, stream_path, ctx, compiled_dir=compiled_dir,
-            dismissed_keys=dkeys,
+            dismissed_keys=dkeys, deleted_keys=delkeys,
         )
 
     if _exists(stream_path):
@@ -118,11 +132,13 @@ def resolve_dimension_eval(
     _stat = opts.stat_fn
     compiled_dir = opts.compiled_dir
     dkeys = _dismissed_keys(base.parent)
+    delkeys = _deleted_keys(base.parent)
 
     eval_path = base / "evaluation" / f"{dimension}.json"
     if _exists(eval_path):
         return _filter_dismissed_from_result(
-            parse_eval_from_json(eval_path, project, run_id, dimension), dkeys,
+            parse_eval_from_json(eval_path, project, run_id, dimension),
+            dkeys, delkeys, dimension,
         )
 
     markdown_path = base / "evaluation" / f"{dimension}_eval.md"
@@ -132,11 +148,12 @@ def resolve_dimension_eval(
         except OSError:
             return None
         return _filter_dismissed_from_result(
-            parse_eval_markdown(content, project, run_id, dimension), dkeys,
+            parse_eval_markdown(content, project, run_id, dimension),
+            dkeys, delkeys, dimension,
         )
 
     ctx = ViolationContext(project=project, run_id=run_id, dimension=dimension)
-    return _try_evidence_formats(base, dimension, ctx, _exists, _stat, compiled_dir, dkeys)
+    return _try_evidence_formats(base, dimension, ctx, _exists, _stat, compiled_dir, dkeys, delkeys)
 
 
 def aggregate_violations(dashboard: dict[str, Any]) -> ViolationSummary:

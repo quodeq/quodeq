@@ -70,3 +70,30 @@ export async function getRescore(projectId, run = 'latest') {
   if (run && run !== 'latest') params.set('run', run);
   return request(`/rescore?${params}`);
 }
+
+/**
+ * Permanently delete a finding (suppress by dimension+principle+file forever).
+ * @param {string} projectId - Project identifier
+ * @param {object} finding - { dimension, principle, file }
+ * @returns {Promise<{ok: boolean, swept: number}>} Server response
+ */
+export async function deleteFinding(projectId, finding) {
+  return request('/findings/delete', {
+    method: 'POST',
+    body: JSON.stringify({ project: projectId, ...finding }),
+  });
+}
+
+/**
+ * Permanently delete all currently-dismissed findings for a project.
+ * Each unique (dimension, principle, file) becomes a permanent suppression
+ * and the dismissed list is cleared.
+ * @param {string} projectId - Project identifier
+ * @returns {Promise<{ok: boolean, deleted: number}>} Server response
+ */
+export async function deleteAllFindings(projectId) {
+  return request('/findings/delete-all', {
+    method: 'POST',
+    body: JSON.stringify({ project: projectId }),
+  });
+}

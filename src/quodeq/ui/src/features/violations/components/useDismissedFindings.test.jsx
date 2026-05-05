@@ -7,6 +7,8 @@ vi.mock('../../../api/index.js', () => ({
   listDismissedFindings: vi.fn(),
   restoreFinding: vi.fn(),
   restoreAllFindings: vi.fn(),
+  deleteFinding: vi.fn(),
+  deleteAllFindings: vi.fn(),
 }));
 
 vi.mock('../../../utils/confirmDialog.js', () => ({
@@ -17,12 +19,20 @@ import {
   listDismissedFindings,
   restoreFinding,
   restoreAllFindings,
+  deleteFinding,
+  deleteAllFindings,
 } from '../../../api/index.js';
 
 import { confirmDialog } from '../../../utils/confirmDialog.js';
 
-const sampleA = { req: 'A1', file: 'a.py', line: 10, severity: 'minor' };
-const sampleB = { req: 'B1', file: 'b.py', line: 20, severity: 'major' };
+const sampleA = {
+  req: 'A1', file: 'a.py', line: 10, severity: 'minor',
+  dimension: 'security', principle: 'Path Validation',
+};
+const sampleB = {
+  req: 'B1', file: 'b.py', line: 20, severity: 'major',
+  dimension: 'reliability', principle: 'Fault Tolerance',
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -77,9 +87,9 @@ describe('useDismissedFindings — restore handlers', () => {
 });
 
 describe('useDismissedFindings — handleDelete', () => {
-  it('removes the matching entry on success and calls onRefresh (mirrors restore on disk, distinct error message)', async () => {
+  it('permanently deletes by (dimension, principle, file) and removes the entry locally', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
-    restoreFinding.mockResolvedValueOnce({ ok: true });
+    deleteFinding.mockResolvedValueOnce({ ok: true, swept: 1 });
     const onRefresh = vi.fn();
     const setRestoreError = vi.fn();
     const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
@@ -87,15 +97,32 @@ describe('useDismissedFindings — handleDelete', () => {
 
     await act(async () => { await result.current.handleDelete(sampleA); });
 
-    expect(restoreFinding).toHaveBeenCalledWith('proj', { req: 'A1', file: 'a.py', line: 10 });
+    expect(deleteFinding).toHaveBeenCalledWith('proj', {
+      dimension: 'security',
+      principle: 'Path Validation',
+      file: 'a.py',
+    });
+    expect(restoreFinding).not.toHaveBeenCalled();
     expect(result.current.dismissed).toEqual([sampleB]);
     expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(setRestoreError).not.toHaveBeenCalled();
   });
 
+  it('sweeps every dismissed entry sharing the same (dimension, principle, file)', async () => {
+    const dupA = { ...sampleA, line: 99 };
+    listDismissedFindings.mockResolvedValueOnce([sampleA, dupA, sampleB]);
+    deleteFinding.mockResolvedValueOnce({ ok: true, swept: 2 });
+    const { result } = renderHook(() => useDismissedFindings('proj', vi.fn(), vi.fn()));
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(3));
+
+    await act(async () => { await result.current.handleDelete(sampleA); });
+
+    expect(result.current.dismissed).toEqual([sampleB]);
+  });
+
   it('reports a delete-specific error and leaves state unchanged on failure', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA]);
-    restoreFinding.mockRejectedValueOnce(new Error('boom'));
+    deleteFinding.mockRejectedValueOnce(new Error('boom'));
     const onRefresh = vi.fn();
     const setRestoreError = vi.fn();
     const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
@@ -110,10 +137,10 @@ describe('useDismissedFindings — handleDelete', () => {
 });
 
 describe('useDismissedFindings — handleDeleteAll', () => {
-  it('opens the confirmation dialog and clears state when the user confirms', async () => {
+  it('opens the confirmation dialog and permanently deletes all on confirm', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     confirmDialog.mockResolvedValueOnce(true);
-    restoreAllFindings.mockResolvedValueOnce({ ok: true, restored: 2 });
+    deleteAllFindings.mockResolvedValueOnce({ ok: true, deleted: 2 });
     const onRefresh = vi.fn();
     const setRestoreError = vi.fn();
     const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
@@ -127,7 +154,8 @@ describe('useDismissedFindings — handleDeleteAll', () => {
       confirmLabel: 'Delete',
       message: expect.stringContaining('permanently delete those 2 findings'),
     }));
-    expect(restoreAllFindings).toHaveBeenCalledWith('proj');
+    expect(deleteAllFindings).toHaveBeenCalledWith('proj');
+    expect(restoreAllFindings).not.toHaveBeenCalled();
     expect(result.current.dismissed).toEqual([]);
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
@@ -143,15 +171,15 @@ describe('useDismissedFindings — handleDeleteAll', () => {
     await act(async () => { await result.current.handleDeleteAll(); });
 
     expect(confirmDialog).toHaveBeenCalledTimes(1);
-    expect(restoreAllFindings).not.toHaveBeenCalled();
+    expect(deleteAllFindings).not.toHaveBeenCalled();
     expect(result.current.dismissed).toEqual([sampleA, sampleB]);
     expect(onRefresh).not.toHaveBeenCalled();
   });
 
-  it('reports a delete-specific error if restoreAllFindings fails after confirmation', async () => {
+  it('reports a delete-specific error if deleteAllFindings fails after confirmation', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA]);
     confirmDialog.mockResolvedValueOnce(true);
-    restoreAllFindings.mockRejectedValueOnce(new Error('boom'));
+    deleteAllFindings.mockRejectedValueOnce(new Error('boom'));
     const onRefresh = vi.fn();
     const setRestoreError = vi.fn();
     const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
