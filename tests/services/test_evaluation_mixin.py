@@ -132,9 +132,21 @@ class TestBuildEvalEnv:
         env = m._build_eval_env("/repo", opts, env={})
         assert env["QUODEQ_TIME_LIMIT"] == "1200"
 
-    def test_default_time_limit_not_set(self):
+    def test_default_time_limit_is_set(self):
+        # Regression: previously this env var was only injected when the
+        # value differed from the default. Dashboard runs that kept the
+        # default 10-min budget got no env var, so the CLI subprocess
+        # couldn't resolve a time limit, the analyzing_start marker never
+        # fired, and the UI countdown timer froze at the static budget.
         m = self._mixin()
         opts = EvaluationOptions(time_limit=_DEFAULT_TIME_LIMIT)
+        env = m._build_eval_env("/repo", opts, env={})
+        assert env["QUODEQ_TIME_LIMIT"] == str(_DEFAULT_TIME_LIMIT)
+
+    def test_unlimited_time_limit_not_set(self):
+        # 0 means "unlimited" — no deadline should be propagated.
+        m = self._mixin()
+        opts = EvaluationOptions(time_limit=0)
         env = m._build_eval_env("/repo", opts, env={})
         assert "QUODEQ_TIME_LIMIT" not in env
 

@@ -200,7 +200,12 @@ class FsEvaluationMixin:
             built_env["SUBAGENT_MODEL"] = subagent_model
         if not options.verify_findings:
             built_env["QUODEQ_NO_VERIFY"] = "1"
-        if options.time_limit != _DEFAULT_TIME_LIMIT:
+        # Always propagate a positive limit. The CLI subprocess uses this to
+        # set the run-level deadline (lifecycle.set_deadline + analyzing_start
+        # marker) that the dashboard's countdown timer depends on. Skipping
+        # the default value left dashboard runs with no deadline, freezing
+        # the UI timer at the static budget.
+        if options.time_limit and options.time_limit > 0:
             built_env["QUODEQ_TIME_LIMIT"] = str(options.time_limit)
         if options.per_dimension:
             built_env["QUODEQ_NO_CONSOLIDATE"] = "1"
