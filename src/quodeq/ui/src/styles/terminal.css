@@ -1624,54 +1624,70 @@
   color: var(--color-accent);
 }
 
-/* Collapsed rail (no hover, not pinned): the row-wide background reads as a
-   square because the rail is narrow and the radius is small. Replace it with
-   a circular pill centred on the icon so the highlight wraps the glyph. */
-.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item {
+/* Collapsed rail (no hover, not pinned): show only the icon, wrapped
+   in a circular highlight. Labels and count badges are positioned
+   absolutely so they don't participate in flex layout — the icon
+   then stays at its flex-start position throughout the rail-width
+   transition, and the text doesn't slide horizontally as it fades.
+   The rail's overflow:hidden clips the labels in screen space while
+   they fade, but the text itself doesn't move. */
+.sidebar.sidebar--expanded .sidebar-nav-item {
   position: relative;
-  justify-content: center !important;
+}
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item {
   background: transparent !important;
 }
 .sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item.active {
   color: var(--color-accent);
 }
-/* Animate the label / count collapse instead of using display:none. With
-   display:none the labels snapped out instantly, which jolted the icon
-   from "left of label" to "centre of rail" before the rail-width
-   transition had even started — the visible jump the user described.
-   Animating max-width (and the surrounding margin / padding / gap) in
-   sync with the existing opacity fade and the rail-width transition lets
-   the icon's position interpolate smoothly from left to centre as the
-   rail shrinks. */
+
+/* Take labels and count badges out of the row's flex flow. Anchor
+   them by their left edge (a fixed offset from button-left, which is
+   itself fixed in screen coords) so they don't slide with the
+   button-right edge during the collapse animation. */
 .sidebar.sidebar--expanded .sidebar-nav-label {
-  max-width: 200px;
-  transition: opacity 160ms ease, max-width 200ms ease;
+  position: absolute;
+  /* button-padding + icon-width + gap → land just to the right of the icon */
+  left: calc(var(--term-space-2) + 18px + var(--term-space-2));
+  top: 50%;
+  transform: translateY(-50%);
+  /* Cap label width so long names truncate without colliding with the
+     count badge's anchored position; box width stays constant across
+     rail states so the text doesn't visibly shrink as it fades. */
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 0 auto;
 }
 .sidebar.sidebar--expanded .sidebar-nav-count {
-  max-width: 60px;
-  transition: opacity 160ms ease, max-width 200ms ease,
-              padding 200ms ease, margin 200ms ease;
+  position: absolute;
+  /* Anchor to button-left (constant in screen coords) at the position
+     this badge occupies in the 240px expanded rail. A `right` anchor
+     would slide leftward with the button-right edge during the
+     collapse animation — the same horizontal motion the user
+     disliked. */
+  left: 184px;
+  top: 50%;
+  transform: translateY(-50%);
 }
-.sidebar.sidebar--expanded .sidebar-nav-item {
-  transition: gap 200ms ease;
+
+/* The .sidebar-nav-label rule further down sets `opacity: 1
+   !important`, which would defeat the fade-out. Override with higher
+   specificity so the existing 160ms opacity transition reaches 0
+   when the rail is collapsed. */
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-label {
+  opacity: 0 !important;
+  pointer-events: none;
 }
-.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-label,
-.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-count {
-  max-width: 0 !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-  overflow: hidden !important;
-}
-.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item {
-  gap: 0 !important;
-}
+
+/* Circular highlight, positioned over the icon's flex-start location
+   (button-padding-left + icon-width / 2). */
 .sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item::before {
   content: "";
   position: absolute;
   top: 50%;
-  left: 50%;
+  left: calc(var(--term-space-2) + 9px);
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -1685,10 +1701,6 @@
 }
 .sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item.active::before {
   background: var(--color-accent-soft);
-}
-.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item > * {
-  position: relative;
-  z-index: 1;
 }
 .sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item svg {
   position: relative;
