@@ -854,9 +854,9 @@ button.eval-provider-badge--clickable:focus-visible {
   display: flex;
   flex-direction: row;
   justify-content: flex-end;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
-  margin-bottom: 12px;
+  margin-bottom: 0;
   min-height: 22px;
 }
 
@@ -866,21 +866,25 @@ button.eval-provider-badge--clickable:focus-visible {
 
 .clean-scan-toggle {
   padding: 2px 8px;
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-border);
+  background: transparent;
+  border: 1px dotted var(--color-border);
   color: var(--color-text-muted);
   font-size: 0.7rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, border-style 0.15s;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
 }
 
 .clean-scan-toggle:hover:not(:disabled) {
-  background: var(--color-surface);
-  color: var(--color-text);
+  border-style: solid;
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: transparent;
 }
 
 .clean-scan-toggle:disabled {
@@ -928,18 +932,22 @@ button.eval-provider-badge--clickable:focus-visible {
 
 .scope-compact-btn {
   padding: 2px 8px;
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-border);
+  background: transparent;
+  border: 1px dotted var(--color-border);
   color: var(--color-text-muted);
   font-size: 0.7rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, border-style 0.15s;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
 }
 
 .scope-compact-btn:hover {
-  background: var(--color-accent);
-  color: var(--color-on-accent, #fff);
+  border-style: solid;
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: transparent;
 }
 
 .scope-display {
@@ -1161,6 +1169,102 @@ button.eval-provider-badge--clickable:focus-visible {
   border-color: var(--color-accent);
   color: var(--color-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 28%, transparent);
+}
+
+/* ------------------------------------------------------------
+   DimensionSelector — terminal variant. Matches the
+   evaluate-panel--terminal aesthetic (mono font, minimal
+   chrome, square corners, dotted dividers).
+   ------------------------------------------------------------ */
+.dimension-label-row--terminal label {
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+.dim-action-btn--terminal {
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--term-radius);
+  border: 1px dotted var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+.dim-action-btn--terminal:hover {
+  border-style: solid;
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: transparent;
+}
+.dimension-grid--terminal {
+  background: transparent;
+  border: 0;
+  border-top: 1px dotted var(--color-border);
+  border-bottom: 1px dotted var(--color-border);
+  border-radius: 0;
+  padding: var(--term-space-2) 0;
+  gap: var(--term-space-2);
+}
+.dimension-chip-btn--terminal {
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+  font-weight: var(--weight-regular);
+  padding: 4px 10px;
+  border-radius: var(--term-radius);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  gap: 8px;
+  box-shadow: none;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+.dimension-chip-btn--terminal .dimension-chip-mark {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+.dimension-chip-btn--terminal:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+  background: transparent;
+  box-shadow: none;
+}
+.dimension-chip-btn--terminal.selected {
+  border-color: var(--color-accent);
+  background: transparent;
+  color: var(--color-accent);
+  font-weight: var(--weight-medium);
+  box-shadow: none;
+}
+.dimension-chip-btn--terminal.selected .dimension-chip-mark {
+  color: var(--color-accent);
+}
+.dimension-chip-btn--terminal.selected:hover:not(:disabled) {
+  background: var(--color-accent-soft);
+  box-shadow: none;
+}
+/* High-specificity overrides so the terminal variant beats the colour
+   pills (dimension-chip-type--builtin / --quodeq / --custom / --community)
+   which are defined later in the stylesheet. */
+.dimension-chip-btn--terminal .dimension-chip-type,
+.dimension-chip-btn--terminal .dimension-chip-type--builtin,
+.dimension-chip-btn--terminal .dimension-chip-type--quodeq,
+.dimension-chip-btn--terminal .dimension-chip-type--custom,
+.dimension-chip-btn--terminal .dimension-chip-type--community {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-family: var(--term-font-mono);
+  font-size: 10px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: var(--weight-regular);
 }
 
 /* Improve submit button */
@@ -2797,7 +2901,20 @@ button.eval-provider-badge--clickable:focus-visible {
   font-family: var(--term-font-mono);
   display: flex;
   align-items: baseline;
-  gap: var(--term-space-2);
+  gap: var(--term-space-1);
+}
+.re-eval-repo-path__sep {
+  color: var(--color-text-muted);
+  margin-left: var(--term-space-1);
+}
+.re-eval-repo-path__branch {
+  color: var(--color-text-muted);
+}
+.re-eval-repo-path--terminal code {
+  /* Override the legacy `.re-eval-repo-path code { flex: 1 }` — in the
+     terminal variant we want path and @branch to sit shoulder to shoulder
+     instead of pushing the branch to the far right of the row. */
+  flex: none;
 }
 .re-eval-repo-path--terminal .re-eval-repo-path__arrow {
   color: var(--color-accent);

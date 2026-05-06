@@ -178,6 +178,7 @@ function DimensionSelectionSection({ allDimensions, selectedDims, cloning, toggl
   if (allDimensions.length === 0) return null;
   return (
     <DimensionSelector
+      variant="terminal"
       allDimensions={allDimensions}
       selectedDims={selectedDims}
       onToggle={cloning ? undefined : toggleDim}
@@ -213,7 +214,7 @@ function ActionButtons({ disabled, canStart, handleScan }) {
     <div style={buttonRowStyle}>
       <button
         type="button"
-        className="term-btn term-btn--primary"
+        className="term-btn term-btn--primary term-btn--filled"
         style={flexButtonStyle}
         disabled={!canStart}
         onClick={handleScan}
@@ -243,7 +244,6 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
           {scope.isLocal && (
             <BranchScopeSelector
               branches={scope.scanData?.branches}
-              currentBranch={scope.scanData?.currentBranch || scope.branch}
               projectPath={info.path}
               onScopeChange={scope.setScopePath}
               scopePath={scope.scopePath}
@@ -258,6 +258,12 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
           <span className="re-eval-repo-path__arrow" aria-hidden="true">▸</span>
           <span className="re-eval-repo-path__label">{info.location === 'online' ? 'remote' : 'local'}</span>
           <code>{info.path}</code>
+          {scope.isLocal && (scope.scanData?.currentBranch || scope.branch) && (
+            <>
+              <span className="re-eval-repo-path__sep" aria-hidden="true">@</span>
+              <code className="re-eval-repo-path__branch">{scope.scanData?.currentBranch || scope.branch}</code>
+            </>
+          )}
         </div>
 
         {info.pathMissing && (
