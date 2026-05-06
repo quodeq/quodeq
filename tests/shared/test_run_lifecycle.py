@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import signal
+import sys
 import threading
 from pathlib import Path
 from unittest.mock import patch
@@ -9,6 +10,15 @@ import pytest
 
 from quodeq.shared.run_status import RunState, read_status
 from quodeq.shared.run_lifecycle import RunLifecycleContext
+
+# os.kill(pid, SIGTERM) on Windows calls TerminateProcess directly — it does
+# not invoke Python signal handlers, so any test that signals its own process
+# kills the pytest runner outright. The signal-handler logic is POSIX-only
+# behaviour anyway; on Windows the runner relies on console events / atexit.
+_POSIX_SIGNALS = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="POSIX-only: os.kill(pid, SIGTERM) terminates the process on Windows without invoking Python handlers",
+)
 
 
 def _ctx(tmp_path: Path) -> RunLifecycleContext:
@@ -48,6 +58,7 @@ def test_systemexit_treated_as_cancelled(tmp_path: Path) -> None:
     assert status["state"] == "cancelled"
 
 
+@_POSIX_SIGNALS
 def test_signal_handler_writes_cancelled(tmp_path: Path) -> None:
     """Sending SIGTERM while in context writes cancelled with signal exit_reason."""
     import os, time
@@ -60,6 +71,7 @@ def test_signal_handler_writes_cancelled(tmp_path: Path) -> None:
     assert status["exit_reason"] == "signal_SIGTERM"
 
 
+@_POSIX_SIGNALS
 def test_signal_handler_sets_process_cancel_event(tmp_path: Path) -> None:
     """SIGTERM must set the shared cancel event so worker threads can unblock."""
     import os

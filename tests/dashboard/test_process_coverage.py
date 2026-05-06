@@ -9,7 +9,11 @@ import pytest
 
 
 class TestTerminatePid:
-    @patch("sys.platform", "darwin")
+    # _terminate_pid reads quodeq.dashboard._process.IS_WIN32, which is
+    # captured at import time from sys.platform — patching sys.platform
+    # after import does not flip it. Patch the module attribute directly
+    # so this test can run (and validate POSIX behaviour) on Windows CI too.
+    @patch("quodeq.dashboard._process.IS_WIN32", False)
     @patch("os.kill")
     def test_unix(self, mock_kill):
         from quodeq.dashboard._process import _terminate_pid
