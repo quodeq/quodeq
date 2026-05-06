@@ -37,8 +37,10 @@ def test_legacy_incremental_true_maps_to_clean_scan_false():
     with patch.object(_helpers_mod._logger, "warning") as mock_warn:
         opts = _build_evaluation_options({"incremental": True})
     assert opts.clean_scan is False
-    assert mock_warn.called
-    assert "deprecated" in mock_warn.call_args[0][0].lower()
+    assert mock_warn.called, "Expected a deprecation warning for legacy `incremental` field"
+    warn_msg = mock_warn.call_args[0][0]
+    assert "deprecated" in warn_msg.lower()
+    assert "incremental" in warn_msg.lower()
 
 
 def test_conflicting_fields_rejected():

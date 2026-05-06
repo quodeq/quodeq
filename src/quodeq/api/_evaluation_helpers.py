@@ -54,7 +54,9 @@ def _resolve_clean_scan(payload: dict) -> bool:
     if has_new and has_legacy:
         raise ValueError(
             "`cleanScan` and `incremental` cannot be combined in a single payload. "
-            "Use `cleanScan` only -- `incremental` is deprecated."
+            "Use `cleanScan` only -- `incremental` is deprecated. "
+            "Send `cleanScan: false` (use cached findings, default) or `cleanScan: true` "
+            "(force full re-analysis)."
         )
     if has_legacy:
         _logger.warning(
