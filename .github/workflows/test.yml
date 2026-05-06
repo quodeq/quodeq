@@ -8,10 +8,21 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    # Windows is non-blocking for now — first time the suite runs there,
+    # expect platform-specific failures. Drop continue-on-error once the
+    # job is consistently green.
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         python-version: ["3.13"]
+        experimental: [false]
+        include:
+          - os: windows-latest
+            python-version: "3.13"
+            experimental: true
 
     steps:
       - uses: actions/checkout@v6

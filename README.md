@@ -61,11 +61,14 @@ Each finding includes a reason, the offending code, and a fix plan. Results are 
 | OS | Command |
 |---|---|
 | **macOS** | `brew install python node pipx` |
+| **Windows** | `winget install Python.Python.3.13 OpenJS.NodeJS` then `python -m pip install --user pipx && python -m pipx ensurepath` |
 | **Debian / Ubuntu** | `sudo apt install -y python3.12 python3-pip pipx nodejs npm` |
 | **Fedora / RHEL** | `sudo dnf install -y python3.12 python3-pip pipx nodejs npm` |
 | **Arch** | `sudo pacman -S python python-pipx nodejs npm` |
 
 > **Debian/Ubuntu heads-up:** `nodejs` and `npm` are separate packages. `apt install nodejs` alone is not enough. If you also use the native desktop window (not `--browser`), you'll need `sudo apt install -y python3-gi gir1.2-webkit2-4.1` too — otherwise quodeq will auto-fall-back to opening the dashboard in your default browser.
+
+> **Windows heads-up:** if you'd rather not install Python and Node, grab the standalone desktop app (`Quodeq-<version>-Windows.zip`) from the [latest release](https://github.com/quodeq/quodeq/releases/latest) and run `Quodeq.exe`. The CLI / `pipx` route still works if you prefer it.
 
 Minimum versions: Python 3.12+, Node.js 18+, npm 9+.
 

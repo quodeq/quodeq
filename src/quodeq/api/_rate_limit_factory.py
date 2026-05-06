@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
 from pathlib import Path
 
 from quodeq.api._rate_limit_store import InMemoryRateLimitStore, RateLimitStore
@@ -10,7 +11,9 @@ from quodeq.api._rate_limit_store import InMemoryRateLimitStore, RateLimitStore
 _logger = logging.getLogger(__name__)
 
 _KNOWN_BACKENDS = {"memory", "file"}
-_DEFAULT_RATE_LIMIT_FILE = "/tmp/quodeq_rate_limits.json"
+# Use the platform's temp dir (e.g. C:\Users\<user>\AppData\Local\Temp on
+# Windows) instead of a hardcoded /tmp path that doesn't exist there.
+_DEFAULT_RATE_LIMIT_FILE = str(Path(tempfile.gettempdir()) / "quodeq_rate_limits.json")
 
 
 def _validated_rate_limit_path(raw: str) -> str:
@@ -44,9 +47,10 @@ def create_rate_limit_store(env: dict[str, str] | None = None) -> RateLimitStore
     Set ``QUODEQ_RATE_LIMIT_BACKEND`` to choose a backend:
 
     - ``memory`` (default): process-local, no external dependencies.
-    - ``file``: JSON file in ``QUODEQ_RATE_LIMIT_FILE`` (default
-      ``/tmp/quodeq_rate_limits.json``).  Suitable for single-machine
-      multi-worker setups but not recommended for high-throughput.
+    - ``file``: JSON file in ``QUODEQ_RATE_LIMIT_FILE`` (default:
+      ``quodeq_rate_limits.json`` in the platform temp dir).  Suitable for
+      single-machine multi-worker setups but not recommended for
+      high-throughput.
 
     For production multi-worker deployments, pass a ``RateLimitStore``-
     compatible shared backend (e.g. Redis) to

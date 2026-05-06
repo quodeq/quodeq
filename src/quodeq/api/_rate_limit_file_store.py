@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import json
 import logging
+import tempfile
 import threading
 from pathlib import Path
 
 from quodeq.api._rate_limit_config import _rate_limit_max, _rate_limit_window
 
 _logger = logging.getLogger(__name__)
+
+_DEFAULT_PATH = str(Path(tempfile.gettempdir()) / "quodeq_rate_limits.json")
 
 
 class FileRateLimitStore:
@@ -21,7 +24,7 @@ class FileRateLimitStore:
 
     def __init__(
         self,
-        path: str | Path = "/tmp/quodeq_rate_limits.json",
+        path: str | Path = _DEFAULT_PATH,
         window: float | None = None,
         max_requests: int | None = None,
     ) -> None:

@@ -11,7 +11,7 @@ authors = [
 requires-python = ">=3.12"
 keywords = ["code-quality", "ai", "evaluation", "iso-25010", "static-analysis"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
