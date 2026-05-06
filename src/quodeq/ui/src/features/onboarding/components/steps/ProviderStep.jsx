@@ -109,8 +109,8 @@ export default function ProviderStep({ state, actions, onContinue, onBack, stepI
       </div>
 
       <div className="onboarding-step__actions">
-        <button type="button" className="term-btn--primary" disabled={continueDisabled} onClick={handleContinue}>continue</button>
-        <button type="button" className="term-btn--secondary" onClick={onBack}>back</button>
+        <button type="button" className="term-btn term-btn--primary term-btn--filled" disabled={continueDisabled} onClick={handleContinue}>continue</button>
+        <button type="button" className="term-btn term-btn--secondary" onClick={onBack}>back</button>
       </div>
     </div>
   );

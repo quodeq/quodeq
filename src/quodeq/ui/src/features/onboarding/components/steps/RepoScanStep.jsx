@@ -123,10 +123,10 @@ export default function RepoScanStep({ state, actions, createProject, getProject
 
       <div className="onboarding-step__actions">
         {sub === 'idle' && (
-          <button type="button" className="term-btn--primary" onClick={handleSubmit} disabled={!state.repo.value}>scan repository</button>
+          <button type="button" className="term-btn term-btn--primary term-btn--filled" onClick={handleSubmit} disabled={!state.repo.value}>scan repository</button>
         )}
         {sub === 'scanned' && (
-          <button type="button" className="term-btn--primary" onClick={onContinue}>continue</button>
+          <button type="button" className="term-btn term-btn--primary term-btn--filled" onClick={onContinue}>continue</button>
         )}
       </div>
 

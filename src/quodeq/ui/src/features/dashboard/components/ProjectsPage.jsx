@@ -185,7 +185,7 @@ function CardFooter({ name, confirming, setConfirming, onDelete, onExport }) {
   );
 }
 
-function ProjectPathContent({ id, p, relocateActions }) {
+function ProjectPathContent({ id, p, relocateActions, subprojectCount = 0 }) {
   const { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate } = relocateActions;
   const path = formatPath(p.path);
   const pathMissing = p.location === 'local' && p.pathExists === false;
@@ -210,6 +210,11 @@ function ProjectPathContent({ id, p, relocateActions }) {
       )}
       {pathMissing && (
         <button type="button" className="project-path-action project-path-action--warn" onClick={(e) => { e.stopPropagation(); startRelocate(id, p.path); }}>Relocate</button>
+      )}
+      {subprojectCount > 0 && (
+        <span className="project-subprojects-tag">
+          subprojects <span className="project-subprojects-tag-count">{subprojectCount}</span>
+        </span>
       )}
     </div>
   );
@@ -241,8 +246,7 @@ function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelec
   return (
     <div key={id} className={`project-card-group${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}>
       <ProjectCard project={p} isSelected={isSelected} cardProps={{ onSelect, onResumeSetup, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} /> }}>
-        <ProjectPathContent id={id} p={p} relocateActions={relocateActions} />
-        {hasChildren && (() => { const childCount = childProjects[id].length; return <span className="parent-summary">{childCount} sub-project{childCount !== 1 ? 's' : ''}</span>; })()}
+        <ProjectPathContent id={id} p={p} relocateActions={relocateActions} subprojectCount={hasChildren ? childProjects[id].length : 0} />
       </ProjectCard>
       {hasChildren && <ProjectChildren childList={childProjects[id]} selectedProject={selectedProject} onSelect={onSelect} confirmActions={confirmActions} onResumeSetup={onResumeSetup} />}
     </div>
@@ -271,12 +275,12 @@ function EmptyProjectsCTA({ onAddProject, isEvaluating }) {
       </p>
       <button
         type="button"
-        className={`projects-empty__cta-btn${isEvaluating ? ' is-disabled' : ''}`}
+        className={`term-btn term-btn--primary term-btn--filled projects-empty__cta-btn${isEvaluating ? ' is-disabled' : ''}`}
         onClick={onAddProject}
         aria-disabled={isEvaluating || undefined}
         title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
       >
-        + Add project
+        <span aria-hidden="true">▸</span> add project
       </button>
     </div>
   );
@@ -298,13 +302,13 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
         {projects.length > 0 && onAddProject && (
           <button
             type="button"
-            className={`projects-page__add-btn${isEvaluating ? ' is-disabled' : ''}`}
+            className={`term-btn term-btn--primary term-btn--filled projects-page__add-btn${isEvaluating ? ' is-disabled' : ''}`}
             onClick={onAddProject}
             aria-label="Add project"
             aria-disabled={isEvaluating || undefined}
             title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
           >
-            + Add project
+            <span aria-hidden="true">▸</span> add project
           </button>
         )}
       </div>

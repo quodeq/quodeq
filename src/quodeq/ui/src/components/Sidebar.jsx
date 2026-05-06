@@ -135,16 +135,6 @@ export default function Sidebar({
           {version && <span className="sidebar-version">v{version}</span>}
         </div>
 
-      <nav className="sidebar-nav sidebar-block">
-        <NavButton
-          id="projects"
-          label={repoName || 'project'}
-          icon={ICON_FOLDER}
-          activeTab={activeTab}
-          onNavTab={handleNav}
-        />
-      </nav>
-
         {showProjectTabs && (
           <nav className="sidebar-nav sidebar-block">
             <NavButton id="overview"   label="overview"   icon={ICON_OVERVIEW}   activeTab={activeTab} onNavTab={handleNav} />
@@ -156,6 +146,16 @@ export default function Sidebar({
 
         <nav className="sidebar-nav sidebar-block">
           <NavButton id="evaluate" label="evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={handleNav} />
+        </nav>
+
+        <nav className="sidebar-nav sidebar-block">
+          <NavButton
+            id="projects"
+            label={repoName || 'project'}
+            icon={ICON_FOLDER}
+            activeTab={activeTab}
+            onNavTab={handleNav}
+          />
         </nav>
 
         <div className="sidebar-spacer" />
