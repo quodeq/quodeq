@@ -35,6 +35,7 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
     setTesting(true);
     try {
       const result = await testProviderConnection({
+        provider: providerId,
         apiBase: providerConfig?.api_base || '',
         model: state.model,
         apiKey: '',
@@ -65,6 +66,10 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
             placeholder="Type model id"
             onChange={(e) => update('model', e.target.value)}
             aria-label="Model identifier"
+            autoCapitalize="off"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
           />
           <button type="button" className="settings-action-btn" onClick={runTest} disabled={testing || !state.model}>
             {testing ? 'Testing...' : 'Test'}
