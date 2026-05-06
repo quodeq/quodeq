@@ -1,4 +1,5 @@
 import { TermHeader, StatStrip, Stat } from '../../../../components/terminal/index.js';
+import HelpHint from '../../../../components/HelpHint.jsx';
 
 function formatTimeLimit(seconds) {
   if (!seconds || seconds <= 0) return 'No limit';
@@ -41,9 +42,16 @@ export default function StandardLaunchStep({ state, actions, standards, onLaunch
                 onChange={() => actions.toggleStandard(s.id)}
                 aria-label={s.name}
               />
-              <div>
+              <div className="onboarding-standard-card__body">
                 <strong>{s.name}</strong>
-                <p>{s.description}</p>
+                {s.description && (
+                  <span
+                    className="onboarding-standard-card__hint"
+                    onClick={(e) => e.preventDefault()}
+                  >
+                    <HelpHint label={`${s.name} description`}>{s.description}</HelpHint>
+                  </span>
+                )}
               </div>
             </label>
           </li>

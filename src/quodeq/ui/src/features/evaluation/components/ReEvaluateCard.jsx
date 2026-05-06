@@ -8,6 +8,14 @@ import CleanScanToggle from './CleanScanToggle.jsx';
 import DimensionSelector from './DimensionSelector.jsx';
 import FolderBrowser from './FolderBrowser.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
+import HelpHint from '../../../components/HelpHint.jsx';
+
+const EVAL_OPTIONS_HINT = (
+  <>
+    <div><strong>Scope</strong> — restrict the evaluation to a subfolder. Default is the whole project.</div>
+    <div><strong>Clean scan</strong> — when off, only changed files since the last run are re-analyzed (incremental). Turn it on to re-evaluate everything from scratch.</div>
+  </>
+);
 
 const NO_STANDARDS_MESSAGE = 'Select at least one standard before evaluating.';
 
@@ -245,6 +253,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
         <CloneSection info={info} cloning={cloning} cloneDest={cloneDest} cloneError={cloneError} setCloneBrowserOpen={setCloneBrowserOpen} />
 
         <div className="re-eval-toggle-row">
+          <HelpHint label="Evaluation options help">{EVAL_OPTIONS_HINT}</HelpHint>
           {scope.isLocal && (
             <BranchScopeSelector
               branches={scope.scanData?.branches}

@@ -147,7 +147,6 @@ export default function ProviderTabs({ providerConfigs }) {
                 onClick={() => selectTab(c.id)}
               >
                 {c.label}
-                {!installed && <span className="settings-pill-badge"> Not installed</span>}
               </button>
             );
           })}

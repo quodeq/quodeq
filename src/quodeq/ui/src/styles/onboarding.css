@@ -273,10 +273,15 @@
   margin-top: 2px;
   flex-shrink: 0;
 }
-.onboarding-standard-card p {
-  margin: 4px 0 0;
-  font-size: 11px;
-  color: var(--color-text-muted);
+.onboarding-standard-card__body {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.onboarding-standard-card__hint {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* ──────────────────────────────────────────────────────────────

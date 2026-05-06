@@ -76,15 +76,16 @@ function buildTrendData(trend, selectedRunId) {
 }
 
 
-function RunHistoryTooltip({ active, hoveredIndex, data }) {
-  if (!active || hoveredIndex === null) return null;
-  const entry = data[hoveredIndex];
+function RunHistoryTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const entry = payload[0]?.payload;
   if (!entry) return null;
+  const score = Number.isFinite(entry.numericAverage) ? entry.numericAverage.toFixed(1) : '—';
+  const grade = gradeLetter(entry.overallGrade);
   return (
     <div className="run-history-tooltip">
       <span className="rht-date">{entry.dateLabel}</span>
-      <span className="rht-score">{entry.numericAverage.toFixed(1)} / 10</span>
-      <span className="rht-grade">{gradeLetter(entry.overallGrade)}</span>
+      <span className="rht-score">{score} - {grade}</span>
     </div>
   );
 }
@@ -94,7 +95,11 @@ function SelectedDot({ cx, cy, payload, selectedRunId }) {
   return <circle cx={cx} cy={cy} r={4} fill={cssVar('--color-chart-line')} stroke="white" strokeWidth={1.5} />;
 }
 
-function ScoreBars({ data, hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }) {
+function ScoreBars({ data, hoveredIndex, selectedRunId, onBarClick }) {
+  // Bar's onClick covers taps that land on the visible 28-px bar — those
+  // never bubble to the chart container because Recharts stops
+  // propagation internally. Chart-level onClick (set on ComposedChart)
+  // covers taps in the gap or above the bar.
   return (
     <Bar
       dataKey="numericAverage"
@@ -102,9 +107,7 @@ function ScoreBars({ data, hoveredIndex, setHoveredIndex, selectedRunId, onBarCl
       maxBarSize={28}
       isAnimationActive={false}
       cursor={onBarClick ? 'pointer' : 'default'}
-      onMouseEnter={(_, index) => setHoveredIndex(index)}
-      onMouseLeave={() => setHoveredIndex(null)}
-      onClick={(entry) => onBarClick?.(entry.runId)}
+      onClick={(entry) => { if (entry?.runId) onBarClick?.(entry.runId); }}
     >
       {data.map((entry, i) => (
         <Cell
@@ -121,9 +124,31 @@ function ScoreBars({ data, hoveredIndex, setHoveredIndex, selectedRunId, onBarCl
 
 function ScoreHistoryChart({ data, interaction }) {
   const { hoveredIndex, setHoveredIndex, selectedRunId, onBarClick } = interaction;
+  // Hit-detection lives on the chart, not on the Bar: the <Area> gradient
+  // and <Line> stroke layer on top of the bars and swallow click events
+  // before they reach the Bar's onClick. The chart's onMouseMove and
+  // onClick are dispatched on the container itself, so they fire wherever
+  // you tap inside the chart and Recharts already computes the nearest
+  // category as `activeTooltipIndex`.
+  const handleMove = (state) => {
+    setHoveredIndex(state?.activeTooltipIndex ?? null);
+  };
+  const handleClick = (state) => {
+    const idx = state?.activeTooltipIndex;
+    if (idx == null) return;
+    const runId = data[idx]?.runId;
+    if (runId) onBarClick?.(runId);
+  };
   return (
     <ResponsiveContainer width="100%" height="100%" minHeight={CHART_HEIGHT}>
-      <ComposedChart data={data} margin={CHART_MARGIN}>
+      <ComposedChart
+        data={data}
+        margin={CHART_MARGIN}
+        onMouseMove={handleMove}
+        onMouseLeave={() => setHoveredIndex(null)}
+        onClick={onBarClick ? handleClick : undefined}
+        style={onBarClick ? { cursor: 'pointer' } : undefined}
+      >
         <defs>
           <linearGradient id="scoreAreaGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={cssVar('--color-accent')} stopOpacity={0.08} />
@@ -135,7 +160,7 @@ function ScoreHistoryChart({ data, interaction }) {
             on top. Labels live in the banner (MIN / MAX / AVG). */}
         <XAxis dataKey="dateLabel" hide />
         <YAxis domain={[0, 10]} hide />
-        <Tooltip cursor={false} isAnimationActive={false} offset={20} content={({ active }) => <RunHistoryTooltip active={active} hoveredIndex={hoveredIndex} data={data} />} />
+        <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<RunHistoryTooltip />} />
         {/* Soft horizontal reference lines at 25% / 50% / 75% of the range —
             kept as subtle grid anchors even though the numeric ticks are
             hidden. */}
@@ -143,7 +168,7 @@ function ScoreHistoryChart({ data, interaction }) {
         <ReferenceLine y={REF_LINE_MID}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.45} />
         <ReferenceLine y={REF_LINE_HIGH} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.45} />
         <Area dataKey="numericAverage" type="monotone" fill="url(#scoreAreaGrad)" stroke="none" isAnimationActive={false} />
-        <ScoreBars data={data} hoveredIndex={hoveredIndex} setHoveredIndex={setHoveredIndex} selectedRunId={selectedRunId} onBarClick={onBarClick} />
+        <ScoreBars data={data} hoveredIndex={hoveredIndex} selectedRunId={selectedRunId} onBarClick={onBarClick} />
         <Line isAnimationActive={false} dataKey="numericAverage" type="monotone" stroke={cssVar('--color-accent')} strokeOpacity={0.9} strokeWidth={2} dot={<SelectedDot selectedRunId={selectedRunId} />} activeDot={false} />
       </ComposedChart>
     </ResponsiveContainer>

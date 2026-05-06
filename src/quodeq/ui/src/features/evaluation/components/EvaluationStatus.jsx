@@ -1,7 +1,6 @@
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
 import ScanProgress from './ScanProgress.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
-import HelpHint from '../../../components/HelpHint.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { TermHeader } from '../../../components/terminal/index.js';
 import JobStatStrip from './JobStatStrip.jsx';
@@ -16,27 +15,6 @@ function termNameForStatus(status) {
   return 'evaluation_cancelled';
 }
 
-function StatusPill({ status, exitReason }) {
-  const isStale = status === 'cancelled' && typeof exitReason === 'string' && exitReason.startsWith('stale_');
-  const text = isStale ? 'cancelled (stale)' : status;
-  const className = `term-status-pill term-status-pill--${status}${isStale ? ' term-status-pill--stale' : ''}`;
-  return (
-    <span className={className} title={exitReason ?? ''}>
-      {text}
-    </span>
-  );
-}
-
-function ActionsHelp() {
-  return (
-    <HelpHint label="Job actions help">
-      <div><strong>Cancel</strong> — stop the running evaluation.</div>
-      <div><strong>View Results</strong> — open the completed run's full report.</div>
-      <div><strong>Close</strong> — dismiss this panel without affecting the run.</div>
-    </HelpHint>
-  );
-}
-
 function JobHeader({ job, onDismiss, onCancel }) {
   const isRunning = job.status === STATUS.RUNNING;
   const isDone = job.status === STATUS.DONE;
@@ -44,7 +22,6 @@ function JobHeader({ job, onDismiss, onCancel }) {
     <div className="evaluate-panel__top evaluate-panel__top--row">
       <TermHeader name={termNameForStatus(job.status)} />
       <div className="evaluate-panel__top-actions">
-        <ActionsHelp />
         {isRunning && (
           <button type="button" className="term-btn term-btn--ghost" onClick={onCancel}>cancel</button>
         )}
@@ -56,7 +33,6 @@ function JobHeader({ job, onDismiss, onCancel }) {
         {!isRunning && (
           <button type="button" className="term-btn term-btn--secondary" onClick={() => onDismiss('close')}>close</button>
         )}
-        {!isRunning && <StatusPill status={job.status} exitReason={job.exitReason} />}
       </div>
     </div>
   );

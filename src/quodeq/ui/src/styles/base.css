@@ -1541,14 +1541,6 @@ textarea:focus {
   border-color: var(--color-accent);
 }
 
-.settings-pill-badge {
-  margin-left: 6px;
-  font-size: 0.85em;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  opacity: 0.8;
-}
-
 .settings-install-hint {
   padding: 12px 16px;
   margin: 0 var(--space-6, 24px) var(--space-4, 16px);

@@ -2147,6 +2147,17 @@
   user-select: none;
 }
 
+/* Recharts attaches click handlers to bar/line/area elements that call
+ * stopPropagation, so clicks landing on a bar never reach the chart's
+ * onClick handler. Make every inner SVG element transparent to pointer
+ * events; the surface itself still receives the events and bubbles
+ * them up to the ComposedChart wrapper, which converts them into
+ * "active bar" clicks via activeTooltipIndex. Hover/tooltip continue
+ * to work because Recharts uses onMouseMove on the wrapper too. */
+.run-history-panel .recharts-surface * {
+  pointer-events: none;
+}
+
 .run-history-panel {
   display: flex;
   flex-direction: column;
@@ -2210,7 +2221,6 @@
 
 .rht-date  { color: var(--color-text-muted); }
 .rht-score { font-weight: 600; color: var(--color-text); }
-.rht-grade { color: var(--color-text-muted); font-size: 0.75rem; }
 
 /* ── History panels row (Score History + Dimension Scores side-by-side) ── */
 
