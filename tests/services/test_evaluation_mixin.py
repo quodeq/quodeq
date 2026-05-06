@@ -76,10 +76,19 @@ class TestBuildEvaluateCmd:
         cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path))
         assert "--n-subagents" not in cmd
 
-    def test_incremental_flag(self, tmp_path: Path):
-        opts = EvaluationOptions(incremental=True)
-        cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path))
-        assert "--incremental" in cmd
+    def test_subprocess_cmd_emits_clean_scan_flag(self, tmp_path: Path):
+        """When clean_scan is True, the spawned CLI gets --clean-scan."""
+        opts = EvaluationOptions(clean_scan=True, dimensions="security")
+        cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path / "reports"))
+        assert "--clean-scan" in cmd
+        assert "--incremental" not in cmd
+
+    def test_subprocess_cmd_omits_clean_scan_by_default(self, tmp_path: Path):
+        """When clean_scan is False (default), --clean-scan is not emitted."""
+        opts = EvaluationOptions(dimensions="security")
+        cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path / "reports"))
+        assert "--clean-scan" not in cmd
+        assert "--incremental" not in cmd
 
 
 # ---------------------------------------------------------------------------
