@@ -1,37 +1,60 @@
 import { describe, it, expect } from 'vitest';
+import { buildScanPayload } from './ReEvaluateCard.jsx';
 
-describe('ReEvaluateCard payload field semantics', () => {
-  // Unit test for the payload building logic in useDimensionSelection hook.
-  // The hook's buildPayload() function was updated to use cleanScan instead of incremental.
-  // This test verifies the field name change and boolean inversion logic.
+const baseState = {
+  info: { path: '/repos/myproject' },
+  branch: null,
+  scopePath: null,
+  selectedDims: new Set(['security', 'maintainability']),
+  cleanScan: 'off',
+};
 
-  it('payload should use cleanScan field with correct boolean when toggle is "off" (default)', () => {
-    // When Clean scan toggle is OFF (default state), we want incremental analysis (use cache)
-    // Old field: payload.incremental = true
-    // New field: payload.cleanScan = false
-    const cleanScanToggleState = 'off';
-    const shouldForcecleanScan = cleanScanToggleState !== 'off';
-
-    expect(shouldForcecleanScan).toBe(false);
+describe('buildScanPayload', () => {
+  it('sets cleanScan: false and omits incremental when toggle is "off" (default)', () => {
+    const payload = buildScanPayload({ ...baseState, cleanScan: 'off' });
+    expect(payload.cleanScan).toBe(false);
+    expect(payload).not.toHaveProperty('incremental');
   });
 
-  it('payload should use cleanScan field with correct boolean when toggle is "once"', () => {
-    // When Clean scan toggle is ONCE, we want full analysis (force clean)
-    // Old field: payload.incremental = false
-    // New field: payload.cleanScan = true
-    const cleanScanToggleState = 'once';
-    const shouldForcecleanScan = cleanScanToggleState !== 'off';
-
-    expect(shouldForcecleanScan).toBe(true);
+  it('sets cleanScan: true when toggle is "once"', () => {
+    const payload = buildScanPayload({ ...baseState, cleanScan: 'once' });
+    expect(payload.cleanScan).toBe(true);
+    expect(payload).not.toHaveProperty('incremental');
   });
 
-  it('payload should use cleanScan field with correct boolean when toggle is "permanent"', () => {
-    // When Clean scan toggle is PERMANENT, we want full analysis (force clean)
-    // Old field: payload.incremental = false
-    // New field: payload.cleanScan = true
-    const cleanScanToggleState = 'permanent';
-    const shouldForcecleanScan = cleanScanToggleState !== 'off';
+  it('sets cleanScan: true when toggle is "permanent"', () => {
+    const payload = buildScanPayload({ ...baseState, cleanScan: 'permanent' });
+    expect(payload.cleanScan).toBe(true);
+    expect(payload).not.toHaveProperty('incremental');
+  });
 
-    expect(shouldForcecleanScan).toBe(true);
+  it('includes repo path from info', () => {
+    const payload = buildScanPayload({ ...baseState });
+    expect(payload.repo).toBe('/repos/myproject');
+  });
+
+  it('includes selected dimensions as an array', () => {
+    const payload = buildScanPayload({ ...baseState });
+    expect(payload.dimensions).toEqual(['security', 'maintainability']);
+  });
+
+  it('includes branch when provided', () => {
+    const payload = buildScanPayload({ ...baseState, branch: 'feat/my-branch' });
+    expect(payload.branch).toBe('feat/my-branch');
+  });
+
+  it('omits branch when null', () => {
+    const payload = buildScanPayload({ ...baseState, branch: null });
+    expect(payload).not.toHaveProperty('branch');
+  });
+
+  it('includes scopePath when provided', () => {
+    const payload = buildScanPayload({ ...baseState, scopePath: 'src/api' });
+    expect(payload.scopePath).toBe('src/api');
+  });
+
+  it('omits scopePath when null', () => {
+    const payload = buildScanPayload({ ...baseState, scopePath: null });
+    expect(payload).not.toHaveProperty('scopePath');
   });
 });

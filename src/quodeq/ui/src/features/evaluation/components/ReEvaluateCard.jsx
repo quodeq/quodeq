@@ -19,6 +19,15 @@ const EVAL_OPTIONS_HINT = (
 
 const NO_STANDARDS_MESSAGE = 'Select at least one standard before evaluating.';
 
+export function buildScanPayload({ info, branch, scopePath, selectedDims, cleanScan }) {
+  const payload = { repo: info.path };
+  payload.dimensions = [...selectedDims];
+  if (branch) payload.branch = branch;
+  if (scopePath) payload.scopePath = scopePath;
+  payload.cleanScan = cleanScan !== 'off';
+  return payload;
+}
+
 
 const BUTTON_ROW_GAP = '8px';
 const REPO_URL_PLACEHOLDER = 'https://github.com/org/repo';
@@ -79,20 +88,12 @@ function useDimensionSelection(allDimensions, info, branch, scopePath, onStart, 
   };
   const selectAll = () => setSelectedDims(new Set(allDimensions.map((d) => d.id)));
   const clearAll = () => setSelectedDims(new Set());
-  const buildPayload = () => {
-    const payload = { repo: info.path };
-    payload.dimensions = [...selectedDims];
-    if (branch) payload.branch = branch;
-    if (scopePath) payload.scopePath = scopePath;
-    payload.cleanScan = cleanScan !== 'off';
-    return payload;
-  };
   const handleScan = () => {
     if (allDimensions.length > 0 && selectedDims.size === 0) {
       onValidationFail?.(NO_STANDARDS_MESSAGE);
       return;
     }
-    onStart(buildPayload());
+    onStart(buildScanPayload({ info, branch, scopePath, selectedDims, cleanScan }));
     if (cleanScan === 'once') setCleanScan('off');
   };
 
