@@ -350,7 +350,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
         log_error(
             "Error: --clean-scan and --diff-from are mutually exclusive. "
             "--diff-from already produces evidence-only output for a specific "
-            "ref; clean_scan has no meaning in that mode."
+            "ref; --clean-scan has no meaning in that mode."
         )
         return 1
 

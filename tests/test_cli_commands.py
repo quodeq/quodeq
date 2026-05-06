@@ -325,23 +325,47 @@ def test_no_flag_means_incremental_default(mock_model, mock_paths, tmp_path):
     assert config.options.incremental is True
 
 
-def test_legacy_incremental_flag_warns_but_works(tmp_path, capsys):
-    """--incremental is accepted as a no-op deprecated alias with a warning."""
-    from quodeq._cli_evaluation import run_evaluate
+@patch("quodeq._cli_evaluation.default_paths")
+@patch("quodeq._cli_evaluation.get_ai_model", return_value="claude-3")
+def test_legacy_incremental_flag_warns_but_works(mock_model, mock_paths, tmp_path, capsys):
+    """--incremental is accepted as a no-op deprecated alias: it warns AND yields incremental=True."""
+    from quodeq._cli_evaluation import _build_run_config, ResolvedInputs, run_evaluate
+    from quodeq.cli_parser import build_parser
 
-    # Trigger the warning by calling run_evaluate up to the deprecation check
-    # using a minimal args namespace that has legacy_incremental set
-    warn_args = argparse.Namespace(
-        legacy_incremental=True,
-        clean_scan=False,
-        diff_from=None,
-        dry_run=True,  # skip AI prereqs
+    mock_paths_obj = MagicMock()
+    mock_paths_obj.standards_dir.exists.return_value = False
+    mock_paths_obj.evaluators_dir = tmp_path / "evaluators"
+    mock_paths.return_value = mock_paths_obj
+
+    (tmp_path / "app.py").write_text("")
+    parser = build_parser()
+    args = parser.parse_args([
+        "evaluate", str(tmp_path), "-d", "security", "--incremental",
+    ])
+
+    # Confirm argparse wiring: --incremental maps to legacy_incremental, not clean_scan.
+    assert args.legacy_incremental is True
+    assert args.clean_scan is False
+
+    # "works" half: legacy_incremental is a no-op; incremental stays True (the default).
+    # A future regression that translates legacy_incremental=True to incremental=False
+    # must fail here.
+    inputs = ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data={})
+    config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path)
+    assert config.options.incremental is True, (
+        "--incremental (legacy) must not change incremental=True default; "
+        "a boolean-translation regression would break this."
     )
+
+    # "warns" half: run_evaluate emits the deprecation warning to stderr via the
+    # quodeq logger (propagate=False, StderrHandler), so capsys captures it.
     with patch("quodeq._cli_evaluation._resolve_evaluation_inputs", return_value=None):
         with patch("quodeq._cli_evaluation.check_evaluate_prereqs"):
-            run_evaluate(warn_args)
+            run_evaluate(args)
     captured = capsys.readouterr()
-    assert "deprecated" in (captured.err + captured.out).lower()
+    assert "deprecated" in captured.err.lower(), (
+        "run_evaluate must emit a deprecation warning when --incremental is passed"
+    )
 
 
 def test_diff_from_forces_clean_scan_internally(tmp_path):
