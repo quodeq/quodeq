@@ -508,6 +508,35 @@ def _install_about_panel_override() -> None:
         print(f"[quodeq-about] NSTimer schedule failed: {exc}", file=_diag, flush=True)
 
 
+def _enable_windows_dark_titlebar(window_title: str) -> None:
+    """Tell DWM to render the native Windows titlebar in dark mode.
+
+    Without this, frameless=False shows a light titlebar that clashes with
+    the dark UI. Uses DWMWA_USE_IMMERSIVE_DARK_MODE — attribute id 20 on
+    Windows 10 build 19041+ and Windows 11, falling back to id 19 on older
+    builds. Failures are non-fatal: a light titlebar is ugly but functional.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+        hwnd = ctypes.windll.user32.FindWindowW(None, window_title)
+        if not hwnd:
+            return
+        value = ctypes.c_int(1)
+        size = ctypes.sizeof(value)
+        for attr in (20, 19):
+            res = ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                wintypes.HWND(hwnd), wintypes.DWORD(attr),
+                ctypes.byref(value), wintypes.DWORD(size),
+            )
+            if res == 0:
+                return
+    except (AttributeError, OSError):
+        pass
+
+
 def _set_app_icon() -> None:
     """Set the application icon (dock on macOS, taskbar on Windows)."""
     if sys.platform == "darwin":
@@ -538,11 +567,17 @@ def main() -> None:
     instance = InstanceController(sock_path)
     api = _WindowApi()
 
+    # Windows uses native chrome so users get the conventional top-right
+    # min/max/close, Snap layouts and Alt+Space. macOS and Linux stay
+    # frameless and rely on the Mac-style traffic-light dots injected by
+    # _webview_html.INJECT_JS.
+    #
     # easy_drag intercepts pointer events on any non-interactive element to
     # move the window — that breaks our resize splitter (a <div>, not a
     # <button>). Disable it and let the topbar opt-in via -webkit-app-region.
+    _frameless = sys.platform != "win32"
     window = webview.create_window("quodeq", url, width=_WINDOW_WIDTH, height=_WINDOW_HEIGHT,
-                                    frameless=True, easy_drag=False,
+                                    frameless=_frameless, easy_drag=False,
                                     background_color=_WINDOW_BG_COLOR, hidden=True,
                                     js_api=api)
     api.bind(window, api_pid=api_pid, instance=instance, base_url=url)
@@ -560,6 +595,8 @@ def main() -> None:
         # targets the pre-pywebview NSApp and gets overridden.
         if sys.platform == "darwin":
             _set_macos_app_identity()
+        elif sys.platform == "win32":
+            _enable_windows_dark_titlebar("quodeq")
 
     def _on_closing() -> bool:
         """Intercept native close (Cmd+Q, red button, window manager).
