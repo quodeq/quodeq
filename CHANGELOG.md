@@ -1,15 +1,44 @@
 # Changelog
 
-## [Unreleased]
+## [1.0.9] - 2026-05-06
 
 ### Features
-- **`--clean-scan` CLI flag**: forces a full re-analysis, discarding any previously cached findings for the target repo. Complements the existing incremental default.
-- **Incremental by default**: analysis runs now carry forward findings for unchanged files without any flag. Pass `--clean-scan` (CLI) or `cleanScan: true` (API) to opt out.
+- **Onboarding overhaul**: terminal-styled wizard, empty-state pages for Overview, Map, Violations and History, project-data tabs hidden until the first run finishes, silent resume when adding an existing project, standards picker honors the visible-standards setting.
+- **Confidence scoring for findings**: each finding now carries a confidence value. Three new context layers downweight likely false positives. Path-role classifier deprioritizes non-prod files. Project-shape detector deprioritizes hosted-service findings on services you don't host. A project-local precedent corpus deprioritizes findings already dismissed in past runs.
+- **Permanent finding deletion**: Delete and Delete all in the Dismissed sub-tab, with principle and file suppression.
+- **Total time limit with live countdown**: per-run hard cap shown in the dashboard and the CLI.
+- **Incremental by default**: analysis carries forward findings for unchanged files. Pass `--clean-scan` (CLI) or `cleanScan: true` (API) to force a full reanalysis.
 - **`cleanScan` API field**: new boolean field on the `POST /api/evaluations` payload (default `false`). Replaces the deprecated `incremental` field.
+- **Persistent shallow-clone cache**: online repos are reused across runs instead of re-cloned every time.
+- **Job-running guards**: blocks double-evaluation and add-project flows while another job is running.
+- **Settings tabs rework**: provider tabs gain inline help hints and friendlier copy.
+- **OpenRouter Test button**: now actually works end-to-end, plus settings input polish.
+
+### Improvements
+- **Cross-platform window chrome**: native chrome on Windows, unified macOS traffic-light dots across screens.
+- **Sidebar polish**: cleaner collapse animation (labels fade rather than slide), circular highlight on collapsed icons, ellipsis for long repo names, hidden labels and badges when collapsed, reordered nav.
+- **Re-evaluate UX**: toggles moved top-right, terminal restyle, snackbar feedback for blocked actions, Hide removed, label clarified to Re-evaluate.
+- **Header and detail-page polish**: header tooltips, principle descriptions, standards descriptions, explorer header, dimension and principle and file detail pages share a unified header.
+- **Help, Evaluate, score-history**: refreshed copy, layout polish, score-history click target fixed.
+- **Wizard polish**: scroll behavior, X-icon close, panel-style burger, scoped StatStrip and radio theme.
+- **Project card polish, dark grade contrast, sidebar reorder.**
+
+### Fixes
+- **Phantom running evaluations**: cancel now stale-promotes when SIGTERM has no target, plus a UI escape hatch for stuck rows.
+- **External runs**: `deadline_at` surfaces on snapshot, CLI-started runs auto-resume on the Evaluate tab, eval-log SSE stays alive through the preparing phase.
+- **Overview**: falls back to the latest complete run when an in-progress run has scored zero dimensions.
+- **Default time limit**: propagated into the analysis subprocess.
+- **Snackbar feedback**: no-standards snackbar now also fires from the re-eval card.
+- **Project navigation**: waits for projects to load before bouncing off project-data tabs, empty-state Case A correctly routes to the Projects tab.
+- **Dismissed list**: no longer silently capped at 500 entries.
+- **Desktop close dialog**: ignores stale running jobs with no live project.
+- **API hardening**: input validation, path and signal safety, capped unbounded reads and lists, hardened standard-id path, export filename, tooltip helper.
+- **macOS launcher**: pinned version bumped to 1.0.9 fallback install.
+- **Tests**: stale UI vitest mocks refreshed, legacy `--incremental` + `--diff-from` regression test made CI-safe.
 
 ### Deprecations
-- **`--incremental` CLI flag**: deprecated, no-op alias for the now-default behaviour. Will be removed in the next release. Use `--clean-scan` to force a full re-analysis.
-- **`incremental` API field**: deprecated, inverted alias for `cleanScan`. Will be removed in the next release. Migrate to `cleanScan: false` (use cache, default) or `cleanScan: true` (force re-analysis).
+- **`--incremental` CLI flag**: deprecated, no-op alias for the now-default behavior. Will be removed in the next release. Use `--clean-scan` to force a full reanalysis.
+- **`incremental` API field**: deprecated, inverted alias for `cleanScan`. Migrate to `cleanScan: false` (use cache, default) or `cleanScan: true` (force reanalysis).
 
 ## [1.0.8] - 2026-05-02
 
