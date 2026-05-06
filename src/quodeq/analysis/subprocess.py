@@ -270,7 +270,9 @@ def _gather_api_source_files(
         ]
         _log.debug("Took %d files from queue for API analysis", len(source_files))
         if not source_files:
-            jsonl_file.write_text("")
+            # Don't touch jsonl_file — it's the SHARED `{dim}_evidence.jsonl`
+            # that every agent in the pool appends to via MCP. Truncating it
+            # here wipes findings from every other agent in the pool.
             stream_file.write_text('{"type":"api_runner","status":"complete"}\n')
             return None
         return source_files

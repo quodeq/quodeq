@@ -1,7 +1,13 @@
 """Tests for source file gathering — _gather_source_files and skip dirs from subprocess.py."""
 from __future__ import annotations
 
-from quodeq.analysis.subprocess import _gather_source_files, _SKIP_DIRS
+from quodeq.analysis._config import AnalysisConfig
+from quodeq.analysis.subagents.file_queue import FileQueue
+from quodeq.analysis.subprocess import (
+    _gather_api_source_files,
+    _gather_source_files,
+    _SKIP_DIRS,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -85,6 +91,34 @@ class TestGatherSourceFiles:
 # ---------------------------------------------------------------------------
 # _SKIP_DIRS
 # ---------------------------------------------------------------------------
+
+class TestGatherApiSourceFiles:
+    """When no usable files come back from the queue, the shared per-dimension
+    JSONL must NOT be truncated — other agents in the same pool write to it via
+    MCP and would lose every finding accumulated so far.
+    """
+
+    def test_does_not_truncate_shared_jsonl_when_batch_yields_no_files(self, tmp_path):
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        jsonl_file = evidence_dir / "security_evidence.jsonl"
+        existing = (
+            '{"t":"violation","p":"SEC-001","file":"a.py","line":10}\n'
+            '{"t":"compliance","p":"SEC-002","file":"b.py","line":20}\n'
+        )
+        jsonl_file.write_text(existing)
+
+        queue_path = evidence_dir / "queue.json"
+        FileQueue(queue_path, files=["missing1.py", "missing2.py", "missing3.py"])
+
+        stream_file = evidence_dir / "agent.stream"
+        cfg = AnalysisConfig(queue_path=queue_path, agent_id="agent-1")
+
+        result = _gather_api_source_files(tmp_path, cfg, jsonl_file, stream_file)
+
+        assert result is None
+        assert jsonl_file.read_text() == existing
+
 
 class TestLoadSkipDirs:
     def test_returns_frozenset(self):
