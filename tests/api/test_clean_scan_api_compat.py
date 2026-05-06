@@ -5,6 +5,40 @@ import pytest
 
 from quodeq.api._evaluation_helpers import _build_evaluation_options
 import quodeq.api._evaluation_helpers as _helpers_mod
+from quodeq.api.app import create_app
+from quodeq.services.base import ActionProvider, EvaluationOptions
+
+
+class _StubProvider(ActionProvider):
+    """Minimal provider for route-level tests."""
+
+    def list_projects(self, reports_dir):
+        return {"projects": []}
+
+    def get_project_info(self, reports_dir, project):
+        return {}
+
+    def start_evaluation(self, repo, reports_dir, options):
+        return {"jobId": "test-job", "status": "running", "logs": []}
+
+    def get_evaluation_status(self, job_id, reports_dir=None):
+        return None
+
+    def cancel_evaluation(self, job_id, reports_dir=None, discard_partial=False):
+        return False
+
+    def list_evaluations(self, *, limit=0, reports_dir=None, states=None):
+        return []
+
+    def delete_project(self, reports_dir, project):
+        return False
+
+
+@pytest.fixture()
+def client(monkeypatch):
+    """Flask test client for route-level tests (auth disabled)."""
+    monkeypatch.delenv("QUODEQ_API_KEY", raising=False)
+    return create_app(_StubProvider()).test_client()
 
 
 def test_clean_scan_field_default_false():
@@ -55,3 +89,23 @@ def test_conflicting_fields_rejected_even_when_values_align():
         # incremental=True (use cache) aligns with cleanScan=False (use cache),
         # but having both is still ambiguous payload state.
         _build_evaluation_options({"incremental": True, "cleanScan": False})
+
+
+def test_route_returns_400_with_specific_message_on_field_conflict(client):
+    """Route surfaces the conflict message, not 'Invalid repository'."""
+    # The CSRF check requires an Origin header matching the test server host.
+    response = client.post(
+        "/api/evaluations",
+        json={
+            "repo": "/some/valid/path",
+            "incremental": True,
+            "cleanScan": True,
+        },
+        headers={"Origin": "http://localhost"},
+    )
+    assert response.status_code == 400
+    body = response.get_json() or {}
+    msg = (body.get("error") or body.get("message") or "").lower()
+    assert "cannot be combined" in msg or "cleanscan" in msg, (
+        f"Expected conflict message; got: {body!r}"
+    )

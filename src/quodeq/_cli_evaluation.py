@@ -341,7 +341,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
     # what --incremental used to mean.
     if getattr(args, "legacy_incremental", False):
         log_warning(
-            "--incremental is deprecated and will be removed in a future release. "
+            "--incremental is deprecated and will be removed in the next release. "
             "Incremental scans are now the default; use --clean-scan to force a "
             "full re-analysis."
         )

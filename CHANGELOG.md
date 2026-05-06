@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+- **`--clean-scan` CLI flag**: forces a full re-analysis, discarding any previously cached findings for the target repo. Complements the existing incremental default.
+- **Incremental by default**: analysis runs now carry forward findings for unchanged files without any flag. Pass `--clean-scan` (CLI) or `cleanScan: true` (API) to opt out.
+- **`cleanScan` API field**: new boolean field on the `POST /api/evaluations` payload (default `false`). Replaces the deprecated `incremental` field.
+
+### Deprecations
+- **`--incremental` CLI flag**: deprecated, no-op alias for the now-default behaviour. Will be removed in the next release. Use `--clean-scan` to force a full re-analysis.
+- **`incremental` API field**: deprecated, inverted alias for `cleanScan`. Will be removed in the next release. Migrate to `cleanScan: false` (use cache, default) or `cleanScan: true` (force re-analysis).
+
 ## [1.0.8] - 2026-05-02
 
 ### Features

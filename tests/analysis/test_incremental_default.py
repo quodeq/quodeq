@@ -19,7 +19,7 @@ def test_analysis_options_incremental_defaults_true():
     )
 
 
-def test_single_dim_reuses_bundle_fingerprint(tmp_path, monkeypatch):
+def test_single_dim_reuses_bundle_fingerprint(tmp_path):
     """A single-dim run after a bundle run reuses the bundle's fingerprint.
 
     This is the exact scenario the user reported on 2026-05-06: running

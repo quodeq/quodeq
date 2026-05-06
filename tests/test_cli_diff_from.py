@@ -33,7 +33,7 @@ def test_clean_scan_and_diff_from_mutually_exclusive(capsys) -> None:
     assert "--clean-scan" in err and "--diff-from" in err
 
 
-def test_legacy_incremental_with_diff_from_does_not_error() -> None:
+def test_legacy_incremental_with_diff_from_does_not_error(capsys) -> None:
     """Deprecated --incremental no longer triggers the mutex when paired with --diff-from.
 
     Regression guard: the mutex was rewritten in Task 3 to check --clean-scan,
@@ -46,11 +46,29 @@ def test_legacy_incremental_with_diff_from_does_not_error() -> None:
     args = parser.parse_args([
         "evaluate", ".", "--incremental", "--diff-from", "origin/develop", "--dry-run",
     ])
-    # Should not error due to mutex; exit_code can be 0 or non-zero depending on
-    # other validation, but the error must not be about the mutex.
     exit_code = run_evaluate(args)
-    # The key assertion is: this should not fail with a mutex error.
-    # With --dry-run, we expect exit_code == 0 or exit early due to other checks,
-    # but NOT due to a --incremental + --diff-from mutex (which is now removed).
-    # The deprecation warning may appear in stderr, which is fine.
-    assert exit_code is not None  # Just verify we got a code, no exception thrown
+
+    # --dry-run bypasses prereq checks and returns 0 without launching a pipeline.
+    assert exit_code == 0, (
+        f"Expected exit code 0 with --dry-run; got {exit_code}. "
+        "If this fails, check whether a mutex on legacy --incremental was re-introduced."
+    )
+
+    captured = capsys.readouterr()
+    combined_output = (captured.out + captured.err).lower()
+
+    # The mutex must NOT have fired. "mutually exclusive" appearing in output means
+    # the legacy --incremental is incorrectly blocking --diff-from again.
+    assert "mutually exclusive" not in combined_output, (
+        "Output contains 'mutually exclusive' — the mutex on legacy --incremental "
+        "has been re-introduced. Only --clean-scan should be mutex'd with --diff-from."
+    )
+    assert "--incremental" not in combined_output or "deprecated" in combined_output, (
+        "If --incremental appears in error output it should only be in a deprecation warning, "
+        "not a rejection message."
+    )
+
+    # The deprecation warning must be present so callers know to migrate.
+    assert "deprecated" in combined_output, (
+        "Expected a deprecation warning for --incremental but found none in stderr/stdout."
+    )
