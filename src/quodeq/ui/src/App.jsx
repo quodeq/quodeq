@@ -279,7 +279,7 @@ const ROUTE_RENDERERS = {
     />
   ),
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />,
-  file: (params) => <FileDetailPage file={params.file} />,
+  file: (params) => <FileDetailPage file={params.file} runId={params.runId} dateLabel={params.dateLabel} />,
   evalprinciple: renderEvalPrincipleDetail,
   'eval-principle-detail': renderEvalPrincipleDetail,
   finding: (params, props) => (

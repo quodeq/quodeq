@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import { complianceRatio } from '../../../utils/formatters.js';
 import { buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
@@ -66,12 +66,21 @@ export default function ExplorerPage({
   refreshSignal,
   trend = [],
 }) {
-  const d = useExplorerData(project, dimension, runId, refreshSignal);
+  // Local run/date state lets the score-history bar click swap which run
+  // is shown without pushing a new entry onto the nav stack (avoids the
+  // "security / security / security ..." breadcrumb pile-up). The props
+  // are the source of truth when the user navigates here from elsewhere;
+  // local state takes over once the user starts clicking bars.
+  const [activeRunId, setActiveRunId] = useState(runId);
+  const [activeDateLabel, setActiveDateLabel] = useState(dateLabel);
+  useEffect(() => { setActiveRunId(runId); }, [runId]);
+  useEffect(() => { setActiveDateLabel(dateLabel); }, [dateLabel]);
+  const d = useExplorerData(project, dimension, activeRunId, refreshSignal);
   const { standardDescription } = useStandardDescriptions(dimension);
 
   const buildEvalPrincipal = useMemo(
-    () => d.evalData ? buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple, project, runId) : () => ({}),
-    [d.evalData, d.complianceByPrinciple, project, runId]
+    () => d.evalData ? buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple, project, activeRunId, activeDateLabel) : () => ({}),
+    [d.evalData, d.complianceByPrinciple, project, activeRunId, activeDateLabel]
   );
 
   const reportSpec = useMemo(() => {
@@ -82,18 +91,18 @@ export default function ExplorerPage({
       principleGrades: d.principleGrades || [],
       allViolations: d.allViolations,
       overallGrade: d.overallGrade,
-      dateLabel,
-      runId,
+      dateLabel: activeDateLabel,
+      runId: activeRunId,
     });
     return {
-      id: `report:dimension:${dim}:${runId ?? 'current'}`,
+      id: `report:dimension:${dim}:${activeRunId ?? 'current'}`,
       type: 'report',
       title: `${dim} report`,
       render: () => <ReportContent markdown={buildMarkdown()} />,
       copy: () => buildMarkdown(),
       download: () => ({ filename: `${dim}-report.md`, body: buildMarkdown() }),
     };
-  }, [d.evalData, d.principleGrades, d.allViolations, d.overallGrade, dateLabel, runId]);
+  }, [d.evalData, d.principleGrades, d.allViolations, d.overallGrade, activeDateLabel, activeRunId]);
   useRegisterWindowSpec('report', reportSpec);
 
   const fixPlanSpec = useMemo(() => {
@@ -101,14 +110,14 @@ export default function ExplorerPage({
     const dim = (d.evalData.dimension || 'unknown').toLowerCase();
     const buildMarkdown = () => buildDimensionPlanFromViolations(d.evalData.dimension, d.allViolations);
     return {
-      id: `fixplan:dimension:${dim}:${runId ?? 'current'}`,
+      id: `fixplan:dimension:${dim}:${activeRunId ?? 'current'}`,
       type: 'fixplan',
       title: `${dim} fix plan`,
       render: () => <ReportContent markdown={buildMarkdown()} />,
       copy: () => buildMarkdown(),
       download: () => ({ filename: `${dim}-fix-plan.md`, body: buildMarkdown() }),
     };
-  }, [d.evalData, d.allViolations, runId]);
+  }, [d.evalData, d.allViolations, activeRunId]);
   useRegisterWindowSpec('fixplan', fixPlanSpec);
 
   if (d.loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
@@ -122,10 +131,11 @@ export default function ExplorerPage({
 
   const overallScoreNum = parseFloat(d.overallGrade?.score);
   const sev = d.severityCounts;
+  const isRefreshing = d.isFetching && !!d.evalData;
 
   return (
-    <>
-      <TermHeader name={dim} description={standardDescription} sub={dateLabel || runId || null} />
+    <div className={`explorer-page dashboard-fade${isRefreshing ? ' dashboard-refreshing' : ''}`}>
+      <TermHeader name={dim} description={standardDescription} sub={activeDateLabel || activeRunId || null} />
 
       <div className="qd-top-grid">
         <div className="qd-top-left">
@@ -158,7 +168,15 @@ export default function ExplorerPage({
             />
           </StatGrid2x2>
 
-          <DimensionScoreHistoryPanel trend={trend} dimension={d.evalData.dimension} />
+          <DimensionScoreHistoryPanel
+            trend={trend}
+            dimension={d.evalData.dimension}
+            selectedRunId={activeRunId}
+            onBarClick={(point) => {
+              setActiveRunId(point.runId);
+              setActiveDateLabel(point.dateLabel);
+            }}
+          />
         </div>
 
         <div className="qd-top-right">
@@ -194,9 +212,9 @@ export default function ExplorerPage({
         </div>
         <TopOffendingFilesTable
           files={d.topFiles}
-          onFileClick={(f) => onNavigate?.('file', { file: f })}
+          onFileClick={(f) => onNavigate?.('file', { file: f, runId: activeRunId, dateLabel: activeDateLabel })}
         />
       </section>
-    </>
+    </div>
   );
 }

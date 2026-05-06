@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { gradeLetter, scoreColorClass } from '../../../utils/formatters.js';
+import { gradeLetter } from '../../../utils/formatters.js';
 import { SectionLabel } from '../../../components/terminal/index.js';
 import {
   ComposedChart,
@@ -13,55 +13,19 @@ import {
   Cell,
   ReferenceLine,
 } from 'recharts';
+import {
+  cssVar,
+  scoreBarColor,
+  REF_LINE_LOW,
+  REF_LINE_MID,
+  REF_LINE_HIGH,
+  CHART_MARGIN,
+  SELECTED_BAR_OPACITY,
+  DESELECTED_BAR_OPACITY,
+} from '../../../components/scoreChartHelpers.js';
 
 const MAX_CHART_RUNS = 20;
 const CHART_HEIGHT = 160;
-const REF_LINE_LOW = 2.5;
-const REF_LINE_MID = 5;
-const REF_LINE_HIGH = 7.5;
-/* Margin zeroed so bars span edge-to-edge inside the panel body. */
-const CHART_MARGIN = { top: 8, right: 0, bottom: 0, left: 0 };
-
-// Module-level CSS variable cache. Cleared automatically by MutationObserver
-// when the data-theme attribute changes. Use clearCssVarCache() for test resets.
-const _cssVarCache = new Map();
-const cssVar = (name, fallback) => {
-  if (_cssVarCache.has(name)) return _cssVarCache.get(name);
-  if (typeof document === 'undefined') return fallback;
-  const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const result = val || fallback;
-  _cssVarCache.set(name, result);
-  return result;
-};
-
-/** Clear the CSS variable cache. Called automatically by MutationObserver on theme change; exported for test resets. */
-export function clearCssVarCache() { _cssVarCache.clear(); }
-
-// Auto-clear cache when theme changes (data-theme attribute mutation)
-if (typeof document !== 'undefined') {
-  new MutationObserver(() => _cssVarCache.clear()).observe(
-    document.documentElement,
-    { attributes: true, attributeFilter: ['data-theme'] },
-  );
-}
-
-const GRADE_CSS_VARS = {
-  'grade-top':    '--color-grade-top-text',
-  'grade-high':   '--color-grade-high-text',
-  'grade-mid':    '--color-grade-mid-text',
-  'grade-low':    '--color-grade-low-text',
-  'grade-bottom': '--color-grade-bottom-text',
-  'grade-none':   '--color-text-muted',
-};
-
-// Bar color follows the active theme's grade spectrum — flynn renders cyan→red,
-// daruma renders gold→crimson, neo renders matrix-green→red, etc. Each theme's
-// `--color-grade-*-text` tokens map through `scoreColorClass` into the 5-step
-// spectrum defined in tokens.css.
-function scoreBarColor(score) {
-  const varName = GRADE_CSS_VARS[scoreColorClass(score)] || '--color-accent';
-  return cssVar(varName);
-}
 
 
 function buildTrendData(trend, selectedRunId) {
@@ -76,15 +40,16 @@ function buildTrendData(trend, selectedRunId) {
 }
 
 
-function RunHistoryTooltip({ active, hoveredIndex, data }) {
-  if (!active || hoveredIndex === null) return null;
-  const entry = data[hoveredIndex];
+function RunHistoryTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const entry = payload[0]?.payload;
   if (!entry) return null;
+  const score = Number.isFinite(entry.numericAverage) ? entry.numericAverage.toFixed(1) : '—';
+  const grade = gradeLetter(entry.overallGrade);
   return (
     <div className="run-history-tooltip">
       <span className="rht-date">{entry.dateLabel}</span>
-      <span className="rht-score">{entry.numericAverage.toFixed(1)} / 10</span>
-      <span className="rht-grade">{gradeLetter(entry.overallGrade)}</span>
+      <span className="rht-score">{score} - {grade}</span>
     </div>
   );
 }
@@ -94,23 +59,23 @@ function SelectedDot({ cx, cy, payload, selectedRunId }) {
   return <circle cx={cx} cy={cy} r={4} fill={cssVar('--color-chart-line')} stroke="white" strokeWidth={1.5} />;
 }
 
-function ScoreBars({ data, hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }) {
+function ScoreBars({ data, hoveredIndex, selectedRunId }) {
+  // Click handling lives on the chart container (see ScoreHistoryChart).
+  // The shared `.run-history-panel .recharts-surface *` CSS rule sets
+  // pointer-events:none so the Area gradient cannot swallow clicks before
+  // they reach the chart-level onClick handler.
   return (
     <Bar
       dataKey="numericAverage"
       radius={[0, 0, 0, 0]}
       maxBarSize={28}
       isAnimationActive={false}
-      cursor={onBarClick ? 'pointer' : 'default'}
-      onMouseEnter={(_, index) => setHoveredIndex(index)}
-      onMouseLeave={() => setHoveredIndex(null)}
-      onClick={(entry) => onBarClick?.(entry.runId)}
     >
       {data.map((entry, i) => (
         <Cell
           key={entry.runId ?? i}
           fill={scoreBarColor(entry.numericAverage)}
-          opacity={entry.runId === selectedRunId ? 0.85 : 0.4}
+          opacity={entry.runId === selectedRunId ? SELECTED_BAR_OPACITY : DESELECTED_BAR_OPACITY}
           stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
           strokeWidth={hoveredIndex === i ? 1.5 : 0}
         />
@@ -121,9 +86,31 @@ function ScoreBars({ data, hoveredIndex, setHoveredIndex, selectedRunId, onBarCl
 
 function ScoreHistoryChart({ data, interaction }) {
   const { hoveredIndex, setHoveredIndex, selectedRunId, onBarClick } = interaction;
+  // Hit-detection lives on the chart, not on the Bar: the <Area> gradient
+  // and <Line> stroke layer on top of the bars and swallow click events
+  // before they reach the Bar's onClick. The chart's onMouseMove and
+  // onClick are dispatched on the container itself, so they fire wherever
+  // you tap inside the chart and Recharts already computes the nearest
+  // category as `activeTooltipIndex`.
+  const handleMove = (state) => {
+    setHoveredIndex(state?.activeTooltipIndex ?? null);
+  };
+  const handleClick = (state) => {
+    const idx = state?.activeTooltipIndex;
+    if (idx == null) return;
+    const runId = data[idx]?.runId;
+    if (runId) onBarClick?.(runId);
+  };
   return (
     <ResponsiveContainer width="100%" height="100%" minHeight={CHART_HEIGHT}>
-      <ComposedChart data={data} margin={CHART_MARGIN}>
+      <ComposedChart
+        data={data}
+        margin={CHART_MARGIN}
+        onMouseMove={handleMove}
+        onMouseLeave={() => setHoveredIndex(null)}
+        onClick={onBarClick ? handleClick : undefined}
+        style={onBarClick ? { cursor: 'pointer' } : undefined}
+      >
         <defs>
           <linearGradient id="scoreAreaGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={cssVar('--color-accent')} stopOpacity={0.08} />
@@ -135,7 +122,7 @@ function ScoreHistoryChart({ data, interaction }) {
             on top. Labels live in the banner (MIN / MAX / AVG). */}
         <XAxis dataKey="dateLabel" hide />
         <YAxis domain={[0, 10]} hide />
-        <Tooltip cursor={false} isAnimationActive={false} offset={20} content={({ active }) => <RunHistoryTooltip active={active} hoveredIndex={hoveredIndex} data={data} />} />
+        <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<RunHistoryTooltip />} />
         {/* Soft horizontal reference lines at 25% / 50% / 75% of the range —
             kept as subtle grid anchors even though the numeric ticks are
             hidden. */}
@@ -143,7 +130,7 @@ function ScoreHistoryChart({ data, interaction }) {
         <ReferenceLine y={REF_LINE_MID}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.45} />
         <ReferenceLine y={REF_LINE_HIGH} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.45} />
         <Area dataKey="numericAverage" type="monotone" fill="url(#scoreAreaGrad)" stroke="none" isAnimationActive={false} />
-        <ScoreBars data={data} hoveredIndex={hoveredIndex} setHoveredIndex={setHoveredIndex} selectedRunId={selectedRunId} onBarClick={onBarClick} />
+        <ScoreBars data={data} hoveredIndex={hoveredIndex} selectedRunId={selectedRunId} />
         <Line isAnimationActive={false} dataKey="numericAverage" type="monotone" stroke={cssVar('--color-accent')} strokeOpacity={0.9} strokeWidth={2} dot={<SelectedDot selectedRunId={selectedRunId} />} activeDot={false} />
       </ComposedChart>
     </ResponsiveContainer>
