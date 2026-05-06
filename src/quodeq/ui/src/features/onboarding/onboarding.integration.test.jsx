@@ -73,7 +73,7 @@ describe('Onboarding integration — happy path', () => {
 
     // Standard & Launch — pitch text is unchanged and uniquely identifies this step
     expect(screen.getByText(/pick one for your first run/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText(/security 101/i));
+    fireEvent.click(screen.getByRole('radio', { name: /security 101/i }));
     fireEvent.click(screen.getByRole('button', { name: /start evaluation/i }));
 
     await waitFor(() => expect(onLaunch).toHaveBeenCalled());

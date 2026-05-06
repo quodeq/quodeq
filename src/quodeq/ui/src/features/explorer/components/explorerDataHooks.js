@@ -34,7 +34,7 @@ function computeComplianceByPrinciple(evalData) {
   return map;
 }
 
-export function buildEvalPrincipalFn(evalData, complianceByPrinciple, project, runId) {
+export function buildEvalPrincipalFn(evalData, complianceByPrinciple, project, runId, dateLabel = '') {
   const principlesByName = new Map((evalData.principles || []).map((p) => [p.name, p]));
   const gradesByPrinciple = new Map((evalData.principleGrades || []).map((p) => [p.principle, p]));
   return function buildEvalPrincipal(principleId) {
@@ -43,7 +43,7 @@ export function buildEvalPrincipalFn(evalData, complianceByPrinciple, project, r
     return {
       principle: principleId, score: pg?.score || null, grade: pg?.grade || null,
       dimension: evalData.dimension || '',
-      project: project || '', runId: runId || '',
+      project: project || '', runId: runId || '', dateLabel: dateLabel || '',
       principleData, dimViolations: principleData?.violations || [],
       dimCompliance: complianceByPrinciple.get(principleId) || [],
     };
@@ -106,13 +106,18 @@ export function useExplorerData(project, dimension, runId, refreshSignal) {
   const { getDimensionEval, getRunScores } = useApi();
   const [evalData, setEvalData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    setLoading(true);
+    // First load shows the LoadingScreen; subsequent run-switches keep
+    // the previous run's data on screen and toggle isFetching so the
+    // caller can dim the page during the background refetch (matches
+    // the Overview placeholderData behaviour).
+    setIsFetching(true);
     fetchAndRescore(project, runId, dimension, getDimensionEval, getRunScores)
-      .then((data) => { setEvalData(data); setLoading(false); })
-      .catch((err) => { setError(err.message); setLoading(false); });
+      .then((data) => { setEvalData(data); setLoading(false); setIsFetching(false); })
+      .catch((err) => { setError(err.message); setLoading(false); setIsFetching(false); });
   }, [project, dimension, runId, getDimensionEval, getRunScores]);
 
   const initialRef = useRef(refreshSignal);
@@ -129,5 +134,5 @@ export function useExplorerData(project, dimension, runId, refreshSignal) {
   const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes('Overall')), [evalData]);
   const allViolations = useMemo(() => computeAllViolations(evalData), [evalData]);
   const stats = useDerivedExplorerStats(evalData, allViolations);
-  return { evalData, loading, error, overallGrade, principleGrades, allViolations, ...stats };
+  return { evalData, loading, isFetching, error, overallGrade, principleGrades, allViolations, ...stats };
 }

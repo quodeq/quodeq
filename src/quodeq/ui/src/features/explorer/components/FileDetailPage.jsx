@@ -75,13 +75,13 @@ function FileSevBadgeRow({ file }) {
   );
 }
 
-function FileHeader({ file, totalViolations, totalCompliance, dimensionsCount }) {
+function FileHeader({ file, totalViolations, totalCompliance, dimensionsCount, dateLabel, runId }) {
   const totalChecks = totalViolations + totalCompliance;
   const ratio = complianceRatio(totalViolations, totalCompliance);
   return (
     <section className="principle-detail-header principle-detail-header--terminal">
       <div className="principle-detail-header__top">
-        <TermHeader name={file.file} />
+        <TermHeader name={file.file} sub={dateLabel || runId || null} />
       </div>
       <StatStrip cards>
         <Stat
@@ -126,7 +126,7 @@ function SeverityGroup({ sev, violations }) {
   );
 }
 
-const FileDetailPage = memo(function FileDetailPage({ file }) {
+const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel }) {
   const totalViolations = file.total || 0;
   const totalCompliance = file.compliance?.length || 0;
   const dimensionsCount = file.dimensionsCount || 0;
@@ -194,6 +194,8 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
         totalViolations={totalViolations}
         totalCompliance={totalCompliance}
         dimensionsCount={dimensionsCount}
+        dateLabel={dateLabel}
+        runId={runId}
       />
 
       {showFilters && (

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { gradeLetter, scoreColorClass } from '../../../utils/formatters.js';
+import { gradeLetter } from '../../../utils/formatters.js';
 import { SectionLabel } from '../../../components/terminal/index.js';
 import {
   ComposedChart,
@@ -13,55 +13,19 @@ import {
   Cell,
   ReferenceLine,
 } from 'recharts';
+import {
+  cssVar,
+  scoreBarColor,
+  REF_LINE_LOW,
+  REF_LINE_MID,
+  REF_LINE_HIGH,
+  CHART_MARGIN,
+  SELECTED_BAR_OPACITY,
+  DESELECTED_BAR_OPACITY,
+} from '../../../components/scoreChartHelpers.js';
 
 const MAX_CHART_RUNS = 20;
 const CHART_HEIGHT = 160;
-const REF_LINE_LOW = 2.5;
-const REF_LINE_MID = 5;
-const REF_LINE_HIGH = 7.5;
-/* Margin zeroed so bars span edge-to-edge inside the panel body. */
-const CHART_MARGIN = { top: 8, right: 0, bottom: 0, left: 0 };
-
-// Module-level CSS variable cache. Cleared automatically by MutationObserver
-// when the data-theme attribute changes. Use clearCssVarCache() for test resets.
-const _cssVarCache = new Map();
-const cssVar = (name, fallback) => {
-  if (_cssVarCache.has(name)) return _cssVarCache.get(name);
-  if (typeof document === 'undefined') return fallback;
-  const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const result = val || fallback;
-  _cssVarCache.set(name, result);
-  return result;
-};
-
-/** Clear the CSS variable cache. Called automatically by MutationObserver on theme change; exported for test resets. */
-export function clearCssVarCache() { _cssVarCache.clear(); }
-
-// Auto-clear cache when theme changes (data-theme attribute mutation)
-if (typeof document !== 'undefined') {
-  new MutationObserver(() => _cssVarCache.clear()).observe(
-    document.documentElement,
-    { attributes: true, attributeFilter: ['data-theme'] },
-  );
-}
-
-const GRADE_CSS_VARS = {
-  'grade-top':    '--color-grade-top-text',
-  'grade-high':   '--color-grade-high-text',
-  'grade-mid':    '--color-grade-mid-text',
-  'grade-low':    '--color-grade-low-text',
-  'grade-bottom': '--color-grade-bottom-text',
-  'grade-none':   '--color-text-muted',
-};
-
-// Bar color follows the active theme's grade spectrum — flynn renders cyan→red,
-// daruma renders gold→crimson, neo renders matrix-green→red, etc. Each theme's
-// `--color-grade-*-text` tokens map through `scoreColorClass` into the 5-step
-// spectrum defined in tokens.css.
-function scoreBarColor(score) {
-  const varName = GRADE_CSS_VARS[scoreColorClass(score)] || '--color-accent';
-  return cssVar(varName);
-}
 
 
 function buildTrendData(trend, selectedRunId) {
@@ -111,7 +75,7 @@ function ScoreBars({ data, hoveredIndex, selectedRunId }) {
         <Cell
           key={entry.runId ?? i}
           fill={scoreBarColor(entry.numericAverage)}
-          opacity={entry.runId === selectedRunId ? 0.85 : 0.4}
+          opacity={entry.runId === selectedRunId ? SELECTED_BAR_OPACITY : DESELECTED_BAR_OPACITY}
           stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
           strokeWidth={hoveredIndex === i ? 1.5 : 0}
         />

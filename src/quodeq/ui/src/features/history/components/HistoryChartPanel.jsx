@@ -11,51 +11,24 @@ import {
   Cell,
   ReferenceLine,
 } from 'recharts';
+import {
+  cssVar,
+  scoreBarColor,
+  REF_LINE_LOW,
+  REF_LINE_MID,
+  REF_LINE_HIGH,
+  CHART_MARGIN,
+  SELECTED_BAR_OPACITY,
+  DESELECTED_BAR_OPACITY,
+} from '../../../components/scoreChartHelpers.js';
 
 const MAX_CHART_RUNS = 40;
 const CHART_HEIGHT = 220;
-const REF_LINE_LOW = 2.5;
-const REF_LINE_MID = 5;
-const REF_LINE_HIGH = 7.5;
 const REF_LINE_FLOOR = 0;
 const REF_LINE_CEIL = 10;
-const DESELECTED_BAR_OPACITY = 0.62;
-const CHART_MARGIN = { top: 8, right: 0, bottom: 0, left: 0 };
 const HOVER_STROKE_WIDTH = 1.5;
 const TREND_LINE_STROKE_WIDTH = 2;
 const TREND_LINE_OPACITY = 0.9;
-
-const _cssVarCache = new Map();
-const cssVar = (name, fallback) => {
-  if (_cssVarCache.has(name)) return _cssVarCache.get(name) || fallback;
-  if (typeof document === 'undefined') return fallback;
-  const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  _cssVarCache.set(name, val);
-  return val || fallback;
-};
-if (typeof document !== 'undefined') {
-  new MutationObserver(() => _cssVarCache.clear()).observe(
-    document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] },
-  );
-}
-
-const GRADE_CSS_VARS = {
-  'grade-top':    '--color-grade-top-text',
-  'grade-high':   '--color-grade-high-text',
-  'grade-mid':    '--color-grade-mid-text',
-  'grade-low':    '--color-grade-low-text',
-  'grade-bottom': '--color-grade-bottom-text',
-};
-
-function scoreBarColor(score) {
-  const n = parseFloat(score);
-  if (Number.isNaN(n)) return cssVar('--color-accent');
-  if (n >= 9) return cssVar(GRADE_CSS_VARS['grade-top']);
-  if (n >= 7) return cssVar(GRADE_CSS_VARS['grade-high']);
-  if (n >= 5) return cssVar(GRADE_CSS_VARS['grade-mid']);
-  if (n >= 3) return cssVar(GRADE_CSS_VARS['grade-low']);
-  return cssVar(GRADE_CSS_VARS['grade-bottom']);
-}
 
 function windowAroundSelected(trend, selectedRunId) {
   if (trend.length <= MAX_CHART_RUNS) return trend;
@@ -137,7 +110,7 @@ function ScoreHistoryChart({ data, interaction }) {
             <Cell
               key={entry.runId ?? i}
               fill={scoreBarColor(entry.numericAverage)}
-              opacity={entry.runId === selectedRunId ? 1 : DESELECTED_BAR_OPACITY}
+              opacity={entry.runId === selectedRunId ? SELECTED_BAR_OPACITY : DESELECTED_BAR_OPACITY}
               stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
               strokeWidth={hoveredIndex === i ? HOVER_STROKE_WIDTH : 0}
             />
