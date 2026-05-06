@@ -125,7 +125,10 @@ def _walk_and_group(
         for fname in filenames:
             suffix = os.path.splitext(fname)[1]
             if suffix in all_extensions:
-                rel = os.path.relpath(os.path.join(dirpath, fname), src)
+                # Normalize to POSIX separators so manifest paths are consistent
+                # across platforms — downstream consumers and scope-prefix
+                # matching all assume "/".
+                rel = os.path.relpath(os.path.join(dirpath, fname), src).replace(os.sep, "/")
                 lang = ext_map.get(suffix, _UNKNOWN_LANG)
                 files_by_lang.setdefault(lang, []).append(rel)
                 ext_counts[suffix] += 1
@@ -156,7 +159,9 @@ def _walk_and_partition_by_scope(
             suffix = os.path.splitext(fname)[1]
             if suffix not in all_extensions:
                 continue
-            rel = os.path.relpath(os.path.join(dirpath, fname), src)
+            # Match the POSIX-style scope_paths from detect_matches_recursive
+            # so prefix matching works on Windows.
+            rel = os.path.relpath(os.path.join(dirpath, fname), src).replace(os.sep, "/")
             owner = _deepest_scope(rel, scope_paths)
             if owner is None:
                 continue

@@ -8,8 +8,11 @@ when ``ps``/``pgrep`` aren't available (CI sandboxes, weird platforms).
 from __future__ import annotations
 
 import re
+import sys
 import time
 from unittest.mock import patch
+
+import pytest
 
 from quodeq.shared.resource_sampler import (
     ResourceSampler,
@@ -78,6 +81,10 @@ class TestErrorTolerance:
             assert sampler._thread is not None and sampler._thread.is_alive()
             sampler.stop()
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="POSIX-only: _self_rss_mb shells out to `ps`, which doesn't exist on Windows",
+    )
     def test_self_rss_returns_int_not_raises(self) -> None:
         # Real ps call against the test process — should always succeed.
         rss = _self_rss_mb()

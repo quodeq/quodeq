@@ -123,7 +123,12 @@ class TestInjectableFileReader:
         file_contents = {"src/example.py": "line1\nline2\nline3\nline4\nline5\n"}
 
         def fake_reader(path: Path) -> str:
-            rel = str(path).split(str(tmp_path) + "/", 1)[-1] if str(tmp_path) in str(path) else str(path)
+            # Compare via Path.relative_to so the lookup key uses POSIX
+            # separators on both POSIX and Windows.
+            try:
+                rel = Path(path).resolve().relative_to(tmp_path.resolve()).as_posix()
+            except ValueError:
+                rel = str(path)
             if rel in file_contents:
                 return file_contents[rel]
             raise FileNotFoundError(rel)

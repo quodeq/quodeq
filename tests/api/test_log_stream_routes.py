@@ -35,7 +35,9 @@ def app(tmp_path: Path) -> Flask:
 def _seed_run(tmp_path: Path, app: Flask, job_id: str, content: str) -> Path:
     run_dir = tmp_path / job_id
     run_dir.mkdir()
-    (run_dir / "run.log").write_text(content)
+    # write_bytes preserves "\n" exactly. write_text on Windows would translate
+    # "\n" to "\r\n", which then mismatches the byte offsets the route reports.
+    (run_dir / "run.log").write_bytes(content.encode("utf-8"))
     app.config["_provider"].map[job_id] = run_dir
     return run_dir
 
