@@ -37,4 +37,8 @@ jobs:
         run: uv sync
 
       - name: Run tests
-        run: uv run pytest tests/ -q --tb=short
+        # Skip @pytest.mark.integration: those spawn real subprocesses and
+        # send signals, which are inherently timing-sensitive on shared CI
+        # runners. They run elsewhere (e.g. nightly) where flakes are
+        # tolerable. PR CI should be fast and deterministic.
+        run: uv run pytest tests/ -q --tb=short -m "not integration"

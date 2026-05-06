@@ -23,7 +23,8 @@ jobs:
         run: uv sync
 
       - name: Run tests
-        run: uv run pytest tests/ -q --tb=short
+        # Skip integration tests — same rationale as test.yml.
+        run: uv run pytest tests/ -q --tb=short -m "not integration"
 
   publish:
     needs: test
