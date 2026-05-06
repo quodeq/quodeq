@@ -239,11 +239,16 @@ class TestRunApiAnalysisBridge:
              pytest.raises(Exception, match="No API base URL configured"):
             _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
 
-    def test_empty_queue_writes_empty_files(self, tmp_path):
+    def test_empty_queue_writes_complete_marker_and_preserves_shared_jsonl(self, tmp_path):
+        """Empty queue: write the per-agent stream 'complete' marker, but
+        leave the SHARED `{dim}_evidence.jsonl` alone — other pool agents
+        append findings to it via MCP and would lose them otherwise.
+        """
         stream = tmp_path / "stream.json"
         jsonl = tmp_path / "evidence.jsonl"
+        # Pre-populate the shared JSONL with findings from other agents
+        jsonl.write_text('{"t":"violation","p":"X","file":"a.py","line":1}\n')
         queue_path = tmp_path / "queue.json"
-        # Create a queue that returns no files
         queue_path.write_text(json.dumps({"version": 1, "pending": [], "taken": [], "max_files_per_agent": 10}))
 
         cfg = AnalysisConfig(
@@ -255,8 +260,8 @@ class TestRunApiAnalysisBridge:
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
             _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
 
-        assert jsonl.read_text() == ""
         assert "complete" in stream.read_text()
+        assert jsonl.read_text() == '{"t":"violation","p":"X","file":"a.py","line":1}\n'
 
     def test_calls_run_api_analysis(self, tmp_path):
         stream = tmp_path / "stream.json"
