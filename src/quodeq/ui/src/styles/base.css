@@ -1479,6 +1479,19 @@ textarea:focus {
   line-height: 1.5;
 }
 
+.settings-description a,
+.settings-row a,
+.settings-install-hint a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.settings-description a:hover,
+.settings-row a:hover,
+.settings-install-hint a:hover {
+  text-decoration: underline;
+}
+
 /* ── Settings: terminal-aligned pill buttons ── */
 
 .settings-pill {

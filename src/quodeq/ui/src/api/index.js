@@ -248,10 +248,10 @@ export function testOllamaConcurrency(model) {
 }
 
 /** @returns {Promise<Object>} Connection test result for the provider */
-export function testProviderConnection({ apiBase, model, apiKey }) {
+export function testProviderConnection({ provider, apiBase, model, apiKey }) {
   return request('/provider/test', {
     method: 'POST',
-    body: JSON.stringify({ api_base: apiBase, model, api_key: apiKey }),
+    body: JSON.stringify({ provider, api_base: apiBase, model, api_key: apiKey }),
   });
 }
 

@@ -37,6 +37,9 @@ const INSTALL_INSTRUCTIONS = {
 
 const CLI_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), 'time-limit': String(DEFAULT_TIME_LIMIT_S) };
 const OLLAMA_DEFAULTS = { 'time-limit': '0' };
+const CLOUD_DEFAULTS_BY_ID = {
+  openrouter: { 'time-limit': String(DEFAULT_TIME_LIMIT_S), 'model': 'baidu/cobuddy:free' },
+};
 const DEFAULT_PROVIDER_ORDER = 50;
 
 const MIGRATION_DONE_KEY = 'cc-provider-tabs-migrated';
@@ -56,7 +59,7 @@ function TabContent({ provider, providerConfig }) {
     ? CLI_DEFAULTS
     : classification === 'local-api'
       ? OLLAMA_DEFAULTS
-      : undefined;
+      : CLOUD_DEFAULTS_BY_ID[provider.id];
   const { state, update } = useProviderSettings(provider.id, defaults);
 
   if (classification === 'local-api') {

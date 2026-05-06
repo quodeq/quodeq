@@ -56,6 +56,10 @@ function ModelTextInput({ label, value, placeholder, onChange, required }) {
         placeholder={placeholder || 'Type model id'}
         onChange={(e) => onChange(e.target.value)}
         aria-label={label ? `${label} model` : 'Model'}
+        autoCapitalize="off"
+        autoCorrect="off"
+        autoComplete="off"
+        spellCheck={false}
       />
     </div>
   );

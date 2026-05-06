@@ -1,6 +1,8 @@
 """API routes for LLM bridge — provider status, models, testing."""
 from __future__ import annotations
 
+import os
+
 from flask import Flask, Response, jsonify, request
 
 from quodeq.llm_bridge import (
@@ -47,18 +49,52 @@ def register_llm_bridge_routes(app: Flask) -> None:
     @app.post("/api/provider/test")
     def provider_test() -> Response:
         data = request.get_json() or {}
-        api_base = data.get("api_base", "")
+        configs = get_provider_configs()
+        provider_id = data.get("provider", "")
+        provider_cfg = configs.get(provider_id, {}) if provider_id else {}
+
+        api_base = data.get("api_base") or provider_cfg.get("api_base", "")
+        api_key = data.get("api_key", "")
+        api_key_env = provider_cfg.get("api_key_env", "")
+        if not api_key:
+            # Resolve env var via provider id when given, else by api_base
+            # match so old clients (without `provider`) still work.
+            if not api_key_env and api_base:
+                for cfg in configs.values():
+                    if cfg.get("api_base") == api_base and cfg.get("api_key_env"):
+                        api_key_env = cfg["api_key_env"]
+                        break
+            if api_key_env:
+                api_key = os.environ.get(api_key_env, "")
+
         if api_base:
             try:
                 validate_url_safe(api_base, allow_private=True)
             except ValueError as exc:
                 return jsonify({"error": str(exc), "code": "INVALID_URL"}), 400
+        if not api_key and api_key_env:
+            return jsonify({
+                "success": False,
+                "error": f"{api_key_env} is not set in the dashboard's environment. "
+                         f"Export it in your shell (e.g. ~/.zshrc) and relaunch the dashboard from that terminal.",
+            })
         result = check_cloud_connection(
             api_base=api_base,
             model=data.get("model", ""),
-            api_key=data.get("api_key", ""),
+            api_key=api_key,
         )
         return jsonify(result)
+
+    @app.get("/api/provider/env-check")
+    def provider_env_check() -> Response:
+        """Report which provider api-key env vars are visible to this process."""
+        configs = get_provider_configs()
+        seen: dict[str, bool] = {}
+        for pid, cfg in configs.items():
+            env_name = cfg.get("api_key_env", "")
+            if env_name:
+                seen[pid] = bool(os.environ.get(env_name, "").strip())
+        return jsonify(seen)
 
     @app.get("/api/known-models")
     def known_models() -> Response:
