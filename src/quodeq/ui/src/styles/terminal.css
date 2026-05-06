@@ -2190,6 +2190,20 @@
   cursor: not-allowed;
 }
 
+/* Filled variant — solid accent background. Compose with --primary,
+   e.g. `term-btn term-btn--primary term-btn--filled`. Theme-safe via
+   --color-on-accent (works in both light and dark themes). */
+.term-btn--filled {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+.term-btn--filled:hover:not(:disabled) {
+  background: var(--color-accent-hover, color-mix(in srgb, var(--color-accent) 90%, black));
+  color: var(--color-on-accent);
+  border-color: var(--color-accent-hover, color-mix(in srgb, var(--color-accent) 90%, black));
+}
+
 /* ------------------------------------------------------------
    term-status-pill — mono outline pill used in the evaluation
    job header (running / done / failed / lost / cancelled).
