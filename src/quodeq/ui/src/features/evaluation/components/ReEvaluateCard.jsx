@@ -84,7 +84,7 @@ function useDimensionSelection(allDimensions, info, branch, scopePath, onStart, 
     payload.dimensions = [...selectedDims];
     if (branch) payload.branch = branch;
     if (scopePath) payload.scopePath = scopePath;
-    payload.incremental = cleanScan === 'off';
+    payload.cleanScan = cleanScan !== 'off';
     return payload;
   };
   const handleScan = () => {
