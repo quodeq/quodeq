@@ -236,8 +236,21 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
 
   return (
     <div className="panel evaluate-panel evaluate-panel--terminal">
-      <div className="evaluate-panel__top">
+      <div className="evaluate-panel__top evaluate-panel__top--row">
         <TermHeader name="evaluate" sub={info.name || project} />
+        <div className="re-eval-toggle-row">
+          <HelpHint label="Evaluation options help">{EVAL_OPTIONS_HINT}</HelpHint>
+          {scope.isLocal && (
+            <BranchScopeSelector
+              branches={scope.scanData?.branches}
+              currentBranch={scope.scanData?.currentBranch || scope.branch}
+              projectPath={info.path}
+              onScopeChange={scope.setScopePath}
+              scopePath={scope.scopePath}
+            />
+          )}
+          <CleanScanToggle value={cleanScan} onChange={setCleanScan} disabled={!canStart} />
+        </div>
       </div>
 
       <div className="evaluate-form-large">
@@ -252,20 +265,6 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
         )}
 
         <CloneSection info={info} cloning={cloning} cloneDest={cloneDest} cloneError={cloneError} setCloneBrowserOpen={setCloneBrowserOpen} />
-
-        <div className="re-eval-toggle-row">
-          <HelpHint label="Evaluation options help">{EVAL_OPTIONS_HINT}</HelpHint>
-          {scope.isLocal && (
-            <BranchScopeSelector
-              branches={scope.scanData?.branches}
-              currentBranch={scope.scanData?.currentBranch || scope.branch}
-              projectPath={info.path}
-              onScopeChange={scope.setScopePath}
-              scopePath={scope.scopePath}
-            />
-          )}
-          <CleanScanToggle value={cleanScan} onChange={setCleanScan} disabled={!canStart} />
-        </div>
 
         <div className={`re-eval-actions-group${cloning ? ' re-eval-disabled-section' : ''}`}>
           <DimensionSelectionSection allDimensions={allDimensions} selectedDims={selectedDims} cloning={cloning} toggleDim={toggleDim} selectAll={selectAll} clearAll={clearAll} />
