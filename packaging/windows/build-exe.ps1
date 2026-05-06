@@ -9,8 +9,16 @@ $RepoRoot = (Resolve-Path "$ScriptDir\..\..").Path
 $BuildDir = "$RepoRoot\dist\dashboard-build"
 $DistDir = "$RepoRoot\dist"
 
-# Extract version
-$Version = python -c "import re; print(re.search(r'version = \`"(.+?)\`"', open('$RepoRoot\pyproject.toml').read()).group(1))"
+# Extract version. Parse in PowerShell rather than shelling to Python:
+# embedding $RepoRoot in a Python string literal triggers escape-sequence
+# decoding (e.g. D:\a -> \x07 / bell), so the path reaches open() corrupted.
+$pyprojectText = Get-Content "$RepoRoot\pyproject.toml" -Raw
+if ($pyprojectText -match 'version = "(.+?)"') {
+    $Version = $Matches[1]
+} else {
+    Write-Error "ERROR: could not extract version from pyproject.toml"
+    exit 1
+}
 Write-Host "Building Quodeq v$Version..."
 
 # Clean build dir
