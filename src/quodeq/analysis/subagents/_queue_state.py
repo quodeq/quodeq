@@ -123,7 +123,9 @@ def write_state(state: dict, path: Path) -> None:
             json.dump(state, f)
             f.flush()
             os.fsync(f.fileno())
-        os.rename(tmp_path, str(path))
+        # os.replace is atomic and overwrites on all platforms;
+        # os.rename raises FileExistsError on Windows when the destination exists.
+        os.replace(tmp_path, str(path))
         cleanup_tmp = None  # ownership transferred to final path
     finally:
         if cleanup_tmp is not None:

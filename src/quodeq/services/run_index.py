@@ -103,12 +103,20 @@ def open_index(db_path: Path) -> sqlite3.Connection:
     db_path = Path(db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
+    db: sqlite3.Connection | None = None
     try:
         db = sqlite3.connect(str(db_path))
         db.execute("PRAGMA journal_mode=WAL")
         db.execute("PRAGMA busy_timeout=3000")
     except sqlite3.DatabaseError as exc:
         _logger.warning("index DB at %s is corrupt (%s) — recreating", db_path, exc)
+        # Windows holds a file handle while the connection is open, so the
+        # subsequent unlink would raise PermissionError. Close first.
+        if db is not None:
+            try:
+                db.close()
+            except sqlite3.Error:
+                pass
         db_path.unlink(missing_ok=True)
         db = sqlite3.connect(str(db_path))
         db.execute("PRAGMA journal_mode=WAL")
