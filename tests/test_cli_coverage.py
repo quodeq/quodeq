@@ -239,9 +239,11 @@ class TestParserAdditionalFlags:
         assert args.no_consolidated is True
 
     def test_incremental_flag(self):
+        # --incremental is a deprecated alias; it maps to legacy_incremental, not clean_scan.
         parser = build_parser()
         args = parser.parse_args(["evaluate", "/tmp/repo", "--incremental"])
-        assert args.incremental is True
+        assert args.legacy_incremental is True
+        assert args.clean_scan is False
 
     def test_defaults(self):
         parser = build_parser()
@@ -252,7 +254,8 @@ class TestParserAdditionalFlags:
         assert args.no_verify is False
         assert args.pool_budget is None
         assert args.no_consolidated is False
-        assert args.incremental is False
+        assert args.clean_scan is False
+        assert args.legacy_incremental is False
         assert args.no_prescan is False
         assert args.dimensions is None
 
@@ -279,7 +282,8 @@ class TestParserAdditionalFlags:
         assert args.n_subagents == 10
         assert args.pool_budget == 200
         assert args.no_consolidated is True
-        assert args.incremental is True
+        assert args.legacy_incremental is True
+        assert args.clean_scan is False
         assert args.branch == "develop"
         assert args.scope == "src/main"
         assert args.output == "/tmp/output"

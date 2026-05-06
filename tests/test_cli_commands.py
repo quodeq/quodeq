@@ -148,7 +148,7 @@ class TestBuildRunConfig:
         args = argparse.Namespace(
             dimensions=None, no_consolidated=False, no_verify=False,
             max_turns=None, max_duration=None, n_subagents=5,
-            pool_budget=None, incremental=False,
+            pool_budget=None, clean_scan=True, legacy_incremental=False,
         )
         inputs = ResolvedInputs(
             src=tmp_path, language="python", manifest=None, dims_data={}
@@ -168,7 +168,7 @@ class TestBuildRunConfig:
         args = argparse.Namespace(
             dimensions="security,reliability", no_consolidated=False,
             no_verify=True, max_turns=10, max_duration=300,
-            n_subagents=3, pool_budget=120, incremental=True,
+            n_subagents=3, pool_budget=120, clean_scan=False, legacy_incremental=False,
         )
         inputs = ResolvedInputs(
             src=tmp_path, language="java", manifest=None, dims_data={}
@@ -180,7 +180,7 @@ class TestBuildRunConfig:
         assert config.options.max_turns == 10
         assert config.options.max_duration == 300
         assert config.options.time_limit == 120
-        assert config.options.incremental is True
+        assert config.options.incremental is True  # clean_scan=False → incremental=True (internal strategy)
         assert config.options.verify_findings is False
         assert config.standards_dir is None
 
@@ -195,7 +195,7 @@ class TestBuildRunConfig:
         args = argparse.Namespace(
             dimensions=None, no_consolidated=False, no_verify=False,
             max_turns=None, max_duration=None, n_subagents=5,
-            pool_budget=None, incremental=False, _single_file=True,
+            pool_budget=None, clean_scan=True, legacy_incremental=False, _single_file=True,
         )
         inputs = ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data={})
         config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env={})
@@ -212,7 +212,7 @@ class TestBuildRunConfig:
         args = argparse.Namespace(
             dimensions=None, no_consolidated=False, no_verify=False,
             max_turns=None, max_duration=None, n_subagents=5,
-            pool_budget=None, incremental=False,
+            pool_budget=None, clean_scan=True, legacy_incremental=False,
         )
         inputs = ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data={})
         config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env={"QUODEQ_NO_CONSOLIDATE": "1"})
@@ -229,7 +229,7 @@ class TestBuildRunConfig:
         args = argparse.Namespace(
             dimensions=None, no_consolidated=False, no_verify=False,
             max_turns=None, max_duration=None, n_subagents=5,
-            pool_budget=None, incremental=False,
+            pool_budget=None, clean_scan=True, legacy_incremental=False,
         )
         inputs = ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data={})
         env = {"QUODEQ_MAX_TURNS": "50", "QUODEQ_MAX_DURATION": "900", "QUODEQ_POOL_BUDGET": "300"}

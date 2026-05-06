@@ -70,17 +70,21 @@ def test_diff_mode_dry_run_produces_evidence_no_evaluation(tmp_path: Path) -> No
         assert not eval_jsons, f"unexpected scored reports in diff mode: {eval_jsons}"
 
 
-def test_diff_mode_incremental_mutex_is_enforced(tmp_path: Path) -> None:
-    """--diff-from + --incremental must return 1 at the process boundary."""
+def test_diff_mode_clean_scan_mutex_is_enforced(tmp_path: Path) -> None:
+    """--diff-from + --clean-scan must return 1 at the process boundary.
+
+    Note: --incremental is now a deprecated no-op alias (incremental scans are
+    the default). The mutex is between --clean-scan and --diff-from.
+    """
     repo = _setup_repo(tmp_path)
     result = subprocess.run(
         [
             "uv", "run", "quodeq", "evaluate", ".",
-            "--diff-from", "main", "--incremental",
+            "--diff-from", "main", "--clean-scan",
             "--output", str(tmp_path / "out"),
         ],
         cwd=str(repo), capture_output=True, text=True,
     )
     assert result.returncode == 1
     combined = result.stdout + result.stderr
-    assert "--incremental" in combined and "--diff-from" in combined
+    assert "--clean-scan" in combined and "--diff-from" in combined
