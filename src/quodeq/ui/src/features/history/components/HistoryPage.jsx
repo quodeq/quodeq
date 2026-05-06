@@ -9,6 +9,8 @@ import { useRunNavigator } from '../../../hooks/useRunNavigator.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards } from '../../../utils/scoreFiltering.js';
 import { TermHeader } from '../../../components/terminal/index.js';
+import EmptyState from '../../../components/EmptyState.jsx';
+import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import FittedText from '../../../components/FittedText.jsx';
 
 const TOAST_DISMISS_MS = 2600;
@@ -75,13 +77,11 @@ function DeltaText({ delta }) {
   return <span className={cls}>{sign}{trimTrailingZero(abs)}</span>;
 }
 
-function HistoryEmpty() {
+function HistoryEmptyShell({ sub, children }) {
   return (
     <div className="history-page history-page--terminal">
-      <TermHeader name="history" sub="no evaluations yet" />
-      <div className="empty-state">
-        <p>No evaluations yet. Run one from the Evaluate tab.</p>
-      </div>
+      <TermHeader name="history" sub={sub} />
+      {children}
     </div>
   );
 }
@@ -320,7 +320,7 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
   );
 }
 
-export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks, projectInfo }) {
+export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, loading, isFetching }) {
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
   const { deleteEvaluation } = useApi();
@@ -373,7 +373,45 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
     return sorted.map(([lang, count]) => `${count} ${lang.toLowerCase()}`).join('  ');
   }, [projectInfo]);
 
-  if (!trend || trend.length === 0) return <HistoryEmpty />;
+  if (!projectsLoaded) return <LoadingScreen />;
+  if (projects.length === 0) {
+    return (
+      <HistoryEmptyShell sub="no projects yet">
+        <EmptyState
+          title="No projects yet"
+          description="Add a project to start analyzing code quality."
+          actionLabel="Add a project"
+          onAction={() => onNavigate?.('projects')}
+        />
+      </HistoryEmptyShell>
+    );
+  }
+  if (!selectedProject) {
+    return (
+      <HistoryEmptyShell sub="no project selected">
+        <EmptyState
+          title="No project selected"
+          description="Pick a project to view its history."
+          actionLabel="Choose project"
+          onAction={() => onNavigate?.('projects')}
+        />
+      </HistoryEmptyShell>
+    );
+  }
+  if (!trend || trend.length === 0) {
+    if (loading || isFetching) return <LoadingScreen />;
+    const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
+    return (
+      <HistoryEmptyShell sub="no evaluations yet">
+        <EmptyState
+          title="No evaluations yet"
+          description={`Run an evaluation for ${projectName} to populate this page.`}
+          actionLabel="Start evaluation"
+          onAction={() => onNavigate?.('evaluate')}
+        />
+      </HistoryEmptyShell>
+    );
+  }
 
   return (
     <HistoryContent

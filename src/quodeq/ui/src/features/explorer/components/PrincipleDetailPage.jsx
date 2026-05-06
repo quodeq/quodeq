@@ -7,6 +7,7 @@ import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
+import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
 
 // Off-screen rows skip layout/paint via CSS `content-visibility: auto` on
 // `.vdetail-row` (see styles/explorer.css), so no JS virtualizer or
@@ -67,7 +68,7 @@ function SevBadgeRow({ sevCounts }) {
 }
 
 function PrincipleHeader({ data }) {
-  const { principle, score, grade, violations, compliance, sevCounts } = data;
+  const { principle, description, score, grade, violations, compliance, sevCounts, dateLabel, runId } = data;
   const scoreDisplay = score ? String(score).replace('/10', '') : '—';
   const ratioDisplay = (compliance.length > 0 && violations.length > 0)
     ? `1:${Math.round(compliance.length / violations.length)}`
@@ -80,7 +81,11 @@ function PrincipleHeader({ data }) {
   return (
     <section className="principle-detail-header principle-detail-header--terminal">
       <div className="principle-detail-header__top">
-        <TermHeader name={`${principle}.detail`} />
+        <TermHeader
+          name={(principle || '').toLowerCase()}
+          description={description}
+          sub={dateLabel || runId || null}
+        />
       </div>
       <StatStrip cards>
         <Stat label="SCORE" value={scoreDisplay} hint={scoreHint} />
@@ -180,7 +185,9 @@ function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) {
 }
 
 const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
-  const { principleData, principle, score, grade, dimension, runId } = evalPrincipal;
+  const { principleData, principle, score, grade, dimension, runId, dateLabel } = evalPrincipal;
+  const { principleDescriptions } = useStandardDescriptions(dimension);
+  const principleDescription = principleDescriptions[principle] || '';
 
   const {
     violations, compliance, violationsBySeverity,
@@ -226,7 +233,7 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
   return (
     <>
       <PrincipleHeader
-        data={{ principle, score: liveScore ?? score, grade: liveGrade ?? grade, violations: filteredViolations, compliance, sevCounts: liveSevCounts }}
+        data={{ principle, description: principleDescription, score: liveScore ?? score, grade: liveGrade ?? grade, violations: filteredViolations, compliance, sevCounts: liveSevCounts, dateLabel, runId }}
       />
       <PrincipleContext principleData={principleData} />
       {(filteredViolations.length > 0 || compliance.length > 0) && (

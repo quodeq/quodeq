@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 function TreeNodeRow({ node, actions, titles, expand }) {
   const { label, isSelected } = node;
@@ -50,10 +50,16 @@ function TreeNodeRow({ node, actions, titles, expand }) {
 function TreeNode({ node, actions, titles, children }) {
   const { depth = 0, alwaysExpanded = false, defaultExpanded = true, isSelected } = node;
   const [expanded, setExpanded] = useState(alwaysExpanded || defaultExpanded);
+  const prevSelected = useRef(isSelected);
 
   useEffect(() => {
-    if (isSelected && !expanded) setExpanded(true);
-  }, [isSelected, expanded]);
+    // Auto-expand only when selection arrives from outside the tree (e.g. a
+    // principle was just added programmatically). Re-firing on every render
+    // while the row stays selected would block the user from collapsing the
+    // currently-selected node by clicking it.
+    if (isSelected && !prevSelected.current) setExpanded(true);
+    prevSelected.current = isSelected;
+  }, [isSelected]);
   const hasChildren = Array.isArray(children) ? children.length > 0 : !!children;
   const showExpand = hasChildren && !alwaysExpanded;
 

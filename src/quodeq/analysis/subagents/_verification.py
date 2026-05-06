@@ -17,6 +17,7 @@ from quodeq.analysis.subagents.verify import (
     _group_by_file,
     _write_verify_manifest,
 )
+from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.shared.logging import log_info, log_success
 
@@ -39,13 +40,19 @@ def _load_and_filter_previous(
     if config.options.incremental_file_filter is not None:
         filter_set = config.options.incremental_file_filter
         prev_findings = [f for f in prev_findings if f.get("file") in filter_set]
-    # Filter out dismissed findings
+    # Filter out dismissed and permanently-deleted findings
     project_dir = evidence_dir.parent
     dkeys = dismissed_keys(project_dir)
+    delkeys = deleted_keys(project_dir)
     if dkeys:
         prev_findings = [
             f for f in prev_findings
             if (f.get("p", ""), f.get("file", ""), f.get("line", 0)) not in dkeys
+        ]
+    if delkeys:
+        prev_findings = [
+            f for f in prev_findings
+            if (dim_id, f.get("p", ""), f.get("file", "")) not in delkeys
         ]
     return prev_findings
 
@@ -89,7 +96,7 @@ def _dispatch_mini_verify(
 
     mini_config = copy(config)
     mini_options = copy(config.options)
-    mini_options.pool_budget = timeout
+    mini_options.time_limit = timeout
     mini_options.max_subagents = min(_MINI_VERIFY_MAX_AGENTS, config.options.max_subagents)
     mini_config.options = mini_options
 

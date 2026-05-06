@@ -60,3 +60,24 @@ def test_incremental_scan_still_loads_prior_findings(tmp_path):
     ) as mock_load:
         _prepare_findings_and_queue(config, dc)
     mock_load.assert_called_once_with(config, dc.dim_id, dc.evidence_dir)
+
+
+def test_fresh_run_no_prior_jsonl_is_safe(tmp_path):
+    """incremental=True (default) with no prior evidence JSONL must not crash.
+
+    Regression guard: after Task 1's default flip, _prepare_findings_and_queue
+    runs the incremental branch on every default run. When _load_and_filter_previous
+    returns [] (no prior file), the if-prev_findings guard must suppress all
+    carry-forward/partition logic and still produce an empty result cleanly.
+    """
+    config = _make_config(incremental=True, src=tmp_path)
+    dc = _make_dc(tmp_path)
+    # Simulate a first-ever run: no previous findings, no previous fingerprint.
+    with patch(
+        "quodeq.analysis.subagents.runner._load_and_filter_previous",
+        return_value=[],  # no prior JSONL
+    ):
+        result = _prepare_findings_and_queue(config, dc)
+
+    assert result.inline_findings == []
+    assert result.mini_verify_findings == []

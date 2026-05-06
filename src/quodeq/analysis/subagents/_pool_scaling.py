@@ -26,6 +26,7 @@ class ScaleUpContext:
     queue: WorkQueue | None
     queue_path: Path
     submit_fn: Callable[[], None]
+    deadline_at: float | None = None
 
 
 @dataclass
@@ -65,9 +66,27 @@ def get_queue(queue: WorkQueue | None, queue_path: Path) -> WorkQueue:
 def should_respawn(
     queue: WorkQueue | None, queue_path: Path,
     pool_start: float, max_duration: float,
+    *, deadline_at: float | None = None,
 ) -> int:
-    """Return remaining file count if a new agent should be spawned, else 0."""
+    """Return remaining file count if a new agent should be spawned, else 0.
+
+    Spawning is gated by two ceilings:
+    - the pool-local *max_duration* (elapsed since *pool_start*), and
+    - the run-level *deadline_at* (a monotonic wall-clock from the run config).
+
+    Without the deadline gate, agents whose per-agent budget was clamped to
+    "remaining run budget" (1s past the deadline) would die and immediately
+    be respawned, producing an infinite stream of 1-second agents that never
+    do useful work.
+    """
     remaining = get_queue(queue, queue_path).remaining()
+    if deadline_at is not None and time.monotonic() >= deadline_at:
+        if remaining > 0:
+            log_warning(
+                f"  Run deadline reached -- {remaining} files left, "
+                f"not spawning new agents"
+            )
+        return 0
     if max_duration <= 0:
         return remaining  # 0 = unlimited
     elapsed = time.monotonic() - pool_start
@@ -132,7 +151,10 @@ def maybe_scale_up(
     scout_timed_out = elapsed >= state.scout_timeout and n_agents > 1
     if not (scout_completed or scout_timed_out):
         return False
-    remaining = should_respawn(ctx.queue, ctx.queue_path, state.pool_start, state.max_duration)
+    remaining = should_respawn(
+        ctx.queue, ctx.queue_path, state.pool_start, state.max_duration,
+        deadline_at=ctx.deadline_at,
+    )
     for _ in range(compute_scale_up(remaining, n_agents, max_files_per_agent)):
         ctx.submit_fn()
     return True

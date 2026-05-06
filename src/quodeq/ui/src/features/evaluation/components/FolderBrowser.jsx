@@ -155,8 +155,8 @@ function NewFolderInput({ currentPath, navigate, onClose }) {
         onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') onClose(); }}
         placeholder="Folder name" autoFocus
       />
-      <button className="folder-nav-btn" onClick={handleCreate} disabled={!name.trim()}>Create</button>
-      <button className="folder-nav-btn" onClick={onClose}>✕</button>
+      <button className="folder-nav-btn folder-nav-btn--text" onClick={handleCreate} disabled={!name.trim()}>Create</button>
+      <button className="folder-nav-btn" onClick={onClose} aria-label="Cancel new folder">✕</button>
       {error && <span className="inline-error" role="alert">{error}</span>}
     </div>
   );

@@ -37,7 +37,20 @@ _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
 # stale dimensions. The full run list is still returned in availableRuns (metadata
 # only, no disk reads) so users can navigate to older runs directly.
 _LATEST_RUN = "latest"
-_MAX_HISTORY_RUNS = 100
+_DEFAULT_MAX_HISTORY_RUNS = 100
+
+
+def _max_history_runs(env: dict[str, str] | None = None) -> int:
+    """Return the history-scan ceiling, honouring QUODEQ_MAX_HISTORY_RUNS."""
+    raw = (env or os.environ).get("QUODEQ_MAX_HISTORY_RUNS")
+    if not raw:
+        return _DEFAULT_MAX_HISTORY_RUNS
+    try:
+        value = int(raw)
+    except ValueError:
+        return _DEFAULT_MAX_HISTORY_RUNS
+    return value if value > 0 else _DEFAULT_MAX_HISTORY_RUNS
+
 
 _DEFAULT_RUN_DIM_CACHE_MAX = 256
 
@@ -239,13 +252,14 @@ def _compute_dashboard_payload(
         (i for i, r in enumerate(scoreable_runs) if r.run_id == ctx.run.run_id),
         None,
     )
+    max_history = _max_history_runs()
     if selected_in_scoreable is None:
         # Selected run was cancelled/failed (so it's not in scoreable_runs).
         # Treat the entire scoreable history as "older" runs relative to it.
-        history_runs = scoreable_runs[:_MAX_HISTORY_RUNS]
+        history_runs = scoreable_runs[:max_history]
         history_index = len(history_runs)
     else:
-        history_runs = scoreable_runs[:max(_MAX_HISTORY_RUNS, selected_in_scoreable + 1)]
+        history_runs = scoreable_runs[:max(max_history, selected_in_scoreable + 1)]
         history_index = selected_in_scoreable
     get_run_dimensions = _make_run_dimension_fetcher(
         reports_root, project, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,

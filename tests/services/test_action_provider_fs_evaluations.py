@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -187,3 +188,91 @@ def test_start_evaluation_writes_repository_info_for_online_repo(tmp_path: Path)
     assert payload["location"] == "online"
     assert payload["path"] == repo_url
     assert "uuid" in payload
+
+
+def test_get_evaluation_status_external_surfaces_deadline_at(tmp_path: Path) -> None:
+    """External (CLI / ext-prefixed) runs must surface deadline_at on the snapshot.
+
+    The dashboard's countdown timer reads ``job.deadlineAt`` to render a
+    live ticker. Internal runs get this populated via the ``analyzing_start``
+    marker parsed by JobManager. External runs bypass JobManager, so the
+    snapshot builder must read deadline_at from the run's status.json.
+    """
+    reports = tmp_path / "reports"
+    project_uuid = "11111111-2222-3333-4444-555555555555"
+    run_id = "20260101120000"
+    run_dir = reports / project_uuid / run_id
+    run_dir.mkdir(parents=True)
+
+    # A real run is signalled by the evidence/manifest.json file. Without it
+    # the index sync skips the directory.
+    (run_dir / "evidence").mkdir()
+    (run_dir / "evidence" / "manifest.json").write_text("{}")
+
+    deadline_iso = "2026-01-01T12:05:00+00:00"
+    _write_json(
+        run_dir / "status.json",
+        {
+            "schema_version": 1,
+            "job_id": f"ext-{run_id}",
+            "state": "running",
+            "started_at": "2026-01-01T12:00:00+00:00",
+            "updated_at": "2026-01-01T12:00:30+00:00",
+            "finalized_at": None,
+            "phase": "analyzing",
+            "current_dimension": "reliability",
+            "dimensions": ["reliability"],
+            # Use the test process's own PID so the stale-promotion check
+            # (heartbeat fresh + PID alive) treats this as a live run and
+            # does NOT rewrite status.json without the deadline.
+            "pid": os.getpid(),
+            "exit_reason": None,
+            "deadline_at": deadline_iso,
+        },
+    )
+    # Fresh heartbeat — the stale check requires < 30s since last heartbeat.
+    (run_dir / ".heartbeat").write_text("")
+
+    provider = FilesystemActionProvider()
+    snapshot = provider.get_evaluation_status(f"ext-{run_id}", reports_dir=reports)
+
+    assert snapshot is not None
+    assert snapshot.job_id == f"ext-{run_id}"
+    assert snapshot.deadline_at == deadline_iso
+    assert snapshot.source == "external"
+
+
+def test_get_evaluation_status_external_handles_missing_deadline(tmp_path: Path) -> None:
+    """Snapshot builder must tolerate runs that have no deadline (unlimited budget)."""
+    reports = tmp_path / "reports"
+    project_uuid = "11111111-2222-3333-4444-555555555555"
+    run_id = "20260101120000"
+    run_dir = reports / project_uuid / run_id
+    run_dir.mkdir(parents=True)
+    (run_dir / "evidence").mkdir()
+    (run_dir / "evidence" / "manifest.json").write_text("{}")
+
+    _write_json(
+        run_dir / "status.json",
+        {
+            "schema_version": 1,
+            "job_id": f"ext-{run_id}",
+            "state": "running",
+            "started_at": "2026-01-01T12:00:00+00:00",
+            "updated_at": "2026-01-01T12:00:30+00:00",
+            "finalized_at": None,
+            "phase": "analyzing",
+            "current_dimension": None,
+            "dimensions": ["reliability"],
+            "pid": os.getpid(),
+            "exit_reason": None,
+            # no deadline_at field — unlimited budget
+        },
+    )
+    (run_dir / ".heartbeat").write_text("")
+
+    provider = FilesystemActionProvider()
+    snapshot = provider.get_evaluation_status(f"ext-{run_id}", reports_dir=reports)
+
+    assert snapshot is not None
+    assert snapshot.deadline_at is None

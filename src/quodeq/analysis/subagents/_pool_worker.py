@@ -1,6 +1,7 @@
 """Worker logic: building agent configs and running single subagents."""
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -33,10 +34,17 @@ def build_agent_config(
     jsonl_file = wctx.evidence_dir / f"{wctx.dimension_key}_evidence.jsonl"
     stream_file = wctx.evidence_dir / f"{wctx.dimension_key}_{agent_id}.stream"
     bc = base_config
-    # Cap per-agent duration to pool budget so agents can't outlive the pool
     agent_dur = bc.max_duration or _DEFAULT_MAX_DURATION_S
-    if bc.pool_budget and bc.pool_budget > 0:
-        agent_dur = min(agent_dur, bc.pool_budget)
+    # Clamp to remaining budget so the last in-flight agent dies on or
+    # before the run-level deadline. Without this, a respawn near the
+    # deadline gets a fresh full-length cap and extends the run.
+    if bc.deadline_at is not None:
+        remaining = max(1, int(bc.deadline_at - time.monotonic()))
+        agent_dur = min(agent_dur, remaining)
+    elif bc.time_limit and bc.time_limit > 0:
+        # Legacy clamp: kept for runs without a deadline. A later task will
+        # retire this branch entirely.
+        agent_dur = min(agent_dur, bc.time_limit)
     ac = AnalysisConfig(
         jsonl_file=jsonl_file, analysis_budget=bc.analysis_budget,
         heartbeat_interval=bc.heartbeat_interval, heartbeat_callback=bc.heartbeat_callback,

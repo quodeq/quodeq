@@ -22,6 +22,8 @@ import openai
 from pydantic import BaseModel, Field
 
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
+from quodeq.context.precedent import load_precedent_fingerprints
+from quodeq.context.project_shape import detect_shape
 from quodeq.core.standards.refs import load_compiled_requirements
 from quodeq.engine._ref_utils import load_compiled_refs
 from quodeq.shared.url_validation import validate_url_safe
@@ -216,6 +218,7 @@ def _enrich_findings(
     compiled_dir: Path | None,
     dimension: str | None,
     work_dir: Path | None,
+    project_dir: Path | None = None,
 ) -> list[dict]:
     """Enrich findings through FindingsRouter (same as MCP path)."""
     _infer_end_line(findings)
@@ -224,11 +227,15 @@ def _enrich_findings(
     try:
         compiled_refs = load_compiled_refs(compiled_dir, dimension) or {}
         compiled_reqs = load_compiled_requirements(compiled_dir, dimension) or {}
+        project_shape = detect_shape(work_dir) if work_dir is not None else None
+        precedents = load_precedent_fingerprints(project_dir) if project_dir else set()
         ctx = CompiledContext(
             compiled_refs=compiled_refs,
             compiled_reqs=compiled_reqs,
             dimension=dimension,
             work_dir=work_dir,
+            project_shape=project_shape,
+            precedent_fingerprints=precedents,
         )
 
         buf = io.StringIO()
@@ -276,7 +283,11 @@ def run_api_analysis(
     if source_file_paths:
         findings = _resolve_file_paths(findings, source_file_paths)
 
-    findings = _enrich_findings(findings, compiled_dir, dimension, work_dir)
+    # jsonl_file is `<project_dir>/<run_id>/evidence/<dim>_evidence.jsonl`,
+    # so the project directory is its great-grandparent. Used by the
+    # context-enricher pipeline to load prior dismissals as precedents.
+    project_dir = jsonl_file.parent.parent.parent if jsonl_file else None
+    findings = _enrich_findings(findings, compiled_dir, dimension, work_dir, project_dir)
 
     _log.debug("Received %d findings from API", len(findings))
 

@@ -1,28 +1,65 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { ACTIVE_PROVIDER_KEY, DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET } from '../../../constants.js';
+import { ACTIVE_PROVIDER_KEY, DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT_S } from '../../../constants.js';
 import useProviderSettings from '../hooks/useProviderSettings.js';
 import { classifyProvider } from './providerUtils.js';
 import OllamaTab from './OllamaTab.jsx';
 import CliProviderTab from './CliProviderTab.jsx';
 import CloudProviderTab from './CloudProviderTab.jsx';
+import HelpHint from '../../../components/HelpHint.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 
-const CLI_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), 'pool-budget': String(DEFAULT_POOL_BUDGET) };
+const PROVIDER_HINT = (
+  <>
+    <p>Quodeq works with several AI providers, but you need to install each one before you can use it.</p>
+    <p>For the CLI tools (Claude Code, Codex, Gemini), install them on your machine and they show up here ready to go. Ollama needs to be running locally. Cloud providers like OpenRouter need an API key set up.</p>
+    <p>Greyed out tabs below mean that provider isn&apos;t installed yet.</p>
+  </>
+);
+
+const INSTALL_INSTRUCTIONS = {
+  claude: (
+    <>
+      Install Claude Code from Anthropic&apos;s official documentation, then restart Quodeq. Once <code>claude</code> is on your PATH, this tab will be ready to use.
+    </>
+  ),
+  codex: (
+    <>
+      Install the OpenAI Codex CLI from the official OpenAI documentation, then restart Quodeq. Once <code>codex</code> is on your PATH, this tab will be ready to use.
+    </>
+  ),
+  gemini: (
+    <>
+      Install the Gemini CLI from Google&apos;s official documentation, then restart Quodeq. Once <code>gemini</code> is on your PATH, this tab will be ready to use.
+    </>
+  ),
+};
+
+const CLI_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), 'time-limit': String(DEFAULT_TIME_LIMIT_S) };
+const OLLAMA_DEFAULTS = { 'time-limit': '0' };
+const CLOUD_DEFAULTS_BY_ID = {
+  openrouter: { 'time-limit': String(DEFAULT_TIME_LIMIT_S), 'model': 'baidu/cobuddy:free' },
+};
 const DEFAULT_PROVIDER_ORDER = 50;
 
 const MIGRATION_DONE_KEY = 'cc-provider-tabs-migrated';
 const LEGACY_AI_CMD_KEY = 'cc-ai-cmd';
 const LEGACY_SETTING_MIGRATIONS = {
   'cc-max-subagents': 'subagents',
-  'cc-pool-budget': 'pool-budget',
+  // Legacy global key — migrate to provider-scoped 'time-limit' suffix.
+  'cc-pool-budget': 'time-limit',
+  'cc-time-limit': 'time-limit',
   'cc-per-dimension': 'per-dimension',
   'cc-ai-model': 'model',
 };
 
 function TabContent({ provider, providerConfig }) {
   const classification = classifyProvider(provider.id, provider.type, providerConfig);
-  const defaults = classification === 'cli' ? CLI_DEFAULTS : undefined;
+  const defaults = classification === 'cli'
+    ? CLI_DEFAULTS
+    : classification === 'local-api'
+      ? OLLAMA_DEFAULTS
+      : CLOUD_DEFAULTS_BY_ID[provider.id];
   const { state, update } = useProviderSettings(provider.id, defaults);
 
   if (classification === 'local-api') {
@@ -69,11 +106,12 @@ export default function ProviderTabs({ providerConfigs }) {
       });
       setClients(list);
       if (!activeTab && list.length > 0) {
-        setActiveTab(list[0].id);
-        localStorage.setItem(ACTIVE_PROVIDER_KEY, list[0].id);
+        const firstInstalled = list.find((c) => c.installed !== false) || list[0];
+        setActiveTab(firstInstalled.id);
+        localStorage.setItem(ACTIVE_PROVIDER_KEY, firstInstalled.id);
       }
       setClientsError(null);
-    }).catch(() => { setClients([]); setClientsError('Failed to load AI providers. Check that the server is running.'); });
+    }).catch(() => { setClients([]); setClientsError('We couldn’t load your AI providers. Make sure the server is running.'); });
   }, []);
 
   const selectTab = (id) => {
@@ -91,25 +129,41 @@ export default function ProviderTabs({ providerConfigs }) {
       {clientsError && <div className="settings-row"><span className="settings-error">{clientsError}</span></div>}
       <div className="settings-row">
         <div className="settings-row-label">
-          <span className="settings-label">AI Provider</span>
-          <span className="settings-description">Select the AI provider used when running evaluations</span>
+          <span className="settings-label-row">
+            <span className="settings-label">AI Provider</span>
+            <HelpHint label="AI provider help">{PROVIDER_HINT}</HelpHint>
+          </span>
+          <span className="settings-description">Choose which AI runs your evaluations.</span>
         </div>
         <div className="settings-pill-group" role="tablist">
-          {clients.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              role="tab"
-              aria-selected={c.id === activeTab}
-              className={`settings-pill${c.id === activeTab ? ' settings-pill--active' : ''}`}
-              onClick={() => selectTab(c.id)}
-            >
-              {c.label}
-            </button>
-          ))}
+          {clients.map((c) => {
+            const installed = c.installed !== false;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                role="tab"
+                aria-selected={c.id === activeTab}
+                aria-disabled={!installed}
+                title={installed ? undefined : `${c.label} isn’t installed yet`}
+                className={`settings-pill${c.id === activeTab ? ' settings-pill--active' : ''}${installed ? '' : ' settings-pill--disabled'}`}
+                onClick={() => selectTab(c.id)}
+              >
+                {c.label}
+              </button>
+            );
+          })}
         </div>
       </div>
-      {active && (
+      {active && active.installed === false && (
+        <div className="settings-row">
+          <div className="settings-install-hint">
+            <strong>{active.label} isn&apos;t installed yet.</strong>{' '}
+            {INSTALL_INSTRUCTIONS[active.id] || <>Install this provider on your machine and restart Quodeq, and this tab will be ready to use.</>}
+          </div>
+        </div>
+      )}
+      {active && active.installed !== false && (
         <div className="provider-tab-content">
           <TabContent key={active.id} provider={active} providerConfig={providerConfigs?.[active.id] || {}} />
         </div>

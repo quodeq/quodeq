@@ -1,8 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
+import HelpHint from '../../../components/HelpHint.jsx';
 import { useServerLog } from '../server-log/ServerLogContext.js';
 import { systemKeys } from '../../../api/queryKeys.js';
+
+const LOCAL_SERVER_HINT = (
+  <>
+    This server runs entirely on your own machine, so nothing leaves your computer. Quodeq is a local-first app that respects your privacy.
+  </>
+);
 
 const HEALTH_POLL_MS = 10000;
 
@@ -32,7 +39,10 @@ export default function ServerSection() {
   return (
     <section className="panel settings-section">
       <div className="panel-header">
-        <SectionLabel marker="▶">Server</SectionLabel>
+        <span className="settings-label-row">
+          <SectionLabel marker="▶">Local server</SectionLabel>
+          <HelpHint label="Local server help">{LOCAL_SERVER_HINT}</HelpHint>
+        </span>
       </div>
 
       <ServerStatusPill

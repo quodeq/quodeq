@@ -62,6 +62,6 @@ describe('OllamaTab', () => {
         <OllamaTab state={state} update={vi.fn()} />
       </Wrapper>,
     );
-    expect(await findByText(/Failed to load Ollama models/i)).toBeTruthy();
+    expect(await findByText(/couldn(?:'|’)t load your Ollama models/i)).toBeTruthy();
   });
 });

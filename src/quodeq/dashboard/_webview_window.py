@@ -135,18 +135,52 @@ class _WindowApi:
             pass
 
     def _get_running_evaluation(self) -> dict | None:
-        """Return the first running evaluation job, or None."""
+        """Return the first non-stale running evaluation job, or None.
+
+        Cross-checks each running job's ``outputProject`` against the
+        ``/api/projects`` list. A "running" record whose project no
+        longer exists (e.g. the project was deleted, or the API was
+        restarted while a job was mid-scan) is treated as stale and
+        ignored — otherwise the close dialog would pop up on shutdown
+        even when the user has no actual evaluation in flight.
+
+        Any failure fetching the projects list falls back to the
+        previous behavior (returning the first running job), so a
+        transient endpoint glitch can't accidentally suppress the
+        dialog during a real evaluation.
+        """
         if not self._base_url:
             return None
         try:
             req = urllib.request.Request(f"{self._base_url}/api/evaluations")
             with urllib.request.urlopen(req, timeout=_EVAL_CHECK_TIMEOUT_S) as resp:
                 jobs = json.loads(resp.read())
-                for j in (jobs if isinstance(jobs, list) else []):
-                    if j.get("status") == "running":
-                        return j
         except Exception:
-            pass
+            return None
+        running = [
+            j for j in (jobs if isinstance(jobs, list) else [])
+            if isinstance(j, dict) and j.get("status") == "running"
+        ]
+        if not running:
+            return None
+        try:
+            projects_req = urllib.request.Request(f"{self._base_url}/api/projects")
+            with urllib.request.urlopen(projects_req, timeout=_EVAL_CHECK_TIMEOUT_S) as resp:
+                data = json.loads(resp.read())
+            projects = (
+                data.get("projects", []) if isinstance(data, dict)
+                else (data if isinstance(data, list) else [])
+            )
+            project_ids = {p.get("id") for p in projects if isinstance(p, dict)}
+        except Exception:
+            return running[0]
+        for j in running:
+            project = j.get("outputProject") or j.get("project")
+            # Jobs without an ``outputProject`` are very-early-phase
+            # evals that haven't registered an output yet — keep
+            # treating those as valid.
+            if not project or project in project_ids:
+                return j
         return None
 
     @staticmethod
@@ -474,6 +508,35 @@ def _install_about_panel_override() -> None:
         print(f"[quodeq-about] NSTimer schedule failed: {exc}", file=_diag, flush=True)
 
 
+def _enable_windows_dark_titlebar(window_title: str) -> None:
+    """Tell DWM to render the native Windows titlebar in dark mode.
+
+    Without this, frameless=False shows a light titlebar that clashes with
+    the dark UI. Uses DWMWA_USE_IMMERSIVE_DARK_MODE — attribute id 20 on
+    Windows 10 build 19041+ and Windows 11, falling back to id 19 on older
+    builds. Failures are non-fatal: a light titlebar is ugly but functional.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+        hwnd = ctypes.windll.user32.FindWindowW(None, window_title)
+        if not hwnd:
+            return
+        value = ctypes.c_int(1)
+        size = ctypes.sizeof(value)
+        for attr in (20, 19):
+            res = ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                wintypes.HWND(hwnd), wintypes.DWORD(attr),
+                ctypes.byref(value), wintypes.DWORD(size),
+            )
+            if res == 0:
+                return
+    except (AttributeError, OSError):
+        pass
+
+
 def _set_app_icon() -> None:
     """Set the application icon (dock on macOS, taskbar on Windows)."""
     if sys.platform == "darwin":
@@ -504,11 +567,17 @@ def main() -> None:
     instance = InstanceController(sock_path)
     api = _WindowApi()
 
+    # Windows uses native chrome so users get the conventional top-right
+    # min/max/close, Snap layouts and Alt+Space. macOS and Linux stay
+    # frameless and rely on the Mac-style traffic-light dots injected by
+    # _webview_html.INJECT_JS.
+    #
     # easy_drag intercepts pointer events on any non-interactive element to
     # move the window — that breaks our resize splitter (a <div>, not a
     # <button>). Disable it and let the topbar opt-in via -webkit-app-region.
+    _frameless = sys.platform != "win32"
     window = webview.create_window("quodeq", url, width=_WINDOW_WIDTH, height=_WINDOW_HEIGHT,
-                                    frameless=True, easy_drag=False,
+                                    frameless=_frameless, easy_drag=False,
                                     background_color=_WINDOW_BG_COLOR, hidden=True,
                                     js_api=api)
     api.bind(window, api_pid=api_pid, instance=instance, base_url=url)
@@ -526,6 +595,8 @@ def main() -> None:
         # targets the pre-pywebview NSApp and gets overridden.
         if sys.platform == "darwin":
             _set_macos_app_identity()
+        elif sys.platform == "win32":
+            _enable_windows_dark_titlebar("quodeq")
 
     def _on_closing() -> bool:
         """Intercept native close (Cmd+Q, red button, window manager).

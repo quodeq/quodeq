@@ -23,7 +23,7 @@ def test_write_and_read_round_trip(tmp_path: Path) -> None:
     assert status["state"] == "pending"
     assert status["job_id"] == "ext-r"
     assert status["dimensions"] == ["security"]
-    assert status["schema_version"] == 1
+    assert status["schema_version"] == 2
 
 
 def test_atomic_write_uses_tmp_then_rename(tmp_path: Path, monkeypatch) -> None:

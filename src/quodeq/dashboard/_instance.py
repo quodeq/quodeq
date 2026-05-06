@@ -15,6 +15,12 @@ _RELOAD_PREFIX = "reload:"
 _MAX_UNIX_SOCK_PATH_LEN = 100
 _TCP_LOCALHOST = "127.0.0.1"
 _RECV_BUFFER_SIZE = 4096
+# listen(1) is too tight on macOS: the probe inside try_acquire() and a
+# follow-up send_reload() on the same path can fill the 1-slot backlog
+# before the listener thread drains it, returning ECONNREFUSED. Linux
+# silently rounds up so this only surfaces on Darwin. A small backlog is
+# plenty — we only ever expect a handful of pending reloads.
+_LISTEN_BACKLOG = 8
 _IS_WIN32 = sys.platform == "win32"
 _WIN_PORT_FILE = "dashboard.port"
 
@@ -100,7 +106,7 @@ class InstanceController:
 
         self._server_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self._bind_server_sock()
-        self._server_sock.listen(1)
+        self._server_sock.listen(_LISTEN_BACKLOG)
         self._server_sock.settimeout(_SOCK_TIMEOUT)
         return True
 
@@ -121,7 +127,7 @@ class InstanceController:
         self._server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_sock.bind((_TCP_LOCALHOST, 0))
         self._tcp_port = self._server_sock.getsockname()[1]
-        self._server_sock.listen(1)
+        self._server_sock.listen(_LISTEN_BACKLOG)
         self._server_sock.settimeout(_SOCK_TIMEOUT)
         self._port_file.write_text(str(self._tcp_port))
         return True

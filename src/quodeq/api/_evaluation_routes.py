@@ -22,13 +22,22 @@ from quodeq.services.scan_progress import build_scan_progress, progress_to_dict
 
 _logger = logging.getLogger(__name__)
 
+# Cap on /api/evaluations ?limit= so a client cannot ask the server to materialize
+# an unbounded list. limit=0 still means "no client cap" but we clamp the actual
+# value the provider sees. 1000 is well above any realistic dashboard query.
+_EVALUATIONS_LIST_HARD_CAP = 1000
+
 
 def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_rate_store: object | None = None) -> None:
     """Register evaluation listing and creation routes."""
 
     @app.get("/api/evaluations")
     def list_evaluations() -> Response:
-        limit = request.args.get("limit", 0, type=int)
+        raw_limit = request.args.get("limit", 0, type=int)
+        if raw_limit <= 0 or raw_limit > _EVALUATIONS_LIST_HARD_CAP:
+            limit = _EVALUATIONS_LIST_HARD_CAP
+        else:
+            limit = raw_limit
         state_arg = request.args.get("state", "").strip()
         states = {s for s in (v.strip() for v in state_arg.split(",")) if s} or None
         items = provider.list_evaluations(limit=limit, reports_dir=_reports_dir(), states=states)
@@ -61,6 +70,10 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
         try:
             options = _build_evaluation_options(payload)
+        except ValueError as exc:
+            body, status = error_response(str(exc), HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
+        try:
             job = provider.start_evaluation(repo=repo, reports_dir=_reports_dir(), options=options)
         except (FileNotFoundError, ValueError):
             body, status = error_response(
@@ -108,16 +121,20 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
         if run_dir is None:
             body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
-        # Pool budget for the running dim's bar — only available for jobs the
+        # Time limit for the running dim's bar — only available for jobs the
         # JobManager started; external runs surface no budget metadata.
-        pool_budget_s: int | None = None
+        time_limit_s: int | None = None
         snapshot = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
         if snapshot is not None:
             options = getattr(snapshot, "options", None) or {}
-            raw = options.get("poolBudget") if isinstance(options, dict) else None
+            # Read new key first; fall back to legacy `poolBudget` for back-compat.
+            raw = (
+                options.get("timeLimit", options.get("poolBudget"))
+                if isinstance(options, dict) else None
+            )
             if isinstance(raw, int) and raw > 0:
-                pool_budget_s = raw
-        progress = build_scan_progress(job_id, run_dir, pool_budget_s=pool_budget_s)
+                time_limit_s = raw
+        progress = build_scan_progress(job_id, run_dir, time_limit_s=time_limit_s)
         if progress is None:
             body, status = error_response("Run not ready", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status

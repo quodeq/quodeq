@@ -18,7 +18,9 @@ def _walk_source_files(
         for fname in filenames:
             suffix = os.path.splitext(fname)[1]
             if suffix in extensions:
-                yield os.path.relpath(os.path.join(dirpath, fname), src), suffix
+                # POSIX separators for cross-platform consistency.
+                rel = os.path.relpath(os.path.join(dirpath, fname), src).replace(os.sep, "/")
+                yield rel, suffix
 
 
 def list_source_files(src: Path, extensions: set[str], skip_dirs: frozenset[str] = frozenset()) -> list[str]:

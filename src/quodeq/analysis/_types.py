@@ -29,8 +29,9 @@ class AnalysisOptions:
     ai_model: str | None = None
     verify_findings: bool = True
     consolidated: bool = True
-    pool_budget: int | None = None
-    incremental: bool = False
+    time_limit: int | None = None
+    deadline_at: float | None = None
+    incremental: bool = True
     incremental_file_filter: set[str] | None = None
     dry_run: bool = False
     # PR diff mode: analyze only files changed since `diff_from`.

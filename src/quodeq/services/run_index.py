@@ -18,6 +18,7 @@ from pathlib import Path
 
 from quodeq.services._index_sync import (
     _check_stale_and_promote,
+    _delete_orphan_non_terminal_rows,
     _sync_legacy_run,
     _upsert_from_status,
     _status_mtime_ns,
@@ -102,12 +103,20 @@ def open_index(db_path: Path) -> sqlite3.Connection:
     db_path = Path(db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
+    db: sqlite3.Connection | None = None
     try:
         db = sqlite3.connect(str(db_path))
         db.execute("PRAGMA journal_mode=WAL")
         db.execute("PRAGMA busy_timeout=3000")
     except sqlite3.DatabaseError as exc:
         _logger.warning("index DB at %s is corrupt (%s) — recreating", db_path, exc)
+        # Windows holds a file handle while the connection is open, so the
+        # subsequent unlink would raise PermissionError. Close first.
+        if db is not None:
+            try:
+                db.close()
+            except sqlite3.Error:
+                pass
         db_path.unlink(missing_ok=True)
         db = sqlite3.connect(str(db_path))
         db.execute("PRAGMA journal_mode=WAL")
@@ -177,11 +186,13 @@ def _sync_one_run(
 def sync_index(db: sqlite3.Connection, evaluations_root: Path) -> None:
     """Lazy upsert: walk *evaluations_root*, sync any run whose status.json
     changed since last seen OR that lacks an index row entirely. Promote
-    stale non-terminal runs.
+    stale non-terminal runs. Sweep non-terminal rows whose ``run_dir`` is
+    gone — those can't be rescued by the heartbeat-based stale check.
     """
     with db:
         for project_uuid, run_id, run_dir in _walk_run_dirs(evaluations_root):
             _sync_one_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+        _delete_orphan_non_terminal_rows(db)
 
 
 def sync_index_for_run(db: sqlite3.Connection, run_dir: Path) -> None:

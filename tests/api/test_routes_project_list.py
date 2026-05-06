@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -9,6 +10,11 @@ import pytest
 from flask import Flask
 
 from quodeq.api.routes_project_list import register_project_list_routes
+
+# Path.is_absolute() requires a drive letter on Windows ("/Users/test/code"
+# is not absolute there), so use a platform-appropriate sample path for
+# routes that validate absolute-ness.
+_ABS_SAMPLE_PATH = "C:\\Users\\test\\code" if os.name == "nt" else "/Users/test/code"
 
 
 class _FakeProvider:
@@ -131,16 +137,16 @@ class TestUpdateProjectPath:
         assert resp.status_code == 400
 
     def test_update_success(self, client, provider):
-        resp = client.patch("/api/projects/my-proj/path", json={"path": "/Users/test/code"})
+        resp = client.patch("/api/projects/my-proj/path", json={"path": _ABS_SAMPLE_PATH})
         assert resp.status_code == 200
         body = resp.get_json()
         assert body["updated"] == "my-proj"
-        assert body["path"] == "/Users/test/code"
+        assert body["path"] == str(Path(_ABS_SAMPLE_PATH).resolve(strict=False))
 
     def test_update_not_found(self, client, provider):
         # Make update_project_path return False
         provider.update_project_path = lambda *a: False
-        resp = client.patch("/api/projects/my-proj/path", json={"path": "/Users/test/code"})
+        resp = client.patch("/api/projects/my-proj/path", json={"path": _ABS_SAMPLE_PATH})
         assert resp.status_code == 404
 
 

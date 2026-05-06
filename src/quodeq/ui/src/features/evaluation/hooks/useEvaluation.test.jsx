@@ -5,6 +5,10 @@ import { useEvaluation } from "./useEvaluation";
 import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
 import { ApiProvider } from "../../../api/ApiContext.jsx";
 
+vi.mock("../../../utils/confirmDialog.js", () => ({
+  confirmDialog: vi.fn().mockResolvedValue({ ok: true, checked: false }),
+}));
+
 const fakeApi = {
   getEvaluation: vi.fn(),
   startEvaluation: vi.fn(),
@@ -102,6 +106,29 @@ describe("useEvaluation", () => {
     );
   });
 
+  it("cancelEvaluation surfaces an error and clears the job when the API rejects", async () => {
+    fakeApi.startEvaluation.mockResolvedValue({
+      jobId: "j-stuck",
+      status: "running",
+      dimensions: [],
+    });
+    fakeApi.cancelEvaluation.mockRejectedValue(new Error("Could not cancel job"));
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await act(async () => {
+      await result.current.startEvaluation({ repo: "x", dimensions: [] });
+    });
+    await waitFor(() => expect(result.current.job?.jobId).toBe("j-stuck"));
+
+    await act(async () => {
+      await result.current.cancelEvaluation();
+    });
+
+    await waitFor(() => {
+      expect(result.current.jobError).toMatch(/cancel/i);
+      expect(result.current.job).toBeNull();
+    });
+  });
+
   it("startEvaluation surfaces a useful error when no provider is configured", async () => {
     localStorage.removeItem("cc-active-provider");
     const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
@@ -109,5 +136,54 @@ describe("useEvaluation", () => {
       result.current.startEvaluation({ repo: "x", dimensions: [] }),
     ).rejects.toThrow(/provider/i);
     await waitFor(() => expect(result.current.jobError).toMatch(/provider/i));
+  });
+
+  it("adopts a running CLI-started external run on mount", async () => {
+    const running = {
+      jobId: "ext-abc",
+      status: "running",
+      source: "external",
+      dimensions: ["security"],
+    };
+    fakeApi.listEvaluations.mockResolvedValue([running]);
+    fakeApi.getEvaluation.mockResolvedValue(running);
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await waitFor(() => {
+      expect(result.current.job?.jobId).toBe("ext-abc");
+    });
+    expect(fakeApi.listEvaluations).toHaveBeenCalledWith(
+      expect.objectContaining({ states: ["running"] }),
+    );
+  });
+
+  it("does not overwrite a user-started job when the resume resolves later", async () => {
+    let resolveList;
+    fakeApi.listEvaluations.mockReturnValue(
+      new Promise((r) => {
+        resolveList = r;
+      }),
+    );
+    fakeApi.startEvaluation.mockResolvedValue({
+      jobId: "j-fresh",
+      status: "pending",
+      dimensions: [],
+    });
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await act(async () => {
+      await result.current.startEvaluation({ repo: "x", dimensions: [] });
+    });
+    expect(result.current.job?.jobId).toBe("j-fresh");
+    await act(async () => {
+      resolveList([{ jobId: "ext-old", status: "running", source: "external" }]);
+    });
+    expect(result.current.job?.jobId).toBe("j-fresh");
+  });
+
+  it("ignores listEvaluations failure on mount", async () => {
+    fakeApi.listEvaluations.mockRejectedValue(new Error("network"));
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await waitFor(() => expect(fakeApi.listEvaluations).toHaveBeenCalled());
+    expect(result.current.job).toBeNull();
+    expect(result.current.jobError).toBeNull();
   });
 });

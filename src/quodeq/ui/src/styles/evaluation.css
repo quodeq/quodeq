@@ -46,7 +46,22 @@
 
 .eval-provider-model {
   font-family: monospace;
-  font-size: 0.72rem;
+  font-size: 0.62rem;
+}
+
+/* Clickable variant — used on the Evaluate page header to navigate to settings. */
+button.eval-provider-badge--clickable {
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 120ms, background 120ms;
+}
+button.eval-provider-badge--clickable:hover {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface-alt));
+}
+button.eval-provider-badge--clickable:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 .evaluate-content {
@@ -58,6 +73,20 @@
   padding: 24px;
 }
 
+/* ── No-project-selected state on the Evaluate tab ── */
+
+.evaluate-no-project {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.evaluate-no-project__hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
 
 .form-group {
   display: flex;
@@ -129,220 +158,9 @@
   font-size: 0.9rem;
 }
 
-/* Job Panel */
-.evaluate-job-panel {
-  padding: 24px;
-}
-
-.job-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.job-header-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.job-header h3 {
-  margin: 0;
-  font-size: var(--text-lg);
-  font-weight: var(--weight-semibold);
-  color: var(--color-text);
-}
-
-/* Header right cluster */
-.job-header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Inline cancel — identical pill to the running badge, accent colour, no animation */
-.job-cancel-inline {
-  display: inline-block;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  line-height: inherit;
-  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
-  border: none;
-  color: var(--color-danger);
-  cursor: pointer;
-  transition: background 150ms ease;
-}
-
-.job-cancel-inline:hover {
-  background: color-mix(in srgb, var(--color-danger) 22%, transparent);
-}
-
-/* Header action buttons (top-right, next to badge) */
-.job-header-view-btn {
-  display: inline-block;
-  padding: 4px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-  color: var(--color-accent);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  cursor: pointer;
-  transition: background 150ms ease, transform 150ms ease, box-shadow 150ms ease;
-}
-
-.job-header-view-btn:hover {
-  background: color-mix(in srgb, var(--color-accent) 22%, transparent);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 25%, transparent);
-}
-
-.job-header-dismiss-btn {
-  display: inline-block;
-  padding: 4px 12px;
-  border-radius: 20px;
-  border: 1px solid var(--color-border);
-  background: transparent;
-  color: var(--color-text-muted);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
-}
-
-.job-header-dismiss-btn:hover {
-  background: var(--color-surface-alt);
-  border-color: color-mix(in srgb, var(--color-text-muted) 50%, transparent);
-  color: var(--color-text);
-}
-
-/* Status badge */
-.job-status-badge {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.job-status-badge.pending {
-  background: var(--color-warning-bg);
-  color: var(--color-warning-text);
-}
-
-.job-status-badge.running {
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-  color: var(--color-accent);
-  animation: pulse 2s infinite;
-}
-
-.job-status-badge.done,
-.job-status-badge.completed {
-  background: color-mix(in srgb, var(--color-success) 12%, transparent);
-  color: var(--color-success);
-}
-
-.job-status-badge.failed {
-  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
-  color: var(--color-danger);
-}
-
-.job-status-badge.cancelled {
-  background: color-mix(in srgb, var(--color-text-muted) 10%, transparent);
-  color: var(--color-text-muted);
-}
-
-.job-status-badge--stale {
-  background: var(--color-warning-bg);
-  color: var(--color-warning-text);
-  border-color: color-mix(in srgb, var(--color-warning) 35%, transparent);
-}
-
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
-}
-
-/* Meta grid — flex with wrap. Each item is sized to its content; the
-   Job ID item gets `flex: 1` so the long UUID + copy row absorbs the
-   leftover horizontal space rather than leaving a dead gap. */
-.job-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 12px 28px;
-  margin-bottom: 20px;
-  padding: 16px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-}
-
-.job-meta-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  flex: 0 0 auto;
-}
-
-.job-meta-item--id {
-  flex: 1 1 220px;
-}
-
-.job-meta-item--full {
-  flex: 0 0 100%;
-}
-
-.job-meta-label {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  color: var(--color-text-subtle);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.job-meta-value {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--color-accent);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.job-meta-code {
-  font-family: var(--font-data);
-  font-size: var(--text-sm);
-  color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.job-meta-code--muted {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-}
-
-.job-meta-id-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.job-meta-id-row .job-meta-code {
-  flex: 1;
-  min-width: 0;
 }
 
 /* Console */
@@ -1036,9 +854,9 @@
   display: flex;
   flex-direction: row;
   justify-content: flex-end;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
-  margin-bottom: 12px;
+  margin-bottom: 0;
   min-height: 22px;
 }
 
@@ -1048,21 +866,25 @@
 
 .clean-scan-toggle {
   padding: 2px 8px;
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-border);
+  background: transparent;
+  border: 1px dotted var(--color-border);
   color: var(--color-text-muted);
   font-size: 0.7rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, border-style 0.15s;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
 }
 
 .clean-scan-toggle:hover:not(:disabled) {
-  background: var(--color-surface);
-  color: var(--color-text);
+  border-style: solid;
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: transparent;
 }
 
 .clean-scan-toggle:disabled {
@@ -1110,18 +932,22 @@
 
 .scope-compact-btn {
   padding: 2px 8px;
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-border);
+  background: transparent;
+  border: 1px dotted var(--color-border);
   color: var(--color-text-muted);
   font-size: 0.7rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, border-style 0.15s;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
 }
 
 .scope-compact-btn:hover {
-  background: var(--color-accent);
-  color: var(--color-on-accent, #fff);
+  border-style: solid;
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: transparent;
 }
 
 .scope-display {
@@ -1183,30 +1009,6 @@
 .re-eval-project-name {
   color: var(--color-accent);
   font-weight: var(--weight-semibold);
-}
-
-.re-eval-repo-path {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 10px 14px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  min-width: 0;
-}
-
-.re-eval-repo-label {
-  flex-shrink: 0;
-  padding: 2px 8px;
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  color: var(--color-text-subtle);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .re-eval-repo-path code {
@@ -1367,6 +1169,102 @@
   border-color: var(--color-accent);
   color: var(--color-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 28%, transparent);
+}
+
+/* ------------------------------------------------------------
+   DimensionSelector — terminal variant. Matches the
+   evaluate-panel--terminal aesthetic (mono font, minimal
+   chrome, square corners, dotted dividers).
+   ------------------------------------------------------------ */
+.dimension-label-row--terminal label {
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+.dim-action-btn--terminal {
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--term-radius);
+  border: 1px dotted var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+.dim-action-btn--terminal:hover {
+  border-style: solid;
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: transparent;
+}
+.dimension-grid--terminal {
+  background: transparent;
+  border: 0;
+  border-top: 1px dotted var(--color-border);
+  border-bottom: 1px dotted var(--color-border);
+  border-radius: 0;
+  padding: var(--term-space-2) 0;
+  gap: var(--term-space-2);
+}
+.dimension-chip-btn--terminal {
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+  font-weight: var(--weight-regular);
+  padding: 4px 10px;
+  border-radius: var(--term-radius);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  gap: 8px;
+  box-shadow: none;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+.dimension-chip-btn--terminal .dimension-chip-mark {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+.dimension-chip-btn--terminal:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+  background: transparent;
+  box-shadow: none;
+}
+.dimension-chip-btn--terminal.selected {
+  border-color: var(--color-accent);
+  background: transparent;
+  color: var(--color-accent);
+  font-weight: var(--weight-medium);
+  box-shadow: none;
+}
+.dimension-chip-btn--terminal.selected .dimension-chip-mark {
+  color: var(--color-accent);
+}
+.dimension-chip-btn--terminal.selected:hover:not(:disabled) {
+  background: var(--color-accent-soft);
+  box-shadow: none;
+}
+/* High-specificity overrides so the terminal variant beats the colour
+   pills (dimension-chip-type--builtin / --quodeq / --custom / --community)
+   which are defined later in the stylesheet. */
+.dimension-chip-btn--terminal .dimension-chip-type,
+.dimension-chip-btn--terminal .dimension-chip-type--builtin,
+.dimension-chip-btn--terminal .dimension-chip-type--quodeq,
+.dimension-chip-btn--terminal .dimension-chip-type--custom,
+.dimension-chip-btn--terminal .dimension-chip-type--community {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-family: var(--term-font-mono);
+  font-size: 10px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: var(--weight-regular);
 }
 
 /* Improve submit button */
@@ -2571,6 +2469,15 @@
   font-weight: bold;
 }
 
+/* Text-content variant of .folder-nav-btn — used by the "Create" button in
+   the new-folder row, where the fixed 36px square clips the label. */
+.folder-nav-btn--text {
+  width: auto;
+  padding: 0 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
 /* ── Dismissed findings section ─────────────────────── */
 .dismissed-bar {
   display: flex;
@@ -2696,6 +2603,26 @@
 .restore-btn:hover {
   border-color: var(--color-accent);
   background: rgba(88, 166, 255, 0.08);
+}
+.dismissed-card-top .delete-btn {
+  margin-left: 6px;
+}
+.delete-btn {
+  font-size: 0.7rem;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-danger, #da3633);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 150ms ease;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.delete-btn:hover {
+  border-color: var(--color-danger, #da3633);
+  background: rgba(218, 54, 51, 0.08);
 }
 
 /* ─── ScanProgress ─── */
@@ -2916,3 +2843,153 @@
 .scan-progress__budget--overrun { color: var(--color-sev-critical-text, #f85149); }
 .scan-progress__partial  { color: var(--color-warn, #d29922); text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; }
 .scan-progress__dim-reason { color: var(--color-warn, #d29922); font-style: italic; }
+
+.eval-countdown {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+  color: var(--color-accent);
+  margin-right: 0.75rem;
+  letter-spacing: 0.04em;
+}
+.eval-countdown--idle {
+  color: var(--color-text-muted);
+}
+.eval-countdown--alert {
+  color: var(--color-danger);
+}
+
+/* ------------------------------------------------------------
+   .evaluate-panel--terminal — terminal-aesthetic wrapper for
+   the ReEvaluateCard, EvaluationStatus job panel, and
+   NoProjectSelected card. Mirrors `.acc-eval-panel--terminal`
+   from the overview panel: subtle border, surface background,
+   uniform internal padding.
+   ------------------------------------------------------------ */
+.evaluate-panel--terminal {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+  padding: var(--term-space-4);
+}
+.evaluate-panel__top {
+  margin-bottom: var(--term-space-3);
+}
+.evaluate-panel__top--row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--term-space-3);
+}
+.evaluate-panel__top-actions {
+  display: flex;
+  gap: var(--term-space-2);
+  align-items: center;
+}
+
+/* ------------------------------------------------------------
+   re-eval-repo-path--terminal — replaces the boxed `Local
+   /path/...` row with a flush mono `▸ local /path/...` line.
+   ------------------------------------------------------------ */
+.re-eval-repo-path--terminal {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dotted var(--color-border);
+  border-radius: 0;
+  padding: var(--term-space-2) 0;
+  margin-bottom: var(--term-space-3);
+  font-family: var(--term-font-mono);
+  display: flex;
+  align-items: baseline;
+  gap: var(--term-space-1);
+}
+.re-eval-repo-path__sep {
+  color: var(--color-text-muted);
+  margin-left: var(--term-space-1);
+}
+.re-eval-repo-path__branch {
+  color: var(--color-text-muted);
+}
+.re-eval-repo-path--terminal code {
+  /* Override the legacy `.re-eval-repo-path code { flex: 1 }` — in the
+     terminal variant we want path and @branch to sit shoulder to shoulder
+     instead of pushing the branch to the far right of the row. */
+  flex: none;
+}
+.re-eval-repo-path--terminal .re-eval-repo-path__arrow {
+  color: var(--color-accent);
+}
+.re-eval-repo-path--terminal .re-eval-repo-path__label {
+  color: var(--color-text-muted);
+  text-transform: lowercase;
+  font-size: 12px;
+}
+.re-eval-repo-path--terminal code {
+  color: var(--color-text);
+  font-size: 12px;
+  background: transparent;
+  padding: 0;
+}
+
+/* ------------------------------------------------------------
+   term-meta-grid — replaces .job-meta. Same 2x2 shape, mono
+   chrome, dotted dividers top/bottom.
+   ------------------------------------------------------------ */
+.term-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--term-space-2) var(--term-space-4);
+  padding: var(--term-space-3) 0;
+  border-top: 1px dotted var(--color-border);
+  border-bottom: 1px dotted var(--color-border);
+  margin-bottom: var(--term-space-3);
+  font-family: var(--term-font-mono);
+}
+.term-meta-grid__item--full {
+  grid-column: 1 / -1;
+}
+.term-meta-grid__label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: 2px;
+}
+.term-meta-grid__value {
+  font-size: 12px;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.term-meta-grid__value code {
+  color: var(--color-text);
+  background: transparent;
+  padding: 0;
+  font-family: var(--term-font-mono);
+}
+
+/* ------------------------------------------------------------
+   evaluate-job-id-line — minimal mono row showing just the job
+   ID with a copy button. Replaces the old `term-meta-grid`
+   block that surfaced project / provider / repo redundantly.
+   ------------------------------------------------------------ */
+.evaluate-job-id-line {
+  display: flex;
+  align-items: center;
+  gap: var(--term-space-2);
+  padding: var(--term-space-2) 0;
+  margin-bottom: var(--term-space-3);
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+.evaluate-job-id-line__label {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.evaluate-job-id-line code {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  background: transparent;
+  padding: 0;
+  font-family: var(--term-font-mono);
+}

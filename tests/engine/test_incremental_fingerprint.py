@@ -97,7 +97,7 @@ class TestBackfillSkipsVerification:
     def test_verify_findings_disabled_during_backfill(self, mock_process, tmp_path):
         """Backfill disables verify_findings before calling _process_single_dimension."""
         config = MagicMock()
-        config.options.pool_budget = 600
+        config.options.time_limit = 600
         config.options.verify_findings = True
         config.options.incremental_file_filter = None
 
@@ -131,7 +131,7 @@ class TestBackfillSkipsVerification:
     def test_verify_findings_restored_on_error(self, mock_process, tmp_path):
         """verify_findings is restored even if _process_single_dimension raises."""
         config = MagicMock()
-        config.options.pool_budget = 600
+        config.options.time_limit = 600
         config.options.verify_findings = True
         config.options.incremental_file_filter = None
 

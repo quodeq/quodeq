@@ -38,7 +38,7 @@
 }
 .term-header__prompt {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--term-space-2);
 }
 .term-header__glyph {
@@ -581,6 +581,11 @@
 .evaluate-header--terminal .evaluate-header__left {
   min-width: 0;
   flex: 1;
+}
+.evaluate-header--terminal .evaluate-header__right {
+  display: flex;
+  align-items: center;
+  gap: var(--term-space-2);
 }
 .evaluate-header--terminal .term-header {
   margin: 0;
@@ -1618,10 +1623,97 @@
   background: var(--color-accent-soft);
   color: var(--color-accent);
 }
+
+/* Collapsed rail (no hover, not pinned): show only the icon, wrapped
+   in a circular highlight. Labels and count badges are positioned
+   absolutely so they don't participate in flex layout — the icon
+   then stays at its flex-start position throughout the rail-width
+   transition, and the text doesn't slide horizontally as it fades.
+   The rail's overflow:hidden clips the labels in screen space while
+   they fade, but the text itself doesn't move. */
+.sidebar.sidebar--expanded .sidebar-nav-item {
+  position: relative;
+}
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item {
+  background: transparent !important;
+}
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item.active {
+  color: var(--color-accent);
+}
+
+/* Take labels and count badges out of the row's flex flow. Anchor
+   them by their left edge (a fixed offset from button-left, which is
+   itself fixed in screen coords) so they don't slide with the
+   button-right edge during the collapse animation. */
 .sidebar.sidebar--expanded .sidebar-nav-label {
-  display: inline !important;
+  position: absolute;
+  /* button-padding + icon-width + gap → land just to the right of the icon */
+  left: calc(var(--term-space-2) + 18px + var(--term-space-2));
+  top: 50%;
+  transform: translateY(-50%);
+  /* Cap label width so long names truncate without colliding with the
+     count badge's anchored position; box width stays constant across
+     rail states so the text doesn't visibly shrink as it fades. */
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 0 auto;
+}
+.sidebar.sidebar--expanded .sidebar-nav-count {
+  position: absolute;
+  /* Anchor to button-left (constant in screen coords) at the position
+     this badge occupies in the 240px expanded rail. A `right` anchor
+     would slide leftward with the button-right edge during the
+     collapse animation — the same horizontal motion the user
+     disliked. */
+  left: 184px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* The .sidebar-nav-label rule further down sets `opacity: 1
+   !important`, which would defeat the fade-out. Override with higher
+   specificity so the existing 160ms opacity transition reaches 0
+   when the rail is collapsed. */
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-label {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+/* Circular highlight, positioned over the icon's flex-start location
+   (button-padding-left + icon-width / 2). */
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: calc(var(--term-space-2) + 9px);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  transition: background 120ms ease;
+  z-index: 0;
+}
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item:hover::before {
+  background: var(--color-surface-alt);
+}
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item.active::before {
+  background: var(--color-accent-soft);
+}
+.sidebar.sidebar--expanded:not(:hover):not(.sidebar--pinned) .sidebar-nav-item svg {
+  position: relative;
+  z-index: 1;
+}
+.sidebar.sidebar--expanded .sidebar-nav-label {
+  display: inline-block !important;
   flex: 1 1 auto;
+  min-width: 0;
   opacity: 1 !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sidebar.sidebar--expanded .sidebar-nav-count {
   font-size: 10px;
@@ -2050,4 +2142,105 @@
   .dashboard { padding: var(--term-space-2); }
   .term-header__name { font-size: 17px; }
   .term-stat__value { font-size: 22px; }
+}
+
+/* ------------------------------------------------------------
+   term-btn — terminal-aesthetic buttons.
+   Originally introduced for the onboarding wizard, now used
+   across onboarding, evaluate, and any other terminal-styled
+   screen. Variants: --primary | --secondary | --ghost.
+   ------------------------------------------------------------ */
+.term-btn--primary,
+.term-btn--secondary,
+.term-btn--ghost {
+  font-family: var(--term-font-mono);
+  font-size: 13px;
+  border-radius: var(--term-radius);
+  padding: var(--term-space-2) var(--term-space-3);
+  cursor: pointer;
+  transition: background 120ms ease;
+  background: transparent;
+}
+.term-btn--primary {
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+}
+.term-btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+.term-btn--secondary {
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+.term-btn--secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+.term-btn--ghost {
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+.term-btn--ghost:hover:not(:disabled) {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+}
+.term-btn--primary:disabled,
+.term-btn--secondary:disabled,
+.term-btn--ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Filled variant — solid accent background. Compose with --primary,
+   e.g. `term-btn term-btn--primary term-btn--filled`. Theme-safe via
+   --color-on-accent (works in both light and dark themes). */
+.term-btn--filled {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+.term-btn--filled:hover:not(:disabled) {
+  background: var(--color-accent-hover, color-mix(in srgb, var(--color-accent) 90%, black));
+  color: var(--color-on-accent);
+  border-color: var(--color-accent-hover, color-mix(in srgb, var(--color-accent) 90%, black));
+}
+
+/* ------------------------------------------------------------
+   term-status-pill — mono outline pill used in the evaluation
+   job header (running / done / failed / lost / cancelled).
+   Replaces the legacy `.job-status-badge` chip.
+   ------------------------------------------------------------ */
+.term-status-pill {
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: var(--term-radius);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  text-transform: lowercase;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.term-status-pill--running   { color: var(--color-warning); }
+.term-status-pill--done,
+.term-status-pill--completed { color: var(--color-success); }
+.term-status-pill--failed,
+.term-status-pill--lost      { color: var(--color-sev-critical-text); }
+.term-status-pill--cancelled { color: var(--color-text-muted); }
+.term-status-pill--stale {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  border-color: color-mix(in srgb, var(--color-warning) 35%, transparent);
+}
+
+/* ------------------------------------------------------------
+   eval-job-stat-strip — small variant of <StatStrip cards>.
+   Wrap the strip in a <div class="eval-job-stat-strip"> to
+   shrink the cell padding and value font for the in-job header.
+   ------------------------------------------------------------ */
+.eval-job-stat-strip { margin-bottom: var(--term-space-3); }
+.eval-job-stat-strip .term-stat-strip--cards .term-stat {
+  padding: 10px 12px;
+}
+.eval-job-stat-strip .term-stat__value {
+  font-size: 18px;
 }

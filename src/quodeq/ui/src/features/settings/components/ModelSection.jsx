@@ -91,6 +91,10 @@ function ModelOverrideInput({ label, value, setter, level, placeholder }) {
         value={value}
         placeholder={placeholder}
         onChange={(e) => handleModelChange(level, e.target.value, setter)}
+        autoCapitalize="off"
+        autoCorrect="off"
+        autoComplete="off"
+        spellCheck={false}
       />
     </div>
   );
@@ -116,6 +120,10 @@ function ModelSettings({ aiCmd, models }) {
           placeholder="default"
           onChange={(e) => handleModelChange(null, e.target.value, onAiModelChange, AI_MODEL_STORAGE_KEY)}
           aria-label="Model override"
+          autoCapitalize="off"
+          autoCorrect="off"
+          autoComplete="off"
+          spellCheck={false}
         />
       </div>
       <div className="settings-row">

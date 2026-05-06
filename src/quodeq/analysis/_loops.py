@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from copy import copy
 from dataclasses import replace
 from collections.abc import Callable
@@ -80,6 +81,10 @@ def run_incremental_loop(
     log_info(f"[loop] incremental: {len(dimensions)} dim(s) to process: {', '.join(dimensions)}")
     for idx, dimension in enumerate(dimensions, 1):
         log_info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
+        deadline = getattr(config.options, "deadline_at", None)
+        if deadline is not None and time.monotonic() >= deadline:
+            log_info(f"[loop] deadline reached -- skipping {dimension} and remaining dims")
+            break
         emit_marker("analyzing", dimension=dimension)
         log_info(f"\u2192 [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
         ev: Evidence | None = None
@@ -179,6 +184,10 @@ def run_per_dimension_loop(
     log_info(f"[loop] per-dimension: {len(dimensions)} dim(s) to process: {', '.join(dimensions)}")
     for idx, dimension in enumerate(dimensions, 1):
         log_info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
+        deadline = getattr(config.options, "deadline_at", None)
+        if deadline is not None and time.monotonic() >= deadline:
+            log_info(f"[loop] deadline reached -- skipping {dimension} and remaining dims")
+            break
         ev: Evidence | None = None
         try:
             ev = process_fn(config, dimension, idx, ctx)

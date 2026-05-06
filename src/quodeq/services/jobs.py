@@ -240,6 +240,8 @@ class JobManager:
         elif phase in ("analyzing", "scoring"):
             job.current_dimension = marker.get("dimension")
             job.phase = phase
+        elif phase == "analyzing_start":
+            job.deadline_at = marker.get("deadline_at")
         elif phase == "report_path":
             project = marker.get("project")
             run_id = marker.get("runId")

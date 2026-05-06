@@ -72,7 +72,7 @@ function LanguageNumbers({ stats, filesCount }) {
 }
 
 function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildren }) {
-  const { onSelect, footer, isChild = false } = cardProps;
+  const { onSelect, footer, isChild = false, onResumeSetup } = cardProps;
   const id = project.id || project.name || project;
   const name = project.name || project;
   const grade = gradeLabel(project.overallGrade ?? project.latestGrade);
@@ -92,6 +92,18 @@ function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildr
         <div className="project-card-top">
           <div className="project-card-top-left">
             <span className="project-card-name">{project.displayName || name}</span>
+            {project.onboardingCompletedAt === null && onResumeSetup && (
+              <button
+                type="button"
+                className="resume-setup-badge"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onResumeSetup(id);
+                }}
+              >
+                Resume setup
+              </button>
+            )}
             {project.scopePath && <span className="scope-badge">{project.scopePath}</span>}
             <GradeChip grade={grade} score={score} />
           </div>
@@ -173,7 +185,7 @@ function CardFooter({ name, confirming, setConfirming, onDelete, onExport }) {
   );
 }
 
-function ProjectPathContent({ id, p, relocateActions }) {
+function ProjectPathContent({ id, p, relocateActions, subprojectCount = 0 }) {
   const { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate } = relocateActions;
   const path = formatPath(p.path);
   const pathMissing = p.location === 'local' && p.pathExists === false;
@@ -199,11 +211,16 @@ function ProjectPathContent({ id, p, relocateActions }) {
       {pathMissing && (
         <button type="button" className="project-path-action project-path-action--warn" onClick={(e) => { e.stopPropagation(); startRelocate(id, p.path); }}>Relocate</button>
       )}
+      {subprojectCount > 0 && (
+        <span className="project-subprojects-tag">
+          subprojects <span className="project-subprojects-tag-count">{subprojectCount}</span>
+        </span>
+      )}
     </div>
   );
 }
 
-function ProjectChildren({ childList, selectedProject, onSelect, confirmActions }) {
+function ProjectChildren({ childList, selectedProject, onSelect, confirmActions, onResumeSetup }) {
   const { confirming, setConfirming, onDelete, onExport } = confirmActions;
   return (
     <div className="project-children-outer">
@@ -211,7 +228,7 @@ function ProjectChildren({ childList, selectedProject, onSelect, confirmActions 
         const childId = child.id || child.name || child;
         return (
           <div key={childId} className="project-child-entry">
-            <ProjectCard project={child} isSelected={childId === selectedProject} cardProps={{ onSelect, isChild: true, footer: <CardFooter name={childId} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} /> }} />
+            <ProjectCard project={child} isSelected={childId === selectedProject} cardProps={{ onSelect, isChild: true, onResumeSetup, footer: <CardFooter name={childId} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} /> }} />
           </div>
         );
       })}
@@ -219,7 +236,7 @@ function ProjectChildren({ childList, selectedProject, onSelect, confirmActions 
   );
 }
 
-function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, dialogActions }) {
+function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, dialogActions, onResumeSetup }) {
   const { confirmActions, relocateActions } = dialogActions;
   const { confirming, setConfirming, onDelete, onExport } = confirmActions;
   const id = p.id || p.name || p;
@@ -228,11 +245,10 @@ function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelec
   const childSelected = hasChildren && childProjects[id].some((c) => (c.id || c.name || c) === selectedProject);
   return (
     <div key={id} className={`project-card-group${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}>
-      <ProjectCard project={p} isSelected={isSelected} cardProps={{ onSelect, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} /> }}>
-        <ProjectPathContent id={id} p={p} relocateActions={relocateActions} />
-        {hasChildren && (() => { const childCount = childProjects[id].length; return <span className="parent-summary">{childCount} sub-project{childCount !== 1 ? 's' : ''}</span>; })()}
+      <ProjectCard project={p} isSelected={isSelected} cardProps={{ onSelect, onResumeSetup, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} /> }}>
+        <ProjectPathContent id={id} p={p} relocateActions={relocateActions} subprojectCount={hasChildren ? childProjects[id].length : 0} />
       </ProjectCard>
-      {hasChildren && <ProjectChildren childList={childProjects[id]} selectedProject={selectedProject} onSelect={onSelect} confirmActions={confirmActions} />}
+      {hasChildren && <ProjectChildren childList={childProjects[id]} selectedProject={selectedProject} onSelect={onSelect} confirmActions={confirmActions} onResumeSetup={onResumeSetup} />}
     </div>
   );
 }
@@ -245,20 +261,59 @@ function useRelocateDialog(onRelocate) {
   return { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate };
 }
 
-export default function ProjectsPage({ projects = [], selectedProject, actions }) {
-  const { onSelect, onDelete, onExport, onRelocate } = actions;
+const EVAL_BLOCKED_TITLE = 'Cannot add a project while an evaluation is running';
+
+function EmptyProjectsCTA({ onAddProject, isEvaluating }) {
+  // The button stays clickable while evaluating so the handler can fire a
+  // snackbar explaining the block. ``aria-disabled`` + the visual muted class
+  // preserve the disabled affordance without swallowing the click.
+  return (
+    <div className="projects-empty projects-empty--cta">
+      <h3 className="projects-empty__title">Add your first project</h3>
+      <p className="projects-empty__hint">
+        Point quodeq at a local repository or paste a Git URL to get started.
+      </p>
+      <button
+        type="button"
+        className={`term-btn term-btn--primary term-btn--filled projects-empty__cta-btn${isEvaluating ? ' is-disabled' : ''}`}
+        onClick={onAddProject}
+        aria-disabled={isEvaluating || undefined}
+        title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
+      >
+        <span aria-hidden="true">▸</span> add project
+      </button>
+    </div>
+  );
+}
+
+export default function ProjectsPage({ projects = [], selectedProject, isEvaluating = false, actions }) {
+  const { onSelect, onDelete, onExport, onRelocate, onAddProject, onResumeSetup } = actions;
   const { children, roots } = useMemo(() => computeProjectTree(projects), [projects]);
   const [confirming, setConfirming] = useState(null);
   const relocateActions = useRelocateDialog(onRelocate);
 
   return (
     <section className="projects-page projects-page--terminal">
-      <TermHeader
-        name="repositories"
-        sub={`${projects.length} ${projects.length === 1 ? 'repository' : 'repositories'} evaluated`}
-      />
+      <div className="projects-page__header">
+        <TermHeader
+          name="repositories"
+          sub={`${projects.length} ${projects.length === 1 ? 'repository' : 'repositories'} evaluated`}
+        />
+        {projects.length > 0 && onAddProject && (
+          <button
+            type="button"
+            className={`term-btn term-btn--primary term-btn--filled projects-page__add-btn${isEvaluating ? ' is-disabled' : ''}`}
+            onClick={onAddProject}
+            aria-label="Add project"
+            aria-disabled={isEvaluating || undefined}
+            title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
+          >
+            <span aria-hidden="true">▸</span> add project
+          </button>
+        )}
+      </div>
       {projects.length === 0 ? (
-        <div className="projects-empty"><p>No projects yet. Run an evaluation to get started.</p></div>
+        <EmptyProjectsCTA onAddProject={onAddProject} isEvaluating={isEvaluating} />
       ) : (
         <div className="projects-cards">
           {roots.map((p) => (
@@ -268,6 +323,7 @@ export default function ProjectsPage({ projects = [], selectedProject, actions }
               children={children}
               selectedProject={selectedProject}
               onSelect={onSelect}
+              onResumeSetup={onResumeSetup}
               dialogActions={{
                 confirmActions: { confirming, setConfirming, onDelete, onExport },
                 relocateActions,

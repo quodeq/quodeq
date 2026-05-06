@@ -1,0 +1,117 @@
+import { useEffect, useState } from 'react';
+import ProviderTabs from '../../../settings/components/ProviderTabs.jsx';
+import { getProviderConfigs } from '../../../../api/index.js';
+import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../../constants.js';
+import { TermHeader } from '../../../../components/terminal/index.js';
+
+const PROVIDER_LABELS = {
+  claude: 'Claude Code',
+  codex: 'Codex CLI',
+  gemini: 'Gemini CLI',
+  ollama: 'Ollama',
+  openrouter: 'OpenRouter',
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
+};
+
+function readActiveProviderState() {
+  try {
+    const id = localStorage.getItem(ACTIVE_PROVIDER_KEY) || null;
+    if (!id) return { id: null, model: null, timeLimitS: null };
+    const model = localStorage.getItem(providerKey(id, 'model')) || null;
+    // ProviderTabs persists time-limit per provider as a stringified number of
+    // seconds. Treat 0 as unlimited; missing key falls back to null so the
+    // wizard's existing default applies.
+    const tlRaw = localStorage.getItem(providerKey(id, 'time-limit'));
+    const timeLimitS = tlRaw === null ? null : Number.parseInt(tlRaw, 10);
+    return { id, model, timeLimitS: Number.isFinite(timeLimitS) ? timeLimitS : null };
+  } catch {
+    return { id: null, model: null, timeLimitS: null };
+  }
+}
+
+/**
+ * ProviderStep
+ *
+ * Reuses the same `<ProviderTabs />` component the Settings page renders,
+ * so the picker is identical: one pill per installed provider (uninstalled
+ * providers shown disabled with install hints), the appropriate per-provider
+ * tab below (CLI / Ollama / Cloud), and the time-limit + advanced settings
+ * inside each tab.
+ *
+ * The wizard reads the active provider+model from localStorage (which
+ * ProviderTabs writes into) and gates Continue until both are set.
+ */
+export default function ProviderStep({ state, actions, onContinue, onBack, stepIndex = 0, stepTotal = 0 }) {
+  const [providerConfigs, setProviderConfigs] = useState({});
+  // Mirror localStorage so Continue updates as the user picks a provider/model.
+  const [activeProvider, setActiveProvider] = useState(readActiveProviderState);
+
+  useEffect(() => {
+    getProviderConfigs().then(setProviderConfigs).catch(() => setProviderConfigs({}));
+  }, []);
+
+  // Poll localStorage for changes — ProviderTabs / its children write directly,
+  // and the `storage` event only fires for cross-tab writes. A short interval
+  // is enough; the picker is interactive and the user is on the screen.
+  useEffect(() => {
+    const tick = () => setActiveProvider(readActiveProviderState());
+    const interval = setInterval(tick, 400);
+    window.addEventListener('storage', tick);
+    return () => { clearInterval(interval); window.removeEventListener('storage', tick); };
+  }, []);
+
+  const continueDisabled = !activeProvider.id || !activeProvider.model;
+
+  function handleContinue() {
+    // Read fresh from localStorage at click time — the polled `activeProvider`
+    // can lag the user's last interaction by up to one polling interval.
+    const fresh = readActiveProviderState();
+    if (!fresh.id || !fresh.model) return;
+    actions.setProvider({
+      id: fresh.id,
+      model: fresh.model,
+      classification: state.provider.classification || null,
+    });
+    // Sync the per-provider time-limit (set inside the embedded ProviderTabs)
+    // into the wizard state so the Standard & Launch summary and the eventual
+    // eval-start payload reflect what the user actually picked.
+    if (fresh.timeLimitS !== null) {
+      actions.setTimeLimit(fresh.timeLimitS);
+    }
+    onContinue();
+  }
+
+  const summary = activeProvider.id
+    ? (
+      <p className="onboarding-provider-active">
+        Selected: <strong>{PROVIDER_LABELS[activeProvider.id] || activeProvider.id}</strong>
+        {activeProvider.model && <> · <code>{activeProvider.model}</code></>}
+      </p>
+    )
+    : (
+      <p className="onboarding-provider-active onboarding-provider-active--empty">
+        Pick a provider tab below and choose a model to continue.
+      </p>
+    );
+
+  return (
+    <div className="onboarding-step onboarding-step--provider">
+      <TermHeader name="provider" sub={`step ${stepIndex} of ${stepTotal} · pick an ai provider`} />
+      <p className="onboarding-step__pitch">
+        quodeq sends source files to an AI model for review. Pick the provider you want to use — uninstalled providers are shown disabled with install hints.
+      </p>
+
+      {summary}
+
+      <div className="onboarding-provider-tabs-host">
+        <ProviderTabs providerConfigs={providerConfigs} />
+      </div>
+
+      <div className="onboarding-step__actions">
+        <button type="button" className="term-btn term-btn--primary term-btn--filled" disabled={continueDisabled} onClick={handleContinue}>continue</button>
+        <button type="button" className="term-btn term-btn--secondary" onClick={onBack}>back</button>
+      </div>
+    </div>
+  );
+}

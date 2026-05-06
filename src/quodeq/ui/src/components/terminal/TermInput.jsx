@@ -42,6 +42,8 @@ export default function TermInput({
         }}
         spellCheck={false}
         autoComplete="off"
+        autoCapitalize="off"
+        autoCorrect="off"
       />
     </div>
   );

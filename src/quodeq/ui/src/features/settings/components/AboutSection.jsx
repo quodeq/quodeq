@@ -19,6 +19,14 @@ export default function AboutSection({ appVersion, settingsPhrase }) {
           <span className="settings-about-key">Repository</span>
           <a className="settings-about-link" href="https://github.com/quodeq/quodeq" target="_blank" rel="noopener noreferrer">github.com/quodeq/quodeq</a>
         </div>
+        <div className="settings-about-row">
+          <span className="settings-about-key">Blog</span>
+          <a className="settings-about-link" href="https://quodeq.ai/blog/" target="_blank" rel="noopener noreferrer">Latest from the team</a>
+        </div>
+        <div className="settings-about-row">
+          <span className="settings-about-key">Changelog</span>
+          <a className="settings-about-link" href="https://quodeq.github.io/quodeq/CHANGELOG.html" target="_blank" rel="noopener noreferrer">What&apos;s new</a>
+        </div>
       </div>
       {settingsPhrase && (
         <div className="settings-row settings-row--last settings-about-phrase-row">

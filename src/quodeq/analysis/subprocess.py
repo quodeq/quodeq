@@ -306,7 +306,11 @@ def _run_api_analysis_bridge(
         repo_root=work_dir,
     )
 
-    rel_paths = [str(f.relative_to(work_dir)) for f in source_files]
+    # POSIX-style separators: paths flow into findings (file fields,
+    # downstream JSONL projection) and into the prompt; the rest of the
+    # pipeline assumes forward slashes (path-role classifier, enrichment,
+    # SQLite store). Backslashes on Windows would break those joins.
+    rel_paths = [f.relative_to(work_dir).as_posix() for f in source_files]
     run_api_analysis(
         prompt=api_prompt,
         jsonl_file=jsonl_file,

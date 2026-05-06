@@ -17,6 +17,16 @@ _logger = logging.getLogger(__name__)
 _SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv", "venv", ".tox", "dist", "build", ".eggs"}
 _GIT_TIMEOUT_S = 10
 
+# Source-code extensions — kept in sync with `data/config/detection.json`
+# (`extensions` map). Used to compute `code_files` so the wizard can show
+# how many of the scanned files will actually be analysed by the eval.
+_CODE_EXTENSIONS = frozenset({
+    "py", "pyx", "ts", "tsx", "js", "jsx", "java", "kt", "kts", "swift", "m",
+    "go", "rs", "rb", "php", "sh", "bash", "cs", "cpp", "c", "h", "scala",
+    "dart", "ex", "exs", "r", "hs", "lhs", "lua", "jl", "zig", "ml", "mli",
+    "cr", "pl", "pm",
+})
+
 
 def scan_project(project_dir: Path, *, output_dir: Path | None = None) -> ScanData:
     """Run a quick scan of a local project directory.
@@ -27,13 +37,18 @@ def scan_project(project_dir: Path, *, output_dir: Path | None = None) -> ScanDa
     project_dir = project_dir.resolve()
     file_tree: list[str] = []
     languages: dict[str, int] = {}
+    code_file_count = 0
 
     for path in _walk_files(project_dir):
-        rel = str(path.relative_to(project_dir))
+        # POSIX separators so the file_tree is consistent across platforms
+        # (UI, scan.json consumers, and tests all assume "/").
+        rel = path.relative_to(project_dir).as_posix()
         file_tree.append(rel)
         ext = path.suffix.lstrip(".")
         if ext:
             languages[ext] = languages.get(ext, 0) + 1
+            if ext in _CODE_EXTENSIONS:
+                code_file_count += 1
 
     branches = _list_branches(project_dir)
     modules = _list_modules(project_dir)
@@ -46,6 +61,7 @@ def scan_project(project_dir: Path, *, output_dir: Path | None = None) -> ScanDa
         modules=modules,
         scanned_at=scanned_at,
         total_files=len(file_tree),
+        code_files=code_file_count,
     )
 
     if output_dir is not None:

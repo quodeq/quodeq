@@ -1,8 +1,9 @@
 """Pipeline coordination — dimension orchestration, merging, and public API."""
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from quodeq.analysis._dim_estimates import compute_dim_estimates, write_dim_estimates
 from quodeq.analysis._incremental_context import load_analysis_context as _load_ctx
@@ -89,6 +90,17 @@ def _run_dimensions(
     dimensions, ctx = load_analysis_context(config)
     _persist_dim_estimates(config, dimensions)
 
+    # Set the run-level deadline once, just before the dim loop starts.
+    # Skipped for dry runs (already returned above), unlimited budget, or
+    # when an outer caller (tests) has pre-set deadline_at.
+    budget_s = config.options.time_limit
+    if config.options.deadline_at is None and budget_s is not None and budget_s > 0:
+        config.options.deadline_at = time.monotonic() + budget_s
+        deadline_iso = (
+            datetime.now(timezone.utc) + timedelta(seconds=budget_s)
+        ).isoformat()
+        emit_marker("analyzing_start", deadline_at=deadline_iso, budget_s=budget_s)
+
     # Diff mode always per-dimension — consolidated/incremental loops are
     # incompatible with evidence-only runs (no prior fingerprint, no
     # cross-dimension scoring). Explicit branch keeps intent clear even if
@@ -102,6 +114,10 @@ def _run_dimensions(
         )
 
     if config.options.incremental:
+        # Default path. AnalysisOptions.incremental defaults to True so
+        # any run that hasn't explicitly opted out (via --clean-scan or
+        # --diff-from at the CLI/API layer) carries forward findings for
+        # unchanged files via per-dimension fingerprint lookup.
         emit_marker("setup", dimensions=dimensions)
         return run_incremental_loop(
             config, dimensions, ctx,
@@ -110,6 +126,9 @@ def _run_dimensions(
             on_dimension_done=on_dimension_done,
         )
 
+    # Clean-scan path: full re-analysis, no carry-forward. Reached only
+    # when the user requested --clean-scan or --diff-from. Consolidated
+    # mode is allowed here because there is no prior fingerprint to honour.
     emit_marker("setup", dimensions=dimensions)
 
     # Consolidated mode: evaluate all dimensions in one pass.

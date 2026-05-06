@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.core.types import DimensionResult
+from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.rescore import rescore_dimensions as _raw_rescore
 from quodeq.services.scoring._run_scores import get_run_dimensions, parse_score
@@ -44,10 +45,11 @@ def rescore_run(
     dimensions = get_run_dimensions(reports_root, project, run_id)
     project_dir = reports_root / project
     dismissed = dismissed_keys(project_dir)
-    if not dismissed:
+    deleted = deleted_keys(project_dir)
+    if not dismissed and not deleted:
         return _dims_to_scored(dimensions, run_id)
 
-    result = _raw_rescore(dimensions, dismissed)
+    result = _raw_rescore(dimensions, dismissed, deleted)
     return [
         _dim_result_to_scored(d, from_run_id=run_id)
         for d in result.get("dimensions", [])
@@ -64,14 +66,15 @@ def rescore_run_raw(
     dimensions = get_run_dimensions(reports_root, project, run_id)
     project_dir = reports_root / project
     dismissed = dismissed_keys(project_dir)
-    if not dismissed:
+    deleted = deleted_keys(project_dir)
+    if not dismissed and not deleted:
         from quodeq.data.fs.report_parser.grades import summarize_dimensions
         from quodeq.core.types import to_camel_dict
         return {
             "dimensions": [to_camel_dict(d) for d in dimensions],
             "summary": to_camel_dict(summarize_dimensions(dimensions)),
         }
-    return _raw_rescore(dimensions, dismissed)
+    return _raw_rescore(dimensions, dismissed, deleted)
 
 
 def _dims_to_scored(

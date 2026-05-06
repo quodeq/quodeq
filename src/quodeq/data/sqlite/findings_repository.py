@@ -15,18 +15,18 @@ _INSERT_SQL = """
 INSERT OR IGNORE INTO findings (
     schema_version, practice_id, dimension, requirement, verdict, severity,
     file, line, end_line, title, reason, snippet,
-    violation_type, context, scope, req_refs_json, dedup_key
+    violation_type, context, scope, req_refs_json, dedup_key, confidence
 ) VALUES (
     :schema_version, :practice_id, :dimension, :requirement, :verdict, :severity,
     :file, :line, :end_line, :title, :reason, :snippet,
-    :violation_type, :context, :scope, :req_refs_json, :dedup_key
+    :violation_type, :context, :scope, :req_refs_json, :dedup_key, :confidence
 )
 """
 
 _SELECT_COLUMNS = (
     "id, practice_id, dimension, requirement, verdict, severity, "
     "file, line, end_line, title, reason, snippet, "
-    "violation_type, context, scope, req_refs_json"
+    "violation_type, context, scope, req_refs_json, confidence"
 )
 
 

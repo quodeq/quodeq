@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 import pytest
 
 from quodeq.core.types import JobSnapshot
-from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_POOL_BUDGET
+from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_TIME_LIMIT
 from quodeq.services.evaluation_mixin import (
     FsEvaluationMixin,
     SubprocessDispatcher,
@@ -76,10 +76,19 @@ class TestBuildEvaluateCmd:
         cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path))
         assert "--n-subagents" not in cmd
 
-    def test_incremental_flag(self, tmp_path: Path):
-        opts = EvaluationOptions(incremental=True)
-        cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path))
-        assert "--incremental" in cmd
+    def test_subprocess_cmd_emits_clean_scan_flag(self, tmp_path: Path):
+        """When clean_scan is True, the spawned CLI gets --clean-scan."""
+        opts = EvaluationOptions(clean_scan=True, dimensions="security")
+        cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path / "reports"))
+        assert "--clean-scan" in cmd
+        assert "--incremental" not in cmd
+
+    def test_subprocess_cmd_omits_clean_scan_by_default(self, tmp_path: Path):
+        """When clean_scan is False (default), --clean-scan is not emitted."""
+        opts = EvaluationOptions(dimensions="security")
+        cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path / "reports"))
+        assert "--clean-scan" not in cmd
+        assert "--incremental" not in cmd
 
 
 # ---------------------------------------------------------------------------
@@ -126,17 +135,29 @@ class TestBuildEvalEnv:
         env = m._build_eval_env("/repo", opts, env={})
         assert "QUODEQ_NO_VERIFY" not in env
 
-    def test_custom_pool_budget(self):
+    def test_custom_time_limit(self):
         m = self._mixin()
-        opts = EvaluationOptions(pool_budget=1200)
+        opts = EvaluationOptions(time_limit=1200)
         env = m._build_eval_env("/repo", opts, env={})
-        assert env["QUODEQ_POOL_BUDGET"] == "1200"
+        assert env["QUODEQ_TIME_LIMIT"] == "1200"
 
-    def test_default_pool_budget_not_set(self):
+    def test_default_time_limit_is_set(self):
+        # Regression: previously this env var was only injected when the
+        # value differed from the default. Dashboard runs that kept the
+        # default 10-min budget got no env var, so the CLI subprocess
+        # couldn't resolve a time limit, the analyzing_start marker never
+        # fired, and the UI countdown timer froze at the static budget.
         m = self._mixin()
-        opts = EvaluationOptions(pool_budget=_DEFAULT_POOL_BUDGET)
+        opts = EvaluationOptions(time_limit=_DEFAULT_TIME_LIMIT)
         env = m._build_eval_env("/repo", opts, env={})
-        assert "QUODEQ_POOL_BUDGET" not in env
+        assert env["QUODEQ_TIME_LIMIT"] == str(_DEFAULT_TIME_LIMIT)
+
+    def test_unlimited_time_limit_not_set(self):
+        # 0 means "unlimited" — no deadline should be propagated.
+        m = self._mixin()
+        opts = EvaluationOptions(time_limit=0)
+        env = m._build_eval_env("/repo", opts, env={})
+        assert "QUODEQ_TIME_LIMIT" not in env
 
     def test_per_dimension(self):
         m = self._mixin()
@@ -621,3 +642,13 @@ class TestListEvaluations:
         m._jobs = MagicMock()
         m._jobs.list_jobs.return_value = []
         assert m.list_evaluations() == []
+
+
+def test_evaluation_options_clean_scan_field_defaults_false():
+    """User-facing flag: clean_scan opts OUT of cache; default behaviour is incremental."""
+    from quodeq.services.base import EvaluationOptions
+    opts = EvaluationOptions()
+    assert opts.clean_scan is False
+    assert not hasattr(opts, "incremental"), (
+        "Old field name leaked through; rename incomplete."
+    )

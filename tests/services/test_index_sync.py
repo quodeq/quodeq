@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.shared.run_status import RunState, write_status
-from quodeq.services.run_index import open_index
+from quodeq.services.run_index import open_index, sync_index
 from quodeq.services._index_sync import (
     _is_pid_alive,
     _sync_legacy_run,
@@ -164,6 +164,10 @@ def test_stale_promotion_live_pid_not_promoted(tmp_path: Path) -> None:
         db.close()
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="POSIX-only: signal.SIGKILL doesn't exist on Windows; use TerminateProcess equivalent in a separate test",
+)
 def test_stale_promotion_after_sigkill_real_subprocess(tmp_path: Path) -> None:
     """SIGKILL leaves status.json as RUNNING — stale-promote must recover it.
 
@@ -215,6 +219,91 @@ def test_stale_promotion_after_sigkill_real_subprocess(tmp_path: Path) -> None:
         if proc.poll() is None:
             proc.kill()
             proc.wait(timeout=5)
+        db.close()
+
+
+def test_sync_index_deletes_orphan_non_terminal_row(tmp_path: Path) -> None:
+    """A non-terminal row whose run_dir is missing on disk must be removed.
+
+    Reproduces the production trap where a row gets stuck as `running` because
+    `_check_stale_and_promote` reads `.heartbeat` from a run_dir that no longer
+    exists, so the heartbeat is unreadable and the row is never promoted.
+    """
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    db = open_index(tmp_path / "idx.db")
+    try:
+        # Row points at a run_dir that does not exist on disk.
+        ghost_dir = reports / "ghost-project" / "ghost-run"
+        db.execute(
+            "INSERT INTO runs (job_id, project_uuid, run_id, run_dir, state, "
+            "started_at, updated_at, status_mtime) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "ext-ghost", "ghost-project", "ghost-run", str(ghost_dir),
+                "running", "2026-01-01T00:00:00+00:00",
+                "2026-01-01T00:00:00+00:00", 0,
+            ),
+        )
+        db.commit()
+
+        sync_index(db, reports)
+
+        row = db.execute(
+            "SELECT job_id FROM runs WHERE job_id = ?", ("ext-ghost",),
+        ).fetchone()
+        assert row is None, "orphan non-terminal row should be removed by sync_index"
+    finally:
+        db.close()
+
+
+def test_sync_index_keeps_orphan_terminal_row(tmp_path: Path) -> None:
+    """A terminal-state row whose run_dir is missing should be preserved.
+
+    Users may prune old run dirs to save disk; the index entry is the only
+    record of that run's outcome and must not be silently deleted.
+    """
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    db = open_index(tmp_path / "idx.db")
+    try:
+        ghost_dir = reports / "p" / "old-run"
+        db.execute(
+            "INSERT INTO runs (job_id, project_uuid, run_id, run_dir, state, "
+            "started_at, updated_at, status_mtime) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "ext-old", "p", "old-run", str(ghost_dir),
+                "done", "2026-01-01T00:00:00+00:00",
+                "2026-01-01T00:00:00+00:00", 0,
+            ),
+        )
+        db.commit()
+
+        sync_index(db, reports)
+
+        row = db.execute(
+            "SELECT state FROM runs WHERE job_id = ?", ("ext-old",),
+        ).fetchone()
+        assert row is not None and row[0] == "done"
+    finally:
+        db.close()
+
+
+def test_sync_index_keeps_rows_whose_run_dir_exists(tmp_path: Path) -> None:
+    """Sanity check: rows backed by a real run_dir survive the orphan sweep."""
+    reports = tmp_path / "reports"
+    run = _make_run_dir(reports, "p", "real-run")
+    write_status(
+        run, state=RunState.RUNNING, job_id="ext-real-run",
+        started_at="2026-04-20T00:00:00+00:00", dimensions=[], pid=os.getpid(),
+    )
+    db = open_index(tmp_path / "idx.db")
+    try:
+        sync_index(db, reports)
+        row = db.execute(
+            "SELECT state FROM runs WHERE job_id = ?", ("ext-real-run",),
+        ).fetchone()
+        assert row is not None and row[0] == "running"
+    finally:
         db.close()
 
 

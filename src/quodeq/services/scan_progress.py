@@ -180,7 +180,7 @@ def build_scan_progress(
     job_id: str,
     run_dir: Path,
     *,
-    pool_budget_s: int | None = None,
+    time_limit_s: int | None = None,
 ) -> _ScanProgress | None:
     """Compute progress for a run.
 
@@ -255,7 +255,7 @@ def build_scan_progress(
 
         tally = tally_unique_findings(evidence_dir / f"{dim_id}_evidence.jsonl")
         elapsed = _dim_elapsed_s(dim_id, run_dir, d_state)
-        budget = pool_budget_s if (d_state == "running" and pool_budget_s and pool_budget_s > 0) else None
+        budget = time_limit_s if (d_state == "running" and time_limit_s and time_limit_s > 0) else None
         active = _active_agents(evidence_dir, dim_id) if d_state == "running" else 0
 
         dim_results.append(_DimProgress(

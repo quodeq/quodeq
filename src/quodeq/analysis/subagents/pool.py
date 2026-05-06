@@ -20,7 +20,7 @@ from quodeq.analysis.subagents._pool_worker import WorkerContext, build_agent_co
 from quodeq.analysis.subagents.file_queue import WorkQueue
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, merge_jsonl
 from quodeq.analysis.subprocess import AnalysisConfig
-from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
+from quodeq.shared.constants import _DEFAULT_TIME_LIMIT
 from quodeq.shared.logging import log_info
 
 # Re-export public API so existing imports keep working.
@@ -94,7 +94,7 @@ class SubagentPool:
 
     def run(self) -> list[SubagentResult]:
         """Launch agents in parallel, returning a SubagentResult per agent."""
-        max_dur = self._base_config.pool_budget if self._base_config.pool_budget is not None else _DEFAULT_POOL_BUDGET
+        max_dur = self._base_config.time_limit if self._base_config.time_limit is not None else _DEFAULT_TIME_LIMIT
         if self._scout_first:
             log_info(f"[{self._phase}] Launching scout agent for {self._dimension_key} (max {self._n} agents)")
         else:
@@ -115,6 +115,7 @@ class SubagentPool:
                     evidence_dir=self._evidence_dir, dimension_key=self._dimension_key,
                     submit_fn=lambda: self._submit_agent(pool),
                     max_files_per_agent=self._base_config.max_files_per_agent,
+                    deadline_at=self._base_config.deadline_at,
                 )
                 if self._scout_first:
                     scout_loop(ctx)

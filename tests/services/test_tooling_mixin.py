@@ -200,18 +200,21 @@ class TestBrowseRepo:
 class TestGetAiClients:
     @patch("quodeq.services.tooling_mixin.get_provider_configs", return_value={})
     @patch("shutil.which", return_value="/usr/bin/claude")
-    def test_includes_installed_cli(self, mock_which, mock_cfg):
+    def test_installed_cli_marked_installed(self, mock_which, mock_cfg):
         mixin = FsToolingMixin()
         result = mixin.get_ai_clients(env={})
-        ids = [c["id"] for c in result["clients"]]
-        assert "claude" in ids
+        claude = next(c for c in result["clients"] if c["id"] == "claude")
+        assert claude["installed"] is True
 
     @patch("quodeq.services.tooling_mixin.get_provider_configs", return_value={})
     @patch("shutil.which", return_value=None)
-    def test_excludes_uninstalled_cli(self, mock_which, mock_cfg):
+    def test_uninstalled_cli_still_listed_with_flag(self, mock_which, mock_cfg):
         mixin = FsToolingMixin()
         result = mixin.get_ai_clients(env={})
-        assert result["clients"] == []
+        # All default CLI candidates are returned so the UI can render them disabled.
+        ids = [c["id"] for c in result["clients"]]
+        assert {"claude", "codex", "gemini"} <= set(ids)
+        assert all(c["installed"] is False for c in result["clients"])
 
     def test_env_override_candidates(self):
         mixin = FsToolingMixin()

@@ -45,7 +45,12 @@ def test_swallows_oserror(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(Path, "touch", raising_touch)
     hb = HeartbeatThread(tmp_path, interval=0.02)
     hb.start()
-    time.sleep(0.2)
+    # Poll instead of sleeping a fixed window — a loaded CI runner can
+    # tick the heartbeat much slower than 20 ms, so a 200 ms sleep is
+    # not enough headroom to guarantee >=3 touches.
+    deadline = time.monotonic() + 5.0
+    while len(errors) < 3 and time.monotonic() < deadline:
+        time.sleep(0.05)
     hb.stop()
     # After the simulated failures, touches eventually succeeded.
     assert len(errors) >= 3

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState, useEffect } from 'react';
+import { lazy, Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
 
 const DashboardPage = lazy(() => import('./features/dashboard/components/DashboardPage.jsx'));
@@ -14,6 +14,8 @@ const StandardsPage = lazy(() => import('./features/standards/StandardsPage.jsx'
 const ViolationsPage = lazy(() => import('./features/violations/components/ViolationsPage.jsx'));
 const MapPage = lazy(() => import('./features/map/components/MapPage.jsx'));
 const HelpPage = lazy(() => import('./features/help/components/HelpPage.jsx'));
+const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
+import EmptyStateWithTour from './features/onboarding/components/EmptyStateWithTour.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
 import { useApi } from './api/ApiContext.jsx';
 import LoadingScreen from './components/LoadingScreen.jsx';
@@ -24,13 +26,17 @@ import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { readVisibleStandardIds } from './utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
-import { SidePane, SidePaneProvider } from './features/side-pane/index.js';
+import { SidePane, useSidePane } from './features/side-pane/index.js';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.jsx';
 import { ServerLogProvider } from './features/settings/server-log/ServerLogProvider.jsx';
 import { OllamaLogProvider } from './features/settings/ollama-log/OllamaLogProvider.jsx';
 
-const NO_PROJECT_TABS = ['evaluate', 'standards', 'settings', 'help'];
+// Tabs that are reachable with zero projects. `projects` is in here so a
+// fresh-install user can land on Projects and add their first one without
+// hitting the "no analyzed projects yet" wall.
+const NO_PROJECT_TABS = ['projects', 'evaluate', 'standards', 'settings', 'help'];
+const SELF_HANDLED_EMPTY = new Set(['overview', 'map', 'violations', 'history']);
 
 /**
  * Returns whether the app is currently rendering dark, taking the saved
@@ -59,7 +65,7 @@ function useEffectiveDark(themeMode) {
  * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string }} props
  * @returns {JSX.Element}
  */
-function EvaluateCase({ serverHealth, evaluation, selectedProject, projects }) {
+function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onGoToProjects, onGoToSettings }) {
   const { connected, setConnected } = serverHealth;
   const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
   const projectInfo = projects?.find(p => (p.id || p.name) === selectedProject) || null;
@@ -69,7 +75,7 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject, projects }) {
       <EvaluateScreen
         evaluation={{ job, jobError, liveViolations }}
         context={{ selectedProject, projectInfo }}
-        actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation }}
+        actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation, onGoToProjects, onGoToSettings }}
       />
     </>
   );
@@ -175,7 +181,16 @@ function ViolationsRoute({ params, props }) {
 
   return (
     <ViolationsPage
-      data={{ accumulated: acc, accumulatedDimensions: dims, selectedProject: props.navigation.selectedProject }}
+      data={{
+        accumulated: acc,
+        accumulatedDimensions: dims,
+        selectedProject: props.navigation.selectedProject,
+        projects: props.navigation.projects,
+        projectsLoaded: props.navigation.projectsLoaded,
+        projectName: props.dashboardData.selectedDisplayName,
+        loading: props.dashboardData.loading,
+        isFetching: props.dashboardData.isFetching,
+      }}
       callbacks={{
         onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
         onFileClick: (fileObj) => nav('file', { file: fileObj, sourceTab: 'violations' }),
@@ -188,6 +203,7 @@ function ViolationsRoute({ params, props }) {
         },
         onPrincipleClick: (principleObj) => navigateToPrinciple(principleObj),
         onRefresh: props.refreshDashboard,
+        onNavigate: nav,
       }}
       isDirectNav={props.navigation.navStackLength === 1}
       tabKey={params._tabKey || 0}
@@ -201,7 +217,21 @@ const ROUTE_RENDERERS = {
   map: (params, props) => {
     const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
     const isDirectNav = props.navigation.navStackLength === 1;
-    return <MapPage data={{ accumulated: acc, dashboard: props.dashboardData.dashboard, projectName: props.dashboardData.selectedDisplayName }} callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard }} isDirectNav={isDirectNav} tabKey={params._tabKey || 0} />;
+    return <MapPage
+      data={{
+        accumulated: acc,
+        dashboard: props.dashboardData.dashboard,
+        projectName: props.dashboardData.selectedDisplayName,
+        projects: props.navigation.projects,
+        projectsLoaded: props.navigation.projectsLoaded,
+        selectedProject: props.navigation.selectedProject,
+        loading: props.dashboardData.loading,
+        isFetching: props.dashboardData.isFetching,
+      }}
+      callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard }}
+      isDirectNav={isDirectNav}
+      tabKey={params._tabKey || 0}
+    />;
   },
   run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
   history: (params, props) => {
@@ -227,6 +257,11 @@ const ROUTE_RENDERERS = {
           onRunChange: props.navigation.setHistorySelectedRun,
           onRunDeleted: () => props.refreshDashboard?.(),
         }}
+        projects={props.navigation.projects}
+        projectsLoaded={props.navigation.projectsLoaded}
+        selectedProject={props.navigation.selectedProject}
+        loading={props.dashboardData.loading}
+        isFetching={props.dashboardData.isFetching}
         projectInfo={props.navigation.projects?.find((p) => (p.id || p.name) === props.navigation.selectedProject) || null}
       />
     );
@@ -243,8 +278,8 @@ const ROUTE_RENDERERS = {
       trend={props.dashboardData.dashboard?.trend || []}
     />
   ),
-  evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} />,
-  file: (params) => <FileDetailPage file={params.file} />,
+  evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />,
+  file: (params) => <FileDetailPage file={params.file} runId={params.runId} dateLabel={params.dateLabel} />,
   evalprinciple: renderEvalPrincipleDetail,
   'eval-principle-detail': renderEvalPrincipleDetail,
   finding: (params, props) => (
@@ -260,7 +295,7 @@ const ROUTE_RENDERERS = {
     />
   ),
   settings: (params, props) => <SettingsCase settings={props.settings} />,
-  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject }} />,
+  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onResumeSetup: props.navigation.onResumeSetup }} />,
   standards: () => <StandardsPage />,
   help: () => <HelpPage />,
 };
@@ -271,11 +306,17 @@ const ROUTE_RENDERERS = {
  */
 function MainContent({ activePage, props }) {
   const { page, ...params } = activePage;
-  if (!NO_PROJECT_TABS.includes(page)) {
+  if (!NO_PROJECT_TABS.includes(page) && !SELF_HANDLED_EMPTY.has(page)) {
     const projects = props.navigation?.projects;
     if (!projects || projects.length === 0) {
       if (!props.navigation?.projectsLoaded) return <LoadingScreen />;
-      return <section className="empty-state"><h2>No analyzed projects yet</h2><p>Run an evaluation to get started.</p></section>;
+      return (
+        <EmptyStateWithTour
+          onAdd={() => props.navigation.onAddProject()}
+          onTour={() => props.navigation.onTakeTour()}
+          isEvaluating={props.navigation.isEvaluating}
+        />
+      );
     }
   }
   const renderer = ROUTE_RENDERERS[page];
@@ -310,6 +351,55 @@ export default function App() {
   const APP_VERSION = state.serverVersion;
   const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
   const [sidebarPinned, setSidebarPinned] = useState(false);
+  const [wizardEntry, setWizardEntry] = useState(null);
+  // Auto-open is a once-per-session decision. Without this guard, closing the
+  // wizard sets wizardEntry → null, which re-fires this effect and re-opens
+  // the wizard immediately because projects.length is still 0. The user's
+  // close action (X, Maybe later, or Start evaluation) is the signal that the
+  // auto-open job is done for this page load.
+  const autoOpenedRef = useRef(false);
+
+  const { showToast } = useSidePane();
+
+  // While an evaluation is running we block any path that would open the
+  // onboarding wizard or start a second evaluation — only one job may be in
+  // flight at a time.
+  const isEvaluating = state.evalLifecycle?.job?.status === 'running';
+
+  // Auto-open wizard on first paint when there are no projects and the user
+  // has not explicitly skipped. The skip flag only suppresses auto-open — it
+  // never blocks "Add a project" or "Take the tour" buttons.
+  useEffect(() => {
+    if (autoOpenedRef.current) return;
+    if (!state.projectsLoaded) return;
+    if (state.projects.length > 0) { autoOpenedRef.current = true; return; }
+    if (isEvaluating) return;
+    let skipped = false;
+    try { skipped = localStorage.getItem('quodeq_onboarding_skipped') === 'true'; } catch { /* ignore */ }
+    autoOpenedRef.current = true;
+    if (!skipped) {
+      setWizardEntry({ startStep: 'welcome', isFirstProject: true });
+    }
+  }, [state.projectsLoaded, state.projects.length, isEvaluating]);
+
+  // Project-data tabs (overview/violations/map/history) only make sense once
+  // the selected project has at least one completed evaluation run. Until
+  // then, hide them from the sidebar and bounce the user to Evaluate if a
+  // cached activeTab lands them on a now-hidden tab. The guards below wait
+  // for /api/projects to resolve and for selectedProjectInfo to populate so
+  // the bouncer doesn't fire against the transient "no projects loaded yet"
+  // state on first paint and strand the user on Evaluate.
+  const PROJECT_DATA_TABS = ['overview', 'violations', 'map', 'history'];
+  const hasCurrentProjectRuns = (selectedProjectInfo?.runsCount ?? 0) > 0;
+  useEffect(() => {
+    if (!state.projectsLoaded) return;
+    if (state.projects.length === 0) return;
+    if (!selectedProjectInfo) return;
+    if (!hasCurrentProjectRuns && PROJECT_DATA_TABS.includes(state.activeTab)) {
+      state.navTab('evaluate');
+    }
+  }, [state.projectsLoaded, state.projects.length, selectedProjectInfo, hasCurrentProjectRuns, state.activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const sidebarProvider = (typeof localStorage !== 'undefined' && localStorage.getItem(ACTIVE_PROVIDER_KEY)) || null;
   const sidebarModel = sidebarProvider && typeof localStorage !== 'undefined'
     ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
@@ -344,18 +434,46 @@ export default function App() {
   const contentProps = {
     dashboardData: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
+      projectsLoaded: state.projectsLoaded,
       dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
       availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
       selectedDisplayName: state.selectedDisplayName,
     },
     navigation: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
+      projectsLoaded: state.projectsLoaded,
       handleNavigate: state.handleNavigate, handleRunSelect: state.handleRunSelect,
       handleProjectChange: state.handleProjectChange, navTab, navStackLength: navStack.length,
       handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject,
       historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
       currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
       prefetchHandlers: state.prefetchHandlers,
+      onAddProject: () => {
+        if (isEvaluating) {
+          showToast('An evaluation is in progress. Cancel it before adding a project.');
+          return;
+        }
+        setWizardEntry({ startStep: 'repo-scan', isFirstProject: state.projects.length === 0 });
+      },
+      onTakeTour: () => {
+        if (isEvaluating) {
+          showToast('An evaluation is in progress. Cancel it before starting the tour.');
+          return;
+        }
+        setWizardEntry({ startStep: 'welcome', isFirstProject: true });
+      },
+      onResumeSetup: (projectId) => {
+        if (isEvaluating) {
+          showToast('An evaluation is in progress. Cancel it before resuming setup.');
+          return;
+        }
+        setWizardEntry({
+          startStep: 'provider',
+          isFirstProject: false,
+          presetProjectId: projectId,
+        });
+      },
+      isEvaluating,
     },
     evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
@@ -377,7 +495,6 @@ export default function App() {
 
   return (
     <>
-    <SidePaneProvider>
       <EvalLogProvider>
         <ServerLogProvider>
           <OllamaLogProvider>
@@ -387,6 +504,7 @@ export default function App() {
               activeTab={activeTab}
               onNavTab={navTab}
               hasEvaluations={state.projects.length > 0}
+              showProjectTabs={hasCurrentProjectRuns}
               projectInfo={{
                 displayName: resolvedDisplayName,
                 meta: state.headerMeta,
@@ -444,13 +562,37 @@ export default function App() {
               <div className="tab-fade" key={activeTab}>
                 <MainContent activePage={activePage} props={contentProps} />
               </div>
+              {wizardEntry && (
+                <OnboardingWizard
+                  entry={wizardEntry}
+                  onClose={({ saved, projectId }) => {
+                    setWizardEntry(null);
+                    if (saved && projectId) {
+                      state.refreshDashboard?.();
+                    }
+                  }}
+                  onLaunch={({ projectId, repo, scopePath, branch, provider, standardIds, totalTimeLimitS }) => {
+                    setWizardEntry(null);
+                    const payload = {
+                      repo: repo || projectId,
+                      dimensions: standardIds,
+                    };
+                    if (scopePath) payload.scopePath = scopePath;
+                    if (branch) payload.branch = branch;
+                    if (provider?.id) payload.aiCmd = provider.id;
+                    if (provider?.model) payload.aiModel = provider.model;
+                    if (totalTimeLimitS) payload.timeLimit = totalTimeLimitS;
+                    state.evalLifecycle.handleStartEvaluation(payload);
+                    navTab('evaluate');
+                  }}
+                />
+              )}
             </Suspense>
           }
             />
           </OllamaLogProvider>
         </ServerLogProvider>
       </EvalLogProvider>
-    </SidePaneProvider>
     {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
     </>
   );

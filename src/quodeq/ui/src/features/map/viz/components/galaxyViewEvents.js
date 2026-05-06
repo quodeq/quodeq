@@ -14,8 +14,12 @@ export function updateTooltip(el, hovered, animating, cx, cy) {
   if (!el) return;
   if (!hovered || animating) { el.style.display = 'none'; return; }
   const d = hovered.data;
+  // label/value are escaped so this helper stays safe even if a future
+  // caller passes a string from data instead of the current numeric/literal
+  // values. Color is hardcoded by callers (CSS var or rgb()) so it bypasses
+  // escape — but is still wrapped in a fixed style attribute.
   const row = (label, value, color) =>
-    `<div style="display:flex;justify-content:space-between;gap:12px;color:${color || 'var(--color-text-muted)'}"><span>${label}</span><span style="color:${color || 'var(--color-text)'};font-weight:500">${value}</span></div>`;
+    `<div style="display:flex;justify-content:space-between;gap:12px;color:${color || 'var(--color-text-muted)'}"><span>${escapeHtml(String(label))}</span><span style="color:${color || 'var(--color-text)'};font-weight:500">${escapeHtml(String(value))}</span></div>`;
   const rows = [row('Score', d.score.toFixed(1))];
   if (hovered.type === 'dim') rows.push(row('Principles', d.principleCount));
   rows.push(row('Violations', d.violations));

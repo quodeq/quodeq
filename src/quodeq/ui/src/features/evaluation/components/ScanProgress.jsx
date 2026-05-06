@@ -3,9 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { getEvaluationProgress } from '../../../api/index.js';
 import { evaluationKeys } from '../../../api/queryKeys.js';
 import { useEvalLog } from '../eval-log/EvalLogContext.js';
-import { CONSOLE_DOT_DISMISSED_KEY } from '../../../constants.js';
 import { pct, computeOverallProgress } from './scanProgressTotals.js';
 import ConsoleButton from '../../../components/ConsoleButton.jsx';
+import { SectionLabel } from '../../../components/terminal/index.js';
 
 const POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATES = new Set(['done', 'failed', 'cancelled']);
@@ -135,10 +135,6 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   const isLost = status === 'lost';
 
   const [detailOpen, setDetailOpen] = useState(false);
-  const [showDot, setShowDot] = useState(() => {
-    if (hasEvaluations) return false;
-    try { return !localStorage.getItem(CONSOLE_DOT_DISMISSED_KEY); } catch { return true; }
-  });
   const evalLog = useEvalLog();
   const consoleOpen = evalLog.activeJobId === jobId;
   const isTerminal = TERMINAL_STATES.has(status);
@@ -180,10 +176,6 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
     } else {
       evalLog.openLog(jobId, progress?.runId || null, status);
     }
-    if (showDot) {
-      setShowDot(false);
-      try { localStorage.setItem(CONSOLE_DOT_DISMISSED_KEY, '1'); } catch { /* ignore */ }
-    }
   }
 
   // Failed / lost: show the error message inline above the progress bar.
@@ -195,6 +187,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
 
   return (
     <div className="scan-progress">
+      <SectionLabel>progress</SectionLabel>
       {errorBanner}
       <div className="scan-progress__row">
         <div className="scan-progress__bar-wrap">
@@ -229,7 +222,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
             </span>
             <span className={`scan-progress__caret${detailOpen ? ' scan-progress__caret--open' : ''}`} aria-hidden="true">▸</span>
           </button>
-          <ConsoleButton open={consoleOpen} showDot={showDot} onToggle={toggleConsole} />
+          <ConsoleButton open={consoleOpen} onToggle={toggleConsole} />
         </div>
       </div>
       {detailOpen && dims.length > 0 && (

@@ -7,14 +7,26 @@ import pytest
 @pytest.fixture(autouse=True)
 def _isolate_quodeq_home(tmp_path_factory: pytest.TempPathFactory,
                          monkeypatch: pytest.MonkeyPatch) -> None:
-    """Point QUODEQ_HOME at an empty per-test tmp dir.
+    """Redirect every Quodeq state path at an empty per-test tmp dir.
 
-    Defensive isolation so tests cannot accidentally read or write the
-    developer's real ``~/.quodeq`` (which holds the existing global
-    ``index.db`` from ``services/run_index.py``, plus per-run state).
+    Tests have repeatedly written to the developer's real ``~/.quodeq``
+    (a stuck ``state=running`` row in ``index.db`` once leaked through and
+    the dashboard auto-resumed it as a phantom job). The previous version
+    of this fixture set ``QUODEQ_HOME``, which **nothing in the codebase
+    reads** — so the defaults in ``shared/_env.py`` continued to fall
+    through to ``Path.home() / ".quodeq"``.
+
+    Set the env vars the production code actually consults:
+      * ``QUODEQ_INDEX_DB_PATH``    — ``services/filesystem._open_index``
+      * ``QUODEQ_EVALUATIONS_DIR``  — ``services/filesystem.list_evaluations`` etc.
+      * ``QUODEQ_DIR``              — ``dashboard/_build_npm._quodeq_dir``
+    ``QUODEQ_HOME`` is kept for any out-of-tree consumer that may rely on it.
     """
     home = tmp_path_factory.mktemp("quodeq-home")
     monkeypatch.setenv("QUODEQ_HOME", str(home))
+    monkeypatch.setenv("QUODEQ_DIR", str(home))
+    monkeypatch.setenv("QUODEQ_INDEX_DB_PATH", str(home / "index.db"))
+    monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(home / "evaluations"))
 
 
 class DummyProcess:

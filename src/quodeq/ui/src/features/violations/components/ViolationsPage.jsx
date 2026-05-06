@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { listDismissedFindings, restoreFinding, restoreAllFindings } from '../../../api/index.js';
 import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../utils/visibleStandards.js';
 import { readCachedState, writeCachedState, resetCachedScope } from '../../../utils/pageStateCache.js';
 import { buildFileTree, treeNodeToFileObj, HeatGridView } from '../../map/viz/index.js';
 import DimensionHeatGridView from './DimensionHeatGridView.jsx';
 import DismissedSubTab from './DismissedSubTab.jsx';
 import { TermHeader, SevBadge, FlagPill } from '../../../components/terminal/index.js';
+import { useDismissedFindings } from './useDismissedFindings.js';
+import EmptyState from '../../../components/EmptyState.jsx';
+import LoadingScreen from '../../../components/LoadingScreen.jsx';
 
 const MAX_TREE_DEPTH = 64;
 
@@ -93,39 +95,6 @@ function FileSubTab({ dimensions, onFileClick, currentPath, setCurrentPath }) {
   );
 }
 
-function useDismissedFindings(selectedProject, onRefresh, setRestoreError) {
-  const [dismissed, setDismissed] = useState([]);
-
-  useEffect(() => {
-    if (!selectedProject) return;
-    listDismissedFindings(selectedProject).then(setDismissed).catch(() => setDismissed([]));
-  }, [selectedProject]);
-
-  const handleRestore = useCallback(async (d) => {
-    try {
-      await restoreFinding(selectedProject, { req: d.req, file: d.file, line: d.line });
-      setDismissed((prev) => prev.filter((item) => !(item.req === d.req && item.file === d.file && item.line === d.line)));
-      onRefresh?.();
-    } catch (err) {
-      console.error('Failed to restore finding:', err);
-      setRestoreError?.('Failed to restore finding. Please try again.');
-    }
-  }, [selectedProject, onRefresh, setRestoreError]);
-
-  const handleRestoreAll = useCallback(async () => {
-    try {
-      await restoreAllFindings(selectedProject);
-      setDismissed([]);
-      onRefresh?.();
-    } catch (err) {
-      console.error('Failed to restore all findings:', err);
-      setRestoreError?.('Failed to restore all findings. Please try again.');
-    }
-  }, [selectedProject, onRefresh, setRestoreError]);
-
-  return { dismissed, handleRestore, handleRestoreAll };
-}
-
 function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, initialSubTab, initialFilePath }) {
   const [activeSubTab, _setActiveSubTab] = useState(initialSubTab);
   const setActiveSubTab = (v) => {
@@ -139,7 +108,7 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, 
   };
 
   const [restoreError, setRestoreError] = useState(null);
-  const { dismissed, handleRestore, handleRestoreAll } = useDismissedFindings(selectedProject, onRefresh, setRestoreError);
+  const { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll } = useDismissedFindings(selectedProject, onRefresh, setRestoreError);
 
   const visibleDimensions = useMemo(() => {
     const visibleSet = new Set(readVisibleStandardIds());
@@ -160,7 +129,8 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, 
 
   return {
     activeSubTab, setActiveSubTab, dismissed,
-    handleRestore, handleRestoreAll, restoreError, visibleDimensions,
+    handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
+    restoreError, visibleDimensions,
     summary, topFilesCount, uniquePrinciples,
     fileCurrentPath, setFileCurrentPath,
   };
@@ -179,7 +149,11 @@ function SevInline({ severity }) {
 }
 
 function ViolationsSubTabContent(props) {
-  const { activeSubTab, visibleDimensions, dismissed, callbacks, fileCurrentPath, setFileCurrentPath, handleRestore, handleRestoreAll } = props;
+  const {
+    activeSubTab, visibleDimensions, dismissed, callbacks,
+    fileCurrentPath, setFileCurrentPath,
+    handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
+  } = props;
   if (activeSubTab === 'file') {
     return <FileSubTab dimensions={visibleDimensions} onFileClick={callbacks.onFileClick} currentPath={fileCurrentPath} setCurrentPath={setFileCurrentPath} />;
   }
@@ -188,15 +162,24 @@ function ViolationsSubTabContent(props) {
   }
   if (activeSubTab === 'dismissed') {
     return dismissed.length > 0
-      ? <DismissedSubTab dismissed={dismissed} onRestore={handleRestore} onRestoreAll={handleRestoreAll} />
+      ? (
+        <DismissedSubTab
+          dismissed={dismissed}
+          onRestore={handleRestore}
+          onRestoreAll={handleRestoreAll}
+          onDelete={handleDelete}
+          onDeleteAll={handleDeleteAll}
+        />
+      )
       : <p className="empty-state">No dismissed violations.</p>;
   }
   return null;
 }
 
 export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
-  const { accumulatedDimensions, selectedProject } = data;
-  const { onRefresh } = callbacks;
+  const { accumulatedDimensions = [], selectedProject } = data;
+  const { projects = [], projectsLoaded, projectName, loading, isFetching } = data;
+  const { onNavigate, onRefresh } = callbacks;
 
   // Fresh tab click (tabKey changed) drops the cached navigation state so
   // the user lands at the default sub-tab / root path. Round-tripping
@@ -219,7 +202,8 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
 
   const {
     activeSubTab, setActiveSubTab, dismissed,
-    handleRestore, handleRestoreAll, restoreError, visibleDimensions,
+    handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
+    restoreError, visibleDimensions,
     summary, topFilesCount, uniquePrinciples,
     fileCurrentPath, setFileCurrentPath,
   } = useViolationsData({
@@ -229,6 +213,49 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
     initialSubTab: cached.activeSubTab,
     initialFilePath: cached.fileCurrentPath,
   });
+
+  if (!projectsLoaded) return <LoadingScreen />;
+  if (projects.length === 0) {
+    return (
+      <div className="violations-page violations-page--terminal">
+        <TermHeader name="violations" sub="no projects yet" />
+        <EmptyState
+          title="No projects yet"
+          description="Add a project to start analyzing code quality."
+          actionLabel="Add a project"
+          onAction={() => onNavigate?.('projects')}
+        />
+      </div>
+    );
+  }
+  if (!selectedProject) {
+    return (
+      <div className="violations-page violations-page--terminal">
+        <TermHeader name="violations" sub="no project selected" />
+        <EmptyState
+          title="No project selected"
+          description="Pick a project to view its violations."
+          actionLabel="Choose project"
+          onAction={() => onNavigate?.('projects')}
+        />
+      </div>
+    );
+  }
+  const hasAnyDimensionData = (accumulatedDimensions || []).length > 0;
+  if (!hasAnyDimensionData) {
+    if (loading || isFetching) return <LoadingScreen />;
+    return (
+      <div className="violations-page violations-page--terminal">
+        <TermHeader name="violations" sub="no evaluations yet" />
+        <EmptyState
+          title="No evaluations yet"
+          description={`Run an evaluation for ${projectName || selectedProject} to populate this page.`}
+          actionLabel="Start evaluation"
+          onAction={() => onNavigate?.('evaluate')}
+        />
+      </div>
+    );
+  }
 
   const total = summary.totalViolations || 0;
   const subParts = [
@@ -259,6 +286,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
         activeSubTab={activeSubTab} visibleDimensions={visibleDimensions} dismissed={dismissed}
         callbacks={callbacks} fileCurrentPath={fileCurrentPath} setFileCurrentPath={setFileCurrentPath}
         handleRestore={handleRestore} handleRestoreAll={handleRestoreAll}
+        handleDelete={handleDelete} handleDeleteAll={handleDeleteAll}
       />
     </div>
   );

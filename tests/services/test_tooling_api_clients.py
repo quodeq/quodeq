@@ -36,7 +36,7 @@ class TestGetAiClientsIncludesApiProviders:
         ollama = [c for c in result["clients"] if c["id"] == "ollama"][0]
         assert ollama["type"] == "api"
 
-    def test_cli_providers_still_require_which(self):
+    def test_cli_providers_marked_uninstalled_when_missing(self):
         mixin = FsToolingMixin()
         with patch("quodeq.services.tooling_mixin.get_provider_configs") as mock_cfg:
             mock_cfg.return_value = {
@@ -44,5 +44,6 @@ class TestGetAiClientsIncludesApiProviders:
             }
             with patch("shutil.which", return_value=None):
                 result = mixin.get_ai_clients()
-        client_ids = [c["id"] for c in result["clients"]]
-        assert "claude" not in client_ids
+        claude = next((c for c in result["clients"] if c["id"] == "claude"), None)
+        assert claude is not None
+        assert claude["installed"] is False

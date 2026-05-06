@@ -9,6 +9,7 @@ import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { ComplianceCard } from './EvalCards.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge } from '../../../components/terminal/index.js';
 import { useRegisterWindowSpec, ReportContent, useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
+import LowConfidenceGroup, { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
@@ -74,13 +75,13 @@ function FileSevBadgeRow({ file }) {
   );
 }
 
-function FileHeader({ file, totalViolations, totalCompliance, dimensionsCount }) {
+function FileHeader({ file, totalViolations, totalCompliance, dimensionsCount, dateLabel, runId }) {
   const totalChecks = totalViolations + totalCompliance;
   const ratio = complianceRatio(totalViolations, totalCompliance);
   return (
     <section className="principle-detail-header principle-detail-header--terminal">
       <div className="principle-detail-header__top">
-        <TermHeader name={`${file.file}.detail`} />
+        <TermHeader name={file.file} sub={dateLabel || runId || null} />
       </div>
       <StatStrip cards>
         <Stat
@@ -125,7 +126,7 @@ function SeverityGroup({ sev, violations }) {
   );
 }
 
-const FileDetailPage = memo(function FileDetailPage({ file }) {
+const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel }) {
   const totalViolations = file.total || 0;
   const totalCompliance = file.compliance?.length || 0;
   const dimensionsCount = file.dimensionsCount || 0;
@@ -140,6 +141,21 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
   const showFilters = distinctSeverities > 1 || (distinctSeverities >= 1 && totalCompliance > 0);
   const showCompliance = !activeFilter || activeFilter === 'all' || activeFilter === 'compliance';
   const showViolations = activeFilter !== 'compliance';
+
+  const { lowConfidenceViolations, highConfidenceBySeverity } = useMemo(() => {
+    const low = [];
+    const high = {};
+    for (const sev of SEVERITY_ORDER) {
+      const bucket = file.violationsBySeverity?.[sev] || [];
+      const highBucket = [];
+      for (const v of bucket) {
+        if (isLowConfidence(v)) low.push(v);
+        else highBucket.push(v);
+      }
+      high[sev] = highBucket;
+    }
+    return { lowConfidenceViolations: low, highConfidenceBySeverity: high };
+  }, [file.violationsBySeverity]);
 
   const reportSpec = useMemo(() => {
     if (!file?.file) return null;
@@ -178,6 +194,8 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
         totalViolations={totalViolations}
         totalCompliance={totalCompliance}
         dimensionsCount={dimensionsCount}
+        dateLabel={dateLabel}
+        runId={runId}
       />
 
       {showFilters && (
@@ -191,8 +209,15 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
 
       {showViolations && SEVERITY_ORDER.map((sev) => {
         if (activeFilter && activeFilter !== 'all' && activeFilter !== sev) return null;
-        return <SeverityGroup key={sev} sev={sev} violations={file.violationsBySeverity?.[sev] || []} />;
+        return <SeverityGroup key={sev} sev={sev} violations={highConfidenceBySeverity[sev] || []} />;
       })}
+
+      {showViolations && (!activeFilter || activeFilter === 'all') && (
+        <LowConfidenceGroup
+          violations={lowConfidenceViolations}
+          renderViolation={(v, idx) => <ViolationCard key={`lc-${idx}`} v={v} index={idx} />}
+        />
+      )}
 
       {showCompliance && totalCompliance > 0 && (
         <div>

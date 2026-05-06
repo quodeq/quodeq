@@ -205,7 +205,7 @@ class TestSerialization:
         expected_keys = {
             "job_id", "status", "command", "started_at", "ended_at",
             "exit_code", "logs", "output_project", "output_run_id",
-            "phase", "current_dimension", "dimensions",
+            "phase", "deadline_at", "current_dimension", "dimensions",
         }
         assert set(data.keys()) == expected_keys
 

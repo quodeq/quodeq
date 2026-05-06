@@ -11,6 +11,7 @@ import argparse
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
@@ -18,7 +19,7 @@ from quodeq.analysis.subprocess import AnalysisError
 from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
 from quodeq.engine.scoring_pipeline import run_full
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
-from quodeq.shared.logging import log_error, log_info
+from quodeq.shared.logging import log_error, log_info, log_warning
 from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_repo, write_text
 from quodeq.shared.repo_handler import cleanup_cloned_repo
 from quodeq.engine._runner_markers import emit_marker
@@ -51,6 +52,33 @@ _logger = logging.getLogger(__name__)
 _ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
 _ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
 _ENV_POOL_BUDGET = "QUODEQ_POOL_BUDGET"
+_ENV_TIME_LIMIT = "QUODEQ_TIME_LIMIT"
+
+
+def _resolve_time_limit(args: argparse.Namespace, env: dict[str, str] | None = None) -> int | None:
+    """Resolve the run-level time limit from CLI args or env.
+
+    Precedence: explicit CLI flag > QUODEQ_TIME_LIMIT > legacy QUODEQ_POOL_BUDGET.
+    Emits a one-line deprecation warning when the legacy CLI flag or env var is
+    the source of the value.
+    """
+    src_env = env or os.environ
+    if getattr(args, "pool_budget", None) is not None:
+        # argparse stores both --time-limit and --pool-budget on the same dest;
+        # detect deprecated form by scanning the original argv.
+        if any(a == "--pool-budget" or a.startswith("--pool-budget=") for a in sys.argv[1:]):
+            sys.stderr.write(
+                "warning: --pool-budget is deprecated, use --time-limit instead\n"
+            )
+        return args.pool_budget
+    if src_env.get(_ENV_TIME_LIMIT) is not None:
+        return _env_int(_ENV_TIME_LIMIT, None, env=env)
+    if src_env.get(_ENV_POOL_BUDGET) is not None:
+        sys.stderr.write(
+            f"warning: {_ENV_POOL_BUDGET} is deprecated, use {_ENV_TIME_LIMIT} instead\n"
+        )
+        return _env_int(_ENV_POOL_BUDGET, None, env=env)
+    return None
 
 
 def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -> int | None:
@@ -205,8 +233,8 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
             subagent_model=subagent_model_val,
             verify_findings=not _no_verify(args, env=env),
             consolidated=consolidated,
-            pool_budget=args.pool_budget if args.pool_budget is not None else _env_int(_ENV_POOL_BUDGET, None, env=env),
-            incremental=args.incremental,
+            time_limit=_resolve_time_limit(args, env=env),
+            incremental=not (getattr(args, "clean_scan", False) or bool(getattr(args, "diff_from", None))),
             incremental_file_filter=incremental_file_filter,
             dry_run=getattr(args, "dry_run", False),
             diff_from=diff_from,
@@ -264,6 +292,17 @@ def _run_pipeline_with_cleanup(
                     # (the UI gates dim-polling on phase in
                     # {analyzing, scoring}).
                     lifecycle.set_phase("analyzing")
+                    # Record the run-level deadline so the dashboard countdown
+                    # has it (visible immediately in status.json and SSE).
+                    # Resolve from CLI args OR env vars — dashboard runs pass
+                    # QUODEQ_TIME_LIMIT via env, not the CLI flag.
+                    budget_s = _resolve_time_limit(args)
+                    if budget_s is not None and budget_s > 0:
+                        from datetime import datetime, timedelta, timezone
+                        deadline_iso = (
+                            datetime.now(timezone.utc) + timedelta(seconds=budget_s)
+                        ).isoformat()
+                        lifecycle.set_deadline(deadline_iso)
                     result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
                     # run_full writes per-dimension reports as each dimension
                     # completes, so by the time it returns scoring is already
@@ -297,11 +336,21 @@ def _run_pipeline_with_cleanup(
 
 def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
-    if getattr(args, "incremental", False) and getattr(args, "diff_from", None):
+    # --incremental is a deprecated no-op alias; emit a warning so external
+    # scripts have notice to migrate. The default behaviour already does
+    # what --incremental used to mean.
+    if getattr(args, "legacy_incremental", False):
+        log_warning(
+            "--incremental is deprecated and will be removed in the next release. "
+            "Incremental scans are now the default; use --clean-scan to force a "
+            "full re-analysis."
+        )
+
+    if getattr(args, "clean_scan", False) and getattr(args, "diff_from", None):
         log_error(
-            "Error: --incremental and --diff-from are mutually exclusive. "
-            "--incremental is for nightly whole-repo runs; --diff-from is for "
-            "PR-scoped analysis."
+            "Error: --clean-scan and --diff-from are mutually exclusive. "
+            "--diff-from already produces evidence-only output for a specific "
+            "ref; --clean-scan has no meaning in that mode."
         )
         return 1
 

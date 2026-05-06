@@ -67,7 +67,7 @@ function useProjects({ onNoProjects }) {
 function useAppNavigation() {
   const [serverConnected, setServerConnected, serverVersion] = useServerHealth();
   const { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab } = useNavStack();
-  const projectBundle = useProjects({ onNoProjects: () => navTab('evaluate') });
+  const projectBundle = useProjects({ onNoProjects: () => { /* wizard handles fresh-user UX in App.jsx */ } });
   const { selectedRun, setSelectedRun, handleRunChange } = projectBundle;
   const [historySelectedRun, setHistorySelectedRun] = useState('latest');
   function handleNavigate(page, params = {}) {
@@ -104,7 +104,9 @@ export function useAppState() {
   // past runs in a comparison-oriented mental model — flashing the previous
   // run's data via placeholderData is confusing. Overview navigation, by
   // contrast, benefits from the instant swap because consecutive runs are
-  // usually nearly identical.
+  // usually nearly identical. The dashboard-refreshing class dims the
+  // page during the background refetch so the user sees that something
+  // is happening without the jarring full-screen LoadingScreen.
   const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, refreshDashboard } = useDashboard({
     selectedProject,
     selectedRun: effectiveRun,

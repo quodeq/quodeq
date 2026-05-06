@@ -158,6 +158,94 @@
   white-space: pre;
 }
 
+/* ── Tip callout ─────────────────────────────────────── */
+
+.help-tip {
+  display: flex;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+  border-left: 2px solid var(--color-accent);
+  border-radius: var(--radius-md);
+}
+
+.help-tip__title {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-accent);
+  margin-bottom: var(--space-1);
+}
+
+.help-tip__body {
+  font-size: clamp(0.85rem, 0.4vw + 0.7rem, 1rem);
+  color: var(--color-text);
+  line-height: 1.65;
+}
+
+.help-tip__body p {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text);
+}
+.help-tip__body p:last-child { margin-bottom: 0; }
+
+.help-tip__body code {
+  font-size: 0.85em;
+}
+
+/* ── Key/value table for "what each thing does" ──────── */
+
+.help-keytable {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.4fr) 1fr;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin: var(--space-3) 0 var(--space-5);
+  background: var(--color-surface-alt);
+}
+
+.help-keytable__row {
+  display: contents;
+}
+
+.help-keytable__k,
+.help-keytable__v {
+  padding: var(--space-2) var(--space-3);
+  font-size: clamp(0.8rem, 0.4vw + 0.7rem, 0.95rem);
+  line-height: 1.6;
+  border-top: 1px solid var(--color-border);
+}
+
+.help-keytable__row:first-child .help-keytable__k,
+.help-keytable__row:first-child .help-keytable__v {
+  border-top: none;
+}
+
+.help-keytable__k {
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-bg) 35%, transparent);
+}
+
+.help-keytable__v {
+  color: var(--color-text-muted);
+}
+
+.help-keytable__v code {
+  font-size: 0.85em;
+}
+
+/* ── Severity tag inline use in help body ────────────── */
+
+.help-section .severity-tag {
+  margin-right: var(--space-1);
+  vertical-align: baseline;
+}
+
 /* ── Responsive ──────────────────────────────────────── */
 
 @media (max-width: 900px) {
@@ -178,5 +266,14 @@
     flex-direction: row;
     flex-wrap: wrap;
     min-width: auto;
+  }
+
+  .help-keytable {
+    grid-template-columns: 1fr;
+  }
+
+  .help-keytable__v {
+    border-top: none;
+    padding-top: 0;
   }
 }

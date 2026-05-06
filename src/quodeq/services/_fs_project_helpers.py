@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.core.types import ProjectEntry
@@ -17,9 +19,40 @@ from quodeq.services.ports import RunInfo
 from quodeq.shared.utils import _env_int
 
 
+def _backfill_onboarding_field(project_dir: Path) -> dict | None:
+    """Add ``onboardingCompletedAt`` to ``repository_info.json`` if missing.
+
+    Returns the (possibly modified) data dict, or ``None`` if the file is
+    missing or unreadable. Persists the change back to disk when a backfill
+    happens. Treats absence of the field as already-onboarded — backfills to
+    the project's existing ``createdAt`` timestamp, falling back to "now".
+    """
+    info_path = project_dir / "repository_info.json"
+    if not info_path.exists():
+        return None
+    try:
+        data = json.loads(info_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+    if "onboardingCompletedAt" in data:
+        return data
+    data["onboardingCompletedAt"] = data.get("createdAt") or datetime.now(timezone.utc).isoformat()
+    try:
+        info_path.write_text(json.dumps(data, indent=2))
+    except OSError:
+        pass
+    return data
+
+
 def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> ProjectEntry:
     """Build a frozen ProjectEntry from its directory and run list."""
-    info = _read_repo_info(reports_root, entry_name)
+    # Lazy backfill: ensure legacy project records have an
+    # ``onboardingCompletedAt`` field so the wizard never auto-opens for
+    # already-onboarded projects. Returns the (possibly updated) info dict
+    # so we can pass the field through to the entry without re-reading.
+    project_dir = reports_root / entry_name
+    backfilled = _backfill_onboarding_field(project_dir)
+    info = backfilled if backfilled is not None else _read_repo_info(reports_root, entry_name)
     meta = _extract_project_metadata(info, entry_name)
     latest_grade, latest_score, files_count = _read_accumulated_summary(
         reports_root, entry_name, runs,
@@ -41,6 +74,7 @@ def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo
         latest_grade=latest_grade,
         latest_score=latest_score,
         language_stats=_read_language_stats(reports_root, entry_name, runs),
+        onboarding_completed_at=info.get("onboardingCompletedAt"),
     )
 
 

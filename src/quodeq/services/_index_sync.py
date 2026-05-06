@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import sqlite3
+import sys
 import time
 from pathlib import Path
 
@@ -49,7 +50,37 @@ ON CONFLICT(job_id) DO UPDATE SET
 
 
 def _is_pid_alive(pid: int) -> bool:
-    """Return True if *pid* refers to a live process. POSIX + Windows."""
+    """Return True if *pid* refers to a live process. POSIX + Windows.
+
+    On POSIX, ``os.kill(pid, 0)`` is the canonical no-op probe.
+
+    On Windows, ``os.kill(pid, 0)`` is *not* a probe — signal 0 is
+    ``CTRL_C_EVENT``, and Python implements that via
+    ``GenerateConsoleCtrlEvent(CTRL_C_EVENT, pid)``. For an invalid /
+    non-existent pid the Win32 call can broadcast Ctrl+C to every
+    process sharing the calling console, which on test runners means
+    pytest itself receives KeyboardInterrupt mid-run. Use
+    ``OpenProcess`` + ``GetExitCodeProcess`` instead, which are
+    side-effect-free and tolerate dead PIDs cleanly.
+    """
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        STILL_ACTIVE = 259
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        handle = kernel32.OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION, False, wintypes.DWORD(pid),
+        )
+        if not handle:
+            return False
+        try:
+            exit_code = wintypes.DWORD()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                return False
+            return exit_code.value == STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
     try:
         os.kill(pid, 0)
     except (OSError, ProcessLookupError):
@@ -161,6 +192,92 @@ def _sync_legacy_run(
     )
 
 
+def _delete_orphan_non_terminal_rows(db: sqlite3.Connection) -> int:
+    """Remove non-terminal rows whose ``run_dir`` no longer exists on disk.
+
+    Without this sweep, an orphan row (e.g. left by a crashed test, a manually
+    deleted run dir, or a partial cleanup) stays as ``running`` forever:
+    ``_check_stale_and_promote`` reads ``.heartbeat`` from ``run_dir``, and an
+    unreadable heartbeat (no dir) provides no liveness signal, so the row is
+    never promoted. Terminal rows are left alone — users may prune old dirs
+    to save disk and the index is their only record.
+    """
+    placeholders = ", ".join("?" for _ in _TERMINAL_STATE_VALUES)
+    rows = db.execute(
+        f"SELECT job_id, run_dir FROM runs WHERE state NOT IN ({placeholders})",
+        tuple(_TERMINAL_STATE_VALUES),
+    ).fetchall()
+    orphan_ids = [job_id for job_id, run_dir in rows if not Path(run_dir).is_dir()]
+    if not orphan_ids:
+        return 0
+    db.executemany("DELETE FROM runs WHERE job_id = ?", [(j,) for j in orphan_ids])
+    return len(orphan_ids)
+
+
+def force_promote_to_cancelled_stale(
+    db: sqlite3.Connection, job_id: str, *, run_dir: Path | None = None,
+) -> bool:
+    """Mark a non-terminal index row as ``cancelled(stale_detected)``.
+
+    Called from the cancel path when SIGTERM has nothing to signal (PID is
+    dead). The row stays in the index — history is preserved. State flips
+    to terminal so the dashboard no longer treats the job as live.
+
+    If *run_dir* is provided and exists, ``status.json`` is also rewritten
+    so the on-disk source of truth matches the index. Findings inside
+    ``run_dir`` are not touched.
+
+    Returns True if the row was promoted, False if it didn't exist or was
+    already terminal.
+    """
+    row = db.execute(
+        "SELECT state, project_uuid, run_id, started_at, phase, "
+        "current_dimension, pid FROM runs WHERE job_id = ?", (job_id,),
+    ).fetchone()
+    if row is None:
+        return False
+    state, project_uuid, run_id, started_at, phase, current_dimension, pid = row
+    if state in _TERMINAL_STATE_VALUES:
+        return False
+
+    # Prefer the FS path: write status.json and let the upsert sync the row.
+    if run_dir is not None and run_dir.is_dir():
+        try:
+            existing = read_status(run_dir) or {}
+            dimensions = existing.get("dimensions") or []
+            write_status(
+                run_dir,
+                state=RunState.CANCELLED,
+                job_id=job_id,
+                started_at=started_at or existing.get("started_at", ""),
+                dimensions=dimensions,
+                phase=phase,
+                current_dimension=current_dimension,
+                pid=pid if isinstance(pid, int) else None,
+                exit_reason="stale_detected",
+            )
+            _upsert_from_status(
+                db, run_dir, project_uuid=project_uuid, run_id=run_id,
+            )
+            return True
+        except (OSError, UnsupportedSchemaError) as exc:
+            _logger.warning(
+                "force-promote: status.json write failed for %s (%s); "
+                "falling back to index-only update", job_id, exc,
+            )
+            # Fall through to DB-only path.
+
+    # No run_dir on disk (full orphan): update the index row directly.
+    from datetime import datetime, timezone
+    now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    db.execute(
+        "UPDATE runs SET state = ?, exit_reason = ?, finalized_at = ?, "
+        "updated_at = ? WHERE job_id = ?",
+        ("cancelled", "stale_detected", now_iso, now_iso, job_id),
+    )
+    return True
+
+
 def _check_stale_and_promote(
     db: sqlite3.Connection, run_dir: Path, *,
     project_uuid: str, run_id: str, stale_seconds: int = 30,
@@ -198,6 +315,9 @@ def _check_stale_and_promote(
             current_dimension=status.get("current_dimension"),
             pid=pid if isinstance(pid, int) else None,
             exit_reason="stale_detected",
+            # Preserve deadline_at across the stale → cancelled rewrite so
+            # downstream readers (filesystem snapshot builder) still see it.
+            deadline_at=status.get("deadline_at"),
         )
         with db:
             _upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)

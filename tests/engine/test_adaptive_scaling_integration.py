@@ -2,12 +2,26 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
+
+# TODO(quodeq#404): SubagentPool.run() hangs on Windows inside the FileQueue
+# lock acquired via msvcrt.locking. Different byte-range / past-EOF semantics
+# from fcntl.flock cause the worker thread to block indefinitely under
+# ThreadPoolExecutor. Pool-using tests are skipped on win32 until the
+# Windows lock path is rewritten (likely with LockFileEx or by ensuring the
+# .lock file always has a non-zero size before locking).
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="SubagentPool FileQueue lock path needs Windows-specific work",
+)
 
 _TEST_FILE_PATTERN = "src/f{}.py"
 

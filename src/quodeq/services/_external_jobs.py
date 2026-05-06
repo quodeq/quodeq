@@ -30,9 +30,11 @@ def resolve_external_pid(project_uuid: str, run_id: str, reports_root: Path) -> 
         pid = int(pid_file.read_text().strip())
     except (OSError, ValueError):
         return None
-    try:
-        os.kill(pid, 0)
-    except OSError:
+    # Use the shared liveness probe — os.kill(pid, 0) is unsafe on
+    # Windows (signal 0 == CTRL_C_EVENT, which can broadcast Ctrl+C
+    # to the calling process). See _index_sync._is_pid_alive.
+    from quodeq.services._index_sync import _is_pid_alive
+    if not _is_pid_alive(pid):
         return None
     return pid
 

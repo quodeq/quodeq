@@ -1,59 +1,55 @@
 import { useState, useEffect } from 'react';
-import EvaluationForm from './EvaluationForm.jsx';
 import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
-import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
-import { TermHeader, SectionLabel } from '../../../components/terminal/index.js';
+import CountdownTimer from './CountdownTimer.jsx';
+import { ACTIVE_PROVIDER_KEY, DEFAULT_TIME_LIMIT_S, providerKey } from '../../../constants.js';
+import { TermHeader } from '../../../components/terminal/index.js';
 
 const TOAST_DISMISS_TIMEOUT_MS = 5000;
 
-function EvaluateHelpSection() {
-  return (
-    <div className="panel evaluate-help-panel">
-      <SectionLabel>how_it_works</SectionLabel>
-      <div className="help-steps">
-        <div className="help-step">
-          <div className="step-number">1</div>
-          <div className="step-content">
-            <h4>Provide Repository</h4>
-            <p>Enter a GitHub URL, SSH path, or local filesystem path to the repository you want to evaluate.</p>
-          </div>
-        </div>
-        <div className="help-step">
-          <div className="step-number">2</div>
-          <div className="step-content">
-            <h4>Select Dimensions</h4>
-            <p>Choose which quality dimensions to analyze. Each dimension covers different aspects of code quality.</p>
-          </div>
-        </div>
-        <div className="help-step">
-          <div className="step-number">3</div>
-          <div className="step-content">
-            <h4>Review Results</h4>
-            <p>Once complete, view detailed findings, grades, and actionable recommendations in the Overview.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ActiveProviderBadge({ storage = localStorage }) {
+function ActiveProviderBadge({ storage = localStorage, onClick }) {
   const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
   const model = storage.getItem(providerKey(provider, 'model')) || '';
   if (!provider) return null;
-  return (
-    <div className="eval-provider-badge">
+  const content = (
+    <>
       <span className="eval-provider-name">{provider}</span>
       {model && <span className="eval-provider-model">{model}</span>}
-    </div>
+    </>
   );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className="eval-provider-badge eval-provider-badge--clickable"
+        onClick={onClick}
+        title="Open provider settings"
+      >
+        {content}
+      </button>
+    );
+  }
+  return <div className="eval-provider-badge">{content}</div>;
 }
 
-function EvaluateHeader() {
+function readBudgetSeconds(storage = localStorage) {
+  const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  if (!provider) return 0;
+  // Read new key first; fall back to legacy 'pool-budget' for back-compat.
+  const raw = storage.getItem(providerKey(provider, 'time-limit'))
+    ?? storage.getItem(providerKey(provider, 'pool-budget'));
+  if (raw === null || raw === undefined) return provider === 'ollama' ? 0 : DEFAULT_TIME_LIMIT_S;
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function EvaluateHeader({ job, onGoToSettings }) {
   // Page title stays steady ("evaluate"); the live "in progress / failed /
   // done" state is carried by the JobHeader card title below to avoid
   // doubling the same status on screen.
+  const deadlineAt = job?.deadlineAt ?? null;
+  const phase = job?.phase ?? job?.status ?? null;
+  const budgetSeconds = readBudgetSeconds();
   return (
     <header className="evaluate-header evaluate-header--terminal">
       <div className="evaluate-header__left">
@@ -62,7 +58,10 @@ function EvaluateHeader() {
           sub="run a comprehensive code quality evaluation on any repository"
         />
       </div>
-      <ActiveProviderBadge />
+      <div className="evaluate-header__right">
+        <CountdownTimer deadlineAt={deadlineAt} budgetSeconds={budgetSeconds} phase={phase} />
+        <ActiveProviderBadge onClick={onGoToSettings} />
+      </div>
     </header>
   );
 }
@@ -89,10 +88,32 @@ function ErrorToast({ message, onDismiss }) {
   );
 }
 
+function NoProjectSelected({ onGoToProjects }) {
+  return (
+    <div className="panel evaluate-panel evaluate-panel--terminal evaluate-no-project">
+      <div className="evaluate-panel__top">
+        <TermHeader name="no_project" sub="pick or add a project to start" />
+      </div>
+      <p className="evaluate-no-project__hint">
+        Add or pick a project from Projects to run an evaluation.
+      </p>
+      {onGoToProjects && (
+        <button
+          type="button"
+          className="term-btn term-btn--primary"
+          onClick={onGoToProjects}
+        >
+          <span aria-hidden="true">▸</span> go to projects
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
   const { selectedProject, projectInfo } = context;
-  const { onStart: onStartEvaluation, onDismiss, onCancel } = actions;
+  const { onStart: onStartEvaluation, onDismiss, onCancel, onGoToProjects, onGoToSettings } = actions;
   const [toastKey, setToastKey] = useState(0);
   const [toastVisible, setToastVisible] = useState(false);
 
@@ -108,23 +129,18 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
 
   return (
     <section className="evaluate-screen">
-      <EvaluateHeader />
+      <EvaluateHeader job={job} onGoToSettings={onGoToSettings} />
 
       <div className="evaluate-content">
         {!job && selectedProject && (
           <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={wrappedOnStart} disabled={false} />
         )}
 
-        {!job && (
-          <div className="panel evaluate-panel">
-            <SectionLabel>{selectedProject ? 'evaluate_new_repository' : 'evaluate_repository'}</SectionLabel>
-            <EvaluationForm onStart={wrappedOnStart} disabled={false} selectedProject={projectInfo} />
-          </div>
+        {!job && !selectedProject && (
+          <NoProjectSelected onGoToProjects={onGoToProjects} />
         )}
 
         <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={onDismiss} onCancel={onCancel} hasEvaluations={!!selectedProject} />
-
-        {!job && <EvaluateHelpSection />}
       </div>
 
       {jobError && toastVisible && (

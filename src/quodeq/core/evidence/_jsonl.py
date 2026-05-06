@@ -14,6 +14,17 @@ from quodeq.shared.utils import open_text
 _logger = logging.getLogger(__name__)
 
 
+def _jsonl_confidence(value: object, default: int = 100) -> int:
+    """Clamp a JSONL confidence value to [0, 100]; missing/non-int → *default*."""
+    if value is None:
+        return default
+    try:
+        coerced = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(0, min(100, coerced))
+
+
 def parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
     """Parse a single JSONL evidence line into a Judgment and optional LLM ref selection."""
     line = line.strip()
@@ -37,6 +48,7 @@ def parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
         violation_type=obj.get("vt", ""), reason=obj.get("reason", ""),
         req=obj.get("req"), title=obj.get("w", ""),
         context=obj.get("context", ""), scope=obj.get("scope", ""),
+        confidence=_jsonl_confidence(obj.get("confidence")),
     )
     pre_resolved = obj.get("req_refs")
     if isinstance(pre_resolved, list) and pre_resolved:
@@ -55,6 +67,12 @@ def judgment_to_dict(j: Judgment) -> dict:
         val = getattr(j, key, None)
         if val:
             d[key] = val
+    # Carry confidence forward only when it's not the default 100. Keeps the
+    # PrincipleEvidence dicts compact for the common case where every finding
+    # has full confidence; producers writing < 100 surface in the output.
+    confidence = getattr(j, "confidence", 100)
+    if confidence != 100:
+        d["confidence"] = confidence
     return d
 
 

@@ -4,11 +4,15 @@ import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
 import DimensionSelector from './DimensionSelector.jsx';
 import BranchScopeSelector from './BranchScopeSelector.jsx';
 import { useScanData } from '../hooks/useScanData.js';
+import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
+import CleanScanToggle from './CleanScanToggle.jsx';
+
+const NO_STANDARDS_MESSAGE = 'Select at least one standard before evaluating.';
 
 
 const FOLDER_MARGIN_BOTTOM = 8;
 
-function RepoInput({ repo, onRepoChange, onClear, onBrowse }) {
+export function RepoInput({ repo, onRepoChange, onClear, onBrowse }) {
   return (
     <div className="form-group">
       <label htmlFor="eval-form-repo">Repository</label>
@@ -48,26 +52,33 @@ function RepoInput({ repo, onRepoChange, onClear, onBrowse }) {
   );
 }
 
-function buildAndSubmit(onStart, formState) {
-  const { repo, selectedDims, branch, scopePath, setRepo, setSelectedDims, setBranch, setScopePath } = formState;
+export function buildEvaluationPayload({ repo, selectedDims, branch, scopePath, cleanScan }) {
   const payload = { repo };
   if (selectedDims.size > 0) payload.dimensions = [...selectedDims];
   if (branch) payload.branch = branch;
   if (scopePath) payload.scopePath = scopePath;
-  onStart(payload);
+  payload.cleanScan = cleanScan !== 'off';
+  return payload;
+}
+
+function buildAndSubmit(onStart, formState) {
+  const { repo, selectedDims, branch, scopePath, cleanScan, setRepo, setSelectedDims, setBranch, setScopePath, setCleanScan } = formState;
+  onStart(buildEvaluationPayload({ repo, selectedDims, branch, scopePath, cleanScan }));
   setRepo('');
   setSelectedDims(new Set());
   setBranch(null);
   setScopePath(null);
+  if (cleanScan === 'once') setCleanScan('off');
 }
 
-function useEvaluationForm(onStart) {
+function useEvaluationForm(onStart, onValidationFail) {
   const [repo, setRepo] = useState('');
   const { allDimensions, dimLoadError } = usePluginDimensions();
   const [selectedDims, setSelectedDims] = useState(new Set());
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
   const [branch, setBranch] = useState(null);
   const [scopePath, setScopePath] = useState(null);
+  const [cleanScan, setCleanScan] = useState('off');
 
   useEffect(() => { setScopePath(null); setBranch(null); }, [repo]);
 
@@ -80,7 +91,11 @@ function useEvaluationForm(onStart) {
   const clearAll = () => setSelectedDims(new Set());
   const handleSubmit = (e) => {
     e.preventDefault();
-    buildAndSubmit(onStart, { repo, selectedDims, branch, scopePath, setRepo, setSelectedDims, setBranch, setScopePath });
+    if (allDimensions.length > 0 && selectedDims.size === 0) {
+      onValidationFail?.(NO_STANDARDS_MESSAGE);
+      return;
+    }
+    buildAndSubmit(onStart, { repo, selectedDims, branch, scopePath, cleanScan, setRepo, setSelectedDims, setBranch, setScopePath, setCleanScan });
   };
   const handleFolderSelect = (path) => { setRepo(path); setFolderBrowserOpen(false); };
   const handleRepoClear = () => { setRepo(''); setSelectedDims(new Set()); };
@@ -91,20 +106,26 @@ function useEvaluationForm(onStart) {
     toggleDim, selectAll, clearAll, handleSubmit,
     handleFolderSelect, handleRepoClear, dimLoadError,
     branch, setBranch, scopePath, setScopePath,
+    cleanScan, setCleanScan,
   };
 }
 
 export default function EvaluationForm({ onStart, disabled, selectedProject }) {
+  const { showToast } = useSidePane();
   const {
     repo, setRepo, allDimensions, selectedDims, folderBrowserOpen, setFolderBrowserOpen,
     toggleDim, selectAll, clearAll, handleSubmit, handleFolderSelect, handleRepoClear, dimLoadError,
     branch, setBranch, scopePath, setScopePath,
-  } = useEvaluationForm(onStart);
+    cleanScan, setCleanScan,
+  } = useEvaluationForm(onStart, showToast);
 
   const isLocalRepo = !!repo && !repo.startsWith('http') && !repo.startsWith('git@') && !repo.includes('github.com');
   const { scanData } = useScanData(null, isLocalRepo ? repo : null);
 
-  const canSubmit = !disabled && !!repo && (allDimensions.length === 0 || selectedDims.size > 0);
+  // Submit stays clickable when no standards are selected so the snackbar
+  // can fire on click. ``disabled`` (the prop) covers the running state and
+  // the missing-repo case keeps the button greyed.
+  const canSubmit = !disabled && !!repo;
 
   return (
     <>
@@ -136,6 +157,8 @@ export default function EvaluationForm({ onStart, disabled, selectedProject }) {
             onClearAll={clearAll}
           />
         )}
+
+        <CleanScanToggle value={cleanScan} onChange={setCleanScan} disabled={!canSubmit} />
 
         <button type="submit" className="evaluate-submit-btn" disabled={!canSubmit}>
           {disabled ? 'Running...' : 'Scan'}

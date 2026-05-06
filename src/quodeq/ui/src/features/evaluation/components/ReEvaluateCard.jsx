@@ -2,10 +2,31 @@ import { useState, useEffect } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
 import { useScanData } from '../hooks/useScanData.js';
+import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import BranchScopeSelector from './BranchScopeSelector.jsx';
 import CleanScanToggle from './CleanScanToggle.jsx';
 import DimensionSelector from './DimensionSelector.jsx';
 import FolderBrowser from './FolderBrowser.jsx';
+import { TermHeader } from '../../../components/terminal/index.js';
+import HelpHint from '../../../components/HelpHint.jsx';
+
+const EVAL_OPTIONS_HINT = (
+  <>
+    <div><strong>Scope</strong>: restrict the evaluation to a subfolder. Default is the whole project.</div>
+    <div><strong>Clean scan</strong>: when off, only changed files since the last run are re-analyzed (incremental). Turn it on to re-evaluate everything from scratch.</div>
+  </>
+);
+
+const NO_STANDARDS_MESSAGE = 'Select at least one standard before evaluating.';
+
+export function buildScanPayload({ info, branch, scopePath, selectedDims, cleanScan }) {
+  const payload = { repo: info.path };
+  payload.dimensions = [...selectedDims];
+  if (branch) payload.branch = branch;
+  if (scopePath) payload.scopePath = scopePath;
+  payload.cleanScan = cleanScan !== 'off';
+  return payload;
+}
 
 
 const BUTTON_ROW_GAP = '8px';
@@ -53,7 +74,7 @@ function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }
   return { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore };
 }
 
-function useDimensionSelection(allDimensions, info, branch, scopePath, onStart) {
+function useDimensionSelection(allDimensions, info, branch, scopePath, onStart, onValidationFail) {
   const [selectedDims, setSelectedDims] = useState(new Set());
   const [cleanScan, setCleanScan] = useState('off');
 
@@ -67,16 +88,12 @@ function useDimensionSelection(allDimensions, info, branch, scopePath, onStart) 
   };
   const selectAll = () => setSelectedDims(new Set(allDimensions.map((d) => d.id)));
   const clearAll = () => setSelectedDims(new Set());
-  const buildPayload = () => {
-    const payload = { repo: info.path };
-    payload.dimensions = [...selectedDims];
-    if (branch) payload.branch = branch;
-    if (scopePath) payload.scopePath = scopePath;
-    payload.incremental = cleanScan === 'off';
-    return payload;
-  };
   const handleScan = () => {
-    onStart(buildPayload());
+    if (allDimensions.length > 0 && selectedDims.size === 0) {
+      onValidationFail?.(NO_STANDARDS_MESSAGE);
+      return;
+    }
+    onStart(buildScanPayload({ info, branch, scopePath, selectedDims, cleanScan }));
     if (cleanScan === 'once') setCleanScan('off');
   };
 
@@ -88,6 +105,7 @@ function useReEvaluateCard(project, onStart, projectInfo) {
   const { getProjectInfo, relocateProject, cloneToLocal } = api;
   const { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo, { getProjectInfo, relocateProject });
   const { allDimensions } = usePluginDimensions();
+  const { showToast } = useSidePane();
   const [branch, setBranch] = useState(null);
   const [scopePath, setScopePath] = useState(null);
 
@@ -101,7 +119,7 @@ function useReEvaluateCard(project, onStart, projectInfo) {
   const { scanData } = useScanData(isLocal ? project : null);
 
   const { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan } =
-    useDimensionSelection(allDimensions, info, branch, scopePath, onStart);
+    useDimensionSelection(allDimensions, info, branch, scopePath, onStart, showToast);
 
   async function handleCloneToLocal(destination) {
     setCloneBrowserOpen(false);
@@ -144,7 +162,7 @@ function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, handleU
         />
         <button
           type="button"
-          className="evaluate-submit-btn"
+          className="term-btn term-btn--primary"
           disabled={!urlInput.trim() || urlSaving}
           onClick={handleUrlRestore}
         >
@@ -160,6 +178,7 @@ function DimensionSelectionSection({ allDimensions, selectedDims, cloning, toggl
   if (allDimensions.length === 0) return null;
   return (
     <DimensionSelector
+      variant="terminal"
       allDimensions={allDimensions}
       selectedDims={selectedDims}
       onToggle={cloning ? undefined : toggleDim}
@@ -195,12 +214,12 @@ function ActionButtons({ disabled, canStart, handleScan }) {
     <div style={buttonRowStyle}>
       <button
         type="button"
-        className="evaluate-submit-btn"
+        className="term-btn term-btn--primary term-btn--filled"
         style={flexButtonStyle}
         disabled={!canStart}
         onClick={handleScan}
       >
-        {disabled ? 'Running...' : 'Scan'}
+        {disabled ? 'Running...' : (<><span aria-hidden="true">▸</span> scan</>)}
       </button>
     </div>
   );
@@ -217,28 +236,14 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
   const canStart = !disabled && !cloning && !info.pathMissing;
 
   return (
-    <div className="panel evaluate-panel">
-      <div className="panel-header">
-        <h3>Re-evaluate <span className="re-eval-project-name">{info.name || project}</span></h3>
-      </div>
-
-      <div className="evaluate-form-large">
-        <div className="re-eval-repo-path">
-          <span className="re-eval-repo-label">{info.location === 'online' ? 'Remote' : 'Local'}</span>
-          <code>{info.path}</code>
-        </div>
-
-        {info.pathMissing && (
-          <UrlRestoreSection urlInput={urlInput} setUrlInput={setUrlInput} urlError={urlError} urlSaving={urlSaving} handleUrlRestore={handleUrlRestore} />
-        )}
-
-        <CloneSection info={info} cloning={cloning} cloneDest={cloneDest} cloneError={cloneError} setCloneBrowserOpen={setCloneBrowserOpen} />
-
+    <div className="panel evaluate-panel evaluate-panel--terminal">
+      <div className="evaluate-panel__top evaluate-panel__top--row">
+        <TermHeader name="evaluate" sub={info.name || project} />
         <div className="re-eval-toggle-row">
+          <HelpHint label="Evaluation options help">{EVAL_OPTIONS_HINT}</HelpHint>
           {scope.isLocal && (
             <BranchScopeSelector
               branches={scope.scanData?.branches}
-              currentBranch={scope.scanData?.currentBranch || scope.branch}
               projectPath={info.path}
               onScopeChange={scope.setScopePath}
               scopePath={scope.scopePath}
@@ -246,6 +251,26 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
           )}
           <CleanScanToggle value={cleanScan} onChange={setCleanScan} disabled={!canStart} />
         </div>
+      </div>
+
+      <div className="evaluate-form-large">
+        <div className="re-eval-repo-path re-eval-repo-path--terminal">
+          <span className="re-eval-repo-path__arrow" aria-hidden="true">▸</span>
+          <span className="re-eval-repo-path__label">{info.location === 'online' ? 'remote' : 'local'}</span>
+          <code>{info.path}</code>
+          {scope.isLocal && (scope.scanData?.currentBranch || scope.branch) && (
+            <>
+              <span className="re-eval-repo-path__sep" aria-hidden="true">@</span>
+              <code className="re-eval-repo-path__branch">{scope.scanData?.currentBranch || scope.branch}</code>
+            </>
+          )}
+        </div>
+
+        {info.pathMissing && (
+          <UrlRestoreSection urlInput={urlInput} setUrlInput={setUrlInput} urlError={urlError} urlSaving={urlSaving} handleUrlRestore={handleUrlRestore} />
+        )}
+
+        <CloneSection info={info} cloning={cloning} cloneDest={cloneDest} cloneError={cloneError} setCloneBrowserOpen={setCloneBrowserOpen} />
 
         <div className={`re-eval-actions-group${cloning ? ' re-eval-disabled-section' : ''}`}>
           <DimensionSelectionSection allDimensions={allDimensions} selectedDims={selectedDims} cloning={cloning} toggleDim={toggleDim} selectAll={selectAll} clearAll={clearAll} />
@@ -276,8 +301,10 @@ export default function ReEvaluateCard({ project, projectInfo, onStart, disabled
 
   if (error) return null;
   if (!info) return (
-    <div className="panel evaluate-panel">
-      <div className="panel-header"><h3>Loading project...</h3></div>
+    <div className="panel evaluate-panel evaluate-panel--terminal">
+      <div className="evaluate-panel__top">
+        <TermHeader name="evaluate" sub="loading project..." />
+      </div>
     </div>
   );
 

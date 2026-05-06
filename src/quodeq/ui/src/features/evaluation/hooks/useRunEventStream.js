@@ -21,8 +21,23 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { evaluationKeys } from "../../../api/queryKeys.js";
 
+// Cap the per-job findings array so a long-running scan with tens of thousands
+// of findings does not grow the React Query cache without bound. The dashboard
+// renders aggregated counts and the most-recent slice; older entries are still
+// reachable through the scored evaluation/<dim>.json artifacts on disk.
+const MAX_FINDINGS_IN_CACHE = 5000;
+
 function isSseEnabled() {
   return import.meta.env?.VITE_USE_SSE_EVENTS === "true";
+}
+
+function appendBoundedFinding(prev, data) {
+  if (prev.length >= MAX_FINDINGS_IN_CACHE) {
+    const trimmed = prev.slice(prev.length - MAX_FINDINGS_IN_CACHE + 1);
+    trimmed.push(data);
+    return trimmed;
+  }
+  return [...prev, data];
 }
 
 export function useRunEventStream(jobId) {
@@ -65,7 +80,7 @@ export function useRunEventStream(jobId) {
         const data = JSON.parse(e.data);
         writeCache(
           evaluationKeys.findings(jobId),
-          (prev = []) => [...prev, data],
+          (prev = []) => appendBoundedFinding(prev, data),
         );
       } catch {
         // ignore

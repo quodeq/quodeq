@@ -13,6 +13,7 @@ from quodeq.services._filesystem_helpers import _list_available_dimensions_for_d
 from quodeq.services._fs_metadata import _has_fingerprints, _infer_discipline
 from quodeq.services._fs_project_helpers import (
     _auto_detect_parents,
+    _backfill_onboarding_field,
     _build_project_entry,
     _max_projects_listed,
 )
@@ -70,6 +71,13 @@ def build_project_list(reports_root: Path) -> list[ProjectEntry]:
         dir_names.append(entry.name)
         if len(dir_names) >= max_listed:
             break
+
+    # Lazy backfill: ensure legacy project records have an
+    # ``onboardingCompletedAt`` field. Run before the parent/child sweep so
+    # any subsequent reads see the updated file. Idempotent — no-op for
+    # records that already have the field. Failures are silently ignored.
+    for name in dir_names:
+        _backfill_onboarding_field(reports_root / name)
 
     parent_ids, subproject_ids = _build_parent_child_sets(reports_root, dir_names)
 

@@ -15,3 +15,6 @@ class ScanData:
     modules: list[str] = field(default_factory=list)
     scanned_at: str = ""
     total_files: int = 0
+    # Subset of total_files whose extension is recognised as analysable
+    # source code (matches the language ext-map used by the evaluation).
+    code_files: int = 0

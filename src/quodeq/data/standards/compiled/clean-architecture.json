@@ -1,7 +1,7 @@
 {
   "id": "clean-architecture",
   "name": "Clean Architecture",
-  "description": "Evaluates adherence to Robert C. Martin's Clean Architecture principles",
+  "description": "Adherence to Clean Architecture as described by Robert C. Martin. Source code dependencies point inward toward the domain, frameworks and infrastructure stay at the edges, and use cases remain decoupled from delivery and persistence concerns.",
   "managed": true,
   "type": "quodeq",
   "source": "Robert C. Martin",

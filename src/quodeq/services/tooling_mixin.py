@@ -203,8 +203,7 @@ class FsToolingMixin:
             candidates = self._CLI_CANDIDATES
 
         for c in candidates:
-            if shutil.which(c["id"]):
-                clients.append({**c, "type": "cli"})
+            clients.append({**c, "type": "cli", "installed": bool(shutil.which(c["id"]))})
 
         # API providers: always available (no CLI binary needed)
         provider_configs = get_provider_configs()
@@ -215,6 +214,7 @@ class FsToolingMixin:
                         "id": provider_id,
                         "label": provider_id.capitalize(),
                         "type": "api",
+                        "installed": True,
                     })
 
         # Sort by 'order' field from ai_providers.json

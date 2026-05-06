@@ -10,7 +10,7 @@ from flask import Response, jsonify, request
 
 from quodeq.api.helpers import error_response
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
-from quodeq.services.base import _DEFAULT_MAX_SUBAGENTS, _DEFAULT_POOL_BUDGET
+from quodeq.services.base import _DEFAULT_MAX_SUBAGENTS, _DEFAULT_TIME_LIMIT
 
 _CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")
 _logger = logging.getLogger(__name__)
@@ -18,14 +18,54 @@ _logger = logging.getLogger(__name__)
 # Bounds for user-supplied evaluation parameters
 _MIN_SUBAGENTS = 1
 _MAX_SUBAGENTS = 10
-_MIN_POOL_BUDGET = 60
-_MAX_POOL_BUDGET = 3600
+_MIN_TIME_LIMIT = 60
+_MAX_TIME_LIMIT = 3600
 _MAX_CONTEXT_SIZE = 2_000_000
+
+
+def _coerce_int(value: object, default: int) -> int:
+    """Return int(*value*) when convertible, else *default*. Never raises."""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _sanitize_url(url: str) -> str:
     """Remove embedded credentials from a URL for safe logging/error messages."""
     return _CREDENTIALS_RE.sub(r"\1***@", url)
+
+
+def _resolve_clean_scan(payload: dict) -> bool:
+    """Resolve the user's clean_scan intent from new and legacy fields.
+
+    New: ``cleanScan: bool`` -- explicit opt-out, default False.
+    Legacy: ``incremental: bool`` -- deprecated, with inverted semantics
+    (old ``True`` meant "use cache" -> ``clean_scan=False``; old ``False``
+    meant "ignore cache" -> ``clean_scan=True``). One-release back-compat.
+
+    Sending both is rejected: we won't guess intent if a client transitions
+    mid-deployment and ends up posting conflicting flags.
+    """
+    has_new = "cleanScan" in payload
+    has_legacy = "incremental" in payload
+    if has_new and has_legacy:
+        raise ValueError(
+            "`cleanScan` and `incremental` cannot be combined in a single payload. "
+            "Use `cleanScan` only -- `incremental` is deprecated. "
+            "Send `cleanScan: false` (use cached findings, default) or `cleanScan: true` "
+            "(force full re-analysis)."
+        )
+    if has_legacy:
+        _logger.warning(
+            "Evaluation payload uses deprecated `incremental` field. "
+            "Migrate to `cleanScan` (inverted semantics). "
+            "Legacy field will be removed in the next release.",
+        )
+        return not bool(payload.get("incremental"))
+    return bool(payload.get("cleanScan", False))
 
 
 def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> tuple[Response, int] | None:
@@ -47,12 +87,16 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
 def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     """Construct and validate EvaluationOptions from the request payload."""
     from quodeq.services.base import EvaluationOptions  # deferred: avoid circular import at module level
-    max_subagents_raw = payload.get("maxSubagents", _DEFAULT_MAX_SUBAGENTS)
-    max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, int(max_subagents_raw)))
-    pool_budget_raw = int(payload.get("poolBudget", _DEFAULT_POOL_BUDGET))
-    pool_budget = 0 if pool_budget_raw == 0 else max(_MIN_POOL_BUDGET, min(_MAX_POOL_BUDGET, pool_budget_raw))
+    max_subagents_raw = _coerce_int(payload.get("maxSubagents"), _DEFAULT_MAX_SUBAGENTS)
+    max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, max_subagents_raw))
+    # Read new key first; fall back to legacy `poolBudget` for back-compat.
+    time_limit_raw = _coerce_int(
+        payload.get("timeLimit", payload.get("poolBudget")), _DEFAULT_TIME_LIMIT,
+    )
+    time_limit = 0 if time_limit_raw == 0 else max(_MIN_TIME_LIMIT, min(_MAX_TIME_LIMIT, time_limit_raw))
     ai_model = payload.get("aiModel") or None
     subagent_model = payload.get("subagentModel") or ai_model  # default to orchestrator
+    clean_scan = _resolve_clean_scan(payload)
     return EvaluationOptions(
         discipline=payload.get("discipline"),
         dimensions=payload.get("dimensions") or "",
@@ -62,10 +106,10 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
         subagent_model=subagent_model,
         verify_findings=bool(payload.get("verifyFindings", True)),
         max_subagents=max_subagents,
-        pool_budget=pool_budget,
-        incremental=bool(payload.get("incremental", False)),
+        time_limit=time_limit,
+        clean_scan=clean_scan,
         per_dimension=bool(payload.get("perDimension", False)),
-        context_size=max(0, min(_MAX_CONTEXT_SIZE, int(payload.get("contextSize", 0)))),
+        context_size=max(0, min(_MAX_CONTEXT_SIZE, _coerce_int(payload.get("contextSize"), 0))),
         branch=payload.get("branch") or None,
         scope_path=payload.get("scopePath") or None,
     )

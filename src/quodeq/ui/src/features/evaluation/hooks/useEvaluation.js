@@ -15,11 +15,13 @@
  *   - startMutation: api.startEvaluation -> seeds status cache on success.
  *   - cancelMutation: api.cancelEvaluation -> invalidates the run subtree.
  *
- * Out of scope (vs. legacy hook):
- *   - Auto-resume of CLI-started external runs via listEvaluations on mount.
- *     Restore in a follow-up if required by user reports.
+ * Mount-time auto-resume:
+ *   - On mount, calls api.listEvaluations({ states: ["running"] }) and adopts
+ *     the most recent running job. Lets a `quodeq evaluate` started in the
+ *     terminal surface in the dashboard so users can close and reopen the UI
+ *     without losing visibility into an in-progress scan.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { confirmDialog } from "../../../utils/confirmDialog.js";
@@ -29,7 +31,7 @@ import {
   ACTIVE_PROVIDER_KEY,
   providerKey,
   DEFAULT_MAX_SUBAGENTS,
-  DEFAULT_POOL_BUDGET,
+  DEFAULT_TIME_LIMIT_S,
 } from "../../../constants.js";
 
 const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === "true";
@@ -38,7 +40,7 @@ const DIM_POLL_MS = 2000;
 const DEFAULT_OLLAMA_SUBAGENTS = "1";
 const DEFAULT_CLI_SUBAGENTS = String(DEFAULT_MAX_SUBAGENTS);
 const DEFAULT_OLLAMA_BUDGET = "0";
-const DEFAULT_CLI_BUDGET = String(DEFAULT_POOL_BUDGET);
+const DEFAULT_CLI_BUDGET = String(DEFAULT_TIME_LIMIT_S);
 
 /**
  * Merge per-provider Settings (provider, model, subagents, budget, etc.)
@@ -54,13 +56,17 @@ function preparePayload(payload, storage = localStorage) {
   if (!model) throw new Error("No model selected. Go to Settings and select one.");
   const isOllama = activeProvider === "ollama";
   const subagents = parseInt(get("subagents") || (isOllama ? DEFAULT_OLLAMA_SUBAGENTS : DEFAULT_CLI_SUBAGENTS), 10);
-  const poolBudget = parseInt(get("pool-budget") || (isOllama ? DEFAULT_OLLAMA_BUDGET : DEFAULT_CLI_BUDGET), 10);
+  // Read new key first; fall back to legacy 'pool-budget' for back-compat.
+  const timeLimit = parseInt(
+    get("time-limit") || get("pool-budget") || (isOllama ? DEFAULT_OLLAMA_BUDGET : DEFAULT_CLI_BUDGET),
+    10,
+  );
   const result = {
     ...payload,
     aiCmd: activeProvider,
     aiModel: model,
     maxSubagents: subagents,
-    poolBudget,
+    timeLimit,
   };
   if (get("per-dimension") === "true") result.perDimension = true;
   if (get("verify") === "false") result.verifyFindings = false;
@@ -76,6 +82,31 @@ export function useEvaluation() {
   // SSE side-effect — writes status/dimensions/findings into cache.
   // No-op when VITE_USE_SSE_EVENTS is off; refetchInterval below covers.
   useRunEventStream(jobId);
+
+  // Adopt any in-progress CLI-started external run on mount so it surfaces
+  // on the Evaluate tab. setJobId guard prevents a late-resolving resume
+  // from clobbering a job the user started in the meantime.
+  useEffect(() => {
+    let cancelled = false;
+    api.listEvaluations({ states: ["running"], limit: 1 })
+      .then((jobs) => {
+        if (cancelled) return;
+        const running = jobs?.[0];
+        if (!running) return;
+        setJobId((current) => {
+          if (current) return current;
+          queryClient.setQueryData(evaluationKeys.status(running.jobId), running);
+          return running.jobId;
+        });
+      })
+      .catch((err) => {
+        console.warn("Failed to fetch running evaluations:", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only resume
+  }, []);
 
   // --- Status (the "job" object) ---------------------------------------
   const statusQuery = useQuery({
@@ -150,6 +181,17 @@ export function useEvaluation() {
       if (jobId) {
         queryClient.invalidateQueries({ queryKey: evaluationKeys.evaluation(jobId) });
       }
+    },
+    onError: (err) => {
+      // The backend returns 409 when the job is no longer cancellable
+      // (process gone, status already terminal, etc.). Without this handler
+      // the user is trapped: status stays "running", Cancel does nothing
+      // visible. Surface the message and clear locally so the panel closes.
+      const msg = err?.message || "Could not cancel evaluation";
+      setJobError(msg);
+      const id = jobId;
+      if (id) queryClient.removeQueries({ queryKey: evaluationKeys.evaluation(id) });
+      setJobId(null);
     },
   });
 

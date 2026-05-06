@@ -4,13 +4,21 @@
 
 import { request } from './request.js';
 
+// The dismissed list is per-project user data: a single response with all
+// entries is fine for any realistic project (a few thousand at most). Ask
+// for the server-side hard cap to avoid the API's default page size.
+const DISMISSED_REQUEST_LIMIT = 5000;
+
 /**
  * List dismissed findings for a project.
  * @param {string} projectId - Project identifier
  * @returns {Promise<Array>} Dismissed findings array
  */
 export async function listDismissedFindings(projectId) {
-  return request(`/findings/dismissed?project=${encodeURIComponent(projectId)}`);
+  return request(
+    `/findings/dismissed?project=${encodeURIComponent(projectId)}`
+    + `&limit=${DISMISSED_REQUEST_LIMIT}`,
+  );
 }
 
 /**
@@ -61,4 +69,31 @@ export async function getRescore(projectId, run = 'latest') {
   const params = new URLSearchParams({ project: projectId });
   if (run && run !== 'latest') params.set('run', run);
   return request(`/rescore?${params}`);
+}
+
+/**
+ * Permanently delete a finding (suppress by dimension+principle+file forever).
+ * @param {string} projectId - Project identifier
+ * @param {object} finding - { dimension, principle, file }
+ * @returns {Promise<{ok: boolean, swept: number}>} Server response
+ */
+export async function deleteFinding(projectId, finding) {
+  return request('/findings/delete', {
+    method: 'POST',
+    body: JSON.stringify({ project: projectId, ...finding }),
+  });
+}
+
+/**
+ * Permanently delete all currently-dismissed findings for a project.
+ * Each unique (dimension, principle, file) becomes a permanent suppression
+ * and the dismissed list is cleared.
+ * @param {string} projectId - Project identifier
+ * @returns {Promise<{ok: boolean, deleted: number}>} Server response
+ */
+export async function deleteAllFindings(projectId) {
+  return request('/findings/delete-all', {
+    method: 'POST',
+    body: JSON.stringify({ project: projectId }),
+  });
 }

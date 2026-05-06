@@ -1,6 +1,7 @@
 {
   "id": "usability",
   "name": "Usability",
+  "description": "How easy the product is to learn, operate, and recover from mistakes with. Appropriateness recognisability, learnability, operability, user error protection, and accessibility shape the everyday experience for real users.",
   "sources": [
     "iso25010",
     "wcag22"
@@ -8,6 +9,7 @@
   "principles": [
     {
       "name": "Appropriateness Recognisability",
+      "description": "A new user can tell what the product is for at first glance. Names, error messages, and the visible API match the user's mental model rather than internal jargon.",
       "source": "iso25010",
       "requirements": [
         {
@@ -59,6 +61,7 @@
     },
     {
       "name": "Learnability",
+      "description": "The product can be picked up without external help. Help text, examples, sensible defaults, and consistent patterns let users go from new to productive quickly.",
       "source": "iso25010",
       "requirements": [
         {
@@ -125,6 +128,7 @@
     },
     {
       "name": "Operability",
+      "description": "Day-to-day use stays smooth and predictable. Long operations show progress, destructive actions confirm, exit codes reflect outcomes, and the product behaves the same way each time.",
       "source": "iso25010",
       "requirements": [
         {
@@ -176,6 +180,7 @@
     },
     {
       "name": "User Error Protection",
+      "description": "Users are guarded from making damaging mistakes. Inputs are validated with helpful messages, dangerous defaults are avoided, and required information is enforced before anything is committed.",
       "source": "iso25010",
       "requirements": [
         {
@@ -242,6 +247,7 @@
     },
     {
       "name": "User Interface Aesthetics",
+      "description": "The interface is pleasant to look at and read. Layout, spacing, and typography respect hierarchy and make the important parts easy to find.",
       "source": "iso25010",
       "requirements": [
         {
@@ -293,6 +299,7 @@
     },
     {
       "name": "Accessibility",
+      "description": "People with different abilities and assistive tools can use the product effectively. Keyboard navigation, semantic markup, sufficient contrast, and predictable focus all matter.",
       "source": "iso25010",
       "requirements": [
         {

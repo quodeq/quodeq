@@ -1,15 +1,49 @@
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useApi } from '../../../api/ApiContext.jsx';
+import { useState } from 'react';
 import { MIN_SUBAGENTS, MAX_SUBAGENTS, DEFAULT_SUBAGENTS } from '../../../constants.js';
-import { settingsKeys } from '../../../api/queryKeys.js';
+import HelpHint from '../../../components/HelpHint.jsx';
 import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import { STORAGE_KEY as POWER_KEY } from '../../evaluation/components/powerLevels.js';
-import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
+import { TimeLimitSetting, AdvancedAnalysisSettings, SUBAGENTS_HINT_REMOTE } from './ProviderSettings.jsx';
 
 const DEFAULT_POWER_LEVEL = 2;
 
-function ModelSuggestInput({ label, value, suggestions, placeholder, onChange, required }) {
+const MODEL_HINTS = {
+  claude: (
+    <>
+      Type <code>haiku</code>, <code>sonnet</code>, or <code>opus</code>. Claude Code will pick the latest version for you. If you want a specific version, just paste its full id. You can find them in Anthropic&apos;s docs.
+    </>
+  ),
+  codex: (
+    <>
+      Type the model id you want to use, like <code>gpt-5-mini</code> or <code>gpt-5</code>. The full list lives in OpenAI&apos;s docs.
+    </>
+  ),
+  gemini: (
+    <>
+      Type the model id you want, like <code>gemini-2.5-flash-lite</code>, <code>gemini-2.5-flash</code>, or <code>gemini-2.5-pro</code>. The full list is in Google&apos;s docs.
+    </>
+  ),
+};
+
+const ANALYSIS_MODEL_HINTS = {
+  claude: (
+    <>
+      Want a different model for different tasks? Pick one per tier (Fast, Balanced, Thorough). Type <code>haiku</code>, <code>sonnet</code>, or <code>opus</code>, and Claude Code picks the latest version. Anything you leave blank just uses the model you chose above.
+    </>
+  ),
+  codex: (
+    <>
+      Want a different model for different tasks? Pick one per tier (Fast, Balanced, Thorough). For example, <code>gpt-5-mini</code> for Fast and <code>gpt-5</code> for Thorough. Anything you leave blank just uses the model you chose above.
+    </>
+  ),
+  gemini: (
+    <>
+      Want a different model for different tasks? Pick one per tier (Fast, Balanced, Thorough). For example, <code>gemini-2.5-flash-lite</code> for Fast and <code>gemini-2.5-pro</code> for Thorough. Anything you leave blank just uses the model you chose above.
+    </>
+  ),
+};
+
+function ModelTextInput({ label, value, placeholder, onChange, required }) {
   const inputId = `model-input-${label || 'default'}`;
   return (
     <div className="settings-model-field">
@@ -18,21 +52,20 @@ function ModelSuggestInput({ label, value, suggestions, placeholder, onChange, r
         type="text"
         id={inputId}
         className={`settings-model-input${required && !value ? ' settings-model-input--required' : ''}`}
-        list={`models-${label}`}
-        value={value}
-        placeholder={placeholder || 'Select or type model'}
+        value={value || ''}
+        placeholder={placeholder || 'Type model id'}
         onChange={(e) => onChange(e.target.value)}
         aria-label={label ? `${label} model` : 'Model'}
+        autoCapitalize="off"
+        autoCorrect="off"
+        autoComplete="off"
+        spellCheck={false}
       />
-      <datalist id={`models-${label}`}>
-        {suggestions.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-      </datalist>
     </div>
   );
 }
 
 export default function CliProviderTab({ providerId, state, update }) {
-  const { getKnownModels } = useApi();
   const [power, setPower] = useState(() => {
     try { return Number(localStorage.getItem(POWER_KEY)) || DEFAULT_POWER_LEVEL; } catch { return DEFAULT_POWER_LEVEL; }
   });
@@ -42,72 +75,73 @@ export default function CliProviderTab({ providerId, state, update }) {
     try { localStorage.setItem(POWER_KEY, String(level)); } catch { /* */ }
   }
 
-  const { data: knownModels } = useQuery({
-    queryKey: settingsKeys.knownModels(providerId),
-    queryFn: () => getKnownModels(),
-    enabled: !!providerId,
-  });
-  const suggestions = knownModels?.[providerId] || [];
+  const hint = MODEL_HINTS[providerId];
+  const analysisHint = ANALYSIS_MODEL_HINTS[providerId];
 
-  const { fast, balanced, thorough } = useMemo(() => {
-    const f = [], b = [], t = [];
-    for (const m of suggestions) {
-      if (m.tier === 'fast') f.push(m);
-      else if (m.tier === 'balanced') b.push(m);
-      else if (m.tier === 'thorough') t.push(m);
-    }
-    return { fast: f, balanced: b, thorough: t };
-  }, [suggestions]);
+  const clampSubagents = (raw) => {
+    const n = parseInt(raw, 10);
+    if (Number.isNaN(n)) return String(DEFAULT_SUBAGENTS);
+    return String(Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, n)));
+  };
 
   return (
     <>
       <div className="settings-row">
         <div className="settings-row-label">
-          <span className="settings-label">Model</span>
-          <span className="settings-description">Select the model to use for evaluation</span>
+          <span className="settings-label-row">
+            <span className="settings-label">Model</span>
+            {hint && <HelpHint label="Model help">{hint}</HelpHint>}
+          </span>
+          <span className="settings-description">Pick the model you want to use.</span>
         </div>
         <div className="settings-model-field">
-          <ModelSuggestInput value={state.model} suggestions={suggestions} onChange={(v) => update('model', v)} required />
-          {!state.model && <span className="settings-model-hint">Select a model to get started</span>}
+          <ModelTextInput value={state.model} onChange={(v) => update('model', v)} required />
+          {!state.model && <span className="settings-model-hint">Pick a model to get started.</span>}
         </div>
       </div>
+      <TimeLimitSetting state={state} update={update} providerType="cli" />
       <div className="settings-row">
         <div className="settings-row-label">
-          <span className="settings-label">Max parallel agents</span>
-          <span className="settings-description">Number of subagents to run in parallel (1–10)</span>
+          <span className="settings-label-row">
+            <span className="settings-label">Max parallel agents</span>
+            <HelpHint label="Max parallel agents help">{SUBAGENTS_HINT_REMOTE}</HelpHint>
+          </span>
+          <span className="settings-description">How many subagents work side by side. Pick a number from 1 to 10.</span>
         </div>
         <input
           type="number"
           className="settings-model-input"
           min={MIN_SUBAGENTS}
           max={MAX_SUBAGENTS}
-          value={parseInt(state.subagents || String(DEFAULT_SUBAGENTS), 10)}
-          onBlur={(e) => update('subagents', Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, parseInt(e.target.value, 10) || DEFAULT_SUBAGENTS)))}
+          value={state.subagents ?? ''}
           onChange={(e) => update('subagents', e.target.value)}
+          onBlur={(e) => { if (e.target.value !== '') update('subagents', clampSubagents(e.target.value)); }}
           aria-label="Max parallel agents"
         />
       </div>
-      <TimeLimitSetting state={state} update={update} />
       <details className="settings-advanced">
         <summary className="settings-advanced-toggle">Advanced</summary>
         <div className="settings-advanced-content">
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-label">Analysis power</span>
-              <span className="settings-description">Controls which model tier is used for analysis</span>
+              <span className="settings-label-row">
+                <span className="settings-label">Analysis models</span>
+                {analysisHint && <HelpHint label="Analysis models help">{analysisHint}</HelpHint>}
+              </span>
+              <span className="settings-description">Optional. Anything you leave blank uses the model you chose above.</span>
             </div>
-            <PowerSelector value={power} onChange={setPower} onPersist={persistPower} />
+            <div className="settings-model-overrides">
+              <ModelTextInput label="Fast" value={state['model-fast']} onChange={(v) => update('model-fast', v)} />
+              <ModelTextInput label="Balanced" value={state['model-balanced']} onChange={(v) => update('model-balanced', v)} />
+              <ModelTextInput label="Thorough" value={state['model-thorough']} onChange={(v) => update('model-thorough', v)} />
+            </div>
           </div>
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-label">Analysis models</span>
-              <span className="settings-description">Override models per power level</span>
+              <span className="settings-label">Analysis power</span>
+              <span className="settings-description">Pick which tier above the evaluation should use.</span>
             </div>
-            <div className="settings-model-overrides">
-              <ModelSuggestInput label="Fast" value={state['model-fast']} suggestions={fast.length ? fast : suggestions} placeholder={fast[0]?.label} onChange={(v) => update('model-fast', v)} />
-              <ModelSuggestInput label="Balanced" value={state['model-balanced']} suggestions={balanced.length ? balanced : suggestions} placeholder={balanced[0]?.label} onChange={(v) => update('model-balanced', v)} />
-              <ModelSuggestInput label="Thorough" value={state['model-thorough']} suggestions={thorough.length ? thorough : suggestions} placeholder={thorough[0]?.label} onChange={(v) => update('model-thorough', v)} />
-            </div>
+            <PowerSelector value={power} onChange={setPower} onPersist={persistPower} />
           </div>
           <AdvancedAnalysisSettings state={state} update={update} />
         </div>

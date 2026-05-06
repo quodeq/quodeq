@@ -14,6 +14,18 @@ def _current_version(conn: sqlite3.Connection) -> int:
     return conn.execute("PRAGMA user_version").fetchone()[0]
 
 
+# Incremental upgrades from version N to N+1. Each function takes a connection
+# already at version N; the caller bumps PRAGMA user_version to N+1 afterwards.
+def _upgrade_v1_to_v2(conn: sqlite3.Connection) -> None:
+    """Add per-finding confidence column (default 100 = full confidence)."""
+    conn.execute("ALTER TABLE findings ADD COLUMN confidence INTEGER NOT NULL DEFAULT 100")
+
+
+_UPGRADES = {
+    1: _upgrade_v1_to_v2,
+}
+
+
 def apply_evaluation_schema(conn: sqlite3.Connection) -> None:
     version = _current_version(conn)
     if version == SCHEMA_VERSION:
@@ -23,8 +35,18 @@ def apply_evaluation_schema(conn: sqlite3.Connection) -> None:
             f"evaluation.db has schema version {version}, "
             f"this binary supports {SCHEMA_VERSION}",
         )
-    if version != 0:
-        raise SchemaVersionError(
-            f"unexpected evaluation.db schema version {version} (expected 0 or {SCHEMA_VERSION})",
-        )
-    conn.executescript(EVALUATION_DDL)
+    if version == 0:
+        # Fresh DB: apply the latest DDL (its leading PRAGMA sets user_version).
+        conn.executescript(EVALUATION_DDL)
+        return
+    # Incremental upgrade path: walk N -> N+1 -> ... -> SCHEMA_VERSION.
+    while version < SCHEMA_VERSION:
+        upgrade = _UPGRADES.get(version)
+        if upgrade is None:
+            raise SchemaVersionError(
+                f"missing upgrade path from schema version {version} "
+                f"(target: {SCHEMA_VERSION})",
+            )
+        upgrade(conn)
+        version += 1
+        conn.execute(f"PRAGMA user_version = {version}")

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,6 +14,12 @@ from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool,
 
 
 from tests.engine.conftest import _fake_run_analysis  # noqa: F401 — shared helper
+
+# See test_adaptive_scaling_integration.py for the Windows skip rationale.
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="SubagentPool FileQueue lock path needs Windows-specific work",
+)
 
 _TEST_DIMENSION = "security"
 
@@ -136,17 +143,17 @@ class TestScoutThenScale:
         assert len(agent_ids) >= 3
 
 
-class TestPoolBudget:
-    def test_pool_uses_pool_budget_not_max_duration(self, tmp_path):
-        """Pool time limit should use pool_budget, not max_duration."""
+class TestTimeLimit:
+    def test_pool_uses_time_limit_not_max_duration(self, tmp_path):
+        """Pool time limit should use time_limit, not max_duration."""
         queue_path = tmp_path / "queue.json"
         FileQueue(queue_path, [f"f{i}.py" for i in range(5)])
 
-        ac = AnalysisConfig(pool_budget=60, max_duration=1800, max_files_per_agent=30)
+        ac = AnalysisConfig(time_limit=60, max_duration=1800, max_files_per_agent=30)
         pool = SubagentPool(
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
             options=PoolOptions(n_agents=1, prompt="test", dimension=_TEST_DIMENSION),
             config=ac,
         )
-        assert pool._base_config.pool_budget == 60
+        assert pool._base_config.time_limit == 60
         assert pool._base_config.max_duration == 1800

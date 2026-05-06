@@ -57,16 +57,23 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         help="Skip post-analysis verification pass",
     )
     parser.add_argument(
-        "--pool-budget", type=int, default=None,
-        help="Total time budget for agent pool in seconds (default: 600)",
+        "--time-limit", "--pool-budget",
+        dest="pool_budget", type=int, default=None,
+        help="Total evaluation time limit in seconds (0 = unlimited; default: 600). "
+             "--pool-budget is a deprecated alias.",
     )
     parser.add_argument(
         "--no-consolidated", action="store_true",
         help="Disable multi-dimension consolidation (evaluate dimensions separately)",
     )
     parser.add_argument(
-        "--incremental", action="store_true",
-        help="Only analyze files changed since last evaluation (carry forward cached findings)",
+        "--clean-scan", action="store_true", dest="clean_scan",
+        help="Force a full re-analysis, ignoring any cached findings from prior runs. "
+             "By default Quodeq carries forward findings for unchanged files.",
+    )
+    parser.add_argument(
+        "--incremental", action="store_true", dest="legacy_incremental",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--branch", default=None,
@@ -152,10 +159,10 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     review_parser.add_argument(
-        "--pool-budget",
-        type=int,
-        dest="pool_budget",
-        help="Total time budget in seconds for the evaluation (default: 300)",
+        "--time-limit", "--pool-budget",
+        dest="pool_budget", type=int,
+        help="Total time budget in seconds for the evaluation (default: 300). "
+             "--pool-budget is a deprecated alias.",
     )
     review_parser.add_argument(
         "--output",

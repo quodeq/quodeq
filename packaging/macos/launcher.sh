@@ -60,9 +60,10 @@ if [ -z "$QUODEQ" ]; then
         # arbitrary code execution in source distributions (setup.py).
         # Using --no-deps to prevent transitive dependency attacks.
         # Pinned to exact version to mitigate supply-chain risk from version
-        # ranges. Update this pin when releasing new versions.
+        # ranges. The release skill bumps this on every cut (see
+        # .claude/skills/release/SKILL.md).
         # TODO: ship requirements.txt with hashes in the .app bundle.
-        python3 -m pip install --user --only-binary :all: --no-deps "quodeq==1.0.5" 2>&1
+        python3 -m pip install --user --only-binary :all: --no-deps "quodeq==1.0.9" 2>&1
     fi
     export PATH="$PATH:$(python3 -m site --user-base)/bin"
     QUODEQ=$(command -v quodeq 2>/dev/null)
