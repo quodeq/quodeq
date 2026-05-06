@@ -40,7 +40,9 @@ def scan_project(project_dir: Path, *, output_dir: Path | None = None) -> ScanDa
     code_file_count = 0
 
     for path in _walk_files(project_dir):
-        rel = str(path.relative_to(project_dir))
+        # POSIX separators so the file_tree is consistent across platforms
+        # (UI, scan.json consumers, and tests all assume "/").
+        rel = path.relative_to(project_dir).as_posix()
         file_tree.append(rel)
         ext = path.suffix.lstrip(".")
         if ext:

@@ -2,12 +2,21 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
+
+# See test_adaptive_scaling_integration.py for the Windows skip rationale.
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="SubagentPool FileQueue lock path needs Windows-specific work",
+)
 
 
 class TestPrioritizationInFileQueue:

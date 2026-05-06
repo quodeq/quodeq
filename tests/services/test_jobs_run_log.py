@@ -83,7 +83,9 @@ def test_consume_stream_filters_cc_markers_from_run_log(tmp_path: Path) -> None:
     ])
     jm._consume_stream("job-cc", stream)
 
-    contents = (run_dir / "run.log").read_text()
+    # RunLogWriter writes UTF-8; on Windows read_text() defaults to cp1252
+    # and mojibakes the unicode arrow. Force utf-8.
+    contents = (run_dir / "run.log").read_text(encoding="utf-8")
     # Human-readable lines survive.
     assert "Starting evaluation..." in contents
     assert "\u2192 [1/3] Analyzing security" in contents

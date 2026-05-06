@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -78,6 +79,10 @@ class TestCreateMcpConfig:
         finally:
             config_path.unlink(missing_ok=True)
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="POSIX permission bits don't apply on Windows file mode",
+    )
     def test_file_permissions(self, tmp_path):
         jsonl = tmp_path / "findings.jsonl"
         jsonl.touch()

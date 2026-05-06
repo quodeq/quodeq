@@ -11,7 +11,7 @@ authors = [
 requires-python = ">=3.12"
 keywords = ["code-quality", "ai", "evaluation", "iso-25010", "static-analysis"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
@@ -36,6 +36,7 @@ Issues = "https://github.com/quodeq/quodeq/issues"
 dev = [
     "pytest==9.0.3",
     "pytest-cov==7.1.0",
+    "pytest-timeout==2.4.0",
 ]
 
 [project.scripts]
@@ -53,6 +54,13 @@ pythonpath = ["src"]
 markers = [
     "integration: end-to-end tests that spawn real subprocesses or require external resources",
 ]
+# Hard per-test cap so a deadlocked socket/subprocess/signal test fails
+# fast with a traceback at the stuck line instead of hanging the suite.
+# Use thread method (not signal) so it works on Windows. Override per
+# test with @pytest.mark.timeout(N) when a slow integration test
+# legitimately needs more time.
+timeout = 60
+timeout_method = "thread"
 
 [tool.coverage.run]
 source = ["quodeq"]

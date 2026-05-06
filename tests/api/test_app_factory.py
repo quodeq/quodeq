@@ -112,9 +112,19 @@ class TestCreateApp:
 
 class TestMainFunction:
     def test_main_runs_app(self, monkeypatch):
-        """Verify main() creates app and calls app.run()."""
+        """Verify main() creates app and calls app.run().
+
+        Patches signal.signal too: main() registers a SIGINT/SIGTERM
+        handler that raises SystemExit(0). Letting the real handler leak
+        into the rest of the test process means pytest-timeout's
+        watchdog (which sends SIGINT to the main thread on timeout) hits
+        that handler instead of pytest's own KeyboardInterrupt path,
+        crashing pytest with INTERNALERROR mid-suite. Surfaced on
+        Windows where a slow test triggered the watchdog.
+        """
         mock_run = MagicMock()
-        with patch("quodeq.api.app.create_app") as mock_create:
+        with patch("quodeq.api.app.create_app") as mock_create, \
+             patch("quodeq.api.app.signal.signal") as mock_signal:
             mock_app = MagicMock()
             mock_app.run = mock_run
             mock_app.config = {"_provider": MagicMock()}
@@ -123,3 +133,4 @@ class TestMainFunction:
             main(env={"QUODEQ_API_KEY": "test-key"})
             mock_create.assert_called_once()
             mock_run.assert_called_once()
+            assert mock_signal.called, "main() should install signal handlers"

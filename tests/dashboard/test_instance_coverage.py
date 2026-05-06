@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import socket
+import sys
 import threading
 import time
 from pathlib import Path
@@ -11,6 +12,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from quodeq.dashboard._instance import InstanceController
+
+# AF_UNIX exists on modern Windows builds but the dashboard's
+# single-instance protocol is unix-socket-specific (the Windows code path
+# uses a port-file + TCP loopback). These tests exercise the unix socket
+# directly, so skip on Windows.
+_UNIX_SOCKET_ONLY = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="POSIX-only: dashboard single-instance uses Unix sockets on POSIX, port-file+TCP on Windows",
+)
 
 
 class TestInstanceControllerInit:
@@ -125,6 +135,7 @@ class TestListenerThread:
         time.sleep(0.5)
         assert not ctrl._listen_thread.is_alive()
 
+    @_UNIX_SOCKET_ONLY
     def test_listener_handles_non_reload_data(self, tmp_path):
         """Listener should ignore data that doesn't start with 'reload:'."""
         sock = tmp_path / "test.sock"
@@ -145,6 +156,7 @@ class TestListenerThread:
 
 
 class TestConnectToSock:
+    @_UNIX_SOCKET_ONLY
     def test_connect_via_helper(self, tmp_path):
         """Connect using the controller's helper (handles long paths)."""
         sock_path = tmp_path / "s.sock"

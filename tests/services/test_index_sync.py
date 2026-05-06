@@ -164,6 +164,10 @@ def test_stale_promotion_live_pid_not_promoted(tmp_path: Path) -> None:
         db.close()
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="POSIX-only: signal.SIGKILL doesn't exist on Windows; use TerminateProcess equivalent in a separate test",
+)
 def test_stale_promotion_after_sigkill_real_subprocess(tmp_path: Path) -> None:
     """SIGKILL leaves status.json as RUNNING — stale-promote must recover it.
 

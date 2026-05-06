@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import signal
 import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch, call
 
@@ -10,6 +11,16 @@ import pytest
 
 
 class TestKillTree:
+    # The three Unix-branch tests below patch os.getpgid + os.killpg.
+    # Neither attribute exists on Windows, so unittest.mock.patch raises
+    # AttributeError before the test body runs. Skip them on win32; the
+    # Windows _kill_tree branch is covered by test_windows_taskkill.
+    _SKIP_ON_WINDOWS = pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="patches POSIX-only os.getpgid/os.killpg",
+    )
+
+    @_SKIP_ON_WINDOWS
     @patch("sys.platform", "darwin")
     @patch("os.killpg")
     @patch("os.getpgid", return_value=1234)
@@ -18,6 +29,7 @@ class TestKillTree:
         _kill_tree(1234)
         mock_killpg.assert_called_once_with(1234, signal.SIGTERM)
 
+    @_SKIP_ON_WINDOWS
     @patch("sys.platform", "darwin")
     @patch("os.killpg", side_effect=ProcessLookupError)
     @patch("os.getpgid", return_value=1234)
@@ -27,6 +39,7 @@ class TestKillTree:
         _kill_tree(1234)
         mock_kill.assert_called_once_with(1234, signal.SIGTERM)
 
+    @_SKIP_ON_WINDOWS
     @patch("sys.platform", "darwin")
     @patch("os.killpg", side_effect=ProcessLookupError)
     @patch("os.getpgid", return_value=1234)
