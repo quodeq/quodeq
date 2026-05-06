@@ -61,7 +61,11 @@ def _build_files_block(source_files: list[Path], repo_root: Path | None = None) 
         content = _read_file_safe(path)
         if content is None:
             continue
-        display_path = str(path.relative_to(repo_root)) if repo_root else path.name
+        # Always emit POSIX-style separators so the LLM sees the same path
+        # shape on every host. str(path.relative_to(...)) yields backslashes
+        # on Windows, which are unusual in code prompts and inconsistent
+        # with the path-role classifier's normalisation.
+        display_path = path.relative_to(repo_root).as_posix() if repo_root else path.name
         numbered = "\n".join(f"{i+1:4d} | {line}" for i, line in enumerate(content.splitlines()))
         parts.append(f"### {display_path}{_role_label(display_path)}\n```\n{numbered}\n```")
     return "\n\n".join(parts)
