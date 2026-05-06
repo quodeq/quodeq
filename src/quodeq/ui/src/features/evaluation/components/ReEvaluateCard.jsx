@@ -12,8 +12,8 @@ import HelpHint from '../../../components/HelpHint.jsx';
 
 const EVAL_OPTIONS_HINT = (
   <>
-    <div><strong>Scope</strong> — restrict the evaluation to a subfolder. Default is the whole project.</div>
-    <div><strong>Clean scan</strong> — when off, only changed files since the last run are re-analyzed (incremental). Turn it on to re-evaluate everything from scratch.</div>
+    <div><strong>Scope</strong>: restrict the evaluation to a subfolder. Default is the whole project.</div>
+    <div><strong>Clean scan</strong>: when off, only changed files since the last run are re-analyzed (incremental). Turn it on to re-evaluate everything from scratch.</div>
   </>
 );
 

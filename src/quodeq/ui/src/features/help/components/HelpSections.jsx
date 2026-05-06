@@ -107,7 +107,7 @@ export function Projects() {
         <li><strong>Grade and score</strong> from the latest run, on a 0 to 10 scale.</li>
         <li><strong>File and line counts</strong> of the analyzed scope.</li>
         <li><strong>Last run timestamp</strong> and the model that produced it.</li>
-        <li><strong>Setup state</strong> — projects with an interrupted onboarding show a <em>Resume setup</em> action.</li>
+        <li><strong>Setup state</strong>: projects with an interrupted onboarding show a <em>Resume setup</em> action.</li>
       </ul>
 
       <h3>What you can do</h3>
@@ -280,7 +280,7 @@ export function Violations() {
       ]} />
 
       <h3>Fix plans</h3>
-      <p>From any violation, the <strong>Fix plan</strong> button opens a side-pane with a structured remediation packet: file path, line number, code context, the violated principle, and concrete guidance. Copy it and paste into your AI agent or IDE — it is designed to give the receiving model everything it needs to apply the fix without follow-up questions.</p>
+      <p>From any violation, the <strong>Fix plan</strong> button opens a side-pane with a structured remediation packet: file path, line number, code context, the violated principle, and concrete guidance. Copy it and paste into your AI agent or IDE. It is designed to give the receiving model everything it needs to apply the fix without follow-up questions.</p>
 
       <h3>Dismissing a finding</h3>
       <p>If a finding is a false positive or an accepted trade-off, dismiss it from the violation detail. You will be asked for a reason. Dismissed findings:</p>
@@ -291,7 +291,7 @@ export function Violations() {
         <li>can be <strong>restored</strong> individually or in bulk via <em>Restore all</em>.</li>
       </ul>
       <Tip title="Dismissals are durable">
-        Dismissals persist across runs. They are tied to the finding's principle and file, so renaming or moving the file may bring the finding back — that is intentional.
+        Dismissals persist across runs. They are tied to the finding's principle and file, so renaming or moving the file may bring the finding back. That is intentional.
       </Tip>
     </section>
   );
@@ -321,7 +321,7 @@ export function CodeMap() {
         <li><strong>Large red blocks</strong> big files with many issues, high-impact refactor targets.</li>
         <li><strong>Clusters of red</strong> entire modules drifting from the standard.</li>
         <li><strong>Galaxy by standards</strong> reveals which principles are violated most across the project, regardless of where the files live.</li>
-        <li><strong>Green islands</strong> well-maintained areas — protect them when refactoring nearby.</li>
+        <li><strong>Green islands</strong>: well-maintained areas. Protect them when refactoring nearby.</li>
       </ul>
 
       <h3>Drilling in</h3>
@@ -348,7 +348,7 @@ export function History() {
       <p>A small chart above the list plots overall score over time, with per-dimension lines you can toggle. Hover a point to see that run's stats; click to open it.</p>
 
       <h3>Run detail and the navigator</h3>
-      <p>Clicking a run opens its <strong>Run Detail</strong> page — the same shell as Overview but locked to that single run. From there, the run navigator at the top lets you step <strong>previous / next / latest</strong> without going back to the list. Drill into any dimension and the Explorer keeps the run id, so you stay anchored to that snapshot.</p>
+      <p>Clicking a run opens its <strong>Run Detail</strong> page: the same shell as Overview but locked to that single run. From there, the run navigator at the top lets you step <strong>previous / next / latest</strong> without going back to the list. Drill into any dimension and the Explorer keeps the run id, so you stay anchored to that snapshot.</p>
 
       <h3>Partial and cancelled runs</h3>
       <p>Cancelled runs that kept their partial findings appear with a <em>partial</em> tag. They count for trend purposes but the Run Detail page makes the partial state obvious so you do not over-interpret it.</p>
@@ -438,7 +438,7 @@ export function Settings() {
       <p>Power tiers (Fast / Balanced / Thorough) ship with sensible defaults. You can pin a different model to each tier if you want a small model for incremental scans and a large one for audits. Leave a tier blank to inherit the main model.</p>
 
       <h3>Server</h3>
-      <p>Shows the current dashboard server: port, version, and status. Live log streams (server, Ollama, evaluation) are wired into the side-pane log viewer — open it from the bottom-bar log buttons to tail what is happening.</p>
+      <p>Shows the current dashboard server: port, version, and status. Live log streams (server, Ollama, evaluation) are wired into the side-pane log viewer. Open it from the bottom-bar log buttons to tail what is happening.</p>
 
       <h3>Appearance</h3>
       <p>Light or dark mode plus a theme family selector. Themes change accent colors and surface tones; layout stays the same.</p>

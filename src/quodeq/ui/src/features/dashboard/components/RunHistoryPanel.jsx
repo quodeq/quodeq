@@ -95,19 +95,17 @@ function SelectedDot({ cx, cy, payload, selectedRunId }) {
   return <circle cx={cx} cy={cy} r={4} fill={cssVar('--color-chart-line')} stroke="white" strokeWidth={1.5} />;
 }
 
-function ScoreBars({ data, hoveredIndex, selectedRunId, onBarClick }) {
-  // Bar's onClick covers taps that land on the visible 28-px bar — those
-  // never bubble to the chart container because Recharts stops
-  // propagation internally. Chart-level onClick (set on ComposedChart)
-  // covers taps in the gap or above the bar.
+function ScoreBars({ data, hoveredIndex, selectedRunId }) {
+  // Click handling lives on the chart container (see ScoreHistoryChart).
+  // The shared `.run-history-panel .recharts-surface *` CSS rule sets
+  // pointer-events:none so the Area gradient cannot swallow clicks before
+  // they reach the chart-level onClick handler.
   return (
     <Bar
       dataKey="numericAverage"
       radius={[0, 0, 0, 0]}
       maxBarSize={28}
       isAnimationActive={false}
-      cursor={onBarClick ? 'pointer' : 'default'}
-      onClick={(entry) => { if (entry?.runId) onBarClick?.(entry.runId); }}
     >
       {data.map((entry, i) => (
         <Cell
@@ -168,7 +166,7 @@ function ScoreHistoryChart({ data, interaction }) {
         <ReferenceLine y={REF_LINE_MID}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.45} />
         <ReferenceLine y={REF_LINE_HIGH} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.45} />
         <Area dataKey="numericAverage" type="monotone" fill="url(#scoreAreaGrad)" stroke="none" isAnimationActive={false} />
-        <ScoreBars data={data} hoveredIndex={hoveredIndex} selectedRunId={selectedRunId} onBarClick={onBarClick} />
+        <ScoreBars data={data} hoveredIndex={hoveredIndex} selectedRunId={selectedRunId} />
         <Line isAnimationActive={false} dataKey="numericAverage" type="monotone" stroke={cssVar('--color-accent')} strokeOpacity={0.9} strokeWidth={2} dot={<SelectedDot selectedRunId={selectedRunId} />} activeDot={false} />
       </ComposedChart>
     </ResponsiveContainer>
