@@ -12,7 +12,7 @@ from quodeq.analysis._dim_estimates import (
     write_dim_estimates,
 )
 from quodeq.analysis._incr_change_detection import ChangeDetectionResult
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis._types import AnalysisOptions, RunConfig
 from quodeq.analysis.incremental import FileClassification
 
 
@@ -148,6 +148,45 @@ class TestComputeDimEstimates:
             estimates = compute_dim_estimates(cfg, ["usability"])
         assert estimates["usability"]["reason"] == "catching-up"
         assert estimates["usability"]["count"] == 80
+
+
+class TestFreshRunSafety:
+    """Regression guards for the incremental=True default with no prior data.
+
+    After Task 1's default flip, compute_dim_estimates runs the incremental
+    branch on every default run. These tests confirm that first-ever runs
+    (no prior fingerprint, no prior queue) do not crash.
+    """
+
+    def test_dim_estimates_no_prior_run_is_safe(self) -> None:
+        """With incremental=True (default) and no prior fingerprint, dim estimates run cleanly."""
+        # Use real AnalysisOptions() so this test breaks if the default reverts.
+        cfg = RunConfig.__new__(RunConfig)
+        cfg.src = Path("/repo")
+        cfg.standards_dir = None
+        cfg.work_dir = None
+        cfg.language = "python"
+        cfg.options = AnalysisOptions()  # incremental=True by default
+        assert cfg.options.incremental is True
+
+        files = ["a.py", "b.py"]
+        with patch(
+            "quodeq.analysis._dim_estimates._list_all_source_files",
+            return_value=files,
+        ), patch(
+            "quodeq.analysis._dim_estimates.find_previous_fingerprint",
+            return_value=(None, None),  # fresh run: no prior fingerprint
+        ), patch(
+            "quodeq.analysis._dim_estimates.detect_changed_files",
+            return_value=ChangeDetectionResult(full_reanalysis=True, reason="no previous fingerprint"),
+        ), patch(
+            "quodeq.analysis._dim_estimates.classify_files",
+            return_value=FileClassification(to_analyze=files, full_reanalysis=True),
+        ):
+            # Must not raise even with no prior fingerprint.
+            estimates = compute_dim_estimates(cfg, ["security"])
+
+        assert estimates == {"security": {"count": 2, "reason": "first-run"}}
 
 
 class TestPersistence:
