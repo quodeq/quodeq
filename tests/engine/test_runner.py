@@ -82,6 +82,8 @@ class TestRun:
             work_dir=tmp_path,
             manifest=_manifest(2),
             dimensions_data=dims_data,
+            # Incremental orchestrator short-circuits to None for manifests with source_files,
+            # so use clean-scan path to exercise the full runner pipeline.
             options=AnalysisOptions(incremental=False),
         )
         evidence = run(config)
@@ -153,6 +155,8 @@ class TestRun:
             work_dir=tmp_path,
             manifest=_manifest(5),
             dimensions_data=dims_data,
+            # Incremental orchestrator short-circuits to None for manifests with source_files,
+            # so use clean-scan path to exercise the full runner pipeline.
             options=AnalysisOptions(incremental=False),
         )
         with pytest.raises(EvaluationError, match="0 findings"):
@@ -174,6 +178,8 @@ class TestRun:
             work_dir=tmp_path,
             manifest=_manifest(1),
             dimensions_data=dims_data,
+            # Incremental orchestrator short-circuits to None for manifests with source_files,
+            # so use clean-scan path to exercise the full runner pipeline.
             options=AnalysisOptions(incremental=False),
         )
         run(config)
