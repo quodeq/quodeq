@@ -25,7 +25,7 @@ class EvaluationOptions:
     verify_findings: bool = True
     max_subagents: int = _DEFAULT_MAX_SUBAGENTS
     time_limit: int = _DEFAULT_TIME_LIMIT
-    incremental: bool = False
+    clean_scan: bool = False
     per_dimension: bool = False
     branch: str | None = None
     scope_path: str | None = None

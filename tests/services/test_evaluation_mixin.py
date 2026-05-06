@@ -633,3 +633,13 @@ class TestListEvaluations:
         m._jobs = MagicMock()
         m._jobs.list_jobs.return_value = []
         assert m.list_evaluations() == []
+
+
+def test_evaluation_options_clean_scan_field_defaults_false():
+    """User-facing flag: clean_scan opts OUT of cache; default behaviour is incremental."""
+    from quodeq.services.base import EvaluationOptions
+    opts = EvaluationOptions()
+    assert opts.clean_scan is False
+    assert not hasattr(opts, "incremental"), (
+        "Old field name leaked through; rename incomplete."
+    )
