@@ -104,7 +104,7 @@ jobs:
           BUDGET="${BUDGET:-600}"
           # Use an array so flag values are passed as proper argv entries
           # (avoids SC2086 word-splitting issues with unquoted $ARGS).
-          ARGS=(evaluate . --incremental
+          ARGS=(evaluate .
                 --pool-budget "$BUDGET"
                 --max-duration 300
                 --n-subagents "${N_SUBAGENTS:-3}"
