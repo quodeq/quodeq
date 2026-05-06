@@ -40,9 +40,20 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Run tests
+      - name: Run tests (Linux/macOS)
+        if: runner.os != 'Windows'
         # Skip @pytest.mark.integration: those spawn real subprocesses and
         # send signals, which are inherently timing-sensitive on shared CI
         # runners. They run elsewhere (e.g. nightly) where flakes are
         # tolerable. PR CI should be fast and deterministic.
         run: uv run pytest tests/ -q --tb=short -m "not integration"
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        # Verbose so per-test names are visible in real time — when a
+        # test hangs or interrupts on Windows we want to know which one.
+        # Disable pytest-timeout (-p no:timeout) for now: a previous run
+        # showed a KeyboardInterrupt on Python 3.13 + Windows that we
+        # couldn't pin to a real test hang vs. plugin behaviour. With
+        # the plugin off, the 15-min job cap is the outer fallback.
+        run: uv run pytest tests/ -v --tb=short -m "not integration" -p no:timeout
