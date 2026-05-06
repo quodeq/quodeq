@@ -485,12 +485,12 @@ html[data-theme="dark"]:root, [data-theme="dark"] {
   --color-grade-top-bg:      color-mix(in srgb, var(--primitive-flynn-accent) 12%, transparent);
   --color-grade-high-text:   #8aafcc;
   --color-grade-high-bg:     color-mix(in srgb, #8aafcc 12%, transparent);
-  --color-grade-mid-text:    var(--primitive-ired-300);
-  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ired-300) 12%, transparent);
+  --color-grade-mid-text:    #ff8a8a;
+  --color-grade-mid-bg:      color-mix(in srgb, #ff8a8a 12%, transparent);
   --color-grade-low-text:    var(--primitive-ired-400);
   --color-grade-low-bg:      color-mix(in srgb, var(--primitive-ired-400) 13%, transparent);
-  --color-grade-bottom-text: var(--primitive-crimson-200);
-  --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-200) 4%, transparent);
+  --color-grade-bottom-text: #e6182a;
+  --color-grade-bottom-bg:   color-mix(in srgb, #e6182a 12%, transparent);
 
   --color-warning:      var(--primitive-amber-400);
   --color-warning-text: var(--primitive-amber-400);

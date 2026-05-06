@@ -146,6 +146,9 @@ export default function Sidebar({
 
         <nav className="sidebar-nav sidebar-block">
           <NavButton id="evaluate" label="evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={handleNav} />
+        </nav>
+
+        <nav className="sidebar-nav sidebar-block">
           <NavButton
             id="projects"
             label={repoName || 'project'}
