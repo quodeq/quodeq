@@ -271,12 +271,12 @@ function EmptyProjectsCTA({ onAddProject, isEvaluating }) {
       </p>
       <button
         type="button"
-        className={`projects-empty__cta-btn${isEvaluating ? ' is-disabled' : ''}`}
+        className={`term-btn term-btn--primary term-btn--filled projects-empty__cta-btn${isEvaluating ? ' is-disabled' : ''}`}
         onClick={onAddProject}
         aria-disabled={isEvaluating || undefined}
         title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
       >
-        + Add project
+        <span aria-hidden="true">▸</span> add project
       </button>
     </div>
   );
@@ -298,13 +298,13 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
         {projects.length > 0 && onAddProject && (
           <button
             type="button"
-            className={`projects-page__add-btn${isEvaluating ? ' is-disabled' : ''}`}
+            className={`term-btn term-btn--primary term-btn--filled projects-page__add-btn${isEvaluating ? ' is-disabled' : ''}`}
             onClick={onAddProject}
             aria-label="Add project"
             aria-disabled={isEvaluating || undefined}
             title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
           >
-            + Add project
+            <span aria-hidden="true">▸</span> add project
           </button>
         )}
       </div>

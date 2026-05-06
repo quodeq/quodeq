@@ -80,6 +80,17 @@
   margin-top: var(--term-space-3);
   flex-wrap: wrap;
 }
+/* Wizard CTA rows: on narrow viewports the buttons grow to fill the
+   row so longer labels (e.g. "scan repository", "start evaluation")
+   stay legible and the primary action is comfortably tappable. */
+@media (max-width: 600px) {
+  .onboarding-step__actions > .term-btn--primary,
+  .onboarding-step__actions > .term-btn--secondary,
+  .onboarding-step__actions > .term-btn--ghost {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+}
 
 /* ──────────────────────────────────────────────────────────────
    Welcome step
@@ -130,8 +141,16 @@
 }
 .onboarding-welcome__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--term-space-2);
   margin-top: var(--term-space-2);
+}
+@media (max-width: 600px) {
+  .onboarding-welcome__actions > .term-btn--primary,
+  .onboarding-welcome__actions > .term-btn--secondary {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
 }
 
 /* ──────────────────────────────────────────────────────────────

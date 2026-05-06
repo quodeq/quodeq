@@ -2617,34 +2617,40 @@
   padding: var(--space-6);
 }
 
-/* ── Projects page header (with "+ Add project" button) ── */
+/* ── Projects page header (with "+ Add project" button) ──
+   Visual styling for the button itself comes from `.term-btn--filled`
+   (composed in JSX). The rules below only handle layout: keep the
+   header in two columns when there's room, drop the CTA below the
+   title at narrow widths, and stretch it to full width on mobile. */
 
 .projects-page__header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  flex-wrap: wrap;
+  gap: var(--space-3);
   margin-bottom: var(--space-4);
 }
 
 .projects-page__add-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-accent);
-  color: var(--color-bg);
-  border: none;
-  border-radius: var(--radius-md, 6px);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.1s;
+  margin-left: auto;
 }
 
-.projects-page__add-btn:hover {
-  background: color-mix(in srgb, var(--color-accent) 80%, var(--color-text));
+/* Disabled (evaluation in progress) — `aria-disabled` keeps the click
+   firing so a snackbar can explain the block, so we can't rely on
+   the native :disabled selector. */
+.term-btn--filled[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .projects-page__add-btn {
+    margin-left: 0;
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 /* ── Empty-projects centered CTA ── */
@@ -2672,21 +2678,9 @@
   color: var(--color-text-muted);
 }
 
+/* Small layout-only adjustments on top of the term-btn--filled visual. */
 .projects-empty__cta-btn {
   margin-top: var(--space-3);
-  padding: var(--space-3) var(--space-6);
-  background: var(--color-accent);
-  color: var(--color-bg);
-  border: none;
-  border-radius: var(--radius-md, 6px);
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.1s;
-}
-
-.projects-empty__cta-btn:hover {
-  background: color-mix(in srgb, var(--color-accent) 80%, var(--color-text));
 }
 
 /* ── Global empty-state CTA (used on overview/violations/map when no projects) ── */

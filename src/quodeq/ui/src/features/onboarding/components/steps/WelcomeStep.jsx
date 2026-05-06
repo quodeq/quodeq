@@ -25,8 +25,8 @@ export default function WelcomeStep({ onStart, onSkip }) {
         ))}
       </ul>
       <div className="onboarding-welcome__actions">
-        <button type="button" className="term-btn--primary" onClick={onStart}>get started</button>
-        <button type="button" className="term-btn--secondary" onClick={onSkip}>maybe later</button>
+        <button type="button" className="term-btn term-btn--primary term-btn--filled" onClick={onStart}>get started</button>
+        <button type="button" className="term-btn term-btn--secondary" onClick={onSkip}>maybe later</button>
       </div>
     </div>
   );
