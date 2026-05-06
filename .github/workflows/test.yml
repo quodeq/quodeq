@@ -13,6 +13,10 @@ jobs:
     # expect platform-specific failures. Drop continue-on-error once the
     # job is consistently green.
     continue-on-error: ${{ matrix.experimental }}
+    # Cap the whole job so a hanging Windows test (no platform-safe
+    # timeout in the suite yet) fails fast instead of burning 6 h of
+    # runner minutes. Ubuntu + macOS finish in ~1 min; 15 min is plenty.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
