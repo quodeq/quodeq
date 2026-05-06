@@ -10,6 +10,7 @@ import pytest
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.engine.scoring_pipeline import run_full
 from quodeq.analysis.runner import run, RunConfig, EvaluationError
+from quodeq.analysis._types import AnalysisOptions
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
 from tests.engine.conftest import _evidence_line
@@ -81,6 +82,9 @@ class TestRun:
             work_dir=tmp_path,
             manifest=_manifest(2),
             dimensions_data=dims_data,
+            # Incremental orchestrator short-circuits to None for manifests with source_files,
+            # so use clean-scan path to exercise the full runner pipeline.
+            options=AnalysisOptions(incremental=False),
         )
         evidence = run(config)
 
@@ -151,6 +155,9 @@ class TestRun:
             work_dir=tmp_path,
             manifest=_manifest(5),
             dimensions_data=dims_data,
+            # Incremental orchestrator short-circuits to None for manifests with source_files,
+            # so use clean-scan path to exercise the full runner pipeline.
+            options=AnalysisOptions(incremental=False),
         )
         with pytest.raises(EvaluationError, match="0 findings"):
             run(config)
@@ -171,6 +178,9 @@ class TestRun:
             work_dir=tmp_path,
             manifest=_manifest(1),
             dimensions_data=dims_data,
+            # Incremental orchestrator short-circuits to None for manifests with source_files,
+            # so use clean-scan path to exercise the full runner pipeline.
+            options=AnalysisOptions(incremental=False),
         )
         run(config)
 

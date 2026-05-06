@@ -114,6 +114,10 @@ def _run_dimensions(
         )
 
     if config.options.incremental:
+        # Default path. AnalysisOptions.incremental defaults to True so
+        # any run that hasn't explicitly opted out (via --clean-scan or
+        # --diff-from at the CLI/API layer) carries forward findings for
+        # unchanged files via per-dimension fingerprint lookup.
         emit_marker("setup", dimensions=dimensions)
         return run_incremental_loop(
             config, dimensions, ctx,
@@ -122,6 +126,9 @@ def _run_dimensions(
             on_dimension_done=on_dimension_done,
         )
 
+    # Clean-scan path: full re-analysis, no carry-forward. Reached only
+    # when the user requested --clean-scan or --diff-from. Consolidated
+    # mode is allowed here because there is no prior fingerprint to honour.
     emit_marker("setup", dimensions=dimensions)
 
     # Consolidated mode: evaluate all dimensions in one pass.

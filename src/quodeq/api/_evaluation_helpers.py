@@ -38,6 +38,36 @@ def _sanitize_url(url: str) -> str:
     return _CREDENTIALS_RE.sub(r"\1***@", url)
 
 
+def _resolve_clean_scan(payload: dict) -> bool:
+    """Resolve the user's clean_scan intent from new and legacy fields.
+
+    New: ``cleanScan: bool`` -- explicit opt-out, default False.
+    Legacy: ``incremental: bool`` -- deprecated, with inverted semantics
+    (old ``True`` meant "use cache" -> ``clean_scan=False``; old ``False``
+    meant "ignore cache" -> ``clean_scan=True``). One-release back-compat.
+
+    Sending both is rejected: we won't guess intent if a client transitions
+    mid-deployment and ends up posting conflicting flags.
+    """
+    has_new = "cleanScan" in payload
+    has_legacy = "incremental" in payload
+    if has_new and has_legacy:
+        raise ValueError(
+            "`cleanScan` and `incremental` cannot be combined in a single payload. "
+            "Use `cleanScan` only -- `incremental` is deprecated. "
+            "Send `cleanScan: false` (use cached findings, default) or `cleanScan: true` "
+            "(force full re-analysis)."
+        )
+    if has_legacy:
+        _logger.warning(
+            "Evaluation payload uses deprecated `incremental` field. "
+            "Migrate to `cleanScan` (inverted semantics). "
+            "Legacy field will be removed in the next release.",
+        )
+        return not bool(payload.get("incremental"))
+    return bool(payload.get("cleanScan", False))
+
+
 def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> tuple[Response, int] | None:
     """Return an error response if *ai_cmd* is not in the allow-list, or None if valid."""
     if not ai_cmd:
@@ -66,6 +96,7 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     time_limit = 0 if time_limit_raw == 0 else max(_MIN_TIME_LIMIT, min(_MAX_TIME_LIMIT, time_limit_raw))
     ai_model = payload.get("aiModel") or None
     subagent_model = payload.get("subagentModel") or ai_model  # default to orchestrator
+    clean_scan = _resolve_clean_scan(payload)
     return EvaluationOptions(
         discipline=payload.get("discipline"),
         dimensions=payload.get("dimensions") or "",
@@ -76,7 +107,7 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
         verify_findings=bool(payload.get("verifyFindings", True)),
         max_subagents=max_subagents,
         time_limit=time_limit,
-        incremental=bool(payload.get("incremental", False)),
+        clean_scan=clean_scan,
         per_dimension=bool(payload.get("perDimension", False)),
         context_size=max(0, min(_MAX_CONTEXT_SIZE, _coerce_int(payload.get("contextSize"), 0))),
         branch=payload.get("branch") or None,

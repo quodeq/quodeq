@@ -19,7 +19,7 @@ from quodeq.analysis.subprocess import AnalysisError
 from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
 from quodeq.engine.scoring_pipeline import run_full
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
-from quodeq.shared.logging import log_error, log_info
+from quodeq.shared.logging import log_error, log_info, log_warning
 from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_repo, write_text
 from quodeq.shared.repo_handler import cleanup_cloned_repo
 from quodeq.engine._runner_markers import emit_marker
@@ -234,7 +234,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
             verify_findings=not _no_verify(args, env=env),
             consolidated=consolidated,
             time_limit=_resolve_time_limit(args, env=env),
-            incremental=args.incremental,
+            incremental=not (getattr(args, "clean_scan", False) or bool(getattr(args, "diff_from", None))),
             incremental_file_filter=incremental_file_filter,
             dry_run=getattr(args, "dry_run", False),
             diff_from=diff_from,
@@ -336,11 +336,21 @@ def _run_pipeline_with_cleanup(
 
 def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
-    if getattr(args, "incremental", False) and getattr(args, "diff_from", None):
+    # --incremental is a deprecated no-op alias; emit a warning so external
+    # scripts have notice to migrate. The default behaviour already does
+    # what --incremental used to mean.
+    if getattr(args, "legacy_incremental", False):
+        log_warning(
+            "--incremental is deprecated and will be removed in the next release. "
+            "Incremental scans are now the default; use --clean-scan to force a "
+            "full re-analysis."
+        )
+
+    if getattr(args, "clean_scan", False) and getattr(args, "diff_from", None):
         log_error(
-            "Error: --incremental and --diff-from are mutually exclusive. "
-            "--incremental is for nightly whole-repo runs; --diff-from is for "
-            "PR-scoped analysis."
+            "Error: --clean-scan and --diff-from are mutually exclusive. "
+            "--diff-from already produces evidence-only output for a specific "
+            "ref; --clean-scan has no meaning in that mode."
         )
         return 1
 

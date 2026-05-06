@@ -67,8 +67,13 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         help="Disable multi-dimension consolidation (evaluate dimensions separately)",
     )
     parser.add_argument(
-        "--incremental", action="store_true",
-        help="Only analyze files changed since last evaluation (carry forward cached findings)",
+        "--clean-scan", action="store_true", dest="clean_scan",
+        help="Force a full re-analysis, ignoring any cached findings from prior runs. "
+             "By default Quodeq carries forward findings for unchanged files.",
+    )
+    parser.add_argument(
+        "--incremental", action="store_true", dest="legacy_incremental",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--branch", default=None,

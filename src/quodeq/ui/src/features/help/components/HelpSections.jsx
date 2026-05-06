@@ -166,7 +166,7 @@ export function Providers() {
       <h3>Power tiers</h3>
       <p>Each provider exposes three power levels that map to model size:</p>
       <KeyTable rows={[
-        ['Fast', 'Smallest tier. Good for incremental scans and tight budgets.'],
+        ['Fast', 'Smallest tier. Good for routine runs and tight budgets.'],
         ['Balanced', 'Default. Best quality-per-cost for most evaluations.'],
         ['Thorough', 'Largest tier. Use for first scans, audits, or sensitive areas.'],
       ]} />
@@ -196,11 +196,15 @@ export function Evaluations() {
         <li><strong>Time budget</strong> a soft cap on run length. Quodeq scores whatever has completed when the timer expires.</li>
       </ul>
 
-      <h3>Full vs incremental scans</h3>
+      <h3>Incremental and clean scans</h3>
+      <p>By default, Quodeq carries findings for unchanged files forward and re-evaluates only files that have changed since the last run. This keeps subsequent scans fast without losing coverage.</p>
+      <p>The <strong>Clean scan</strong> toggle forces a full re-analysis of every file. Use it after a big refactor, when you change standards, or whenever you want a fresh start. The toggle has three states:</p>
       <ul>
-        <li><strong>Full scan</strong> evaluates the entire scope from scratch. Use for first runs, after big refactors, or when you change standards.</li>
-        <li><strong>Incremental scan</strong> uses <code>git diff</code> to detect changed files and re-evaluates only those. Findings for unchanged files carry forward. Toggle <em>Incremental</em> on before launching.</li>
+        <li><strong>Off (default)</strong> incremental behavior. Unchanged-file findings are reused; only changed files are re-evaluated.</li>
+        <li><strong>Once</strong> the next scan runs clean. The toggle resets to Off automatically after that run completes.</li>
+        <li><strong>Permanent</strong> every scan runs clean until you turn the toggle off. Stored in <code>localStorage</code> so it persists across sessions.</li>
       </ul>
+      <p>The Clean scan toggle is available both on the Scan form (before you start) and on the Re-evaluate card (after a run finishes).</p>
 
       <h3>What you see while it runs</h3>
       <p>The Evaluate tab streams a live phase indicator (detect → analyze → collect → score → report), an active provider badge, a countdown against your time budget, and a feed of findings as the agents discover them. Click any finding in the feed to jump straight to its file context, even mid-run.</p>
@@ -435,7 +439,7 @@ export function Settings() {
       <p>Each tab also exposes <strong>sub-agent count</strong> and a <strong>time budget</strong> default. Start an evaluation and you can override these per-run.</p>
 
       <h3>Model overrides per tier</h3>
-      <p>Power tiers (Fast / Balanced / Thorough) ship with sensible defaults. You can pin a different model to each tier if you want a small model for incremental scans and a large one for audits. Leave a tier blank to inherit the main model.</p>
+      <p>Power tiers (Fast / Balanced / Thorough) ship with sensible defaults. You can pin a different model to each tier if you want a small model for routine runs and a large one for audits. Leave a tier blank to inherit the main model.</p>
 
       <h3>Server</h3>
       <p>Shows the current dashboard server: port, version, and status. Live log streams (server, Ollama, evaluation) are wired into the side-pane log viewer. Open it from the bottom-bar log buttons to tail what is happening.</p>

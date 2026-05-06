@@ -70,6 +70,10 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
         try:
             options = _build_evaluation_options(payload)
+        except ValueError as exc:
+            body, status = error_response(str(exc), HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
+        try:
             job = provider.start_evaluation(repo=repo, reports_dir=_reports_dir(), options=options)
         except (FileNotFoundError, ValueError):
             body, status = error_response(

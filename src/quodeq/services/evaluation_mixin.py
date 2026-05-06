@@ -85,8 +85,8 @@ def _build_evaluate_cmd(
         cmd += ["-m", "numerical"]
     if options.max_subagents != _DEFAULT_MAX_SUBAGENTS:
         cmd += ["--n-subagents", str(options.max_subagents)]
-    if options.incremental:
-        cmd += ["--incremental"]
+    if options.clean_scan:
+        cmd += ["--clean-scan"]
     if options.branch:
         cmd += ["--branch", options.branch]
     if options.scope_path:

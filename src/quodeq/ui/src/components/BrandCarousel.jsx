@@ -19,7 +19,7 @@ const PHRASES = [
   'the <b>score history</b> chart shows how your codebase quality evolves over time',
   'violations are ranked by <b>severity</b>: critical, major, and minor',
   'every principle is graded and mapped to a <b>quality dimension</b>',
-  'use <b>incremental scans</b> to re-evaluate only the files you changed since last run',
+  'use <b>Clean scan</b> when you want every file re-analyzed; otherwise Quodeq carries unchanged files forward automatically',
   'run analysis with <b>local Ollama</b> models for free, private code review on your own machine',
   'the <b>code map</b> visualises file size and issue density so you can spot hotspots at a glance',
   'every finding gets a <b>severity</b>, an explanation, and pointers to the exact code that triggered it',
