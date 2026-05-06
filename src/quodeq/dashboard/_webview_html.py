@@ -4,6 +4,11 @@ from __future__ import annotations
 import json
 import sys
 
+# Windows uses native chrome (frameless=False in _webview_window), so no
+# in-page controls are injected. macOS and Linux use frameless windows with
+# Mac-style traffic-light dots on the left — keeping them on the left avoids
+# colliding with topbar actions that live on the right (e.g. Re-evaluate
+# toggles).
 _CONTROLS_MAC = """\
 <style>
   /* Traffic-light dots sit INSIDE the topbar's empty left-padding area
@@ -45,38 +50,7 @@ _CONTROLS_MAC = """\
   <button class="qd-dot qd-dot--maximize" title="Fullscreen" onclick="pywebview.api.maximize()"></button>
 </div>"""
 
-_CONTROLS_WIN = """\
-<style>
-  .qd-winbtns {
-    position: fixed;
-    top: 0;
-    right: 0;
-    display: flex;
-    z-index: 99999;
-  }
-  .qd-winbtn {
-    width: 46px; height: 32px;
-    border: none;
-    background: transparent;
-    color: var(--color-text-muted, #888);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    transition: background 0.1s;
-  }
-  .qd-winbtn:hover { background: var(--color-surface-alt, rgba(255,255,255,0.1)); }
-  .qd-winbtn--close:hover { background: #e81123; color: #fff; }
-  body { padding-top: 32px !important; }
-</style>
-<div class="qd-winbtns">
-  <button class="qd-winbtn" title="Minimize" onclick="pywebview.api.minimize()">&#x2013;</button>
-  <button class="qd-winbtn" title="Maximize" onclick="pywebview.api.maximize()">&#x2610;</button>
-  <button class="qd-winbtn qd-winbtn--close" title="Close" onclick="pywebview.api.close()">&#x2715;</button>
-</div>"""
-
-_CONTROLS_HTML = _CONTROLS_WIN if sys.platform == "win32" else _CONTROLS_MAC
+_CONTROLS_HTML = "" if sys.platform == "win32" else _CONTROLS_MAC
 
 _CONTROLS_JS = """\
 (function() {
