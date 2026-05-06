@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.10] - 2026-05-06
+
+### Fixes
+- **Ollama / API providers**: subagents no longer wipe the shared findings file mid-scan when a batch yields no usable source files (e.g., all skipped because they exceed the 15 KB API limit). Findings from other agents in the pool were being silently lost, surfacing as a scan-progress reset to "0 findings".
+- **Windows EXE build**: the release script no longer fails on GitHub Actions runners. PowerShell was interpolating `$RepoRoot` (e.g., `D:\a\quodeq\quodeq`) into a Python string literal where `\a` got decoded as a bell character, breaking path resolution. Version is now parsed with PowerShell's native regex.
+
 ## [1.0.9] - 2026-05-06
 
 ### Features
