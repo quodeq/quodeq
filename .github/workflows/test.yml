@@ -40,9 +40,17 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Run tests
+      - name: Run tests (Linux/macOS)
+        if: runner.os != 'Windows'
         # Skip @pytest.mark.integration: those spawn real subprocesses and
         # send signals, which are inherently timing-sensitive on shared CI
         # runners. They run elsewhere (e.g. nightly) where flakes are
         # tolerable. PR CI should be fast and deterministic.
         run: uv run pytest tests/ -q --tb=short -m "not integration"
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        # Verbose + -ra so per-test names and the FAILED summary survive
+        # GitHub's log truncation. Until Windows is fully green we need
+        # the test names visible to fix individual failures.
+        run: uv run pytest tests/ -v -ra --tb=short -m "not integration"
