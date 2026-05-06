@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.timeout(180)
+
 
 @pytest.mark.integration
 def test_cli_writes_run_log(tmp_path: Path) -> None:

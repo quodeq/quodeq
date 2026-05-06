@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.timeout(180)
+
 
 @pytest.mark.integration
 def test_cli_run_appears_in_index(tmp_path: Path, monkeypatch) -> None:
