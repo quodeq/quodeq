@@ -80,11 +80,14 @@ def locked(lock_path: Path):
     where one process unlinks it while another is about to lock it.
     """
     fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, _LOCK_FILE_MODE)
+    locked_ok = False
     try:
         lock_file(fd)
+        locked_ok = True
         yield
     finally:
-        unlock_file(fd)
+        if locked_ok:
+            unlock_file(fd)
         os.close(fd)
 
 
