@@ -165,8 +165,8 @@ Choose what fits your workflow. Configure in **Settings** from the dashboard.
 llama.cpp is one process per model, fixed at launch. Start `llama-server` yourself, then point Quodeq at it from **Settings → AI Provider → llama.cpp**.
 
 ```bash
-# Redirect to ~/.quodeq/logs so the dashboard's CONSOLE button picks it up
-mkdir -p ~/.quodeq/logs
+# Quodeq creates ~/.quodeq/logs/ on first launch — just redirect there
+# and the CONSOLE button picks it up automatically.
 llama-server -m path/to/target.gguf --port 8080 \
   > ~/.quodeq/logs/llama-server.log 2>&1
 
