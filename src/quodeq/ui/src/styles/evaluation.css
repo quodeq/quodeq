@@ -9,7 +9,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .evaluate-header h1 {
@@ -25,52 +25,60 @@
   font-size: 1rem;
 }
 
+/* Provider/model pill — visually aligned with the topbar provider pill
+   (mono, 12px, transparent bg, subtle border, muted text). */
 .eval-provider-badge {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  background: var(--color-surface-alt);
+  min-height: 28px;
+  box-sizing: border-box;
+  background: transparent;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
+  border-radius: var(--term-radius);
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
   color: var(--color-text-muted);
   white-space: nowrap;
 }
 
 .eval-provider-name {
-  font-weight: var(--weight-semibold);
   color: var(--color-text);
-  text-transform: capitalize;
+}
+
+.eval-provider-sep {
+  opacity: 0.4;
 }
 
 .eval-provider-model {
-  font-family: monospace;
-  font-size: 0.62rem;
+  color: var(--color-text-muted);
 }
 
 /* Clickable variant — used on the Evaluate page header to navigate to settings. */
 button.eval-provider-badge--clickable {
   cursor: pointer;
-  font: inherit;
-  transition: border-color 120ms, background 120ms;
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
 }
 button.eval-provider-badge--clickable:hover {
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface-alt));
+  border-color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
 }
 button.eval-provider-badge--clickable:focus-visible {
   outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 .evaluate-content {
   display: grid;
-  gap: 24px;
+  gap: 16px;
 }
 
 .evaluate-panel {
-  padding: 24px;
+  padding: 16px;
 }
 
 /* ── No-project-selected state on the Evaluate tab ── */
@@ -855,7 +863,7 @@ button.eval-provider-badge--clickable:focus-visible {
 .evaluate-form-large {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .evaluate-form-large .form-group label {
@@ -1103,7 +1111,7 @@ button.eval-provider-badge--clickable:focus-visible {
 .re-eval-actions-group {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .re-eval-disabled-section {
@@ -2907,10 +2915,10 @@ button.eval-provider-badge--clickable:focus-visible {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--term-radius);
-  padding: var(--term-space-4);
+  padding: var(--term-space-3);
 }
 .evaluate-panel__top {
-  margin-bottom: var(--term-space-3);
+  margin-bottom: var(--term-space-2);
 }
 .evaluate-panel__top--row {
   display: flex;
@@ -2933,8 +2941,8 @@ button.eval-provider-badge--clickable:focus-visible {
   border: 0;
   border-bottom: 1px dotted var(--color-border);
   border-radius: 0;
-  padding: var(--term-space-2) 0;
-  margin-bottom: var(--term-space-3);
+  padding: var(--term-space-1) 0;
+  margin-bottom: var(--term-space-2);
   font-family: var(--term-font-mono);
   display: flex;
   align-items: baseline;

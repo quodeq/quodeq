@@ -14,6 +14,7 @@ function ActiveProviderBadge({ storage = localStorage, onClick }) {
   const content = (
     <>
       <span className="eval-provider-name">{provider}</span>
+      {model && <span className="eval-provider-sep" aria-hidden="true">·</span>}
       {model && <span className="eval-provider-model">{model}</span>}
     </>
   );
