@@ -16,7 +16,7 @@ _HEARTBEAT_FMT = (
     "[{dimension}] {mins}m{secs:02d}s | "
     "{active} active agent{plural} | "
     "files {taken}/{total_files} · {remaining} left | "
-    "{violations} violations | {compliance} compliance"
+    "{violations} violations · {compliance} compliance"
 )
 
 
