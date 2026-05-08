@@ -4,7 +4,7 @@ import ScanProgress from '../../../evaluation/components/ScanProgress.jsx';
 import FolderBrowser from '../../../evaluation/components/FolderBrowser.jsx';
 import CloneTargetStep from './CloneTargetStep.jsx';
 
-const URL_RE = /^(https?:\/\/|git@|ssh:\/\/|git:\/\/)/;
+const URL_RE = /^(https?:\/\/|git@|ssh:\/\/|git:\/\/)/i;
 const CLONE_DEST_STORAGE_KEY = 'quodeq.lastCloneRoot';
 
 // Map backend error codes (Task A8) to user-facing messages.
