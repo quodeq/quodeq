@@ -135,6 +135,7 @@ function FollowToggle({ active, onToggle }) {
 
 export default function ConsoleLogViewer({ logs }) {
   const scrollRef = useRef(null);
+  const contentRef = useRef(null);
   const [follow, setFollow] = useState(true);
   const followRef = useRef(true);
   const lastLogCount = useRef(0);
@@ -189,7 +190,27 @@ export default function ConsoleLogViewer({ logs }) {
       setFollow((prev) => (prev === atBottom ? prev : atBottom));
     };
     el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
+    // Resize alone never fires `scroll`, so adding a side-pane window or
+    // dragging a divider would shrink clientHeight and silently leave the
+    // user above the bottom — even with follow=true — until the next log
+    // line. Watch BOTH the scroller (clientHeight changes) and its inner
+    // content (scrollHeight changes from late `content-visibility` re-measures
+    // and from new lines settling in) and re-snap on size changes.
+    const snap = () => {
+      if (!followRef.current) return;
+      if (hasActiveSelectionInside(el)) return;
+      programmaticScroll.current = true;
+      el.scrollTop = el.scrollHeight;
+      lastScrollHeight.current = el.scrollHeight;
+      requestAnimationFrame(() => { programmaticScroll.current = false; });
+    };
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(snap) : null;
+    ro?.observe(el);
+    if (contentRef.current) ro?.observe(contentRef.current);
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      ro?.disconnect();
+    };
   }, []);
 
   const handleToggle = useCallback(() => {
@@ -203,11 +224,13 @@ export default function ConsoleLogViewer({ logs }) {
   return (
     <div className="console-shell">
       <div className="console-scroll" ref={scrollRef}>
-        {cleanedLogs.length === 0 ? (
-          <div className="console-log-empty">Waiting for output…</div>
-        ) : (
-          cleanedLogs.map((line, i) => <LogLine key={i} text={line} />)
-        )}
+        <div className="console-content" ref={contentRef}>
+          {cleanedLogs.length === 0 ? (
+            <div className="console-log-empty">Waiting for output…</div>
+          ) : (
+            cleanedLogs.map((line, i) => <LogLine key={i} text={line} />)
+          )}
+        </div>
       </div>
       <FollowToggle active={follow} onToggle={handleToggle} />
     </div>
