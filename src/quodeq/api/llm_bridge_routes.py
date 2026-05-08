@@ -10,6 +10,9 @@ from quodeq.llm_bridge import (
     list_ollama_models,
     estimate_max_agents,
     run_concurrency_test,
+    get_llamacpp_status,
+    list_llamacpp_models,
+    run_llamacpp_concurrency_test,
     get_known_models,
     get_provider_configs,
     check_cloud_connection,
@@ -45,6 +48,25 @@ def register_llm_bridge_routes(app: Flask) -> None:
         model_size = data.get("model_size", 0)
         gpu_memory = data.get("gpu_memory", 0)
         return jsonify(estimate_max_agents(model_size=model_size, gpu_memory=gpu_memory))
+
+    @app.get("/api/llamacpp/status")
+    def llamacpp_status() -> Response:
+        return jsonify(get_llamacpp_status())
+
+    @app.get("/api/llamacpp/models")
+    def llamacpp_models() -> Response:
+        return jsonify({"models": list_llamacpp_models()})
+
+    @app.post("/api/llamacpp/test-concurrency")
+    def llamacpp_test_concurrency() -> Response:
+        data = request.get_json() or {}
+        model = data.get("model", "")
+        if not isinstance(model, str):
+            return jsonify({"error": "model must be a string", "code": "INVALID_PARAM"}), 400
+        if "\\" in model or ".." in model or "\0" in model:
+            return jsonify({"error": "Invalid model name", "code": "INVALID_PARAM"}), 400
+        result = run_llamacpp_concurrency_test(model)
+        return jsonify(result)
 
     @app.post("/api/provider/test")
     def provider_test() -> Response:

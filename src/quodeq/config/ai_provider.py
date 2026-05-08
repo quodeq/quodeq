@@ -18,6 +18,7 @@ PROVIDERS = {
     "codex": ("CODEX_API_KEY", "codex"),
     "gemini": ("GEMINI_API_KEY", "gemini"),
     "ollama": ("", "ollama"),
+    "llamacpp": ("", "llamacpp"),
     "openrouter": ("OPENROUTER_API_KEY", "openrouter"),
     "custom": ("AI_API_KEY", "custom"),
 }

@@ -235,6 +235,25 @@ export function testOllamaConcurrency(model) {
   });
 }
 
+/** @returns {Promise<Object>} llama.cpp connection status */
+export function getLlamacppStatus() {
+  return request('/llamacpp/status');
+}
+
+/** @returns {Promise<Object[]>} Loaded llama.cpp model (0 or 1 entries) */
+export async function getLlamacppModels() {
+  const data = await request('/llamacpp/models');
+  return data?.models ?? [];
+}
+
+/** @returns {Promise<Object>} Concurrency test results for the loaded model */
+export function testLlamacppConcurrency(model) {
+  return request('/llamacpp/test-concurrency', {
+    method: 'POST',
+    body: JSON.stringify({ model: model || '' }),
+  });
+}
+
 /** @returns {Promise<Object>} Connection test result for the provider */
 export function testProviderConnection({ provider, apiBase, model, apiKey }) {
   return request('/provider/test', {

@@ -153,11 +153,26 @@ Choose what fits your workflow. Configure in **Settings** from the dashboard.
 | Provider | Type | Getting started |
 |---|---|---|
 | [Ollama](https://ollama.com/download) | Local | Free, private, code never leaves your machine |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) | Local | Run any GGUF directly. Supports speculative decoding (MTP) via a draft model |
 | [Claude Code](https://code.claude.com/docs/en/quickstart) | Cloud | Best balance of speed, quality, and cost |
 | [Codex CLI](https://developers.openai.com/codex/quickstart) | Cloud | OpenAI models |
 | [Gemini CLI](https://geminicli.com/docs/get-started/installation/) | Cloud | Google models |
 
 > For local analysis we recommend [Gemma 4](https://deepmind.google/models/gemma/gemma-4/) ([`gemma4:26b`](https://ollama.com/library/gemma4:26b)). Reducing the context window to 32k still gives good results and allows running multiple subagents in parallel.
+
+### Using llama.cpp
+
+llama.cpp is one process per model, fixed at launch. Start `llama-server` yourself, then point Quodeq at it from **Settings → AI Provider → llama.cpp**.
+
+```bash
+# Single model
+llama-server -m path/to/target.gguf --port 8080
+
+# Speculative decoding (MTP), pair a target with a smaller drafter
+llama-server -m path/to/target.gguf -md path/to/drafter.gguf --port 8080
+```
+
+Quodeq probes `http://localhost:8080`. To use a different port or host, set `LLAMACPP_BASE_URL`. To switch models, stop `llama-server` and relaunch with a different `-m`.
 
 ---
 

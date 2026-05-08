@@ -207,12 +207,15 @@ class FsToolingMixin:
 
         # API providers: always available (no CLI binary needed)
         provider_configs = get_provider_configs()
+        # Display labels for provider IDs whose default capitalize() form
+        # reads awkwardly (e.g. "Llamacpp" instead of "llama.cpp").
+        api_label_overrides = {"llamacpp": "llama.cpp"}
         for provider_id, cfg in provider_configs.items():
             if cfg.get("type") == "api" and provider_id != "custom":
                 if not any(c["id"] == provider_id for c in clients):
                     clients.append({
                         "id": provider_id,
-                        "label": provider_id.capitalize(),
+                        "label": api_label_overrides.get(provider_id, provider_id.capitalize()),
                         "type": "api",
                         "installed": True,
                     })

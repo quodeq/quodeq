@@ -14,6 +14,11 @@ from quodeq.llm_bridge._ollama import (
     estimate_max_agents,
     run_concurrency_test,
 )
+from quodeq.llm_bridge._llamacpp import (
+    get_llamacpp_status,
+    list_llamacpp_models,
+    run_concurrency_test as run_llamacpp_concurrency_test,
+)
 from quodeq.llm_bridge._cloud import check_cloud_connection
 from quodeq.llm_bridge._models import get_known_models
 
@@ -25,6 +30,9 @@ __all__ = [
     "list_ollama_models",
     "estimate_max_agents",
     "run_concurrency_test",
+    "get_llamacpp_status",
+    "list_llamacpp_models",
+    "run_llamacpp_concurrency_test",
     "check_cloud_connection",
     "get_known_models",
 ]
