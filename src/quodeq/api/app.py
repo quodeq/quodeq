@@ -82,6 +82,11 @@ def create_app(
     app = Flask(__name__)
     if test_config is not None:
         app.config.update(test_config)
+    # Cap multipart uploads (project import) at the same size as the export
+    # limit, plus a small headroom for multipart framing. Flask aborts with
+    # 413 before reading the full body, which keeps large bogus uploads cheap.
+    from quodeq.api.zip import _max_zip_size_bytes
+    app.config.setdefault("MAX_CONTENT_LENGTH", _max_zip_size_bytes() + 1 * 1024 * 1024)
     provider = provider or _default_provider()
     app.config["_provider"] = provider
 

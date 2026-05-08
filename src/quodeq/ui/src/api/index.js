@@ -260,6 +260,38 @@ export function scanPath(dirPath) {
 
 // Standards and findings APIs are re-exported at the top of this file.
 
+/**
+ * Import a previously-exported project zip.
+ *
+ * Uses raw fetch so we can (a) send multipart/form-data without the shared
+ * request() wrapper forcing application/json, and (b) read err.status,
+ * err.kind, err.existingProjectId on a 409 collision so the caller can
+ * prompt the user to choose Replace / Import as copy / Cancel.
+ *
+ * @param {File|Blob} file - the .zip file to import
+ * @param {{ action?: 'replace'|'copy' }} [opts]
+ * @returns {Promise<{ imported: boolean, projectId: string, sourceProjectId: string, renamed: boolean, projectName?: string }>}
+ * @throws {Error & { status: number, code?: string, kind?: string, existingProjectId?: string, projectName?: string }} on non-2xx
+ */
+export async function importProject(file, opts = {}) {
+  const form = new FormData();
+  form.append('file', file);
+  if (opts.action) form.append('action', opts.action);
+  // No timeout: large project zips can take a while to upload.
+  const res = await fetch(`${BASE}/projects/import`, { method: 'POST', body: form });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(body.error || `importProject failed (${res.status})`);
+    err.status = res.status;
+    if (body.code) err.code = body.code;
+    if (body.kind) err.kind = body.kind;
+    if (body.existingProjectId) err.existingProjectId = body.existingProjectId;
+    if (body.projectName) err.projectName = body.projectName;
+    throw err;
+  }
+  return body;
+}
+
 // Note: uses raw fetch (not the shared request() wrapper) so the wizard can
 // read err.status and err.existingProjectId on a 409 duplicate response —
 // request() throws plain Error and discards both. Refactoring request() to
