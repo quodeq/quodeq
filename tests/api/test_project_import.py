@@ -57,8 +57,17 @@ def _make_zip(
     }
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        sep = "\\" if files_use_backslashes else "/"
-        zf.writestr(f"{project_uuid}{sep}repository_info.json", json.dumps(repo_info))
+        if files_use_backslashes:
+            # ZipInfo.__init__ normalises os.sep ("\\" on Windows) to "/", so a
+            # raw f"{uuid}\\repository_info.json" string would round-trip to
+            # forward-slashes on Windows and never reach our server check.
+            # Mutating .filename after construction puts the literal backslash
+            # on the wire on every platform.
+            info = zipfile.ZipInfo("placeholder")
+            info.filename = f"{project_uuid}\\repository_info.json"
+            zf.writestr(info, json.dumps(repo_info))
+        else:
+            zf.writestr(f"{project_uuid}/repository_info.json", json.dumps(repo_info))
         if include_manifest:
             manifest = {
                 "schema": _MANIFEST_SCHEMA,
