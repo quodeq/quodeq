@@ -9,6 +9,11 @@ from pathlib import Path
 _logger = logging.getLogger(__name__)
 
 
+def _log_rmtree_error(func, path, exc):
+    """rmtree onexc callback that logs failures instead of swallowing them."""
+    _logger.warning("Failed to remove %s: %s", path, exc)
+
+
 def delete_ephemeral_clone(clones_root: Path, project_uuid: str) -> None:
     """Remove the ephemeral clone directory for *project_uuid*.
 
@@ -26,7 +31,7 @@ def delete_ephemeral_clone(clones_root: Path, project_uuid: str) -> None:
         return
     if not target.exists():
         return
-    shutil.rmtree(target, ignore_errors=True)
+    shutil.rmtree(target, onexc=_log_rmtree_error)
 
 
 def sweep_orphaned_clones(clones_root: Path, reports_root: Path) -> None:
@@ -45,4 +50,4 @@ def sweep_orphaned_clones(clones_root: Path, reports_root: Path) -> None:
         registered = set()
     for entry in clones_root.iterdir():
         if entry.is_dir() and entry.name not in registered:
-            shutil.rmtree(entry, ignore_errors=True)
+            shutil.rmtree(entry, onexc=_log_rmtree_error)
