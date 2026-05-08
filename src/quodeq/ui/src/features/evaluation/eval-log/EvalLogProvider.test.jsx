@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SidePaneProvider } from '../../side-pane/index.js';
@@ -103,29 +103,36 @@ describe('EvalLogProvider', () => {
   });
 
   it('updates the side-pane window body as new log lines arrive', () => {
-    function ProbeWithRender() {
-      const { openLog } = useEvalLog();
-      const { windows } = useSidePane();
-      const body = windows[0]?.render?.() ?? null;
-      return (
-        <div>
-          <button onClick={() => openLog('job-x', 'Run X')}>open</button>
-          <div data-testid="body">{body}</div>
-        </div>
+    vi.useFakeTimers();
+    try {
+      function ProbeWithRender() {
+        const { openLog } = useEvalLog();
+        const { windows } = useSidePane();
+        const body = windows[0]?.render?.() ?? null;
+        return (
+          <div>
+            <button onClick={() => openLog('job-x', 'Run X')}>open</button>
+            <div data-testid="body">{body}</div>
+          </div>
+        );
+      }
+      render(
+        <SidePaneProvider>
+          <EvalLogProvider>
+            <ProbeWithRender />
+          </EvalLogProvider>
+        </SidePaneProvider>
       );
+      fireEvent.click(screen.getByText('open'));
+      expect(screen.getByTestId('body')).toHaveTextContent('Waiting for output');
+      const es = MockEventSource.instances[0];
+      act(() => { es.emit('message', { data: 'hello world' }); });
+      // useJobLogStream batches via rAF + 50ms timer; drain it.
+      act(() => { vi.runAllTimers(); });
+      expect(screen.getByTestId('body')).toHaveTextContent('hello world');
+    } finally {
+      vi.useRealTimers();
     }
-    render(
-      <SidePaneProvider>
-        <EvalLogProvider>
-          <ProbeWithRender />
-        </EvalLogProvider>
-      </SidePaneProvider>
-    );
-    fireEvent.click(screen.getByText('open'));
-    expect(screen.getByTestId('body')).toHaveTextContent('Waiting for output');
-    const es = MockEventSource.instances[0];
-    act(() => { es.emit('message', { data: 'hello world' }); });
-    expect(screen.getByTestId('body')).toHaveTextContent('hello world');
   });
 
   it('clears activeJobId when the side-pane window is removed externally', () => {
