@@ -87,11 +87,17 @@ def process_dimension_with_cache(
         # warning + single-agent fallback runs unchanged.
         return process_dimension_with_subagents(config, dim_id, idx, ctx, callbacks)
 
-    classify = classify_files_via_cache(config, dim_id, files, cache)
+    # Clean-scan (incremental=False) bypasses cache reads — fresh dispatch
+    # every time — but writes still happen below so the cache stays current.
+    bypass_reads = not config.options.incremental
+    classify = classify_files_via_cache(
+        config, dim_id, files, cache, bypass_reads=bypass_reads,
+    )
     n_hits = len(files) - len(classify.misses)
     _logger.info(
-        "[%s] cache: %d hits / %d misses (%d total)",
+        "[%s] cache: %d hits / %d misses (%d total)%s",
         dim_id, n_hits, len(classify.misses), len(files),
+        " — clean-scan refresh" if bypass_reads else "",
     )
 
     jsonl = _jsonl_path(config, dim_id)
