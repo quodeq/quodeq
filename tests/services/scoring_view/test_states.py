@@ -4,9 +4,12 @@ Pinning the contracts described in scoring_view/README.md so that:
 
   - ``is_successful_run`` matches only the user-intended success cases.
   - ``is_trustable_run`` includes cancelled (so incremental can salvage
-    partial work) but excludes failed.
-  - ``is_eligible_for_default_view`` excludes cancelled (so partial-stop
-    data doesn't silently distort the cards) but includes in_progress.
+    partial work) and in_progress (so already-scored dims are real for
+    next-run salvage) but excludes failed.
+  - ``is_eligible_for_default_view`` is the strictest rule: only
+    ``complete`` runs drive the overview cards. in_progress and
+    cancelled are both excluded — overview waits for the umbrella run
+    to terminate before counting any of its dims.
 
 A mismatch between any two of these predicates is what the package
 exists to prevent — these tests fail fast if the rules drift.
@@ -96,11 +99,13 @@ class TestIsEligibleForDefaultView:
     def test_complete_is_eligible(self):
         assert is_eligible_for_default_view("complete") is True
 
-    def test_in_progress_is_eligible(self):
-        # Today's run hasn't finished yet but the dims it has scored
-        # are real — show them on the overview without making the user
-        # wait for finalization.
-        assert is_eligible_for_default_view("in_progress") is True
+    def test_in_progress_is_NOT_eligible(self):
+        # An in-progress run's already-scored dims are real but the
+        # umbrella run hasn't terminated, so they don't count toward
+        # the overview yet. Users see those dims on the run-detail
+        # page (clicking the running row in history); the overview
+        # cards only update when the run reaches a terminal state.
+        assert is_eligible_for_default_view("in_progress") is False
 
     def test_cancelled_is_NOT_eligible(self):
         # A signal-cancelled run can have stub or sparse-coverage

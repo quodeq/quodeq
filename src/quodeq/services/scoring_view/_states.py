@@ -85,10 +85,7 @@ def is_successful_run(status: str, exit_reason: str | None = None) -> bool:
 
     Anything else (manual signal cancel, stale-detect, exception, error,
     or in-progress runs) is **not** successful for the purposes of this
-    predicate. In-progress runs in particular have a distinct
-    ``is_eligible_for_default_view`` predicate — they're allowed in the
-    overview *while running* but don't count as a "completed run" until
-    they reach one of the success states above.
+    predicate.
     """
     if status == RUN_STATE_COMPLETE:
         return True
@@ -120,14 +117,24 @@ def is_trustable_run(status: str) -> bool:
 def is_eligible_for_default_view(status: str) -> bool:
     """A run whose data can drive the overview cards / headline by default.
 
-    Narrower than ``is_trustable_run``: ``cancelled`` is excluded
-    because a run that was signal-cancelled mid-flight may have
-    sparse-coverage stub evals (model only got through 5% of files
-    before stop) — silently mixing those into the cards distorts the
-    score the user reads.
+    The strictest of the three predicates: only ``complete`` qualifies.
 
-    A user can still explicitly navigate to a cancelled run via the
-    chart or history table — this predicate only governs the *default*
+      - ``in_progress`` is excluded because the umbrella run hasn't
+        terminated. Already-scored dims are real, but counting them in
+        the overview while the run is alive means the cards twitch each
+        time a dim finishes; users instead want a stable view of the
+        *last finished* run until the new one terminates. Mid-flight
+        dims are still inspectable on the run-detail page (clicking the
+        running row in history).
+      - ``cancelled`` is excluded because a signal-cancelled run can
+        have sparse-coverage stub evals (model only got through 5% of
+        files before stop) — silently mixing those into the cards
+        distorts the score.
+      - ``failed`` is excluded — the run errored before producing
+        trustworthy data.
+
+    A user can still explicitly navigate to a non-complete run via the
+    chart or history table; this predicate only governs the *default*
     landing-page selection, where surprises are unwelcome.
 
     Used by:
@@ -139,7 +146,7 @@ def is_eligible_for_default_view(status: str) -> bool:
     Both call sites consult this single predicate so they cannot drift
     apart (a class of bug we hit repeatedly before centralisation).
     """
-    return status in (RUN_STATE_COMPLETE, RUN_STATE_IN_PROGRESS)
+    return status == RUN_STATE_COMPLETE
 
 
 # ---------------------------------------------------------------------------

@@ -115,7 +115,10 @@ See `__init__.py` for the canonical export list. Highlights:
 
 - `is_successful_run(state, exit_reason)` — the success predicate.
 - `is_trustable_run(state)` — for incremental salvage.
-- `is_eligible_for_default_view(state)` — narrower: cards/headline.
+- `is_eligible_for_default_view(state)` — narrowest: cards/headline.
+  Only `complete` qualifies; `in_progress` and `cancelled` are excluded
+  so the overview waits for the umbrella run to terminate cleanly
+  before counting any of its dims.
 - `is_visible_in_history(reports_root, project, run_info)` — for the
   history table filter.
 - `resolve_latest_per_dim(reports_root, project, *, as_of=None)` —

@@ -11,7 +11,7 @@ from quodeq.services.ports import RunInfo, list_runs
 from quodeq.core.types import DimensionResult
 from quodeq.shared.utils import _env_int
 from quodeq.services._cache import make_lru_dimension_fetcher
-from quodeq.services.dim_resolution import is_eligible_for_default_view, is_successful_run
+from quodeq.services.dim_resolution import is_eligible_for_default_view
 from quodeq.services.deleted import filter_deleted_from_dimensions
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
 from quodeq.services._fs_projects import find_children as _find_children
@@ -70,38 +70,32 @@ def _compute_result(
 ) -> _AccumulatedResult:
     """Load run data and compute trends, severity, and scores.
 
-    Cancelled/failed runs are excluded from the per-dim "latest" pick so the
-    overview cards don't quietly mix partial-run scores (e.g. inflated 9.x
-    from a dim the model only finished a fraction of) with stable scores
-    from older complete runs. ``in_progress`` runs ARE included so dims
-    that have already produced a scored evaluation file (eval/<dim>.json)
-    surface in the cards as soon as they finish — users shouldn't have to
-    wait for the umbrella run to finalise before seeing those results.
-    If every run on file is partial (fresh project, all attempts crashed),
-    fall back to all runs so the dashboard isn't blank.
+    Only ``complete`` runs feed the overview by default. ``in_progress``
+    runs are excluded so partial mid-flight dims don't leak into the
+    cards: during a running evaluation the overview shows the previous
+    complete run's data unchanged, and when the run terminates with
+    status ``complete`` its dims become the new latest pick. ``failed``
+    runs are excluded outright (no trustworthy data).
+
+    If no complete run exists but cancelled runs do (fresh project where
+    every attempt was stopped early), fall back to those — better to
+    show what real data we have than to render a blank dashboard. The
+    fallback explicitly excludes ``in_progress`` so a brand-new project
+    whose first run is still alive starts blank, matching the rule that
+    in-progress dims never count toward the overview.
 
     The eligibility predicate is the shared
-    ``dim_resolution.is_eligible_for_default_view`` rule, used by both this
-    call site and ``dashboard._resolve_selected_run`` so the headline and
-    cards always read from the same set of runs.
-
-    Defensive fallback: if the eligible set yields zero scored dimensions
-    *and* it included a non-complete run, retry across complete runs only.
-    This kicks in when a fresh in-progress run is the newest entry but
-    hasn't produced any scored eval files yet (the overview would
-    otherwise go blank mid-evaluation, even though the previous complete
-    run's data is still on disk).
+    ``dim_resolution.is_eligible_for_default_view`` rule, used by both
+    this call site and ``dashboard._resolve_selected_run`` so the
+    headline and cards always read from the same set of runs.
     """
     eligible_run_infos = [r for r in all_run_infos if is_eligible_for_default_view(r.status)]
     if not eligible_run_infos:
-        eligible_run_infos = all_run_infos
-    result = _build_accumulated_for_runs(reports_root, project, eligible_run_infos, cache_config)
-
-    if not result.all_dimensions:
-        complete_only = [r for r in all_run_infos if is_successful_run(r.status)]
-        if complete_only and len(complete_only) < len(eligible_run_infos):
-            result = _build_accumulated_for_runs(reports_root, project, complete_only, cache_config)
-    return result
+        # Fall back to terminal-but-not-complete runs (cancelled), still
+        # excluding in_progress. ``_read_all_run_data``'s per-eval-file
+        # trustworthiness check filters out stub evals from these.
+        eligible_run_infos = [r for r in all_run_infos if r.status != "in_progress"]
+    return _build_accumulated_for_runs(reports_root, project, eligible_run_infos, cache_config)
 
 
 def _build_accumulated_for_runs(

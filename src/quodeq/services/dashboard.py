@@ -195,17 +195,20 @@ def _build_dashboard_result(
 def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     """Return the selected RunInfo and its index in *runs*, raising FileNotFoundError if absent.
 
-    For ``run == _LATEST_RUN``, prefer the most recent run that's eligible
-    to drive the default view (``complete`` or ``in_progress``). The
-    eligibility predicate is the shared
-    ``dim_resolution.is_eligible_for_default_view`` rule, used by both this
-    call site and ``accumulated._compute_result``. Keeping them on the
-    same predicate is what prevents the "headline says one thing, cards
-    say another" inconsistency users hit when the two filters drift.
+    For ``run == _LATEST_RUN``, prefer the most recent ``complete`` run.
+    in_progress and cancelled runs are skipped: the overview waits for a
+    run to terminate cleanly before promoting it to the default
+    landing-page view. The eligibility predicate is the shared
+    ``dim_resolution.is_eligible_for_default_view`` rule, used by both
+    this call site and ``accumulated._compute_result``. Keeping them on
+    the same predicate is what prevents the "headline says one thing,
+    cards say another" inconsistency users hit when the two filters
+    drift.
 
-    If every run is cancelled (fresh project / repeated crashes), fall
-    back to ``runs[0]`` rather than refusing to render. Users can still
-    navigate to a specific partial run via the score-history chart.
+    If no run is complete (fresh project, only run still in progress,
+    every attempt cancelled), fall back to ``runs[0]`` rather than
+    refusing to render. Users can still navigate to a specific partial
+    run via the score-history chart or history table.
 
     Note: run IDs are opaque UUIDs (no sensitive data), safe to include in
     error messages.
