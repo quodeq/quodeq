@@ -2845,3 +2845,17 @@
 .resume-setup-badge:hover {
   background: color-mix(in srgb, var(--color-warn, #f59e0b) 22%, transparent);
 }
+
+/* "setup incomplete" badge for legacy location: "online" projects.
+   Surfaces the need to complete clone-on-add setup without blocking. */
+.badge-setup-incomplete {
+  display: inline-block;
+  font-family: var(--term-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  background: color-mix(in srgb, var(--color-warn, #f59e0b) 14%, transparent);
+  color: var(--color-warn, #f59e0b);
+  border: 1px solid color-mix(in srgb, var(--color-warn, #f59e0b) 40%, transparent);
+  border-radius: var(--term-radius, 2px);
+  padding: 2px 8px;
+  text-transform: lowercase;
+}
