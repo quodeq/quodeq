@@ -15,7 +15,7 @@ _SECONDS_PER_MINUTE = 60
 _HEARTBEAT_FMT = (
     "[{dimension}] {mins}m{secs:02d}s | "
     "{active} active agent{plural} | "
-    "files {taken}/{total_files} | "
+    "files {taken}/{total_files} · {remaining} left | "
     "{violations} violations | {compliance} compliance"
 )
 
@@ -64,6 +64,7 @@ def heartbeat_loop(
                 plural="" if active == 1 else "s",
                 taken=taken,
                 total_files=taken + remaining,
+                remaining=remaining,
                 violations=tally.violations,
                 compliance=tally.compliance,
             ))

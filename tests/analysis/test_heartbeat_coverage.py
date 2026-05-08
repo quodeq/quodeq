@@ -69,12 +69,12 @@ class TestHeartbeatFormat:
         line = _HEARTBEAT_FMT.format(
             dimension="security", mins=1, secs=2,
             active=2, plural="s",
-            taken=10, total_files=30,
+            taken=10, total_files=30, remaining=20,
             violations=2, compliance=5,
         )
         assert line.startswith("[security] 1m02s")
         assert "2 active agents" in line
-        assert "files 10/30" in line
+        assert "files 10/30 · 20 left" in line
         assert "2 violations | 5 compliance" in line
         assert "findings" not in line
         assert "total" not in line
@@ -83,7 +83,7 @@ class TestHeartbeatFormat:
         line = _HEARTBEAT_FMT.format(
             dimension="security", mins=0, secs=5,
             active=1, plural="",
-            taken=1, total_files=2,
+            taken=1, total_files=2, remaining=1,
             violations=0, compliance=0,
         )
         assert "1 active agent |" in line
