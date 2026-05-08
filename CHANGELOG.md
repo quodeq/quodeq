@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.1.0] - 2026-05-08
+
+### Features
+- **llama.cpp as a first-class local provider**: select llama.cpp in the provider tabs alongside Ollama. Auto-detects the server log file at platform-standard paths (`~/.quodeq/logs/llama-server.log` on macOS/Linux), with an opt-in console viewer via `LLAMACPP_LOG_FILE`.
+- **Import project from exported zip**: bring a project archive in via the new import flow on the Projects page.
+- **Online-repo flow rebuilt around clone-on-add**: URL inputs in the wizard now route through a Clone Target step instead of a separate "clone-to-local" step on Re-evaluate. Choose a persistent location or use ephemeral clones that get cleaned up when the run finishes. Last-updated freshness shown on the project page; legacy online projects badged as setup-incomplete with a Complete Setup CTA. Re-evaluation blocked on ephemeral-completed projects.
+- **Project name in headers**: shown in the overview header and on the running evaluation panel.
+- **Live history polling**: history view auto-refreshes while a run is in progress; overview shows an empty state until the first run completes.
+
+### Improvements
+- **Cheaper, more reliable eval-log streaming**: SSE bursts are coalesced into one render per frame via `requestAnimationFrame` (with a 50ms timer fallback for hidden tabs), and the side-pane spec is decoupled from the log array so only the log body re-renders on each batch. Follow button now re-snaps to bottom on resize and scrollHeight changes.
+- **Heartbeat log line trimmed**: progress line shows dimension/agents/files/scores with a remaining-count in the files segment and a pipe separator between violations and compliance.
+- **History trend**: running runs show "running" with their scored dimensions instead of "in progress".
+- **UI polish**: subtler import-project pill, sidebar count badge with breathing room and responsive scaling on narrow widths, more compact Evaluate panel with provider badge aligned to the topbar style, bolder filled term-btn weight, dimmer side-pane icon buttons at rest, log panes simplified (copy/download removed).
+- **Filenames in finding cards never truncated**; pill click no longer toggles the row, and ellipsis only kicks in on real overflow.
+- **Scroll resets on screen change**.
+- **Dependency bumps** (Python and npm).
+
+### Fixes
+- **Job watchdog**: respects the user's `deadline_at` instead of a hardcoded 2-hour limit.
+- **Windows file-lock contention**: retries when another process is briefly holding the lock; cleans up on persistent failure.
+- **Incremental analysis**: incomplete prior runs no longer carry forward, affected files are re-analyzed.
+- **Confidence threshold scales with project size**: small projects no longer have findings filtered too aggressively by a one-size-fits-all threshold.
+- **Run date_iso emits explicit UTC marker** so report timestamps roundtrip cleanly.
+- **Overview**: excludes in-progress runs from the accumulated view.
+- **URL detection**: case-insensitive regex; localStorage and error-message paths covered.
+
 ## [1.0.10] - 2026-05-06
 
 ### Fixes
