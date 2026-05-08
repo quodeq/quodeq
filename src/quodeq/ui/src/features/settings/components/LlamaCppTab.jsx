@@ -6,6 +6,7 @@ import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { useLlamacppServerStatus } from '../hooks/useLlamacppServerStatus.js';
 import { TimeLimitSetting, AdvancedAnalysisSettings, SUBAGENTS_HINT_OLLAMA } from './ProviderSettings.jsx';
+import { useLlamaCppLog } from '../llamacpp-log/LlamaCppLogContext.js';
 import { settingsKeys } from '../../../api/queryKeys.js';
 
 const LLAMACPP_MODEL_HINT = (
@@ -29,6 +30,7 @@ function LoadedModel({ models }) {
 export default function LlamaCppTab({ state, update }) {
   const { getLlamacppModels, testLlamacppConcurrency } = useApi();
   const llamacppStatus = useLlamacppServerStatus();
+  const llamacppLog = useLlamaCppLog();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [testError, setTestError] = useState(null);
@@ -85,6 +87,12 @@ export default function LlamaCppTab({ state, update }) {
             llama-server isn&apos;t running. Start it with <code>llama-server -m model.gguf --port 8080</code>.
           </span>
         }
+        onToggleConsole={
+          llamacppLog.available
+            ? () => (llamacppLog.open ? llamacppLog.closeLog() : llamacppLog.openLog())
+            : undefined
+        }
+        consoleOpen={llamacppLog.open}
       />
       {modelsError && <div className="settings-row"><span className="settings-error">{modelsError}</span></div>}
       <div className="settings-row">

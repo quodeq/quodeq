@@ -3,6 +3,7 @@ import { render, waitFor } from '@testing-library/react';
 import React from 'react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
+import { LlamaCppLogContext } from '../llamacpp-log/LlamaCppLogContext.js';
 import LlamaCppTab from './LlamaCppTab.jsx';
 
 const fakeApi = {
@@ -11,12 +12,16 @@ const fakeApi = {
   getLlamacppStatus: vi.fn().mockResolvedValue({ running: false }),
 };
 
+const stubLog = { open: false, available: false, openLog: vi.fn(), closeLog: vi.fn() };
+
 function makeWrapper() {
   const QueryWrapper = withQueryClient();
   return function Wrapper({ children }) {
     return (
       <QueryWrapper>
-        <ApiProvider value={fakeApi}>{children}</ApiProvider>
+        <ApiProvider value={fakeApi}>
+          <LlamaCppLogContext.Provider value={stubLog}>{children}</LlamaCppLogContext.Provider>
+        </ApiProvider>
       </QueryWrapper>
     );
   };
