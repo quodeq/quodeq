@@ -1,19 +1,26 @@
-"""llama.cpp log-stream route — opt-in SSE tail of a user-pointed file.
+"""llama.cpp log-stream route — SSE tail of a llama-server log file.
 
 Quodeq does not start ``llama-server``; the user does. So unlike the
-Ollama log (which lives in a known location), the only way to surface
-llama-server output in the dashboard is to have the user point us at a
-log file via the ``LLAMACPP_LOG_FILE`` env var. If unset or missing,
-the route returns 404 and the UI hides the console button.
+Ollama log (which lives in a known location), there is no log file
+unless the user redirects ``llama-server``'s stdout to one. We resolve
+a path in this order:
 
-Typical usage:
+    1. ``LLAMACPP_LOG_FILE`` env var (explicit override)
+    2. Platform-standard fallback paths (see ``_DEFAULT_LOG_PATHS``)
 
-    llama-server -m model.gguf --port 8080 > /tmp/llama-server.log 2>&1
-    LLAMACPP_LOG_FILE=/tmp/llama-server.log quodeq
+If neither produces an existing file, the route returns 404 and the UI
+hides the console button. Recommended launch:
+
+    # macOS
+    llama-server -m model.gguf --port 8080 > ~/Library/Logs/llama-server.log 2>&1
+
+    # Linux
+    llama-server -m model.gguf --port 8080 > ~/.local/state/llama-server.log 2>&1
 """
 from __future__ import annotations
 
 import os
+import sys
 from http import HTTPStatus
 from pathlib import Path
 
@@ -22,12 +29,42 @@ from flask import Flask, Response, jsonify, request
 from quodeq.api._sse_log_helpers import sse_tail_generator
 
 
+def _default_log_paths() -> list[Path]:
+    """Return platform-standard locations to probe when the env var is unset.
+
+    First match wins. We only return paths the user is likely to have
+    written to themselves (Library/Logs on macOS, XDG state dir on
+    Linux, LocalAppData on Windows) plus ``/tmp/llama-server.log`` as
+    the lowest-friction default that "just works" if they redirected
+    output to ``/tmp``.
+    """
+    home = Path.home()
+    candidates: list[Path] = []
+    if sys.platform == "darwin":
+        candidates.append(home / "Library" / "Logs" / "llama-server.log")
+    elif sys.platform == "win32":
+        local_app = os.environ.get("LOCALAPPDATA")
+        if local_app:
+            candidates.append(Path(local_app) / "llama.cpp" / "server.log")
+    else:
+        xdg_state = os.environ.get("XDG_STATE_HOME") or str(home / ".local" / "state")
+        candidates.append(Path(xdg_state) / "llama-server.log")
+    candidates.append(Path("/tmp/llama-server.log"))
+    return candidates
+
+
 def _llamacpp_log_path() -> Path | None:
-    """Return the user-configured llama.cpp log path, or None."""
+    """Resolve a usable log path, or None if no candidate file exists."""
     override = os.environ.get("LLAMACPP_LOG_FILE")
-    if not override:
-        return None
-    return Path(override)
+    if override:
+        # Honor an explicit override even if the file doesn't exist yet —
+        # llama-server might create it on next launch and the UI's
+        # availability poll will pick it up then.
+        return Path(override)
+    for candidate in _default_log_paths():
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def register_llamacpp_log_routes(app: Flask) -> None:
@@ -57,10 +94,10 @@ def register_llamacpp_log_routes(app: Flask) -> None:
                     "error": "llamacpp log unavailable",
                     "code": "NOT_FOUND",
                     "help": (
-                        "Set the LLAMACPP_LOG_FILE env var to a file llama-server is "
-                        "writing to (for example: "
-                        "`llama-server -m model.gguf --port 8080 > /tmp/llama-server.log 2>&1`, "
-                        "then `LLAMACPP_LOG_FILE=/tmp/llama-server.log quodeq`)."
+                        "Could not locate a llama-server log file. Either redirect "
+                        "llama-server's output to a standard path (e.g. on macOS: "
+                        "`llama-server -m model.gguf --port 8080 > ~/Library/Logs/llama-server.log 2>&1`) "
+                        "or set the LLAMACPP_LOG_FILE env var to its location."
                     ),
                 }),
                 HTTPStatus.NOT_FOUND,
