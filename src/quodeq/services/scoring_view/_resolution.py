@@ -89,8 +89,8 @@ def resolve_latest_per_dim(
     Walks runs newest-first; for each ``(run, dim)`` pair, accepts the
     first one where:
 
-      - the run is **eligible for default view** (``complete`` or
-        ``in_progress``) — stricter than ``is_trustable_run`` because
+      - the run is **eligible for default view** (``complete`` only) —
+        stricter than ``is_trustable_run`` because in-progress and
         cancelled-run evals aren't promoted to the cards by default.
       - ``evaluation/<dim>.json`` exists with ``filesRead > 0``.
       - the run's date is on or before ``as_of`` (when provided).

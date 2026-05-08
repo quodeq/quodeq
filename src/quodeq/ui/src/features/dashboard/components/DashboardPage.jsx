@@ -6,6 +6,28 @@ import IncompleteSetupCard from './IncompleteSetupCard.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
 
+function NoCompletedEvalPanel({ availableRuns = [], onNavigate }) {
+  const hasRunning = availableRuns.some((r) => r?.status === 'in_progress');
+  if (hasRunning) {
+    return (
+      <EmptyState
+        title="Evaluation in progress"
+        description="Results will appear here once the evaluation finishes. You can watch dimensions complete one by one in the History tab."
+        actionLabel="Open history"
+        onAction={() => onNavigate?.('history')}
+      />
+    );
+  }
+  return (
+    <EmptyState
+      title="No completed evaluation yet"
+      description="Previous attempts didn't finish cleanly. Start a new evaluation to populate the overview."
+      actionLabel="Start evaluation"
+      onAction={() => onNavigate?.('evaluate')}
+    />
+  );
+}
+
 function DashboardContent({ runMode, data, focus, callbacks }) {
   const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo } = data;
   const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
@@ -23,6 +45,15 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
   }
   if (!accumulated) {
     return <LoadingScreen />;
+  }
+  if (accumulatedDimensions.length === 0) {
+    // Project has runs (otherwise the upstream `!dashboard` empty
+    // state would have fired) but none have terminated cleanly yet —
+    // first evaluation in progress, or every prior attempt was
+    // cancelled/failed. Render a clear waiting-for-results state in
+    // place of the empty stat strip and dim cards (the page header
+    // above still shows project name, language mix, file count).
+    return <NoCompletedEvalPanel availableRuns={availableRuns} onNavigate={onNavigate} />;
   }
   if (focusedDimension) {
     return (

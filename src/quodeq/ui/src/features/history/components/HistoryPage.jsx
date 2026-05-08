@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { gradeLabel, scoreColorClass } from '../../../utils/formatters.js';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
+import { useRunningRunsRefresh } from '../../../hooks/useRunningRunsRefresh.js';
 const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
 
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
@@ -324,6 +325,10 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
   const { deleteEvaluation } = useApi();
+  // Background refresh while a run is alive so the running row flips
+  // to "complete" without the user manually reloading. Scoped to this
+  // page only — other tabs don't poll.
+  useRunningRunsRefresh({ selectedProject, availableRuns });
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
   const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet), [rawTrend, visibleSet]);
 
