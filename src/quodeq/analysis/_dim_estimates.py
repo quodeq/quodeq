@@ -7,18 +7,12 @@ dim actually runs, so the header total stays stable as dims transition
 from pending → running.
 
 Each estimate carries a short *reason* tag so the UI can flag inflated
-counts that aren't really "this much code" but "catching up from a
-previous run that died early":
+counts that aren't really "this much code" but the cache being cold:
 
-  - "full"             — non-incremental run; estimate = full source list
-  - "diff"             — diff filter active; estimate = filter intersection
-  - "incremental"      — normal incremental; estimate = changed + dependents
-  - "first-run"        — no prev fingerprint; estimate = full source list
-  - "standards-changed" — standards file changed; full re-analysis
-  - "prompts-changed"  — prompt files changed; full re-analysis
-  - "catching-up"      — most files were fingerprinted but never analyzed
-                          last time (pool timed out / cancelled), so they
-                          get re-swept this run
+  - "full"        — non-incremental (clean-scan); estimate = full source list
+  - "diff"        — diff filter active; estimate = filter intersection
+  - "incremental" — incremental run; estimate = cache-miss count
+  - "first-run"   — cold cache for this dim; everything is a miss
 """
 from __future__ import annotations
 
@@ -26,27 +20,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis._incr_change_detection import detect_changed_files
-from quodeq.analysis._incremental_phases import _list_all_source_files
 from quodeq.analysis._types import RunConfig
-from quodeq.analysis.fingerprint import find_previous_fingerprint
-from quodeq.analysis.incremental import ClassificationInput, classify_files
+from quodeq.analysis.cache import LocalFileBackend, classify_files_via_cache
+from quodeq.analysis.subagents._source_files import _list_source_files
 
 DIM_ESTIMATES_FILENAME = "dim_estimates.json"
-
-# Below this fraction, the previous run is considered to have died early and
-# this dim is "catching up" (most files re-swept via the not_analyzed branch).
-_CATCHING_UP_PREV_ANALYZED_RATIO = 0.5
-
-
-def _classify_full_reanalysis_reason(detection_reason: str) -> str:
-    if "standards" in detection_reason:
-        return "standards-changed"
-    if "prompts" in detection_reason:
-        return "prompts-changed"
-    if "no previous fingerprint" in detection_reason:
-        return "first-run"
-    return "first-run"
 
 
 def compute_dim_estimates(
@@ -54,43 +32,27 @@ def compute_dim_estimates(
 ) -> dict[str, dict[str, Any]]:
     """Estimate per-dim file count + reason, before any dim runs.
 
-    Returns ``{dim_id: {"count": int, "reason": str}}``. See module docstring
-    for the reason vocabulary.
+    Returns ``{dim_id: {"count": int, "reason": str}}``. The estimate is
+    the number of cache misses per dimension — exactly what V2 will
+    dispatch on this run.
     """
     estimates: dict[str, dict[str, Any]] = {}
-    evidence_dir = config.work_dir or config.src
     file_filter = config.options.incremental_file_filter
+    cache = LocalFileBackend()
     for dim_id in dimensions:
-        files = _list_all_source_files(config, dim_id)
+        files, _ext = _list_source_files(config, dim_id, ignore_file_filter=True)
         if not files:
             estimates[dim_id] = {"count": 0, "reason": "empty"}
             continue
         if config.options.incremental:
-            prev_fp, _ = find_previous_fingerprint(evidence_dir, dim_id)
-            detection = detect_changed_files(
-                config.src, files, prev_fp, config.standards_dir, dim_id,
-            )
-            classification = classify_files(
-                inputs=ClassificationInput(
-                    src=config.src, files=files, prev_fingerprint=prev_fp,
-                    standards_dir=config.standards_dir, dimension=dim_id,
-                    language=config.language,
-                ),
-            )
-            count = len(classification.to_analyze)
-            if detection.full_reanalysis:
-                reason = _classify_full_reanalysis_reason(detection.reason)
+            classify = classify_files_via_cache(config, dim_id, files, cache)
+            miss_count = len(classify.misses)
+            if miss_count == len(files):
+                # Every file is a miss → cache cold for this dim.
+                reason = "first-run"
             else:
-                prev_analyzed = len(prev_fp.get("analyzed_files", [])) if prev_fp else 0
-                prev_files = len(prev_fp.get("file_hashes", {})) if prev_fp else 0
-                if (
-                    prev_files > 0
-                    and prev_analyzed < prev_files * _CATCHING_UP_PREV_ANALYZED_RATIO
-                ):
-                    reason = "catching-up"
-                else:
-                    reason = "incremental"
-            estimates[dim_id] = {"count": count, "reason": reason}
+                reason = "incremental"
+            estimates[dim_id] = {"count": miss_count, "reason": reason}
         elif file_filter is not None:
             count = sum(1 for f in files if f in file_filter)
             estimates[dim_id] = {"count": count, "reason": "diff"}
