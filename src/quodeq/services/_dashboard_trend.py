@@ -61,6 +61,11 @@ def build_accumulated_trend(
                 "runId": item.run_id,
                 "dateISO": item.date_iso,
                 "dateLabel": item.date_label,
+                # Surface the run's lifecycle state so the History row can
+                # render "running" instead of a misleading completion time
+                # while the evaluation is still in progress (some dims have
+                # scored, others haven't).
+                "status": item.status,
                 "dimensionsCount": len(run_dim_names),
                 "dimensions": run_dim_names,
                 "dimensionDetails": dim_details,
