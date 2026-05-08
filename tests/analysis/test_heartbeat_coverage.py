@@ -7,7 +7,6 @@ from pathlib import Path
 
 from quodeq.analysis.subagents._heartbeat import (
     HeartbeatContext,
-    _format_dup_segment,
     _read_tally,
     _HEARTBEAT_FMT,
     heartbeat_loop,
@@ -66,30 +65,28 @@ class TestHeartbeatContext:
 
 
 class TestHeartbeatFormat:
-    def test_format_includes_duplicates_segment_when_present(self) -> None:
-        """The duplicates segment must appear when overlap exists."""
+    def test_format_renders_expected_segments(self) -> None:
         line = _HEARTBEAT_FMT.format(
             dimension="security", mins=1, secs=2,
-            active=2, total_agents=5,
-            taken=10, remaining=20,
-            findings=7, dup_seg=_format_dup_segment(3),
+            active=2, plural="s",
+            taken=10, total_files=30, remaining=20,
             violations=2, compliance=5,
         )
-        assert "7 findings (3 dup)" in line
-        assert "2 violations" in line
-        assert "5 compliance" in line
+        assert line.startswith("[security] 1m02s")
+        assert "2 active agents" in line
+        assert "files 10/30 · 20 left" in line
+        assert "2 violations · 5 compliance" in line
+        assert "findings" not in line
+        assert "total" not in line
 
-    def test_format_omits_duplicates_segment_when_zero(self) -> None:
-        """No `(0 dup)` clutter when there's no overlap."""
+    def test_format_uses_singular_for_one_active_agent(self) -> None:
         line = _HEARTBEAT_FMT.format(
-            dimension="security", mins=1, secs=2,
-            active=2, total_agents=5,
-            taken=10, remaining=20,
-            findings=7, dup_seg=_format_dup_segment(0),
-            violations=2, compliance=5,
+            dimension="security", mins=0, secs=5,
+            active=1, plural="",
+            taken=1, total_files=2, remaining=1,
+            violations=0, compliance=0,
         )
-        assert "7 findings |" in line
-        assert "dup" not in line
+        assert "1 active agent |" in line
 
 
 class TestHeartbeatLoop:
