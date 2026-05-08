@@ -2197,6 +2197,9 @@
   background: var(--color-accent);
   color: var(--color-on-accent);
   border-color: var(--color-accent);
+  /* Heavier weight for legibility on solid accent fills — the default
+     400 monospace reads thin against high-saturation backgrounds. */
+  font-weight: 600;
 }
 .term-btn--filled:hover:not(:disabled) {
   background: var(--color-accent-hover, color-mix(in srgb, var(--color-accent) 90%, black));
