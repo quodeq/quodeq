@@ -12,8 +12,6 @@ function buildSpec(logs) {
     type: WINDOW_ID,
     title: 'Server log',
     render: () => <ConsoleLogViewer logs={logs} />,
-    copy: () => logs.join('\n'),
-    download: () => ({ filename: 'server.log', body: logs.join('\n') }),
   };
 }
 

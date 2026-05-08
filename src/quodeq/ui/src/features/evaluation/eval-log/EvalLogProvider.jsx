@@ -38,9 +38,8 @@ function statusWord(jobStatus, streamStatus, terminalState) {
   return STREAM_STATUS_WORD[streamStatus] || '';
 }
 
-function buildSpec({ jobId, label, jobStatus, logs, status, terminalState }) {
+function buildSpec({ jobId, jobStatus, logs, status, terminalState }) {
   if (!jobId) return null;
-  const baseFilename = (label || jobId).replace(/[^A-Za-z0-9._-]+/g, '-');
   const word = statusWord(jobStatus, status, terminalState);
   const parts = ['log evaluation'];
   if (word) parts.push(word);
@@ -50,21 +49,21 @@ function buildSpec({ jobId, label, jobStatus, logs, status, terminalState }) {
     type: 'eval-log',
     title: parts.join(' · '),
     render: () => <ConsoleLogViewer logs={logs} />,
-    copy: () => logs.join('\n'),
-    download: () => ({ filename: `${baseFilename}.log`, body: logs.join('\n') }),
   };
 }
+
+const WINDOW_ID = 'eval-log';
 
 export function EvalLogProvider({ children }) {
   const [activeJobId, setActiveJobId] = useState(null);
   const [activeJobLabel, setActiveJobLabel] = useState(null);
   const [activeJobStatus, setActiveJobStatus] = useState(null);
   const { logs, status, terminalState } = useJobLogStream(activeJobId);
-  const { addWindow, removeWindow, replaceWindow } = useSidePane();
+  const { addWindow, removeWindow, replaceWindow, hasWindow } = useSidePane();
 
   const spec = useMemo(
-    () => buildSpec({ jobId: activeJobId, label: activeJobLabel, jobStatus: activeJobStatus, logs, status, terminalState }),
-    [activeJobId, activeJobLabel, activeJobStatus, logs, status, terminalState],
+    () => buildSpec({ jobId: activeJobId, jobStatus: activeJobStatus, logs, status, terminalState }),
+    [activeJobId, activeJobStatus, logs, status, terminalState],
   );
 
   useEffect(() => {
@@ -76,7 +75,7 @@ export function EvalLogProvider({ children }) {
     setActiveJobId(jobId);
     setActiveJobLabel(label);
     setActiveJobStatus(jobStatus);
-    const fresh = buildSpec({ jobId, label, jobStatus, logs: [], status: 'streaming' });
+    const fresh = buildSpec({ jobId, jobStatus, logs: [], status: 'streaming' });
     addWindow(fresh);
     replaceWindow(fresh);
   }, [addWindow, replaceWindow]);
@@ -89,8 +88,19 @@ export function EvalLogProvider({ children }) {
     setActiveJobId(null);
     setActiveJobLabel(null);
     setActiveJobStatus(null);
-    removeWindow('eval-log');
+    removeWindow(WINDOW_ID);
   }, [removeWindow]);
+
+  // If the user closes the side-pane window via the X (or Escape closes
+  // all panes), sync our active-job state — otherwise `consoleOpen` stays
+  // truthy and the Console button needs two clicks to reopen.
+  useEffect(() => {
+    if (activeJobId && !hasWindow(WINDOW_ID)) {
+      setActiveJobId(null);
+      setActiveJobLabel(null);
+      setActiveJobStatus(null);
+    }
+  }, [activeJobId, hasWindow]);
 
   const value = useMemo(
     () => ({ activeJobId, activeJobLabel, activeJobStatus, status, openLog, closeLog, updateJobStatus }),

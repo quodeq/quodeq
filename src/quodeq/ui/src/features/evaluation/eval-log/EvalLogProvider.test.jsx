@@ -128,6 +128,34 @@ describe('EvalLogProvider', () => {
     expect(screen.getByTestId('body')).toHaveTextContent('hello world');
   });
 
+  it('clears activeJobId when the side-pane window is removed externally', () => {
+    function SyncProbe() {
+      const { activeJobId, openLog } = useEvalLog();
+      const { windows, removeWindow, closeAll } = useSidePane();
+      return (
+        <div>
+          <div data-testid="active">{activeJobId || 'none'}</div>
+          <div data-testid="dock">{windows.map((w) => w.id).join(',') || 'empty'}</div>
+          <button onClick={() => openLog('job-a', 'Run A')}>open</button>
+          <button onClick={() => removeWindow('eval-log')}>remove-via-x</button>
+          <button onClick={closeAll}>close-all</button>
+        </div>
+      );
+    }
+    renderWithProviders(<SyncProbe />);
+    fireEvent.click(screen.getByText('open'));
+    expect(screen.getByTestId('active')).toHaveTextContent('job-a');
+    // Simulate the user closing the pane via its X button.
+    fireEvent.click(screen.getByText('remove-via-x'));
+    expect(screen.getByTestId('dock')).toHaveTextContent('empty');
+    expect(screen.getByTestId('active')).toHaveTextContent('none');
+    // And via the Escape-style close-all path.
+    fireEvent.click(screen.getByText('open'));
+    expect(screen.getByTestId('active')).toHaveTextContent('job-a');
+    fireEvent.click(screen.getByText('close-all'));
+    expect(screen.getByTestId('active')).toHaveTextContent('none');
+  });
+
   it('window title reflects job lifecycle status when provided', () => {
     function StatusProbe() {
       const { openLog, updateJobStatus } = useEvalLog();
