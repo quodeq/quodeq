@@ -14,15 +14,21 @@ def normalize_date(raw: str) -> tuple[str, str] | None:
     """Parse a date/datetime string and return (sortable_iso, human_label).
 
     Accepts ISO datetime (2026-03-01T14:30:25), ISO date (2026-03-01),
-    or compact date (20260301).  The first element is the full string
-    (including time when available) so that same-day runs sort correctly.
+    or compact date (20260301). Datetime values are normalized to UTC
+    and emitted with an explicit ``Z`` suffix so JavaScript clients
+    render them in the user's local timezone — without the suffix the
+    ECMAScript spec interprets the offset-less string as *local* time,
+    which surfaces UTC as if it were the user's wall clock.
     """
     for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%Y%m%d"):
         try:
             parsed = datetime.strptime(raw, fmt)
-            if parsed.tzinfo is not None:
-                parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
-            sortable = parsed.isoformat(timespec='seconds') if "T" in fmt else parsed.date().isoformat()
+            if "T" in fmt:
+                if parsed.tzinfo is not None:
+                    parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+                sortable = parsed.isoformat(timespec='seconds') + 'Z'
+            else:
+                sortable = parsed.date().isoformat()
             label = parsed.strftime(f"{parsed.day} %b %Y")
             return sortable, label
         except ValueError:
