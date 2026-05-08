@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import shutil
 from pathlib import Path
@@ -32,6 +33,33 @@ def delete_ephemeral_clone(clones_root: Path, project_uuid: str) -> None:
     if not target.exists():
         return
     shutil.rmtree(target, onexc=_log_rmtree_error)
+
+
+def maybe_cleanup_after_job(
+    *,
+    reports_root: Path,
+    project_uuid: str,
+    clones_root: Path,
+) -> None:
+    """Delete the ephemeral clone for *project_uuid* if its info file says so.
+
+    Reads ``<reports_root>/<project_uuid>/repository_info.json`` and only
+    removes the clone when ``info["ephemeral"]`` is truthy. Missing or
+    unreadable info files (including corrupt JSON) are no-ops so the
+    JobManager on-complete callback never raises on incomplete state.
+    """
+    info_path = Path(reports_root) / project_uuid / "repository_info.json"
+    try:
+        raw = info_path.read_text()
+    except (OSError, ValueError):
+        return
+    try:
+        info = json.loads(raw)
+    except ValueError:
+        return
+    if not isinstance(info, dict) or not info.get("ephemeral"):
+        return
+    delete_ephemeral_clone(Path(clones_root), project_uuid)
 
 
 def sweep_orphaned_clones(clones_root: Path, reports_root: Path) -> None:
