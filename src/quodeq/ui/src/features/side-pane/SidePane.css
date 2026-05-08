@@ -89,21 +89,24 @@
 }
 .side-pane-window__actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
 }
 /* Buttons read as buttons at rest — copying a fix-plan into an LLM
    prompt is a primary flow, so the affordance shouldn't hide until
    hover. Same chip treatment is reused for download and close so the
-   header reads as a consistent toolstrip. */
+   header reads as a consistent toolstrip. The chip is dimmed at rest
+   (faint surface fill + outline, slightly muted glyph) so it doesn't
+   compete with the title; hover restores full contrast and tints to
+   the accent. */
 .side-pane-window__icon-btn {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 28%, transparent);
+  color: color-mix(in srgb, var(--color-text) 80%, transparent);
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1;
   display: inline-flex;
   align-items: center;
