@@ -295,7 +295,7 @@ const ROUTE_RENDERERS = {
     />
   ),
   settings: (params, props) => <SettingsCase settings={props.settings} />,
-  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onResumeSetup: props.navigation.onResumeSetup }} />,
+  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup }} />,
   standards: () => <StandardsPage />,
   help: () => <HelpPage />,
 };
@@ -444,7 +444,7 @@ export default function App() {
       projectsLoaded: state.projectsLoaded,
       handleNavigate: state.handleNavigate, handleRunSelect: state.handleRunSelect,
       handleProjectChange: state.handleProjectChange, navTab, navStackLength: navStack.length,
-      handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject,
+      handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject, handleImportProject: state.handleImportProject,
       historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
       currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
       prefetchHandlers: state.prefetchHandlers,
@@ -454,6 +454,13 @@ export default function App() {
           return;
         }
         setWizardEntry({ startStep: 'repo-scan', isFirstProject: state.projects.length === 0 });
+      },
+      onImportProject: () => {
+        if (isEvaluating) {
+          showToast('An evaluation is in progress. Cancel it before importing a project.');
+          return;
+        }
+        state.handleImportProject();
       },
       onTakeTour: () => {
         if (isEvaluating) {

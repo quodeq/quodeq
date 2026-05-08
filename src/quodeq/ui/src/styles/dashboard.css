@@ -2681,7 +2681,14 @@
 
 .projects-page__add-btn {
   flex-shrink: 0;
+}
+
+.projects-page__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin-left: auto;
+  flex-wrap: wrap;
 }
 
 /* Disabled (evaluation in progress) — `aria-disabled` keeps the click
@@ -2693,9 +2700,12 @@
 }
 
 @media (max-width: 600px) {
-  .projects-page__add-btn {
+  .projects-page__header-actions {
     margin-left: 0;
     width: 100%;
+  }
+  .projects-page__add-btn {
+    flex: 1 1 auto;
     justify-content: center;
   }
 }
@@ -2728,6 +2738,14 @@
 /* Small layout-only adjustments on top of the term-btn--filled visual. */
 .projects-empty__cta-btn {
   margin-top: var(--space-3);
+}
+
+.projects-empty__cta-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 /* ── Global empty-state CTA (used on overview/violations/map when no projects) ── */

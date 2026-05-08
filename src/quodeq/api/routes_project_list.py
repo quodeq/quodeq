@@ -10,6 +10,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import error_response
+from quodeq.api.import_project import import_project as _import_project
 from quodeq.api.routes_common import reports_dir
 from quodeq.api.zip import export_project_zip
 from quodeq.services._fs_scan import scan_project
@@ -174,6 +175,16 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     def export_project(project: str) -> Response | tuple[Response, int]:
         """Export a project as a ZIP archive."""
         return export_project_zip(project, reports_dir())
+
+    @app.post("/api/projects/import")
+    def import_project_route() -> Response | tuple[Response, int]:
+        """Import a previously-exported project ZIP archive.
+
+        Body: ``multipart/form-data`` with a ``file`` field containing the zip
+        and an optional ``action`` field (``replace`` or ``copy``) used to
+        resolve a 409 collision returned from a prior call.
+        """
+        return _import_project(reports_dir())
 
     @app.delete("/api/projects/<project>")
     def delete_project(project: str) -> Response | tuple[Response, int]:

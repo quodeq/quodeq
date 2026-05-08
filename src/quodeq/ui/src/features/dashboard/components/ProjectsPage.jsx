@@ -263,7 +263,7 @@ function useRelocateDialog(onRelocate) {
 
 const EVAL_BLOCKED_TITLE = 'Cannot add a project while an evaluation is running';
 
-function EmptyProjectsCTA({ onAddProject, isEvaluating }) {
+function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
   // The button stays clickable while evaluating so the handler can fire a
   // snackbar explaining the block. ``aria-disabled`` + the visual muted class
   // preserve the disabled affordance without swallowing the click.
@@ -273,21 +273,34 @@ function EmptyProjectsCTA({ onAddProject, isEvaluating }) {
       <p className="projects-empty__hint">
         Point quodeq at a local repository or paste a Git URL to get started.
       </p>
-      <button
-        type="button"
-        className={`term-btn term-btn--primary term-btn--filled projects-empty__cta-btn${isEvaluating ? ' is-disabled' : ''}`}
-        onClick={onAddProject}
-        aria-disabled={isEvaluating || undefined}
-        title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
-      >
-        <span aria-hidden="true">▸</span> add project
-      </button>
+      <div className="projects-empty__cta-row">
+        <button
+          type="button"
+          className={`term-btn term-btn--primary term-btn--filled projects-empty__cta-btn${isEvaluating ? ' is-disabled' : ''}`}
+          onClick={onAddProject}
+          aria-disabled={isEvaluating || undefined}
+          title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
+        >
+          <span aria-hidden="true">▸</span> add project
+        </button>
+        {onImportProject && (
+          <button
+            type="button"
+            className={`term-btn projects-empty__cta-btn${isEvaluating ? ' is-disabled' : ''}`}
+            onClick={onImportProject}
+            aria-disabled={isEvaluating || undefined}
+            title={isEvaluating ? EVAL_BLOCKED_TITLE : 'Import a previously-exported project'}
+          >
+            <span aria-hidden="true">▸</span> import project
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
 export default function ProjectsPage({ projects = [], selectedProject, isEvaluating = false, actions }) {
-  const { onSelect, onDelete, onExport, onRelocate, onAddProject, onResumeSetup } = actions;
+  const { onSelect, onDelete, onExport, onRelocate, onAddProject, onImportProject, onResumeSetup } = actions;
   const { children, roots } = useMemo(() => computeProjectTree(projects), [projects]);
   const [confirming, setConfirming] = useState(null);
   const relocateActions = useRelocateDialog(onRelocate);
@@ -299,21 +312,37 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
           name="repositories"
           sub={`${projects.length} ${projects.length === 1 ? 'repository' : 'repositories'} evaluated`}
         />
-        {projects.length > 0 && onAddProject && (
-          <button
-            type="button"
-            className={`term-btn term-btn--primary term-btn--filled projects-page__add-btn${isEvaluating ? ' is-disabled' : ''}`}
-            onClick={onAddProject}
-            aria-label="Add project"
-            aria-disabled={isEvaluating || undefined}
-            title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
-          >
-            <span aria-hidden="true">▸</span> add project
-          </button>
+        {projects.length > 0 && (
+          <div className="projects-page__header-actions">
+            {onImportProject && (
+              <button
+                type="button"
+                className={`term-btn projects-page__add-btn${isEvaluating ? ' is-disabled' : ''}`}
+                onClick={onImportProject}
+                aria-label="Import project"
+                aria-disabled={isEvaluating || undefined}
+                title={isEvaluating ? EVAL_BLOCKED_TITLE : 'Import a previously-exported project'}
+              >
+                <span aria-hidden="true">▸</span> import project
+              </button>
+            )}
+            {onAddProject && (
+              <button
+                type="button"
+                className={`term-btn term-btn--primary term-btn--filled projects-page__add-btn${isEvaluating ? ' is-disabled' : ''}`}
+                onClick={onAddProject}
+                aria-label="Add project"
+                aria-disabled={isEvaluating || undefined}
+                title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
+              >
+                <span aria-hidden="true">▸</span> add project
+              </button>
+            )}
+          </div>
         )}
       </div>
       {projects.length === 0 ? (
-        <EmptyProjectsCTA onAddProject={onAddProject} isEvaluating={isEvaluating} />
+        <EmptyProjectsCTA onAddProject={onAddProject} onImportProject={onImportProject} isEvaluating={isEvaluating} />
       ) : (
         <div className="projects-cards">
           {roots.map((p) => (

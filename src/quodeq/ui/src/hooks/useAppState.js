@@ -94,7 +94,7 @@ export function useAppState() {
   const {
     projects, projectsLoaded, setProjects, selectedProject,
     selectedRun, setSelectedRun, loadProjects, handleProjectChange,
-    selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject,
+    selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject,
   } = projectBundle;
   const settings = useAppSettings();
   const isHistoryRun = activePage.page === 'history-run';
@@ -142,7 +142,7 @@ export function useAppState() {
   return {
     serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navTab,
     projects, projectsLoaded, selectedProject, selectedRun, handleProjectChange, handleNavigate,
-    handleDeleteProject, handleExportProject, handleRelocateProject,
+    handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject,
     dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex,
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect, prefetchHandlers,
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
