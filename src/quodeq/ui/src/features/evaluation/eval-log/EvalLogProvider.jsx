@@ -55,12 +55,14 @@ function buildSpec({ jobId, label, jobStatus, logs, status, terminalState }) {
   };
 }
 
+const WINDOW_ID = 'eval-log';
+
 export function EvalLogProvider({ children }) {
   const [activeJobId, setActiveJobId] = useState(null);
   const [activeJobLabel, setActiveJobLabel] = useState(null);
   const [activeJobStatus, setActiveJobStatus] = useState(null);
   const { logs, status, terminalState } = useJobLogStream(activeJobId);
-  const { addWindow, removeWindow, replaceWindow } = useSidePane();
+  const { addWindow, removeWindow, replaceWindow, hasWindow } = useSidePane();
 
   const spec = useMemo(
     () => buildSpec({ jobId: activeJobId, label: activeJobLabel, jobStatus: activeJobStatus, logs, status, terminalState }),
@@ -89,8 +91,19 @@ export function EvalLogProvider({ children }) {
     setActiveJobId(null);
     setActiveJobLabel(null);
     setActiveJobStatus(null);
-    removeWindow('eval-log');
+    removeWindow(WINDOW_ID);
   }, [removeWindow]);
+
+  // If the user closes the side-pane window via the X (or Escape closes
+  // all panes), sync our active-job state — otherwise `consoleOpen` stays
+  // truthy and the Console button needs two clicks to reopen.
+  useEffect(() => {
+    if (activeJobId && !hasWindow(WINDOW_ID)) {
+      setActiveJobId(null);
+      setActiveJobLabel(null);
+      setActiveJobStatus(null);
+    }
+  }, [activeJobId, hasWindow]);
 
   const value = useMemo(
     () => ({ activeJobId, activeJobLabel, activeJobStatus, status, openLog, closeLog, updateJobStatus }),
