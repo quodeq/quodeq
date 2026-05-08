@@ -30,16 +30,19 @@ from quodeq.api._sse_log_helpers import sse_tail_generator
 
 
 def _default_log_paths() -> list[Path]:
-    """Return platform-standard locations to probe when the env var is unset.
+    """Return locations to probe when the env var is unset.
 
-    First match wins. We only return paths the user is likely to have
-    written to themselves (Library/Logs on macOS, XDG state dir on
-    Linux, LocalAppData on Windows) plus ``/tmp/llama-server.log`` as
-    the lowest-friction default that "just works" if they redirected
-    output to ``/tmp``.
+    First match wins. Order:
+
+    1. ``~/.quodeq/logs/llama-server.log`` — Quodeq-namespaced, same path
+       on every OS, easy for users to discover and clean up.
+    2. Platform-standard log directory (macOS Library/Logs, XDG state
+       dir on Linux, LocalAppData on Windows). Honors host conventions
+       and integrates with system log viewers like macOS Console.app.
+    3. ``/tmp/llama-server.log`` as a lowest-friction last resort.
     """
     home = Path.home()
-    candidates: list[Path] = []
+    candidates: list[Path] = [home / ".quodeq" / "logs" / "llama-server.log"]
     if sys.platform == "darwin":
         candidates.append(home / "Library" / "Logs" / "llama-server.log")
     elif sys.platform == "win32":
