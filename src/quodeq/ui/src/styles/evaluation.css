@@ -2131,7 +2131,10 @@ button.eval-provider-badge--clickable:focus-visible {
   font-weight: var(--weight-semibold);
   color: var(--color-text-muted);
   cursor: pointer;
-  flex-shrink: 0;
+  /* Cap at the row width after flex-wrap so the inner label can
+     ellipsize on extremely long filenames in narrow viewports. */
+  max-width: 100%;
+  min-width: 0;
   white-space: nowrap;
   transition: color 120ms ease;
 }

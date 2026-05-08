@@ -2129,11 +2129,16 @@
   min-width: 36px;
 }
 
-/* FileCopyBtn label: always show the full filename — never truncate or
-   ellipsize. The button keeps `white-space: nowrap` so `name.rb:6` stays
-   on one line; if the row is too narrow the parent flex row wraps. */
+/* FileCopyBtn label: render the full filename whenever it fits. CSS
+   ellipsis is kept as a graceful fallback for genuinely cramped rows
+   (long filename + narrow viewport) — it only kicks in when the
+   browser actually has to clip, never preemptively. The parent row
+   uses flex-wrap so the pill drops to a new line before shrinking. */
 .vlive-detail-file-btn__label {
+  min-width: 0;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Mobile: tighten padding further at very narrow widths. */
