@@ -135,6 +135,19 @@ def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> 
                 "  ollama serve\n\n"
                 "Or install Ollama from https://ollama.com/download"
             ) from exc
+    elif provider == "llamacpp":
+        try:
+            _base = _env.get("LLAMACPP_BASE_URL", "http://localhost:8080")
+            urllib.request.urlopen(f"{_base}/health", timeout=_API_CHECK_TIMEOUT_S)
+        except (urllib.error.URLError, OSError) as exc:
+            raise RuntimeError(
+                "llama.cpp is configured as your AI provider but llama-server is not running.\n\n"
+                "Start it with a GGUF model, for example:\n"
+                "  llama-server -m path/to/model.gguf --port 8080\n\n"
+                "For speculative decoding (MTP), pair it with a draft model:\n"
+                "  llama-server -m path/to/target.gguf -md path/to/drafter.gguf --port 8080\n\n"
+                "Install llama.cpp from https://github.com/ggml-org/llama.cpp"
+            ) from exc
 
 
 def _collect_tool_issue(cmd: list[str], tool_name: str, min_major: int) -> str | None:

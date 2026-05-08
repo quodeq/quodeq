@@ -31,6 +31,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.jsx';
 import { ServerLogProvider } from './features/settings/server-log/ServerLogProvider.jsx';
 import { OllamaLogProvider } from './features/settings/ollama-log/OllamaLogProvider.jsx';
+import { LlamaCppLogProvider } from './features/settings/llamacpp-log/LlamaCppLogProvider.jsx';
 
 // Tabs that are reachable with zero projects. `projects` is in here so a
 // fresh-install user can land on Projects and add their first one without
@@ -506,7 +507,8 @@ export default function App() {
       <EvalLogProvider>
         <ServerLogProvider>
           <OllamaLogProvider>
-            <AppShell
+            <LlamaCppLogProvider>
+              <AppShell
           sidebar={
             <Sidebar
               activeTab={activeTab}
@@ -598,6 +600,7 @@ export default function App() {
             </Suspense>
           }
             />
+            </LlamaCppLogProvider>
           </OllamaLogProvider>
         </ServerLogProvider>
       </EvalLogProvider>

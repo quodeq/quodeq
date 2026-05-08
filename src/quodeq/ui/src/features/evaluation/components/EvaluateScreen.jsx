@@ -38,7 +38,7 @@ function readBudgetSeconds(storage = localStorage) {
   // Read new key first; fall back to legacy 'pool-budget' for back-compat.
   const raw = storage.getItem(providerKey(provider, 'time-limit'))
     ?? storage.getItem(providerKey(provider, 'pool-budget'));
-  if (raw === null || raw === undefined) return provider === 'ollama' ? 0 : DEFAULT_TIME_LIMIT_S;
+  if (raw === null || raw === undefined) return (provider === 'ollama' || provider === 'llamacpp') ? 0 : DEFAULT_TIME_LIMIT_S;
   const parsed = parseInt(raw, 10);
   return Number.isFinite(parsed) ? parsed : 0;
 }

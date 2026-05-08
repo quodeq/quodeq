@@ -36,6 +36,18 @@ class TestGetAiClientsIncludesApiProviders:
         ollama = [c for c in result["clients"] if c["id"] == "ollama"][0]
         assert ollama["type"] == "api"
 
+    def test_llamacpp_label_is_dotted(self):
+        mixin = FsToolingMixin()
+        with patch("quodeq.services.tooling_mixin.get_provider_configs") as mock_cfg:
+            mock_cfg.return_value = {
+                "llamacpp": {"type": "api", "model": "", "api_base": "http://localhost:8080/v1"},
+            }
+            with patch("shutil.which", return_value=None):
+                result = mixin.get_ai_clients()
+        llamacpp = next((c for c in result["clients"] if c["id"] == "llamacpp"), None)
+        assert llamacpp is not None
+        assert llamacpp["label"] == "llama.cpp"
+
     def test_cli_providers_marked_uninstalled_when_missing(self):
         mixin = FsToolingMixin()
         with patch("quodeq.services.tooling_mixin.get_provider_configs") as mock_cfg:

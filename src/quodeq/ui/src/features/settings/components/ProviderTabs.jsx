@@ -4,6 +4,7 @@ import { ACTIVE_PROVIDER_KEY, DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT_S } from
 import useProviderSettings from '../hooks/useProviderSettings.js';
 import { classifyProvider } from './providerUtils.js';
 import OllamaTab from './OllamaTab.jsx';
+import LlamaCppTab from './LlamaCppTab.jsx';
 import CliProviderTab from './CliProviderTab.jsx';
 import CloudProviderTab from './CloudProviderTab.jsx';
 import HelpHint from '../../../components/HelpHint.jsx';
@@ -37,6 +38,7 @@ const INSTALL_INSTRUCTIONS = {
 
 const CLI_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), 'time-limit': String(DEFAULT_TIME_LIMIT_S) };
 const OLLAMA_DEFAULTS = { 'time-limit': '0' };
+const LLAMACPP_DEFAULTS = { 'time-limit': '0' };
 const CLOUD_DEFAULTS_BY_ID = {
   openrouter: { 'time-limit': String(DEFAULT_TIME_LIMIT_S), 'model': 'baidu/cobuddy:free' },
 };
@@ -55,14 +57,18 @@ const LEGACY_SETTING_MIGRATIONS = {
 
 function TabContent({ provider, providerConfig }) {
   const classification = classifyProvider(provider.id, provider.type, providerConfig);
+  const localApiDefaults = provider.id === 'llamacpp' ? LLAMACPP_DEFAULTS : OLLAMA_DEFAULTS;
   const defaults = classification === 'cli'
     ? CLI_DEFAULTS
     : classification === 'local-api'
-      ? OLLAMA_DEFAULTS
+      ? localApiDefaults
       : CLOUD_DEFAULTS_BY_ID[provider.id];
   const { state, update } = useProviderSettings(provider.id, defaults);
 
   if (classification === 'local-api') {
+    if (provider.id === 'llamacpp') {
+      return <LlamaCppTab state={state} update={update} />;
+    }
     return <OllamaTab state={state} update={update} />;
   }
   if (classification === 'cli') {

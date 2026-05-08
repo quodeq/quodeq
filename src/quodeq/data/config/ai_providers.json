@@ -5,6 +5,12 @@
     "model": "gemma4:26b",
     "api_base": "http://localhost:11434/v1"
   },
+  "llamacpp": {
+    "type": "api",
+    "order": 5,
+    "model": "",
+    "api_base": "http://localhost:8080/v1"
+  },
   "claude": {
     "type": "cli",
     "order": 1,
