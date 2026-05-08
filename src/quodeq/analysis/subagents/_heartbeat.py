@@ -14,9 +14,9 @@ _HEARTBEAT_INTERVAL = 10
 _SECONDS_PER_MINUTE = 60
 _HEARTBEAT_FMT = (
     "[{dimension}] {mins}m{secs:02d}s | "
-    "{active} active agent{plural} | "
+    "{violations} v · {compliance} c | "
     "files {taken}/{total_files} · {remaining} left | "
-    "{violations} violations · {compliance} compliance"
+    "{active} agent{plural}"
 )
 
 
