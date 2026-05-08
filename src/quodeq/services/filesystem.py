@@ -60,7 +60,6 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
     ) -> None:
         super().__init__()
         self._reports_root = reports_root
-        self._jobs = job_manager or JobManager(reports_root=reports_root)
 
         # Delete the ephemeral clone (if any) when its evaluation completes.
         # JobManager already wraps callbacks in try/except so exceptions here
@@ -77,7 +76,12 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
                 clones_root=get_clones_dir(),
             )
 
-        self._jobs._on_job_complete = _on_complete
+        # When a JobManager is injected (tests, alternative wiring), the caller
+        # is responsible for wiring cleanup callbacks. We do not mutate an
+        # externally-owned manager's private state.
+        self._jobs = job_manager or JobManager(
+            reports_root=reports_root, on_job_complete=_on_complete
+        )
         self._compiled_dir = compiled_dir
         self._index_db_path = Path(index_db_path) if index_db_path is not None else None
         self._model_fetchers: dict[str, Callable] = {
