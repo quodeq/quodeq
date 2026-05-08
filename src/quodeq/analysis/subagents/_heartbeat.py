@@ -13,17 +13,11 @@ from quodeq.shared.logging import log_info, log_warning
 _HEARTBEAT_INTERVAL = 10
 _SECONDS_PER_MINUTE = 60
 _HEARTBEAT_FMT = (
-    "  [{dimension}] {mins}m{secs:02d}s | "
-    "{active} active ({total_agents} total) | "
-    "{taken} files taken ({remaining} left) | "
-    "{findings} findings{dup_seg} | "
-    "{violations} violations · {compliance} compliance"
+    "[{dimension}] {mins}m{secs:02d}s | "
+    "{violations} v · {compliance} c | "
+    "files {taken}/{total_files} · {remaining} left | "
+    "{active} agent{plural}"
 )
-
-
-def _format_dup_segment(duplicates: int) -> str:
-    """Render the ``(N dup)`` suffix only when there's actual overlap to surface."""
-    return f" ({duplicates} dup)" if duplicates > 0 else ""
 
 
 @dataclass
@@ -51,10 +45,8 @@ def heartbeat_loop(
     """Emit periodic progress lines for the subagent pool.
 
     Each tick re-reads the dimension JSONL and deduplicates by
-    ``(p, file, line, t)`` in memory, so the unique counts always match
-    :mod:`quodeq.services.scan_progress` (which the UI consumes). The
-    ``duplicates`` segment surfaces overlap between parallel agents in real
-    time.
+    ``(p, file, line, t)`` in memory, so the violation/compliance counts
+    always match :mod:`quodeq.services.scan_progress` (which the UI consumes).
     """
     start = time.monotonic()
     while not stop.wait(_HEARTBEAT_INTERVAL):
@@ -63,18 +55,16 @@ def heartbeat_loop(
             mins, secs = divmod(elapsed, _SECONDS_PER_MINUTE)
             tally = _read_tally(ctx.jsonl_path, ctx.lock)
             remaining, taken = FileQueue(ctx.queue_path).stats()
-            total_agents = len(finished)
             active = sum(1 for v in finished.values() if not v)
             log_info(_HEARTBEAT_FMT.format(
                 dimension=ctx.dimension_key,
                 mins=mins,
                 secs=secs,
                 active=active,
-                total_agents=total_agents,
+                plural="" if active == 1 else "s",
                 taken=taken,
+                total_files=taken + remaining,
                 remaining=remaining,
-                findings=tally.total,
-                dup_seg=_format_dup_segment(tally.duplicates),
                 violations=tally.violations,
                 compliance=tally.compliance,
             ))

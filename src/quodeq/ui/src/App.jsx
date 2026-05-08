@@ -31,6 +31,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.jsx';
 import { ServerLogProvider } from './features/settings/server-log/ServerLogProvider.jsx';
 import { OllamaLogProvider } from './features/settings/ollama-log/OllamaLogProvider.jsx';
+import { LlamaCppLogProvider } from './features/settings/llamacpp-log/LlamaCppLogProvider.jsx';
 
 // Tabs that are reachable with zero projects. `projects` is in here so a
 // fresh-install user can land on Projects and add their first one without
@@ -212,7 +213,7 @@ function ViolationsRoute({ params, props }) {
 }
 
 const ROUTE_RENDERERS = {
-  overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect }} runMode={false} />,
+  overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect, onProjectsReload: props.navigation.loadProjects }} runMode={false} />,
   violations: (params, props) => <ViolationsRoute params={params} props={props} />,
   map: (params, props) => {
     const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
@@ -295,7 +296,7 @@ const ROUTE_RENDERERS = {
     />
   ),
   settings: (params, props) => <SettingsCase settings={props.settings} />,
-  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onResumeSetup: props.navigation.onResumeSetup }} />,
+  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup }} />,
   standards: () => <StandardsPage />,
   help: () => <HelpPage />,
 };
@@ -406,6 +407,15 @@ export default function App() {
     : null;
   const { activePage, navStack, navPop, navGoTo, navTab, activeTab } = state;
 
+  // Reset scroll on project switch — useNavStack handles the same for
+  // tab/page changes, but selectedProject lives outside the nav stack.
+  // Without this, switching from a project scrolled deep into Projects
+  // lands the user partway down the next project's Overview.
+  useEffect(() => {
+    const main = document.querySelector('.app-shell__main-column > .dashboard');
+    if (main) main.scrollTop = 0;
+  }, [state.selectedProject]);
+
   const currentDayLabel = useMemo(
     () => formatDayLabel(state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex),
     [state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex]
@@ -442,9 +452,10 @@ export default function App() {
     navigation: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
       projectsLoaded: state.projectsLoaded,
+      loadProjects: state.loadProjects,
       handleNavigate: state.handleNavigate, handleRunSelect: state.handleRunSelect,
       handleProjectChange: state.handleProjectChange, navTab, navStackLength: navStack.length,
-      handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject,
+      handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject, handleImportProject: state.handleImportProject,
       historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
       currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
       prefetchHandlers: state.prefetchHandlers,
@@ -454,6 +465,13 @@ export default function App() {
           return;
         }
         setWizardEntry({ startStep: 'repo-scan', isFirstProject: state.projects.length === 0 });
+      },
+      onImportProject: () => {
+        if (isEvaluating) {
+          showToast('An evaluation is in progress. Cancel it before importing a project.');
+          return;
+        }
+        state.handleImportProject();
       },
       onTakeTour: () => {
         if (isEvaluating) {
@@ -498,7 +516,8 @@ export default function App() {
       <EvalLogProvider>
         <ServerLogProvider>
           <OllamaLogProvider>
-            <AppShell
+            <LlamaCppLogProvider>
+              <AppShell
           sidebar={
             <Sidebar
               activeTab={activeTab}
@@ -590,6 +609,7 @@ export default function App() {
             </Suspense>
           }
             />
+            </LlamaCppLogProvider>
           </OllamaLogProvider>
         </ServerLogProvider>
       </EvalLogProvider>

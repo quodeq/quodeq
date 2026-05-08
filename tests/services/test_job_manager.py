@@ -371,31 +371,125 @@ class TestMonitorProcess:
         mgr._monitor_process("j1", proc)  # should not raise
         assert job.status == STATUS_DONE
 
-    def test_timeout_kills_process(self):
+    def test_env_cap_kills_process(self, monkeypatch):
+        """When QUODEQ_JOB_TIMEOUT_S is set, the watchdog kills past that cap
+        even if no deadline_at was set on the job.
+        """
+        from quodeq.services import jobs as jobs_mod
+        monkeypatch.setenv("QUODEQ_JOB_TIMEOUT_S", "0.05")
+        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
+
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
-        mgr._JOB_TIMEOUT_S = 0.01  # very short timeout
-
         job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None)
         store.put(job)
 
-        class SlowProcess:
-            pid = 123
-            stdout = io.StringIO("")
-
-            def wait(self, timeout=None):
-                if timeout is not None and timeout < 1:
-                    raise subprocess.TimeoutExpired(cmd="cmd", timeout=timeout)
-                return -9
-
-            def kill(self):
-                pass
-
-        proc = SlowProcess()
+        proc = _NeverExitsProcess()
         mgr._processes["j1"] = proc
         mgr._monitor_process("j1", proc)
+
+        assert proc.killed is True
         assert job.exit_code == _EXIT_CODE_TIMEOUT
         assert job.status == STATUS_FAILED
+
+    def test_no_cap_no_deadline_does_not_kill(self, monkeypatch):
+        """With no QUODEQ_JOB_TIMEOUT_S and no deadline_at, the watchdog must
+        never preemptively kill — the user did not opt into a time cap.
+        """
+        from quodeq.services import jobs as jobs_mod
+        monkeypatch.delenv("QUODEQ_JOB_TIMEOUT_S", raising=False)
+        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
+
+        store = InMemoryJobStore()
+        mgr = JobManager(job_store=store)
+        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None)
+        store.put(job)
+
+        # Process exits cleanly after a few poll cycles.
+        proc = _ExitsAfter(returncode=0, exits_after_n_polls=3)
+        mgr._processes["j1"] = proc
+        mgr._monitor_process("j1", proc)
+
+        assert proc.killed is False
+        assert job.exit_code == 0
+        assert job.status == STATUS_DONE
+
+    def test_deadline_in_future_does_not_kill(self, monkeypatch):
+        """Job with deadline_at in the future is not killed by the watchdog."""
+        from datetime import datetime, timedelta, timezone
+        from quodeq.services import jobs as jobs_mod
+        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
+
+        store = InMemoryJobStore()
+        mgr = JobManager(job_store=store)
+        future = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None, deadline_at=future)
+        store.put(job)
+
+        proc = _ExitsAfter(returncode=0, exits_after_n_polls=3)
+        mgr._processes["j1"] = proc
+        mgr._monitor_process("j1", proc)
+
+        assert proc.killed is False
+        assert job.status == STATUS_DONE
+
+    def test_deadline_past_plus_grace_kills(self, monkeypatch):
+        """Job whose deadline_at has passed (plus the grace window) is killed."""
+        from datetime import datetime, timedelta, timezone
+        from quodeq.services import jobs as jobs_mod
+        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
+        monkeypatch.setattr(jobs_mod, "_WATCHDOG_DEADLINE_GRACE_S", 0.02)
+
+        store = InMemoryJobStore()
+        mgr = JobManager(job_store=store)
+        past = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
+        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None, deadline_at=past)
+        store.put(job)
+
+        proc = _NeverExitsProcess()
+        mgr._processes["j1"] = proc
+        mgr._monitor_process("j1", proc)
+
+        assert proc.killed is True
+        assert job.exit_code == _EXIT_CODE_TIMEOUT
+        assert job.status == STATUS_FAILED
+
+
+class _NeverExitsProcess:
+    """Subprocess stub: every wait(timeout=...) raises TimeoutExpired until killed."""
+    pid = 123
+
+    def __init__(self):
+        self.stdout = io.StringIO("")
+        self.killed = False
+
+    def wait(self, timeout=None):
+        if self.killed:
+            return -9
+        raise subprocess.TimeoutExpired(cmd="cmd", timeout=timeout)
+
+    def kill(self):
+        self.killed = True
+
+
+class _ExitsAfter:
+    """Subprocess stub that raises TimeoutExpired N times, then returns cleanly."""
+    pid = 124
+
+    def __init__(self, returncode: int, exits_after_n_polls: int):
+        self.stdout = io.StringIO("")
+        self._returncode = returncode
+        self._remaining = exits_after_n_polls
+        self.killed = False
+
+    def wait(self, timeout=None):
+        if self._remaining <= 0:
+            return self._returncode
+        self._remaining -= 1
+        raise subprocess.TimeoutExpired(cmd="cmd", timeout=timeout)
+
+    def kill(self):
+        self.killed = True
 
 
 def test_list_jobs_warns_on_deprecated_reports_root_kwarg(tmp_path):

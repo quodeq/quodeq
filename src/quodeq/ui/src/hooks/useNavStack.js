@@ -86,7 +86,12 @@ export function useNavStack({ historyAdapter } = {}) {
   const activePage = navStack[navStack.length - 1];
 
   useEffect(() => {
-    window.scrollTo({ top: 0 });
+    // The window itself doesn't scroll — the dashboard <main> does.
+    // Reset its scrollTop so navigating to a new screen always lands
+    // at the top instead of inheriting the previous screen's offset.
+    const main = document.querySelector('.app-shell__main-column > .dashboard');
+    if (main) main.scrollTop = 0;
+    else window.scrollTo({ top: 0 });
   }, [activePage]);
 
   return { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab };

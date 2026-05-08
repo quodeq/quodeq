@@ -1,5 +1,4 @@
 import json
-import subprocess
 import uuid as _uuid
 from pathlib import Path
 
@@ -88,56 +87,6 @@ def test_get_project_info_valid_online_not_missing(tmp_path: Path) -> None:
     info = provider.get_project_info(str(tmp_path), project_uuid)
     assert info is not None
     assert info["pathMissing"] is False
-
-
-def test_clone_to_local_updates_project(tmp_path: Path, monkeypatch) -> None:
-    """clone_to_local should clone the repo and update repository_info.json."""
-    project_uuid = _create_online_project_with_url(tmp_path)
-    dest = tmp_path / "local_repos"
-    dest.mkdir()
-
-    def fake_run(cmd, check, **kwargs):
-        clone_dest = Path(cmd[-1])
-        clone_dest.mkdir(parents=True, exist_ok=True)
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
-
-    provider = FilesystemActionProvider()
-    result = provider.clone_to_local(str(tmp_path), project_uuid, str(dest))
-    assert result is not None
-    assert result["location"] == "local"
-    assert "shaka-player" in result["path"]
-    assert Path(result["path"]).is_dir()
-
-    info = json.loads((tmp_path / project_uuid / "repository_info.json").read_text())
-    assert info["location"] == "local"
-    assert info["path"] == result["path"]
-
-
-def _create_local_project(reports_dir: Path, local_path: Path) -> str:
-    """Helper: create a project with location=local."""
-    project_uuid = str(_uuid.uuid4())
-    project_dir = reports_dir / project_uuid
-    project_dir.mkdir(parents=True, exist_ok=True)
-    info = {
-        "uuid": project_uuid,
-        "name": "my-project",
-        "discipline": None,
-        "location": "local",
-        "path": str(local_path),
-    }
-    (project_dir / "repository_info.json").write_text(json.dumps(info))
-    return project_uuid
-
-
-def test_clone_to_local_rejects_local_project(tmp_path: Path) -> None:
-    """clone_to_local should return None for projects already local."""
-    local_path = tmp_path / "existing"
-    local_path.mkdir()
-    project_uuid = _create_local_project(tmp_path, local_path)
-    provider = FilesystemActionProvider()
-    result = provider.clone_to_local(str(tmp_path), project_uuid, str(tmp_path / "dest"))
-    assert result is None
 
 
 def test_update_project_path_accepts_url(tmp_path: Path) -> None:

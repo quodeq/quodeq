@@ -3,6 +3,14 @@ import { render, screen, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { useJobLogStream } from './useJobLogStream.js';
 
+// The hook coalesces SSE bursts via requestAnimationFrame + a 50ms timer
+// fallback. Tests need to drain that queue between an emit and an assertion.
+function flushBatched() {
+  act(() => {
+    vi.runAllTimers();
+  });
+}
+
 // --- Mock EventSource ---
 class MockEventSource {
   static instances = [];
@@ -43,12 +51,14 @@ function Probe({ jobId }) {
 describe('useJobLogStream', () => {
   let originalEventSource;
   beforeEach(() => {
+    vi.useFakeTimers();
     originalEventSource = globalThis.EventSource;
     globalThis.EventSource = MockEventSource;
     MockEventSource.instances = [];
   });
   afterEach(() => {
     globalThis.EventSource = originalEventSource;
+    vi.useRealTimers();
   });
 
   it('opens EventSource at the right URL for given jobId', () => {
@@ -63,6 +73,7 @@ describe('useJobLogStream', () => {
     const es = MockEventSource.instances[0];
     act(() => { es.emit('message', { data: 'first line' }); });
     act(() => { es.emit('message', { data: 'second line' }); });
+    flushBatched();
     expect(screen.getByTestId('logs')).toHaveTextContent('first line|second line');
   });
 
@@ -80,6 +91,7 @@ describe('useJobLogStream', () => {
     act(() => {
       for (let i = 0; i < 5050; i++) es.emit('message', { data: `line-${i}` });
     });
+    flushBatched();
     const text = screen.getByTestId('logs').textContent;
     const lines = text.split('|');
     expect(lines.length).toBe(5000);

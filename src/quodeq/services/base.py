@@ -47,10 +47,6 @@ class ProjectActions(Protocol):
         """Update the local filesystem path for a project. Return True on success."""
         ...
 
-    def clone_to_local(self, reports_dir: str, project: str, destination: str) -> dict | None:
-        """Clone an online project's repo to a local directory. Return updated info or None."""
-        ...
-
     def delete_project(self, reports_dir: str, project: str) -> bool:
         """Remove a project and all its report data. Return True on success."""
         ...

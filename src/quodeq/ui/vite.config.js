@@ -16,11 +16,13 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-d3': ['d3-hierarchy'],
-          'vendor-markdown': ['react-markdown', 'remark-gfm'],
-          'vendor-tanstack-query': ['@tanstack/react-query', '@tanstack/react-query-devtools'],
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('/react-dom/') || /\/react\//.test(id)) return 'vendor-react';
+          if (id.includes('/d3-hierarchy/')) return 'vendor-d3';
+          if (id.includes('/react-markdown/') || id.includes('/remark-gfm/')) return 'vendor-markdown';
+          if (id.includes('/@tanstack/react-query')) return 'vendor-tanstack-query';
+          return undefined;
         },
       },
     },

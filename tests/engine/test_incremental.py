@@ -16,6 +16,7 @@ class TestDetectChangedFiles:
             "git_commit": "abc123",
             "file_hashes": {f: hashlib.sha256(c.encode()).hexdigest() for f, c in files_content.items()},
             "standards_checksum": "std_hash_123",
+            "analyzed_files": sorted(files_content.keys()),
             "timestamp": "2026-01-01",
         }
 
@@ -210,6 +211,7 @@ class TestClassifyFiles:
                 "unchanged.py": hashlib.sha256(b"same").hexdigest(),
             },
             "standards_checksum": None,
+            "analyzed_files": ["changed.py", "dependent.py", "unchanged.py"],
         }
         result = classify_files(inputs=ClassificationInput(
             src=tmp_path, files=["changed.py", "dependent.py", "unchanged.py"],
@@ -264,6 +266,7 @@ class TestIncrementalRunnerIntegration:
             "dimension": "security", "git_commit": None,
             "file_hashes": {"a.py": hashlib.sha256(b"same").hexdigest()},
             "standards_checksum": None,
+            "analyzed_files": ["a.py"],
         }
         result = classify_files(inputs=ClassificationInput(
             src=tmp_path, files=["a.py"], prev_fingerprint=prev_fp,

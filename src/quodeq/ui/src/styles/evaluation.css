@@ -9,7 +9,24 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: var(--term-space-2);
+  margin-bottom: 12px;
+}
+
+@media (max-width: 600px) {
+  /* On narrow viewports stack the title above the right-hand cluster
+     (countdown timer + provider badge) so neither truncates. */
+  .evaluate-header {
+    align-items: flex-start;
+  }
+  .evaluate-header__right {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .evaluate-panel__top--row {
+    flex-wrap: wrap;
+  }
 }
 
 .evaluate-header h1 {
@@ -25,52 +42,60 @@
   font-size: 1rem;
 }
 
+/* Provider/model pill — visually aligned with the topbar provider pill
+   (mono, 12px, transparent bg, subtle border, muted text). */
 .eval-provider-badge {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  background: var(--color-surface-alt);
+  min-height: 28px;
+  box-sizing: border-box;
+  background: transparent;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
+  border-radius: var(--term-radius);
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
   color: var(--color-text-muted);
   white-space: nowrap;
 }
 
 .eval-provider-name {
-  font-weight: var(--weight-semibold);
   color: var(--color-text);
-  text-transform: capitalize;
+}
+
+.eval-provider-sep {
+  opacity: 0.4;
 }
 
 .eval-provider-model {
-  font-family: monospace;
-  font-size: 0.62rem;
+  color: var(--color-text-muted);
 }
 
 /* Clickable variant — used on the Evaluate page header to navigate to settings. */
 button.eval-provider-badge--clickable {
   cursor: pointer;
-  font: inherit;
-  transition: border-color 120ms, background 120ms;
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
 }
 button.eval-provider-badge--clickable:hover {
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface-alt));
+  border-color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
 }
 button.eval-provider-badge--clickable:focus-visible {
   outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 .evaluate-content {
   display: grid;
-  gap: 24px;
+  gap: 16px;
 }
 
 .evaluate-panel {
-  padding: 24px;
+  padding: 16px;
 }
 
 /* ── No-project-selected state on the Evaluate tab ── */
@@ -214,9 +239,31 @@ button.eval-provider-badge--clickable:focus-visible {
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
+  /* Tighter horizontal padding than the default 16px — combined with the
+     thin scrollbar below it gives long log lines visibly more room before
+     wrapping in narrow docks. */
+  padding: 12px 10px;
   /* Reserve space below the last line so the floating follow button doesn't
      sit on top of in-progress output. */
   padding-bottom: 48px;
+  scrollbar-width: thin;
+}
+
+.side-pane-window__body > .console-shell .console-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.side-pane-window__body > .console-shell .console-scroll:hover::-webkit-scrollbar {
+  width: 12px;
+}
+.side-pane-window__body > .console-shell .console-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.side-pane-window__body > .console-shell .console-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-console-text) 22%, transparent);
+  border-radius: 4px;
+}
+.side-pane-window__body > .console-shell .console-scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-console-text) 38%, transparent);
 }
 
 /* During a side-pane drag (outer or inner divider), skip layout/paint of
@@ -833,7 +880,7 @@ button.eval-provider-badge--clickable:focus-visible {
 .evaluate-form-large {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .evaluate-form-large .form-group label {
@@ -1067,10 +1114,21 @@ button.eval-provider-badge--clickable:focus-visible {
   margin: var(--space-1) 0;
 }
 
+/* Ephemeral-completed note: surfaced when projectInfo.ephemeral && !evaluable */
+.ephemeral-completed-note {
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--color-accent, #5b8db8) 10%, var(--color-surface));
+  border-left: 3px solid color-mix(in srgb, var(--color-accent, #5b8db8) 40%, var(--color-border));
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
 .re-eval-actions-group {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .re-eval-disabled-section {
@@ -2098,7 +2156,10 @@ button.eval-provider-badge--clickable:focus-visible {
   font-weight: var(--weight-semibold);
   color: var(--color-text-muted);
   cursor: pointer;
-  flex-shrink: 0;
+  /* Cap at the row width after flex-wrap so the inner label can
+     ellipsize on extremely long filenames in narrow viewports. */
+  max-width: 100%;
+  min-width: 0;
   white-space: nowrap;
   transition: color 120ms ease;
 }
@@ -2230,6 +2291,7 @@ button.eval-provider-badge--clickable:focus-visible {
 .vdetail-row-main {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 10px 0;
   cursor: default;
@@ -2870,10 +2932,10 @@ button.eval-provider-badge--clickable:focus-visible {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--term-radius);
-  padding: var(--term-space-4);
+  padding: var(--term-space-3);
 }
 .evaluate-panel__top {
-  margin-bottom: var(--term-space-3);
+  margin-bottom: var(--term-space-2);
 }
 .evaluate-panel__top--row {
   display: flex;
@@ -2896,8 +2958,8 @@ button.eval-provider-badge--clickable:focus-visible {
   border: 0;
   border-bottom: 1px dotted var(--color-border);
   border-radius: 0;
-  padding: var(--term-space-2) 0;
-  margin-bottom: var(--term-space-3);
+  padding: var(--term-space-1) 0;
+  margin-bottom: var(--term-space-2);
   font-family: var(--term-font-mono);
   display: flex;
   align-items: baseline;
@@ -2976,11 +3038,12 @@ button.eval-provider-badge--clickable:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--term-space-2);
-  padding: var(--term-space-2) 0;
-  margin-bottom: var(--term-space-3);
+  padding: var(--term-space-1) 0;
+  margin-bottom: var(--term-space-2);
   font-family: var(--term-font-mono);
   font-size: 11px;
   color: var(--color-text-muted);
+  flex-wrap: wrap;
 }
 .evaluate-job-id-line__label {
   text-transform: uppercase;

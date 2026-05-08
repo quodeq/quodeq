@@ -134,10 +134,10 @@ class TestResolveLatestPerDim:
         assert result["security"].run_id == "run1"
         assert result["security"].files_read == 500
 
-    def test_includes_in_progress_run_for_finished_dims(self, tmp_path: Path):
-        # If a dim has finished scoring inside a running scan, its data
-        # is trustworthy and should surface — users shouldn't have to
-        # wait for the umbrella run to finalise to see results.
+    def test_excludes_in_progress_run_from_default_view(self, tmp_path: Path):
+        # A still-running run's already-scored dims must NOT promote to
+        # the overview — the umbrella run hasn't terminated, so the
+        # overview waits and falls through to the previous complete run.
         # ``in_progress`` is detected upstream via a live PID lookup, which
         # we'd need to fake on disk; mocking ``list_runs`` at its new
         # location in scoring_view._resolution keeps the test focused on
@@ -151,8 +151,10 @@ class TestResolveLatestPerDim:
         ]
         with patch("quodeq.services.scoring_view._resolution.list_runs", return_value=runs_for_mock):
             result = resolve_latest_per_dim(tmp_path, "proj")
-        assert result["security"].run_id == "run2"
-        assert result["security"].run_state == "in_progress"
+        # run2 (in_progress) skipped; run1 (complete) wins.
+        assert result["security"].run_id == "run1"
+        assert result["security"].run_state == "complete"
+        assert result["security"].overall_score == "7.0/10"
 
     def test_excludes_cancelled_run_from_default_view(self, tmp_path: Path):
         # Cancelled runs are NOT promoted to overview cards by default —
@@ -260,13 +262,15 @@ class TestSharedTrustPredicates:
     def test_is_trustable_run_excludes_failed(self):
         assert is_trustable_run("failed") is False
 
-    def test_is_eligible_for_default_view_includes_complete_in_progress(self):
-        # The narrower rule — used by overview cards / headline. Cancelled
-        # is OUT because partial-coverage stub evals can distort the cards.
+    def test_is_eligible_for_default_view_includes_only_complete(self):
+        # The strictest rule — used by overview cards / headline. Only
+        # terminal-and-trustworthy runs count: ``complete``. in_progress
+        # is excluded so partial mid-run dims don't leak into the cards;
+        # cancelled is excluded because of partial-coverage stub evals.
         assert is_eligible_for_default_view("complete") is True
-        assert is_eligible_for_default_view("in_progress") is True
 
-    def test_is_eligible_for_default_view_excludes_cancelled_and_failed(self):
+    def test_is_eligible_for_default_view_excludes_in_progress_cancelled_failed(self):
+        assert is_eligible_for_default_view("in_progress") is False
         assert is_eligible_for_default_view("cancelled") is False
         assert is_eligible_for_default_view("failed") is False
 

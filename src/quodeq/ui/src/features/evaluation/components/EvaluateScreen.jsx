@@ -14,6 +14,7 @@ function ActiveProviderBadge({ storage = localStorage, onClick }) {
   const content = (
     <>
       <span className="eval-provider-name">{provider}</span>
+      {model && <span className="eval-provider-sep" aria-hidden="true">·</span>}
       {model && <span className="eval-provider-model">{model}</span>}
     </>
   );
@@ -38,7 +39,7 @@ function readBudgetSeconds(storage = localStorage) {
   // Read new key first; fall back to legacy 'pool-budget' for back-compat.
   const raw = storage.getItem(providerKey(provider, 'time-limit'))
     ?? storage.getItem(providerKey(provider, 'pool-budget'));
-  if (raw === null || raw === undefined) return provider === 'ollama' ? 0 : DEFAULT_TIME_LIMIT_S;
+  if (raw === null || raw === undefined) return (provider === 'ollama' || provider === 'llamacpp') ? 0 : DEFAULT_TIME_LIMIT_S;
   const parsed = parseInt(raw, 10);
   return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -140,7 +141,15 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
           <NoProjectSelected onGoToProjects={onGoToProjects} />
         )}
 
-        <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={onDismiss} onCancel={onCancel} hasEvaluations={!!selectedProject} />
+        <EvaluationStatus
+          job={job}
+          project={selectedProject}
+          projectInfo={projectInfo}
+          liveViolations={liveViolations}
+          onDismiss={onDismiss}
+          onCancel={onCancel}
+          hasEvaluations={!!selectedProject}
+        />
       </div>
 
       {jobError && toastVisible && (

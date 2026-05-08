@@ -68,8 +68,13 @@ class TestCheckApiProvider:
             with pytest.raises(RuntimeError, match="server is not running"):
                 _check_api_provider("ollama")
 
+    def test_llamacpp_not_running_raises(self):
+        with patch("urllib.request.urlopen", side_effect=OSError("Connection refused")):
+            with pytest.raises(RuntimeError, match="llama-server is not running"):
+                _check_api_provider("llamacpp")
+
     def test_non_ollama_api_passes(self):
-        # Non-ollama API providers have no connectivity check
+        # Cloud API providers have no connectivity check
         _check_api_provider("openrouter")
 
 

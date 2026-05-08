@@ -9,6 +9,7 @@ import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
 import { withDimensionsStr } from '../../../utils/dimensionUtils.js';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
+import LastFetchedLine from '../../../components/LastFetchedLine.jsx';
 
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterTrendByVisibleStandardsDaily, filterAccumulatedByVisibleStandards } from '../../../utils/scoreFiltering.js';
@@ -89,9 +90,10 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulated
     <section className="acc-eval-panel acc-eval-panel--terminal">
       <div className="acc-eval-panel__top">
         <TermHeader
-          name="overview"
+          name={projectInfo?.displayName || projectInfo?.name || projectName || 'overview'}
           sub={buildLanguageSub(projectInfo) || (lastDate ? `last_evaluated · ${lastDate}` : null)}
         />
+        <LastFetchedLine lastFetchedAt={projectInfo?.lastFetchedAt} />
       </div>
       <StatStrip cards>
         <Stat

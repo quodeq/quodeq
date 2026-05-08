@@ -9,6 +9,13 @@ used by the subagent pool via ``analysis.subagents._file_lock``.
 from __future__ import annotations
 
 import sys
+import time
+
+# Windows blocking lock budget. msvcrt.LK_LOCK only retries 10x at 1s,
+# which is too short under the subagent pool's heavy contention. We use
+# the non-blocking variant in our own retry loop instead.
+_WIN_LOCK_TIMEOUT_S = 60.0
+_WIN_LOCK_RETRY_INTERVAL_S = 0.05
 
 
 def _make_lock_ops() -> tuple:
@@ -16,7 +23,15 @@ def _make_lock_ops() -> tuple:
     if sys.platform == "win32":
         import msvcrt
         def _lock(fd: int) -> None:
-            msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+            deadline = time.monotonic() + _WIN_LOCK_TIMEOUT_S
+            while True:
+                try:
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                    return
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        raise
+                    time.sleep(_WIN_LOCK_RETRY_INTERVAL_S)
         def _unlock(fd: int) -> None:
             msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
     else:

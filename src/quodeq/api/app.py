@@ -82,8 +82,23 @@ def create_app(
     app = Flask(__name__)
     if test_config is not None:
         app.config.update(test_config)
+    # Cap multipart uploads (project import) at the same size as the export
+    # limit, plus a small headroom for multipart framing. Flask aborts with
+    # 413 before reading the full body, which keeps large bogus uploads cheap.
+    from quodeq.api.zip import _max_zip_size_bytes
+    app.config.setdefault("MAX_CONTENT_LENGTH", _max_zip_size_bytes() + 1 * 1024 * 1024)
     provider = provider or _default_provider()
     app.config["_provider"] = provider
+
+    from pathlib import Path
+    from quodeq.services._ephemeral_cleanup import sweep_orphaned_clones
+    from quodeq.shared._env import get_clones_dir, get_evaluations_dir
+
+    try:
+        sweep_orphaned_clones(get_clones_dir(), Path(get_evaluations_dir()))
+    except Exception as exc:  # pragma: no cover - best-effort cleanup
+        _logger.warning("Orphaned-clone sweep failed at startup: %s", exc)
+
     store = rate_limit_store or create_rate_limit_store()
     eval_store = InMemoryRateLimitStore(
         window=_EVALUATION_RATE_LIMIT_WINDOW, max_requests=_EVALUATION_RATE_LIMIT_MAX,

@@ -63,26 +63,38 @@
    ------------------------------------------------------------ */
 .term-stat-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: var(--term-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--term-space-3);
   font-family: var(--term-font-mono);
-  padding: var(--term-space-3) 0;
+  padding: var(--term-space-2) 0;
 }
 /* cards variant: each <Stat> renders as its own bordered card with a subtle
-   surface fill so the top row reads as a band of chrome rather than bare page.
-   Vertical padding is deliberately generous so the large numeric value has
-   breathing room above the hint line. */
+   surface fill so the top row reads as a band of chrome rather than bare page. */
 .term-stat-strip--cards {
   padding: 0;
 }
 .term-stat-strip--cards .term-stat {
   border: var(--term-border);
   border-radius: var(--term-radius);
-  padding: var(--term-space-3) var(--term-space-3) 18px;
+  padding: var(--term-space-2) var(--term-space-3) var(--term-space-3);
   background: var(--color-surface);
   display: flex;
   flex-direction: column;
   gap: var(--term-space-1);
+}
+
+/* Tablet/mobile — drop card padding and shrink the value font so the stat
+   strip stays readable when it wraps to two columns or stacks. */
+@media (max-width: 600px) {
+  .term-stat-strip {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: var(--term-space-2);
+  }
+  .term-stat-strip--cards .term-stat {
+    padding: var(--term-space-2);
+  }
+  .term-stat__value { font-size: 22px; }
+  .term-stat__label { margin-bottom: 0; }
 }
 
 /* `count-abbr` sev badge variant used in the VIOLATIONS stat cell */
@@ -1654,7 +1666,7 @@
   /* Cap label width so long names truncate without colliding with the
      count badge's anchored position; box width stays constant across
      rail states so the text doesn't visibly shrink as it fades. */
-  max-width: 140px;
+  max-width: 124px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1666,8 +1678,9 @@
      this badge occupies in the 240px expanded rail. A `right` anchor
      would slide leftward with the button-right edge during the
      collapse animation — the same horizontal motion the user
-     disliked. */
-  left: 184px;
+     disliked. The offset gives a 3-digit badge clear breathing room
+     to the rail edge (button content ends at ~224, rail at 240). */
+  left: 168px;
   top: 50%;
   transform: translateY(-50%);
 }
@@ -1716,12 +1729,22 @@
   white-space: nowrap;
 }
 .sidebar.sidebar--expanded .sidebar-nav-count {
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 1.4;
   color: var(--color-text-muted);
   background: color-mix(in srgb, var(--color-border) 65%, transparent);
-  padding: 1px 5px;
+  padding: 1px 6px;
   border-radius: var(--term-radius);
   font-variant-numeric: tabular-nums;
+  /* Constant min-width so single-digit counts don't render as a tiny dot,
+     plus a max-width as a final safety net (the JSX caps display at
+     "999+", so this should never actually ellipsize in practice). */
+  min-width: 22px;
+  max-width: 48px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar.sidebar--expanded .sidebar-spacer { flex: 1 1 auto; }
@@ -2129,12 +2152,16 @@
   min-width: 36px;
 }
 
-/* FileCopyBtn label: allow the pretext-fitted text to shrink with its container. */
+/* FileCopyBtn label: render the full filename whenever it fits. CSS
+   ellipsis is kept as a graceful fallback for genuinely cramped rows
+   (long filename + narrow viewport) — it only kicks in when the
+   browser actually has to clip, never preemptively. The parent row
+   uses flex-wrap so the pill drops to a new line before shrinking. */
 .vlive-detail-file-btn__label {
   min-width: 0;
-  flex: 1 1 auto;
-  overflow: hidden;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Mobile: tighten padding further at very narrow widths. */
@@ -2197,6 +2224,9 @@
   background: var(--color-accent);
   color: var(--color-on-accent);
   border-color: var(--color-accent);
+  /* Heavier weight for legibility on solid accent fills — the default
+     400 monospace reads thin against high-saturation backgrounds. */
+  font-weight: 600;
 }
 .term-btn--filled:hover:not(:disabled) {
   background: var(--color-accent-hover, color-mix(in srgb, var(--color-accent) 90%, black));

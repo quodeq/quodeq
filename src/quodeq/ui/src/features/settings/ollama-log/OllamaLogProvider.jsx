@@ -19,8 +19,6 @@ function buildSpec(logs, status) {
     type: WINDOW_ID,
     title: `Ollama log${STATUS_LABEL[status] || ''}`,
     render: () => <ConsoleLogViewer logs={logs} />,
-    copy: () => logs.join('\n'),
-    download: () => ({ filename: 'ollama-server.log', body: logs.join('\n') }),
   };
 }
 

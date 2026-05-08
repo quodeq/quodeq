@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { gradeLabel, scoreColorClass } from '../../../utils/formatters.js';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
+import { useRunningRunsRefresh } from '../../../hooks/useRunningRunsRefresh.js';
 const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
 
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
@@ -176,8 +177,17 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
             // Stubs (hasScoredDims === false) have no completed standards yet
             // and would land on an empty dashboard. Block the click and tell
             // the user to wait. Running runs that ARE in trend (i.e. already
-            // have at least one scored dim) remain clickable.
+            // have at least one scored dim) remain clickable, and we surface
+            // the dims that *have* completed instead of a generic
+            // "in progress" placeholder.
             const notReady = entry.hasScoredDims === false;
+            const dimsCell = notReady
+              ? <span className="history-row__muted">no scores yet</span>
+              : (
+                <span className="history-row__muted">
+                  <FittedText text={formatDimSummary(entry)} mode="end" />
+                </span>
+              );
             return (
               <HistoryRow
                 key={entry.runId}
@@ -195,7 +205,7 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
                   grade: <span className="history-row__muted">—</span>,
                   score: <span className="history-row__muted">—</span>,
                   delta: <span className="history-delta history-delta--muted">—</span>,
-                  dims: <span className="history-row__muted">{notReady ? 'no scores yet' : 'in progress'}</span>,
+                  dims: dimsCell,
                 }}
               />
             );
@@ -324,6 +334,10 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
   const { deleteEvaluation } = useApi();
+  // Background refresh while a run is alive so the running row flips
+  // to "complete" without the user manually reloading. Scoped to this
+  // page only — other tabs don't poll.
+  useRunningRunsRefresh({ selectedProject, availableRuns });
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
   const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet), [rawTrend, visibleSet]);
 

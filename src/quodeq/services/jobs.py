@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import threading
+import time
 import uuid
 from typing import Any, Callable, Iterable
 
@@ -49,6 +50,14 @@ _PROCESS_WAIT_TIMEOUT_S = 30
 _EXIT_CODE_SPAWN_FAILURE = -1
 _EXIT_CODE_TIMEOUT = -9
 _DEFAULT_LIST_LIMIT = 100
+
+# Watchdog polls process state every N seconds and re-checks deadline_at,
+# which only lands in job state after the analyzing_start marker — so a
+# blocking wait(timeout=full_budget) at spawn time can't see it.
+_WATCHDOG_POLL_INTERVAL_S = 1.0
+# Grace window past deadline_at before SIGKILL — gives the analysis side's
+# graceful-cancel path time to score completed dimensions.
+_WATCHDOG_DEADLINE_GRACE_S = 60
 
 # Canonical job status strings.
 STATUS_RUNNING = "running"
@@ -368,18 +377,51 @@ class JobManager:
                 self._store.delete(jid)
 
     @property
-    def _job_timeout_s(self) -> int:
-        """Job timeout in seconds — reads from env at call time for lazy configuration."""
-        return int(os.environ.get("QUODEQ_JOB_TIMEOUT_S", "7200"))
+    def _job_timeout_cap_s(self) -> float:
+        """Hard sanity cap on job duration (seconds). 0 = no cap (default).
+
+        Was hard-coded to 7200 (2h), which silently SIGKILLed long Ollama
+        runs even when the user had configured a much longer ``--time-limit``.
+        Now opt-in: set ``QUODEQ_JOB_TIMEOUT_S`` to a positive number to
+        re-enable a wall-clock cap. Otherwise the watchdog only enforces
+        the user-set ``deadline_at`` (with a grace window).
+        """
+        return float(os.environ.get("QUODEQ_JOB_TIMEOUT_S", "0"))
+
+    def _watchdog_should_kill(self, job_id: str, started_at: float) -> bool:
+        """Return True when the watchdog should SIGKILL the job process now."""
+        now = time.time()
+        cap = self._job_timeout_cap_s
+        if cap > 0 and (now - started_at) > cap:
+            return True
+        job = self._store.get(job_id)
+        deadline_at = getattr(job, "deadline_at", None) if job else None
+        if not deadline_at:
+            return False
+        try:
+            deadline = datetime.fromisoformat(deadline_at).timestamp()
+        except (TypeError, ValueError):
+            return False
+        return now > deadline + _WATCHDOG_DEADLINE_GRACE_S
 
     def _monitor_process(self, job_id: str, process: subprocess.Popen) -> None:
-        try:
-            exit_code = process.wait(timeout=self._job_timeout_s)
-        except subprocess.TimeoutExpired:
-            _logger.warning("Job %s exceeded %ds timeout — killing", job_id, self._job_timeout_s)
-            process.kill()
-            process.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
-            exit_code = _EXIT_CODE_TIMEOUT
+        started_at = time.time()
+        exit_code: int = 0
+        while True:
+            try:
+                exit_code = process.wait(timeout=_WATCHDOG_POLL_INTERVAL_S)
+                break
+            except subprocess.TimeoutExpired:
+                if self._watchdog_should_kill(job_id, started_at):
+                    elapsed = int(time.time() - started_at)
+                    _logger.warning("Job %s watchdog killing after %ds", job_id, elapsed)
+                    process.kill()
+                    try:
+                        process.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
+                    except subprocess.TimeoutExpired:
+                        pass
+                    exit_code = _EXIT_CODE_TIMEOUT
+                    break
         with self._lock:
             self._processes.pop(job_id, None)
             job = self._store.get(job_id)

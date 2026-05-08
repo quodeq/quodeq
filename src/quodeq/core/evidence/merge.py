@@ -22,6 +22,12 @@ def merge_evidence(
             else:
                 merged_principles[pid] = pe
 
+    # merge_findings recomputes metrics with default thresholds; redo
+    # the pass with the merged source_file_count so small-project
+    # confidence scaling survives the merge.
+    for pe in merged_principles.values():
+        pe.compute_metrics(source_file_count=source_file_count)
+
     coverage_pct = compute_coverage_pct(total_files_read, source_file_count)
 
     # Inherit module from the first evidence object if not explicitly provided

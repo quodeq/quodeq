@@ -6,7 +6,7 @@
 </p>
 
 <h2 align="center">AI-powered code quality and security scanner</h2>
-<p align="center"><strong>v1.0.10</strong></p>
+<p align="center"><strong>v1.1.0</strong></p>
 <p align="center">
   <a href="https://github.com/quodeq/quodeq/actions/workflows/test.yml"><img src="https://github.com/quodeq/quodeq/actions/workflows/test.yml/badge.svg" alt="Tests" /></a>
   <a href="https://github.com/quodeq/quodeq/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
@@ -153,11 +153,29 @@ Choose what fits your workflow. Configure in **Settings** from the dashboard.
 | Provider | Type | Getting started |
 |---|---|---|
 | [Ollama](https://ollama.com/download) | Local | Free, private, code never leaves your machine |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) | Local | Run any GGUF directly. Supports speculative decoding (MTP) via a draft model |
 | [Claude Code](https://code.claude.com/docs/en/quickstart) | Cloud | Best balance of speed, quality, and cost |
 | [Codex CLI](https://developers.openai.com/codex/quickstart) | Cloud | OpenAI models |
 | [Gemini CLI](https://geminicli.com/docs/get-started/installation/) | Cloud | Google models |
 
 > For local analysis we recommend [Gemma 4](https://deepmind.google/models/gemma/gemma-4/) ([`gemma4:26b`](https://ollama.com/library/gemma4:26b)). Reducing the context window to 32k still gives good results and allows running multiple subagents in parallel.
+
+### Using llama.cpp
+
+llama.cpp is one process per model, fixed at launch. Start `llama-server` yourself, then point Quodeq at it from **Settings → AI Provider → llama.cpp**.
+
+```bash
+# Quodeq creates ~/.quodeq/logs/ on first launch — just redirect there
+# and the CONSOLE button picks it up automatically.
+llama-server -m path/to/target.gguf --port 8080 \
+  > ~/.quodeq/logs/llama-server.log 2>&1
+
+# Speculative decoding (MTP), pair a target with a smaller drafter
+llama-server -m path/to/target.gguf -md path/to/drafter.gguf --port 8080 \
+  > ~/.quodeq/logs/llama-server.log 2>&1
+```
+
+Quodeq probes `http://localhost:8080` and looks for the log file at `~/.quodeq/logs/llama-server.log` (or platform-standard locations like `~/Library/Logs/llama-server.log` on macOS). Override with `LLAMACPP_LOG_FILE`. To use a different port or host, set `LLAMACPP_BASE_URL`. To switch models, stop `llama-server` and relaunch with a different `-m`.
 
 ---
 

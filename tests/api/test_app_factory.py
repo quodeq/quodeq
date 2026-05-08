@@ -24,9 +24,6 @@ class _StubProvider:
     def delete_project(self, reports_dir, project):
         return False
 
-    def clone_to_local(self, reports_dir, project, destination):
-        return None
-
     def start_evaluation(self, *a, **kw):
         return None
 

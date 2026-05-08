@@ -2,8 +2,31 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import DimensionCard from './DimensionCard.jsx';
 import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
+import IncompleteSetupCard from './IncompleteSetupCard.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
+
+function NoCompletedEvalPanel({ availableRuns = [], onNavigate }) {
+  const hasRunning = availableRuns.some((r) => r?.status === 'in_progress');
+  if (hasRunning) {
+    return (
+      <EmptyState
+        title="Evaluation in progress"
+        description="Results will appear here once the evaluation finishes. You can watch dimensions complete one by one in the History tab."
+        actionLabel="Open history"
+        onAction={() => onNavigate?.('history')}
+      />
+    );
+  }
+  return (
+    <EmptyState
+      title="No completed evaluation yet"
+      description="Previous attempts didn't finish cleanly. Start a new evaluation to populate the overview."
+      actionLabel="Start evaluation"
+      onAction={() => onNavigate?.('evaluate')}
+    />
+  );
+}
 
 function DashboardContent({ runMode, data, focus, callbacks }) {
   const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo } = data;
@@ -22,6 +45,15 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
   }
   if (!accumulated) {
     return <LoadingScreen />;
+  }
+  if (accumulatedDimensions.length === 0) {
+    // Project has runs (otherwise the upstream `!dashboard` empty
+    // state would have fired) but none have terminated cleanly yet —
+    // first evaluation in progress, or every prior attempt was
+    // cancelled/failed. Render a clear waiting-for-results state in
+    // place of the empty stat strip and dim cards (the page header
+    // above still shows project name, language mix, file count).
+    return <NoCompletedEvalPanel availableRuns={availableRuns} onNavigate={onNavigate} />;
   }
   if (focusedDimension) {
     return (
@@ -73,7 +105,15 @@ function useDashboardHandlers(onNavigate, dashboard) {
 export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
   const { selectedProject, selectedRun, projects = [], dashboard, accumulated, loading, isFetching, error, availableRuns = [], dailyRuns, overviewRunIndex = 0 } = data;
   const projectInfo = projects.find((p) => (p.id || p.name) === selectedProject) || null;
-  const { onNavigate, onRunSelect } = callbacks;
+  const { onNavigate, onRunSelect, onProjectsReload } = callbacks;
+  // After a successful clone-on-add migration the project's repository_info.json
+  // has been rewritten with location: "local". Refetch the projects list so the
+  // sidebar/header reflect the new state. Fall back to a full reload if no
+  // refetch hook is plumbed through.
+  const handleSetupComplete = () => {
+    if (typeof onProjectsReload === 'function') onProjectsReload();
+    else if (typeof window !== 'undefined') window.location.reload();
+  };
   const [focusedDimension, setFocusedDimension] = useState(null);
   const selectedRunId = dashboard?.selectedRun?.runId || selectedRun;
   // Clear focused dimension when the active run changes to avoid showing stale data
@@ -114,12 +154,15 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   if (!loading && !isFetching && !dashboard) {
     const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
     return (
-      <EmptyState
-        title="No evaluations yet"
-        description={`Run an evaluation for ${projectName} to populate this page.`}
-        actionLabel="Start evaluation"
-        onAction={() => onNavigate?.('evaluate')}
-      />
+      <div className="dashboard-page dashboard-fade dashboard-ready">
+        <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
+        <EmptyState
+          title="No evaluations yet"
+          description={`Run an evaluation for ${projectName} to populate this page.`}
+          actionLabel="Start evaluation"
+          onAction={() => onNavigate?.('evaluate')}
+        />
+      </div>
     );
   }
 
@@ -132,6 +175,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
 
   return (
     <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : 'dashboard-ready'}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
+      <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
       {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
       {isLoading && <LoadingScreen />}
       {dashboard && (

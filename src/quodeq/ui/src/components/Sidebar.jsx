@@ -32,7 +32,17 @@ function Logo() {
   );
 }
 
+// Cap the count badge text so the absolutely-positioned chip can't grow
+// past the rail edge. Anything four digits or more reads as "999+", and
+// the title carries the exact number.
+function formatNavCount(count) {
+  if (count == null) return null;
+  if (count >= 1000) return '999+';
+  return String(count);
+}
+
 function NavButton({ id, label, icon, activeTab, onNavTab, count }) {
+  const countLabel = formatNavCount(count);
   return (
     <button
       type="button"
@@ -42,7 +52,11 @@ function NavButton({ id, label, icon, activeTab, onNavTab, count }) {
     >
       {icon}
       <span className="sidebar-nav-label">{label}</span>
-      {count != null && <span className="sidebar-nav-count">{count}</span>}
+      {countLabel != null && (
+        <span className="sidebar-nav-count" title={count >= 1000 ? String(count) : undefined}>
+          {countLabel}
+        </span>
+      )}
     </button>
   );
 }

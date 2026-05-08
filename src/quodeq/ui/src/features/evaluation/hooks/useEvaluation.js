@@ -41,6 +41,7 @@ const DEFAULT_OLLAMA_SUBAGENTS = "1";
 const DEFAULT_CLI_SUBAGENTS = String(DEFAULT_MAX_SUBAGENTS);
 const DEFAULT_OLLAMA_BUDGET = "0";
 const DEFAULT_CLI_BUDGET = String(DEFAULT_TIME_LIMIT_S);
+const LOCAL_API_PROVIDERS = new Set(["ollama", "llamacpp"]);
 
 /**
  * Merge per-provider Settings (provider, model, subagents, budget, etc.)
@@ -54,11 +55,11 @@ function preparePayload(payload, storage = localStorage) {
   const get = (key) => storage.getItem(providerKey(activeProvider, key));
   const model = get("model");
   if (!model) throw new Error("No model selected. Go to Settings and select one.");
-  const isOllama = activeProvider === "ollama";
-  const subagents = parseInt(get("subagents") || (isOllama ? DEFAULT_OLLAMA_SUBAGENTS : DEFAULT_CLI_SUBAGENTS), 10);
+  const isLocalApi = LOCAL_API_PROVIDERS.has(activeProvider);
+  const subagents = parseInt(get("subagents") || (isLocalApi ? DEFAULT_OLLAMA_SUBAGENTS : DEFAULT_CLI_SUBAGENTS), 10);
   // Read new key first; fall back to legacy 'pool-budget' for back-compat.
   const timeLimit = parseInt(
-    get("time-limit") || get("pool-budget") || (isOllama ? DEFAULT_OLLAMA_BUDGET : DEFAULT_CLI_BUDGET),
+    get("time-limit") || get("pool-budget") || (isLocalApi ? DEFAULT_OLLAMA_BUDGET : DEFAULT_CLI_BUDGET),
     10,
   );
   const result = {

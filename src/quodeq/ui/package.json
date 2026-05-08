@@ -12,25 +12,23 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@chenglou/pretext": "^0.0.5",
-    "@tanstack/react-query": "^5.100.6",
+    "@chenglou/pretext": "^0.0.6",
+    "@tanstack/react-query": "^5.100.9",
     "d3-hierarchy": "^3.1.2",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "react-markdown": "^9.1.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
-    "remark-gfm": "^4.0.1",
-    "xterm": "^5.3.0",
-    "xterm-addon-fit": "^0.8.0"
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
-    "@tanstack/react-query-devtools": "^5.100.6",
+    "@tanstack/react-query-devtools": "^5.100.9",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@vitejs/plugin-react": "4.7.0",
-    "jsdom": "^29.0.2",
-    "vite": "7.3.2",
+    "@vitejs/plugin-react": "6.0.1",
+    "jsdom": "^29.1.1",
+    "vite": "8.0.11",
     "vitest": "^4.1.4"
   }
 }

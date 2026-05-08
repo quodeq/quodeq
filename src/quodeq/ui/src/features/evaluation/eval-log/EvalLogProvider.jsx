@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import ConsoleLogViewer from '../components/ConsoleLogViewer.jsx';
-import { EvalLogContext } from './EvalLogContext.js';
+import { EvalLogContext, EvalLogLogsContext, useEvalLogLogs } from './EvalLogContext.js';
 import { useJobLogStream } from './useJobLogStream.js';
+
+// Read logs from the dedicated logs context so the side-pane's spec stays
+// stable across log appends — only this leaf re-renders on each batch.
+function EvalLogPaneBody() {
+  const { logs } = useEvalLogLogs();
+  return <ConsoleLogViewer logs={logs} />;
+}
 
 const STREAM_STATUS_WORD = {
   idle: '',
@@ -38,20 +45,19 @@ function statusWord(jobStatus, streamStatus, terminalState) {
   return STREAM_STATUS_WORD[streamStatus] || '';
 }
 
-function buildSpec({ jobId, label, jobStatus, logs, status, terminalState }) {
+const WINDOW_ID = 'eval-log';
+
+function buildSpec({ jobId, jobStatus, status, terminalState }) {
   if (!jobId) return null;
-  const baseFilename = (label || jobId).replace(/[^A-Za-z0-9._-]+/g, '-');
   const word = statusWord(jobStatus, status, terminalState);
   const parts = ['log evaluation'];
   if (word) parts.push(word);
   parts.push(jobId);
   return {
-    id: 'eval-log',
+    id: WINDOW_ID,
     type: 'eval-log',
     title: parts.join(' · '),
-    render: () => <ConsoleLogViewer logs={logs} />,
-    copy: () => logs.join('\n'),
-    download: () => ({ filename: `${baseFilename}.log`, body: logs.join('\n') }),
+    render: () => <EvalLogPaneBody />,
   };
 }
 
@@ -60,11 +66,11 @@ export function EvalLogProvider({ children }) {
   const [activeJobLabel, setActiveJobLabel] = useState(null);
   const [activeJobStatus, setActiveJobStatus] = useState(null);
   const { logs, status, terminalState } = useJobLogStream(activeJobId);
-  const { addWindow, removeWindow, replaceWindow } = useSidePane();
+  const { addWindow, removeWindow, replaceWindow, hasWindow } = useSidePane();
 
   const spec = useMemo(
-    () => buildSpec({ jobId: activeJobId, label: activeJobLabel, jobStatus: activeJobStatus, logs, status, terminalState }),
-    [activeJobId, activeJobLabel, activeJobStatus, logs, status, terminalState],
+    () => buildSpec({ jobId: activeJobId, jobStatus: activeJobStatus, status, terminalState }),
+    [activeJobId, activeJobStatus, status, terminalState],
   );
 
   useEffect(() => {
@@ -76,7 +82,7 @@ export function EvalLogProvider({ children }) {
     setActiveJobId(jobId);
     setActiveJobLabel(label);
     setActiveJobStatus(jobStatus);
-    const fresh = buildSpec({ jobId, label, jobStatus, logs: [], status: 'streaming' });
+    const fresh = buildSpec({ jobId, jobStatus, status: 'streaming' });
     addWindow(fresh);
     replaceWindow(fresh);
   }, [addWindow, replaceWindow]);
@@ -89,13 +95,32 @@ export function EvalLogProvider({ children }) {
     setActiveJobId(null);
     setActiveJobLabel(null);
     setActiveJobStatus(null);
-    removeWindow('eval-log');
+    removeWindow(WINDOW_ID);
   }, [removeWindow]);
+
+  // If the user closes the side-pane window via the X (or Escape closes all
+  // panes), sync our active-job state — otherwise consoleOpen stays truthy
+  // and the Console button needs two clicks to reopen.
+  useEffect(() => {
+    if (activeJobId && !hasWindow(WINDOW_ID)) {
+      setActiveJobId(null);
+      setActiveJobLabel(null);
+      setActiveJobStatus(null);
+    }
+  }, [activeJobId, hasWindow]);
 
   const value = useMemo(
     () => ({ activeJobId, activeJobLabel, activeJobStatus, status, openLog, closeLog, updateJobStatus }),
     [activeJobId, activeJobLabel, activeJobStatus, status, openLog, closeLog, updateJobStatus],
   );
 
-  return <EvalLogContext.Provider value={value}>{children}</EvalLogContext.Provider>;
+  const logsValue = useMemo(() => ({ logs }), [logs]);
+
+  return (
+    <EvalLogContext.Provider value={value}>
+      <EvalLogLogsContext.Provider value={logsValue}>
+        {children}
+      </EvalLogLogsContext.Provider>
+    </EvalLogContext.Provider>
+  );
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SidePaneProvider } from '../../side-pane/index.js';
@@ -103,29 +103,64 @@ describe('EvalLogProvider', () => {
   });
 
   it('updates the side-pane window body as new log lines arrive', () => {
-    function ProbeWithRender() {
-      const { openLog } = useEvalLog();
-      const { windows } = useSidePane();
-      const body = windows[0]?.render?.() ?? null;
+    vi.useFakeTimers();
+    try {
+      function ProbeWithRender() {
+        const { openLog } = useEvalLog();
+        const { windows } = useSidePane();
+        const body = windows[0]?.render?.() ?? null;
+        return (
+          <div>
+            <button onClick={() => openLog('job-x', 'Run X')}>open</button>
+            <div data-testid="body">{body}</div>
+          </div>
+        );
+      }
+      render(
+        <SidePaneProvider>
+          <EvalLogProvider>
+            <ProbeWithRender />
+          </EvalLogProvider>
+        </SidePaneProvider>
+      );
+      fireEvent.click(screen.getByText('open'));
+      expect(screen.getByTestId('body')).toHaveTextContent('Waiting for output');
+      const es = MockEventSource.instances[0];
+      act(() => { es.emit('message', { data: 'hello world' }); });
+      // useJobLogStream batches via rAF + 50ms timer; drain it.
+      act(() => { vi.runAllTimers(); });
+      expect(screen.getByTestId('body')).toHaveTextContent('hello world');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears activeJobId when the side-pane window is removed externally', () => {
+    function SyncProbe() {
+      const { activeJobId, openLog } = useEvalLog();
+      const { windows, removeWindow, closeAll } = useSidePane();
       return (
         <div>
-          <button onClick={() => openLog('job-x', 'Run X')}>open</button>
-          <div data-testid="body">{body}</div>
+          <div data-testid="active">{activeJobId || 'none'}</div>
+          <div data-testid="dock">{windows.map((w) => w.id).join(',') || 'empty'}</div>
+          <button onClick={() => openLog('job-a', 'Run A')}>open</button>
+          <button onClick={() => removeWindow('eval-log')}>remove-via-x</button>
+          <button onClick={closeAll}>close-all</button>
         </div>
       );
     }
-    render(
-      <SidePaneProvider>
-        <EvalLogProvider>
-          <ProbeWithRender />
-        </EvalLogProvider>
-      </SidePaneProvider>
-    );
+    renderWithProviders(<SyncProbe />);
     fireEvent.click(screen.getByText('open'));
-    expect(screen.getByTestId('body')).toHaveTextContent('Waiting for output');
-    const es = MockEventSource.instances[0];
-    act(() => { es.emit('message', { data: 'hello world' }); });
-    expect(screen.getByTestId('body')).toHaveTextContent('hello world');
+    expect(screen.getByTestId('active')).toHaveTextContent('job-a');
+    // Simulate the user closing the pane via its X button.
+    fireEvent.click(screen.getByText('remove-via-x'));
+    expect(screen.getByTestId('dock')).toHaveTextContent('empty');
+    expect(screen.getByTestId('active')).toHaveTextContent('none');
+    // And via the Escape-style close-all path.
+    fireEvent.click(screen.getByText('open'));
+    expect(screen.getByTestId('active')).toHaveTextContent('job-a');
+    fireEvent.click(screen.getByText('close-all'));
+    expect(screen.getByTestId('active')).toHaveTextContent('none');
   });
 
   it('window title reflects job lifecycle status when provided', () => {

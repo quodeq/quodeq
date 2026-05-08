@@ -66,18 +66,6 @@ export function relocateProject(projectId, newPath) {
   });
 }
 
-/**
- * @param {string} projectId
- * @param {string} destination
- * @returns {Promise<Object>}
- */
-export function cloneToLocal(projectId, destination) {
-  return request(`/projects/${encodeURIComponent(projectId)}/clone-local`, {
-    method: 'POST',
-    body: JSON.stringify({ destination }),
-  });
-}
-
 // ── Unified Scores ─────────────────────────────────────────────────────
 
 /** @returns {Promise<{accumulated: Object, trend: Array, availableRuns: Array}>} */
@@ -247,6 +235,25 @@ export function testOllamaConcurrency(model) {
   });
 }
 
+/** @returns {Promise<Object>} llama.cpp connection status */
+export function getLlamacppStatus() {
+  return request('/llamacpp/status');
+}
+
+/** @returns {Promise<Object[]>} Loaded llama.cpp model (0 or 1 entries) */
+export async function getLlamacppModels() {
+  const data = await request('/llamacpp/models');
+  return data?.models ?? [];
+}
+
+/** @returns {Promise<Object>} Concurrency test results for the loaded model */
+export function testLlamacppConcurrency(model) {
+  return request('/llamacpp/test-concurrency', {
+    method: 'POST',
+    body: JSON.stringify({ model: model || '' }),
+  });
+}
+
 /** @returns {Promise<Object>} Connection test result for the provider */
 export function testProviderConnection({ provider, apiBase, model, apiKey }) {
   return request('/provider/test', {
@@ -272,6 +279,38 @@ export function scanPath(dirPath) {
 
 // Standards and findings APIs are re-exported at the top of this file.
 
+/**
+ * Import a previously-exported project zip.
+ *
+ * Uses raw fetch so we can (a) send multipart/form-data without the shared
+ * request() wrapper forcing application/json, and (b) read err.status,
+ * err.kind, err.existingProjectId on a 409 collision so the caller can
+ * prompt the user to choose Replace / Import as copy / Cancel.
+ *
+ * @param {File|Blob} file - the .zip file to import
+ * @param {{ action?: 'replace'|'copy' }} [opts]
+ * @returns {Promise<{ imported: boolean, projectId: string, sourceProjectId: string, renamed: boolean, projectName?: string }>}
+ * @throws {Error & { status: number, code?: string, kind?: string, existingProjectId?: string, projectName?: string }} on non-2xx
+ */
+export async function importProject(file, opts = {}) {
+  const form = new FormData();
+  form.append('file', file);
+  if (opts.action) form.append('action', opts.action);
+  // No timeout: large project zips can take a while to upload.
+  const res = await fetch(`${BASE}/projects/import`, { method: 'POST', body: form });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(body.error || `importProject failed (${res.status})`);
+    err.status = res.status;
+    if (body.code) err.code = body.code;
+    if (body.kind) err.kind = body.kind;
+    if (body.existingProjectId) err.existingProjectId = body.existingProjectId;
+    if (body.projectName) err.projectName = body.projectName;
+    throw err;
+  }
+  return body;
+}
+
 // Note: uses raw fetch (not the shared request() wrapper) so the wizard can
 // read err.status and err.existingProjectId on a 409 duplicate response —
 // request() throws plain Error and discards both. Refactoring request() to
@@ -280,9 +319,9 @@ export function scanPath(dirPath) {
  * Register a new project without starting an evaluation.
  * Used by the onboarding wizard's Repo & Scan step.
  *
- * @param {{ repo: string, branch?: string, scopePath?: string, discipline?: string }} payload
+ * @param {{ repo: string, cloneDest?: string, ephemeral?: boolean, branch?: string, scopePath?: string, discipline?: string }} payload
  * @returns {Promise<{ projectId: string, scanData: object }>}
- * @throws {Error & { status: number, existingProjectId?: string }} on non-2xx
+ * @throws {Error & { status: number, code?: string, existingProjectId?: string }} on non-2xx
  */
 export async function registerProject(payload) {
   const res = await fetch('/api/projects', {
@@ -294,6 +333,7 @@ export async function registerProject(payload) {
   if (!res.ok) {
     const err = new Error(body.error || `registerProject failed (${res.status})`);
     err.status = res.status;
+    if (body.code) err.code = body.code;
     if (body.existingProjectId) err.existingProjectId = body.existingProjectId;
     throw err;
   }
