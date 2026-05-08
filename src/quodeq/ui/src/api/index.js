@@ -66,18 +66,6 @@ export function relocateProject(projectId, newPath) {
   });
 }
 
-/**
- * @param {string} projectId
- * @param {string} destination
- * @returns {Promise<Object>}
- */
-export function cloneToLocal(projectId, destination) {
-  return request(`/projects/${encodeURIComponent(projectId)}/clone-local`, {
-    method: 'POST',
-    body: JSON.stringify({ destination }),
-  });
-}
-
 // ── Unified Scores ─────────────────────────────────────────────────────
 
 /** @returns {Promise<{accumulated: Object, trend: Array, availableRuns: Array}>} */

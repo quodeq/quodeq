@@ -69,7 +69,6 @@ function makeFakeApi(overrides = {}) {
   return {
     getProjectInfo: vi.fn().mockResolvedValue(null),
     relocateProject: vi.fn().mockResolvedValue(null),
-    cloneToLocal: vi.fn().mockResolvedValue(null),
     listPlugins: vi.fn().mockResolvedValue([]),
     listStandards: vi.fn().mockResolvedValue([]),
     ...overrides,

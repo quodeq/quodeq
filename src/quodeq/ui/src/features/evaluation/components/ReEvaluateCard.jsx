@@ -6,7 +6,6 @@ import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import BranchScopeSelector from './BranchScopeSelector.jsx';
 import CleanScanToggle from './CleanScanToggle.jsx';
 import DimensionSelector from './DimensionSelector.jsx';
-import FolderBrowser from './FolderBrowser.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import HelpHint from '../../../components/HelpHint.jsx';
 
@@ -71,7 +70,7 @@ function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }
     }
   }
 
-  return { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore };
+  return { info, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore };
 }
 
 function useDimensionSelection(allDimensions, info, branch, scopePath, onStart, onValidationFail) {
@@ -102,18 +101,14 @@ function useDimensionSelection(allDimensions, info, branch, scopePath, onStart, 
 
 function useReEvaluateCard(project, onStart, projectInfo) {
   const api = useApi();
-  const { getProjectInfo, relocateProject, cloneToLocal } = api;
-  const { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo, { getProjectInfo, relocateProject });
+  const { getProjectInfo, relocateProject } = api;
+  const { info, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo, { getProjectInfo, relocateProject });
   const { allDimensions } = usePluginDimensions();
   const { showToast } = useSidePane();
   const [branch, setBranch] = useState(null);
   const [scopePath, setScopePath] = useState(null);
 
   useEffect(() => { setScopePath(null); setBranch(null); }, [project]);
-  const [cloneBrowserOpen, setCloneBrowserOpen] = useState(false);
-  const [cloning, setCloning] = useState(false);
-  const [cloneDest, setCloneDest] = useState('');
-  const [cloneError, setCloneError] = useState(null);
 
   const isLocal = info?.location === 'local';
   const { scanData } = useScanData(isLocal ? project : null);
@@ -121,26 +116,10 @@ function useReEvaluateCard(project, onStart, projectInfo) {
   const { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan } =
     useDimensionSelection(allDimensions, info, branch, scopePath, onStart, showToast);
 
-  async function handleCloneToLocal(destination) {
-    setCloneBrowserOpen(false);
-    setCloning(true);
-    setCloneDest(destination);
-    setCloneError(null);
-    try {
-      const updated = await cloneToLocal(project, destination);
-      setInfo(updated);
-    } catch (err) {
-      setCloneError(err.message || 'Clone failed');
-    } finally {
-      setCloning(false);
-    }
-  }
-
   return {
     info, error, allDimensions, selectedDims,
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
-    cloneBrowserOpen, setCloneBrowserOpen, cloning, cloneDest, cloneError, handleCloneToLocal,
     isLocal, scanData, branch, setBranch, scopePath, setScopePath,
   };
 }
@@ -174,38 +153,17 @@ function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, handleU
   );
 }
 
-function DimensionSelectionSection({ allDimensions, selectedDims, cloning, toggleDim, selectAll, clearAll }) {
+function DimensionSelectionSection({ allDimensions, selectedDims, toggleDim, selectAll, clearAll }) {
   if (allDimensions.length === 0) return null;
   return (
     <DimensionSelector
       variant="terminal"
       allDimensions={allDimensions}
       selectedDims={selectedDims}
-      onToggle={cloning ? undefined : toggleDim}
-      onSelectAll={cloning ? undefined : selectAll}
-      onClearAll={cloning ? undefined : clearAll}
+      onToggle={toggleDim}
+      onSelectAll={selectAll}
+      onClearAll={clearAll}
     />
-  );
-}
-
-function CloneSection({ info, cloning, cloneDest, cloneError, setCloneBrowserOpen }) {
-  return (
-    <>
-      {info.location === 'online' && !info.pathMissing && !cloning && (
-        <div className="re-eval-clone-row">
-          <a href="#" className="re-eval-clone-link" onClick={(e) => { e.preventDefault(); setCloneBrowserOpen(true); }}>
-            ⬇ Clone to local storage
-          </a>
-        </div>
-      )}
-      {cloneError && <p className="inline-error">{cloneError}</p>}
-      {cloning && (
-        <div className="re-eval-clone-banner">
-          <span className="re-eval-clone-spinner" />
-          <span>Cloning to <code>{cloneDest}</code>...</span>
-        </div>
-      )}
-    </>
   );
 }
 
@@ -230,11 +188,10 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
   const {
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
-    cloneBrowserOpen, setCloneBrowserOpen, cloning, cloneDest, cloneError, handleCloneToLocal,
   } = actions;
 
   const isReadOnlyEphemeral = info?.ephemeral === true && info?.evaluable === false;
-  const canStart = !disabled && !cloning && !info.pathMissing && !isReadOnlyEphemeral;
+  const canStart = !disabled && !info.pathMissing && !isReadOnlyEphemeral;
 
   return (
     <div className="panel evaluate-panel evaluate-panel--terminal">
@@ -278,22 +235,11 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
           <UrlRestoreSection urlInput={urlInput} setUrlInput={setUrlInput} urlError={urlError} urlSaving={urlSaving} handleUrlRestore={handleUrlRestore} />
         )}
 
-        <CloneSection info={info} cloning={cloning} cloneDest={cloneDest} cloneError={cloneError} setCloneBrowserOpen={setCloneBrowserOpen} />
-
-        <div className={`re-eval-actions-group${cloning ? ' re-eval-disabled-section' : ''}`}>
-          <DimensionSelectionSection allDimensions={allDimensions} selectedDims={selectedDims} cloning={cloning} toggleDim={toggleDim} selectAll={selectAll} clearAll={clearAll} />
+        <div className="re-eval-actions-group">
+          <DimensionSelectionSection allDimensions={allDimensions} selectedDims={selectedDims} toggleDim={toggleDim} selectAll={selectAll} clearAll={clearAll} />
           <ActionButtons disabled={disabled} canStart={canStart} handleScan={handleScan} />
         </div>
       </div>
-
-      {cloneBrowserOpen && (
-        <FolderBrowser
-          onSelect={handleCloneToLocal}
-          onClose={() => setCloneBrowserOpen(false)}
-          title="Select Clone Destination"
-          confirmText="Clone Here"
-        />
-      )}
     </div>
   );
 }
@@ -303,7 +249,6 @@ export default function ReEvaluateCard({ project, projectInfo, onStart, disabled
     info, error, allDimensions, selectedDims,
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
-    cloneBrowserOpen, setCloneBrowserOpen, cloning, cloneDest, cloneError, handleCloneToLocal,
     isLocal, scanData, branch, setBranch, scopePath, setScopePath,
   } = useReEvaluateCard(project, onStart, projectInfo);
 
@@ -325,7 +270,6 @@ export default function ReEvaluateCard({ project, projectInfo, onStart, disabled
       actions={{
         toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
         urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
-        cloneBrowserOpen, setCloneBrowserOpen, cloning, cloneDest, cloneError, handleCloneToLocal,
       }}
       scope={{ isLocal, scanData, branch, setBranch, scopePath, setScopePath }}
     />
