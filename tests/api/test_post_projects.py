@@ -75,38 +75,6 @@ def test_post_projects_bad_local_path_returns_400_and_no_dir(app_client, tmp_pat
     assert after_dirs == before_dirs, "Rollback should leave no new project directory on disk"
 
 
-@pytest.mark.skip(
-    reason="Clone-on-add A2: URL registration now requires clone_dest or "
-    "ephemeral; the POST /api/projects route is updated in Task A3 to "
-    "forward cloneDest/ephemeral from the request body. Until then, URL "
-    "registration intentionally rejects this old contract."
-)
-def test_post_projects_online_url_returns_stub_scan(app_client, tmp_path):
-    c, home, _ = app_client
-    repo_url = "https://github.com/owner/repo"
-    # Online registration does not clone at this stage (clone-on-demand
-    # happens at evaluation time), so we patch subprocess.run defensively
-    # to ensure no git command is invoked during registration.
-    with _patch_home(home), patch("subprocess.run") as mock_run:
-        resp = c.post("/api/projects", json={"repo": repo_url}, headers=_ORIGIN)
-    assert resp.status_code == 200, resp.get_json()
-    body = resp.get_json()
-    assert "projectId" in body
-    assert body["scanData"] == {
-        "total_files": 0,
-        "code_files": 0,
-        "languages": {},
-        "branches": [],
-        "modules": [],
-        "file_tree": [],
-    }
-    mock_run.assert_not_called()
-    info_path = home / "evaluations" / body["projectId"] / "repository_info.json"
-    assert info_path.exists()
-    info = json.loads(info_path.read_text())
-    assert info.get("location") == "online"
-
-
 def test_post_projects_cleartext_http_returns_400(app_client):
     c, home, _ = app_client
     with _patch_home(home):

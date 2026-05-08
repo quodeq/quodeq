@@ -19,7 +19,6 @@ from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 _BLOCKED_SCAN_PATHS = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
-_EMPTY_SCAN: dict[str, object] = {"total_files": 0, "code_files": 0, "languages": {}, "branches": [], "modules": [], "file_tree": []}
 
 
 def _find_existing_project(reports_root: str, repo: str, scope_path: str | None) -> str | None:
@@ -241,15 +240,11 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     def create_project() -> Response | tuple[Response, int]:
         """Register a new project (clone + scan) without starting an evaluation.
 
-        Body: ``{ repo, branch?, scopePath?, discipline? }``
+        Body: ``{ repo, cloneDest?, ephemeral?, branch?, scopePath?, discipline? }``
 
-        Returns:
-            200 ``{ projectId, scanData }`` on success.
-            409 ``{ existingProjectId }`` when a project for the same repo
-                identity already exists.
-            400 with rollback when the repo input is invalid (missing or a
-                local path that does not exist).
-            500 with rollback when scan/registration fails unexpectedly.
+        For URL repos: requires either ``cloneDest`` (existing dir under home)
+        or ``ephemeral: true``. For local-path repos: ``cloneDest`` and
+        ``ephemeral`` are ignored.
         """
         from quodeq.services.evaluation_mixin import _register_project
         from quodeq.shared.utils import is_repo_url
@@ -262,6 +257,8 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
         scope_path = data.get("scopePath") or None
         discipline = data.get("discipline") or None
+        clone_dest = data.get("cloneDest") or None
+        ephemeral = bool(data.get("ephemeral", False))
         reports_root = reports_dir()
 
         try:
@@ -270,10 +267,37 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             body, status = error_response("Invalid repo URL", HTTPStatus.BAD_REQUEST, "INVALID_REPO_URL")
             return jsonify(body), status
 
-        # For local repos, fail fast if the path doesn't exist — registering
-        # a project for a missing directory would leave an orphan UUID dir
-        # behind that the caller has no way to recover from.
-        if not is_url:
+        if is_url:
+            if not ephemeral and not clone_dest:
+                body, status = error_response(
+                    "cloneDest is required for URL repos when ephemeral is false",
+                    HTTPStatus.BAD_REQUEST,
+                    "MISSING_CLONE_DEST",
+                )
+                return jsonify(body), status
+            if not ephemeral and clone_dest:
+                dest_path = Path(clone_dest)
+                home = Path.home().resolve()
+                try:
+                    dest_resolved = dest_path.resolve()
+                except OSError:
+                    body, status = error_response(
+                        "Invalid cloneDest path",
+                        HTTPStatus.BAD_REQUEST,
+                        "INVALID_CLONE_DEST",
+                    )
+                    return jsonify(body), status
+                if not dest_resolved.is_dir() or not dest_resolved.is_relative_to(home):
+                    body, status = error_response(
+                        "cloneDest must be an existing directory under your home folder",
+                        HTTPStatus.BAD_REQUEST,
+                        "INVALID_CLONE_DEST",
+                    )
+                    return jsonify(body), status
+        else:
+            # For local repos, fail fast if the path doesn't exist — registering
+            # a project for a missing directory would leave an orphan UUID dir
+            # behind that the caller has no way to recover from.
             local_candidate = Path(repo)
             if not local_candidate.exists() or not local_candidate.is_dir():
                 body, status = error_response(
@@ -302,7 +326,14 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         )
 
         try:
-            project_uuid = _register_project(repo, discipline, reports_root, scope_path=scope_path)
+            project_uuid = _register_project(
+                repo,
+                discipline,
+                reports_root,
+                scope_path=scope_path,
+                clone_dest=clone_dest,
+                ephemeral=ephemeral,
+            )
         except (FileNotFoundError, ValueError) as exc:
             _rollback_new_dirs(reports_root, before)
             body, status = error_response(str(exc), HTTPStatus.BAD_REQUEST, "INVALID_REPO")
@@ -329,18 +360,19 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             )
             return jsonify(body), status
 
-        # Read the scan that ``_register_project`` just produced (local) or
-        # synthesise a stub (online — clone-on-demand happens at evaluation
-        # time so the scan file may not yet exist).
+        # scan.json is now always present after _register_project succeeds.
         scan_path = Path(reports_root) / project_uuid / "scan.json"
-        scan_data: dict[str, object]
-        if scan_path.exists():
-            try:
-                scan_data = json.loads(scan_path.read_text())
-            except (json.JSONDecodeError, OSError):
-                scan_data = dict(_EMPTY_SCAN)
-        else:
-            scan_data = dict(_EMPTY_SCAN)
+        try:
+            scan_data = json.loads(scan_path.read_text())
+        except (json.JSONDecodeError, OSError, FileNotFoundError):
+            scan_data = {
+                "total_files": 0,
+                "code_files": 0,
+                "languages": {},
+                "branches": [],
+                "modules": [],
+                "file_tree": [],
+            }
 
         return jsonify({"projectId": project_uuid, "scanData": scan_data})
 
