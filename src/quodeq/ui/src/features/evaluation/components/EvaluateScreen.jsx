@@ -141,7 +141,15 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
           <NoProjectSelected onGoToProjects={onGoToProjects} />
         )}
 
-        <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={onDismiss} onCancel={onCancel} hasEvaluations={!!selectedProject} />
+        <EvaluationStatus
+          job={job}
+          project={selectedProject}
+          projectInfo={projectInfo}
+          liveViolations={liveViolations}
+          onDismiss={onDismiss}
+          onCancel={onCancel}
+          hasEvaluations={!!selectedProject}
+        />
       </div>
 
       {jobError && toastVisible && (

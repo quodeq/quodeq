@@ -15,12 +15,12 @@ function termNameForStatus(status) {
   return 'evaluation_cancelled';
 }
 
-function JobHeader({ job, onDismiss, onCancel }) {
+function JobHeader({ job, projectLabel, onDismiss, onCancel }) {
   const isRunning = job.status === STATUS.RUNNING;
   const isDone = job.status === STATUS.DONE;
   return (
     <div className="evaluate-panel__top evaluate-panel__top--row">
-      <TermHeader name={termNameForStatus(job.status)} />
+      <TermHeader name={termNameForStatus(job.status)} sub={projectLabel || undefined} />
       <div className="evaluate-panel__top-actions">
         {isRunning && (
           <button type="button" className="term-btn term-btn--ghost" onClick={onCancel}>cancel</button>
@@ -48,12 +48,13 @@ function JobIdLine({ jobId }) {
   );
 }
 
-export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, onCancel, hasEvaluations }) {
+export default function EvaluationStatus({ job, project, projectInfo, liveViolations = {}, onDismiss, onCancel, hasEvaluations }) {
   if (!job) return null;
+  const projectLabel = projectInfo?.displayName || projectInfo?.name || project || null;
 
   return (
     <div className="panel evaluate-panel--terminal">
-      <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
+      <JobHeader job={job} projectLabel={projectLabel} onDismiss={onDismiss} onCancel={onCancel} />
       <JobStatStrip job={job} liveViolations={liveViolations} />
       <JobIdLine jobId={job.jobId} />
       <ScanProgress job={job} hasEvaluations={hasEvaluations} />
