@@ -8,6 +8,7 @@ from quodeq.analysis._dimension_steps import (
     _parse_dimension_evidence,
     _run_dimension_analysis,
 )
+from quodeq.analysis.cache.flags import is_cache_v2_enabled
 from quodeq.analysis.subagents.runner import DimensionCallbacks, process_dimension_with_subagents
 from quodeq.core.evidence.model import Evidence
 from quodeq.engine._runner_markers import emit_marker
@@ -39,14 +40,17 @@ def _process_single_dimension(
         emit_marker("analyzing", dimension=dimension)
         log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension}")
 
-    ev = process_dimension_with_subagents(
-        config, dimension, idx, ctx,
-        callbacks=DimensionCallbacks(
-            build_prompt=_build_dimension_prompt,
-            run_analysis=_run_dimension_analysis,
-            parse_evidence=_parse_dimension_evidence,
-        ),
+    callbacks = DimensionCallbacks(
+        build_prompt=_build_dimension_prompt,
+        run_analysis=_run_dimension_analysis,
+        parse_evidence=_parse_dimension_evidence,
     )
+    if is_cache_v2_enabled():
+        # Deferred import: avoids loading the cache stack on default runs.
+        from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+        ev = process_dimension_with_cache(config, dimension, idx, ctx, callbacks)
+    else:
+        ev = process_dimension_with_subagents(config, dimension, idx, ctx, callbacks)
 
     if ev is None:
         log_warning(f"[{idx}/{ctx.total}] {dimension} — no valid evidence, skipping")
