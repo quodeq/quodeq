@@ -103,8 +103,15 @@ def process_dimension_with_cache(
     jsonl = _jsonl_path(config, dim_id)
 
     # All-hits short-circuit: no dispatch needed.
+    # We append (not overwrite) because callers may invoke us multiple times
+    # within the same dim (e.g. V1's backfill phase under stacked migration).
+    # Truncating here would destroy findings written by prior phases.
+    # Dedup runs after to handle any overlap from a same-run repeat.
     if not classify.misses:
-        _write_findings(jsonl, classify.cached_findings, append=False)
+        from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
+        _write_findings(jsonl, classify.cached_findings, append=True)
+        if jsonl.exists():
+            deduplicate_jsonl(jsonl)
         return parse_evidence_from_jsonl(
             config, dim_id, ctx, jsonl, files_read=len(files),
         )
@@ -129,8 +136,12 @@ def process_dimension_with_cache(
 
     # If there are also cache hits, merge them into the JSONL and
     # re-parse so the returned Evidence reflects the full picture.
+    # Dedup handles overlap with anything earlier phases may have written.
     if classify.cached_findings:
+        from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
         _write_findings(jsonl, classify.cached_findings, append=True)
+        if jsonl.exists():
+            deduplicate_jsonl(jsonl)
         return parse_evidence_from_jsonl(
             config, dim_id, ctx, jsonl, files_read=len(files),
         )

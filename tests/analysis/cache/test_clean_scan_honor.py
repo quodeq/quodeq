@@ -123,30 +123,10 @@ class TestClassifyBypassReads:
         assert len(result.cached_findings) == 1
 
 
-# ============================================================
-# 2. _try_v2_full_hit honors incremental=False
-# ============================================================
-
-
-class TestOrchestratorFastPathHonorsCleanScan:
-    def test_clean_scan_returns_none_despite_full_cache(
-        self, tmp_path: Path, cache: LocalFileBackend,
-        monkeypatch: pytest.MonkeyPatch,
-    ):
-        """incremental=False means V2 must not serve fast-path hits."""
-        config, _ = _setup(tmp_path, {"a.py": "x"}, incremental=False)
-        _populate_cache(cache, config, "security", ["a.py"])
-
-        monkeypatch.setenv("QUODEQ_CACHE_V2", "1")
-
-        from quodeq.analysis._incremental_orchestrator import _try_v2_full_hit
-
-        with patch(
-            "quodeq.analysis._incremental_orchestrator.LocalFileBackend",
-            return_value=cache,
-        ):
-            ev = _try_v2_full_hit(config, "security", _make_ctx())
-        assert ev is None
+# Removed TestOrchestratorFastPathHonorsCleanScan: the orchestrator-level
+# _try_v2_full_hit no longer exists. After B6 the orchestrator delegates
+# to _process_single_dimension which routes through process_dimension_with_cache,
+# and clean-scan honoring is verified at that layer (TestDispatchBypassesCacheOnCleanScan).
 
 
 # ============================================================

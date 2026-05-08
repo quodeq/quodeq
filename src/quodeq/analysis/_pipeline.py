@@ -15,7 +15,6 @@ from quodeq.analysis._dimension_ops import (
     _parse_dimension_evidence,
     _process_single_dimension,
     _run_dimension_analysis,
-    _save_dimension_fingerprint,
 )
 from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
 from quodeq.analysis.subagents.runner import process_consolidated_dimensions
@@ -53,7 +52,8 @@ def _run_dry_run(
             files_read=0,
             coverage_pct=0.0,
         )
-        _save_dimension_fingerprint(config, dimension, files=[], analyzed_files=set())
+        # V2 cache writes happen per-file inside the dispatch path; dry-run
+        # has nothing to dispatch, so no cache state is created here.
         jsonl_path = evidence_dir / f"{dimension}_evidence.jsonl"
         jsonl_path.parent.mkdir(parents=True, exist_ok=True)
         if not jsonl_path.exists():
