@@ -1,26 +1,22 @@
-"""Dimension orchestration: single-dimension processing, logging, fingerprinting."""
+"""Dimension orchestration: single-dimension processing and logging.
+
+V2 (content-addressed cache) is the canonical path. Per-file cache
+entries are written by ``persist_dispatch_results`` after dispatch;
+no separate per-dimension fingerprint file is required.
+"""
 from __future__ import annotations
 
-from quodeq.analysis._incremental_evidence import save_dimension_fingerprint
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis._dimension_steps import (
     _build_dimension_prompt,
     _parse_dimension_evidence,
     _run_dimension_analysis,
 )
-from quodeq.analysis.cache.flags import is_cache_v2_enabled
-from quodeq.analysis.subagents.runner import DimensionCallbacks, process_dimension_with_subagents
+from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.subagents.runner import DimensionCallbacks
 from quodeq.core.evidence.model import Evidence
 from quodeq.engine._runner_markers import emit_marker
 from quodeq.shared.logging import log_info, log_success, log_warning
-
-
-def _save_dimension_fingerprint(
-    config: RunConfig, dimension: str, files: list[str] | None = None,
-    analyzed_files: set[str] | None = None,
-) -> None:
-    """Save a fingerprint after any successful dimension analysis."""
-    save_dimension_fingerprint(config, dimension, files, analyzed_files)
 
 
 def _log_dimension_result(ev: Evidence, dimension: str, idx: int, total: int) -> None:
@@ -45,18 +41,12 @@ def _process_single_dimension(
         run_analysis=_run_dimension_analysis,
         parse_evidence=_parse_dimension_evidence,
     )
-    if is_cache_v2_enabled():
-        # Deferred import: avoids loading the cache stack on default runs.
-        from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
-        ev = process_dimension_with_cache(config, dimension, idx, ctx, callbacks)
-    else:
-        ev = process_dimension_with_subagents(config, dimension, idx, ctx, callbacks)
+    ev = process_dimension_with_cache(config, dimension, idx, ctx, callbacks)
 
     if ev is None:
         log_warning(f"[{idx}/{ctx.total}] {dimension} — no valid evidence, skipping")
         return None
 
-    _save_dimension_fingerprint(config, dimension)
     if emit_log:
         _log_dimension_result(ev, dimension, idx, ctx.total)
     return ev

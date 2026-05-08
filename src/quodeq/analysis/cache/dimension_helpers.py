@@ -19,9 +19,8 @@ These are pure functions used by the V2 dimension processor (Phase B5):
     files that were actually dispatched. Empty-finding files get an
     empty entry — a clean analysis is still a hit, not a miss.
 
-These helpers do not call into the live pipeline. The Phase B5 wrapper
-will compose them with ``process_dimension_with_subagents`` behind the
-``QUODEQ_CACHE_V2`` flag.
+These helpers compose into the canonical V2 dimension processor in
+``cache/dimension_runner.py``.
 """
 from __future__ import annotations
 

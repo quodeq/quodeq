@@ -182,7 +182,6 @@ class TestDryRunPipeline:
         config = self._make_config(tmp_path)
 
         with patch("quodeq.analysis._pipeline._process_single_dimension") as mock_proc, \
-             patch("quodeq.analysis._pipeline._save_dimension_fingerprint"), \
              patch("quodeq.analysis._pipeline.emit_marker"), \
              patch("quodeq.analysis._pipeline.load_analysis_context") as mock_ctx:
             dims = ["security", "reliability"]
@@ -200,8 +199,7 @@ class TestDryRunPipeline:
         """Each dimension gets an Evidence object with correct metadata."""
         config = self._make_config(tmp_path)
 
-        with patch("quodeq.analysis._pipeline._save_dimension_fingerprint"), \
-             patch("quodeq.analysis._pipeline.emit_marker"), \
+        with patch("quodeq.analysis._pipeline.emit_marker"), \
              patch("quodeq.analysis._pipeline.load_analysis_context") as mock_ctx:
             dims = ["security", "reliability"]
             ctx = MagicMock()
@@ -219,32 +217,16 @@ class TestDryRunPipeline:
             assert ev.files_read == 0
             assert ev.coverage_pct == 0.0
 
-    def test_fingerprints_saved_per_dimension(self, tmp_path):
-        """Fingerprint is saved for each dimension even with no AI calls."""
-        config = self._make_config(tmp_path)
-
-        with patch("quodeq.analysis._pipeline._save_dimension_fingerprint") as mock_fp, \
-             patch("quodeq.analysis._pipeline.emit_marker"), \
-             patch("quodeq.analysis._pipeline.load_analysis_context") as mock_ctx:
-            dims = ["security", "reliability"]
-            ctx = MagicMock()
-            ctx.total = 2
-            mock_ctx.return_value = (dims, ctx)
-
-            from quodeq.analysis._pipeline import run_per_dimension
-            run_per_dimension(config)
-
-        assert mock_fp.call_count == 2
-        called_dims = {call.args[1] for call in mock_fp.call_args_list}
-        assert called_dims == {"security", "reliability"}
+    # Removed test_fingerprints_saved_per_dimension: V1's per-dimension
+    # fingerprint write is gone. V2 writes per-file cache entries during
+    # dispatch, and dry-run doesn't dispatch — no cache state to assert.
 
     def test_on_dimension_done_callback_called(self, tmp_path):
         """on_dimension_done callback receives each dimension and its Evidence."""
         config = self._make_config(tmp_path)
         done_calls: list[tuple[str, Evidence]] = []
 
-        with patch("quodeq.analysis._pipeline._save_dimension_fingerprint"), \
-             patch("quodeq.analysis._pipeline.emit_marker"), \
+        with patch("quodeq.analysis._pipeline.emit_marker"), \
              patch("quodeq.analysis._pipeline.load_analysis_context") as mock_ctx:
             dims = ["security", "reliability"]
             ctx = MagicMock()
@@ -262,8 +244,7 @@ class TestDryRunPipeline:
         """run() in dry-run mode returns a single merged Evidence."""
         config = self._make_config(tmp_path)
 
-        with patch("quodeq.analysis._pipeline._save_dimension_fingerprint"), \
-             patch("quodeq.analysis._pipeline.emit_marker"), \
+        with patch("quodeq.analysis._pipeline.emit_marker"), \
              patch("quodeq.analysis._pipeline.load_analysis_context") as mock_ctx:
             dims = ["security", "reliability"]
             ctx = MagicMock()
@@ -281,8 +262,7 @@ class TestDryRunPipeline:
         """Dry-run respects the dimension filter."""
         config = self._make_config(tmp_path, dimensions=["security"])
 
-        with patch("quodeq.analysis._pipeline._save_dimension_fingerprint"), \
-             patch("quodeq.analysis._pipeline.emit_marker"), \
+        with patch("quodeq.analysis._pipeline.emit_marker"), \
              patch("quodeq.analysis._pipeline.load_analysis_context") as mock_ctx:
             dims = ["security"]  # filtered down to just this one
             ctx = MagicMock()
@@ -298,8 +278,7 @@ class TestDryRunPipeline:
         """Dry-run creates an empty evidence JSONL file for each dimension."""
         config = self._make_config(tmp_path)
 
-        with patch("quodeq.analysis._pipeline._save_dimension_fingerprint"), \
-             patch("quodeq.analysis._pipeline.emit_marker"), \
+        with patch("quodeq.analysis._pipeline.emit_marker"), \
              patch("quodeq.analysis._pipeline.load_analysis_context") as mock_ctx:
             dims = ["security", "reliability"]
             ctx = MagicMock()
@@ -327,8 +306,7 @@ class TestDryRunPipeline:
         )
         (tmp_path / "evidence").mkdir(parents=True, exist_ok=True)
 
-        with patch("quodeq.analysis._pipeline._save_dimension_fingerprint"), \
-             patch("quodeq.analysis._pipeline.emit_marker"), \
+        with patch("quodeq.analysis._pipeline.emit_marker"), \
              patch("quodeq.analysis._pipeline.load_analysis_context") as mock_ctx:
             ctx = MagicMock()
             ctx.total = 1

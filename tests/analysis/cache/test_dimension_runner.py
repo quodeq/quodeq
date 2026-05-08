@@ -334,62 +334,25 @@ class TestNoSourceFiles:
 # ============================================================
 
 
-class TestFlagWiring:
-    def test_v2_flag_routes_to_cache_runner(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+class TestWiring:
+    def test_process_single_dimension_routes_to_cache_runner(
+        self, tmp_path: Path,
     ):
-        """When QUODEQ_CACHE_V2=1, _process_single_dimension dispatches
-        through the cache runner instead of calling subagents directly."""
+        """V2 is the canonical path: _process_single_dimension always
+        routes through process_dimension_with_cache."""
         from quodeq.analysis._dimension_ops import _process_single_dimension
 
         config, src = _setup(tmp_path, {"a.py": "x"})
 
-        monkeypatch.setenv("QUODEQ_CACHE_V2", "1")
-
-        called_v2 = {"hit": False}
-        def fake_v2(config, dim_id, idx, ctx, callbacks, cache=None):
-            called_v2["hit"] = True
+        called = {"hit": False}
+        def fake_cache(config, dim_id, idx, ctx, callbacks, cache=None):
+            called["hit"] = True
             return _make_dummy_evidence(files_read=1)
 
         with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_cache",
-            new=fake_v2,
-        ), patch(
-            "quodeq.analysis._dimension_ops._save_dimension_fingerprint",
+            "quodeq.analysis._dimension_ops.process_dimension_with_cache",
+            new=fake_cache,
         ):
             _process_single_dimension(config, "security", 1, _make_ctx(), emit_log=False)
 
-        assert called_v2["hit"] is True
-
-    def test_v2_flag_off_routes_to_subagents_directly(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    ):
-        """Default behaviour: flag off → existing path, no V2 involvement."""
-        from quodeq.analysis._dimension_ops import _process_single_dimension
-
-        config, src = _setup(tmp_path, {"a.py": "x"})
-
-        monkeypatch.delenv("QUODEQ_CACHE_V2", raising=False)
-
-        called_v2 = {"hit": False}
-        called_v1 = {"hit": False}
-        def fake_v2(*args, **kwargs):
-            called_v2["hit"] = True
-            return _make_dummy_evidence(files_read=1)
-        def fake_v1(*args, **kwargs):
-            called_v1["hit"] = True
-            return _make_dummy_evidence(files_read=1)
-
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_cache",
-            new=fake_v2,
-        ), patch(
-            "quodeq.analysis._dimension_ops.process_dimension_with_subagents",
-            new=fake_v1,
-        ), patch(
-            "quodeq.analysis._dimension_ops._save_dimension_fingerprint",
-        ):
-            _process_single_dimension(config, "security", 1, _make_ctx(), emit_log=False)
-
-        assert called_v1["hit"] is True
-        assert called_v2["hit"] is False
+        assert called["hit"] is True

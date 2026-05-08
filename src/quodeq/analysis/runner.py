@@ -35,7 +35,6 @@ from quodeq.analysis._dimension_ops import (
     _log_dimension_result as _log_dimension_result,
     _process_single_dimension as _process_single_dimension,
     _run_dimension_incremental as _run_dimension_incremental,
-    _save_dimension_fingerprint as _save_dimension_fingerprint,
 )
 
 # Re-export pipeline API (used by cli.py, scoring_pipeline.py, tests)
