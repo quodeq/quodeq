@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, Protocol
 from quodeq.core.types import JobSnapshot
 from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_TIME_LIMIT
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
-from quodeq.shared.repo_handler import is_valid_repo_url
 from quodeq.core.evidence.parser import parse_jsonl_to_evidence, EvidenceContext
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.analysis.report import write_dimension_report
@@ -254,18 +253,16 @@ class FsEvaluationMixin:
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:
         """Start an asynchronous evaluation subprocess for a repository."""
         if is_repo_url(repo):
-            if not is_valid_repo_url(repo):
-                raise ValueError(
-                    f"Invalid repository URL format: {repo}. "
-                    f"Expected a URL like https://github.com/owner/repo or git@github.com:owner/repo.git"
-                )
-        else:
-            resolved = Path(repo).resolve()
-            if not resolved.exists():
-                raise FileNotFoundError(
-                    f"Repository not found: {repo}. "
-                    f"Check that the path exists and is accessible from this machine."
-                )
+            raise ValueError(
+                "URL repos are not supported here. Register the project via "
+                "POST /api/projects (which clones to disk) and pass the local path."
+            )
+        resolved = Path(repo).resolve()
+        if not resolved.exists():
+            raise FileNotFoundError(
+                f"Repository not found: {repo}. "
+                f"Check that the path exists and is accessible from this machine."
+            )
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
         _register_project(repo, options.discipline, reports_dir, scope_path=options.scope_path)
@@ -275,21 +272,17 @@ class FsEvaluationMixin:
         if hasattr(self._jobs, "set_reports_root"):
             self._jobs.set_reports_root(Path(reports_dir))
         env = self._build_eval_env(repo, options)
-        if is_repo_url(repo):
-            cwd = str(Path.cwd())
+        # For files, walk up to find git root; for dirs, use as-is
+        if resolved.is_file():
+            candidate = resolved.parent
+            cwd = str(candidate)
+            while candidate != candidate.parent:
+                if (candidate / ".git").exists():
+                    cwd = str(candidate)
+                    break
+                candidate = candidate.parent
         else:
-            resolved = Path(repo).resolve()
-            # For files, walk up to find git root; for dirs, use as-is
-            if resolved.is_file():
-                candidate = resolved.parent
-                cwd = str(candidate)
-                while candidate != candidate.parent:
-                    if (candidate / ".git").exists():
-                        cwd = str(candidate)
-                        break
-                    candidate = candidate.parent
-            else:
-                cwd = str(resolved)
+            cwd = str(resolved)
         return self.dispatcher.dispatch(cmd, cwd=cwd, env=env)
 
     def get_evaluation_status(self, job_id: str, reports_dir: str | None = None) -> JobSnapshot | None:

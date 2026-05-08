@@ -122,3 +122,20 @@ def test_register_url_clone_dest_must_exist(tmp_path):
 
     # Verify nothing was created under the missing path
     assert not nonexistent.exists()
+
+
+def test_start_evaluation_rejects_url_input(tmp_path):
+    """start_evaluation no longer clones; URLs must already be registered as local."""
+    from quodeq.services.base import EvaluationOptions
+    from quodeq.services.evaluation_mixin import FsEvaluationMixin
+
+    class _Stub(FsEvaluationMixin):
+        _jobs = None
+        _dispatcher = None
+
+    with pytest.raises(ValueError, match="not supported"):
+        _Stub().start_evaluation(
+            "https://github.com/example/repo.git",
+            str(tmp_path),
+            EvaluationOptions(),
+        )
