@@ -1,11 +1,20 @@
 """Evidence model — dataclasses for judgments, principles, and evaluation output."""
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 DEFAULT_WEIGHT = "Medium (x2)"
 _HIGH_CONFIDENCE_THRESHOLD = 10  # minimum total instances for "high" confidence
 _MEDIUM_CONFIDENCE_THRESHOLD = 5  # minimum total instances for "medium" confidence
+# A 5-file project can never produce 5 instances of every principle; the
+# fixed threshold above hides genuine findings as "Insufficient" on small
+# projects. Scale the threshold down by source-file count, capped at the
+# defaults so larger projects keep their existing bar.
+_HIGH_INSTANCES_PER_FILE = 0.2  # 1 instance per 5 files for high confidence
+_MEDIUM_INSTANCES_PER_FILE = 0.1  # 1 instance per 10 files for medium confidence
+_MIN_HIGH_INSTANCES = 2  # absolute floor — never trust "high" on a single sample
+_MIN_MEDIUM_INSTANCES = 1  # absolute floor — at least one finding to be "medium"
 _LOW_CONF_MAJORITY_DIVISOR = 2  # denominator for "low confidence majority" threshold
 PERCENT_SCALE = 100
 
@@ -87,10 +96,31 @@ class PrincipleEvidence:
         self.compliance.extend(other.compliance)
         self.compute_metrics()
 
-    def compute_metrics(self, scale_multiplier: int = 1) -> None:
-        """Calculate compliance percentage and confidence level from violation/compliance counts."""
-        high_threshold = _HIGH_CONFIDENCE_THRESHOLD * scale_multiplier
-        medium_threshold = _MEDIUM_CONFIDENCE_THRESHOLD * scale_multiplier
+    def compute_metrics(self, scale_multiplier: int = 1, source_file_count: int = 0) -> None:
+        """Calculate compliance percentage and confidence level from violation/compliance counts.
+
+        Thresholds scale with project size:
+        - large projects (via ``scale_multiplier``) need more instances
+          to reach high/medium confidence;
+        - small projects (via ``source_file_count``) need fewer, since
+          a 5-file repo can't physically produce 5 findings per
+          principle. Without this, small projects always read as
+          "Insufficient" even when critical violations are present.
+        """
+        base_high = _HIGH_CONFIDENCE_THRESHOLD * scale_multiplier
+        base_medium = _MEDIUM_CONFIDENCE_THRESHOLD * scale_multiplier
+        if source_file_count > 0:
+            high_threshold = max(
+                _MIN_HIGH_INSTANCES,
+                min(base_high, math.ceil(source_file_count * _HIGH_INSTANCES_PER_FILE)),
+            )
+            medium_threshold = max(
+                _MIN_MEDIUM_INSTANCES,
+                min(base_medium, math.ceil(source_file_count * _MEDIUM_INSTANCES_PER_FILE)),
+            )
+        else:
+            high_threshold = base_high
+            medium_threshold = base_medium
 
         n_violations = len(self.violations)
         n_compliance = len(self.compliance)
