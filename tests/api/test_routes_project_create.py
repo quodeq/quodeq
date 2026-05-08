@@ -104,3 +104,39 @@ def test_post_projects_clone_dest_must_exist(client, tmp_path):
     )
     assert resp.status_code == 400
     assert resp.get_json()["code"] == "INVALID_CLONE_DEST"
+
+
+def test_post_projects_clone_dest_must_be_directory_not_file(client, tmp_path):
+    """If cloneDest points to a file (not a directory), reject with INVALID_CLONE_DEST."""
+    # Fixture sets home to tmp_path, so a file under tmp_path is "under home" but not a dir.
+    a_file = tmp_path / "regular-file.txt"
+    a_file.write_text("not a directory")
+
+    resp = client.post(
+        "/api/projects",
+        json={
+            "repo": "https://github.com/x/y.git",
+            "cloneDest": str(a_file),
+        },
+        headers=_ORIGIN,
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["code"] == "INVALID_CLONE_DEST"
+
+
+def test_post_projects_clone_dest_must_be_under_home(client, tmp_path):
+    """If cloneDest resolves outside the user's home folder, reject with INVALID_CLONE_DEST."""
+    # Fixture pins home to tmp_path. Build a sibling path that exists but is outside home.
+    outside = tmp_path.parent / "outside-home-dir"
+    outside.mkdir(exist_ok=True)
+
+    resp = client.post(
+        "/api/projects",
+        json={
+            "repo": "https://github.com/x/y.git",
+            "cloneDest": str(outside),
+        },
+        headers=_ORIGIN,
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["code"] == "INVALID_CLONE_DEST"
