@@ -280,9 +280,9 @@ export function scanPath(dirPath) {
  * Register a new project without starting an evaluation.
  * Used by the onboarding wizard's Repo & Scan step.
  *
- * @param {{ repo: string, branch?: string, scopePath?: string, discipline?: string }} payload
+ * @param {{ repo: string, cloneDest?: string, ephemeral?: boolean, branch?: string, scopePath?: string, discipline?: string }} payload
  * @returns {Promise<{ projectId: string, scanData: object }>}
- * @throws {Error & { status: number, existingProjectId?: string }} on non-2xx
+ * @throws {Error & { status: number, code?: string, existingProjectId?: string }} on non-2xx
  */
 export async function registerProject(payload) {
   const res = await fetch('/api/projects', {
@@ -294,6 +294,7 @@ export async function registerProject(payload) {
   if (!res.ok) {
     const err = new Error(body.error || `registerProject failed (${res.status})`);
     err.status = res.status;
+    if (body.code) err.code = body.code;
     if (body.existingProjectId) err.existingProjectId = body.existingProjectId;
     throw err;
   }
