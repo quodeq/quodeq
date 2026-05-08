@@ -2129,11 +2129,10 @@
   min-width: 36px;
 }
 
-/* FileCopyBtn label: allow the pretext-fitted text to shrink with its container. */
+/* FileCopyBtn label: always show the full filename — never truncate or
+   ellipsize. The button keeps `white-space: nowrap` so `name.rb:6` stays
+   on one line; if the row is too narrow the parent flex row wraps. */
 .vlive-detail-file-btn__label {
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow: hidden;
   white-space: nowrap;
 }
 
