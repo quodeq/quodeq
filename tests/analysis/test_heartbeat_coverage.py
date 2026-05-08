@@ -75,7 +75,7 @@ class TestHeartbeatFormat:
         assert line.startswith("[security] 1m02s")
         assert "2 active agents" in line
         assert "files 10/30" in line
-        assert "2 violations · 5 compliance" in line
+        assert "2 violations | 5 compliance" in line
         assert "findings" not in line
         assert "total" not in line
 
