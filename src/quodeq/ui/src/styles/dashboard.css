@@ -2683,6 +2683,43 @@
   flex-shrink: 0;
 }
 
+/* Pill-style import button — visually aligned with the topbar provider/model
+   pill (muted text, subtle border, transparent bg) so it reads as a
+   secondary action next to the red filled "add project" CTA. */
+.projects-page__import-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  min-height: 28px;
+  box-sizing: border-box;
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
+  flex-shrink: 0;
+}
+.projects-page__import-btn:hover:not(.is-disabled) {
+  border-color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+.projects-page__import-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.projects-page__import-btn.is-disabled,
+.projects-page__import-btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .projects-page__header-actions {
   display: flex;
   align-items: center;
@@ -2704,7 +2741,8 @@
     margin-left: 0;
     width: 100%;
   }
-  .projects-page__add-btn {
+  .projects-page__add-btn,
+  .projects-page__import-btn {
     flex: 1 1 auto;
     justify-content: center;
   }

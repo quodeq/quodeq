@@ -294,12 +294,12 @@ function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
         {onImportProject && (
           <button
             type="button"
-            className={`term-btn projects-empty__cta-btn${isEvaluating ? ' is-disabled' : ''}`}
+            className={`projects-page__import-btn projects-empty__cta-btn${isEvaluating ? ' is-disabled' : ''}`}
             onClick={onImportProject}
             aria-disabled={isEvaluating || undefined}
             title={isEvaluating ? EVAL_BLOCKED_TITLE : 'Import a previously-exported project'}
           >
-            <span aria-hidden="true">▸</span> import project
+            import project
           </button>
         )}
       </div>
@@ -325,13 +325,13 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
             {onImportProject && (
               <button
                 type="button"
-                className={`term-btn projects-page__add-btn${isEvaluating ? ' is-disabled' : ''}`}
+                className={`projects-page__import-btn${isEvaluating ? ' is-disabled' : ''}`}
                 onClick={onImportProject}
                 aria-label="Import project"
                 aria-disabled={isEvaluating || undefined}
                 title={isEvaluating ? EVAL_BLOCKED_TITLE : 'Import a previously-exported project'}
               >
-                <span aria-hidden="true">▸</span> import project
+                import project
               </button>
             )}
             {onAddProject && (
