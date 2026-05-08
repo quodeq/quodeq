@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import subprocess as _subprocess
@@ -41,7 +42,7 @@ _NETWORK_MARKERS = (
     "Connection refused",
     "Operation timed out",
 )
-_NOT_FOUND_MARKERS = ("Repository not found", "does not exist", "could not find")
+_NOT_FOUND_MARKERS = ("Repository not found", "repository '", "' not found")
 _DEST_EXISTS_MARKERS = ("already exists and is not an empty directory",)
 _DISK_MARKERS = ("No space left on device", "disk full")
 
@@ -63,7 +64,7 @@ def _classify_stderr(stderr: str) -> str:
 
 def run_git_clone(url: str, clone_dest: Path) -> None:
     """Execute ``git clone`` for *url* into *clone_dest*. Raises CloneError on failure."""
-    env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
+    env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1", "LC_ALL": "C", "LANG": "C"}
     try:
         _subprocess.run(
             ["git", "clone", "--progress", "--", url, str(clone_dest)],
@@ -82,8 +83,11 @@ def run_git_clone(url: str, clone_dest: Path) -> None:
         raise CloneError(kind, f"git clone failed ({kind})", stderr) from exc
     except _subprocess.TimeoutExpired as exc:
         raise CloneError("network", "git clone timed out") from exc
+    except FileNotFoundError as exc:
+        raise CloneError("unknown", f"git binary not found: {exc}") from exc
     except OSError as exc:
-        raise CloneError("disk", f"git clone could not start: {exc}") from exc
+        kind = "disk" if exc.errno == errno.ENOSPC else "unknown"
+        raise CloneError(kind, f"git clone could not start: {exc}") from exc
 
 
 def clone_to_local(
