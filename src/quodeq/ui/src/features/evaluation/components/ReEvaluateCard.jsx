@@ -233,7 +233,8 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
     cloneBrowserOpen, setCloneBrowserOpen, cloning, cloneDest, cloneError, handleCloneToLocal,
   } = actions;
 
-  const canStart = !disabled && !cloning && !info.pathMissing;
+  const isReadOnlyEphemeral = info?.ephemeral === true && info?.evaluable === false;
+  const canStart = !disabled && !cloning && !info.pathMissing && !isReadOnlyEphemeral;
 
   return (
     <div className="panel evaluate-panel evaluate-panel--terminal">
@@ -265,6 +266,13 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
             </>
           )}
         </div>
+
+        {isReadOnlyEphemeral && (
+          <div className="ephemeral-completed-note">
+            This was a one-shot ephemeral evaluation. The working copy was deleted after it ran,
+            so re-evaluating would require cloning again. Add the project from URL once more if you want a fresh run.
+          </div>
+        )}
 
         {info.pathMissing && (
           <UrlRestoreSection urlInput={urlInput} setUrlInput={setUrlInput} urlError={urlError} urlSaving={urlSaving} handleUrlRestore={handleUrlRestore} />
