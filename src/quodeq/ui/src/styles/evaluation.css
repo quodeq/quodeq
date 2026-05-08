@@ -9,7 +9,24 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--term-space-2);
   margin-bottom: 12px;
+}
+
+@media (max-width: 600px) {
+  /* On narrow viewports stack the title above the right-hand cluster
+     (countdown timer + provider badge) so neither truncates. */
+  .evaluate-header {
+    align-items: flex-start;
+  }
+  .evaluate-header__right {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .evaluate-panel__top--row {
+    flex-wrap: wrap;
+  }
 }
 
 .evaluate-header h1 {
@@ -3021,11 +3038,12 @@ button.eval-provider-badge--clickable:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--term-space-2);
-  padding: var(--term-space-2) 0;
-  margin-bottom: var(--term-space-3);
+  padding: var(--term-space-1) 0;
+  margin-bottom: var(--term-space-2);
   font-family: var(--term-font-mono);
   font-size: 11px;
   color: var(--color-text-muted);
+  flex-wrap: wrap;
 }
 .evaluate-job-id-line__label {
   text-transform: uppercase;
