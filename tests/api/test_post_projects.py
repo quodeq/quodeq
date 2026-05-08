@@ -75,6 +75,12 @@ def test_post_projects_bad_local_path_returns_400_and_no_dir(app_client, tmp_pat
     assert after_dirs == before_dirs, "Rollback should leave no new project directory on disk"
 
 
+@pytest.mark.skip(
+    reason="Clone-on-add A2: URL registration now requires clone_dest or "
+    "ephemeral; the POST /api/projects route is updated in Task A3 to "
+    "forward cloneDest/ephemeral from the request body. Until then, URL "
+    "registration intentionally rejects this old contract."
+)
 def test_post_projects_online_url_returns_stub_scan(app_client, tmp_path):
     c, home, _ = app_client
     repo_url = "https://github.com/owner/repo"

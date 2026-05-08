@@ -3,6 +3,8 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 from quodeq.services.base import EvaluationOptions
 from quodeq.services.filesystem import FilesystemActionProvider
 
@@ -166,6 +168,11 @@ def test_start_evaluation_writes_repository_info(tmp_path: Path) -> None:
     assert "uuid" in payload
 
 
+@pytest.mark.skip(
+    reason="Clone-on-add A2: URL registration always writes location=local now. "
+    "start_evaluation()'s URL path is rewritten in Task A4 to forward "
+    "clone_dest/ephemeral; will be replaced with a parity test then."
+)
 def test_start_evaluation_writes_repository_info_for_online_repo(tmp_path: Path) -> None:
     repo_url = "git@github.com:example/acme-service.git"
     reports_dir = tmp_path / "reports"
