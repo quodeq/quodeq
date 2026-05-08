@@ -57,7 +57,13 @@ def _try_v2_full_hit(
 
     Also writes a V1-compatible fingerprint so flipping the flag off later
     doesn't trigger a needless full re-analysis.
+
+    Honors ``config.options.incremental``: a clean-scan run (incremental=False)
+    must not serve fast-path hits — that's the whole user intent.
     """
+    if not config.options.incremental:
+        return None
+
     files = _list_all_source_files(config, dimension)
     if not files:
         return None
