@@ -177,8 +177,17 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
             // Stubs (hasScoredDims === false) have no completed standards yet
             // and would land on an empty dashboard. Block the click and tell
             // the user to wait. Running runs that ARE in trend (i.e. already
-            // have at least one scored dim) remain clickable.
+            // have at least one scored dim) remain clickable, and we surface
+            // the dims that *have* completed instead of a generic
+            // "in progress" placeholder.
             const notReady = entry.hasScoredDims === false;
+            const dimsCell = notReady
+              ? <span className="history-row__muted">no scores yet</span>
+              : (
+                <span className="history-row__muted">
+                  <FittedText text={formatDimSummary(entry)} mode="end" />
+                </span>
+              );
             return (
               <HistoryRow
                 key={entry.runId}
@@ -196,7 +205,7 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
                   grade: <span className="history-row__muted">—</span>,
                   score: <span className="history-row__muted">—</span>,
                   delta: <span className="history-delta history-delta--muted">—</span>,
-                  dims: <span className="history-row__muted">{notReady ? 'no scores yet' : 'in progress'}</span>,
+                  dims: dimsCell,
                 }}
               />
             );
