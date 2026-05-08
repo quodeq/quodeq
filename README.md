@@ -165,14 +165,17 @@ Choose what fits your workflow. Configure in **Settings** from the dashboard.
 llama.cpp is one process per model, fixed at launch. Start `llama-server` yourself, then point Quodeq at it from **Settings → AI Provider → llama.cpp**.
 
 ```bash
-# Single model
-llama-server -m path/to/target.gguf --port 8080
+# Redirect to ~/.quodeq/logs so the dashboard's CONSOLE button picks it up
+mkdir -p ~/.quodeq/logs
+llama-server -m path/to/target.gguf --port 8080 \
+  > ~/.quodeq/logs/llama-server.log 2>&1
 
 # Speculative decoding (MTP), pair a target with a smaller drafter
-llama-server -m path/to/target.gguf -md path/to/drafter.gguf --port 8080
+llama-server -m path/to/target.gguf -md path/to/drafter.gguf --port 8080 \
+  > ~/.quodeq/logs/llama-server.log 2>&1
 ```
 
-Quodeq probes `http://localhost:8080`. To use a different port or host, set `LLAMACPP_BASE_URL`. To switch models, stop `llama-server` and relaunch with a different `-m`.
+Quodeq probes `http://localhost:8080` and looks for the log file at `~/.quodeq/logs/llama-server.log` (or platform-standard locations like `~/Library/Logs/llama-server.log` on macOS). Override with `LLAMACPP_LOG_FILE`. To use a different port or host, set `LLAMACPP_BASE_URL`. To switch models, stop `llama-server` and relaunch with a different `-m`.
 
 ---
 
