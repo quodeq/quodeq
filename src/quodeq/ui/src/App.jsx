@@ -407,6 +407,15 @@ export default function App() {
     : null;
   const { activePage, navStack, navPop, navGoTo, navTab, activeTab } = state;
 
+  // Reset scroll on project switch — useNavStack handles the same for
+  // tab/page changes, but selectedProject lives outside the nav stack.
+  // Without this, switching from a project scrolled deep into Projects
+  // lands the user partway down the next project's Overview.
+  useEffect(() => {
+    const main = document.querySelector('.app-shell__main-column > .dashboard');
+    if (main) main.scrollTop = 0;
+  }, [state.selectedProject]);
+
   const currentDayLabel = useMemo(
     () => formatDayLabel(state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex),
     [state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex]
