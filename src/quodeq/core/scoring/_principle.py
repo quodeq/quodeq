@@ -9,9 +9,10 @@ from quodeq.core.scoring.overall import MODE_NUMERICAL
 from quodeq.core.scoring.internals import (
     build_deductions,
     compliance_dampening,
-    compliance_lift,
+    compliance_lift_from_wv,
     confidence_interval_for,
     count_grade_drops,
+    density_weighted_sum,
     drop_grade,
     evidence_has_taxonomy,
     score_to_grade_label,
@@ -20,8 +21,8 @@ from quodeq.core.scoring.internals import (
     tally_compliance_types_by_taxonomy,
     tally_types_by_reason,
     tally_types_by_taxonomy,
-    violation_base,
-    violation_ceiling,
+    violation_base_from_wv,
+    violation_ceiling_from_wv,
 )
 
 _BASE_SCORE = 10
@@ -35,6 +36,12 @@ class _PrincipleContext:
     pct: float
     vt_counts: dict[str, int]
     ct_counts: dict[str, int]
+    # Density-aware weighted sums (severity weight × log2(1 + instances)
+    # per (severity, type) group). Used by violation_base_from_wv and
+    # violation_ceiling_from_wv so a principle with many instances of
+    # one type is punished more than one with a single instance.
+    wv_density: float
+    wc_density: float
     dampening: float
     using_taxonomy: bool
     conf_level: str
@@ -74,11 +81,16 @@ def _score_numerical(ctx: _PrincipleContext) -> PrincipleScore:
             deductions=build_deductions({}, scale_multiplier=ctx.scale_mult),
             final_score=0.0, grade="Insufficient",
         )
-    base = violation_base(ctx.vt_counts)
-    lift = compliance_lift(ctx.ct_counts, ctx.vt_counts)
+    base = violation_base_from_wv(ctx.wv_density)
+    # compliance_lift uses an unweighted compliance count vs the weighted
+    # violation total — keep that legacy semantic to avoid disturbing the
+    # lift balance that's already calibrated. We only feed the
+    # density-aware wv on the violation side.
+    cc = sum(ctx.ct_counts.get(sev, 0) for sev in ctx.ct_counts)
+    lift = compliance_lift_from_wv(cc, ctx.wv_density)
     raw = base + (_BASE_SCORE - base) * lift
     final_pts = round(max(severity_grade_floor(ctx.vt_counts),
-                          min(violation_ceiling(ctx.vt_counts), raw)), 1)
+                          min(violation_ceiling_from_wv(ctx.wv_density), raw)), 1)
     return PrincipleScore(
         **kwargs, base_score=round(base, 1),
         deductions=build_deductions(ctx.vt_counts, scale_multiplier=ctx.scale_mult),
@@ -110,9 +122,11 @@ def _build_context(
     metrics = pdata.get("metrics", {})
     pct = metrics.get("compliance_percentage", 0.0)
     conf_level = metrics.get("confidence_level", "medium")
-    vt_counts, ct_counts, using_taxonomy = compute_tallies(
-        pdata.get("violations", []), pdata.get("compliance", []),
-    )
+    violations = pdata.get("violations", [])
+    compliance = pdata.get("compliance", [])
+    vt_counts, ct_counts, using_taxonomy = compute_tallies(violations, compliance)
+    wv_density = density_weighted_sum(violations, using_taxonomy=using_taxonomy)
+    wc_density = density_weighted_sum(compliance, using_taxonomy=using_taxonomy)
     ci = confidence_interval_for(
         confidence_level=conf_level,
         is_balanced=metrics.get("is_balanced", True),
@@ -121,7 +135,8 @@ def _build_context(
     )
     return _PrincipleContext(
         key=key, pdata=pdata, pct=pct, vt_counts=vt_counts,
-        ct_counts=ct_counts, dampening=compliance_dampening(ct_counts, vt_counts),
+        ct_counts=ct_counts, wv_density=wv_density, wc_density=wc_density,
+        dampening=compliance_dampening(ct_counts, vt_counts),
         using_taxonomy=using_taxonomy, conf_level=conf_level, ci=ci,
         scale_mult=scale_mult,
     )

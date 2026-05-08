@@ -24,6 +24,7 @@ from quodeq.core.scoring._constants import (  # noqa: F401 — re-exports
 from quodeq.core.scoring._tallies import (  # noqa: F401 — re-exports
     _tally_types,
     _weighted_sum,
+    density_weighted_sum,
     evidence_has_taxonomy,
     tally_compliance_types_by_reason,
     tally_compliance_types_by_taxonomy,
@@ -41,16 +42,35 @@ from quodeq.core.scoring.numerical import (  # noqa: F401 — re-export
 # 4-stage scoring formula
 # ---------------------------------------------------------------------------
 
+def violation_base_from_wv(wv: float) -> float:
+    """Hyperbolic base score from a precomputed weighted-violation total.
+
+    Split out from :func:`violation_base` so principle-level scoring can
+    feed in a density-aware weighted sum (see
+    :func:`density_weighted_sum`) instead of the legacy distinct-type
+    sum. Existing callers that only have ``vt_counts`` keep working
+    through the wrapper below.
+    """
+    if wv == 0:
+        return 10.0
+    return 10.0 / (1.0 + _BASE_K * wv)
+
+
 def violation_base(violation_type_counts: dict[str, int]) -> float:
     """Compute the base score from violations alone (ignoring compliance).
 
     Uses a hyperbolic curve: ``base = 10 / (1 + K * weighted_violations)``
     Returns a value in [0, 10].
     """
-    wv = _weighted_sum(violation_type_counts)
-    if wv == 0:
-        return 10.0
-    return 10.0 / (1.0 + _BASE_K * wv)
+    return violation_base_from_wv(_weighted_sum(violation_type_counts))
+
+
+def compliance_lift_from_wv(wc: float, wv: float) -> float:
+    """Lift factor from precomputed weighted compliance/violation totals."""
+    if wc == 0 or wv == 0:
+        return 0.0
+    raw_lift = wc / (wc + wv)
+    return raw_lift ** _LIFT_COMPRESS
 
 
 def compliance_lift(
@@ -63,10 +83,14 @@ def compliance_lift(
     """
     wv = _weighted_sum(violation_type_counts)
     cc = sum(compliance_type_counts.get(sev, 0) for sev in compliance_type_counts)
-    if cc == 0 or wv == 0:
-        return 0.0
-    raw_lift = cc / (cc + wv)
-    return raw_lift ** _LIFT_COMPRESS
+    return compliance_lift_from_wv(cc, wv)
+
+
+def violation_ceiling_from_wv(wv: float) -> float:
+    """Ceiling score from a precomputed weighted-violation total."""
+    if wv == 0:
+        return 10.0
+    return 10.0 - math.log2(1.0 + wv) * _CEIL_SCALE
 
 
 def violation_ceiling(violation_type_counts: dict[str, int]) -> float:
@@ -74,10 +98,7 @@ def violation_ceiling(violation_type_counts: dict[str, int]) -> float:
 
     ``ceiling = 10 - log2(1 + wv) * CEIL_SCALE``
     """
-    wv = _weighted_sum(violation_type_counts)
-    if wv == 0:
-        return 10.0
-    return 10.0 - math.log2(1.0 + wv) * _CEIL_SCALE
+    return violation_ceiling_from_wv(_weighted_sum(violation_type_counts))
 
 
 def severity_grade_floor(violation_type_counts: dict[str, int]) -> float:

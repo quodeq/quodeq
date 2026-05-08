@@ -8,6 +8,7 @@ import pytest
 from quodeq.core.scoring.internals import (
     compliance_dampening,
     compliance_lift,
+    density_weighted_sum,
     drop_grade,
     score_to_grade_label,
     severity_grade_floor,
@@ -152,6 +153,38 @@ class TestDropGrade:
 
     def test_invalid_grade_returns_insufficient(self):
         assert drop_grade("Unknown", 0) == "Insufficient"
+
+
+class TestDensityWeightedSum:
+    def test_empty(self):
+        assert density_weighted_sum([], using_taxonomy=True) == 0.0
+
+    def test_single_instance_matches_legacy(self):
+        # A single instance per type → log2(2) = 1.0, so the result equals
+        # the legacy weighted sum (severity_weight × type_count).
+        items = [
+            {"severity": "critical", "vt": "A"},
+            {"severity": "critical", "vt": "B"},
+            {"severity": "major", "vt": "C"},
+        ]
+        # 2 critical types × 4.0 + 1 major type × 1.5 = 9.5
+        assert density_weighted_sum(items, using_taxonomy=True) == pytest.approx(9.5)
+
+    def test_high_instance_density_dominates(self):
+        """Many instances of one type weigh more than a single instance — the
+        whole point of the density formula."""
+        sparse = [{"severity": "critical", "vt": "A"}]
+        dense = [{"severity": "critical", "vt": "A"}] * 10
+        assert density_weighted_sum(dense, using_taxonomy=True) > density_weighted_sum(sparse, using_taxonomy=True)
+        # 10 instances → severity_weight × log2(11) ≈ 4.0 × 3.46 ≈ 13.84
+        assert density_weighted_sum(dense, using_taxonomy=True) == pytest.approx(4.0 * math.log2(11))
+
+    def test_skips_taxonomy_items_without_vt(self):
+        items = [
+            {"severity": "critical", "vt": "A"},
+            {"severity": "critical"},  # no vt → skipped in taxonomy mode
+        ]
+        assert density_weighted_sum(items, using_taxonomy=True) == pytest.approx(4.0 * math.log2(2))
 
 
 class TestWeightAsMultiplier:
