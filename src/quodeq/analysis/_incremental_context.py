@@ -1,8 +1,11 @@
-"""Incremental analysis context — dimension loading and resolution."""
+"""Analysis context — dimension loading and resolution.
+
+Post-V2 (B6.1): the V1-only ``IncrementalCoverage`` dataclass was
+removed. ``load_analysis_context`` is the only surviving export.
+"""
 from __future__ import annotations
 
 import json as _json
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -10,14 +13,6 @@ from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.prompts.builder import load_template
 from quodeq.config.paths import default_paths
 from quodeq.shared.logging import log_warning
-
-
-@dataclass
-class IncrementalCoverage:
-    """Groups coverage-related data for incremental finalization."""
-    files: list[str]
-    all_analyzed: set[str]
-    files_read: int
 
 
 def _load_custom_dimensions(evaluators_dir: Path, dims_data: list[str]) -> list[str]:
