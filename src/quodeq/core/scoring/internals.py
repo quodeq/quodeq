@@ -17,9 +17,7 @@ from quodeq.core.scoring._constants import (  # noqa: F401 — re-exports
     _SEVERITY_WEIGHT,
     _WEIGHT_DOUBLE,
     _WEIGHT_TRIPLE,
-    effective_cap_multiplier,
     scale_multiplier,
-    small_project_multiplier,
 )
 from quodeq.core.scoring._tallies import (  # noqa: F401 — re-exports
     _tally_types,
