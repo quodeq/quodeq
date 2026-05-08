@@ -792,6 +792,12 @@ textarea:focus {
   color: var(--color-text-muted);
 }
 
+.last-fetched-line {
+  color: var(--color-text-muted);
+  font-size: 0.85em;
+  margin: 0;
+}
+
 .content-project-name {
   font-size: var(--text-xl);
   font-weight: var(--weight-semibold);

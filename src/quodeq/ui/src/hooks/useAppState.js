@@ -141,7 +141,7 @@ export function useAppState() {
 
   return {
     serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navTab,
-    projects, projectsLoaded, selectedProject, selectedRun, handleProjectChange, handleNavigate,
+    projects, projectsLoaded, selectedProject, selectedRun, loadProjects, handleProjectChange, handleNavigate,
     handleDeleteProject, handleExportProject, handleRelocateProject,
     dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex,
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect, prefetchHandlers,

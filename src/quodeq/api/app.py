@@ -84,6 +84,16 @@ def create_app(
         app.config.update(test_config)
     provider = provider or _default_provider()
     app.config["_provider"] = provider
+
+    from pathlib import Path
+    from quodeq.services._ephemeral_cleanup import sweep_orphaned_clones
+    from quodeq.shared._env import get_clones_dir, get_evaluations_dir
+
+    try:
+        sweep_orphaned_clones(get_clones_dir(), Path(get_evaluations_dir()))
+    except Exception as exc:  # pragma: no cover - best-effort cleanup
+        _logger.warning("Orphaned-clone sweep failed at startup: %s", exc)
+
     store = rate_limit_store or create_rate_limit_store()
     eval_store = InMemoryRateLimitStore(
         window=_EVALUATION_RATE_LIMIT_WINDOW, max_requests=_EVALUATION_RATE_LIMIT_MAX,
