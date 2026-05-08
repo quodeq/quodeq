@@ -121,34 +121,6 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     return jsonify({"updated": project, "path": new_path})
 
 
-def _handle_clone_project_local(provider: ActionProvider) -> Response | tuple[Response, int]:
-    """Handle POST /api/projects/<project>/clone-local."""
-    project = request.view_args["project"]
-    data = request.get_json(silent=True) or {}
-    destination = data.get("destination", "").strip()
-    if not destination:
-        body, status = error_response("destination is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return jsonify(body), status
-    dest_resolved = Path(destination).resolve()
-    home = Path.home().resolve()
-    if not dest_resolved.is_relative_to(home):
-        body, status = error_response(
-            "Destination must be within the user's home directory",
-            HTTPStatus.FORBIDDEN,
-            "FORBIDDEN",
-        )
-        return jsonify(body), status
-    if not dest_resolved.is_dir():
-        body, status = error_response("Destination directory not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
-    _logger.info("clone_project_local: project=%s, dest=%s, remote_addr=%s", project, destination, request.remote_addr)
-    result = provider.clone_to_local(reports_dir(), project, str(dest_resolved))
-    if result is None:
-        body, status = error_response("Clone failed — check project exists and is an online project", HTTPStatus.BAD_REQUEST, "CLONE_FAILED")
-        return jsonify(body), status
-    return jsonify(result)
-
-
 def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     """Register project listing, mutation, and export routes."""
 
@@ -188,11 +160,6 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify(info)
-
-    @app.post("/api/projects/<project>/clone-local")
-    def clone_project_local(project: str) -> Response | tuple[Response, int]:
-        """Clone an online project to a local directory."""
-        return _handle_clone_project_local(provider)
 
     @app.get("/api/projects/<project>/scan")
     def project_scan(project: str) -> Response | tuple[Response, int]:

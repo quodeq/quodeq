@@ -3,15 +3,9 @@
 from __future__ import annotations
 
 import errno
-import json
 import os
 import subprocess as _subprocess
-import urllib.parse
 from pathlib import Path
-from typing import Any
-
-from quodeq.data.fs.repo_validation import _PRIVATE_HOST_RE, _resolves_to_private
-from quodeq.shared.repo_handler import is_valid_repo_url
 
 _GIT_CLONE_TIMEOUT_S = int(os.environ.get("QUODEQ_GIT_CLONE_TIMEOUT_S", "300"))
 
@@ -88,58 +82,3 @@ def run_git_clone(url: str, clone_dest: Path) -> None:
     except OSError as exc:
         kind = "disk" if exc.errno == errno.ENOSPC else "unknown"
         raise CloneError(kind, f"git clone could not start: {exc}") from exc
-
-
-def clone_to_local(
-    reports_dir: str, project: str, destination: str, *, get_project_info_fn: Any,
-) -> dict[str, Any] | None:
-    """Clone an online project's repo to a local path and update its metadata."""
-    reports_root = Path(reports_dir).resolve()
-    info_path = (reports_root / project / "repository_info.json").resolve()
-    if not info_path.is_relative_to(reports_root) or not info_path.exists():
-        return None
-    try:
-        info = json.loads(info_path.read_text())
-    except (json.JSONDecodeError, OSError):
-        return None
-
-    url = info.get("path", "")
-    if info.get("location") != "online" or not is_valid_repo_url(url):
-        return None
-
-    dest_dir = Path(destination).resolve()
-    if not dest_dir.is_dir():
-        return None
-
-    if _PRIVATE_HOST_RE.match(url):
-        return None
-    if url.startswith("http"):
-        hostname = urllib.parse.urlparse(url).hostname or ""
-        if hostname and _resolves_to_private(hostname):
-            return None
-
-    project_name = info.get("name", url.split("/")[-1].replace(".git", ""))
-    # Sanitize project name to prevent path traversal
-    if "/" in project_name or "\\" in project_name or ".." in project_name:
-        return None
-    clone_dest = dest_dir / project_name
-    if not clone_dest.resolve().is_relative_to(dest_dir.resolve()):
-        return None
-
-    if clone_dest.exists():
-        return None
-
-    try:
-        run_git_clone(url, clone_dest)
-    except CloneError:
-        return None
-
-    resolved_clone = str(clone_dest.resolve())
-    info["path"] = resolved_clone
-    info["location"] = "local"
-    try:
-        info_path.write_text(json.dumps(info, indent=2))
-    except OSError:
-        return None
-
-    return get_project_info_fn(reports_dir, project)

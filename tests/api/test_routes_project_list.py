@@ -25,7 +25,6 @@ class _FakeProvider:
         self.deleted: list[str] = []
         self.updated_paths: dict[str, str] = {}
         self.project_info: dict | None = None
-        self.clone_result: dict | None = None
 
     def list_projects(self, reports_dir: str) -> dict:
         return {"projects": self.projects}
@@ -42,9 +41,6 @@ class _FakeProvider:
 
     def get_project_info(self, reports_dir: str, project: str) -> dict:
         return self.project_info or {}
-
-    def clone_to_local(self, reports_dir: str, project: str, destination: str) -> dict | None:
-        return self.clone_result
 
 
 @pytest.fixture()
@@ -161,43 +157,6 @@ class TestProjectInfo:
         provider.project_info = {}
         resp = client.get("/api/projects/proj/info")
         assert resp.status_code == 404
-
-
-class TestCloneProjectLocal:
-    def test_requires_destination(self, client):
-        resp = client.post("/api/projects/proj/clone-local", json={})
-        assert resp.status_code == 400
-        assert resp.get_json()["code"] == "INVALID_INPUT"
-
-    def test_destination_outside_home_forbidden(self, client):
-        resp = client.post("/api/projects/proj/clone-local", json={"destination": "/tmp/evil"})
-        assert resp.status_code == 403
-
-    def test_destination_not_found(self, client, tmp_path):
-        home = Path.home().resolve()
-        fake_dir = home / "nonexistent_quodeq_test_dir_xyz"
-        resp = client.post("/api/projects/proj/clone-local", json={"destination": str(fake_dir)})
-        assert resp.status_code == 404
-
-    def test_clone_success(self, client, provider, tmp_path):
-        home = Path.home().resolve()
-        # Use a real directory under $HOME
-        dest = home / ".cache"
-        if not dest.is_dir():
-            pytest.skip("~/.cache not available")
-        provider.clone_result = {"project": "proj", "path": str(dest)}
-        resp = client.post("/api/projects/proj/clone-local", json={"destination": str(dest)})
-        assert resp.status_code == 200
-
-    def test_clone_failure(self, client, provider, tmp_path):
-        home = Path.home().resolve()
-        dest = home / ".cache"
-        if not dest.is_dir():
-            pytest.skip("~/.cache not available")
-        provider.clone_result = None
-        resp = client.post("/api/projects/proj/clone-local", json={"destination": str(dest)})
-        assert resp.status_code == 400
-        assert resp.get_json()["code"] == "CLONE_FAILED"
 
 
 class TestProjectScan:

@@ -25,7 +25,7 @@ def _status_json_terminal(run_dir: Path) -> bool:
     state = data.get("state")
     return isinstance(state, str) and state in _TERMINAL_STATUS_STATES
 from quodeq.core.types.job import JobSnapshot
-from quodeq.services import _fs_clone, _fs_projects, _fs_reports
+from quodeq.services import _fs_projects, _fs_reports
 from quodeq.services import run_index as _run_index
 from quodeq.services._ephemeral_cleanup import maybe_cleanup_after_job
 from quodeq.services.base import ActionProvider
@@ -380,15 +380,6 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
 
     def delete_project(self, reports_dir: str, project: str) -> bool:
         return _fs_projects.delete_project(reports_dir, project)
-
-    def clone_to_local(self, reports_dir: str, project: str, destination: str) -> dict[str, Any] | None:
-        # Validate destination: must be absolute and free of traversal components.
-        dest = Path(destination)
-        if not dest.is_absolute() or ".." in dest.parts:
-            return None
-        return _fs_clone.clone_to_local(
-            reports_dir, project, destination, get_project_info_fn=self.get_project_info,
-        )
 
     def get_project_info(self, reports_dir: str, project: str) -> dict[str, Any] | None:
         return _fs_projects.get_project_info(reports_dir, project)
