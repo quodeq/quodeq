@@ -89,27 +89,41 @@
 }
 .side-pane-window__actions {
   display: flex;
-  gap: 4px;
+  gap: 6px;
 }
+/* Buttons read as buttons at rest — copying a fix-plan into an LLM
+   prompt is a primary flow, so the affordance shouldn't hide until
+   hover. Same chip treatment is reused for download and close so the
+   header reads as a consistent toolstrip. */
 .side-pane-window__icon-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--color-text-muted);
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 80ms ease, border-color 80ms ease, color 80ms ease;
 }
 .side-pane-window__icon-btn:hover {
-  background: var(--color-surface-alt);
-  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+  color: var(--color-accent);
+}
+.side-pane-window__icon-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 .side-pane-window__icon-btn--ok,
 .side-pane-window__icon-btn--ok:hover {
   color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 18%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-accent) 50%, var(--color-border));
 }
 
 /* ── Window body ─────────────────────────────────────── */
