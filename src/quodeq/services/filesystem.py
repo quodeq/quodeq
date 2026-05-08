@@ -25,8 +25,9 @@ def _status_json_terminal(run_dir: Path) -> bool:
     state = data.get("state")
     return isinstance(state, str) and state in _TERMINAL_STATUS_STATES
 from quodeq.core.types.job import JobSnapshot
-from quodeq.services import _fs_clone, _fs_projects, _fs_reports
+from quodeq.services import _fs_projects, _fs_reports
 from quodeq.services import run_index as _run_index
+from quodeq.services._ephemeral_cleanup import maybe_cleanup_after_job
 from quodeq.services.base import ActionProvider
 from quodeq.services.evaluation_mixin import FsEvaluationMixin
 from quodeq.services.jobs import JobManager
@@ -59,7 +60,28 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
     ) -> None:
         super().__init__()
         self._reports_root = reports_root
-        self._jobs = job_manager or JobManager(reports_root=reports_root)
+
+        # Delete the ephemeral clone (if any) when its evaluation completes.
+        # JobManager already wraps callbacks in try/except so exceptions here
+        # are logged, never raised back into the job lifecycle.
+        def _on_complete(job_id: str, job) -> None:
+            project_uuid = job.output_project
+            if not project_uuid:
+                return
+            from quodeq.shared._env import get_clones_dir, get_evaluations_dir
+            reports = Path(reports_root) if reports_root is not None else Path(get_evaluations_dir())
+            maybe_cleanup_after_job(
+                reports_root=reports,
+                project_uuid=project_uuid,
+                clones_root=get_clones_dir(),
+            )
+
+        # When a JobManager is injected (tests, alternative wiring), the caller
+        # is responsible for wiring cleanup callbacks. We do not mutate an
+        # externally-owned manager's private state.
+        self._jobs = job_manager or JobManager(
+            reports_root=reports_root, on_job_complete=_on_complete
+        )
         self._compiled_dir = compiled_dir
         self._index_db_path = Path(index_db_path) if index_db_path is not None else None
         self._model_fetchers: dict[str, Callable] = {
@@ -358,15 +380,6 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
 
     def delete_project(self, reports_dir: str, project: str) -> bool:
         return _fs_projects.delete_project(reports_dir, project)
-
-    def clone_to_local(self, reports_dir: str, project: str, destination: str) -> dict[str, Any] | None:
-        # Validate destination: must be absolute and free of traversal components.
-        dest = Path(destination)
-        if not dest.is_absolute() or ".." in dest.parts:
-            return None
-        return _fs_clone.clone_to_local(
-            reports_dir, project, destination, get_project_info_fn=self.get_project_info,
-        )
 
     def get_project_info(self, reports_dir: str, project: str) -> dict[str, Any] | None:
         return _fs_projects.get_project_info(reports_dir, project)

@@ -92,6 +92,14 @@ function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildr
         <div className="project-card-top">
           <div className="project-card-top-left">
             <span className="project-card-name">{project.displayName || name}</span>
+            {project.location === 'online' && (
+              <span
+                className="badge-setup-incomplete"
+                title="This project was added by URL but has no local copy. Complete setup to evaluate."
+              >
+                setup incomplete
+              </span>
+            )}
             {project.onboardingCompletedAt === null && onResumeSetup && (
               <button
                 type="button"

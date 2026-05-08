@@ -166,30 +166,6 @@ def test_start_evaluation_writes_repository_info(tmp_path: Path) -> None:
     assert "uuid" in payload
 
 
-def test_start_evaluation_writes_repository_info_for_online_repo(tmp_path: Path) -> None:
-    repo_url = "git@github.com:example/acme-service.git"
-    reports_dir = tmp_path / "reports"
-
-    provider = FilesystemActionProvider(job_manager=StubJobs())
-
-    provider.start_evaluation(
-        repo=repo_url,
-        reports_dir=str(reports_dir),
-        options=EvaluationOptions(discipline="backend_springboot_java"),
-    )
-
-    # UUID-based project directory
-    project_dirs = [d for d in reports_dir.iterdir() if d.is_dir()]
-    assert len(project_dirs) == 1
-    info_path = project_dirs[0] / "repository_info.json"
-    payload = json.loads(info_path.read_text())
-    assert payload["name"] == "acme-service"
-    assert payload["discipline"] == "backend_springboot_java"
-    assert payload["location"] == "online"
-    assert payload["path"] == repo_url
-    assert "uuid" in payload
-
-
 def test_get_evaluation_status_external_surfaces_deadline_at(tmp_path: Path) -> None:
     """External (CLI / ext-prefixed) runs must surface deadline_at on the snapshot.
 

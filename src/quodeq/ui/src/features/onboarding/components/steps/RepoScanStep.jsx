@@ -2,10 +2,36 @@ import { useState } from 'react';
 import { TermHeader, TermInput, StatStrip, Stat } from '../../../../components/terminal/index.js';
 import ScanProgress from '../../../evaluation/components/ScanProgress.jsx';
 import FolderBrowser from '../../../evaluation/components/FolderBrowser.jsx';
+import CloneTargetStep from './CloneTargetStep.jsx';
+
+const URL_RE = /^(https?:\/\/|git@|ssh:\/\/|git:\/\/)/i;
+const CLONE_DEST_STORAGE_KEY = 'quodeq.lastCloneRoot';
+
+// Map backend error codes (Task A8) to user-facing messages.
+function friendlyCloneError(err) {
+  const code = err?.code;
+  switch (code) {
+    case 'AUTH_REQUIRED':
+      return "Couldn't clone. If this is a private repo, make sure `git clone <url>` works in your terminal first.";
+    case 'NETWORK_ERROR':
+      return "Couldn't reach the remote. Check your connection and try again.";
+    case 'REPO_NOT_FOUND':
+      return 'Repository not found. Check the URL and try again.';
+    case 'DEST_EXISTS':
+      return 'That folder already contains files. Pick a different location, or use the existing directory as a local-path project.';
+    case 'DISK_ERROR':
+      return err?.message || 'A disk error occurred. Check available space and permissions.';
+    default:
+      return err?.message || 'Clone failed.';
+  }
+}
 
 export default function RepoScanStep({ state, actions, createProject, getProjectInfo, onContinue, onCancel, stepIndex = 0, stepTotal = 0 }) {
   const sub = state.repoScanSubState;
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
+  const [subStep, setSubStep] = useState('input'); // 'input' | 'cloneTarget'
+  const [cloneSubmitting, setCloneSubmitting] = useState(false);
+  const [cloneError, setCloneError] = useState(null);
 
   // 409 + existingProjectId means a project was already registered for this
   // repo. If it has no evaluations yet, silently resume into it — the user
@@ -26,10 +52,18 @@ export default function RepoScanStep({ state, actions, createProject, getProject
   }
 
   async function handleSubmit() {
-    if (!state.repo.value) return;
+    const repo = state.repo.value?.trim();
+    if (!repo) return;
+    if (URL_RE.test(repo)) {
+      // URL input branches into the clone-target sub-step. Local-path inputs
+      // continue to call createProject directly.
+      setSubStep('cloneTarget');
+      setCloneError(null);
+      return;
+    }
     actions.startScan();
     try {
-      const { projectId, scanData } = await createProject({ repo: state.repo.value });
+      const { projectId, scanData } = await createProject({ repo });
       actions.succeedScan(projectId, scanData);
     } catch (err) {
       if (err.status === 409 && err.existingProjectId) {
@@ -40,9 +74,51 @@ export default function RepoScanStep({ state, actions, createProject, getProject
     }
   }
 
+  async function handleCloneTargetSubmit({ cloneDest, ephemeral }) {
+    const repo = state.repo.value?.trim();
+    setCloneSubmitting(true);
+    setCloneError(null);
+    actions.startScan();
+    try {
+      const payload = { repo, cloneDest, ephemeral };
+      const { projectId, scanData } = await createProject(payload);
+      if (cloneDest && !ephemeral) {
+        try { localStorage.setItem(CLONE_DEST_STORAGE_KEY, cloneDest); } catch (_) { /* private mode */ }
+      }
+      actions.succeedScan(projectId, scanData);
+      setSubStep('input');
+    } catch (err) {
+      if (err.status === 409 && err.existingProjectId) {
+        const resumed = await tryResumeExisting(err.existingProjectId);
+        if (resumed) {
+          setSubStep('input');
+          return;
+        }
+      }
+      setCloneError(friendlyCloneError(err));
+      actions.failScan({ message: err.message, status: err.status, existingProjectId: err.existingProjectId, code: err.code });
+    } finally {
+      setCloneSubmitting(false);
+    }
+  }
+
   function handleFolderSelect(path) {
     actions.setRepo({ value: path, source: 'local' });
     setFolderBrowserOpen(false);
+  }
+
+  if (subStep === 'cloneTarget') {
+    return (
+      <CloneTargetStep
+        repoUrl={state.repo.value?.trim()}
+        onSubmit={handleCloneTargetSubmit}
+        onBack={() => { setSubStep('input'); setCloneError(null); }}
+        submitting={cloneSubmitting}
+        error={cloneError}
+        stepIndex={stepIndex}
+        stepTotal={stepTotal}
+      />
+    );
   }
 
   return (

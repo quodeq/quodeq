@@ -1089,6 +1089,17 @@ button.eval-provider-badge--clickable:focus-visible {
   margin: var(--space-1) 0;
 }
 
+/* Ephemeral-completed note: surfaced when projectInfo.ephemeral && !evaluable */
+.ephemeral-completed-note {
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--color-accent, #5b8db8) 10%, var(--color-surface));
+  border-left: 3px solid color-mix(in srgb, var(--color-accent, #5b8db8) 40%, var(--color-border));
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
 .re-eval-actions-group {
   display: flex;
   flex-direction: column;

@@ -12,11 +12,12 @@ from typing import TYPE_CHECKING, Any, Protocol
 from quodeq.core.types import JobSnapshot
 from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_TIME_LIMIT
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
-from quodeq.shared.repo_handler import is_valid_repo_url
 from quodeq.core.evidence.parser import parse_jsonl_to_evidence, EvidenceContext
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.analysis.report import write_dimension_report
+from quodeq.services._fs_clone import run_git_clone
 from quodeq.services._fs_scan import scan_project
+from quodeq.shared._env import get_clones_dir
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo
 
 if TYPE_CHECKING:
@@ -107,39 +108,75 @@ def _scan_parent_project(project_dir: Path, reports_path: Path, repo_path: Path)
         pass
 
 
-def _register_project(repo: str, discipline: str | None, reports_dir: str, scope_path: str | None = None) -> str:
-    """Resolve/register project and run a scan for local projects.
+def _register_project(
+    repo: str,
+    discipline: str | None,
+    reports_dir: str,
+    scope_path: str | None = None,
+    *,
+    clone_dest: str | None = None,
+    ephemeral: bool = False,
+) -> str:
+    """Resolve/register project and run a scan.
 
-    For scoped evaluations, registers parent first, scans it, then registers
-    the child so both exist with scan data before the evaluation starts.
+    For URL inputs, clones the repo before scanning. Either *clone_dest* (a
+    user-chosen parent directory) or *ephemeral=True* must be set when *repo*
+    is a URL. Ephemeral clones land under ``~/.quodeq/clones/<uuid>/``.
+
+    For local path inputs, scans in place; *clone_dest* and *ephemeral* are
+    ignored.
 
     Returns the project's UUID.
     """
-    repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
+    is_url = is_repo_url(repo)
+    if is_url and not ephemeral and clone_dest is None:
+        raise ValueError(
+            "URL repos require either clone_dest (user-chosen path) or ephemeral=True"
+        )
+    if is_url and not ephemeral:
+        dest = Path(clone_dest)
+        if not dest.is_dir():
+            raise FileNotFoundError(
+                f"clone destination does not exist or is not a directory: {clone_dest}"
+            )
+
     project_name = project_name_from_repo(repo)
-    location = _LOCATION_ONLINE if is_repo_url(repo) else _LOCATION_LOCAL
+    repo_resolved = repo if is_url else str(Path(repo).resolve())
     reports_path = Path(reports_dir)
 
     project_uuid = resolve_project_uuid(
         reports_path,
-        ProjectIdentity(project_name, repo_resolved, discipline, location, scope_path=scope_path),
+        ProjectIdentity(project_name, repo_resolved, discipline, _LOCATION_LOCAL, scope_path=scope_path),
     )
+    project_dir = reports_path / project_uuid
+    _ensure_onboarding_field(project_dir)
 
-    # Mark this project as needing onboarding completion (Phase 2 of the
-    # onboarding wizard). The field is set to `null` on first registration
-    # and rewritten to an ISO-8601 timestamp the first time an evaluation
-    # successfully starts against this project (see _mark_onboarding_completed).
-    _ensure_onboarding_field(reports_path / project_uuid)
+    # Resolve the on-disk path the project will live at.
+    if is_url:
+        if ephemeral:
+            target_path = get_clones_dir() / project_uuid
+        else:
+            target_path = Path(clone_dest).resolve() / project_name
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        # run_git_clone raises CloneError on failure (Task A8). We let it propagate.
+        run_git_clone(repo, target_path)
+    else:
+        target_path = Path(repo_resolved)
+        if not target_path.is_dir():
+            raise FileNotFoundError(f"Repo path does not exist: {target_path}")
 
-    # Scan local projects so file lists are available immediately
-    if location == _LOCATION_LOCAL:
-        repo_path = Path(repo_resolved)
-        if repo_path.is_dir():
-            project_dir = reports_path / project_uuid
-            scan_project(repo_path, output_dir=project_dir)
-            # For scoped projects, also scan the parent using the parent UUID from repo info
-            if scope_path:
-                _scan_parent_project(project_dir, reports_path, repo_path)
+    # Persist the resolved path + ephemeral flag in repository_info.json.
+    info_path = project_dir / "repository_info.json"
+    info = json.loads(info_path.read_text()) if info_path.exists() else {}
+    info["path"] = str(target_path.resolve())
+    info["location"] = _LOCATION_LOCAL
+    info["ephemeral"] = bool(ephemeral)
+    info_path.write_text(json.dumps(info, indent=2))
+
+    # Scan now that files are guaranteed on disk.
+    scan_project(target_path, output_dir=project_dir)
+    if scope_path:
+        _scan_parent_project(project_dir, reports_path, target_path)
 
     return project_uuid
 
@@ -216,18 +253,16 @@ class FsEvaluationMixin:
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:
         """Start an asynchronous evaluation subprocess for a repository."""
         if is_repo_url(repo):
-            if not is_valid_repo_url(repo):
-                raise ValueError(
-                    f"Invalid repository URL format: {repo}. "
-                    f"Expected a URL like https://github.com/owner/repo or git@github.com:owner/repo.git"
-                )
-        else:
-            resolved = Path(repo).resolve()
-            if not resolved.exists():
-                raise FileNotFoundError(
-                    f"Repository not found: {repo}. "
-                    f"Check that the path exists and is accessible from this machine."
-                )
+            raise ValueError(
+                "URL repos are not supported here. Register the project via "
+                "POST /api/projects (which clones to disk) and pass the local path."
+            )
+        resolved = Path(repo).resolve()
+        if not resolved.exists():
+            raise FileNotFoundError(
+                f"Repository not found: {repo}. "
+                f"Check that the path exists and is accessible from this machine."
+            )
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
         _register_project(repo, options.discipline, reports_dir, scope_path=options.scope_path)
@@ -237,21 +272,17 @@ class FsEvaluationMixin:
         if hasattr(self._jobs, "set_reports_root"):
             self._jobs.set_reports_root(Path(reports_dir))
         env = self._build_eval_env(repo, options)
-        if is_repo_url(repo):
-            cwd = str(Path.cwd())
+        # For files, walk up to find git root; for dirs, use as-is
+        if resolved.is_file():
+            candidate = resolved.parent
+            cwd = str(candidate)
+            while candidate != candidate.parent:
+                if (candidate / ".git").exists():
+                    cwd = str(candidate)
+                    break
+                candidate = candidate.parent
         else:
-            resolved = Path(repo).resolve()
-            # For files, walk up to find git root; for dirs, use as-is
-            if resolved.is_file():
-                candidate = resolved.parent
-                cwd = str(candidate)
-                while candidate != candidate.parent:
-                    if (candidate / ".git").exists():
-                        cwd = str(candidate)
-                        break
-                    candidate = candidate.parent
-            else:
-                cwd = str(resolved)
+            cwd = str(resolved)
         return self.dispatcher.dispatch(cmd, cwd=cwd, env=env)
 
     def get_evaluation_status(self, job_id: str, reports_dir: str | None = None) -> JobSnapshot | None:

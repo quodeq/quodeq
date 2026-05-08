@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,30 @@ from quodeq.shared.repo_handler import is_valid_repo_url
 from quodeq.shared.utils import is_repo_url
 
 _MAX_PROJECT_BUILD_WORKERS = 8
+
+
+def _derive_last_fetched_at(repo_path: str | None) -> str | None:
+    """Return ISO-8601 mtime of .git/FETCH_HEAD (or .git/HEAD as fallback), or None."""
+    if not repo_path:
+        return None
+    p = Path(repo_path)
+    fetch_head = p / ".git" / "FETCH_HEAD"
+    head = p / ".git" / "HEAD"
+    candidate = fetch_head if fetch_head.exists() else head if head.exists() else None
+    if candidate is None:
+        return None
+    try:
+        ts = candidate.stat().st_mtime
+    except OSError:
+        return None
+    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
+
+def _is_evaluable(repo_path: str | None) -> bool:
+    """Return True if the working copy directory exists on disk."""
+    if not repo_path:
+        return False
+    return Path(repo_path).is_dir()
 
 
 def find_children(reports_root: Path, parent_id: str) -> list[str]:
@@ -176,6 +201,10 @@ def get_project_info(reports_dir: str, project: str) -> dict[str, Any] | None:
         info.get("location") == "online"
         and not (info.get("path", "").startswith(("https://", "git@")))
     )
+    repo_path = info.get("path")
+    info["lastFetchedAt"] = _derive_last_fetched_at(repo_path)
+    info["evaluable"] = _is_evaluable(repo_path)
+    info.setdefault("ephemeral", False)
     return {
         **info,
         "discipline": discipline,

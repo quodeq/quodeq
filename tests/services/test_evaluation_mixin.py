@@ -227,14 +227,13 @@ class TestStartEvaluation:
         m._dispatcher.dispatch.return_value = JobSnapshot(job_id="j1", status="running")
         return m
 
-    @patch("quodeq.services.evaluation_mixin._register_project")
-    @patch("quodeq.services.evaluation_mixin.is_valid_repo_url", return_value=True)
-    def test_start_with_url(self, mock_valid, mock_reg):
+    def test_url_input_rejected(self):
+        """Clone-on-add (A4): start_evaluation refuses URLs; clone happens at registration."""
         m = self._setup_mixin()
         opts = EvaluationOptions()
-        snap = m.start_evaluation("https://github.com/org/repo.git", "/reports", opts)
-        assert snap.job_id == "j1"
-        m._dispatcher.dispatch.assert_called_once()
+        with pytest.raises(ValueError, match="not supported"):
+            m.start_evaluation("https://github.com/org/repo.git", "/reports", opts)
+        m._dispatcher.dispatch.assert_not_called()
 
     @patch("quodeq.services.evaluation_mixin._register_project")
     def test_start_with_local_dir(self, mock_reg, tmp_path: Path):
@@ -242,13 +241,6 @@ class TestStartEvaluation:
         opts = EvaluationOptions()
         snap = m.start_evaluation(str(tmp_path), str(tmp_path / "reports"), opts)
         assert snap.job_id == "j1"
-
-    @patch("quodeq.services.evaluation_mixin.is_valid_repo_url", return_value=False)
-    def test_invalid_url_raises(self, mock_valid):
-        m = self._setup_mixin()
-        opts = EvaluationOptions()
-        with pytest.raises(ValueError, match="Invalid repository URL"):
-            m.start_evaluation("https://bad-url", "/reports", opts)
 
     def test_nonexistent_local_path_raises(self):
         m = self._setup_mixin()

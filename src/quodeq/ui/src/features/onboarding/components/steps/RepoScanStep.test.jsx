@@ -103,6 +103,136 @@ describe('RepoScanStep', () => {
     }
   });
 
+  it('routes URL input through CloneTargetStep instead of calling createProject directly', async () => {
+    const createProject = vi.fn().mockResolvedValue({ projectId: 'uuid-9', scanData: { total_files: 7 } });
+    render(
+      <RepoScanStep
+        state={{ repoScanSubState: 'idle', repo: { value: 'https://github.com/x/y.git' } }}
+        actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
+        createProject={createProject}
+        onContinue={noop}
+        onCancel={noop}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /scan/i }));
+    // We should NOT call createProject yet — instead, see CloneTargetStep
+    expect(createProject).not.toHaveBeenCalled();
+    expect(await screen.findByText(/where should we clone this repo/i)).toBeInTheDocument();
+  });
+
+  it('local path input continues to call createProject directly', async () => {
+    const createProject = vi.fn().mockResolvedValue({ projectId: 'uuid-9', scanData: { total_files: 7 } });
+    render(
+      <RepoScanStep
+        state={{ repoScanSubState: 'idle', repo: { value: '/tmp/repo' } }}
+        actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
+        createProject={createProject}
+        onContinue={noop}
+        onCancel={noop}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /scan/i }));
+    await waitFor(() => expect(createProject).toHaveBeenCalledWith({ repo: '/tmp/repo' }));
+  });
+
+  it('CloneTargetStep submission forwards cloneDest to createProject', async () => {
+    const createProject = vi.fn().mockResolvedValue({ projectId: 'uuid-9', scanData: { total_files: 7 } });
+    render(
+      <RepoScanStep
+        state={{ repoScanSubState: 'idle', repo: { value: 'https://github.com/x/y.git' } }}
+        actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
+        createProject={createProject}
+        onContinue={noop}
+        onCancel={noop}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /scan/i }));
+    await screen.findByText(/where should we clone this repo/i);
+    const input = await screen.findByLabelText(/clone destination/i);
+    fireEvent.change(input, { target: { value: '/Users/v/code' } });
+    fireEvent.click(screen.getByRole('button', { name: /clone and scan/i }));
+    await waitFor(() => expect(createProject).toHaveBeenCalledWith({
+      repo: 'https://github.com/x/y.git',
+      cloneDest: '/Users/v/code',
+      ephemeral: false,
+    }));
+  });
+
+  it('back button on CloneTargetStep returns to URL input form', async () => {
+    render(
+      <RepoScanStep
+        state={{ repoScanSubState: 'idle', repo: { value: 'https://github.com/x/y.git' } }}
+        actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
+        createProject={vi.fn()}
+        onContinue={noop}
+        onCancel={noop}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /scan/i }));
+    await screen.findByText(/where should we clone this repo/i);
+    fireEvent.click(screen.getByRole('button', { name: /^back$/i }));
+    // After back, the URL input form is shown again
+    await screen.findByDisplayValue('https://github.com/x/y.git');
+  });
+
+  it('persists cloneDest to localStorage on successful non-ephemeral submission', async () => {
+    const createProject = vi.fn().mockResolvedValue({ projectId: 'uuid', scanData: {} });
+    localStorage.removeItem('quodeq.lastCloneRoot');
+    render(
+      <RepoScanStep
+        state={{ repoScanSubState: 'idle', repo: { value: 'https://github.com/x/y.git' } }}
+        actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
+        createProject={createProject}
+        onContinue={noop}
+        onCancel={noop}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /scan/i }));
+    await screen.findByText(/where should we clone this repo/i);
+    fireEvent.change(screen.getByLabelText(/clone destination/i), { target: { value: '/Users/v/code' } });
+    fireEvent.click(screen.getByRole('button', { name: /clone and scan/i }));
+    await waitFor(() => expect(createProject).toHaveBeenCalled());
+    expect(localStorage.getItem('quodeq.lastCloneRoot')).toBe('/Users/v/code');
+  });
+
+  it('does not persist localStorage when ephemeral is true', async () => {
+    const createProject = vi.fn().mockResolvedValue({ projectId: 'uuid', scanData: {} });
+    localStorage.removeItem('quodeq.lastCloneRoot');
+    render(
+      <RepoScanStep
+        state={{ repoScanSubState: 'idle', repo: { value: 'https://github.com/x/y.git' } }}
+        actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
+        createProject={createProject}
+        onContinue={noop}
+        onCancel={noop}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /scan/i }));
+    await screen.findByText(/where should we clone this repo/i);
+    fireEvent.click(screen.getByRole('button', { name: /just run one evaluation/i }));
+    await waitFor(() => expect(createProject).toHaveBeenCalled());
+    expect(localStorage.getItem('quodeq.lastCloneRoot')).toBeNull();
+  });
+
+  it('shows actionable message when clone fails with AUTH_REQUIRED', async () => {
+    const err = Object.assign(new Error('git clone failed (auth)'), { code: 'AUTH_REQUIRED' });
+    const createProject = vi.fn().mockRejectedValue(err);
+    render(
+      <RepoScanStep
+        state={{ repoScanSubState: 'idle', repo: { value: 'https://github.com/x/y.git' } }}
+        actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
+        createProject={createProject}
+        onContinue={noop}
+        onCancel={noop}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /scan/i }));
+    await screen.findByText(/where should we clone this repo/i);
+    fireEvent.change(screen.getByLabelText(/clone destination/i), { target: { value: '/Users/v/code' } });
+    fireEvent.click(screen.getByRole('button', { name: /clone and scan/i }));
+    expect(await screen.findByText(/private repo/i)).toBeInTheDocument();
+  });
+
   it('409 with evaluations on the existing project surfaces the error normally', async () => {
     const succeedScan = vi.fn();
     const failScan = vi.fn();

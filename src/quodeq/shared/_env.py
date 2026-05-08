@@ -127,6 +127,22 @@ def get_index_db_path(default: str | None = None, env: dict[str, str] | None = N
     return default or str(_DEFAULT_INDEX_DB_PATH)
 
 
+_DEFAULT_CLONES_DIR = Path.home() / ".quodeq" / "clones"
+
+
+def get_clones_dir(env: dict[str, str] | None = None) -> Path:
+    """Return the directory where ephemeral clones live.
+
+    Resolution order: QUODEQ_CLONES_DIR env var, then ~/.quodeq/clones.
+    Recomputes the default on each call so test monkeypatches of
+    ``Path.home`` are honored.
+    """
+    from_env = (env or os.environ).get("QUODEQ_CLONES_DIR")
+    if from_env:
+        return Path(from_env)
+    return Path.home() / ".quodeq" / "clones"
+
+
 _SQLITE_DISABLE_TRUTHY = {"1", "true", "yes", "on"}
 
 
