@@ -104,14 +104,21 @@ def build_cache_key_for_file(config: RunConfig, file_path: str, dimension: str) 
 def classify_files_via_cache(
     config: RunConfig, dimension: str, files: list[str],
     cache: CacheBackend,
+    *, bypass_reads: bool = False,
 ) -> ClassifyResult:
-    """Split ``files`` into cache hits (findings) and misses (need dispatch)."""
+    """Split ``files`` into cache hits (findings) and misses (need dispatch).
+
+    When ``bypass_reads`` is True (e.g. honoring ``--clean-scan``), every
+    file is forced into the misses bucket regardless of cache state. The
+    miss_keys map is still populated so callers can write fresh entries
+    after dispatch — clean-scan refreshes the cache rather than ignoring it.
+    """
     cached_findings: list[dict] = []
     misses: list[str] = []
     miss_keys: dict[str, str] = {}
     for f in files:
         key = build_cache_key_for_file(config, f, dimension)
-        hit = cache.get(key)
+        hit = None if bypass_reads else cache.get(key)
         if hit is None:
             misses.append(f)
             miss_keys[f] = key
