@@ -73,9 +73,9 @@ class TestHeartbeatFormat:
             violations=2, compliance=5,
         )
         assert line.startswith("[security] 1m02s")
-        assert "2 active agents" in line
+        assert "2 v · 5 c" in line
         assert "files 10/30 · 20 left" in line
-        assert "2 violations · 5 compliance" in line
+        assert line.endswith("2 agents")
         assert "findings" not in line
         assert "total" not in line
 
@@ -86,7 +86,7 @@ class TestHeartbeatFormat:
             taken=1, total_files=2, remaining=1,
             violations=0, compliance=0,
         )
-        assert "1 active agent |" in line
+        assert line.endswith("1 agent")
 
 
 class TestHeartbeatLoop:
@@ -122,4 +122,4 @@ class TestHeartbeatLoop:
 
         assert emitted, "heartbeat should emit at least one log line"
         assert "[security]" in emitted[0]
-        assert "1 violations" in emitted[0]
+        assert "1 v · 0 c" in emitted[0]
