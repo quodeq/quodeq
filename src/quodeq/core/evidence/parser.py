@@ -30,7 +30,7 @@ class EvidenceContext:
 
 
 def _build_principles(
-    grouped: _GroupedJudgments, dimension_name: str,
+    grouped: _GroupedJudgments, dimension_name: str, source_file_count: int = 0,
 ) -> dict[str, PrincipleEvidence]:
     """Build scored PrincipleEvidence entries from grouped judgments."""
     all_keys = set(grouped.violations.keys()) | set(grouped.compliance.keys())
@@ -42,7 +42,7 @@ def _build_principles(
             violations=[judgment_to_dict(j) for j in grouped.violations.get(sc, [])],
             compliance=[judgment_to_dict(j) for j in grouped.compliance.get(sc, [])],
         )
-        pe.compute_metrics()
+        pe.compute_metrics(source_file_count=source_file_count)
         principles[sc] = pe
     return principles
 
@@ -82,7 +82,8 @@ def parse_jsonl_to_evidence_by_dimension(
         return {}
     return {
         dim: _build_evidence(context, _build_principles(
-            _group_judgments(dj, dimension=dim, evaluators_dir=evaluators_dir), dim))
+            _group_judgments(dj, dimension=dim, evaluators_dir=evaluators_dir),
+            dim, context.source_file_count))
         for dim, dj in by_dim.items()
     }
 
@@ -99,4 +100,4 @@ def parse_jsonl_to_evidence(
     judgments = read_judgments(jsonl_file, compiled_dir)
     dim = judgments[0].dimension if judgments else ""
     grouped = _group_judgments(judgments, dimension=dim, evaluators_dir=evaluators_dir)
-    return _build_evidence(context, _build_principles(grouped, dim))
+    return _build_evidence(context, _build_principles(grouped, dim, context.source_file_count))
