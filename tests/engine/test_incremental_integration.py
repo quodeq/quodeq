@@ -18,7 +18,7 @@ class TestIncrementalEndToEnd:
         (tmp_path / "routes.py").write_text("from auth import login")
 
         files = ["auth.py", "utils.py", "routes.py"]
-        fp1 = build_fingerprint(tmp_path, files, "security", standards_dir=None)
+        fp1 = build_fingerprint(tmp_path, files, "security", standards_dir=None, analyzed_files=set(files))
         evidence_dir_1 = tmp_path / "run1"
         evidence_dir_1.mkdir()
         save_fingerprint(fp1, evidence_dir_1)
@@ -63,7 +63,7 @@ class TestIncrementalEndToEnd:
         (tmp_path / "b.py").write_text("also_same")
 
         files = ["a.py", "b.py"]
-        fp = build_fingerprint(tmp_path, files, "reliability", standards_dir=None)
+        fp = build_fingerprint(tmp_path, files, "reliability", standards_dir=None, analyzed_files=set(files))
 
         prev_jsonl = tmp_path / "prev.jsonl"
         prev_jsonl.write_text(

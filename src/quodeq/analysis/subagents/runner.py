@@ -135,7 +135,14 @@ def _execute_pool_and_collect(
     )
     pool, results = _launch_pool(config, dc.dim_id, params)
 
-    fp = build_fingerprint(config.src, dc.files, dc.dim_id, config.standards_dir)
+    # Record what the queue actually dispatched. Without this, the saved
+    # fingerprint has analyzed_files=[], which combined with up-to-date
+    # file_hashes makes the next run's change detection skip everything.
+    queue_taken = set(FileQueue(pool_params.queue_path).all_taken_files())
+    fp = build_fingerprint(
+        config.src, dc.files, dc.dim_id, config.standards_dir,
+        analyzed_files=queue_taken or None,
+    )
     save_fingerprint(fp, dc.evidence_dir)
 
     if pool_params.mini_verify_findings:

@@ -103,11 +103,20 @@ def detect_changed_files(
     new_files = file_set - prev_files
     changed |= new_files
 
+    # A previous fingerprint with file_hashes but no analyzed_files is either
+    # legacy (pre-tracking) or a corrupt/incomplete write from a crashed run.
+    # Either way it can't be trusted to mean "everything was analyzed", so
+    # force a full re-analysis to heal the state on the next run.
+    prev_analyzed = set(prev_fingerprint.get("analyzed_files", []))
+    if prev_files and not prev_analyzed:
+        return ChangeDetectionResult(
+            full_reanalysis=True,
+            reason="previous fingerprint has no analyzed_files (incomplete or pre-tracking)",
+        )
+
     # Files that were fingerprinted but never analyzed (e.g. pool timed out)
     # must be treated as changed so they get picked up on the next run.
-    prev_analyzed = set(prev_fingerprint.get("analyzed_files", []))
-    if prev_analyzed:
-        not_analyzed = (file_set & prev_files) - prev_analyzed - changed
-        changed |= not_analyzed
+    not_analyzed = (file_set & prev_files) - prev_analyzed - changed
+    changed |= not_analyzed
 
     return ChangeDetectionResult(changed=changed)
