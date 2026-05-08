@@ -104,3 +104,21 @@ def test_register_url_without_dest_or_ephemeral_raises(tmp_path):
     reports.mkdir()
     with pytest.raises(ValueError, match="clone_dest"):
         _register_project("https://github.com/example/repo.git", None, str(reports))
+
+
+def test_register_url_clone_dest_must_exist(tmp_path):
+    """Pre-flight rejects a non-existent clone_dest before any side effects."""
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    nonexistent = tmp_path / "no-such-dir"
+
+    with pytest.raises(FileNotFoundError, match="clone destination"):
+        _register_project(
+            "https://github.com/example/repo.git",
+            None,
+            str(reports),
+            clone_dest=str(nonexistent),
+        )
+
+    # Verify nothing was created under the missing path
+    assert not nonexistent.exists()

@@ -18,6 +18,7 @@ from quodeq.core.scoring.engine import score_evidence
 from quodeq.analysis.report import write_dimension_report
 from quodeq.services._fs_clone import run_git_clone
 from quodeq.services._fs_scan import scan_project
+from quodeq.shared._env import get_clones_dir
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo
 
 if TYPE_CHECKING:
@@ -133,6 +134,12 @@ def _register_project(
         raise ValueError(
             "URL repos require either clone_dest (user-chosen path) or ephemeral=True"
         )
+    if is_url and not ephemeral:
+        dest = Path(clone_dest)
+        if not dest.is_dir():
+            raise FileNotFoundError(
+                f"clone destination does not exist or is not a directory: {clone_dest}"
+            )
 
     project_name = project_name_from_repo(repo)
     repo_resolved = repo if is_url else str(Path(repo).resolve())
@@ -148,7 +155,7 @@ def _register_project(
     # Resolve the on-disk path the project will live at.
     if is_url:
         if ephemeral:
-            target_path = Path.home() / ".quodeq" / "clones" / project_uuid
+            target_path = get_clones_dir() / project_uuid
         else:
             target_path = Path(clone_dest).resolve() / project_name
         target_path.parent.mkdir(parents=True, exist_ok=True)
