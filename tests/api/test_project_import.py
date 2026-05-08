@@ -39,7 +39,6 @@ def _make_zip(
     extra_files: dict[str, bytes] | None = None,
     include_manifest: bool = True,
     manifest_overrides: dict | None = None,
-    files_use_backslashes: bool = False,
     extra_member: tuple[str, bytes] | None = None,
     add_symlink_entry: bool = False,
     raw_bytes: bytes | None = None,
@@ -57,17 +56,7 @@ def _make_zip(
     }
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        if files_use_backslashes:
-            # ZipInfo.__init__ normalises os.sep ("\\" on Windows) to "/", so a
-            # raw f"{uuid}\\repository_info.json" string would round-trip to
-            # forward-slashes on Windows and never reach our server check.
-            # Mutating .filename after construction puts the literal backslash
-            # on the wire on every platform.
-            info = zipfile.ZipInfo("placeholder")
-            info.filename = f"{project_uuid}\\repository_info.json"
-            zf.writestr(info, json.dumps(repo_info))
-        else:
-            zf.writestr(f"{project_uuid}/repository_info.json", json.dumps(repo_info))
+        zf.writestr(f"{project_uuid}/repository_info.json", json.dumps(repo_info))
         if include_manifest:
             manifest = {
                 "schema": _MANIFEST_SCHEMA,
@@ -173,12 +162,16 @@ def test_import_rejects_symlink_entry(app_client):
     assert resp.get_json()["code"] in {"DISALLOWED_ENTRY", "INVALID_ARCHIVE"}
 
 
-def test_import_rejects_backslashes(app_client):
-    c, home, _ = app_client
-    data = _make_zip(files_use_backslashes=True)
-    with _patch_home(home):
-        resp = _post_zip(c, data)
-    assert resp.status_code == 400
+def test_import_rejects_backslashes_in_member_name():
+    """The backslash check is defense-in-depth: stdlib zipfile normalises
+    os.sep to "/" on Windows both when writing and when reading the central
+    directory, so a HTTP-level test can't exercise this branch on Windows.
+    Test the validator directly instead.
+    """
+    from quodeq.api.import_project import _ImportError, _validate_member_name
+    with pytest.raises(_ImportError) as exc:
+        _validate_member_name("uuid\\repository_info.json")
+    assert "backslash" in str(exc.value).lower()
 
 
 def test_import_rejects_multiple_top_dirs(app_client):
