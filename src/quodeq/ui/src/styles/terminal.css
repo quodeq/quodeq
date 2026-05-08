@@ -1666,7 +1666,7 @@
   /* Cap label width so long names truncate without colliding with the
      count badge's anchored position; box width stays constant across
      rail states so the text doesn't visibly shrink as it fades. */
-  max-width: 140px;
+  max-width: 124px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1678,8 +1678,9 @@
      this badge occupies in the 240px expanded rail. A `right` anchor
      would slide leftward with the button-right edge during the
      collapse animation — the same horizontal motion the user
-     disliked. */
-  left: 184px;
+     disliked. The offset gives a 3-digit badge clear breathing room
+     to the rail edge (button content ends at ~224, rail at 240). */
+  left: 168px;
   top: 50%;
   transform: translateY(-50%);
 }
