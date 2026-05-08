@@ -219,6 +219,63 @@
 .onboarding-scan-summary__lang-count { color: var(--color-accent); }
 
 /* ──────────────────────────────────────────────────────────────
+   Clone-target step
+   ────────────────────────────────────────────────────────────── */
+.onboarding-clone-target__repo-url {
+  margin: 0;
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  padding: var(--term-space-1) 0;
+  word-break: break-all;
+}
+.onboarding-clone-target__repo-url code {
+  font-family: inherit;
+  color: var(--color-text);
+}
+.onboarding-clone-target__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--term-space-2);
+}
+.onboarding-clone-target__label {
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: 2px;
+}
+.onboarding-clone-target__input {
+  appearance: none;
+  width: 100%;
+  background: var(--color-surface);
+  border: var(--term-border);
+  border-radius: var(--term-radius);
+  padding: var(--term-space-2) 10px;
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+  color: var(--color-text);
+  outline: 0;
+}
+.onboarding-clone-target__input:focus {
+  border-color: var(--color-border-focus);
+}
+.onboarding-clone-target__hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+.onboarding-clone-target__error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-danger);
+}
+.onboarding-clone-target__escape-hatch {
+  margin-top: var(--term-space-3);
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* ──────────────────────────────────────────────────────────────
    Provider step
    ────────────────────────────────────────────────────────────── */
 .onboarding-provider-active {

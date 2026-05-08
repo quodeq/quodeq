@@ -41,4 +41,20 @@ describe('CloneTargetStep', () => {
     fireEvent.click(screen.getByRole('button', { name: /back/i }));
     expect(onBack).toHaveBeenCalled();
   });
+
+  it('trims whitespace from cloneDest before submitting', () => {
+    const onSubmit = vi.fn();
+    render(<CloneTargetStep repoUrl="https://x/y.git" onSubmit={onSubmit} onBack={vi.fn()} />);
+    const input = screen.getByLabelText(/clone destination/i);
+    fireEvent.change(input, { target: { value: '  /tmp/code  ' } });
+    fireEvent.click(screen.getByRole('button', { name: /clone and scan/i }));
+    expect(onSubmit).toHaveBeenCalledWith({ cloneDest: '/tmp/code', ephemeral: false });
+  });
+
+  it('disables submit when cloneDest is whitespace-only', () => {
+    render(<CloneTargetStep repoUrl="https://x/y.git" onSubmit={vi.fn()} onBack={vi.fn()} />);
+    const input = screen.getByLabelText(/clone destination/i);
+    fireEvent.change(input, { target: { value: '   ' } });
+    expect(screen.getByRole('button', { name: /clone and scan/i })).toBeDisabled();
+  });
 });

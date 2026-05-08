@@ -28,7 +28,7 @@ export default function CloneTargetStep({
 
   function handleSubmit(e) {
     e.preventDefault();
-    onSubmit({ cloneDest, ephemeral: false });
+    onSubmit({ cloneDest: cloneDest.trim(), ephemeral: false });
   }
 
   function handleEphemeral() {
@@ -61,7 +61,7 @@ export default function CloneTargetStep({
           <button
             type="submit"
             className="term-btn term-btn--primary term-btn--filled"
-            disabled={submitting || !cloneDest}
+            disabled={submitting || !cloneDest.trim()}
           >
             {submitting ? 'cloning...' : 'clone and scan'}
           </button>
