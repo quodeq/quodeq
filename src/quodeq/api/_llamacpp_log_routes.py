@@ -35,14 +35,26 @@ def _default_log_paths() -> list[Path]:
     First match wins. Order:
 
     1. ``~/.quodeq/logs/llama-server.log`` — Quodeq-namespaced, same path
-       on every OS, easy for users to discover and clean up.
+       on every OS, easy for users to discover and clean up. The parent
+       directory is created on probe so users can redirect there
+       without running ``mkdir -p`` themselves.
     2. Platform-standard log directory (macOS Library/Logs, XDG state
        dir on Linux, LocalAppData on Windows). Honors host conventions
        and integrates with system log viewers like macOS Console.app.
     3. ``/tmp/llama-server.log`` as a lowest-friction last resort.
     """
     home = Path.home()
-    candidates: list[Path] = [home / ".quodeq" / "logs" / "llama-server.log"]
+    quodeq_logs = home / ".quodeq" / "logs"
+    # Create the directory eagerly so the suggested redirect command in
+    # the README and the offline-message hint just works, even on a
+    # fresh install before the user has run any evaluations.
+    try:
+        quodeq_logs.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # Permission denied or read-only home — fall through to other
+        # candidates rather than failing the whole probe.
+        pass
+    candidates: list[Path] = [quodeq_logs / "llama-server.log"]
     if sys.platform == "darwin":
         candidates.append(home / "Library" / "Logs" / "llama-server.log")
     elif sys.platform == "win32":
