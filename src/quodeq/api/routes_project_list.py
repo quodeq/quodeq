@@ -12,6 +12,7 @@ from flask import Flask, Response, jsonify, request
 from quodeq.api.helpers import error_response
 from quodeq.api.routes_common import reports_dir
 from quodeq.api.zip import export_project_zip
+from quodeq.services._fs_clone import CloneError
 from quodeq.services._fs_scan import scan_project
 from quodeq.services.base import ActionProvider
 from quodeq.shared.validation import validate_path_segment
@@ -305,6 +306,19 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         except (FileNotFoundError, ValueError) as exc:
             _rollback_new_dirs(reports_root, before)
             body, status = error_response(str(exc), HTTPStatus.BAD_REQUEST, "INVALID_REPO")
+            return jsonify(body), status
+        except CloneError as exc:
+            _rollback_new_dirs(reports_root, before)
+            code_map = {
+                "auth": ("AUTH_REQUIRED", HTTPStatus.BAD_REQUEST),
+                "network": ("NETWORK_ERROR", HTTPStatus.BAD_GATEWAY),
+                "repo_not_found": ("REPO_NOT_FOUND", HTTPStatus.NOT_FOUND),
+                "dest_exists": ("DEST_EXISTS", HTTPStatus.CONFLICT),
+                "disk": ("DISK_ERROR", HTTPStatus.INSUFFICIENT_STORAGE),
+                "unknown": ("CLONE_FAILED", HTTPStatus.BAD_GATEWAY),
+            }
+            code, status = code_map.get(exc.kind, ("CLONE_FAILED", HTTPStatus.BAD_GATEWAY))
+            body, _ = error_response(str(exc), status, code)
             return jsonify(body), status
         except Exception as exc:  # pragma: no cover — unexpected scan/clone failure
             _rollback_new_dirs(reports_root, before)
