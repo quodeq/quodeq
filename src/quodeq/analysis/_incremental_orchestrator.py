@@ -1,10 +1,18 @@
 """Incremental analysis — top-level orchestrator for a single dimension."""
 from __future__ import annotations
 
+import json
+import logging
 import time
 from pathlib import Path
 
 from quodeq.analysis._backfill import BackfillContext, extract_files_from_jsonl, run_backfill_phase
+from quodeq.analysis._incremental_evidence import (
+    parse_evidence_from_jsonl, save_dimension_fingerprint,
+)
+from quodeq.analysis.cache.dimension_helpers import classify_files_via_cache
+from quodeq.analysis.cache.flags import is_cache_v2_enabled
+from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.incremental import ClassificationInput, classify_files
 from quodeq.analysis._incremental_context import IncrementalCoverage
 from quodeq.analysis._incremental_phases import (
@@ -15,6 +23,8 @@ from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.fingerprint import find_previous_fingerprint
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.core.evidence.model import Evidence
+
+_logger = logging.getLogger(__name__)
 
 
 def _actual_analyzed_files(evidence_dir: "Path", dimension: str) -> set[str]:
@@ -36,10 +46,58 @@ def _actual_analyzed_files(evidence_dir: "Path", dimension: str) -> set[str]:
     return analyzed
 
 
+def _try_v2_full_hit(
+    config: RunConfig, dimension: str, ctx: _AnalysisContext,
+) -> Evidence | None:
+    """V2 fast-path: if every file is a cache hit, return Evidence directly.
+
+    Returns None when any file misses, so the caller can fall through to
+    V1's incremental path (which still uses the per-file V2 wiring inside
+    _process_single_dimension for the dispatched subset).
+
+    Also writes a V1-compatible fingerprint so flipping the flag off later
+    doesn't trigger a needless full re-analysis.
+    """
+    files = _list_all_source_files(config, dimension)
+    if not files:
+        return None
+
+    cache = LocalFileBackend()
+    classify = classify_files_via_cache(config, dimension, files, cache)
+    if classify.misses:
+        return None
+
+    _logger.info(
+        "[%s] cache: %d hits / 0 misses (%d total) — V2 fast-path",
+        dimension, len(files), len(files),
+    )
+
+    evidence_dir = config.work_dir or config.src
+    jsonl = evidence_dir / f"{dimension}_evidence.jsonl"
+    jsonl.parent.mkdir(parents=True, exist_ok=True)
+    with jsonl.open("w", encoding="utf-8") as out:
+        for finding in classify.cached_findings:
+            out.write(json.dumps(finding) + "\n")
+
+    ev = parse_evidence_from_jsonl(config, dimension, ctx, jsonl, files_read=len(files))
+    if ev is None:
+        return None
+
+    # Keep V1's fingerprint state consistent so the system can fall back to
+    # the V1 path cleanly if the flag is later disabled.
+    save_dimension_fingerprint(config, dimension, files=files, analyzed_files=set(files))
+    return ev
+
+
 def run_dimension_incremental(
     config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
 ) -> Evidence | None:
     """Incremental path: detect changes, carry forward, analyze only changed files."""
+    if is_cache_v2_enabled():
+        ev = _try_v2_full_hit(config, dimension, ctx)
+        if ev is not None:
+            return ev
+
     phase_start = time.monotonic()
     evidence_dir = config.work_dir or config.src
 
