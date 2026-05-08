@@ -15,6 +15,12 @@ The module is loaded eagerly but the cache itself is only consulted when
 from __future__ import annotations
 
 from quodeq.analysis.cache.backend import CacheBackend, CacheStats
+from quodeq.analysis.cache.dimension_helpers import (
+    ClassifyResult,
+    build_cache_key_for_file,
+    classify_files_via_cache,
+    persist_dispatch_results,
+)
 from quodeq.analysis.cache.entry import CacheEntry
 from quodeq.analysis.cache.flags import is_cache_v2_enabled, is_result_cache_disabled
 from quodeq.analysis.cache.key import CacheKey, compute_key
@@ -33,6 +39,7 @@ __all__ = [
     "CacheEntry",
     "CacheKey",
     "CacheStats",
+    "ClassifyResult",
     "DispatchResult",
     "Dispatcher",
     "LocalFileBackend",
@@ -40,8 +47,11 @@ __all__ = [
     "UnitResult",
     "WorkUnit",
     "analyze_unit",
+    "build_cache_key_for_file",
+    "classify_files_via_cache",
     "compute_key",
     "default_cache_root",
     "is_cache_v2_enabled",
     "is_result_cache_disabled",
+    "persist_dispatch_results",
 ]
