@@ -80,3 +80,36 @@ def scale_multiplier(source_file_count: int) -> int:
         if source_file_count >= threshold:
             return multiplier
     return 1
+
+
+# Very small projects (e.g. demo / test repos) hit the violation type-cap
+# thresholds (3 critical / 5 major) too aggressively: a handful of distinct
+# critical types in a 10–30 file repo immediately drops the grade to Poor in
+# graded mode, even though the same density on a "Medium" project would only
+# drop it by one level. Mirror the large-project scaling at the small end.
+_SMALL_PROJECT_FLOOR = 30
+_SMALL_PROJECT_LENIENCY = 2
+
+
+def small_project_multiplier(source_file_count: int) -> int:
+    """Extra cap leniency for very small projects.
+
+    Returns an additional multiplier on top of :func:`scale_multiplier`
+    so the violation type caps and graded-mode drop thresholds scale up
+    for tiny repos (where a few distinct types is noisier signal).
+    """
+    if 0 < source_file_count < _SMALL_PROJECT_FLOOR:
+        return _SMALL_PROJECT_LENIENCY
+    return 1
+
+
+def effective_cap_multiplier(source_file_count: int) -> int:
+    """Combined size-based multiplier used for violation type caps.
+
+    Composes :func:`scale_multiplier` (raises caps for large projects)
+    with :func:`small_project_multiplier` (raises caps for very small
+    projects). The reported tier (``ScaleInfo.tier``) continues to use
+    :func:`scale_multiplier` alone — leniency is invisible to the
+    surface UI and only affects how harshly type counts are scored.
+    """
+    return scale_multiplier(source_file_count) * small_project_multiplier(source_file_count)
