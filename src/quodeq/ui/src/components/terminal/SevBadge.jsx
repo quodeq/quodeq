@@ -18,24 +18,54 @@ const SHORT = { critical: 'CRIT', major: 'MAJ', minor: 'MIN' };
 const LONG = { critical: 'critical', major: 'major', minor: 'minor' };
 const ABBR = { critical: 'crit', major: 'maj', minor: 'min' };
 
-export default function SevBadge({ level, format = 'short', count }) {
+export default function SevBadge({ level, format = 'short', count, onClick, ariaLabel }) {
   if (!level || !(level in SHORT)) return null;
 
+  const baseClass = `term-sev-badge term-sev-badge--${level}`;
+
   if (format === 'count-abbr') {
-    return (
-      <span className={`term-sev-badge term-sev-badge--${level} term-sev-badge--count-abbr`}>
+    const className = `${baseClass} term-sev-badge--count-abbr${onClick ? ' term-sev-badge--clickable' : ''}`;
+    const content = (
+      <>
         {count != null ? count : ''}
         {count != null ? ' ' : ''}
         {ABBR[level]}
-      </span>
+      </>
     );
+    if (onClick) {
+      return (
+        <button
+          type="button"
+          className={className}
+          onClick={(e) => { e.stopPropagation(); onClick(); }}
+          aria-label={ariaLabel || `${level} severity`}
+        >
+          {content}
+        </button>
+      );
+    }
+    return <span className={className}>{content}</span>;
   }
 
   const text = format === 'short' ? SHORT[level] : LONG[level];
-  return (
-    <span className={`term-sev-badge term-sev-badge--${level}`}>
+  const className = `${baseClass}${onClick ? ' term-sev-badge--clickable' : ''}`;
+  const content = (
+    <>
       {text}
       {count != null && <span className="term-sev-badge__count"> {count}</span>}
-    </span>
+    </>
   );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className={className}
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        aria-label={ariaLabel || `${level} severity`}
+      >
+        {content}
+      </button>
+    );
+  }
+  return <span className={className}>{content}</span>;
 }

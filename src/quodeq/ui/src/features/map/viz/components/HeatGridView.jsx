@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import HeatGridCells from './HeatGridCells.jsx';
+import { ICON_FOLDER } from '../../../../constants/navigation.jsx';
 
 const COL_NAME = 'name';
 const COL_CRITICAL = 'critical';
@@ -87,7 +88,8 @@ export default function HeatGridView({ node, onDrillDown, onFileClick, onCellCli
                     onKeyDown={(e) => e.key === 'Enter' && (canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row))}
                     title={row.path}
                   >
-                    {row.isFile ? '' : '\uD83D\uDCC1 '}{row.name}
+                    {row.isFile ? null : <span className="heat-grid-folder-icon" aria-hidden="true">{ICON_FOLDER}</span>}
+                    {row.name}
                   </div>
                 </td>
                 <HeatGridCells row={row} onCellClick={onCellClick} variant={variant} />

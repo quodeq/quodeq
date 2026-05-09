@@ -2288,6 +2288,22 @@ button.eval-provider-badge--clickable:focus-visible {
   contain-intrinsic-size: auto 180px;
 }
 
+/* Inside JS-virtualized lists (FileDetailPage) the virtualizer already
+ * skips off-screen rows. Layering `content-visibility: auto` on top causes
+ * the wrapper's ResizeObserver to cache the intrinsic-size placeholder as
+ * the final height, producing overlapping rows after scroll. Drop it for
+ * virtualized rows and disable the per-row enter animation, which would
+ * otherwise replay every time a row scrolls into the overscan window.
+ * `!important` because the base `.vdetail-row` rule sets these properties
+ * directly and we need to win against any future override that adds them
+ * back. */
+.vlive-violations-virtual .vdetail-row {
+  content-visibility: visible !important;
+  contain-intrinsic-size: auto !important;
+  contain: none !important;
+  animation: none !important;
+}
+
 .vdetail-row-main {
   display: flex;
   align-items: center;

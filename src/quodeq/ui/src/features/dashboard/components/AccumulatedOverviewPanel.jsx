@@ -6,7 +6,7 @@ import { collapseByDay, collectDayDimensions } from '../../../utils/dailyGroupin
 const RunHistoryPanel = lazy(() => import('./RunHistoryPanel.jsx'));
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
-import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
+import { buildTopOffendingFiles, buildProjectRootFile } from '../../../utils/explorerUtils.js';
 import { withDimensionsStr } from '../../../utils/dimensionUtils.js';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 import LastFetchedLine from '../../../components/LastFetchedLine.jsx';
@@ -52,14 +52,15 @@ function computeAccumulatedStats(accumulated, accumulatedDimensions, dailyTrend,
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function SeverityBadgeRow({ severity }) {
+function SeverityBadgeRow({ severity, onSeverityClick }) {
   const sev = severity || {};
   if (!(sev.critical || sev.major || sev.minor)) return null;
+  const onClickFor = (level) => onSeverityClick ? () => onSeverityClick(level) : undefined;
   return (
     <span className="acc-eval-sev-row">
-      {sev.critical > 0 && <SevBadge level="critical" count={sev.critical} format="count-abbr" />}
-      {sev.major > 0    && <SevBadge level="major"    count={sev.major}    format="count-abbr" />}
-      {sev.minor > 0    && <SevBadge level="minor"    count={sev.minor}    format="count-abbr" />}
+      {sev.critical > 0 && <SevBadge level="critical" count={sev.critical} format="count-abbr" onClick={onClickFor('critical')} />}
+      {sev.major > 0    && <SevBadge level="major"    count={sev.major}    format="count-abbr" onClick={onClickFor('major')} />}
+      {sev.minor > 0    && <SevBadge level="minor"    count={sev.minor}    format="count-abbr" onClick={onClickFor('minor')} />}
     </span>
   );
 }
@@ -76,7 +77,7 @@ function buildLanguageSub(projectInfo) {
     .join('  ');
 }
 
-function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulatedDimensions, projectName, projectInfo }) {
+function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulatedDimensions, projectName, projectInfo, onCardNavigate }) {
   const summary = accumulated?.summary;
   const scoreNum = parseFloat(summary?.numericAverage);
   const scoreDisplay = isNaN(scoreNum) ? '—' : scoreNum.toFixed(1);
@@ -85,6 +86,10 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulated
   const compliance = summary?.totalCompliance || 0;
   const totalChecks = violations + compliance;
   const ratio = complianceRatio(violations, compliance);
+
+  const handleViolations = onCardNavigate ? () => onCardNavigate('violations') : undefined;
+  const handleCompliance = onCardNavigate && compliance > 0 ? () => onCardNavigate('compliance') : undefined;
+  const handleSeverity = onCardNavigate ? (level) => onCardNavigate(level) : undefined;
 
   return (
     <section className="acc-eval-panel acc-eval-panel--terminal">
@@ -105,12 +110,16 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulated
         <Stat
           label="VIOLATIONS"
           value={violations}
-          hint={<SeverityBadgeRow severity={summary?.severity} />}
+          hint={<SeverityBadgeRow severity={summary?.severity} onSeverityClick={handleSeverity} />}
+          onClick={violations > 0 ? handleViolations : undefined}
+          ariaLabel={violations > 0 ? 'Show all violations' : undefined}
         />
         <Stat
           label="COMPLIANCE"
           value={compliance}
           hint={totalChecks > 0 ? `passing / ${totalChecks} checks` : null}
+          onClick={handleCompliance}
+          ariaLabel={compliance > 0 ? 'Show compliance entries' : undefined}
         />
         <Stat
           label="RATIO"
@@ -215,6 +224,15 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
   }, [hasReportData, reportProjectName, filteredAccumulated, filteredDimensions]);
   useRegisterWindowSpec('report', reportSpec);
 
+  const onCardNavigate = useMemo(() => {
+    if (!onNavigate) return undefined;
+    return (kind) => {
+      const projectFile = buildProjectRootFile(filteredDimensions || [], reportProjectName);
+      const severityFilter = kind === 'violations' ? 'all' : kind;
+      onNavigate('file', { file: projectFile, severityFilter });
+    };
+  }, [onNavigate, filteredDimensions, reportProjectName]);
+
   return (
     <>
       <AccumulatedHeroSection
@@ -224,6 +242,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
         accumulatedDimensions={filteredDimensions}
         projectName={data.selectedProject}
         projectInfo={data.projectInfo}
+        onCardNavigate={onCardNavigate}
       />
 
       <div className="history-panels-row">

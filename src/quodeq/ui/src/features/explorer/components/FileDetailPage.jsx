@@ -1,4 +1,5 @@
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { buildFilePlanText } from '../../../utils/planTextBuilders.js';
 import { buildFileReport } from '../../../utils/reportBuilder.js';
 import { SEVERITY_ORDER, parseFileRef, complianceRatio } from '../../../utils/formatters.js';
@@ -9,12 +10,9 @@ import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { ComplianceCard } from './EvalCards.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge } from '../../../components/terminal/index.js';
 import { useRegisterWindowSpec, ReportContent, useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
-import LowConfidenceGroup, { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
+import { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
 
-const ANIM_DELAY_PER_ITEM_MS = 30;
-const ANIM_MAX_DELAY_MS = 300;
-
-function ViolationCard({ v, index, onDismiss }) {
+const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
   const { addWindow } = useSidePane();
   const { filePath, line } = parseFileRef(v.file, v.line);
   const filename = filePath ? filePath.split('/').pop() : null;
@@ -23,7 +21,7 @@ function ViolationCard({ v, index, onDismiss }) {
   const display = line != null ? `${filename}:${range}` : filename;
   const linkedRefs = v.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url)) || [];
   return (
-    <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}>
+    <div className={`vdetail-row vdetail-row--${v.severity}`}>
       <div className="vdetail-row-main">
         <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
         {v.dimension && <span className="vrow-label">[{v.dimension}]</span>}
@@ -73,7 +71,7 @@ function ViolationCard({ v, index, onDismiss }) {
       </div>
     </div>
   );
-}
+});
 
 function FileSevBadgeRow({ sevCounts }) {
   if (!(sevCounts.critical || sevCounts.major || sevCounts.minor)) return null;
@@ -119,29 +117,102 @@ function FileHeader({ file, sevCounts, totalViolations, totalCompliance, dimensi
   );
 }
 
-
-function SeverityGroup({ sev, violations, onDismiss }) {
-  if (violations.length === 0) return null;
+function GroupHeader({ title, count }) {
   return (
-    <div>
-      <div className="violation-group-header">
-        <span className="violation-group-title">{sev.charAt(0).toUpperCase() + sev.slice(1)}</span>
-        <span className="violation-group-count">{violations.length}</span>
-      </div>
-      <div className="vlive-violations-group">
-        {violations.map((v, idx) => (
-          <ViolationCard key={idx} v={v} index={idx} onDismiss={onDismiss} />
-        ))}
-      </div>
+    <div className="violation-group-header">
+      <span className="violation-group-title">{title}</span>
+      <span className="violation-group-count">{count}</span>
     </div>
   );
 }
 
-const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, onDismiss }) {
+function LowConfidenceToggle({ count, expanded, onToggle }) {
+  return (
+    <button
+      type="button"
+      className="violation-group-header low-confidence-group-header"
+      aria-expanded={expanded}
+      onClick={onToggle}
+    >
+      <span className="violation-group-title">Low confidence</span>
+      <span className="violation-group-count">{count}</span>
+      <span className="low-confidence-group-hint">
+        {expanded ? 'Hide' : 'Show'} likely false positives
+      </span>
+    </button>
+  );
+}
+
+// Virtualizer extracted into its own component so the parent can remount it
+// (via `key={activeFilter}`) when the filter changes. A fresh virtualizer
+// starts with empty measurement caches, sidestepping the class of bugs
+// where stale heights at recycled indices cause row overlap.
+function VirtualList({ items, scrollElement, renderItem }) {
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => scrollElement,
+    estimateSize: (i) => {
+      const item = items[i];
+      if (!item) return 140;
+      if (item.kind === 'sev-header' || item.kind === 'compliance-header') return 36;
+      if (item.kind === 'low-conf-toggle') return 36;
+      return 160;
+    },
+    overscan: 6,
+    getItemKey: (i) => {
+      const item = items[i];
+      if (!item) return i;
+      if (item.kind === 'sev-header') return `h-${item.sev}`;
+      if (item.kind === 'compliance-header') return 'h-compliance';
+      if (item.kind === 'low-conf-toggle') return 'h-lowconf';
+      if (item.kind === 'violation') {
+        return `v-${item.v.dimension || ''}:${item.v.file || ''}:${item.v.line ?? ''}:${item.v.principle || ''}:${item.v.title || ''}`;
+      }
+      if (item.kind === 'low-conf-row') {
+        return `lc-${item.v.dimension || ''}:${item.v.file || ''}:${item.v.line ?? ''}:${item.v.principle || ''}:${item.v.title || ''}`;
+      }
+      if (item.kind === 'compliance') {
+        return `c-${item.c.dimension || ''}:${item.c.file || ''}:${item.c.line ?? ''}:${item.c.principle || ''}`;
+      }
+      return i;
+    },
+  });
+
+  const totalSize = virtualizer.getTotalSize();
+  const virtualItems = virtualizer.getVirtualItems();
+
+  return (
+    <div className="vlive-violations-virtual" style={{ position: 'relative', width: '100%', height: totalSize }}>
+      {virtualItems.map((virtualRow) => {
+        const item = items[virtualRow.index];
+        if (!item) return null;
+        return (
+          <div
+            key={virtualRow.key}
+            data-index={virtualRow.index}
+            ref={virtualizer.measureElement}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              transform: `translateY(${virtualRow.start}px)`,
+            }}
+          >
+            {renderItem(item)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, onDismiss, severityFilter }) {
   const totalCompliance = file.compliance?.length || 0;
   const dimensionsCount = file.dimensionsCount || 0;
-  const [activeFilter, setActiveFilter] = useState(null);
+  const [activeFilter, setActiveFilter] = useState(severityFilter || null);
   const [dismissedSet, setDismissedSet] = useState(new Set());
+  const [lowConfExpanded, setLowConfExpanded] = useState(false);
 
   const dismissKey = (v) => `${v.file}:${v.line}`;
 
@@ -176,6 +247,47 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, on
   const showCompliance = !activeFilter || activeFilter === 'all' || activeFilter === 'compliance';
   const showViolations = activeFilter !== 'compliance';
 
+  // Flatten everything into a single virtualizable items array. Mixing
+  // headers + rows in one list lets us virtualize the whole page with one
+  // scroller; React never holds more than ~30 row instances at once even on
+  // 3k-violation projects.
+  const items = useMemo(() => {
+    const arr = [];
+    if (showViolations) {
+      for (const sev of SEVERITY_ORDER) {
+        const bucket = highConfidenceBySeverity[sev] || [];
+        if (bucket.length === 0) continue;
+        if (activeFilter && activeFilter !== 'all' && activeFilter !== sev) continue;
+        arr.push({ kind: 'sev-header', sev, count: bucket.length });
+        for (const v of bucket) arr.push({ kind: 'violation', v });
+      }
+      if ((!activeFilter || activeFilter === 'all') && lowConfidenceViolations.length > 0) {
+        arr.push({ kind: 'low-conf-toggle', count: lowConfidenceViolations.length, expanded: lowConfExpanded });
+        if (lowConfExpanded) {
+          for (const v of lowConfidenceViolations) arr.push({ kind: 'low-conf-row', v });
+        }
+      }
+    }
+    if (showCompliance && totalCompliance > 0) {
+      arr.push({ kind: 'compliance-header', count: totalCompliance });
+      for (const c of file.compliance) arr.push({ kind: 'compliance', c });
+    }
+    return arr;
+  }, [showViolations, showCompliance, activeFilter, highConfidenceBySeverity, lowConfidenceViolations, lowConfExpanded, file.compliance, totalCompliance]);
+
+  // The dashboard's main column owns vertical scroll; tanstack-virtual needs
+  // a ref to that ancestor to track scroll position.
+  const [scrollElement, setScrollElement] = useState(null);
+  useLayoutEffect(() => {
+    setScrollElement(document.querySelector('.app-shell__main-column > .dashboard'));
+  }, []);
+
+  // Snap to top whenever the filter changes so a giant list doesn't dump the
+  // user mid-scroll into a freshly-mounted virtualizer.
+  useEffect(() => {
+    if (scrollElement) scrollElement.scrollTop = 0;
+  }, [activeFilter, scrollElement]);
+
   const reportSpec = useMemo(() => {
     if (!file?.file) return null;
     const buildMarkdown = () => buildFileReport(file);
@@ -206,6 +318,30 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, on
   }, [file]);
   useRegisterWindowSpec('fixplan', fixPlanSpec);
 
+  const renderItem = (item) => {
+    switch (item.kind) {
+      case 'sev-header':
+        return <GroupHeader title={item.sev.charAt(0).toUpperCase() + item.sev.slice(1)} count={item.count} />;
+      case 'compliance-header':
+        return <GroupHeader title="Compliance" count={item.count} />;
+      case 'low-conf-toggle':
+        return <LowConfidenceToggle count={item.count} expanded={item.expanded} onToggle={() => setLowConfExpanded((v) => !v)} />;
+      case 'violation':
+      case 'low-conf-row':
+        return <ViolationCard v={item.v} onDismiss={onDismiss ? handleDismiss : undefined} />;
+      case 'compliance':
+        return <ComplianceCard c={item.c} principle={item.c.principle} index={0} />;
+      default:
+        return null;
+    }
+  };
+
+  // Remount the virtualizer whenever the items collection changes shape.
+  // A fresh useVirtualizer call begins with no cached heights, so the row
+  // wrappers re-measure from scratch — eliminating overlap caused by stale
+  // measurements lingering from a previous filter or dismiss state.
+  const virtualKey = `${activeFilter ?? 'all'}-${dismissedSet.size}-${lowConfExpanded ? 'lc' : ''}-${file?.file || ''}`;
+
   return (
     <>
       <FileHeader
@@ -227,31 +363,7 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, on
         />
       )}
 
-      {showViolations && SEVERITY_ORDER.map((sev) => {
-        if (activeFilter && activeFilter !== 'all' && activeFilter !== sev) return null;
-        return <SeverityGroup key={sev} sev={sev} violations={highConfidenceBySeverity[sev] || []} onDismiss={onDismiss ? handleDismiss : undefined} />;
-      })}
-
-      {showViolations && (!activeFilter || activeFilter === 'all') && (
-        <LowConfidenceGroup
-          violations={lowConfidenceViolations}
-          renderViolation={(v, idx) => <ViolationCard key={`lc-${idx}`} v={v} index={idx} onDismiss={onDismiss ? handleDismiss : undefined} />}
-        />
-      )}
-
-      {showCompliance && totalCompliance > 0 && (
-        <div>
-          <div className="violation-group-header">
-            <span className="violation-group-title">Compliance</span>
-            <span className="violation-group-count">{totalCompliance}</span>
-          </div>
-          <div className="vlive-violations-group">
-            {file.compliance.map((c, idx) => (
-              <ComplianceCard key={idx} c={c} principle={c.principle} index={idx} />
-            ))}
-          </div>
-        </div>
-      )}
+      <VirtualList key={virtualKey} items={items} scrollElement={scrollElement} renderItem={renderItem} />
     </>
   );
 });

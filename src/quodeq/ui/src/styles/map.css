@@ -343,6 +343,15 @@
   word-break: break-word;
 }
 
+.heat-grid-folder-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 8px;
+  color: var(--color-text-muted);
+  vertical-align: middle;
+}
+.heat-grid-file.clickable:hover .heat-grid-folder-icon { color: var(--color-accent); }
+
 .heat-grid-file.clickable {
   cursor: pointer;
 }
@@ -427,9 +436,12 @@
 }
 
 /* Severity/health cells in the flat variant: no fill, no border, just
-   colored text (color comes from inline style in HeatGridCells). */
+   colored text (color comes from inline style in HeatGridCells). Block
+   layout so the full table cell is the hit target — matches the
+   VIOLATIONS column's heat-grid-num and gives a consistent click area
+   across all numeric columns. */
 .heat-grid--flat .heat-grid-cell {
-  display: inline-block;
+  display: block;
   min-width: 0;
   height: auto;
   padding: 0;
@@ -438,6 +450,7 @@
   box-shadow: none;
   font-weight: var(--weight-medium);
   font-size: 13px;
+  text-align: right;
   transition: color 120ms ease;
 }
 .heat-grid--flat .heat-grid-cell.empty {

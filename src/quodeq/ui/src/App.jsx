@@ -25,6 +25,7 @@ import { ACTIVE_PROVIDER_KEY, providerKey } from './constants.js';
 import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { readVisibleStandardIds } from './utils/visibleStandards.js';
+import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
 import { SidePane, useSidePane } from './features/side-pane/index.js';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
@@ -177,7 +178,19 @@ function ViolationsRoute({ params, props }) {
   function navigateToDimension(row, severity) {
     const dim = row.raw || dimMap.get(row.dimension);
     if (!dim) return;
-    nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, severity, sourceTab: 'violations' });
+    // Cell clicks on a dimension row (numeric severity columns or the
+    // "violations" total) drill into the dimension's findings — match the
+    // project/run pattern by handing FileDetailPage a synthetic file
+    // aggregated from the dimension, with the chosen severity preselected.
+    const dimFile = buildProjectRootFile([dim], dim.dimension);
+    const severityFilter = severity || 'all';
+    nav('file', {
+      file: dimFile,
+      severityFilter,
+      runId: dim.fromRunId,
+      dateLabel: dim.fromDateLabel,
+      sourceTab: 'violations',
+    });
   }
 
   return (
@@ -194,7 +207,7 @@ function ViolationsRoute({ params, props }) {
       }}
       callbacks={{
         onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
-        onFileClick: (fileObj) => nav('file', { file: fileObj, sourceTab: 'violations' }),
+        onFileClick: (fileObj, opts) => nav('file', { file: fileObj, sourceTab: 'violations', severityFilter: opts?.severity || null }),
         onCellClick: ({ row, severity }) => {
           if (row.type === 'principle' && row.principleObj) {
             navigateToPrinciple(row.principleObj, severity);
@@ -285,6 +298,7 @@ const ROUTE_RENDERERS = {
       file={params.file}
       runId={params.runId}
       dateLabel={params.dateLabel}
+      severityFilter={params.severityFilter || params.severity || null}
       onDismiss={(v) => {
         props.dismissFinding(props.navigation.selectedProject, buildDismissPayload(v))
           .then(() => props.refreshDashboard?.())
