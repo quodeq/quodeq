@@ -39,7 +39,10 @@ from quodeq.analysis.fingerprint import _hash_file, _hash_prompts_map, _hash_sta
 _logger = logging.getLogger(__name__)
 
 # Bumped on any breaking change to key composition or entry format.
-_SCHEMA_VERSION = 1
+# v1 -> v2: file_done marker contract; entries written without marker
+# filtering are no longer trusted, so old entries naturally invalidate
+# on the next input change.
+_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
