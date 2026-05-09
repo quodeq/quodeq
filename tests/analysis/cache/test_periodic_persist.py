@@ -97,6 +97,7 @@ class TestWatcherStartsAndStops:
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             jsonl.write_text(
                 '{"file": "a.py", "line": 1, "t": "violation", "w": "found"}\n'
+                + '{"_marker": "file_done", "file": "a.py", "status": "ok"}\n'
             )
             time.sleep(0.3)  # let the watcher tick
             return Evidence(
@@ -124,18 +125,18 @@ class TestWatcherStartsAndStops:
 
 
 class TestWatcherSurvivesDispatchException:
-    def test_dispatch_raises_watcher_still_does_final_persist(
+    def test_dispatch_raises_orphan_findings_not_cached(
         self, tmp_path: Path, cache: LocalFileBackend,
     ):
-        """If the dispatch raises mid-run, the watcher's final persist must
-        still run. The lost-work window is the persist interval, not the
-        whole dim."""
+        """If the dispatch raises without emitting a file_done=ok marker, the
+        file must NOT be cached — the worker crashed mid-file so we can't trust
+        the findings are complete. The next run will re-dispatch."""
         config = _setup(tmp_path, {"a.py": "x"})
 
         def crashing_dispatcher(cfg, dim_id, idx, ctx, callbacks):
             jsonl = cfg.work_dir / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
-            # Write findings that completed before the crash.
+            # Write partial findings with no ok marker (worker died mid-file).
             jsonl.write_text(
                 '{"file": "a.py", "line": 1, "t": "violation", "w": "completed"}\n'
             )
@@ -153,11 +154,10 @@ class TestWatcherSurvivesDispatchException:
                     cache=cache,
                 )
 
-        # Final persist in the finally block must have written a.py's entry.
+        # No ok marker emitted → orphaned findings must NOT be cached.
         key = build_cache_key_for_file(config, "a.py", "security")
         entry = cache.get(key)
-        assert entry is not None, "final persist did not run after dispatch raise"
-        assert any(f.get("w") == "completed" for f in entry.findings)
+        assert entry is None, "orphaned findings without ok marker must not be cached"
 
 
 class TestNoWatcherWhenNoMisses:

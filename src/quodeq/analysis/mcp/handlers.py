@@ -14,6 +14,9 @@ from quodeq.analysis.mcp.schemas import (
     GET_NEXT_FILES_DESC,
     GET_NEXT_FILES_NAME,
     GET_NEXT_FILES_SCHEMA,
+    MARK_FILE_DONE_DESC,
+    MARK_FILE_DONE_NAME,
+    MARK_FILE_DONE_SCHEMA,
     REPORT_FINDING_DESC,
     REPORT_FINDING_NAME,
     REPORT_FINDING_SCHEMA,
@@ -65,6 +68,11 @@ def handle_tools_list(request_id: object, *, has_queue: bool = False) -> dict:
             "description": GET_NEXT_FILES_DESC,
             "inputSchema": GET_NEXT_FILES_SCHEMA,
         })
+    tools.append({
+        "name": MARK_FILE_DONE_NAME,
+        "description": MARK_FILE_DONE_DESC,
+        "inputSchema": MARK_FILE_DONE_SCHEMA,
+    })
     return _ok(request_id, {"tools": tools})
 
 
@@ -101,6 +109,26 @@ def handle_tools_call(
         file_list = "\n".join(files)
         return _ok(request_id, {
             "content": [{"type": "text", "text": f"{len(files)} files to analyse:\n{file_list}"}],
+        })
+
+    if name == MARK_FILE_DONE_NAME:
+        file = args.get("file")
+        status = args.get("status")
+        reason = args.get("reason") or None
+        if not isinstance(file, str) or not isinstance(status, str):
+            return _ok(request_id, {
+                "content": [{"type": "text", "text": "mark_file_done requires 'file' (string) and 'status' (\"ok\"|\"error\")"}],
+                "isError": True,
+            })
+        try:
+            router.mark_file_done(file=file, status=status, reason=reason)
+        except ValueError as exc:
+            return _ok(request_id, {
+                "content": [{"type": "text", "text": str(exc)}],
+                "isError": True,
+            })
+        return _ok(request_id, {
+            "content": [{"type": "text", "text": "marked"}],
         })
 
     return _ok(request_id, {

@@ -274,3 +274,17 @@ class FindingsRouter:
                 )
         self.counter += 1
         return f"Finding #{self.counter} recorded.", False
+
+    def mark_file_done(self, *, file: str, status: str, reason: str | None = None) -> None:
+        """Append a per-file completion marker to the JSONL.
+
+        Used by the cache layer to decide which files are safely cached.
+        Lines without a matching ok marker are not persisted as cache hits.
+        """
+        if status not in ("ok", "error"):
+            raise ValueError(f"mark_file_done: status must be 'ok' or 'error', got {status!r}")
+        payload: dict = {"_marker": "file_done", "file": file, "status": status}
+        if reason is not None:
+            payload["reason"] = reason
+        line = json.dumps(payload) + "\n"
+        _locked_write(self._fh, line)

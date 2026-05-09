@@ -39,7 +39,10 @@ from quodeq.analysis.fingerprint import _hash_file, _hash_prompts_map, _hash_sta
 _logger = logging.getLogger(__name__)
 
 # Bumped on any breaking change to key composition or entry format.
-_SCHEMA_VERSION = 1
+# v1 -> v2: file_done marker contract; entries written without marker
+# filtering are no longer trusted, so old entries naturally invalidate
+# on the next input change.
+_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -130,51 +133,62 @@ def classify_files_via_cache(
     )
 
 
-def _group_findings_by_file(jsonl_path: Path) -> dict[str, list[dict]]:
-    """Read a JSONL of findings and group lines by their ``file`` field."""
+def _group_findings_by_file(jsonl_path: Path) -> tuple[dict[str, list[dict]], set[str]]:
+    """Read a JSONL of findings + markers and return (grouped_findings, ok_files).
+
+    Marker lines are recognised by the ``_marker`` key and excluded from the
+    grouped findings. ``ok_files`` contains the set of files whose *most
+    recent* file_done marker has status='ok'. Files whose latest marker is
+    'error' (or have no marker at all) are not in the set.
+    """
     grouped: dict[str, list[dict]] = {}
+    last_status: dict[str, str] = {}
     if not jsonl_path.is_file():
-        return grouped
+        return grouped, set()
     try:
         text = jsonl_path.read_text(encoding="utf-8")
     except OSError as exc:
         _logger.warning("failed to read JSONL %s: %s", jsonl_path, exc)
-        return grouped
-    for line in text.splitlines():
-        line = line.strip()
-        if not line:
+        return grouped, set()
+    for raw in text.splitlines():
+        raw = raw.strip()
+        if not raw:
             continue
         try:
-            entry = json.loads(line)
+            entry = json.loads(raw)
         except json.JSONDecodeError:
+            continue
+        if entry.get("_marker") == "file_done":
+            f = entry.get("file")
+            status = entry.get("status")
+            if isinstance(f, str) and status in ("ok", "error"):
+                last_status[f] = status
             continue
         f = entry.get("file")
         if isinstance(f, str) and f:
             grouped.setdefault(f, []).append(entry)
-    return grouped
+    ok_files = {f for f, s in last_status.items() if s == "ok"}
+    return grouped, ok_files
 
 
 def persist_dispatch_results(
     config: RunConfig, dimension: str, *, miss_files: list[str],
     jsonl_path: Path, miss_keys: dict[str, str], cache: CacheBackend,
 ) -> None:
-    """Write per-file cache entries from a dispatch run's JSONL output.
+    """Write per-file cache entries for files with a file_done='ok' marker.
 
-    A successful dispatch that produced no findings for a given file
-    still writes an empty entry — the next run hits instead of
-    re-dispatching. If the JSONL doesn't exist (dispatch crashed before
-    writing), no entries are written: we don't fabricate "no findings"
-    when there's no evidence the analysis ran.
+    Files in *miss_files* that lack an ok marker (worker crashed, token-out,
+    abandoned) are NOT cached, so the next run re-dispatches them.
     """
     if not jsonl_path.is_file():
-        # Dispatch failed before writing; let the next run retry.
         return
-    grouped = _group_findings_by_file(jsonl_path)
+    grouped, ok_files = _group_findings_by_file(jsonl_path)
     model_id = _model_id_from(config)
     for f in miss_files:
+        if f not in ok_files:
+            continue
         key = miss_keys.get(f)
         if key is None:
-            # Caller error: missed file with no key. Skip rather than fabricate.
             _logger.debug("persist_dispatch_results: no key for %s; skipping", f)
             continue
         entry = CacheEntry(
