@@ -2248,6 +2248,15 @@ button.term-sev-badge--clickable:focus-visible {
   cursor: not-allowed;
 }
 
+/* Small size modifier — for secondary or destructive actions tucked into
+   corners (e.g. cancel during a running eval) where a full-size button
+   would overweight the layout. Composes with any variant. */
+.term-btn--sm {
+  font-size: 11px;
+  padding: 2px var(--term-space-2);
+  letter-spacing: 0.02em;
+}
+
 /* Filled variant — solid accent background. Compose with --primary,
    e.g. `term-btn term-btn--primary term-btn--filled`. Theme-safe via
    --color-on-accent (works in both light and dark themes). */
