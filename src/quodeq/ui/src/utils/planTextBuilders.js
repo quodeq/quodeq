@@ -46,9 +46,28 @@ export function buildFilePlanText(file, severityFilter) {
  * @param {Object} [principleData] - Optional extra data (e.g. `.findings`) for convention 1.
  * @returns {string} Formatted plan text.
  */
-export function buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData) {
+export function buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData, severityFilter) {
   if (violations !== undefined) {
-    return buildGroupPlanText({ title: principle, violations, violationsBySeverity, context: principleData?.findings || undefined });
+    if (severityFilter === 'compliance') {
+      return '_No violations match the current filter._';
+    }
+    let filteredViolations = violations;
+    let filteredBySeverity = violationsBySeverity;
+    if (severityFilter && severityFilter !== 'all') {
+      filteredViolations = (violations || []).filter(
+        (v) => (v.severity || 'minor').toLowerCase() === severityFilter,
+      );
+      filteredBySeverity = {};
+      for (const sev of SEVERITY_ORDER) {
+        filteredBySeverity[sev] = sev === severityFilter ? (violationsBySeverity?.[sev] || []) : [];
+      }
+    }
+    return buildGroupPlanText({
+      title: principle,
+      violations: filteredViolations,
+      violationsBySeverity: filteredBySeverity,
+      context: principleData?.findings || undefined,
+    });
   }
   const allViolations = principle.violations || [];
   const bySeverity = {};
