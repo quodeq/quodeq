@@ -23,7 +23,7 @@ function JobHeader({ job, projectLabel, onDismiss, onCancel }) {
       <TermHeader name={termNameForStatus(job.status)} sub={projectLabel || undefined} />
       <div className="evaluate-panel__top-actions">
         {isRunning && (
-          <button type="button" className="term-btn term-btn--ghost" onClick={onCancel}>cancel</button>
+          <button type="button" className="term-btn term-btn--ghost term-btn--sm" onClick={onCancel}>cancel</button>
         )}
         {!isRunning && isDone && (
           <button type="button" className="term-btn term-btn--primary" onClick={() => onDismiss('view')}>
