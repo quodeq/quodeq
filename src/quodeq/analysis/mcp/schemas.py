@@ -1,7 +1,7 @@
 """MCP tool schemas and constants for the findings server.
 
 Defines the JSON-RPC tool names, descriptions, and input schemas
-for ``report_finding`` and ``get_next_files``.
+for ``report_finding``, ``get_next_files``, and ``mark_file_done``.
 """
 from __future__ import annotations
 
