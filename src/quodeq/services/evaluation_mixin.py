@@ -454,11 +454,17 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
     evaluation_dir.mkdir(parents=True, exist_ok=True)
     source_file_count = _read_project_source_file_count(reports_dir, project)
 
+    from quodeq.shared.dimensions_state import read_dimensions
+    dim_states = read_dimensions(Path(reports_dir) / project / run_id).get("dimensions", {})
+
     for jsonl_path in evidence_dir.glob("*_evidence.jsonl"):
         dim_id = jsonl_path.name.replace("_evidence.jsonl", "")
         eval_file = evaluation_dir / f"{dim_id}.json"
         if eval_file.exists():
             continue  # already scored
+        if dim_states.get(dim_id, {}).get("state") == "incomplete":
+            _logger.info("Skipping scoring for incomplete dim %s", dim_id)
+            continue
         if jsonl_path.stat().st_size == 0:
             continue  # no findings
         # Only score dimensions that passed verification (analysis queue exists)
