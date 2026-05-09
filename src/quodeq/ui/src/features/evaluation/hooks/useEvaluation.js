@@ -202,16 +202,18 @@ export function useEvaluation() {
   );
 
   const cancelEvaluation = useCallback(async () => {
+    // Three-button form: dismiss + two cancel variants. The title carries
+    // the "cancel evaluation" verb so the button labels can be terse and
+    // describe the side-effect on findings, not repeat the cancel intent.
+    // Only the destructive option ('discard') is rendered red; 'keep' and
+    // 'dismiss' are neutral so they don't compete visually.
     const choice = await chooseDialog({
       title: "Cancel evaluation?",
-      message: "The run will stop. Choose what to do with findings collected so far.",
+      message: "The run will stop. Choose what happens to findings collected so far.",
       cancelLabel: "Keep running",
       actions: [
-        // 'default' renders as a neutral outlined button so it doesn't
-        // compete visually with the destructive 'discard' action. Both
-        // cancel paths stop the run; only one wipes the cache.
-        { key: "preserve", label: "Cancel and keep findings", variant: "default" },
-        { key: "discard", label: "Cancel and discard findings", variant: "danger" },
+        { key: "preserve", label: "Keep findings", variant: "default" },
+        { key: "discard", label: "Discard findings", variant: "danger" },
       ],
     });
     if (!choice) return;
