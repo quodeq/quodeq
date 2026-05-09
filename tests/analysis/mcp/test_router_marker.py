@@ -1,7 +1,6 @@
 from __future__ import annotations
 import io
 import json
-from pathlib import Path
 
 import pytest
 
@@ -13,7 +12,7 @@ def _make_router(fh: io.StringIO) -> FindingsRouter:
 
 
 def _read_lines(fh: io.StringIO) -> list[dict]:
-    return [json.loads(l) for l in fh.getvalue().splitlines() if l.strip()]
+    return [json.loads(ln) for ln in fh.getvalue().splitlines() if ln.strip()]
 
 
 class TestMarkFileDone:

@@ -284,7 +284,7 @@ class FindingsRouter:
         if status not in ("ok", "error"):
             raise ValueError(f"mark_file_done: status must be 'ok' or 'error', got {status!r}")
         payload: dict = {"_marker": "file_done", "file": file, "status": status}
-        if reason:
+        if reason is not None:
             payload["reason"] = reason
         line = json.dumps(payload) + "\n"
         _locked_write(self._fh, line)
