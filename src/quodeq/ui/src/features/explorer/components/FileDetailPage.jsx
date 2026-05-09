@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { buildFilePlanText } from '../../../utils/planTextBuilders.js';
 import { buildFileReport } from '../../../utils/reportBuilder.js';
 import { SEVERITY_ORDER, parseFileRef, complianceRatio } from '../../../utils/formatters.js';
@@ -14,7 +14,7 @@ import LowConfidenceGroup, { isLowConfidence } from '../../violations/components
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
 
-function ViolationCard({ v, index }) {
+function ViolationCard({ v, index, onDismiss }) {
   const { addWindow } = useSidePane();
   const { filePath, line } = parseFileRef(v.file, v.line);
   const filename = filePath ? filePath.split('/').pop() : null;
@@ -39,6 +39,17 @@ function ViolationCard({ v, index }) {
           <SparkleIcon />
           Fix plan
         </button>
+        {onDismiss && (
+          <button
+            type="button"
+            className="dismiss-btn"
+            onClick={(e) => { e.stopPropagation(); onDismiss(v); }}
+            title="Dismiss this finding (exclude from scoring)"
+            aria-label="Dismiss this finding (exclude from scoring)"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        )}
       </div>
       <div className="vlive-detail">
         {(v.title || v.reason) && (
@@ -64,18 +75,18 @@ function ViolationCard({ v, index }) {
   );
 }
 
-function FileSevBadgeRow({ file }) {
-  if (!(file.critical || file.major || file.minor)) return null;
+function FileSevBadgeRow({ sevCounts }) {
+  if (!(sevCounts.critical || sevCounts.major || sevCounts.minor)) return null;
   return (
     <span className="principle-detail-sev-row">
-      {file.critical > 0 && <SevBadge level="critical" count={file.critical} format="count-abbr" />}
-      {file.major    > 0 && <SevBadge level="major"    count={file.major}    format="count-abbr" />}
-      {file.minor    > 0 && <SevBadge level="minor"    count={file.minor}    format="count-abbr" />}
+      {sevCounts.critical > 0 && <SevBadge level="critical" count={sevCounts.critical} format="count-abbr" />}
+      {sevCounts.major    > 0 && <SevBadge level="major"    count={sevCounts.major}    format="count-abbr" />}
+      {sevCounts.minor    > 0 && <SevBadge level="minor"    count={sevCounts.minor}    format="count-abbr" />}
     </span>
   );
 }
 
-function FileHeader({ file, totalViolations, totalCompliance, dimensionsCount, dateLabel, runId }) {
+function FileHeader({ file, sevCounts, totalViolations, totalCompliance, dimensionsCount, dateLabel, runId }) {
   const totalChecks = totalViolations + totalCompliance;
   const ratio = complianceRatio(totalViolations, totalCompliance);
   return (
@@ -87,7 +98,7 @@ function FileHeader({ file, totalViolations, totalCompliance, dimensionsCount, d
         <Stat
           label="VIOLATIONS"
           value={totalViolations}
-          hint={<FileSevBadgeRow file={file} />}
+          hint={<FileSevBadgeRow sevCounts={sevCounts} />}
         />
         <Stat
           label="COMPLIANCE"
@@ -109,7 +120,7 @@ function FileHeader({ file, totalViolations, totalCompliance, dimensionsCount, d
 }
 
 
-function SeverityGroup({ sev, violations }) {
+function SeverityGroup({ sev, violations, onDismiss }) {
   if (violations.length === 0) return null;
   return (
     <div>
@@ -119,43 +130,51 @@ function SeverityGroup({ sev, violations }) {
       </div>
       <div className="vlive-violations-group">
         {violations.map((v, idx) => (
-          <ViolationCard key={idx} v={v} index={idx} />
+          <ViolationCard key={idx} v={v} index={idx} onDismiss={onDismiss} />
         ))}
       </div>
     </div>
   );
 }
 
-const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel }) {
-  const totalViolations = file.total || 0;
+const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, onDismiss }) {
   const totalCompliance = file.compliance?.length || 0;
   const dimensionsCount = file.dimensionsCount || 0;
   const [activeFilter, setActiveFilter] = useState(null);
+  const [dismissedSet, setDismissedSet] = useState(new Set());
 
-  const sevCounts = {
-    critical: file.critical || 0,
-    major:    file.major    || 0,
-    minor:    file.minor    || 0,
-  };
-  const distinctSeverities = SEVERITY_ORDER.filter((s) => sevCounts[s] > 0).length;
-  const showFilters = distinctSeverities > 1 || (distinctSeverities >= 1 && totalCompliance > 0);
-  const showCompliance = !activeFilter || activeFilter === 'all' || activeFilter === 'compliance';
-  const showViolations = activeFilter !== 'compliance';
+  const dismissKey = (v) => `${v.file}:${v.line}`;
 
-  const { lowConfidenceViolations, highConfidenceBySeverity } = useMemo(() => {
+  const handleDismiss = useCallback((v) => {
+    if (!onDismiss) return;
+    onDismiss(v);
+    setDismissedSet((prev) => new Set(prev).add(dismissKey(v)));
+  }, [onDismiss]);
+
+  const { lowConfidenceViolations, highConfidenceBySeverity, liveSevCounts, liveTotal } = useMemo(() => {
     const low = [];
     const high = {};
+    const counts = { critical: 0, major: 0, minor: 0 };
+    let total = 0;
     for (const sev of SEVERITY_ORDER) {
-      const bucket = file.violationsBySeverity?.[sev] || [];
+      const bucket = (file.violationsBySeverity?.[sev] || []).filter((v) => !dismissedSet.has(dismissKey(v)));
       const highBucket = [];
       for (const v of bucket) {
         if (isLowConfidence(v)) low.push(v);
         else highBucket.push(v);
       }
       high[sev] = highBucket;
+      if (counts[sev] !== undefined) counts[sev] = bucket.length;
+      total += bucket.length;
     }
-    return { lowConfidenceViolations: low, highConfidenceBySeverity: high };
-  }, [file.violationsBySeverity]);
+    return { lowConfidenceViolations: low, highConfidenceBySeverity: high, liveSevCounts: counts, liveTotal: total };
+  }, [file.violationsBySeverity, dismissedSet]);
+
+  const totalViolations = liveTotal;
+  const distinctSeverities = SEVERITY_ORDER.filter((s) => liveSevCounts[s] > 0).length;
+  const showFilters = distinctSeverities > 1 || (distinctSeverities >= 1 && totalCompliance > 0);
+  const showCompliance = !activeFilter || activeFilter === 'all' || activeFilter === 'compliance';
+  const showViolations = activeFilter !== 'compliance';
 
   const reportSpec = useMemo(() => {
     if (!file?.file) return null;
@@ -191,6 +210,7 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel }) 
     <>
       <FileHeader
         file={file}
+        sevCounts={liveSevCounts}
         totalViolations={totalViolations}
         totalCompliance={totalCompliance}
         dimensionsCount={dimensionsCount}
@@ -200,7 +220,7 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel }) 
 
       {showFilters && (
         <SeverityFilterPills
-          counts={sevCounts}
+          counts={liveSevCounts}
           complianceCount={totalCompliance}
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
@@ -209,13 +229,13 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel }) 
 
       {showViolations && SEVERITY_ORDER.map((sev) => {
         if (activeFilter && activeFilter !== 'all' && activeFilter !== sev) return null;
-        return <SeverityGroup key={sev} sev={sev} violations={highConfidenceBySeverity[sev] || []} />;
+        return <SeverityGroup key={sev} sev={sev} violations={highConfidenceBySeverity[sev] || []} onDismiss={onDismiss ? handleDismiss : undefined} />;
       })}
 
       {showViolations && (!activeFilter || activeFilter === 'all') && (
         <LowConfidenceGroup
           violations={lowConfidenceViolations}
-          renderViolation={(v, idx) => <ViolationCard key={`lc-${idx}`} v={v} index={idx} />}
+          renderViolation={(v, idx) => <ViolationCard key={`lc-${idx}`} v={v} index={idx} onDismiss={onDismiss ? handleDismiss : undefined} />}
         />
       )}
 

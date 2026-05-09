@@ -280,7 +280,18 @@ const ROUTE_RENDERERS = {
     />
   ),
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />,
-  file: (params) => <FileDetailPage file={params.file} runId={params.runId} dateLabel={params.dateLabel} />,
+  file: (params, props) => (
+    <FileDetailPage
+      file={params.file}
+      runId={params.runId}
+      dateLabel={params.dateLabel}
+      onDismiss={(v) => {
+        props.dismissFinding(props.navigation.selectedProject, buildDismissPayload(v))
+          .then(() => props.refreshDashboard?.())
+          .catch((e) => console.error('[Dismiss] failed:', e));
+      }}
+    />
+  ),
   evalprinciple: renderEvalPrincipleDetail,
   'eval-principle-detail': renderEvalPrincipleDetail,
   finding: (params, props) => (
