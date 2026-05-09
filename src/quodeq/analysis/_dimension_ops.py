@@ -48,7 +48,18 @@ def _process_single_dimension(
         return None
 
     if emit_log:
-        _log_dimension_result(ev, dimension, idx, ctx.total)
+        # The dim has analytically succeeded at this point: subagent pool
+        # is done, JSONL is dedupped, evidence parsed cleanly. The success
+        # log line is observability only; if the dashboard's stdout pipe
+        # closed mid-evaluation, do NOT let a logging failure propagate
+        # out as if the analysis itself failed -- the loop's outer except
+        # would mark this dim INCOMPLETE despite all 18 files (or however
+        # many) having completed cleanly with findings on disk.
+        try:
+            _log_dimension_result(ev, dimension, idx, ctx.total)
+        except BrokenPipeError:
+            from quodeq.analysis._loops import _silence_broken_stdout
+            _silence_broken_stdout()
     return ev
 
 
