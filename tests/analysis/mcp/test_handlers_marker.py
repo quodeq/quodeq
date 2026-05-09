@@ -37,12 +37,23 @@ class TestToolsCallDispatchesMarker:
         )
         router.mark_file_done.assert_called_once_with(file="b.py", status="error", reason="token_limit")
 
-    def test_invalid_args_returns_error_response(self):
+    def test_router_value_error_returns_error_response(self):
         router = MagicMock()
-        router.mark_file_done.side_effect = ValueError("bogus")
+        router.mark_file_done.side_effect = ValueError("status must be ok or error")
         result = handle_tools_call(
             request_id=1,
             params={"name": "mark_file_done", "arguments": {"file": "b.py", "status": "bogus"}},
             router=router,
         )
         assert result["result"].get("isError") is True
+        router.mark_file_done.assert_called_once()
+
+    def test_non_string_args_short_circuit_without_calling_router(self):
+        router = MagicMock()
+        result = handle_tools_call(
+            request_id=1,
+            params={"name": "mark_file_done", "arguments": {"file": 123, "status": "ok"}},
+            router=router,
+        )
+        assert result["result"].get("isError") is True
+        router.mark_file_done.assert_not_called()
