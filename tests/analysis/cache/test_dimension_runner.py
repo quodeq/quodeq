@@ -501,3 +501,86 @@ class TestCircuitBreakerWiring:
             assert not cancellation.is_cancelled()
         finally:
             cancellation.reset()
+
+
+# ============================================================
+# Carry order: cached findings appear FIRST in the JSONL
+# ============================================================
+#
+# Pre-fix, cached findings were appended AFTER dispatch wrote its fresh
+# findings, producing two effects users complained about:
+#  1. The merged JSONL ordered fresh-then-cached, so the final report
+#     read "new findings, then carries" -- the opposite of how a user
+#     thinks about it ("carries are foundation, fresh is on top").
+#  2. The dispatcher's internal dedup ran BEFORE we appended cached
+#     findings, producing two log lines like "Deduplicated ...: 27"
+#     followed by "Deduplicated ...: 55", visibly confusing.
+#
+# Now: cached findings are pre-written to the JSONL BEFORE dispatch.
+# Dispatch's internal dedup sees the merged set in one pass.
+
+
+class TestCarryOrder:
+    def test_cached_findings_appear_before_fresh(self, tmp_path: Path, cache):
+        """Pre-populate cache for one file. Dispatch a different file. The
+        JSONL should have the cached file's findings BEFORE the dispatched
+        file's findings (carries first, then fresh)."""
+        from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+        from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
+
+        config, src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
+
+        # Cache a.py with a recognizable finding.
+        key = build_cache_key_for_file(config, "a.py", "security")
+        cache.put(key, CacheEntry(
+            key=key, schema_version=1,
+            findings=[{"file": "a.py", "line": 1, "t": "violation",
+                       "w": "carry-a", "p": "P1", "d": "security",
+                       "req": "X-1", "severity": "minor",
+                       "snippet": "x", "reason": "r"}],
+            files_read=1, file_path="a.py", dimension="security",
+            model_id="test-model",
+        ))
+
+        # b.py is a miss -- fake dispatcher writes a fresh finding for it.
+        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+            jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
+            jsonl.parent.mkdir(parents=True, exist_ok=True)
+            with jsonl.open("a") as out:
+                out.write(json.dumps({
+                    "file": "b.py", "line": 1, "t": "violation",
+                    "w": "fresh-b", "p": "P2", "d": "security",
+                    "req": "X-2", "severity": "minor",
+                    "snippet": "y", "reason": "r",
+                }) + "\n")
+                out.write(json.dumps({
+                    "_marker": "file_done", "file": "b.py", "status": "ok",
+                }) + "\n")
+            return _make_dummy_evidence(files_read=1)
+
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=fake_dispatch,
+        ):
+            process_dimension_with_cache(
+                config, "security", 1, _make_ctx(),
+                _make_callbacks(), cache=cache,
+            )
+
+        jsonl_path = (config.work_dir or config.src) / "security_evidence.jsonl"
+        lines = [json.loads(ln) for ln in jsonl_path.read_text().splitlines() if ln.strip()]
+        # Filter to actual finding lines (not markers).
+        findings = [ln for ln in lines if "_marker" not in ln]
+        # Carry comes first; fresh comes second.
+        assert findings[0]["w"] == "carry-a", (
+            f"expected carry-a first, got {[f.get('w') for f in findings]}"
+        )
+        assert any(f.get("w") == "fresh-b" for f in findings), (
+            "fresh dispatch finding missing from JSONL"
+        )
+        # Specifically: the carry comes before the fresh in JSONL order.
+        carry_idx = next(i for i, f in enumerate(findings) if f.get("w") == "carry-a")
+        fresh_idx = next(i for i, f in enumerate(findings) if f.get("w") == "fresh-b")
+        assert carry_idx < fresh_idx, (
+            f"carry (index {carry_idx}) should appear before fresh (index {fresh_idx})"
+        )
