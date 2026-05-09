@@ -30,14 +30,19 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from quodeq.analysis._evidence_parser import parse_evidence_from_jsonl
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis._types import AnalysisOptions, RunConfig, _AnalysisContext
 from quodeq.analysis.cache.backend import CacheBackend
+from quodeq.analysis.cache._failure_streak import (
+    CircuitBreakerError,
+    FailureStreakWatcher,
+)
 from quodeq.analysis.cache.dimension_helpers import (
     ClassifyResult,
     classify_files_via_cache,
@@ -59,6 +64,21 @@ _logger = logging.getLogger(__name__)
 # normal runs. 30s is a pragmatic default — at typical model dispatch
 # speeds (~10-30s per file), each tick covers a handful of completed files.
 _PERSIST_INTERVAL_S = 30.0
+
+
+def _resolve_failure_streak_threshold(opts: AnalysisOptions) -> int:
+    """Return the effective breaker threshold.
+
+    Priority: ``QUODEQ_FAILURE_STREAK`` env var > options field. Negative or
+    non-integer env values fall back to the options field. 0 disables.
+    """
+    raw = os.environ.get("QUODEQ_FAILURE_STREAK")
+    if raw is not None:
+        try:
+            return max(0, int(raw))
+        except ValueError:
+            pass
+    return max(0, opts.failure_streak_threshold)
 
 
 def _periodic_persist(
@@ -182,6 +202,11 @@ def process_dimension_with_cache(
     )
     watcher.start()
 
+    breaker = FailureStreakWatcher(
+        jsonl, threshold=_resolve_failure_streak_threshold(config.options),
+    )
+    breaker.start()
+
     try:
         miss_evidence = process_dimension_with_subagents(
             miss_config, dim_id, idx, ctx, callbacks,
@@ -192,6 +217,13 @@ def process_dimension_with_cache(
         # returned cleanly or raised.
         stop_event.set()
         watcher.join(timeout=5.0)
+        breaker.stop_and_join(timeout=5.0)
+
+    if breaker.trip_event is not None:
+        # The breaker tripped. Surface a typed exception so the pipeline
+        # layer can mark this dim's state with reason=circuit_breaker and
+        # the lifecycle layer can record exit_reason=failure_streak.
+        raise CircuitBreakerError("circuit_breaker")
 
     if miss_evidence is None:
         # Dispatch returned None — final persist already ran via the

@@ -39,6 +39,10 @@ class AnalysisOptions:
     # persistence and scoring are suppressed — PR runs are evidence-only.
     diff_from: str | None = None
     skip_scoring: bool = False
+    # Consecutive `file_done: error` markers that trip the dim-runner's
+    # circuit breaker. 0 disables. The QUODEQ_FAILURE_STREAK env var,
+    # when set, overrides this default at runtime.
+    failure_streak_threshold: int = 5
 
 
 @dataclass
