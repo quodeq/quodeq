@@ -24,7 +24,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
-import { confirmDialog } from "../../../utils/confirmDialog.js";
+import { chooseDialog } from "../../../utils/chooseDialog.js";
 import { useRunEventStream } from "./useRunEventStream.js";
 import { evaluationKeys } from "../../../api/queryKeys.js";
 import {
@@ -202,16 +202,20 @@ export function useEvaluation() {
   );
 
   const cancelEvaluation = useCallback(async () => {
-    const result = await confirmDialog({
+    const choice = await chooseDialog({
       title: "Cancel evaluation?",
-      message: "The run will stop. Findings collected so far are kept by default.",
-      checkboxLabel: "Discard collected findings",
-      confirmLabel: "Cancel evaluation",
+      message: "The run will stop. Choose what to do with findings collected so far.",
       cancelLabel: "Keep running",
-      variant: "danger",
+      actions: [
+        // 'default' renders as a neutral outlined button so it doesn't
+        // compete visually with the destructive 'discard' action. Both
+        // cancel paths stop the run; only one wipes the cache.
+        { key: "preserve", label: "Cancel and keep findings", variant: "default" },
+        { key: "discard", label: "Cancel and discard findings", variant: "danger" },
+      ],
     });
-    if (!result || !result.ok) return;
-    cancelMutation.mutate({ discard: result.checked });
+    if (!choice) return;
+    cancelMutation.mutate({ discard: choice === "discard" });
   }, [cancelMutation]);
 
   const clearJob = useCallback(() => {
