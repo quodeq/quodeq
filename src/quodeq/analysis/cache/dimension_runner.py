@@ -50,6 +50,7 @@ from quodeq.analysis.subagents.runner import (
     process_dimension_with_subagents,
 )
 from quodeq.core.evidence.model import Evidence
+from quodeq.engine._runner_markers import emit_marker
 
 _logger = logging.getLogger(__name__)
 
@@ -128,6 +129,17 @@ def process_dimension_with_cache(
         "[%s] cache: %d hits / %d misses (%d total)%s",
         dim_id, n_hits, len(classify.misses), len(files),
         " — clean-scan refresh" if bypass_reads else "",
+    )
+    # Structured marker for the dashboard / SSE stream — one event per
+    # dim summarising hit/miss split. Per-file events would be too noisy
+    # for a UI-level stream; per-dim is the right granularity.
+    emit_marker(
+        "cache_stats",
+        dimension=dim_id,
+        hits=n_hits,
+        misses=len(classify.misses),
+        total=len(files),
+        mode="clean-scan-refresh" if bypass_reads else "incremental",
     )
 
     jsonl = _jsonl_path(config, dim_id)
