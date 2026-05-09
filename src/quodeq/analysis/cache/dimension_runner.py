@@ -45,6 +45,7 @@ from quodeq.analysis.cache._failure_streak import (
 )
 from quodeq.analysis.cache.dimension_helpers import (
     ClassifyResult,
+    build_cache_key_for_file,
     classify_files_via_cache,
     persist_dispatch_results,
 )
@@ -138,9 +139,28 @@ def process_dimension_with_cache(
         # warning + single-agent fallback runs unchanged.
         return process_dimension_with_subagents(config, dim_id, idx, ctx, callbacks)
 
-    # Clean-scan (incremental=False) bypasses cache reads — fresh dispatch
-    # every time — but writes still happen below so the cache stays current.
+    # Clean-scan (incremental=False) means "I want fresh analysis." The user's
+    # mental model: cancelled clean-scan + retry should NOT short-circuit on
+    # stale entries that pre-date the clean-scan. So at clean-scan start, we
+    # delete the cache entries for this (dim, files) tuple BEFORE classify.
+    # If the run completes, the cache is naturally repopulated. If the run
+    # cancels mid-flight, the cache only contains what THIS run completed --
+    # never ghosts from before. Without this, "clean" only meant "bypass
+    # reads," and a cancelled clean run left the prior cache fully intact.
     bypass_reads = not config.options.incremental
+    if bypass_reads:
+        wiped = 0
+        for f in files:
+            key = build_cache_key_for_file(config, f, dim_id)
+            try:
+                cache.delete(key)
+                wiped += 1
+            except Exception as exc:  # noqa: BLE001
+                _logger.debug("[%s] cache delete failed for %s: %s", dim_id, f, exc)
+        _logger.info(
+            "[%s] cache: invalidated %d entries before clean-scan dispatch",
+            dim_id, wiped,
+        )
     classify = classify_files_via_cache(
         config, dim_id, files, cache, bypass_reads=bypass_reads,
     )
@@ -148,9 +168,9 @@ def process_dimension_with_cache(
     _logger.info(
         "[%s] cache: %d hits / %d misses (%d total)%s",
         dim_id, n_hits, len(classify.misses), len(files),
-        " — clean-scan refresh" if bypass_reads else "",
+        " - clean-scan invalidated" if bypass_reads else "",
     )
-    # Structured marker for the dashboard / SSE stream — one event per
+    # Structured marker for the dashboard / SSE stream - one event per
     # dim summarising hit/miss split. Per-file events would be too noisy
     # for a UI-level stream; per-dim is the right granularity.
     emit_marker(
@@ -159,7 +179,7 @@ def process_dimension_with_cache(
         hits=n_hits,
         misses=len(classify.misses),
         total=len(files),
-        mode="clean-scan-refresh" if bypass_reads else "incremental",
+        mode="clean-scan-invalidated" if bypass_reads else "incremental",
     )
 
     jsonl = _jsonl_path(config, dim_id)

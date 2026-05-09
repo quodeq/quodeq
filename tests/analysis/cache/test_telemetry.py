@@ -152,11 +152,12 @@ class TestCacheStatsMarker:
         assert payload["misses"] == 2
         assert payload["total"] == 3
 
-    def test_clean_scan_marks_refresh_mode(
+    def test_clean_scan_marks_invalidated_mode(
         self, tmp_path: Path, cache: LocalFileBackend,
     ):
         """Clean-scan runs include a 'mode' field so the dashboard can
-        distinguish 'fresh forced re-analysis' from a regular cold run."""
+        distinguish 'cache invalidated, forced re-analysis' from a
+        regular cold run."""
         config = _setup(tmp_path, {"a.py": "x"})
         config.options.incremental = False  # clean scan
 
@@ -190,7 +191,7 @@ class TestCacheStatsMarker:
         cache_stats = [(p, kw) for p, kw in markers if p == "cache_stats"]
         assert len(cache_stats) == 1
         _, payload = cache_stats[0]
-        assert payload["mode"] == "clean-scan-refresh"
+        assert payload["mode"] == "clean-scan-invalidated"
 
     def test_marker_payload_is_json_serializable(
         self, tmp_path: Path, cache: LocalFileBackend,
