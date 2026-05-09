@@ -183,10 +183,18 @@ def process_dimension_with_cache(
     miss_options = replace(config.options, incremental_file_filter=set(classify.misses))
     miss_config = replace(config, options=miss_options)
 
+    # Persist the per-file cache keys to a sidecar so the discard path can
+    # locate this dim's V2 cache entries even after the process exits. Without
+    # this, a user clicking "discard partial findings" can't wipe entries that
+    # were written by the periodic-persist watcher above.
+    sidecar = _evidence_dir(config) / f"{dim_id}_dispatch_keys.json"
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    sidecar.write_text(json.dumps(classify.miss_keys, indent=2), encoding="utf-8")
+
     # Periodic persist watcher: persists what's in JSONL every
     # _PERSIST_INTERVAL_S seconds. If the dispatch is cancelled (SIGTERM,
     # exception, etc.) the cache retains the work that completed before
-    # the cancel — instead of losing the entire dim's progress.
+    # the cancel - instead of losing the entire dim's progress.
     def _persist_now() -> None:
         persist_dispatch_results(
             config, dim_id, miss_files=classify.misses,

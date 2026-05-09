@@ -356,21 +356,32 @@ class FsEvaluationMixin:
         return jobs[:limit] if limit > 0 else jobs
 
 
+def _open_cache():
+    """Indirection so tests can swap in a fake backend."""
+    from quodeq.analysis.cache import LocalFileBackend
+    return LocalFileBackend()
+
+
 def _discard_partial_dim_state(reports_dir: str, job: dict) -> None:
-    """Wipe queue + fingerprint files for any dim that didn't finish scoring.
+    """Wipe queue + fingerprint + V2 cache + JSONL for any dim that didn't finish scoring.
 
     Invoked when the user opts to discard collected findings on cancel.
-    Dims with ``evaluation/<dim>.json`` (cleanly scored) are preserved —
+    Dims with ``evaluation/<dim>.json`` (cleanly scored) are preserved -
     only in-flight ones are reset, so partial work doesn't get accidentally
     discarded just because the umbrella run was stopped.
+
+    For dims marked ``incomplete`` in ``dimensions.json``, also wipes the V2
+    content-addressed cache entries (looked up via the ``<dim>_dispatch_keys.json``
+    sidecar written by the dim runner) and the dim's evidence JSONL.
     """
     project = job.get("outputProject")
     run_id = job.get("outputRunId")
     if not project or not run_id:
         return
 
-    evidence_dir = Path(reports_dir) / project / run_id / "evidence"
-    evaluation_dir = Path(reports_dir) / project / run_id / "evaluation"
+    run_dir = Path(reports_dir) / project / run_id
+    evidence_dir = run_dir / "evidence"
+    evaluation_dir = run_dir / "evaluation"
     if not evidence_dir.is_dir():
         return
 
@@ -390,6 +401,39 @@ def _discard_partial_dim_state(reports_dir: str, job: dict) -> None:
                 pass
             except OSError as exc:
                 _logger.warning("Could not discard %s: %s", victim, exc)
+
+    # V2 cache + JSONL wipe for dims explicitly marked incomplete.
+    from quodeq.shared.dimensions_state import read_dimensions
+    dim_states = read_dimensions(run_dir).get("dimensions", {})
+    cache = None
+    for dim_id, info in dim_states.items():
+        if info.get("state") != "incomplete":
+            continue
+        sidecar = evidence_dir / f"{dim_id}_dispatch_keys.json"
+        if sidecar.is_file():
+            try:
+                keys = json.loads(sidecar.read_text(encoding="utf-8"))
+                if cache is None:
+                    cache = _open_cache()
+                for key in keys.values():
+                    try:
+                        cache.delete(key)
+                    except Exception as exc:  # noqa: BLE001
+                        _logger.warning("Could not delete cache entry %s: %s", key, exc)
+            except (OSError, json.JSONDecodeError) as exc:
+                _logger.warning("Could not read sidecar %s: %s", sidecar, exc)
+        else:
+            _logger.warning(
+                "No dispatch-keys sidecar for incomplete dim %s; skipping cache wipe",
+                dim_id,
+            )
+        jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
+        try:
+            jsonl.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            _logger.warning("Could not delete %s: %s", jsonl, exc)
 
 
 def _read_queue_files_count(queue_path: Path) -> int:
