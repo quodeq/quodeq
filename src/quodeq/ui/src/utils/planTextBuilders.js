@@ -6,12 +6,20 @@ const addEntryTitle = (v) => ({ ...v, _entryTitle: v.principle || 'Violation' })
 /**
  * Build a copy-friendly plan text summarising violations for a single file.
  * @param {{ file: string, violationsBySeverity: Object }} file - File object with violation data.
+ * @param {string} [severityFilter] - Optional severity to filter by ('all', 'critical', 'major', 'minor', 'compliance').
  * @returns {string} Formatted plan text.
  */
-export function buildFilePlanText(file) {
+export function buildFilePlanText(file, severityFilter) {
+  if (severityFilter === 'compliance') {
+    return '_No violations match the current filter._';
+  }
   const allViolations = [];
   const violationsBySeverity = {};
   for (const sev of SEVERITY_ORDER) {
+    if (severityFilter && severityFilter !== 'all' && severityFilter !== sev) {
+      violationsBySeverity[sev] = [];
+      continue;
+    }
     const mapped = (file.violationsBySeverity?.[sev] || []).map(addEntryTitle);
     violationsBySeverity[sev] = mapped;
     allViolations.push(...mapped);
@@ -36,11 +44,33 @@ export function buildFilePlanText(file) {
  * @param {Array} [violations] - Flat array of violation objects (convention 1 only).
  * @param {Object} [violationsBySeverity] - Violations keyed by severity (convention 1 only).
  * @param {Object} [principleData] - Optional extra data (e.g. `.findings`) for convention 1.
+ * @param {string} [severityFilter] - Optional severity filter; values: null/'all' (no filter),
+ *   'critical'/'major'/'minor' (only that bucket), or 'compliance' (returns the empty-state
+ *   string `_No violations match the current filter._`). Split form only.
  * @returns {string} Formatted plan text.
  */
-export function buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData) {
+export function buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData, severityFilter) {
   if (violations !== undefined) {
-    return buildGroupPlanText({ title: principle, violations, violationsBySeverity, context: principleData?.findings || undefined });
+    if (severityFilter === 'compliance') {
+      return '_No violations match the current filter._';
+    }
+    let filteredViolations = violations;
+    let filteredBySeverity = violationsBySeverity;
+    if (severityFilter && severityFilter !== 'all') {
+      filteredViolations = (violations || []).filter(
+        (v) => (v.severity || 'minor').toLowerCase() === severityFilter,
+      );
+      filteredBySeverity = {};
+      for (const sev of SEVERITY_ORDER) {
+        filteredBySeverity[sev] = sev === severityFilter ? (violationsBySeverity?.[sev] || []) : [];
+      }
+    }
+    return buildGroupPlanText({
+      title: principle,
+      violations: filteredViolations,
+      violationsBySeverity: filteredBySeverity,
+      context: principleData?.findings || undefined,
+    });
   }
   const allViolations = principle.violations || [];
   const bySeverity = {};

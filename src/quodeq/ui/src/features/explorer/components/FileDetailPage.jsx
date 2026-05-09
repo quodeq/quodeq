@@ -12,6 +12,11 @@ import { TermHeader, StatStrip, Stat, SevBadge } from '../../../components/termi
 import { useRegisterWindowSpec, ReportContent, useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
 import { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
 
+function filterTitleSuffix(filter) {
+  if (!filter || filter === 'all') return '';
+  return ` (${filter})`;
+}
+
 const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
   const { addWindow } = useSidePane();
   const { filePath, line } = parseFileRef(v.file, v.line);
@@ -290,32 +295,34 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, on
 
   const reportSpec = useMemo(() => {
     if (!file?.file) return null;
-    const buildMarkdown = () => buildFileReport(file);
+    const buildMarkdown = () => buildFileReport(file, activeFilter);
     const filenameLabel = file.file.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
+    const baseTitle = `${file.file.split('/').pop()} report`;
     return {
       id: `report:file:${file.file}`,
       type: 'report',
-      title: `${file.file.split('/').pop()} report`,
+      title: `${baseTitle}${filterTitleSuffix(activeFilter)}`,
       render: () => <ReportContent markdown={buildMarkdown()} />,
       copy: () => buildMarkdown(),
       download: () => ({ filename: `file-${filenameLabel}-report.md`, body: buildMarkdown() }),
     };
-  }, [file]);
+  }, [file, activeFilter]);
   useRegisterWindowSpec('report', reportSpec);
 
   const fixPlanSpec = useMemo(() => {
     if (!file?.file || (file.total || 0) === 0) return null;
-    const buildMarkdown = () => buildFilePlanText(file);
+    const buildMarkdown = () => buildFilePlanText(file, activeFilter);
     const filenameLabel = file.file.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
+    const baseTitle = `${file.file.split('/').pop()} fix plan`;
     return {
       id: `fixplan:file:${file.file}`,
       type: 'fixplan',
-      title: `${file.file.split('/').pop()} fix plan`,
+      title: `${baseTitle}${filterTitleSuffix(activeFilter)}`,
       render: () => <ReportContent markdown={buildMarkdown()} />,
       copy: () => buildMarkdown(),
       download: () => ({ filename: `file-${filenameLabel}-fix-plan.md`, body: buildMarkdown() }),
     };
-  }, [file]);
+  }, [file, activeFilter]);
   useRegisterWindowSpec('fixplan', fixPlanSpec);
 
   const renderItem = (item) => {

@@ -9,6 +9,11 @@ import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../co
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
 
+function filterTitleSuffix(filter) {
+  if (!filter || filter === 'all') return '';
+  return ` (${filter})`;
+}
+
 // Off-screen rows skip layout/paint via CSS `content-visibility: auto` on
 // `.vdetail-row` (see styles/explorer.css), so no JS virtualizer or
 // "Show all" pagination is needed. Rows render naturally inside the app's
@@ -190,8 +195,7 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
   const principleDescription = principleDescriptions[principle] || '';
 
   const {
-    violations, compliance, violationsBySeverity,
-    liveScore, liveGrade, activeSevFilter, setActiveSevFilter,
+    compliance, liveScore, liveGrade, activeSevFilter, setActiveSevFilter,
     handleDismiss, filteredViolations, liveSevCounts, displayedBySeverity,
   } = usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss);
 
@@ -200,34 +204,48 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
     const buildMarkdown = () => buildPrincipleReport({
       principle, dimension,
       score: liveScore ?? score, grade: liveGrade ?? grade,
-      violations: filteredViolations, violationsBySeverity: displayedBySeverity,
+      violations: filteredViolations,
       compliance, principleData, runId,
+      severityFilter: activeSevFilter,
     });
     const slug = `${(dimension || 'dim')}-${principle}`.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
     return {
       id: `report:principle:${dimension || 'dim'}:${principle}:${runId || 'current'}`,
       type: 'report',
-      title: `${principle} report`,
+      title: `${principle} report${filterTitleSuffix(activeSevFilter)}`,
       render: () => <ReportContent markdown={buildMarkdown()} />,
       copy: () => buildMarkdown(),
       download: () => ({ filename: `principle-${slug}-report.md`, body: buildMarkdown() }),
     };
-  }, [principle, dimension, runId, score, grade, liveScore, liveGrade, filteredViolations, displayedBySeverity, compliance, principleData]);
+  }, [principle, dimension, runId, score, grade, liveScore, liveGrade, filteredViolations, compliance, principleData, activeSevFilter]);
   useRegisterWindowSpec('report', reportSpec);
 
   const fixPlanSpec = useMemo(() => {
     if (!principle || filteredViolations.length === 0) return null;
-    const buildMarkdown = () => buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData);
+    const buildBySeverity = () => {
+      const bucket = {};
+      for (const sev of EVAL_SEVERITY_ORDER) {
+        bucket[sev] = filteredViolations.filter((v) => (v.severity || 'minor').toLowerCase() === sev);
+      }
+      return bucket;
+    };
+    const buildMarkdown = () => buildPrinciplePlanText(
+      principle,
+      filteredViolations,
+      buildBySeverity(),
+      principleData,
+      activeSevFilter,
+    );
     const slug = `${(dimension || 'dim')}-${principle}`.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
     return {
       id: `fixplan:principle:${dimension || 'dim'}:${principle}:${runId || 'current'}`,
       type: 'fixplan',
-      title: `${principle} fix plan`,
+      title: `${principle} fix plan${filterTitleSuffix(activeSevFilter)}`,
       render: () => <ReportContent markdown={buildMarkdown()} />,
       copy: () => buildMarkdown(),
       download: () => ({ filename: `principle-${slug}-fix-plan.md`, body: buildMarkdown() }),
     };
-  }, [principle, dimension, runId, violations, violationsBySeverity, principleData, filteredViolations.length]);
+  }, [principle, dimension, runId, filteredViolations, principleData, activeSevFilter]);
   useRegisterWindowSpec('fixplan', fixPlanSpec);
 
   return (
