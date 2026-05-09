@@ -123,6 +123,51 @@ export function buildTopOffendingFiles(dimensions = [], filters = {}, limit = DE
     .slice(0, limit);
 }
 
+/**
+ * Build a synthetic "project root" file object from the same dimensions
+ * structure that powers buildTopOffendingFiles. The result has the same
+ * shape FileDetailPage expects (violationsBySeverity / compliance / counts),
+ * so the project itself can be navigated to as if it were a file.
+ */
+export function buildProjectRootFile(dimensions = [], projectName = 'project') {
+  const violationsBySeverity = { critical: [], major: [], minor: [], unknown: [] };
+  const compliance = [];
+  const dims = new Set();
+  const principles = new Set();
+  let total = 0;
+
+  for (const dim of dimensions) {
+    const dimName = dim.dimension || '';
+    for (const v of dim.violations || []) {
+      const sev = normalizeSeverity(v.severity);
+      const enriched = { ...v, dimension: v.dimension || dimName };
+      (violationsBySeverity[sev] || violationsBySeverity.unknown).push(enriched);
+      total += 1;
+      if (enriched.dimension) dims.add(enriched.dimension);
+      if (enriched.principle) principles.add(enriched.principle);
+    }
+    for (const c of dim.compliance || []) {
+      compliance.push({ ...c, dimension: c.dimension || dimName });
+      if (dimName) dims.add(dimName);
+      if (c.principle) principles.add(c.principle);
+    }
+  }
+
+  return {
+    file: projectName || 'project',
+    total,
+    critical: violationsBySeverity.critical.length,
+    major: violationsBySeverity.major.length,
+    minor: violationsBySeverity.minor.length,
+    unknown: violationsBySeverity.unknown.length,
+    dimensions: Array.from(dims).sort((a, b) => a.localeCompare(b)),
+    dimensionsCount: dims.size,
+    principlesCount: principles.size,
+    violationsBySeverity,
+    compliance,
+  };
+}
+
 export function pickValidProject(projects = [], selectedProject = '') {
   if (!Array.isArray(projects) || projects.length === 0) {
     return '';

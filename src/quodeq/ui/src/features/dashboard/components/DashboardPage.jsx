@@ -40,6 +40,7 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
         projectName={projectInfo?.displayName || projectInfo?.name || selectedProject}
         onDimensionClick={onDimensionCardClick}
         onFileClick={onFileClick}
+        onNavigate={onNavigate}
       />
     );
   }

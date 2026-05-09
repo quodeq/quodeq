@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import { complianceRatio } from '../../../utils/formatters.js';
-import { buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
+import { buildDimensionPlanFromViolations, buildProjectRootFile } from '../../../utils/explorerUtils.js';
 import { buildDimensionReport } from '../../../utils/reportBuilder.js';
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { useExplorerData, buildEvalPrincipalFn } from './explorerDataHooks.js';
@@ -133,6 +133,24 @@ export default function ExplorerPage({
   const sev = d.severityCounts;
   const isRefreshing = d.isFetching && !!d.evalData;
 
+  // Synthetic file for the dimension lets the VIOLATIONS / COMPLIANCE cards
+  // (and severity badges) navigate into a FileDetailPage scoped to this
+  // standard, mirroring the project / run / by-dimension-row pattern.
+  const allCompliance = [];
+  if (d.complianceByPrinciple) {
+    for (const items of d.complianceByPrinciple.values()) allCompliance.push(...items);
+  }
+  const dimFile = buildProjectRootFile(
+    [{ dimension: d.evalData.dimension, violations: d.allViolations, compliance: allCompliance }],
+    d.evalData.dimension,
+  );
+  const handleCardNavigate = (kind) => {
+    if (!onNavigate) return;
+    const severityFilter = kind === 'violations' ? 'all' : kind;
+    onNavigate('file', { file: dimFile, severityFilter, runId: activeRunId, dateLabel: activeDateLabel });
+  };
+  const onSeverityBadge = (level) => () => handleCardNavigate(level);
+
   return (
     <div className={`explorer-page dashboard-fade${isRefreshing ? ' dashboard-refreshing' : ''}`}>
       <TermHeader name={dim} description={standardDescription} sub={activeDateLabel || activeRunId || null} />
@@ -150,16 +168,20 @@ export default function ExplorerPage({
               value={d.allViolations.length}
               hint={(sev.critical || sev.major || sev.minor) ? (
                 <span className="principle-detail-sev-row">
-                  {sev.critical > 0 && <SevBadge level="critical" count={sev.critical} />}
-                  {sev.major    > 0 && <SevBadge level="major"    count={sev.major} />}
-                  {sev.minor    > 0 && <SevBadge level="minor"    count={sev.minor} />}
+                  {sev.critical > 0 && <SevBadge level="critical" count={sev.critical} onClick={onNavigate ? onSeverityBadge('critical') : undefined} />}
+                  {sev.major    > 0 && <SevBadge level="major"    count={sev.major}    onClick={onNavigate ? onSeverityBadge('major') : undefined} />}
+                  {sev.minor    > 0 && <SevBadge level="minor"    count={sev.minor}    onClick={onNavigate ? onSeverityBadge('minor') : undefined} />}
                 </span>
               ) : null}
+              onClick={onNavigate && d.allViolations.length > 0 ? () => handleCardNavigate('violations') : undefined}
+              ariaLabel={d.allViolations.length > 0 ? 'Show all violations' : undefined}
             />
             <Stat
               label="COMPLIANCE"
               value={d.totalCompliant}
               hint={`passing / ${d.totalCompliant + d.allViolations.length} checks`}
+              onClick={onNavigate && d.totalCompliant > 0 ? () => handleCardNavigate('compliance') : undefined}
+              ariaLabel={d.totalCompliant > 0 ? 'Show compliance entries' : undefined}
             />
             <Stat
               label="RATIO"
