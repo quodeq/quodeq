@@ -44,6 +44,9 @@ export function buildFilePlanText(file, severityFilter) {
  * @param {Array} [violations] - Flat array of violation objects (convention 1 only).
  * @param {Object} [violationsBySeverity] - Violations keyed by severity (convention 1 only).
  * @param {Object} [principleData] - Optional extra data (e.g. `.findings`) for convention 1.
+ * @param {string} [severityFilter] - Optional severity filter; values: null/'all' (no filter),
+ *   'critical'/'major'/'minor' (only that bucket), or 'compliance' (returns the empty-state
+ *   string `_No violations match the current filter._`). Split form only.
  * @returns {string} Formatted plan text.
  */
 export function buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData, severityFilter) {
