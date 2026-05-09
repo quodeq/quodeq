@@ -47,9 +47,11 @@ class TestToolsList:
             findings_file,
         )
         tools = responses[0]["result"]["tools"]
-        assert len(tools) == 1
-        assert tools[0]["name"] == "report_finding"
-        assert "inputSchema" in tools[0]
+        names = {tool["name"] for tool in tools}
+        assert "report_finding" in names
+        assert "mark_file_done" in names
+        report_tool = next(tool for tool in tools if tool["name"] == "report_finding")
+        assert "inputSchema" in report_tool
 
 
 class TestToolsCall:
