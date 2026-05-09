@@ -359,3 +359,56 @@ class TestWiring:
             _process_single_dimension(config, "security", 1, _make_ctx(), emit_log=False)
 
         assert called["hit"] is True
+
+
+class TestDispatchKeysSidecar:
+    def test_sidecar_written_with_miss_keys(self, tmp_path: Path, cache):
+        from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
+        config, src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
+
+        dispatcher = FakeDispatcher(src)
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=dispatcher,
+        ):
+            process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+            )
+
+        sidecar = (config.work_dir or config.src) / "security_dispatch_keys.json"
+        assert sidecar.is_file()
+        keys = json.loads(sidecar.read_text())
+        expected_keys = {
+            "a.py": build_cache_key_for_file(config, "a.py", "security"),
+            "b.py": build_cache_key_for_file(config, "b.py", "security"),
+        }
+        assert keys == expected_keys
+
+    def test_sidecar_skipped_when_all_hits(self, tmp_path: Path, cache):
+        """All-hits short-circuit returns before reaching the dispatch path,
+        so no sidecar is written. Discard for an all-hits dim has nothing
+        to wipe anyway."""
+        from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
+        config, src = _setup(tmp_path, {"a.py": "x"})
+        key = build_cache_key_for_file(config, "a.py", "security")
+        cache.put(key, CacheEntry(
+            key=key, schema_version=1,
+            findings=[{"file": "a.py", "line": 1, "t": "violation", "w": "v"}],
+            files_read=1, file_path="a.py", dimension="security",
+            model_id="test-model",
+        ))
+
+        dispatcher = FakeDispatcher(src)
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=dispatcher,
+        ):
+            process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+            )
+
+        assert dispatcher.calls == []  # confirm we hit the all-hits path
+        sidecar = (config.work_dir or config.src) / "security_dispatch_keys.json"
+        assert not sidecar.exists()
