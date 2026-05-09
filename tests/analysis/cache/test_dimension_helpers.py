@@ -222,6 +222,8 @@ class TestPersist:
             json.dumps({"file": "a.py", "line": 1, "t": "violation", "w": "a-issue"}) + "\n"
             + json.dumps({"file": "b.py", "line": 2, "t": "compliance", "w": "b-ok"}) + "\n"
             + json.dumps({"file": "a.py", "line": 5, "t": "violation", "w": "a-issue-2"}) + "\n"
+            + json.dumps({"_marker": "file_done", "file": "a.py", "status": "ok"}) + "\n"
+            + json.dumps({"_marker": "file_done", "file": "b.py", "status": "ok"}) + "\n"
         )
 
         persist_dispatch_results(
@@ -246,8 +248,10 @@ class TestPersist:
 
         jsonl = tmp_path / "work" / "security_evidence.jsonl"
         jsonl.parent.mkdir(parents=True, exist_ok=True)
-        # No findings for clean.py — JSONL is empty.
-        jsonl.write_text("")
+        # No findings for clean.py — just the ok marker to confirm it completed.
+        jsonl.write_text(
+            json.dumps({"_marker": "file_done", "file": "clean.py", "status": "ok"}) + "\n"
+        )
 
         persist_dispatch_results(
             config, "security", miss_files=files,
@@ -271,6 +275,7 @@ class TestPersist:
         jsonl.write_text(
             json.dumps({"file": "a.py", "line": 1}) + "\n"
             + json.dumps({"file": "carried.py", "line": 2}) + "\n"
+            + json.dumps({"_marker": "file_done", "file": "a.py", "status": "ok"}) + "\n"
         )
 
         persist_dispatch_results(
@@ -320,6 +325,8 @@ class TestRoundTrip:
         jsonl.write_text(
             json.dumps({"file": "a.py", "line": 1, "t": "violation"}) + "\n"
             + json.dumps({"file": "b.py", "line": 2, "t": "compliance"}) + "\n"
+            + json.dumps({"_marker": "file_done", "file": "a.py", "status": "ok"}) + "\n"
+            + json.dumps({"_marker": "file_done", "file": "b.py", "status": "ok"}) + "\n"
         )
 
         # Persist results.

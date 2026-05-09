@@ -142,6 +142,9 @@ class FakeDispatcher:
                 out.write(json.dumps({
                     "file": f, "line": 1, "t": "violation", "w": f"v-{f}",
                 }) + "\n")
+                out.write(json.dumps({
+                    "_marker": "file_done", "file": f, "status": "ok",
+                }) + "\n")
         return _make_dummy_evidence(files_read=len(files_to_dispatch))
 
     def _all_source_files(self) -> list[str]:

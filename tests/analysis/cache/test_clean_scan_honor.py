@@ -155,6 +155,9 @@ class TestDispatchBypassesCacheOnCleanScan:
                     out.write(json.dumps({
                         "file": f, "line": 1, "t": "violation", "w": f"fresh-{f}",
                     }) + "\n")
+                    out.write(json.dumps({
+                        "_marker": "file_done", "file": f, "status": "ok",
+                    }) + "\n")
             return Evidence(
                 repository="", language="python", date="2026-01-01",
                 source_file_count=len(files), files_read=len(files),
@@ -205,6 +208,9 @@ class TestDispatchBypassesCacheOnCleanScan:
             with jsonl.open("a") as out:
                 out.write(json.dumps({
                     "file": "a.py", "line": 1, "t": "violation", "w": "fresh",
+                }) + "\n")
+                out.write(json.dumps({
+                    "_marker": "file_done", "file": "a.py", "status": "ok",
                 }) + "\n")
             return Evidence(
                 repository="", language="python", date="2026-01-01",

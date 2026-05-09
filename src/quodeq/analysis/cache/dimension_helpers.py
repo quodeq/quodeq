@@ -172,23 +172,20 @@ def persist_dispatch_results(
     config: RunConfig, dimension: str, *, miss_files: list[str],
     jsonl_path: Path, miss_keys: dict[str, str], cache: CacheBackend,
 ) -> None:
-    """Write per-file cache entries from a dispatch run's JSONL output.
+    """Write per-file cache entries for files with a file_done='ok' marker.
 
-    A successful dispatch that produced no findings for a given file
-    still writes an empty entry — the next run hits instead of
-    re-dispatching. If the JSONL doesn't exist (dispatch crashed before
-    writing), no entries are written: we don't fabricate "no findings"
-    when there's no evidence the analysis ran.
+    Files in *miss_files* that lack an ok marker (worker crashed, token-out,
+    abandoned) are NOT cached, so the next run re-dispatches them.
     """
     if not jsonl_path.is_file():
-        # Dispatch failed before writing; let the next run retry.
         return
-    grouped = _group_findings_by_file(jsonl_path)
+    grouped, ok_files = _group_findings_by_file(jsonl_path)
     model_id = _model_id_from(config)
     for f in miss_files:
+        if f not in ok_files:
+            continue
         key = miss_keys.get(f)
         if key is None:
-            # Caller error: missed file with no key. Skip rather than fabricate.
             _logger.debug("persist_dispatch_results: no key for %s; skipping", f)
             continue
         entry = CacheEntry(
