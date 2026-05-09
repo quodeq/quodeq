@@ -294,7 +294,7 @@ export function buildPrincipleReport({ principle, dimension, score, grade, viola
     lines.push('');
   }
 
-  const showViolations = !severityFilter || severityFilter === 'all' || severityFilter !== 'compliance';
+  const showViolations = severityFilter !== 'compliance';
   const showCompliance = !severityFilter || severityFilter === 'all' || severityFilter === 'compliance';
 
   const filteredViolations = (showViolations && severityFilter && severityFilter !== 'all')
