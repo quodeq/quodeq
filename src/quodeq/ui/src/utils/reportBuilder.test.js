@@ -129,6 +129,7 @@ test("buildFileReport with severityFilter='major' shows only major and omits com
   assert.match(md, /Maj-1/);
   assert.doesNotMatch(md, /Min-1/);
   assert.doesNotMatch(md, /## Compliance Summary/);
+  assert.match(md, /## Violations \(1\)/);
 });
 
 test("buildFileReport with severityFilter='compliance' omits violations and shows compliance", () => {
