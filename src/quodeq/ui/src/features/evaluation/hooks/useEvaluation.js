@@ -24,7 +24,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
-import { confirmDialog } from "../../../utils/confirmDialog.js";
+import { chooseDialog } from "../../../utils/chooseDialog.js";
 import { useRunEventStream } from "./useRunEventStream.js";
 import { evaluationKeys } from "../../../api/queryKeys.js";
 import {
@@ -202,16 +202,22 @@ export function useEvaluation() {
   );
 
   const cancelEvaluation = useCallback(async () => {
-    const result = await confirmDialog({
+    // Three-button form: dismiss + two cancel variants. The title carries
+    // the "cancel evaluation" verb so the button labels can be terse and
+    // describe the side-effect on findings, not repeat the cancel intent.
+    // Only the destructive option ('discard') is rendered red; 'keep' and
+    // 'dismiss' are neutral so they don't compete visually.
+    const choice = await chooseDialog({
       title: "Cancel evaluation?",
-      message: "The run will stop. Findings collected so far are kept by default.",
-      checkboxLabel: "Discard collected findings",
-      confirmLabel: "Cancel evaluation",
+      message: "The run will stop. Choose what happens to findings collected so far.",
       cancelLabel: "Keep running",
-      variant: "danger",
+      actions: [
+        { key: "preserve", label: "Keep findings", variant: "default" },
+        { key: "discard", label: "Discard findings", variant: "danger" },
+      ],
     });
-    if (!result || !result.ok) return;
-    cancelMutation.mutate({ discard: result.checked });
+    if (!choice) return;
+    cancelMutation.mutate({ discard: choice === "discard" });
   }, [cancelMutation]);
 
   const clearJob = useCallback(() => {
