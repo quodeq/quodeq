@@ -26,7 +26,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { chooseDialog } from "../../../utils/chooseDialog.js";
 import { useRunEventStream } from "./useRunEventStream.js";
-import { evaluationKeys } from "../../../api/queryKeys.js";
+import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
 import {
   ACTIVE_PROVIDER_KEY,
   providerKey,
@@ -167,6 +167,13 @@ export function useEvaluation() {
       setJobError(null);
       setJobId(created.jobId);
       queryClient.setQueryData(evaluationKeys.status(created.jobId), created);
+      // Invalidate the project subtree so History (and any other view
+      // backed by project queries) shows the freshly-started run as
+      // 'running' immediately, instead of waiting for the next poll
+      // tick. Without this, History stays stale until the user
+      // navigates away and back, or the polling timer fires --
+      // user-visible delay was ~10-30s on a fresh start.
+      queryClient.invalidateQueries({ queryKey: projectKeys.all() });
     },
     onError: (err) => {
       const msg = err?.message || "Failed to start evaluation.";
