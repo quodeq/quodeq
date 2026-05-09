@@ -35,7 +35,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis._incremental_evidence import parse_evidence_from_jsonl
+from quodeq.analysis._evidence_parser import parse_evidence_from_jsonl
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.dimension_helpers import (

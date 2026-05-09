@@ -6,7 +6,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
 from quodeq.analysis._dim_estimates import compute_dim_estimates, write_dim_estimates
-from quodeq.analysis._incremental_context import load_analysis_context as _load_ctx
+from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
 from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis._dimension_ops import (

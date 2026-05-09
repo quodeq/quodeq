@@ -55,7 +55,10 @@ def _process_single_dimension(
 def _run_dimension_incremental(
     config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
 ) -> Evidence | None:
-    """Incremental path: detect changes, carry forward, analyze only changed files."""
-    # Deferred import: circular dependency _dimension_ops → _incremental_orchestrator → _incremental_phases → _dimension_ops
-    from quodeq.analysis._incremental_orchestrator import run_dimension_incremental
-    return run_dimension_incremental(config, dimension, idx, ctx)
+    """Incremental dimension path — V2 cache owns change detection.
+
+    V1's classify_files + carry-forward + phase1 + backfill + finalize
+    is gone (B6). The ``(incremental)`` log line is emitted by the
+    caller in ``_loops.run_incremental_loop``.
+    """
+    return _process_single_dimension(config, dimension, idx, ctx, emit_log=False)

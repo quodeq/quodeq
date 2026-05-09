@@ -1,10 +1,8 @@
 """Evidence parsing — JSONL → ``Evidence``.
 
-Post-V2 (B6.1): the per-dimension fingerprint write
-(``save_dimension_fingerprint``) and its supporting helpers are gone.
-V2 writes per-file cache entries during dispatch — there is no
-fingerprint to persist. This module exists solely to host
-``parse_evidence_from_jsonl``, which V2's dimension runner uses.
+The V2 dimension runner uses ``parse_evidence_from_jsonl`` to build
+the final ``Evidence`` object once cache hits and dispatch results
+have all been merged into the dimension's ``<dim>_evidence.jsonl``.
 """
 from __future__ import annotations
 

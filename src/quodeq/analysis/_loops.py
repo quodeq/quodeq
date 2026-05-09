@@ -9,7 +9,7 @@ from copy import copy
 from dataclasses import replace
 from collections.abc import Callable
 
-from quodeq.analysis._incremental_orchestrator import run_dimension_incremental
+from quodeq.analysis._dimension_ops import _run_dimension_incremental as run_dimension_incremental
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.errors import EvaluationError
 from quodeq.core.evidence.model import Evidence
