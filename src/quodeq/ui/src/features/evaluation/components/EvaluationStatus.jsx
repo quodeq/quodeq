@@ -26,12 +26,12 @@ function JobHeader({ job, projectLabel, onDismiss, onCancel }) {
           <button type="button" className="term-btn term-btn--ghost term-btn--sm" onClick={onCancel}>cancel</button>
         )}
         {!isRunning && isDone && (
-          <button type="button" className="term-btn term-btn--primary" onClick={() => onDismiss('view')}>
+          <button type="button" className="term-btn term-btn--primary term-btn--sm" onClick={() => onDismiss('view')}>
             <span aria-hidden="true">▸</span> view results
           </button>
         )}
         {!isRunning && (
-          <button type="button" className="term-btn term-btn--secondary" onClick={() => onDismiss('close')}>close</button>
+          <button type="button" className="term-btn term-btn--secondary term-btn--sm" onClick={() => onDismiss('close')}>close</button>
         )}
       </div>
     </div>
