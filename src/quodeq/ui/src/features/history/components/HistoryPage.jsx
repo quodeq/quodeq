@@ -230,7 +230,7 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
                     {isPartial && (
                       <span
                         className="chip small history-row__partial-chip"
-                        title="Run was cancelled — some dimensions completed, others didn't"
+                        title="Run cancelled. Some dimensions completed; re-run to finish the rest."
                       >
                         partial
                       </span>
