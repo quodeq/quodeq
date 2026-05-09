@@ -27,8 +27,6 @@ class DimState(str, enum.Enum):
     INCOMPLETE = "incomplete"
 
 
-_TERMINAL = frozenset({DimState.DONE, DimState.INCOMPLETE})
-
 _ALLOWED: dict[DimState, frozenset[DimState]] = {
     DimState.PENDING: frozenset({DimState.RUNNING, DimState.INCOMPLETE}),
     DimState.RUNNING: frozenset({DimState.DONE, DimState.INCOMPLETE}),
@@ -73,6 +71,10 @@ def write_dim_state(
             try:
                 prev = DimState(existing["state"])
             except ValueError:
+                _logger.warning(
+                    "dimensions.json: corrupt state %r for %s; treating as pending",
+                    existing.get("state"), dimension,
+                )
                 prev = DimState.PENDING
             if state not in _ALLOWED[prev]:
                 raise IllegalDimTransitionError(
