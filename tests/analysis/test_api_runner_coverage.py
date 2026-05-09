@@ -11,8 +11,8 @@ instructor = pytest.importorskip("instructor", reason="requires quodeq[api] extr
 
 from quodeq.analysis._api_runner import (
     ApiRunnerConfig,
+    _build_router_context,
     _call_api,
-    _enrich_findings,
     _Finding,
     _Findings,
     _FindingType,
@@ -148,6 +148,25 @@ class TestCallApi:
             api_key="ollama",
         )
 
+    def test_returns_clean_flag_on_success(self):
+        config = ApiRunnerConfig(
+            model="llama3.1", api_base="http://localhost:11434/v1",
+        )
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = _Findings(findings=[
+            _Finding(req="X-1", t=_FindingType.violation, file="a.py", line=1,
+                     severity=_Severity.minor, w="x", snippet="code", reason="r"),
+        ])
+
+        with patch("quodeq.analysis._api_runner.instructor") as mock_inst, \
+             patch("quodeq.analysis._api_runner.openai"):
+            mock_inst.from_openai.return_value = mock_client
+            mock_inst.Mode.JSON = "json"
+            findings, salvaged = _call_api("test", config)
+
+        assert len(findings) == 1
+        assert salvaged is False
+
     def test_salvages_on_exception(self):
         config = ApiRunnerConfig(
             model="llama3.1", api_base="http://localhost:11434/v1",
@@ -161,9 +180,10 @@ class TestCallApi:
              patch("quodeq.analysis._api_runner.openai"):
             mock_inst.from_openai.return_value = mock_client
             mock_inst.Mode.JSON = "json"
-            result = _call_api("test", config)
+            findings, salvaged = _call_api("test", config)
 
-        assert len(result) >= 1
+        assert len(findings) >= 1
+        assert salvaged is True
 
     def test_returns_empty_on_unsalvageable_error(self):
         config = ApiRunnerConfig(
@@ -176,9 +196,10 @@ class TestCallApi:
              patch("quodeq.analysis._api_runner.openai"):
             mock_inst.from_openai.return_value = mock_client
             mock_inst.Mode.JSON = "json"
-            result = _call_api("test", config)
+            findings, salvaged = _call_api("test", config)
 
-        assert result == []
+        assert findings == []
+        assert salvaged is True
 
 
 # ---------------------------------------------------------------------------
@@ -216,23 +237,23 @@ class TestResolveFilePaths:
 
 
 # ---------------------------------------------------------------------------
-# _enrich_findings
+# _build_router_context
 # ---------------------------------------------------------------------------
 
-class TestEnrichFindings:
-    def test_returns_raw_when_no_compiled_dir(self):
-        findings = [{"req": "X-1", "file": "a.py"}]
-        result = _enrich_findings(findings, None, None, None)
-        assert result == findings
+class TestBuildRouterContext:
+    def test_returns_none_without_compiled_dir(self):
+        """Without a compiled standards dir there is no enrichment context to
+        build. Callers fall back to a default-context router (still emits
+        markers and writes findings, just no req-ref enrichment)."""
+        assert _build_router_context(None, None, None, None) is None
 
-    def test_returns_raw_on_import_error(self):
-        findings = [{"req": "X-1", "file": "a.py"}]
-        with patch("quodeq.analysis._api_runner.json") as mock_json:
-            # Simulate the enrichment failing
-            with patch.dict("sys.modules", {"quodeq.analysis.mcp.router": None}):
-                result = _enrich_findings(findings, Path("/nonexistent"), "security", None)
-        # Should fall back to raw findings
-        assert len(result) >= 1
+    def test_returns_none_on_load_failure(self):
+        """A broken compiled dir must not propagate -- the API runner needs
+        to keep writing findings + markers even when enrichment fails."""
+        with patch("quodeq.analysis._api_runner.load_compiled_refs",
+                   side_effect=OSError("boom")):
+            ctx = _build_router_context(Path("/nonexistent"), "security", None, None)
+        assert ctx is None
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +284,10 @@ class TestRunApiAnalysisAppend:
         assert json.loads(lines[0])["req"] == "existing"
         assert json.loads(lines[1])["req"] == "NEW-1"
 
-    def test_enrichment_called_with_compiled_dir(self, tmp_path):
+    def test_router_context_built_when_compiled_dir_provided(self, tmp_path):
+        """When a compiled dir is passed, the API runner builds a router
+        context for enrichment. Without it, the router falls back to a
+        default context (no enrichment) but still writes findings + markers."""
         jsonl = tmp_path / "evidence.jsonl"
         config = ApiRunnerConfig(model="m", api_base="http://localhost/v1")
         findings = _Findings(findings=[
@@ -275,11 +299,15 @@ class TestRunApiAnalysisAppend:
 
         with patch("quodeq.analysis._api_runner.instructor") as mock_inst, \
              patch("quodeq.analysis._api_runner.openai"), \
-             patch("quodeq.analysis._api_runner._enrich_findings", return_value=[{"req": "X-1", "enriched": True}]) as mock_enrich:
+             patch("quodeq.analysis._api_runner._build_router_context",
+                   return_value=None) as mock_ctx:
             mock_inst.from_openai.return_value = mock_client
             mock_inst.Mode.JSON = "json"
             run_api_analysis(
                 prompt="test", jsonl_file=jsonl, config=config,
                 compiled_dir=tmp_path, dimension="security",
             )
-            mock_enrich.assert_called_once()
+            mock_ctx.assert_called_once()
+            args = mock_ctx.call_args.args
+            assert args[0] == tmp_path  # compiled_dir
+            assert args[1] == "security"  # dimension
