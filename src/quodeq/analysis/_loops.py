@@ -47,10 +47,17 @@ def _safe_write_dim_state(
 
 
 def _run_dir_for(config: RunConfig) -> Path | None:
+    """Resolve the run directory for dim-state writes.
+
+    Only accepts a real ``Path`` or ``str`` candidate. Mocked configs
+    (whose ``work_dir`` / ``src`` are ``MagicMock`` instances) return
+    ``None`` so tests don't create stray ``<MagicMock id=...>``
+    directories in the CWD when they exercise the dim loops.
+    """
     work_dir = getattr(config, "work_dir", None)
     src = getattr(config, "src", None)
-    candidate = work_dir or src
-    if candidate is None:
+    candidate = work_dir if work_dir is not None else src
+    if not isinstance(candidate, (str, Path)):
         return None
     try:
         return Path(candidate)
