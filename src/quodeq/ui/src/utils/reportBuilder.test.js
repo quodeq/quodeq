@@ -91,6 +91,59 @@ test('buildFileReport with no violations shows "No violations found"', () => {
   assert.match(md, /No violations found\./);
 });
 
+const fileFixture = {
+  file: 'src/foo/bar.js',
+  total: 3,
+  critical: 1,
+  major: 1,
+  minor: 1,
+  dimensionsCount: 2,
+  compliance: [{ principle: 'Naming', file: 'src/foo/bar.js' }],
+  violationsBySeverity: {
+    critical: [{ severity: 'critical', principle: 'SRP', title: 'Crit-1', file: 'src/foo/bar.js', line: 12 }],
+    major:    [{ severity: 'major',    principle: 'DRY', title: 'Maj-1', file: 'src/foo/bar.js' }],
+    minor:    [{ severity: 'minor',    principle: 'Style', title: 'Min-1', file: 'src/foo/bar.js' }],
+  },
+};
+
+test('buildFileReport with no severityFilter renders all severities and compliance', () => {
+  const md = buildFileReport(fileFixture);
+  assert.match(md, /Crit-1/);
+  assert.match(md, /Maj-1/);
+  assert.match(md, /Min-1/);
+  assert.match(md, /## Compliance Summary/);
+});
+
+test("buildFileReport with severityFilter='critical' shows only critical and omits compliance", () => {
+  const md = buildFileReport(fileFixture, 'critical');
+  assert.match(md, /Crit-1/);
+  assert.doesNotMatch(md, /Maj-1/);
+  assert.doesNotMatch(md, /Min-1/);
+  assert.doesNotMatch(md, /## Compliance Summary/);
+  assert.match(md, /## Violations \(1\)/);
+});
+
+test("buildFileReport with severityFilter='major' shows only major and omits compliance", () => {
+  const md = buildFileReport(fileFixture, 'major');
+  assert.doesNotMatch(md, /Crit-1/);
+  assert.match(md, /Maj-1/);
+  assert.doesNotMatch(md, /Min-1/);
+  assert.doesNotMatch(md, /## Compliance Summary/);
+});
+
+test("buildFileReport with severityFilter='compliance' omits violations and shows compliance", () => {
+  const md = buildFileReport(fileFixture, 'compliance');
+  assert.match(md, /## Violations \(0\)/);
+  assert.match(md, /No violations found\./);
+  assert.match(md, /## Compliance Summary \(1\)/);
+});
+
+test("buildFileReport with severityFilter='all' is identical to no filter", () => {
+  const filtered = buildFileReport(fileFixture, 'all');
+  const unfiltered = buildFileReport(fileFixture);
+  assert.equal(filtered, unfiltered);
+});
+
 test('buildPrincipleReport includes principle, score, findings, and violations', () => {
   const md = buildPrincipleReport({
     principle: 'Single Responsibility',
