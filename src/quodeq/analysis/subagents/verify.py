@@ -1,41 +1,27 @@
-"""Finding verification — re-checks previous findings using a fast AI pool.
+"""Prior-findings reader — used by priority scoring and the V2 cache layer.
 
-Two-phase approach:
-1. Mechanical pre-filter: drop findings whose files no longer exist (instant)
-2. AI verification pool: dispatch remaining findings to fast model subagents
-   grouped by file, each agent reads the current code and confirms/drops
+Post-V2 (B6.2b): the verify-pool dispatch is gone. What remains in
+this module is the *reader*: ``load_previous_findings_for_dimension``
+loads, pre-filters, and returns prior findings for callers that want
+to use them as input (e.g., priority scoring weights newly-changed
+files higher when prior findings exist).
 
-Confirmed findings are written to the evidence JSONL via MCP (same as
-main analysis), so they appear on the dashboard immediately.
-
-This module is the public entry point; implementation is split across:
-- _verify_io: evidence path resolution and JSONL parsing
-- _verify_filter: pre-filtering and fingerprint classification
-- _verify_output: writing findings and grouping by file
+The verify-pool's role — re-validating prior findings when standards
+change — is now structurally redundant: V2's content-addressed cache
+key includes ``standards_hash`` and ``prompts_hash``, so any change
+invalidates entries and triggers full fresh dispatch.
 """
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis.subagents._verify_filter import (  # noqa: F401
-    _classify_findings,
-    _pre_filter_gone,
-    partition_findings_by_fingerprint,
-)
-from quodeq.analysis.subagents._verify_io import (  # noqa: F401
-    _find_previous_evidence,
-    _load_previous_findings,
-    _parse_finding_line,
+from quodeq.analysis.subagents._verify_filter import _pre_filter_gone
+from quodeq.analysis.subagents._verify_io import (  # noqa: F401 — re-exports
     _resolve_previous_evidence,
     resolve_evidence_paths,
 )
-from quodeq.analysis.subagents._verify_output import (  # noqa: F401
-    _group_by_file,
-    _write_verify_manifest,
-    write_carry_forward_findings,
-)
-from quodeq.analysis.subagents._verify_pool import build_verify_prompt  # noqa: F401 — re-export
+from quodeq.analysis.subagents._verify_io import _load_previous_findings
 from quodeq.shared.logging import log_info
 
 
@@ -50,10 +36,10 @@ def load_previous_findings_for_dimension(
     """Load and pre-filter previous findings for a dimension.
 
     When *cache* is provided, results are stored per (evidence_dir, dim_id)
-    so multiple callers (priority scoring, verification) don't repeat file
-    I/O within the same run.  Pass ``None`` to disable caching.
+    so multiple callers don't repeat file I/O within the same run.  Pass
+    ``None`` to disable caching.
 
-    Returns list of findings to verify (may be empty).
+    Returns list of surviving findings (files still exist).
     """
     if not getattr(config, 'options', None) or not config.options.verify_findings:
         return []
