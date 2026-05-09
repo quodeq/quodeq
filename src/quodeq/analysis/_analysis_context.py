@@ -1,7 +1,9 @@
 """Analysis context — dimension loading and resolution.
 
-Post-V2 (B6.1): the V1-only ``IncrementalCoverage`` dataclass was
-removed. ``load_analysis_context`` is the only surviving export.
+``load_analysis_context`` resolves which dimensions to analyze (from
+the dimensions config, custom evaluators, and the user's
+``--dimensions`` selection) and builds the shared ``_AnalysisContext``
+passed to every dimension runner.
 """
 from __future__ import annotations
 
