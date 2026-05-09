@@ -1,4 +1,4 @@
-"""Dimension loop orchestrators — run dimensions sequentially or incrementally."""
+"""Dimension loop orchestrators - run dimensions sequentially or incrementally."""
 from __future__ import annotations
 
 import json
@@ -15,7 +15,7 @@ from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.errors import EvaluationError
 from quodeq.core.evidence.model import Evidence
 from quodeq.engine._runner_markers import emit_marker
-# NOTE: logging in inner layer — tracked for middleware extraction
+# NOTE: logging in inner layer - tracked for middleware extraction
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared import cancellation
 from quodeq.shared.dimensions_state import DimState, write_dim_state, IllegalDimTransitionError
@@ -74,11 +74,11 @@ def _silence_broken_stdout() -> None:
 
     Once the parent has closed its end of the pipe every subsequent write to
     stdout/stderr raises BrokenPipeError. The actual analysis work (evidence
-    files, MCP calls, etc.) doesn't depend on those streams — only logging
+    files, MCP calls, etc.) doesn't depend on those streams - only logging
     does. Swapping the streams to /dev/null lets remaining dimensions run.
     """
     try:
-        devnull = open(os.devnull, "w")  # noqa: SIM115 — long-lived
+        devnull = open(os.devnull, "w")  # noqa: SIM115 - long-lived
         sys.stdout = devnull
         sys.stderr = devnull
     except OSError:
@@ -93,7 +93,7 @@ def check_zero_findings(
 
     When *incremental_filter_active* is True, zero findings is a legitimate
     outcome (PR-diff / incremental mode deliberately narrows the scan to a
-    changed-file set that may contain none of the dimension's language) —
+    changed-file set that may contain none of the dimension's language) -
     skip the check. Otherwise a genuinely empty result is almost always a
     symptom of a broken AI CLI tool loop, not a clean codebase.
     """
@@ -108,7 +108,7 @@ def check_zero_findings(
         raise EvaluationError(
             f"Evaluation produced 0 findings across {len(result)} dimensions{skip_msg}. "
             f"This usually means the AI CLI could not read files or report findings "
-            "— check tool permissions and MCP configuration."
+            "- check tool permissions and MCP configuration."
         )
 
 
@@ -139,7 +139,7 @@ def run_incremental_loop(
         run_dir = _run_dir_for(config)
         _safe_write_dim_state(run_dir, dimension, DimState.RUNNING)
         emit_marker("analyzing", dimension=dimension)
-        log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
+        log_info(f"-> [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
         ev: Evidence | None = None
         try:
             ev = run_dimension_incremental(config, dimension, idx, ctx)
@@ -147,7 +147,7 @@ def run_incremental_loop(
             _silence_broken_stdout()
             ev = None
         except (OSError, KeyError, ValueError, RuntimeError) as exc:
-            log_warning(f"[{idx}/{ctx.total}] {dimension} — incremental failed: {exc}, falling back to full")
+            log_warning(f"[{idx}/{ctx.total}] {dimension} - incremental failed: {exc}, falling back to full")
             fallback_options = copy(config.options)
             fallback_options.incremental_file_filter = None
             fallback_config = replace(config, options=fallback_options)
@@ -163,12 +163,12 @@ def run_incremental_loop(
             # so subsequent dims still run; the surfaced log line gives us
             # the trail we need next time this happens.
             log_warning(
-                f"[loop] {dimension} — unexpected exception "
-                f"{type(exc).__name__}: {exc} — skipping dim, continuing loop",
+                f"[loop] {dimension} - unexpected exception "
+                f"{type(exc).__name__}: {exc} - skipping dim, continuing loop",
             )
             ev = None
         # log_result_fn / on_dimension_done are caller-provided (e.g., the
-        # dashboard's scoring callback). Wrap them too — an exception in a
+        # dashboard's scoring callback). Wrap them too - an exception in a
         # callback shouldn't drop the next iteration on the floor.
         if ev:
             _safe_write_dim_state(run_dir, dimension, DimState.DONE)
@@ -182,7 +182,7 @@ def run_incremental_loop(
                 # stderr, then retry the callback once: scoring callbacks like
                 # ``_score_dimension`` write evaluation/<dim>.json to disk and
                 # are idempotent (overwrite). The previous "result kept"
-                # message was misleading — only the in-memory Evidence stayed,
+                # message was misleading - only the in-memory Evidence stayed,
                 # the persistent file write was lost with the exception.
                 _silence_broken_stdout()
                 result.setdefault(dimension, ev)
@@ -190,20 +190,20 @@ def run_incremental_loop(
                     try:
                         on_dimension_done(dimension, ev)
                         log_warning(
-                            f"[loop] {dimension} — callback broken pipe, "
+                            f"[loop] {dimension} - callback broken pipe, "
                             f"retried after silencing stdout, result persisted",
                         )
                     except Exception as exc:  # noqa: BLE001
                         log_warning(
-                            f"[loop] {dimension} — callback retry after broken pipe raised "
-                            f"{type(exc).__name__}: {exc} — result NOT persisted, continuing loop",
+                            f"[loop] {dimension} - callback retry after broken pipe raised "
+                            f"{type(exc).__name__}: {exc} - result NOT persisted, continuing loop",
                         )
                 else:
-                    log_warning(f"[loop] {dimension} — callback broken pipe, no retry needed, continuing loop")
+                    log_warning(f"[loop] {dimension} - callback broken pipe, no retry needed, continuing loop")
             except Exception as exc:  # noqa: BLE001
                 log_warning(
-                    f"[loop] {dimension} — callback raised "
-                    f"{type(exc).__name__}: {exc} — result kept, continuing loop",
+                    f"[loop] {dimension} - callback raised "
+                    f"{type(exc).__name__}: {exc} - result kept, continuing loop",
                 )
                 result.setdefault(dimension, ev)
         else:
@@ -257,7 +257,7 @@ def run_per_dimension_loop(
             log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: broken pipe)")
             continue
         except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
-            log_warning(f"[{idx}/{ctx.total}] {dimension} — failed: {exc}")
+            log_warning(f"[{idx}/{ctx.total}] {dimension} - failed: {exc}")
             skipped_count += 1
             _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason())
             log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: {type(exc).__name__})")
@@ -266,8 +266,8 @@ def run_per_dimension_loop(
             # Don't let an exotic exception class drop the rest of the loop
             # silently. Log + count as skipped + continue so we get the trail.
             log_warning(
-                f"[loop] {dimension} — unexpected exception "
-                f"{type(exc).__name__}: {exc} — skipping dim, continuing loop",
+                f"[loop] {dimension} - unexpected exception "
+                f"{type(exc).__name__}: {exc} - skipping dim, continuing loop",
             )
             skipped_count += 1
             _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason())
@@ -278,7 +278,7 @@ def run_per_dimension_loop(
             _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason())
             log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: ev=None)")
             continue
-        # ev is set — dim succeeded analytically.
+        # ev is set - dim succeeded analytically.
         _safe_write_dim_state(run_dir, dimension, DimState.DONE)
         try:
             result[dimension] = ev
@@ -294,20 +294,20 @@ def run_per_dimension_loop(
                 try:
                     on_dimension_done(dimension, ev)
                     log_warning(
-                        f"[loop] {dimension} — callback broken pipe, "
+                        f"[loop] {dimension} - callback broken pipe, "
                         f"retried after silencing stdout, result persisted",
                     )
                 except Exception as exc:  # noqa: BLE001
                     log_warning(
-                        f"[loop] {dimension} — callback retry after broken pipe raised "
-                        f"{type(exc).__name__}: {exc} — result NOT persisted, continuing loop",
+                        f"[loop] {dimension} - callback retry after broken pipe raised "
+                        f"{type(exc).__name__}: {exc} - result NOT persisted, continuing loop",
                     )
             else:
-                log_warning(f"[loop] {dimension} — callback broken pipe, no retry needed, continuing loop")
+                log_warning(f"[loop] {dimension} - callback broken pipe, no retry needed, continuing loop")
         except Exception as exc:  # noqa: BLE001
             log_warning(
-                f"[loop] {dimension} — callback raised "
-                f"{type(exc).__name__}: {exc} — result kept, continuing loop",
+                f"[loop] {dimension} - callback raised "
+                f"{type(exc).__name__}: {exc} - result kept, continuing loop",
             )
         log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (ev=set)")
     log_info(
