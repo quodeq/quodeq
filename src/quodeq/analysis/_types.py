@@ -47,11 +47,21 @@ class AnalysisOptions:
 
 @dataclass
 class RunConfig:
-    """Configuration for a single evaluation run."""
+    """Configuration for a single evaluation run.
+
+    ``run_dir`` is the per-run directory (``<reports>/<project>/<run_id>/``)
+    and is the canonical anchor for run-level metadata: ``status.json``,
+    ``dimensions.json``, ``run.log``, etc. ``work_dir`` is the per-run
+    *evidence* subdir (typically ``<run_dir>/evidence/``), where per-dim
+    JSONLs and the dispatch-keys sidecar live. The two are distinct and
+    must not be confused -- the lifecycle context writes to ``run_dir``
+    while the dispatcher writes to ``work_dir``.
+    """
     src: Path
     language: str
     standards_dir: Path | None = None
     work_dir: Path | None = None
+    run_dir: Path | None = None
     options: AnalysisOptions = field(default_factory=AnalysisOptions)
     manifest: SourceManifest | None = None
     dimensions_data: DimensionsConfig | None = None

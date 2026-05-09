@@ -47,22 +47,30 @@ def _safe_write_dim_state(
 
 
 def _run_dir_for(config: RunConfig) -> Path | None:
-    """Resolve the run directory for dim-state writes.
+    """Resolve the run directory for ``dimensions.json`` writes.
 
-    Only accepts a real ``Path`` or ``str`` candidate. Mocked configs
-    (whose ``work_dir`` / ``src`` are ``MagicMock`` instances) return
-    ``None`` so tests don't create stray ``<MagicMock id=...>``
-    directories in the CWD when they exercise the dim loops.
+    Returns ``config.run_dir`` when set -- the canonical anchor populated by
+    the CLI/API entry point. The lifecycle context seeds ``dimensions.json``
+    at this same path, so loop transitions and lifecycle seed agree.
+
+    Falls back to ``work_dir`` / ``src`` for tests and any caller that
+    hasn't been migrated to populate ``run_dir``. Backward-compat: in pre-
+    fix code paths, ``work_dir`` was the evidence subdir, which caused the
+    loop to write a parallel ``dimensions.json`` the API never read. New
+    callers should always populate ``run_dir`` explicitly.
+
+    Only accepts a real ``Path`` or ``str``. Mocked configs (whose fields
+    are ``MagicMock`` instances) return ``None`` so tests don't create
+    stray ``<MagicMock id=...>`` directories in the CWD.
     """
-    work_dir = getattr(config, "work_dir", None)
-    src = getattr(config, "src", None)
-    candidate = work_dir if work_dir is not None else src
-    if not isinstance(candidate, (str, Path)):
-        return None
-    try:
-        return Path(candidate)
-    except (TypeError, ValueError):
-        return None
+    for attr in ("run_dir", "work_dir", "src"):
+        candidate = getattr(config, attr, None)
+        if isinstance(candidate, (str, Path)):
+            try:
+                return Path(candidate)
+            except (TypeError, ValueError):
+                continue
+    return None
 
 
 def _interruption_reason(exc: BaseException | None = None) -> str:

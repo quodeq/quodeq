@@ -192,7 +192,7 @@ def _save_manifest(manifest, evidence_dir: Path) -> None:
             _logger.debug("Could not write manifest: %s", exc)
 
 
-def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evidence_dir: Path, env: dict[str, str] | None = None) -> RunConfig:
+def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evidence_dir: Path, run_dir: Path | None = None, env: dict[str, str] | None = None) -> RunConfig:
     """Assemble a RunConfig from CLI args and resolved inputs."""
     _env = env or os.environ
     standards_dir = default_paths().standards_dir
@@ -221,6 +221,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
         language=inputs.language,
         standards_dir=standards_dir if standards_dir.exists() else None,
         work_dir=evidence_dir,
+        run_dir=run_dir,
         manifest=inputs.manifest,
         dimensions_data=inputs.dims_data,
         evaluators_dir=default_paths().evaluators_dir,
@@ -262,7 +263,7 @@ def _run_pipeline_with_cleanup(
     except OSError:
         pass  # non-fatal; cancel-by-filesystem just won't work for this run
 
-    config = _build_run_config(args, inputs=inputs, evidence_dir=evidence_dir)
+    config = _build_run_config(args, inputs=inputs, evidence_dir=evidence_dir, run_dir=run_dir)
 
     # Install a per-run log handler so every log_info lands in run.log.
     from quodeq.shared.run_log import RunLogHandler, RunLogWriter

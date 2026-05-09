@@ -178,3 +178,93 @@ class TestIncrementalLoopTransitions:
         entry = read_dimensions(tmp_path)["dimensions"]["security"]
         assert entry["state"] == "incomplete"
         assert entry["reason"] == "failed_exception"
+
+
+# ============================================================
+# Run-dir resolution -- regression for dual-writer bug
+# ============================================================
+#
+# Background: in production, RunLifecycleContext seeds dimensions.json at
+# <run_dir>/dimensions.json. The analysis loop then writes state transitions
+# to the SAME file. Pre-fix, the loop derived its target path from
+# config.work_dir (which is <run_dir>/evidence/), producing TWO competing
+# dimensions.json files -- the lifecycle's stayed at PENDING, the loop's
+# advanced. The API read the lifecycle's, so dimStates was always wrong.
+# These tests pin: when run_dir is set, the loop writes there, and the
+# lifecycle and loop agree on the file.
+
+
+class TestRunDirResolution:
+    def test_loop_writes_to_run_dir_when_set(self, tmp_path: Path):
+        from quodeq.analysis._loops import _run_dir_for
+
+        run_dir = tmp_path / "run"
+        evidence_dir = run_dir / "evidence"
+        run_dir.mkdir()
+        evidence_dir.mkdir()
+
+        config = MagicMock()
+        config.run_dir = run_dir
+        config.work_dir = evidence_dir
+        config.src = tmp_path / "src"
+        assert _run_dir_for(config) == run_dir
+
+    def test_falls_back_to_work_dir_when_run_dir_absent(self, tmp_path: Path):
+        """Backward-compat for callers that haven't been migrated."""
+        from quodeq.analysis._loops import _run_dir_for
+
+        config = MagicMock()
+        config.run_dir = None
+        config.work_dir = tmp_path / "work"
+        config.src = tmp_path / "src"
+        assert _run_dir_for(config) == tmp_path / "work"
+
+    def test_falls_back_to_src_when_neither_set(self, tmp_path: Path):
+        from quodeq.analysis._loops import _run_dir_for
+
+        config = MagicMock()
+        config.run_dir = None
+        config.work_dir = None
+        config.src = tmp_path / "src"
+        assert _run_dir_for(config) == tmp_path / "src"
+
+    def test_loop_state_lands_where_lifecycle_seeds(self, tmp_path: Path):
+        """End-to-end: lifecycle seeds + loop transitions write to ONE file."""
+        from quodeq.shared.run_lifecycle import RunLifecycleContext
+        from quodeq.shared.dimensions_state import DimState, read_dimensions
+
+        run_dir = tmp_path / "run"
+        evidence_dir = run_dir / "evidence"
+        run_dir.mkdir()
+        evidence_dir.mkdir()
+
+        config = MagicMock()
+        config.run_dir = run_dir
+        config.work_dir = evidence_dir
+        config.src = run_dir
+        config.options.deadline_at = None
+        config.options.incremental_file_filter = None
+        config.options.skip_scoring = True
+        config.options.incremental = False
+        config.source_file_count = 1
+
+        with RunLifecycleContext(run_dir, "ext-test", ["security"]):
+            # Seed wrote PENDING to <run_dir>/dimensions.json.
+            seed = read_dimensions(run_dir)["dimensions"]["security"]["state"]
+            assert seed == "pending"
+
+            # Now drive the loop -- transition to DONE.
+            ev = MagicMock()
+            ctx = MagicMock(total=1)
+            run_per_dimension_loop(
+                config, ["security"], ctx,
+                process_fn=MagicMock(return_value=ev),
+            )
+
+        # The loop's DONE write hit the SAME file the lifecycle seeded.
+        # Pre-fix: the loop wrote to <evidence_dir>/dimensions.json and the
+        # outer file stayed at "pending".
+        assert read_dimensions(run_dir)["dimensions"]["security"]["state"] == "done"
+        assert not (evidence_dir / "dimensions.json").exists(), (
+            "loop should not write a parallel dimensions.json in evidence/"
+        )
