@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from quodeq.analysis._types import RunConfig
-from quodeq.analysis.fingerprint import build_fingerprint, find_previous_fingerprint, save_fingerprint
+from quodeq.analysis.fingerprint import find_previous_fingerprint
 from quodeq.analysis.subagents._finding_classifier import classify_findings
 from quodeq.analysis.subagents.verify import (
     partition_findings_by_fingerprint, write_carry_forward_findings,
@@ -104,17 +104,9 @@ def _prepare_findings_and_queue(
     queue_path = dc.evidence_dir / f"{dc.dim_id}_queue.json"
     files_per_agent = _compute_files_per_agent(len(dc.files))
     FileQueue(queue_path, dc.files, max_files_per_agent=files_per_agent)
-    # Persist a fingerprint *now* — before any agent runs — so a crash or
-    # cancel mid-dim doesn't void the file_hashes / standards baseline.
-    # `analyzed_files` carries forward whatever the previous run analyzed
-    # (it'll be augmented by queue.taken on read in find_previous_fingerprint).
-    prev_fp_for_seed, _ = find_previous_fingerprint(dc.evidence_dir, dc.dim_id)
-    seed_analyzed = set(prev_fp_for_seed.get("analyzed_files", [])) if prev_fp_for_seed else set()
-    initial_fp = build_fingerprint(
-        config.src, dc.files, dc.dim_id, config.standards_dir,
-        analyzed_files=seed_analyzed or None,
-    )
-    save_fingerprint(initial_fp, dc.evidence_dir)
+    # V1's per-dimension fingerprint write is gone (B6.2). The V2 cache
+    # owns crash-safe state via per-file entries written by
+    # ``persist_dispatch_results`` (and the periodic-persist watcher).
     log_info(f"  [{dc.idx}/{dc.ctx.total}] {dc.dim_id} -- {len(dc.files)} files queued, {len(inline_findings)} inline findings")
 
     return _PoolExecutionParams(
@@ -135,15 +127,8 @@ def _execute_pool_and_collect(
     )
     pool, results = _launch_pool(config, dc.dim_id, params)
 
-    # Record what the queue actually dispatched. Without this, the saved
-    # fingerprint has analyzed_files=[], which combined with up-to-date
-    # file_hashes makes the next run's change detection skip everything.
-    queue_taken = set(FileQueue(pool_params.queue_path).all_taken_files())
-    fp = build_fingerprint(
-        config.src, dc.files, dc.dim_id, config.standards_dir,
-        analyzed_files=queue_taken or None,
-    )
-    save_fingerprint(fp, dc.evidence_dir)
+    # V2 owns post-dispatch state via per-file cache entries; the V1
+    # post-pool fingerprint write is no longer needed (B6.2).
 
     if pool_params.mini_verify_findings:
         verify_results = _dispatch_mini_verify(config, dc.dim_id, dc.evidence_dir, pool_params.mini_verify_findings)
