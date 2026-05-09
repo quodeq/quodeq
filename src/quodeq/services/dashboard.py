@@ -150,6 +150,38 @@ def _make_run_dimension_fetcher(
     )
 
 
+def _make_status_aware_fetcher(
+    reports_root: Path,
+    project: str,
+    runs: list[RunInfo],
+    cache: OrderedDict[tuple, list[DimensionResult]] | None = None,
+    lock: threading.Lock | None = None,
+    max_size: int | None = None,
+) -> Callable[[str], list[DimensionResult]]:
+    """Return a fetcher that bypasses the LRU cache for in_progress runs.
+
+    The shared cache is correct for terminal runs ("runs are immutable once
+    finalized" -- see _SHARED_RUN_DIM_CACHE comment) but WRONG for in_progress
+    runs whose ``evaluation/<dim>.json`` set grows as dims finish mid-run.
+    Without this bypass, the History page renders the partial dim set from
+    the first read forever, never picking up new dims that complete later.
+
+    Cancelled and failed runs go through the cache normally -- they're
+    terminal too. Only ``in_progress`` is treated as mutable.
+    """
+    cached = _make_run_dimension_fetcher(
+        reports_root, project, cache=cache, lock=lock, max_size=max_size,
+    )
+    status_by_id = {r.run_id: r.status for r in runs}
+
+    def fetch(run_id: str) -> list[DimensionResult]:
+        if status_by_id.get(run_id) == "in_progress":
+            return read_run_data(reports_root, project, run_id)
+        return cached(run_id)
+
+    return fetch
+
+
 @dataclass
 class _DashboardPayload:
     """Pre-computed parts for the dashboard response."""
@@ -264,8 +296,13 @@ def _compute_dashboard_payload(
     else:
         history_runs = scoreable_runs[:max(max_history, selected_in_scoreable + 1)]
         history_index = selected_in_scoreable
-    get_run_dimensions = _make_run_dimension_fetcher(
-        reports_root, project, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
+    # Status-aware fetcher: bypass cache for in_progress runs whose on-disk
+    # evaluation/*.json set grows as dims finish mid-run. Without this,
+    # the History page renders the partial dim set from the first read
+    # forever -- new dims that complete later never surface.
+    get_run_dimensions = _make_status_aware_fetcher(
+        reports_root, project, history_runs,
+        cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
     )
     previous_by_dimension = _collect_previous_scores(
         history_runs, history_index, selected_dim_names, get_run_dimensions,
