@@ -21,6 +21,7 @@ state and the dispatcher call recorder.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -359,3 +360,91 @@ class TestWiring:
             _process_single_dimension(config, "security", 1, _make_ctx(), emit_log=False)
 
         assert called["hit"] is True
+
+
+# ============================================================
+# Circuit breaker (Slice 5)
+# ============================================================
+
+
+class TestCircuitBreakerWiring:
+    def test_breaker_trips_and_raises(self, tmp_path: Path, cache, monkeypatch):
+        """Threshold=2 + dispatcher emits 2 error markers => CircuitBreakerError."""
+        from quodeq.analysis.cache._failure_streak import CircuitBreakerError
+        from quodeq.shared import cancellation
+        cancellation.reset()
+
+        config, src = _setup(tmp_path, {"a.py": "x", "b.py": "y", "c.py": "z"})
+        config = replace(config, options=replace(config.options, failure_streak_threshold=2))
+
+        evidence_dir = config.work_dir or config.src
+
+        def err_dispatcher(config, dim_id, idx, ctx, callbacks):
+            jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
+            jsonl.parent.mkdir(parents=True, exist_ok=True)
+            with jsonl.open("a") as out:
+                out.write(json.dumps({
+                    "_marker": "file_done", "file": "a.py",
+                    "status": "error", "reason": "token_limit",
+                }) + "\n")
+                out.write(json.dumps({
+                    "_marker": "file_done", "file": "b.py",
+                    "status": "error", "reason": "token_limit",
+                }) + "\n")
+            # Give the watcher's poll loop time to read both errors and trip.
+            import time as _time
+            _time.sleep(1.0)
+            return _make_dummy_evidence(files_read=2)
+
+        try:
+            with patch(
+                "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+                new=err_dispatcher,
+            ):
+                with pytest.raises(CircuitBreakerError) as excinfo:
+                    process_dimension_with_cache(
+                        config, "security", idx=1, ctx=_make_ctx(),
+                        callbacks=_make_callbacks(), cache=cache,
+                    )
+            assert excinfo.value.reason == "circuit_breaker"
+            assert cancellation.is_cancelled()
+        finally:
+            cancellation.reset()
+
+    def test_breaker_disabled_when_threshold_zero(
+        self, tmp_path: Path, cache, monkeypatch,
+    ):
+        """threshold=0 disables the breaker even with many error markers."""
+        from quodeq.shared import cancellation
+        cancellation.reset()
+
+        config, src = _setup(tmp_path, {"a.py": "x"})
+        config = replace(config, options=replace(config.options, failure_streak_threshold=0))
+
+        evidence_dir = config.work_dir or config.src
+
+        def err_dispatcher(config, dim_id, idx, ctx, callbacks):
+            jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
+            jsonl.parent.mkdir(parents=True, exist_ok=True)
+            with jsonl.open("a") as out:
+                for i in range(10):
+                    out.write(json.dumps({
+                        "_marker": "file_done", "file": f"f{i}.py",
+                        "status": "error",
+                    }) + "\n")
+            return _make_dummy_evidence(files_read=10)
+
+        try:
+            with patch(
+                "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+                new=err_dispatcher,
+            ):
+                # Should NOT raise CircuitBreakerError.
+                ev = process_dimension_with_cache(
+                    config, "security", idx=1, ctx=_make_ctx(),
+                    callbacks=_make_callbacks(), cache=cache,
+                )
+            assert ev is not None
+            assert not cancellation.is_cancelled()
+        finally:
+            cancellation.reset()

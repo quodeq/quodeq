@@ -65,7 +65,17 @@ def _run_dir_for(config: RunConfig) -> Path | None:
         return None
 
 
-def _interruption_reason() -> str:
+def _interruption_reason(exc: BaseException | None = None) -> str:
+    """Map a process state and optional exception to a dim-state reason.
+
+    - Circuit-breaker trip: returns 'circuit_breaker' (recognised so the
+      lifecycle exit handler can map to exit_reason=failure_streak).
+    - Cancellation flag set (signal or breaker-via-flag): 'cancelled_signal'.
+    - Otherwise: 'failed_exception'.
+    """
+    from quodeq.analysis.cache._failure_streak import CircuitBreakerError
+    if isinstance(exc, CircuitBreakerError):
+        return "circuit_breaker"
     return "cancelled_signal" if cancellation.is_cancelled() else "failed_exception"
 
 
@@ -141,20 +151,27 @@ def run_incremental_loop(
         emit_marker("analyzing", dimension=dimension)
         log_info(f"-> [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
         ev: Evidence | None = None
+        last_exc: BaseException | None = None
         try:
             ev = run_dimension_incremental(config, dimension, idx, ctx)
-        except BrokenPipeError:
+        except BrokenPipeError as exc:
             _silence_broken_stdout()
+            last_exc = exc
             ev = None
         except (OSError, KeyError, ValueError, RuntimeError) as exc:
             log_warning(f"[{idx}/{ctx.total}] {dimension} - incremental failed: {exc}, falling back to full")
+            last_exc = exc
             fallback_options = copy(config.options)
             fallback_options.incremental_file_filter = None
             fallback_config = replace(config, options=fallback_options)
             try:
                 ev = process_fn(fallback_config, dimension, idx, ctx)
-            except BrokenPipeError:
+            except BrokenPipeError as inner_exc:
                 _silence_broken_stdout()
+                last_exc = inner_exc
+                ev = None
+            except Exception as inner_exc:  # noqa: BLE001
+                last_exc = inner_exc
                 ev = None
         except Exception as exc:  # noqa: BLE001
             # Loop-level diagnostic: an unanticipated exception class would
@@ -166,6 +183,7 @@ def run_incremental_loop(
                 f"[loop] {dimension} - unexpected exception "
                 f"{type(exc).__name__}: {exc} - skipping dim, continuing loop",
             )
+            last_exc = exc
             ev = None
         # log_result_fn / on_dimension_done are caller-provided (e.g., the
         # dashboard's scoring callback). Wrap them too - an exception in a
@@ -207,7 +225,7 @@ def run_incremental_loop(
                 )
                 result.setdefault(dimension, ev)
         else:
-            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason())
+            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason(last_exc))
         log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (ev={'set' if ev else 'None'})")
     log_info(
         f"[loop] incremental finished: processed {len(result)} of {len(dimensions)} dim(s) "
@@ -250,16 +268,16 @@ def run_per_dimension_loop(
         ev: Evidence | None = None
         try:
             ev = process_fn(config, dimension, idx, ctx)
-        except BrokenPipeError:
+        except BrokenPipeError as exc:
             _silence_broken_stdout()
             skipped_count += 1
-            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason())
+            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason(exc))
             log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: broken pipe)")
             continue
         except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
             log_warning(f"[{idx}/{ctx.total}] {dimension} - failed: {exc}")
             skipped_count += 1
-            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason())
+            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason(exc))
             log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: {type(exc).__name__})")
             continue
         except Exception as exc:  # noqa: BLE001
@@ -270,7 +288,7 @@ def run_per_dimension_loop(
                 f"{type(exc).__name__}: {exc} - skipping dim, continuing loop",
             )
             skipped_count += 1
-            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason())
+            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason(exc))
             log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: unexpected)")
             continue
         if ev is None:

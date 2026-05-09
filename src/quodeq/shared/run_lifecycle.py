@@ -115,6 +115,12 @@ class RunLifecycleContext:
                 if self._current_state != RunState.FINALIZING:
                     self._transition(RunState.FINALIZING)
                 self._transition(RunState.DONE)
+        elif self._is_circuit_breaker_error(exc_type):
+            # Circuit breaker tripped — auto-protection, not user cancel.
+            # Distinct exit_reason makes the History entry distinguishable
+            # from regular failures so the UI can surface it differently.
+            if self._current_state not in TERMINAL_STATES:
+                self._transition(RunState.FAILED, exit_reason="failure_streak")
         else:
             # Any other exception → failed.
             if self._current_state not in TERMINAL_STATES:
@@ -167,6 +173,21 @@ class RunLifecycleContext:
                 write_dim_state(self._run_dir, dim, DimState.PENDING)
             except Exception as exc:  # noqa: BLE001
                 _logger.warning("failed to seed dim state for %s: %s", dim, exc)
+
+    @staticmethod
+    def _is_circuit_breaker_error(exc_type: type[BaseException] | None) -> bool:
+        """Detect CircuitBreakerError without a hard import dependency.
+
+        Lifecycle is a shared/low-level module; importing from analysis.cache
+        would invert the dependency graph. Class-name match is enough since
+        we control both ends.
+        """
+        if exc_type is None:
+            return False
+        for cls in exc_type.__mro__:
+            if cls.__name__ == "CircuitBreakerError":
+                return True
+        return False
 
     def _install_signal_handlers(self) -> None:
         def _handle(signum: int, frame: Any) -> None:
