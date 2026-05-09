@@ -44,3 +44,22 @@ GET_NEXT_FILES_SCHEMA = {
         },
     },
 }
+
+MARK_FILE_DONE_NAME = "mark_file_done"
+MARK_FILE_DONE_DESC = (
+    "Call this exactly once after you have finished analysing a file, "
+    "successfully or not. Pass status='ok' if you analysed the file end-to-end "
+    "(even if there were no findings). Pass status='error' if you abandoned the file "
+    "(token limit, parse error, retry budget exhausted). The server uses this to "
+    "decide which files are safe to cache as 'done'; without it the file will be "
+    "re-analysed on the next run."
+)
+MARK_FILE_DONE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "file": {"type": "string", "description": "Repo-relative file path that was just analysed"},
+        "status": {"type": "string", "enum": ["ok", "error"], "description": "ok if analysis completed, error if abandoned"},
+        "reason": {"type": "string", "description": "Short stable code when status=error: token_limit | parse_error | retry_exhausted | subprocess_error | timeout"},
+    },
+    "required": ["file", "status"],
+}
