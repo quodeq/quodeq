@@ -6,12 +6,20 @@ const addEntryTitle = (v) => ({ ...v, _entryTitle: v.principle || 'Violation' })
 /**
  * Build a copy-friendly plan text summarising violations for a single file.
  * @param {{ file: string, violationsBySeverity: Object }} file - File object with violation data.
+ * @param {string} [severityFilter] - Optional severity to filter by ('all', 'critical', 'major', 'minor', 'compliance').
  * @returns {string} Formatted plan text.
  */
-export function buildFilePlanText(file) {
+export function buildFilePlanText(file, severityFilter) {
+  if (severityFilter === 'compliance') {
+    return '_No violations match the current filter._';
+  }
   const allViolations = [];
   const violationsBySeverity = {};
   for (const sev of SEVERITY_ORDER) {
+    if (severityFilter && severityFilter !== 'all' && severityFilter !== sev) {
+      violationsBySeverity[sev] = [];
+      continue;
+    }
     const mapped = (file.violationsBySeverity?.[sev] || []).map(addEntryTitle);
     violationsBySeverity[sev] = mapped;
     allViolations.push(...mapped);
