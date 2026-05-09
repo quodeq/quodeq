@@ -130,28 +130,42 @@ def classify_files_via_cache(
     )
 
 
-def _group_findings_by_file(jsonl_path: Path) -> dict[str, list[dict]]:
-    """Read a JSONL of findings and group lines by their ``file`` field."""
+def _group_findings_by_file(jsonl_path: Path) -> tuple[dict[str, list[dict]], set[str]]:
+    """Read a JSONL of findings + markers and return (grouped_findings, ok_files).
+
+    Marker lines are recognised by the ``_marker`` key and excluded from the
+    grouped findings. ``ok_files`` contains the set of files whose *most
+    recent* file_done marker has status='ok'. Files whose latest marker is
+    'error' (or have no marker at all) are not in the set.
+    """
     grouped: dict[str, list[dict]] = {}
+    last_status: dict[str, str] = {}
     if not jsonl_path.is_file():
-        return grouped
+        return grouped, set()
     try:
         text = jsonl_path.read_text(encoding="utf-8")
     except OSError as exc:
         _logger.warning("failed to read JSONL %s: %s", jsonl_path, exc)
-        return grouped
-    for line in text.splitlines():
-        line = line.strip()
-        if not line:
+        return grouped, set()
+    for raw in text.splitlines():
+        raw = raw.strip()
+        if not raw:
             continue
         try:
-            entry = json.loads(line)
+            entry = json.loads(raw)
         except json.JSONDecodeError:
+            continue
+        if entry.get("_marker") == "file_done":
+            f = entry.get("file")
+            status = entry.get("status")
+            if isinstance(f, str) and status in ("ok", "error"):
+                last_status[f] = status
             continue
         f = entry.get("file")
         if isinstance(f, str) and f:
             grouped.setdefault(f, []).append(entry)
-    return grouped
+    ok_files = {f for f, s in last_status.items() if s == "ok"}
+    return grouped, ok_files
 
 
 def persist_dispatch_results(
