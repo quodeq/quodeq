@@ -210,6 +210,7 @@ test("buildPrincipleReport with severityFilter='critical' shows only critical, n
 test("buildPrincipleReport with severityFilter='compliance' omits violations and shows compliance", () => {
   const md = buildPrincipleReport({ ...principleFixture, severityFilter: 'compliance' });
   assert.match(md, /## Violations \(0\)/);
+  assert.match(md, /No violations found\./);
   assert.match(md, /## Compliance Summary \(1\)/);
 });
 

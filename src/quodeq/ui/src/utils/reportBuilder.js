@@ -294,20 +294,19 @@ export function buildPrincipleReport({ principle, dimension, score, grade, viola
     lines.push('');
   }
 
+  const showViolations = !severityFilter || severityFilter === 'all' || severityFilter !== 'compliance';
   const showCompliance = !severityFilter || severityFilter === 'all' || severityFilter === 'compliance';
-  const showViolationEntries = severityFilter !== 'compliance';
 
-  const filteredViolations = (severityFilter && severityFilter !== 'all' && severityFilter !== 'compliance')
+  const filteredViolations = (showViolations && severityFilter && severityFilter !== 'all')
     ? rawViolations.filter((v) => (v.severity || 'minor').toLowerCase() === severityFilter)
-    : rawViolations;
+    : (showViolations ? rawViolations : []);
   const bySeverity = (violationsBySeverity && (!severityFilter || severityFilter === 'all'))
     ? violationsBySeverity
     : groupBySeverity(filteredViolations);
 
-  const visibleCount = showViolationEntries ? filteredViolations.length : 0;
-  lines.push(`## Violations (${visibleCount})`);
+  lines.push(`## Violations (${filteredViolations.length})`);
   lines.push('');
-  if (visibleCount === 0) {
+  if (filteredViolations.length === 0) {
     lines.push('No violations found.');
     lines.push('');
   } else {
