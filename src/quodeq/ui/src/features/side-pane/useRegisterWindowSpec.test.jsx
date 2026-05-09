@@ -164,4 +164,39 @@ describe('useRegisterWindowSpec', () => {
     fireEvent.click(screen.getByTestId('bump'));
     expect(screen.getByTestId('dock-body')).toHaveTextContent('empty');
   });
+
+  it('re-registering the same spec reference does not trigger a render cascade', () => {
+    let renderCount = 0;
+    function CountingPage({ spec }) {
+      useRegisterWindowSpec('report', spec);
+      renderCount += 1;
+      return null;
+    }
+    function Harness() {
+      const spec = useMemo(
+        () => ({ id: 'r1', type: 'report', title: 'v1', render: () => <p>body</p> }),
+        [],
+      );
+      const { addWindow } = useSidePane();
+      return (
+        <>
+          <CountingPage spec={spec} />
+          <button data-testid="open" onClick={() => addWindow(spec)}>open</button>
+        </>
+      );
+    }
+    render(
+      <SidePaneProvider>
+        <Harness />
+      </SidePaneProvider>,
+    );
+    const before = renderCount;
+    fireEvent.click(screen.getByTestId('open'));
+    const after = renderCount;
+    // Opening the window should cause at most one extra render of the page
+    // (the windows state changes once). If replaceWindow does not short-
+    // circuit on identity, this triggers an unbounded cascade and the diff
+    // will be much larger.
+    expect(after - before).toBeLessThanOrEqual(2);
+  });
 });

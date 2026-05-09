@@ -105,6 +105,7 @@ export function SidePaneProvider({ children }) {
     setWindows((prev) => {
       const idx = prev.findIndex((w) => w.id === spec.id);
       if (idx === -1) return prev;
+      if (prev[idx] === spec) return prev;
       const next = prev.slice();
       next[idx] = spec;
       return next;
