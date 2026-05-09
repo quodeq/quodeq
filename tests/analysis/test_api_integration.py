@@ -78,12 +78,12 @@ class TestApiIntegration:
             )
 
         assert jsonl_file.exists()
-        lines = jsonl_file.read_text().strip().split("\n")
-        assert len(lines) == 1
-        finding = json.loads(lines[0])
-        assert finding["req"] == "S-CON-3"
-        assert finding["t"] == "violation"
-        assert finding["severity"] == "critical"
+        all_lines = [json.loads(ln) for ln in jsonl_file.read_text().splitlines() if ln.strip()]
+        findings = [ln for ln in all_lines if "_marker" not in ln]
+        assert len(findings) == 1
+        assert findings[0]["req"] == "S-CON-3"
+        assert findings[0]["t"] == "violation"
+        assert findings[0]["severity"] == "critical"
         assert stream_file.exists()
 
     def test_full_flow_openai_compatible(self, source_repo, tmp_path):
@@ -117,7 +117,7 @@ class TestApiIntegration:
             )
 
         assert jsonl_file.exists()
-        lines = jsonl_file.read_text().strip().split("\n")
-        assert len(lines) == 1
-        finding = json.loads(lines[0])
-        assert finding["req"] == "S-CON-3"
+        all_lines = [json.loads(ln) for ln in jsonl_file.read_text().splitlines() if ln.strip()]
+        findings = [ln for ln in all_lines if "_marker" not in ln]
+        assert len(findings) == 1
+        assert findings[0]["req"] == "S-CON-3"

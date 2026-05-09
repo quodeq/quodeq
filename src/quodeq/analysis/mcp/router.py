@@ -194,12 +194,30 @@ def _default_read_file(path: Path) -> str:
 
 
 class FindingsRouter:
-    """Deduplicates and enriches findings before writing to JSONL.
+    """Canonical sink for per-dimension JSONL evidence.
 
-    - Dedup by (principle, file, line, type) -- skips duplicate findings
-    - Auto-fills principle name (p) and dimension (d) from req ID
-    - Enriches req_refs from compiled standards -- LLM doesn't need to pick refs
-    - Returns feedback to the LLM so it can move on from duplicates
+    Every provider path that writes ``<dim>_evidence.jsonl`` MUST go through
+    a router instance:
+
+    - **CLI/MCP path:** the agent calls ``report_finding`` and ``mark_file_done``
+      MCP tools; the dispatcher in ``mcp/handlers.py`` forwards each call to
+      this router via ``receive`` / ``mark_file_done``.
+    - **API/Instructor path:** ``analysis/_api_runner.py`` opens the JSONL,
+      constructs a router pointed at that file handle, and calls ``receive``
+      per finding plus ``mark_file_done`` per source file on a clean return.
+    - **Future paths:** any new provider integration uses this same surface.
+      Adding a path that bypasses the router is a regression because the V2
+      cache layer (``analysis/cache/dimension_helpers.py``) only persists
+      files with a ``mark_file_done: ok`` marker -- without one, every run
+      re-dispatches every file.
+
+    Beyond the marker contract, the router owns:
+    - Atomic per-line writes via ``_locked_write`` (concurrency-safe).
+    - Dedup by (principle, file, line, type) -- skips duplicate findings.
+    - Auto-fills principle name (``p``) and dimension (``d``) from the req ID.
+    - Enriches ``req_refs`` from compiled standards.
+    - Returns feedback strings to the LLM for the ``Duplicate`` / ``Recorded``
+      flow when called from the MCP handler.
     """
 
     def __init__(
