@@ -183,6 +183,19 @@ def process_dimension_with_cache(
     miss_options = replace(config.options, incremental_file_filter=set(classify.misses))
     miss_config = replace(config, options=miss_options)
 
+    # Pre-write cached findings to the JSONL BEFORE dispatch. Two reasons:
+    # (1) Ordering: carries (prior runs' findings) appear first in the JSONL,
+    #     fresh dispatch findings appear after. The final report reads
+    #     foundation-then-new instead of "new findings, oh by the way here
+    #     are the carries tacked on at the end."
+    # (2) Single dedup pass: the dispatcher's internal dedup at the end of
+    #     its evidence collector runs on the merged JSONL, so the user sees
+    #     ONE final "Deduplicated ...: N unique findings" log line. Pre-fix
+    #     the user saw two confusing counts -- "27 unique" (dispatch only)
+    #     followed by "55 unique" (after we appended cached findings).
+    if classify.cached_findings:
+        _write_findings(jsonl, classify.cached_findings, append=True)
+
     # Persist the per-file cache keys to a sidecar so the discard path can
     # locate this dim's V2 cache entries even after the process exits. Without
     # this, a user clicking "discard partial findings" can't wipe entries that
@@ -234,20 +247,19 @@ def process_dimension_with_cache(
         raise CircuitBreakerError("circuit_breaker")
 
     if miss_evidence is None:
-        # Dispatch returned None — final persist already ran via the
-        # watcher, so any partial completion is preserved.
+        # Dispatch returned None - final persist already ran via the
+        # watcher, so any partial completion is preserved. If we have
+        # cached findings already in the JSONL (pre-written above), parse
+        # them so the run still has SOMETHING to score; otherwise None.
+        if classify.cached_findings and jsonl.exists():
+            return parse_evidence_from_jsonl(
+                config, dim_id, ctx, jsonl, files_read=len(files),
+            )
         return None
 
-    # If there are also cache hits, merge them into the JSONL and
-    # re-parse so the returned Evidence reflects the full picture.
-    # Dedup handles overlap with anything earlier phases may have written.
-    if classify.cached_findings:
-        from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
-        _write_findings(jsonl, classify.cached_findings, append=True)
-        if jsonl.exists():
-            deduplicate_jsonl(jsonl)
-        return parse_evidence_from_jsonl(
-            config, dim_id, ctx, jsonl, files_read=len(files),
-        )
-
-    return miss_evidence
+    # Re-parse the JSONL so files_read reflects the total (hits + misses),
+    # not just len(misses) which is what the dispatcher's Evidence carries.
+    # The dispatcher already deduped on its way out, so no extra dedup here.
+    return parse_evidence_from_jsonl(
+        config, dim_id, ctx, jsonl, files_read=len(files),
+    )
