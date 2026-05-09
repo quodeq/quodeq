@@ -267,8 +267,8 @@ export function buildRunReport({ dashboard, runSummary, projectName }) {
   return lines.join('\n');
 }
 
-export function buildPrincipleReport({ principle, dimension, score, grade, violations, violationsBySeverity, compliance, principleData, runId, dateLabel }) {
-  const violationsList = violations || [];
+export function buildPrincipleReport({ principle, dimension, score, grade, violations, violationsBySeverity, compliance, principleData, runId, dateLabel, severityFilter }) {
+  const rawViolations = violations || [];
   const complianceList = (compliance || []).filter((c) => c.file || c.reason || c.snippet);
   const date = dateLabel || formatDate();
   const ridSuffix = runId ? ` · **Run:** ${runId.slice(0, 8)}` : '';
@@ -294,14 +294,25 @@ export function buildPrincipleReport({ principle, dimension, score, grade, viola
     lines.push('');
   }
 
-  const bySeverity = violationsBySeverity || groupBySeverity(violationsList);
-  lines.push(`## Violations (${violationsList.length})`);
+  const showCompliance = !severityFilter || severityFilter === 'all' || severityFilter === 'compliance';
+  const showViolationEntries = severityFilter !== 'compliance';
+
+  const filteredViolations = (severityFilter && severityFilter !== 'all' && severityFilter !== 'compliance')
+    ? rawViolations.filter((v) => (v.severity || 'minor').toLowerCase() === severityFilter)
+    : rawViolations;
+  const bySeverity = (violationsBySeverity && (!severityFilter || severityFilter === 'all'))
+    ? violationsBySeverity
+    : groupBySeverity(filteredViolations);
+
+  const visibleCount = showViolationEntries ? filteredViolations.length : 0;
+  lines.push(`## Violations (${visibleCount})`);
   lines.push('');
-  if (violationsList.length === 0) {
+  if (visibleCount === 0) {
     lines.push('No violations found.');
     lines.push('');
   } else {
     for (const sev of SEVERITY_ORDER) {
+      if (severityFilter && severityFilter !== 'all' && severityFilter !== sev) continue;
       const vs = bySeverity[sev] || [];
       if (vs.length === 0) continue;
       lines.push(`### ${sev.charAt(0).toUpperCase() + sev.slice(1)} (${vs.length})`);
@@ -310,7 +321,9 @@ export function buildPrincipleReport({ principle, dimension, score, grade, viola
     }
   }
 
-  lines.push(...buildComplianceSection(complianceList));
+  if (showCompliance) {
+    lines.push(...buildComplianceSection(complianceList));
+  }
 
   return lines.join('\n');
 }

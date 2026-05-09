@@ -177,6 +177,48 @@ test('buildPrincipleReport with no violations shows "No violations found"', () =
   assert.match(md, /No violations found\./);
 });
 
+const principleFixture = {
+  principle: 'SRP',
+  dimension: 'maintainability',
+  score: '7.5/10',
+  grade: 'B',
+  violations: [
+    { severity: 'critical', principle: 'SRP', title: 'P-Crit', reason: 'reason-c', file: 'a.js' },
+    { severity: 'major',    principle: 'SRP', title: 'P-Maj',  reason: 'reason-m', file: 'b.js' },
+    { severity: 'minor',    principle: 'SRP', title: 'P-Min',  reason: 'reason-n', file: 'c.js' },
+  ],
+  compliance: [{ principle: 'SRP', file: 'd.js', reason: 'ok' }],
+};
+
+test('buildPrincipleReport with no severityFilter renders all severities and compliance', () => {
+  const md = buildPrincipleReport(principleFixture);
+  assert.match(md, /P-Crit/);
+  assert.match(md, /P-Maj/);
+  assert.match(md, /P-Min/);
+  assert.match(md, /## Compliance Summary/);
+});
+
+test("buildPrincipleReport with severityFilter='critical' shows only critical, no compliance", () => {
+  const md = buildPrincipleReport({ ...principleFixture, severityFilter: 'critical' });
+  assert.match(md, /P-Crit/);
+  assert.doesNotMatch(md, /P-Maj/);
+  assert.doesNotMatch(md, /P-Min/);
+  assert.doesNotMatch(md, /## Compliance Summary/);
+  assert.match(md, /## Violations \(1\)/);
+});
+
+test("buildPrincipleReport with severityFilter='compliance' omits violations and shows compliance", () => {
+  const md = buildPrincipleReport({ ...principleFixture, severityFilter: 'compliance' });
+  assert.match(md, /## Violations \(0\)/);
+  assert.match(md, /## Compliance Summary \(1\)/);
+});
+
+test("buildPrincipleReport with severityFilter='all' equals no filter", () => {
+  const filtered = buildPrincipleReport({ ...principleFixture, severityFilter: 'all' });
+  const unfiltered = buildPrincipleReport(principleFixture);
+  assert.equal(filtered, unfiltered);
+});
+
 test('existing buildOverviewReport and buildDimensionReport still produce output', () => {
   const acc = { summary: { numericAverage: 8.0, overallGrade: 'B', totalViolations: 3, totalCompliance: 1, severity: { critical: 1, major: 1, minor: 1 } } };
   const md1 = buildOverviewReport(acc, dimensions, 'MyApp');
