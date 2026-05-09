@@ -103,8 +103,6 @@ def is_trustable_run(status: str) -> bool:
     is real; just not promoted to the overview cards by default.
 
     Used by:
-      - ``find_previous_fingerprint`` — incremental classification can
-        reuse cancelled-run analyzed files for next-run salvage.
       - ``is_visible_in_history`` (composed predicate) for the broader
         existence check before the per-eval-file trustworthiness scan.
 
