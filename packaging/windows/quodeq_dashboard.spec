@@ -9,6 +9,7 @@ repo_root = Path(os.environ["QUODEQ_REPO_ROOT"])
 src_dir = repo_root / "src"
 pkg_mac = repo_root / "packaging" / "macos"
 pkg_win = repo_root / "packaging" / "windows"
+icons_dir = src_dir / "quodeq" / "data" / "icons"
 
 # ── Data files ──
 datas = []
@@ -25,14 +26,9 @@ defaults_json = src_dir / "quodeq" / "shared" / "defaults.json"
 if defaults_json.exists():
     datas.append((str(defaults_json), "quodeq/shared"))
 
-# Bundle icons so _icon_path() finds them in frozen mode
-icon_ico = pkg_win / "icon.ico"
-if icon_ico.exists():
-    datas.append((str(icon_ico), "packaging/windows"))
-
-icon_icns = pkg_mac / "icon.icns"
-if icon_icns.exists():
-    datas.append((str(icon_icns), "packaging/macos"))
+# Icons live in src/quodeq/data/icons/ (already bundled via data_dir above);
+# keep a local pointer for the EXE() icon= arg below.
+icon_ico = icons_dir / "icon.ico"
 
 # ── Analysis ──
 a = Analysis(
