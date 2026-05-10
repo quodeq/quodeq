@@ -63,7 +63,7 @@ if [ -z "$QUODEQ" ]; then
         # ranges. The release skill bumps this on every cut (see
         # .claude/skills/release/SKILL.md).
         # TODO: ship requirements.txt with hashes in the .app bundle.
-        python3 -m pip install --user --only-binary :all: --no-deps "quodeq==1.1.0" 2>&1
+        python3 -m pip install --user --only-binary :all: --no-deps "quodeq==1.1.1" 2>&1
     fi
     export PATH="$PATH:$(python3 -m site --user-base)/bin"
     QUODEQ=$(command -v quodeq 2>/dev/null)
