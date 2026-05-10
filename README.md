@@ -37,17 +37,17 @@ Every finding maps to a [CWE](https://cwe.mitre.org/) identifier. You get grades
 ## What It Finds
 
 ```
-CRITICAL  src/db.py:15        SQL Injection via string concatenation     CWE-89
-          query = f"SELECT * FROM users WHERE id = {user_id}"
+CRITICAL    src/db.py:15        SQL injection via string concatenation     CWE-89
+            query = f"SELECT * FROM users WHERE id = {user_id}"
 
-HIGH      src/auth.py:42      Hardcoded credentials in source code       CWE-798
-          credentials = {"user": "admin", "pass": "secret123"}
+MAJOR       src/auth.py:42      Hardcoded credentials in source code       CWE-798
+            credentials = {"user": "admin", "pass": "secret123"}
 
-MEDIUM    src/api.py:88       Missing rate limiting on login endpoint     CWE-307
-          @app.route("/login", methods=["POST"])
+MINOR       src/utils.py:23     Bare except clause hides errors            CWE-396
+            except: pass
 
-MINOR     src/utils.py:23     Bare except clause hides errors             CWE-396
-          except: pass
+COMPLIANCE  src/api.py:88       Parameterized query prevents injection
+            cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
 ```
 
 Each finding includes a reason, the offending code, and a fix plan. Results are stored as JSON on your machine.
