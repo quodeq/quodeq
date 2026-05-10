@@ -265,8 +265,22 @@ export function Violations() {
         <li><span className="severity-tag critical">CRITICAL</span> immediate security or reliability risk. Fix now.</li>
         <li><span className="severity-tag major">MAJOR</span> significant quality issue. Fix before the next release.</li>
         <li><span className="severity-tag minor">MINOR</span> improvement opportunity. Fix when convenient.</li>
-        <li><span className="severity-tag compliance">COMPLIANCE</span> not a violation: a file that follows the standard correctly. Lifts the score.</li>
+        <li><span className="severity-tag compliance">COMPLIANT</span> not a violation: code that follows the standard correctly. Lifts the score.</li>
       </ul>
+
+      <p>Each finding includes a file and line, a short reason, the offending code, and a CWE classification. Compliant findings cite the CWE the code is correctly defending against.</p>
+
+      <pre className="help-pre">{`CRITICAL    src/db.py:15        SQL injection via string concatenation     CWE-89
+            query = f"SELECT * FROM users WHERE id = {user_id}"
+
+MAJOR       src/auth.py:42      Hardcoded credentials in source code       CWE-798
+            credentials = {"user": "admin", "pass": "secret123"}
+
+MINOR       src/utils.py:23     Bare except clause hides errors            CWE-396
+            except: pass
+
+COMPLIANT   src/api.py:88       Parameterized query prevents injection     CWE-89
+            cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))`}</pre>
 
       <h3>Two views, one dataset</h3>
       <p>Use the view switcher at the top of the tab:</p>

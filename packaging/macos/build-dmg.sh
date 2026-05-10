@@ -38,7 +38,7 @@ export QUODEQ_REPO_ROOT="$REPO_ROOT"
 uv run --with pyinstaller --with rumps pyinstaller \
     --name QuodeqBar \
     --windowed \
-    --icon "$SCRIPT_DIR/icon.icns" \
+    --icon "$REPO_ROOT/src/quodeq/data/icons/icon.icns" \
     --osx-bundle-identifier com.quodeq.menubar \
     --distpath "$BUILD_DIR/dist" \
     --workpath "$BUILD_DIR/work" \
@@ -69,7 +69,7 @@ fi
     || /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
 
 # Copy icon to Resources
-cp "$SCRIPT_DIR/icon.icns" "$APP/Contents/Resources/icon.icns"
+cp "$REPO_ROOT/src/quodeq/data/icons/icon.icns" "$APP/Contents/Resources/icon.icns"
 
 echo "  Created $APP"
 
