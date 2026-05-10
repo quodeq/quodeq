@@ -59,15 +59,44 @@ function computeDeltas(rows) {
   });
 }
 
+// Shorter labels for the multi-dim summary so the row's dimensions cell
+// can fit the count and names instead of truncating after the first dim.
+// The full dim name is still visible after click-through.
+const _DIM_ABBREV = {
+  flexibility: 'flex',
+  maintainability: 'maint',
+  performance: 'perf',
+  reliability: 'rel',
+  security: 'sec',
+  usability: 'usab',
+};
+
+function _abbrevDim(name) {
+  if (!name) return name;
+  const lower = name.toLowerCase();
+  return _DIM_ABBREV[lower] || (lower.length > 5 ? lower.slice(0, 4) : lower);
+}
+
 function formatDimSummary(entry) {
   const dims = (entry?.dimensionDetails || []).filter((d) => d?.dimension);
   if (dims.length === 0) return '—';
-  const parts = dims.map((d) => {
+  // Single-dim runs: keep the full name -- it's compact enough.
+  if (dims.length === 1) {
+    const d = dims[0];
     const score = parseFloat(d.score);
     if (Number.isNaN(score)) return d.dimension.toLowerCase();
     return `${d.dimension.toLowerCase()} ${score.toFixed(1)}`;
+  }
+  // Multi-dim runs: lead with the count so even after truncation the user
+  // sees there are more dims. Use abbreviated names so all of them fit
+  // in the dimensions cell instead of getting truncated after the first.
+  const parts = dims.map((d) => {
+    const score = parseFloat(d.score);
+    const label = _abbrevDim(d.dimension);
+    if (Number.isNaN(score)) return label;
+    return `${label} ${score.toFixed(1)}`;
   });
-  return parts.join(', ');
+  return `${dims.length} dims · ${parts.join(', ')}`;
 }
 
 function DeltaText({ delta }) {
