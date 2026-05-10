@@ -9,6 +9,13 @@ vi.mock("../../../utils/confirmDialog.js", () => ({
   confirmDialog: vi.fn().mockResolvedValue({ ok: true, checked: false }),
 }));
 
+// chooseDialog renders a real DOM dialog and waits for a click; in jsdom
+// that never resolves and the mutation never fires. Auto-resolve to a
+// non-destructive choice so cancel-flow tests can drive cancelMutation.
+vi.mock("../../../utils/chooseDialog.js", () => ({
+  chooseDialog: vi.fn().mockResolvedValue("preserve"),
+}));
+
 const fakeApi = {
   getEvaluation: vi.fn(),
   startEvaluation: vi.fn(),
@@ -132,6 +139,41 @@ describe("useEvaluation", () => {
         aiModel: "llama3.1",
       }),
     );
+  });
+
+  it("cancelEvaluation invalidates project queries so History drops the cancelled run immediately", async () => {
+    // Regression: pre-fix, after cancel the History row stayed on the
+    // 'performing an evaluation...' placeholder until either polling
+    // ticked or (under SSE) the terminal-status event arrived. Mirrors
+    // startMutation's existing project-subtree invalidate.
+    const { QueryClient, QueryClientProvider } = await import("@tanstack/react-query");
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    fakeApi.startEvaluation.mockResolvedValue({
+      jobId: "j-cancel-1", status: "running", dimensions: [],
+    });
+    fakeApi.cancelEvaluation.mockResolvedValue({ ok: true });
+    function Wrapper({ children }) {
+      return (
+        <QueryClientProvider client={client}>
+          <ApiProvider value={fakeApi}>{children}</ApiProvider>
+        </QueryClientProvider>
+      );
+    }
+    const { result } = renderHook(() => useEvaluation(), { wrapper: Wrapper });
+    await act(async () => {
+      await result.current.startEvaluation({ repo: "x", dimensions: [] });
+    });
+    await waitFor(() => expect(result.current.job?.jobId).toBe("j-cancel-1"));
+    // Spy AFTER start so we only observe cancel's invalidations.
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    await act(async () => {
+      await result.current.cancelEvaluation();
+    });
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["project"] });
+    });
   });
 
   it("cancelEvaluation surfaces an error and clears the job when the API rejects", async () => {
