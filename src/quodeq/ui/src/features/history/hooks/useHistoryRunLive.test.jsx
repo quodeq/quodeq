@@ -2,24 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useHistoryRunLive } from './useHistoryRunLive.js';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
-
-class MockEventSource {
-  constructor(url) {
-    this.url = url;
-    this.listeners = {};
-    MockEventSource.last = this;
-  }
-  addEventListener(event, handler) {
-    if (!this.listeners[event]) this.listeners[event] = [];
-    this.listeners[event].push(handler);
-  }
-  close() { this.closed = true; }
-  emit(event, data) {
-    (this.listeners[event] || []).forEach((h) =>
-      h({ data: JSON.stringify(data), lastEventId: data?.id }),
-    );
-  }
-}
+import { MockEventSource } from '../../../test-utils/MockEventSource.js';
 
 describe('useHistoryRunLive', () => {
   beforeEach(() => {
