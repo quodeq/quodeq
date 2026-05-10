@@ -189,6 +189,12 @@ export function useEvaluation() {
       if (jobId) {
         queryClient.invalidateQueries({ queryKey: evaluationKeys.evaluation(jobId) });
       }
+      // Mirror startMutation: refresh the project subtree so History's
+      // availableRuns drops the cancelled run from the in-progress list
+      // immediately. Without this, the History row stays on the
+      // 'performing an evaluation...' placeholder until the next polling
+      // tick (or, under SSE, the terminal-status event from the stream).
+      queryClient.invalidateQueries({ queryKey: projectKeys.all() });
     },
     onError: (err) => {
       // The backend returns 409 when the job is no longer cancellable
