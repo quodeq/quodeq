@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.2] - 2026-05-10
+
+### Fixes
+- **Adequate vs Poor/Critical color in light theme**: the legend's Adequate band was indistinguishable from Poor/Critical in the daruma light theme. Tokens now give it its own hue.
+- **App icon ships in the wheel**: pipx and pip installs now find the bundled icon, so the desktop app launches with the correct icon instead of a default one.
+
+### Docs
+- **README example block**: the "What it finds" sample now uses Quodeq's actual severity labels (CRITICAL/MAJOR/MINOR/COMPLIANT) and the COMPLIANT row cites the CWE the code defends against.
+- **Help → Violations & Fix Plans**: added a worked example block under Severity levels that mirrors the README, and renamed COMPLIANCE to COMPLIANT to match the badge shown on finding cards.
+
 ## [1.1.1] - 2026-05-10
 
 ### Features
