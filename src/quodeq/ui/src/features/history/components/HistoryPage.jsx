@@ -13,6 +13,7 @@ import { TermHeader } from '../../../components/terminal/index.js';
 import EmptyState from '../../../components/EmptyState.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import FittedText from '../../../components/FittedText.jsx';
+import { abbrevDim } from '../utils/dimAbbrev.js';
 
 const TOAST_DISMISS_MS = 2600;
 const NOT_READY_MESSAGE = 'No standards fully evaluated yet. Try again once the first one finishes.';
@@ -59,23 +60,6 @@ function computeDeltas(rows) {
   });
 }
 
-// Shorter labels for the multi-dim summary so the row's dimensions cell
-// can fit the count and names instead of truncating after the first dim.
-// The full dim name is still visible after click-through.
-const _DIM_ABBREV = {
-  flexibility: 'flex',
-  maintainability: 'maint',
-  performance: 'perf',
-  reliability: 'rel',
-  security: 'sec',
-  usability: 'usab',
-};
-
-function _abbrevDim(name) {
-  if (!name) return name;
-  const lower = name.toLowerCase();
-  return _DIM_ABBREV[lower] || (lower.length > 5 ? lower.slice(0, 4) : lower);
-}
 
 function formatDimSummary(entry) {
   const dims = (entry?.dimensionDetails || []).filter((d) => d?.dimension);
@@ -92,7 +76,7 @@ function formatDimSummary(entry) {
   // in the dimensions cell instead of getting truncated after the first.
   const parts = dims.map((d) => {
     const score = parseFloat(d.score);
-    const label = _abbrevDim(d.dimension);
+    const label = abbrevDim(d.dimension);
     if (Number.isNaN(score)) return label;
     return `${label} ${score.toFixed(1)}`;
   });
