@@ -25,13 +25,15 @@ test('returns the poll interval when at least one run is in_progress', () => {
   assert.equal(pollIntervalForRuns(runs), IN_PROGRESS_POLL_MS);
 });
 
-test('IN_PROGRESS_POLL_MS is in the 10-30 second range', () => {
-  // Background-poll cadence: tight enough to flip the row within
-  // seconds of the umbrella run terminating, loose enough that a
-  // local server with one running scan barely notices. Polling is
-  // History-page-only, not global. If this constant moves outside
-  // the band, revisit the UX/perf tradeoff.
-  assert.ok(IN_PROGRESS_POLL_MS >= 10000 && IN_PROGRESS_POLL_MS <= 30000);
+test('IN_PROGRESS_POLL_MS is in the 3-15 second range', () => {
+  // Background-poll cadence: tight enough that a dim landing on disk
+  // shows up in the History row within a handful of seconds (live
+  // feel), loose enough that a local server with one running scan
+  // barely notices. Polling is History-page-only, not global. If this
+  // constant moves outside the band, revisit the UX/perf tradeoff -
+  // the proper next step is per-evaluation SSE so updates push instead
+  // of being polled.
+  assert.ok(IN_PROGRESS_POLL_MS >= 3000 && IN_PROGRESS_POLL_MS <= 15000);
 });
 
 test('treats missing status as not in_progress (defensive)', () => {
