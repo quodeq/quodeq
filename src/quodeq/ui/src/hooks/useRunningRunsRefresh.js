@@ -19,6 +19,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { projectKeys } from '../api/queryKeys.js';
 import { pollIntervalForRuns } from '../utils/runPolling.js';
 
+const SSE_ENABLED = () => import.meta.env?.VITE_USE_SSE_EVENTS === 'true';
+
 export function useRunningRunsRefresh({ selectedProject, availableRuns }) {
   const queryClient = useQueryClient();
   const interval = pollIntervalForRuns(availableRuns);
@@ -33,9 +35,12 @@ export function useRunningRunsRefresh({ selectedProject, availableRuns }) {
     });
   }, [queryClient, selectedProject]);
 
-  // (2) Background polling: only while in_progress runs exist.
+  // (2) Background polling: only while in_progress runs exist AND SSE is off.
+  // With SSE on, terminal-status events drive the running -> terminal flip
+  // (see useRunEventStream); polling here would just double the request rate.
   useEffect(() => {
     if (!selectedProject || !interval) return undefined;
+    if (SSE_ENABLED()) return undefined;
     const id = setInterval(() => {
       queryClient.invalidateQueries({
         queryKey: projectKeys.project(selectedProject),

@@ -19,6 +19,7 @@ function makeWrapper() {
 describe('useRunningRunsRefresh', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    import.meta.env.VITE_USE_SSE_EVENTS = 'false';
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -142,5 +143,58 @@ describe('useRunningRunsRefresh', () => {
       vi.advanceTimersByTime(IN_PROGRESS_POLL_MS * 3);
     });
     expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  it('mount-time refresh fires regardless of VITE_USE_SSE_EVENTS', () => {
+    import.meta.env.VITE_USE_SSE_EVENTS = 'true';
+    const { Wrapper, invalidateSpy } = makeWrapper();
+    renderHook(
+      () =>
+        useRunningRunsRefresh({
+          selectedProject: 'p1',
+          availableRuns: [{ runId: 'r1', status: 'in_progress' }],
+        }),
+      { wrapper: Wrapper },
+    );
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: projectKeys.project('p1'),
+    });
+  });
+
+  it('suppresses recurring poll when VITE_USE_SSE_EVENTS=true', () => {
+    import.meta.env.VITE_USE_SSE_EVENTS = 'true';
+    const { Wrapper, invalidateSpy } = makeWrapper();
+    renderHook(
+      () =>
+        useRunningRunsRefresh({
+          selectedProject: 'p1',
+          availableRuns: [{ runId: 'r1', status: 'in_progress' }],
+        }),
+      { wrapper: Wrapper },
+    );
+    invalidateSpy.mockClear(); // ignore the mount-time refresh
+    act(() => {
+      vi.advanceTimersByTime(IN_PROGRESS_POLL_MS * 5);
+    });
+    expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  it('still polls when VITE_USE_SSE_EVENTS is not "true"', () => {
+    import.meta.env.VITE_USE_SSE_EVENTS = 'false';
+    const { Wrapper, invalidateSpy } = makeWrapper();
+    renderHook(
+      () =>
+        useRunningRunsRefresh({
+          selectedProject: 'p1',
+          availableRuns: [{ runId: 'r1', status: 'in_progress' }],
+        }),
+      { wrapper: Wrapper },
+    );
+    invalidateSpy.mockClear();
+    act(() => {
+      vi.advanceTimersByTime(IN_PROGRESS_POLL_MS * 2 + 50);
+    });
+    expect(invalidateSpy).toHaveBeenCalledTimes(2);
   });
 });
