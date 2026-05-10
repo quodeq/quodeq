@@ -34,14 +34,9 @@ ai_defaults = src_dir / "quodeq" / "config" / "ai_defaults.json"
 if ai_defaults.exists():
     datas.append((str(ai_defaults), "quodeq/config"))
 
-# Bundle icons so _icon_path() finds them in frozen mode
-icon_icns = pkg_dir / "icon.icns"
-if icon_icns.exists():
-    datas.append((str(icon_icns), "packaging/macos"))
-
-icon_ico = repo_root / "packaging" / "windows" / "icon.ico"
-if icon_ico.exists():
-    datas.append((str(icon_ico), "packaging/windows"))
+# Icons live in src/quodeq/data/icons/ (already bundled via data_dir above);
+# keep a local pointer for the BUNDLE() icon= arg below.
+icon_icns = src_dir / "quodeq" / "data" / "icons" / "icon.icns"
 
 # ── Analysis ──
 a = Analysis(

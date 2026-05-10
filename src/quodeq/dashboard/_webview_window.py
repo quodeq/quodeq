@@ -298,15 +298,20 @@ def _kill_api(pid: int) -> None:
 
 
 def _icon_path(ext: str) -> str | None:
-    """Resolve the quodeq icon path for the given extension (.icns or .ico)."""
+    """Resolve the quodeq icon path for the given extension (.icns or .ico).
+
+    Icons live in package data (`quodeq/data/icons/`) so they ship in the
+    wheel — that's what makes the dock icon work under `pipx install`,
+    not just the frozen DMG build.
+    """
     if getattr(sys, "frozen", False):
-        base = Path(sys._MEIPASS) / "packaging"  # type: ignore[attr-defined]
+        base = Path(sys._MEIPASS) / "quodeq" / "data" / "icons"  # type: ignore[attr-defined]
     else:
-        base = Path(__file__).resolve().parent.parent.parent.parent / "packaging"
+        base = Path(__file__).resolve().parent.parent / "data" / "icons"
     if ext == ".icns":
-        p = base / "macos" / "icon.icns"
+        p = base / "icon.icns"
     elif ext == ".ico":
-        p = base / "windows" / "icon.ico"
+        p = base / "icon.ico"
     else:
         return None
     return str(p) if p.exists() else None
