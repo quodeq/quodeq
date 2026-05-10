@@ -1,26 +1,22 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useQuery } from "@tanstack/react-query";
 import { useRunEventStream } from "./useRunEventStream";
-import { evaluationKeys } from "../../../api/queryKeys.js";
+import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
 import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
+import { MockEventSource } from "../../../test-utils/MockEventSource.js";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-class MockEventSource {
-  constructor(url) {
-    this.url = url;
-    this.listeners = {};
-    MockEventSource.last = this;
+function renderStreamWithSpy(jobId) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
+  });
+  const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+  function Wrapper({ children }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
   }
-  addEventListener(event, handler) {
-    if (!this.listeners[event]) this.listeners[event] = [];
-    this.listeners[event].push(handler);
-  }
-  close() { this.closed = true; }
-  emit(event, data) {
-    (this.listeners[event] || []).forEach((h) =>
-      h({ data: JSON.stringify(data), lastEventId: data?.id }),
-    );
-  }
+  const utils = renderHook(() => useRunEventStream(jobId), { wrapper: Wrapper });
+  return { ...utils, invalidateSpy };
 }
 
 function renderStreamAndQuery(jobId, key) {
@@ -110,5 +106,44 @@ describe("useRunEventStream (cache-writer)", () => {
     import.meta.env.VITE_USE_SSE_EVENTS = "false";
     renderStreamAndQuery("job-1", evaluationKeys.status("job-1"));
     expect(MockEventSource.last).toBeNull();
+  });
+
+  it("invalidates project trend on terminal status (done)", () => {
+    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    const { invalidateSpy } = renderStreamWithSpy("job-term-1");
+    act(() => {
+      MockEventSource.last.emit("status", { state: "done" });
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() });
+  });
+
+  it("invalidates project trend on terminal status (failed)", () => {
+    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    const { invalidateSpy } = renderStreamWithSpy("job-term-2");
+    act(() => {
+      MockEventSource.last.emit("status", { state: "failed" });
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() });
+  });
+
+  it("invalidates project trend on terminal status (cancelled)", () => {
+    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    const { invalidateSpy } = renderStreamWithSpy("job-term-3");
+    act(() => {
+      MockEventSource.last.emit("status", { state: "cancelled" });
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() });
+  });
+
+  it("does NOT invalidate project trend on non-terminal status", () => {
+    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    const { invalidateSpy } = renderStreamWithSpy("job-running");
+    act(() => {
+      MockEventSource.last.emit("status", { state: "running" });
+    });
+    const sawProjectInvalidate = invalidateSpy.mock.calls.some(
+      ([arg]) => Array.isArray(arg?.queryKey) && arg.queryKey[0] === "project",
+    );
+    expect(sawProjectInvalidate).toBe(false);
   });
 });

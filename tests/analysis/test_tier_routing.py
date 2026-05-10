@@ -139,7 +139,6 @@ class TestDimensionAnalysisModel:
 
 
 from quodeq.analysis.subagents._pool_launcher import _default_subagent_model
-from quodeq.analysis.subagents._verify_pool import _fast_model
 
 
 class TestSubagentModelEnvVar:
@@ -159,10 +158,5 @@ class TestSubagentModelEnvVar:
 
     def test_pool_launcher_returns_none_when_unset(self):
         assert _default_subagent_model(env={}) is None
-
-    def test_fast_model_reads_quodeq_fast_model(self):
-        env = {"QUODEQ_FAST_MODEL": "qwen3.5:4b"}
-        assert _fast_model(env=env) == "qwen3.5:4b"
-
-    def test_fast_model_default_is_haiku(self):
-        assert _fast_model(env={}) == "haiku"
+    # Removed _fast_model tests: the verify-pool that needed a fast model
+    # for its yes/no verification dispatch is gone (B6.2b).

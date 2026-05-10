@@ -12,7 +12,6 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence_by_dimension
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_consolidated_prompt
-from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.analysis.subagents._pool_launcher import _default_subagent_model, _compute_files_per_agent
@@ -79,10 +78,9 @@ def _collect_consolidated_results(
         except (OSError, ValueError, KeyError):
             pass
 
-    # Save per-dimension fingerprints so incremental works after consolidated runs
-    for dim in run_ctx.dimensions:
-        fp = build_fingerprint(config.src, run_ctx.files, dim, config.standards_dir, analyzed_files=analyzed or None)
-        save_fingerprint(fp, paths.evidence_dir)
+    # V2 cache owns incremental state via per-file entries written
+    # during dispatch; the V1 per-dimension fingerprint write is no
+    # longer needed (B6.2).
 
     ev_ctx = EvidenceContext(
         language=config.language,

@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -309,6 +310,13 @@ class FsEvaluationMixin:
         report file already exists), so double-firing with the route-level
         scoring in ``_evaluation_routes`` is a no-op.
 
+        After ``cancel_job`` returns we wait briefly for the run lifecycle
+        handler in the subprocess to write ``status.json`` to a terminal
+        state. Without this wait, the API returns while observers reading
+        ``status.json`` (UI dashboard query, SSE stream, etc.) still see
+        the run as ``in_progress`` for a window of ~100ms-1s, producing
+        the "two running rows" UX after a cancel-then-start.
+
         When ``discard_partial`` is True we also wipe queue + fingerprint
         files for any dim that didn't complete scoring — the next run sees
         no salvageable state and starts fresh for those dims.
@@ -317,6 +325,8 @@ class FsEvaluationMixin:
         job = self.get_evaluation_status(job_id, reports_dir=reports_dir)
         ok = self._jobs.cancel_job(job_id, reports_root=reports_root)
         if ok and reports_dir and job:
+            run_dir = Path(reports_dir) / job.output_project / job.output_run_id
+            _wait_for_terminal_status(run_dir)
             _score_completed_evidence(reports_dir, {
                 "outputProject": job.output_project,
                 "outputRunId": job.output_run_id,
@@ -356,21 +366,72 @@ class FsEvaluationMixin:
         return jobs[:limit] if limit > 0 else jobs
 
 
+_TERMINAL_RUN_STATES = frozenset({"done", "failed", "cancelled"})
+_CANCEL_WAIT_TIMEOUT_S = 2.0
+_CANCEL_WAIT_POLL_S = 0.05
+
+
+def _wait_for_terminal_status(
+    run_dir: Path,
+    *,
+    timeout_s: float = _CANCEL_WAIT_TIMEOUT_S,
+    poll_interval_s: float = _CANCEL_WAIT_POLL_S,
+) -> bool:
+    """Block until ``run_dir/status.json`` reports a terminal state, or timeout.
+
+    Returns True when a terminal state ({done, failed, cancelled}) is
+    observed on disk; returns False on timeout. Best-effort: a False
+    return does not abort the calling cancel flow — downstream polling
+    or SSE will eventually catch up.
+
+    Bridges the async gap between ``JobManager.cancel_job`` returning
+    (in-memory state flipped, signal sent to subprocess) and the run
+    lifecycle handler in the subprocess flushing ``status.json`` to
+    terminal. Without this wait, observers reading from disk
+    immediately after the API returns can still see the run as
+    ``in_progress`` for ~100ms-1s, producing a window where a
+    follow-up "Start" surfaces two ``running`` rows in the UI.
+    """
+    deadline = time.monotonic() + timeout_s
+    status_path = run_dir / "status.json"
+    while True:
+        try:
+            data = json.loads(status_path.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and data.get("state") in _TERMINAL_RUN_STATES:
+                return True
+        except (OSError, ValueError):
+            pass
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(poll_interval_s)
+
+
+def _open_cache():
+    """Indirection so tests can swap in a fake backend."""
+    from quodeq.analysis.cache import LocalFileBackend
+    return LocalFileBackend()
+
+
 def _discard_partial_dim_state(reports_dir: str, job: dict) -> None:
-    """Wipe queue + fingerprint files for any dim that didn't finish scoring.
+    """Wipe queue + fingerprint + V2 cache + JSONL for any dim that didn't finish scoring.
 
     Invoked when the user opts to discard collected findings on cancel.
-    Dims with ``evaluation/<dim>.json`` (cleanly scored) are preserved —
+    Dims with ``evaluation/<dim>.json`` (cleanly scored) are preserved -
     only in-flight ones are reset, so partial work doesn't get accidentally
     discarded just because the umbrella run was stopped.
+
+    For dims marked ``incomplete`` in ``dimensions.json``, also wipes the V2
+    content-addressed cache entries (looked up via the ``<dim>_dispatch_keys.json``
+    sidecar written by the dim runner) and the dim's evidence JSONL.
     """
     project = job.get("outputProject")
     run_id = job.get("outputRunId")
     if not project or not run_id:
         return
 
-    evidence_dir = Path(reports_dir) / project / run_id / "evidence"
-    evaluation_dir = Path(reports_dir) / project / run_id / "evaluation"
+    run_dir = Path(reports_dir) / project / run_id
+    evidence_dir = run_dir / "evidence"
+    evaluation_dir = run_dir / "evaluation"
     if not evidence_dir.is_dir():
         return
 
@@ -390,6 +451,39 @@ def _discard_partial_dim_state(reports_dir: str, job: dict) -> None:
                 pass
             except OSError as exc:
                 _logger.warning("Could not discard %s: %s", victim, exc)
+
+    # V2 cache + JSONL wipe for dims explicitly marked incomplete.
+    from quodeq.shared.dimensions_state import read_dimensions
+    dim_states = read_dimensions(run_dir).get("dimensions", {})
+    cache = None
+    for dim_id, info in dim_states.items():
+        if info.get("state") != "incomplete":
+            continue
+        sidecar = evidence_dir / f"{dim_id}_dispatch_keys.json"
+        if sidecar.is_file():
+            try:
+                keys = json.loads(sidecar.read_text(encoding="utf-8"))
+                if cache is None:
+                    cache = _open_cache()
+                for key in keys.values():
+                    try:
+                        cache.delete(key)
+                    except Exception as exc:  # noqa: BLE001
+                        _logger.warning("Could not delete cache entry %s: %s", key, exc)
+            except (OSError, json.JSONDecodeError) as exc:
+                _logger.warning("Could not read sidecar %s: %s", sidecar, exc)
+        else:
+            _logger.warning(
+                "No dispatch-keys sidecar for incomplete dim %s; skipping cache wipe",
+                dim_id,
+            )
+        jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
+        try:
+            jsonl.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            _logger.warning("Could not delete %s: %s", jsonl, exc)
 
 
 def _read_queue_files_count(queue_path: Path) -> int:
@@ -454,11 +548,17 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
     evaluation_dir.mkdir(parents=True, exist_ok=True)
     source_file_count = _read_project_source_file_count(reports_dir, project)
 
+    from quodeq.shared.dimensions_state import read_dimensions
+    dim_states = read_dimensions(Path(reports_dir) / project / run_id).get("dimensions", {})
+
     for jsonl_path in evidence_dir.glob("*_evidence.jsonl"):
         dim_id = jsonl_path.name.replace("_evidence.jsonl", "")
         eval_file = evaluation_dir / f"{dim_id}.json"
         if eval_file.exists():
             continue  # already scored
+        if dim_states.get(dim_id, {}).get("state") == "incomplete":
+            _logger.info("Skipping scoring for incomplete dim %s", dim_id)
+            continue
         if jsonl_path.stat().st_size == 0:
             continue  # no findings
         # Only score dimensions that passed verification (analysis queue exists)

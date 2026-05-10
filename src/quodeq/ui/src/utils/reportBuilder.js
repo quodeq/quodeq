@@ -267,8 +267,8 @@ export function buildRunReport({ dashboard, runSummary, projectName }) {
   return lines.join('\n');
 }
 
-export function buildPrincipleReport({ principle, dimension, score, grade, violations, violationsBySeverity, compliance, principleData, runId, dateLabel }) {
-  const violationsList = violations || [];
+export function buildPrincipleReport({ principle, dimension, score, grade, violations, violationsBySeverity, compliance, principleData, runId, dateLabel, severityFilter }) {
+  const rawViolations = violations || [];
   const complianceList = (compliance || []).filter((c) => c.file || c.reason || c.snippet);
   const date = dateLabel || formatDate();
   const ridSuffix = runId ? ` · **Run:** ${runId.slice(0, 8)}` : '';
@@ -294,14 +294,24 @@ export function buildPrincipleReport({ principle, dimension, score, grade, viola
     lines.push('');
   }
 
-  const bySeverity = violationsBySeverity || groupBySeverity(violationsList);
-  lines.push(`## Violations (${violationsList.length})`);
+  const showViolations = severityFilter !== 'compliance';
+  const showCompliance = !severityFilter || severityFilter === 'all' || severityFilter === 'compliance';
+
+  const filteredViolations = (showViolations && severityFilter && severityFilter !== 'all')
+    ? rawViolations.filter((v) => (v.severity || 'minor').toLowerCase() === severityFilter)
+    : (showViolations ? rawViolations : []);
+  const bySeverity = (violationsBySeverity && (!severityFilter || severityFilter === 'all'))
+    ? violationsBySeverity
+    : groupBySeverity(filteredViolations);
+
+  lines.push(`## Violations (${filteredViolations.length})`);
   lines.push('');
-  if (violationsList.length === 0) {
+  if (filteredViolations.length === 0) {
     lines.push('No violations found.');
     lines.push('');
   } else {
     for (const sev of SEVERITY_ORDER) {
+      if (severityFilter && severityFilter !== 'all' && severityFilter !== sev) continue;
       const vs = bySeverity[sev] || [];
       if (vs.length === 0) continue;
       lines.push(`### ${sev.charAt(0).toUpperCase() + sev.slice(1)} (${vs.length})`);
@@ -310,7 +320,9 @@ export function buildPrincipleReport({ principle, dimension, score, grade, viola
     }
   }
 
-  lines.push(...buildComplianceSection(complianceList));
+  if (showCompliance) {
+    lines.push(...buildComplianceSection(complianceList));
+  }
 
   return lines.join('\n');
 }
@@ -329,9 +341,11 @@ function buildFileSummarySection(file, totalViolations, totalCompliance) {
   return lines;
 }
 
-function buildFileViolationsSection(file) {
+function buildFileViolationsSection(file, severityFilter) {
   const lines = [];
-  const allViolations = SEVERITY_ORDER.flatMap((sev) => file.violationsBySeverity?.[sev] || []);
+  const allViolations = SEVERITY_ORDER
+    .filter((sev) => !severityFilter || severityFilter === 'all' || severityFilter === sev)
+    .flatMap((sev) => file.violationsBySeverity?.[sev] || []);
   lines.push(`## Violations (${allViolations.length})`);
   lines.push('');
   if (allViolations.length === 0) {
@@ -340,6 +354,7 @@ function buildFileViolationsSection(file) {
     return lines;
   }
   for (const sev of SEVERITY_ORDER) {
+    if (severityFilter && severityFilter !== 'all' && severityFilter !== sev) continue;
     const vs = file.violationsBySeverity?.[sev] || [];
     if (vs.length === 0) continue;
     lines.push(`### ${sev.charAt(0).toUpperCase() + sev.slice(1)} (${vs.length})`);
@@ -349,7 +364,7 @@ function buildFileViolationsSection(file) {
   return lines;
 }
 
-export function buildFileReport(file) {
+export function buildFileReport(file, severityFilter) {
   const filePath = file?.file || 'unknown';
   const totalViolations = file?.total || 0;
   const totalCompliance = file?.compliance?.length || 0;
@@ -362,8 +377,11 @@ export function buildFileReport(file) {
   lines.push('');
 
   lines.push(...buildFileSummarySection(file, totalViolations, totalCompliance));
-  lines.push(...buildFileViolationsSection(file));
-  lines.push(...buildComplianceSection(file?.compliance || []));
+
+  const showCompliance = !severityFilter || severityFilter === 'all' || severityFilter === 'compliance';
+
+  lines.push(...buildFileViolationsSection(file, severityFilter));
+  if (showCompliance) lines.push(...buildComplianceSection(file?.compliance || []));
 
   return lines.join('\n');
 }

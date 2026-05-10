@@ -29,15 +29,24 @@ export function StatStrip({ children, cards = false }) {
  * @param {React.ReactNode} [props.trailing] Right-aligned accessory slot (badges, delta).
  * @param {string} [props.tone] One of "default" | "success" | "warning" | "critical".
  */
-export function Stat({ label, value, hint, trailing, tone = 'default' }) {
-  return (
-    <div className={`term-stat term-stat--${tone}`}>
+export function Stat({ label, value, hint, trailing, tone = 'default', onClick, ariaLabel }) {
+  const className = `term-stat term-stat--${tone}${onClick ? ' term-stat--clickable' : ''}`;
+  const content = (
+    <>
       <div className="term-stat__label">{label}</div>
       <div className="term-stat__value-row">
         <span className="term-stat__value">{value}</span>
         {trailing != null && <span className="term-stat__trailing">{trailing}</span>}
       </div>
       {hint != null && <div className="term-stat__hint">{hint}</div>}
-    </div>
+    </>
   );
+  if (onClick) {
+    return (
+      <button type="button" className={className} onClick={onClick} aria-label={ariaLabel || label}>
+        {content}
+      </button>
+    );
+  }
+  return <div className={className}>{content}</div>;
 }

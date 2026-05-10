@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
+from pathlib import Path
+from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
@@ -19,8 +21,22 @@ from quodeq.api.routes import _reports_dir
 from quodeq.services.base import ActionProvider
 from quodeq.services.evaluation_mixin import _score_completed_evidence
 from quodeq.services.scan_progress import build_scan_progress, progress_to_dict
+from quodeq.shared.dimensions_state import read_dimensions
 
 _logger = logging.getLogger(__name__)
+
+
+def _read_dim_states(job: Any) -> dict[str, dict[str, Any]]:
+    """Read dimensions.json for *job*'s run dir, returning the dimensions map.
+
+    Empty dict on missing/corrupt file (read_dimensions handles that).
+    """
+    project = getattr(job, "output_project", None)
+    run_id = getattr(job, "output_run_id", None)
+    if not project or not run_id:
+        return {}
+    run_dir = Path(_reports_dir()) / project / run_id
+    return read_dimensions(run_dir).get("dimensions", {})
 
 # Cap on /api/evaluations ?limit= so a client cannot ask the server to materialize
 # an unbounded list. limit=0 still means "no client cap" but we clamp the actual
@@ -112,7 +128,9 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
                 })
             except Exception as exc:
                 _logger.debug("Could not score cancelled dimension for %s: %s", job_id, exc)
-        return jsonify(to_camel_dict(job))
+        payload = to_camel_dict(job)
+        payload["dimStates"] = _read_dim_states(job)
+        return jsonify(payload)
 
     @app.get("/api/evaluations/<job_id>/progress")
     def get_evaluation_progress(job_id: str) -> Response | tuple[Response, int]:

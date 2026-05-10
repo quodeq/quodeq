@@ -1,4 +1,10 @@
-"""Subagent processing path -- runs a dimension via N parallel subagents."""
+"""Subagent processing path -- runs a dimension via N parallel subagents.
+
+Post-V2 (B6.2b): the verify-pool is gone. V2's content-addressed cache
+already invalidates on file/standards/prompts changes, triggering a
+full fresh dispatch. The V1 "carry-forward + verify-when-rules-change"
+optimization no longer earns its complexity.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,13 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from quodeq.analysis._types import RunConfig
-from quodeq.analysis.fingerprint import build_fingerprint, find_previous_fingerprint, save_fingerprint
-from quodeq.analysis.subagents._finding_classifier import classify_findings
-from quodeq.analysis.subagents.verify import (
-    partition_findings_by_fingerprint, write_carry_forward_findings,
-)
 from quodeq.core.evidence.model import Evidence
-from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.shared.logging import log_info, log_warning
 
 # Re-exports from split modules -- keep the public API stable
@@ -29,13 +29,7 @@ from quodeq.analysis.subagents._evidence_collector import (  # noqa: F401
     _CollectionContext,
     _collect_evidence,
 )
-from quodeq.analysis.subagents._verification import (  # noqa: F401
-    _dispatch_mini_verify,
-    _dispatch_verification_pool,
-    _load_and_filter_previous,
-    _run_verification_pool,
-    _run_verification_step,
-)
+from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents._consolidated import (
     process_consolidated_dimensions as _process_consolidated_impl,
 )
@@ -62,8 +56,6 @@ class _DimensionContext:
 @dataclass
 class _PoolExecutionParams:
     """Grouped parameters for pool execution and evidence collection."""
-    inline_findings: list[dict]
-    mini_verify_findings: list[dict]
     queue_path: Path
     files_per_agent: int
 
@@ -78,47 +70,15 @@ def process_consolidated_dimensions(
 def _prepare_findings_and_queue(
     config: RunConfig, dc: _DimensionContext,
 ) -> _PoolExecutionParams:
-    """Load previous findings, partition by fingerprint, and create the file queue."""
-    # Clean scan (incremental=False) means "ignore everything from before",
-    # not "re-verify everything from before". Skip the loader so prior
-    # findings don't get inlined into prompts as needs_verify entries.
-    if config.options.incremental:
-        prev_findings = _load_and_filter_previous(config, dc.dim_id, dc.evidence_dir)
-    else:
-        prev_findings = []
-    carry_forward: list[dict] = []
-    needs_verify: list[dict] = []
-    if prev_findings:
-        prev_fp, _ = find_previous_fingerprint(dc.evidence_dir, dc.dim_id)
-        carry_forward, needs_verify = partition_findings_by_fingerprint(
-            prev_findings, prev_fp, config.src,
-            standards_dir=config.standards_dir, dimension=dc.dim_id,
-        )
-    if carry_forward:
-        written = write_carry_forward_findings(carry_forward, dc.evidence_dir, dc.dim_id)
-        log_info(f"  [{dc.idx}/{dc.ctx.total}] {dc.dim_id} -- {written} findings carried forward")
-
-    queue_files = set(dc.files)
-    inline_findings, mini_verify_findings = classify_findings(needs_verify, queue_files)
-
+    """Build the file queue for the pool. No prior-findings logic — V2's
+    cache hit/miss already determined which files need dispatch."""
     queue_path = dc.evidence_dir / f"{dc.dim_id}_queue.json"
     files_per_agent = _compute_files_per_agent(len(dc.files))
     FileQueue(queue_path, dc.files, max_files_per_agent=files_per_agent)
-    # Persist a fingerprint *now* — before any agent runs — so a crash or
-    # cancel mid-dim doesn't void the file_hashes / standards baseline.
-    # `analyzed_files` carries forward whatever the previous run analyzed
-    # (it'll be augmented by queue.taken on read in find_previous_fingerprint).
-    prev_fp_for_seed, _ = find_previous_fingerprint(dc.evidence_dir, dc.dim_id)
-    seed_analyzed = set(prev_fp_for_seed.get("analyzed_files", [])) if prev_fp_for_seed else set()
-    initial_fp = build_fingerprint(
-        config.src, dc.files, dc.dim_id, config.standards_dir,
-        analyzed_files=seed_analyzed or None,
+    log_info(
+        f"  [{dc.idx}/{dc.ctx.total}] {dc.dim_id} -- {len(dc.files)} files queued",
     )
-    save_fingerprint(initial_fp, dc.evidence_dir)
-    log_info(f"  [{dc.idx}/{dc.ctx.total}] {dc.dim_id} -- {len(dc.files)} files queued, {len(inline_findings)} inline findings")
-
     return _PoolExecutionParams(
-        inline_findings=inline_findings, mini_verify_findings=mini_verify_findings,
         queue_path=queue_path, files_per_agent=files_per_agent,
     )
 
@@ -126,30 +86,18 @@ def _prepare_findings_and_queue(
 def _execute_pool_and_collect(
     config: RunConfig, dc: _DimensionContext, pool_params: _PoolExecutionParams,
 ) -> Evidence | None:
-    """Build prompt, launch pool, save fingerprint, and collect evidence."""
-    prompt = _build_subagent_prompt(config, dc.dim_id, dc.ctx, inline_findings=pool_params.inline_findings)
+    """Build prompt, launch pool, collect evidence."""
+    prompt = _build_subagent_prompt(config, dc.dim_id, dc.ctx)
     params = LaunchPoolParams(
         evidence_dir=dc.evidence_dir, queue_path=pool_params.queue_path,
         prompt=prompt, max_files_per_agent=pool_params.files_per_agent,
         all_files=dc.files,
     )
     pool, results = _launch_pool(config, dc.dim_id, params)
-
-    # Record what the queue actually dispatched. Without this, the saved
-    # fingerprint has analyzed_files=[], which combined with up-to-date
-    # file_hashes makes the next run's change detection skip everything.
-    queue_taken = set(FileQueue(pool_params.queue_path).all_taken_files())
-    fp = build_fingerprint(
-        config.src, dc.files, dc.dim_id, config.standards_dir,
-        analyzed_files=queue_taken or None,
+    return _collect_evidence(
+        config, dc.dim_id, dc.evidence_dir,
+        _CollectionContext(results=results, ctx=dc.ctx, files=dc.files),
     )
-    save_fingerprint(fp, dc.evidence_dir)
-
-    if pool_params.mini_verify_findings:
-        verify_results = _dispatch_mini_verify(config, dc.dim_id, dc.evidence_dir, pool_params.mini_verify_findings)
-        results = results + verify_results
-
-    return _collect_evidence(config, dc.dim_id, dc.evidence_dir, _CollectionContext(results=results, ctx=dc.ctx, files=dc.files))
 
 
 def process_dimension_with_subagents(

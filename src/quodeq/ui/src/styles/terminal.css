@@ -136,6 +136,24 @@
 .term-stat--warning .term-stat__value { color: var(--color-warning); }
 .term-stat--critical .term-stat__value { color: var(--color-sev-critical-text); }
 
+/* Clickable variant — used when a Stat doubles as a navigation affordance. */
+button.term-stat--clickable {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+button.term-stat--clickable:hover {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
+}
+button.term-stat--clickable:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 /* ------------------------------------------------------------
    FlagPill: `--flag` toggle
    ------------------------------------------------------------ */
@@ -210,6 +228,19 @@
   color: var(--color-sev-minor-text);
   background: var(--color-sev-minor-bg);
   border-color: var(--color-sev-minor-border);
+}
+button.term-sev-badge--clickable {
+  appearance: none;
+  font: inherit;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+button.term-sev-badge--clickable:hover {
+  filter: brightness(1.15);
+}
+button.term-sev-badge--clickable:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 /* ------------------------------------------------------------
@@ -2215,6 +2246,15 @@
 .term-btn--ghost:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Small size modifier — for secondary or destructive actions tucked into
+   corners (e.g. cancel during a running eval) where a full-size button
+   would overweight the layout. Composes with any variant. */
+.term-btn--sm {
+  font-size: 11px;
+  padding: 2px var(--term-space-2);
+  letter-spacing: 0.02em;
 }
 
 /* Filled variant — solid accent background. Compose with --primary,

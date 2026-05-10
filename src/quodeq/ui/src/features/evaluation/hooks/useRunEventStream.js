@@ -19,13 +19,14 @@
  */
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { evaluationKeys } from "../../../api/queryKeys.js";
+import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
 
 // Cap the per-job findings array so a long-running scan with tens of thousands
 // of findings does not grow the React Query cache without bound. The dashboard
 // renders aggregated counts and the most-recent slice; older entries are still
 // reachable through the scored evaluation/<dim>.json artifacts on disk.
 const MAX_FINDINGS_IN_CACHE = 5000;
+const TERMINAL_STATES = new Set(["done", "failed", "cancelled"]);
 
 function isSseEnabled() {
   return import.meta.env?.VITE_USE_SSE_EVENTS === "true";
@@ -58,6 +59,14 @@ export function useRunEventStream(jobId) {
       try {
         const data = JSON.parse(e.data);
         writeCache(evaluationKeys.status(jobId), data);
+        if (data && TERMINAL_STATES.has(data.state)) {
+          // Run just hit a terminal state -- the trend's view of this run is
+          // about to flip from "in-progress / partial" to "terminal / final".
+          // Invalidate the project subtree so the History row rerenders against
+          // the freshly-fetched trend instead of staying on the SSE-fed live
+          // dim cache for an unbounded time.
+          queryClient.invalidateQueries({ queryKey: projectKeys.all() });
+        }
       } catch {
         // ignore malformed frames; reconnect handles recovery via Last-Event-ID
       }

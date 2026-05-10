@@ -1,4 +1,7 @@
-"""Tests for quodeq.analysis._dim_estimates — upfront per-dim file estimation."""
+"""Tests for quodeq.analysis._dim_estimates — upfront per-dim file estimation.
+
+After B6 the estimate is just the V2 cache-miss count per dimension.
+"""
 from __future__ import annotations
 
 import json
@@ -11,225 +14,161 @@ from quodeq.analysis._dim_estimates import (
     read_dim_estimates,
     write_dim_estimates,
 )
-from quodeq.analysis._incr_change_detection import ChangeDetectionResult
 from quodeq.analysis._types import AnalysisOptions, RunConfig
-from quodeq.analysis.incremental import FileClassification
+from quodeq.analysis.cache import (
+    CacheEntry, LocalFileBackend, build_cache_key_for_file,
+)
+from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 
 
-def _make_config(*, incremental: bool = False, file_filter=None) -> RunConfig:
-    """Minimal RunConfig stub. Only fields read by compute_dim_estimates matter."""
-    cfg = RunConfig.__new__(RunConfig)
-    cfg.src = Path("/repo")
-    cfg.standards_dir = None
-    cfg.work_dir = None
-    cfg.language = "python"
-    options = type("O", (), {})()
-    options.incremental = incremental
-    options.incremental_file_filter = file_filter
-    cfg.options = options
-    return cfg
+def _make_config(
+    src: Path, file_names: list[str], *,
+    incremental: bool = True, file_filter=None,
+) -> RunConfig:
+    target = AnalysisTarget(
+        name="t", language="python", source_files=sorted(file_names),
+        total_files=len(file_names),
+        language_stats={"py": len(file_names)},
+    )
+    manifest = SourceManifest(targets=[target], total_files=len(file_names))
+    return RunConfig(
+        src=src, language="python", standards_dir=None,
+        work_dir=src, manifest=manifest,
+        options=AnalysisOptions(
+            subagent_model="test-model",
+            incremental=incremental,
+            incremental_file_filter=file_filter,
+        ),
+    )
+
+
+def _write_files(src: Path, names: list[str]) -> None:
+    src.mkdir(parents=True, exist_ok=True)
+    for n in names:
+        (src / n).write_text(f"# {n}")
+
+
+def _populate(cache: LocalFileBackend, config: RunConfig, dim: str, files: list[str]) -> None:
+    for f in files:
+        key = build_cache_key_for_file(config, f, dim)
+        cache.put(key, CacheEntry(
+            key=key, schema_version=1, findings=[],
+            files_read=1, file_path=f, dimension=dim, model_id="test-model",
+        ))
 
 
 class TestComputeDimEstimates:
-    def test_full_run_returns_per_dim_file_count(self) -> None:
-        cfg = _make_config()
+    def test_clean_scan_returns_full_count(self, tmp_path: Path):
+        src = tmp_path / "src"
+        _write_files(src, ["a.py", "b.py", "c.py"])
+        config = _make_config(src, ["a.py", "b.py", "c.py"], incremental=False)
+
+        result = compute_dim_estimates(config, ["security"])
+        assert result["security"] == {"count": 3, "reason": "full"}
+
+    def test_diff_mode_intersects_filter(self, tmp_path: Path):
+        src = tmp_path / "src"
+        _write_files(src, ["a.py", "b.py", "c.py"])
+        config = _make_config(
+            src, ["a.py", "b.py", "c.py"],
+            incremental=False, file_filter={"a.py", "c.py"},
+        )
+
+        result = compute_dim_estimates(config, ["security"])
+        assert result["security"] == {"count": 2, "reason": "diff"}
+
+    def test_empty_dim_returns_zero_with_empty_reason(self, tmp_path: Path):
+        src = tmp_path / "src"
+        src.mkdir(parents=True, exist_ok=True)
+        config = _make_config(src, [])
+
+        result = compute_dim_estimates(config, ["security"])
+        assert result["security"]["count"] == 0
+        assert result["security"]["reason"] == "empty"
+
+    def test_incremental_first_run_all_misses(self, tmp_path: Path):
+        src = tmp_path / "src"
+        _write_files(src, ["a.py", "b.py"])
+        config = _make_config(src, ["a.py", "b.py"], incremental=True)
+
         with patch(
-            "quodeq.analysis._dim_estimates._list_all_source_files",
-            side_effect=lambda config, dim: {
-                "security": ["a.py", "b.py", "c.py"],
-                "reliability": ["a.py", "b.py"],
-            }[dim],
+            "quodeq.analysis._dim_estimates.LocalFileBackend",
+            return_value=LocalFileBackend(root=tmp_path / "fresh-cache"),
         ):
-            estimates = compute_dim_estimates(cfg, ["security", "reliability"])
-        assert estimates == {
-            "security": {"count": 3, "reason": "full"},
-            "reliability": {"count": 2, "reason": "full"},
-        }
+            result = compute_dim_estimates(config, ["security"])
+        assert result["security"] == {"count": 2, "reason": "first-run"}
 
-    def test_empty_dim_returns_zero_with_empty_reason(self) -> None:
-        cfg = _make_config()
+    def test_incremental_partial_cache_marks_incremental(self, tmp_path: Path):
+        src = tmp_path / "src"
+        _write_files(src, ["a.py", "b.py", "c.py"])
+        config = _make_config(src, ["a.py", "b.py", "c.py"], incremental=True)
+        cache = LocalFileBackend(root=tmp_path / "fresh-cache")
+        _populate(cache, config, "security", ["a.py", "b.py"])
+
         with patch(
-            "quodeq.analysis._dim_estimates._list_all_source_files",
-            return_value=[],
+            "quodeq.analysis._dim_estimates.LocalFileBackend",
+            return_value=cache,
         ):
-            estimates = compute_dim_estimates(cfg, ["security"])
-        assert estimates == {"security": {"count": 0, "reason": "empty"}}
+            result = compute_dim_estimates(config, ["security"])
+        assert result["security"] == {"count": 1, "reason": "incremental"}
 
-    def test_diff_mode_intersects_filter(self) -> None:
-        cfg = _make_config(file_filter={"a.py", "c.py"})
+    def test_incremental_full_cache_returns_zero(self, tmp_path: Path):
+        src = tmp_path / "src"
+        _write_files(src, ["a.py"])
+        config = _make_config(src, ["a.py"], incremental=True)
+        cache = LocalFileBackend(root=tmp_path / "fresh-cache")
+        _populate(cache, config, "security", ["a.py"])
+
         with patch(
-            "quodeq.analysis._dim_estimates._list_all_source_files",
-            return_value=["a.py", "b.py", "c.py", "d.py"],
+            "quodeq.analysis._dim_estimates.LocalFileBackend",
+            return_value=cache,
         ):
-            estimates = compute_dim_estimates(cfg, ["security"])
-        assert estimates == {"security": {"count": 2, "reason": "diff"}}
-
-    def test_incremental_normal_run(self) -> None:
-        cfg = _make_config(incremental=True)
-        files = ["a.py", "b.py", "c.py", "d.py"]
-        prev_fp = {"file_hashes": {f: "h" for f in files}, "analyzed_files": files}
-        with patch(
-            "quodeq.analysis._dim_estimates._list_all_source_files",
-            return_value=files,
-        ), patch(
-            "quodeq.analysis._dim_estimates.find_previous_fingerprint",
-            return_value=(prev_fp, Path("/prev")),
-        ), patch(
-            "quodeq.analysis._dim_estimates.detect_changed_files",
-            return_value=ChangeDetectionResult(changed={"a.py"}),
-        ), patch(
-            "quodeq.analysis._dim_estimates.classify_files",
-            return_value=FileClassification(to_analyze=["a.py", "b.py"], unchanged={"c.py", "d.py"}),
-        ):
-            estimates = compute_dim_estimates(cfg, ["security"])
-        assert estimates == {"security": {"count": 2, "reason": "incremental"}}
-
-    def test_incremental_first_run_marks_first_run(self) -> None:
-        cfg = _make_config(incremental=True)
-        files = ["a.py", "b.py"]
-        with patch(
-            "quodeq.analysis._dim_estimates._list_all_source_files",
-            return_value=files,
-        ), patch(
-            "quodeq.analysis._dim_estimates.find_previous_fingerprint",
-            return_value=(None, None),
-        ), patch(
-            "quodeq.analysis._dim_estimates.detect_changed_files",
-            return_value=ChangeDetectionResult(full_reanalysis=True, reason="no previous fingerprint"),
-        ), patch(
-            "quodeq.analysis._dim_estimates.classify_files",
-            return_value=FileClassification(to_analyze=files, full_reanalysis=True),
-        ):
-            estimates = compute_dim_estimates(cfg, ["security"])
-        assert estimates == {"security": {"count": 2, "reason": "first-run"}}
-
-    def test_incremental_standards_changed(self) -> None:
-        cfg = _make_config(incremental=True)
-        files = ["a.py", "b.py"]
-        with patch(
-            "quodeq.analysis._dim_estimates._list_all_source_files",
-            return_value=files,
-        ), patch(
-            "quodeq.analysis._dim_estimates.find_previous_fingerprint",
-            return_value=({"file_hashes": {}}, Path("/prev")),
-        ), patch(
-            "quodeq.analysis._dim_estimates.detect_changed_files",
-            return_value=ChangeDetectionResult(full_reanalysis=True, reason="standards changed"),
-        ), patch(
-            "quodeq.analysis._dim_estimates.classify_files",
-            return_value=FileClassification(to_analyze=files, full_reanalysis=True),
-        ):
-            estimates = compute_dim_estimates(cfg, ["security"])
-        assert estimates["security"]["reason"] == "standards-changed"
-
-    def test_incremental_catching_up_when_prior_run_died_early(self) -> None:
-        # Prior run fingerprinted 100 files but only analyzed 20 → < 50%
-        # threshold → marked as catching-up so the UI can flag the inflated
-        # count as catch-up work, not a code growth signal.
-        cfg = _make_config(incremental=True)
-        files = [f"f{i}.py" for i in range(100)]
-        prev_fp = {
-            "file_hashes": {f: "h" for f in files},
-            "analyzed_files": files[:20],
-        }
-        with patch(
-            "quodeq.analysis._dim_estimates._list_all_source_files",
-            return_value=files,
-        ), patch(
-            "quodeq.analysis._dim_estimates.find_previous_fingerprint",
-            return_value=(prev_fp, Path("/prev")),
-        ), patch(
-            "quodeq.analysis._dim_estimates.detect_changed_files",
-            return_value=ChangeDetectionResult(changed=set(files[20:])),
-        ), patch(
-            "quodeq.analysis._dim_estimates.classify_files",
-            return_value=FileClassification(to_analyze=files[20:], unchanged=set(files[:20])),
-        ):
-            estimates = compute_dim_estimates(cfg, ["usability"])
-        assert estimates["usability"]["reason"] == "catching-up"
-        assert estimates["usability"]["count"] == 80
-
-
-class TestFreshRunSafety:
-    """Regression guards for the incremental=True default with no prior data.
-
-    After Task 1's default flip, compute_dim_estimates runs the incremental
-    branch on every default run. These tests confirm that first-ever runs
-    (no prior fingerprint, no prior queue) do not crash.
-    """
-
-    def test_dim_estimates_no_prior_run_is_safe(self) -> None:
-        """With incremental=True (default) and no prior fingerprint, dim estimates run cleanly."""
-        # Use real AnalysisOptions() so this test breaks if the default reverts.
-        cfg = RunConfig.__new__(RunConfig)
-        cfg.src = Path("/repo")
-        cfg.standards_dir = None
-        cfg.work_dir = None
-        cfg.language = "python"
-        cfg.options = AnalysisOptions()  # incremental=True by default
-        assert cfg.options.incremental is True
-
-        files = ["a.py", "b.py"]
-        with patch(
-            "quodeq.analysis._dim_estimates._list_all_source_files",
-            return_value=files,
-        ), patch(
-            "quodeq.analysis._dim_estimates.find_previous_fingerprint",
-            return_value=(None, None),  # fresh run: no prior fingerprint
-        ), patch(
-            "quodeq.analysis._dim_estimates.detect_changed_files",
-            return_value=ChangeDetectionResult(full_reanalysis=True, reason="no previous fingerprint"),
-        ), patch(
-            "quodeq.analysis._dim_estimates.classify_files",
-            return_value=FileClassification(to_analyze=files, full_reanalysis=True),
-        ):
-            # Must not raise even with no prior fingerprint.
-            estimates = compute_dim_estimates(cfg, ["security"])
-
-        assert estimates == {"security": {"count": 2, "reason": "first-run"}}
+            result = compute_dim_estimates(config, ["security"])
+        assert result["security"]["count"] == 0
+        assert result["security"]["reason"] == "incremental"
 
 
 class TestPersistence:
-    def test_write_then_read_roundtrip(self, tmp_path: Path) -> None:
-        payload = {
-            "security": {"count": 42, "reason": "incremental"},
-            "usability": {"count": 999, "reason": "catching-up"},
+    def test_write_and_read_round_trip(self, tmp_path: Path):
+        run_dir = tmp_path / "run"
+        estimates = {
+            "security": {"count": 3, "reason": "incremental"},
+            "reliability": {"count": 0, "reason": "empty"},
         }
-        write_dim_estimates(tmp_path, payload)
-        assert read_dim_estimates(tmp_path) == payload
+        write_dim_estimates(run_dir, estimates)
+        loaded = read_dim_estimates(run_dir)
+        assert loaded == estimates
 
-    def test_read_missing_returns_empty(self, tmp_path: Path) -> None:
-        assert read_dim_estimates(tmp_path) == {}
+    def test_read_missing_returns_empty(self, tmp_path: Path):
+        assert read_dim_estimates(tmp_path / "nope") == {}
 
-    def test_read_corrupt_returns_empty(self, tmp_path: Path) -> None:
-        (tmp_path / DIM_ESTIMATES_FILENAME).write_text("not json{", encoding="utf-8")
-        assert read_dim_estimates(tmp_path) == {}
+    def test_read_corrupt_returns_empty(self, tmp_path: Path):
+        run_dir = tmp_path / "run"
+        run_dir.mkdir()
+        (run_dir / DIM_ESTIMATES_FILENAME).write_text("{not json")
+        assert read_dim_estimates(run_dir) == {}
 
-    def test_read_skips_malformed_entries(self, tmp_path: Path) -> None:
-        (tmp_path / DIM_ESTIMATES_FILENAME).write_text(
-            json.dumps({
-                "good": {"count": 5, "reason": "incremental"},
-                "missing_count": {"reason": "incremental"},
-                "wrong_count_type": {"count": "oops", "reason": "incremental"},
-                "wrong_value_type": "oops",
-                "legacy_int": 7,
-            }),
-            encoding="utf-8",
-        )
-        # legacy_int is accepted (back-compat); the others are dropped.
-        assert read_dim_estimates(tmp_path) == {
-            "good": {"count": 5, "reason": "incremental"},
-            "legacy_int": {"count": 7, "reason": ""},
-        }
+    def test_read_legacy_int_format_normalises(self, tmp_path: Path):
+        run_dir = tmp_path / "run"
+        run_dir.mkdir()
+        (run_dir / DIM_ESTIMATES_FILENAME).write_text(json.dumps({"security": 5}))
+        loaded = read_dim_estimates(run_dir)
+        assert loaded == {"security": {"count": 5, "reason": ""}}
 
-    def test_read_non_dict_returns_empty(self, tmp_path: Path) -> None:
-        (tmp_path / DIM_ESTIMATES_FILENAME).write_text(
-            json.dumps([1, 2, 3]), encoding="utf-8",
-        )
-        assert read_dim_estimates(tmp_path) == {}
 
-    def test_read_defaults_missing_reason_to_empty_string(self, tmp_path: Path) -> None:
-        (tmp_path / DIM_ESTIMATES_FILENAME).write_text(
-            json.dumps({"security": {"count": 5}}), encoding="utf-8",
-        )
-        assert read_dim_estimates(tmp_path) == {"security": {"count": 5, "reason": ""}}
+class TestFreshRunSafety:
+    def test_dim_estimates_no_prior_state(self, tmp_path: Path):
+        """A first run with cold cache must not raise."""
+        src = tmp_path / "src"
+        _write_files(src, ["a.py"])
+        config = _make_config(src, ["a.py"], incremental=True)
+
+        with patch(
+            "quodeq.analysis._dim_estimates.LocalFileBackend",
+            return_value=LocalFileBackend(root=tmp_path / "fresh-cache"),
+        ):
+            result = compute_dim_estimates(config, ["security", "reliability"])
+
+        for dim in ("security", "reliability"):
+            assert result[dim]["count"] == 1
+            assert result[dim]["reason"] == "first-run"

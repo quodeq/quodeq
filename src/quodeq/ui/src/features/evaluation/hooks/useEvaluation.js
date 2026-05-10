@@ -24,9 +24,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
-import { confirmDialog } from "../../../utils/confirmDialog.js";
+import { chooseDialog } from "../../../utils/chooseDialog.js";
 import { useRunEventStream } from "./useRunEventStream.js";
-import { evaluationKeys } from "../../../api/queryKeys.js";
+import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
 import {
   ACTIVE_PROVIDER_KEY,
   providerKey,
@@ -167,6 +167,13 @@ export function useEvaluation() {
       setJobError(null);
       setJobId(created.jobId);
       queryClient.setQueryData(evaluationKeys.status(created.jobId), created);
+      // Invalidate the project subtree so History (and any other view
+      // backed by project queries) shows the freshly-started run as
+      // 'running' immediately, instead of waiting for the next poll
+      // tick. Without this, History stays stale until the user
+      // navigates away and back, or the polling timer fires --
+      // user-visible delay was ~10-30s on a fresh start.
+      queryClient.invalidateQueries({ queryKey: projectKeys.all() });
     },
     onError: (err) => {
       const msg = err?.message || "Failed to start evaluation.";
@@ -182,6 +189,12 @@ export function useEvaluation() {
       if (jobId) {
         queryClient.invalidateQueries({ queryKey: evaluationKeys.evaluation(jobId) });
       }
+      // Mirror startMutation: refresh the project subtree so History's
+      // availableRuns drops the cancelled run from the in-progress list
+      // immediately. Without this, the History row stays on the
+      // 'performing an evaluation...' placeholder until the next polling
+      // tick (or, under SSE, the terminal-status event from the stream).
+      queryClient.invalidateQueries({ queryKey: projectKeys.all() });
     },
     onError: (err) => {
       // The backend returns 409 when the job is no longer cancellable
@@ -202,16 +215,22 @@ export function useEvaluation() {
   );
 
   const cancelEvaluation = useCallback(async () => {
-    const result = await confirmDialog({
+    // Three-button form: dismiss + two cancel variants. The title carries
+    // the "cancel evaluation" verb so the button labels can be terse and
+    // describe the side-effect on findings, not repeat the cancel intent.
+    // Only the destructive option ('discard') is rendered red; 'keep' and
+    // 'dismiss' are neutral so they don't compete visually.
+    const choice = await chooseDialog({
       title: "Cancel evaluation?",
-      message: "The run will stop. Findings collected so far are kept by default.",
-      checkboxLabel: "Discard collected findings",
-      confirmLabel: "Cancel evaluation",
+      message: "The run will stop. Choose what happens to findings collected so far.",
       cancelLabel: "Keep running",
-      variant: "danger",
+      actions: [
+        { key: "preserve", label: "Keep findings", variant: "default" },
+        { key: "discard", label: "Discard findings", variant: "danger" },
+      ],
     });
-    if (!result || !result.ok) return;
-    cancelMutation.mutate({ discard: result.checked });
+    if (!choice) return;
+    cancelMutation.mutate({ discard: choice === "discard" });
   }, [cancelMutation]);
 
   const clearJob = useCallback(() => {

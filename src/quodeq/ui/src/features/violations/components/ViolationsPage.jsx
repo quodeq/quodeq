@@ -83,8 +83,10 @@ function FileSubTab({ dimensions, onFileClick, currentPath, setCurrentPath }) {
   }, [onFileClick]);
 
   const handleCellClick = useCallback(({ row, severity }) => {
-    // Navigate to file/folder detail filtered by severity
-    onFileClick?.(treeNodeToFileObj(row, { severity: severity || undefined }));
+    // Pass the full file object and let FileDetailPage apply the filter, so
+    // the severity-filter pill reflects the user's choice (rather than the
+    // file silently arriving pre-filtered).
+    onFileClick?.(treeNodeToFileObj(row), { severity: severity || undefined });
   }, [onFileClick]);
 
   return (

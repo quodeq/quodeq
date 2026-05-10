@@ -65,31 +65,6 @@ def test_incremental_mode_uses_incremental_loop() -> None:
     per.assert_not_called()
 
 
-def test_save_dimension_fingerprint_is_noop_when_skip_scoring(tmp_path: Path) -> None:
-    """The underlying save_dimension_fingerprint must short-circuit in diff mode.
-
-    Gating here (not at call sites) covers all callers: _process_single_dimension,
-    _run_dry_run, etc.
-    """
-    from quodeq.analysis._incremental_evidence import save_dimension_fingerprint
-
-    # Isolate on skip_scoring specifically: leave diff_from=None so the gate
-    # can only be reading skip_scoring, not diff_from.
-    config = _minimal_config(diff_from=None, skip_scoring=True)
-    config.work_dir = tmp_path
-    # With skip_scoring True, no fingerprint file should be written.
-    save_dimension_fingerprint(config, "security")
-    assert not list(tmp_path.glob("*_fingerprint.json"))
-
-
-def test_save_dimension_fingerprint_writes_when_not_skip_scoring(tmp_path: Path) -> None:
-    """Baseline: normal mode must still write the fingerprint."""
-    from quodeq.analysis._incremental_evidence import save_dimension_fingerprint
-
-    config = _minimal_config(diff_from=None, skip_scoring=False)
-    config.work_dir = tmp_path
-    # Patch the underlying save_fingerprint so we don't exercise the full
-    # fingerprint-build path (which requires source files on disk).
-    with patch("quodeq.analysis._incremental_evidence.save_fingerprint") as real_save:
-        save_dimension_fingerprint(config, "security", files=[], analyzed_files=set())
-    real_save.assert_called_once()
+# Removed save_dimension_fingerprint tests: V1's per-dim fingerprint
+# write is gone (B6). V2 writes per-file cache entries during dispatch
+# and skip_scoring/diff-mode gating happens at the cache layer instead.

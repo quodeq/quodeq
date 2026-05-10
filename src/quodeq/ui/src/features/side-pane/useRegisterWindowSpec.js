@@ -10,7 +10,7 @@ import { useSidePane } from './SidePaneContext.jsx';
  */
 export function useRegisterWindowSpec(type, spec) {
   const ctx = useSidePane();
-  const { registerSpec, unregisterSpec, hasWindow, toggleWindow, windows, MAX_WINDOWS } = ctx;
+  const { registerSpec, unregisterSpec, replaceWindow, hasWindow, toggleWindow, windows, MAX_WINDOWS } = ctx;
 
   useEffect(() => {
     if (!spec) {
@@ -18,8 +18,11 @@ export function useRegisterWindowSpec(type, spec) {
       return undefined;
     }
     registerSpec(type, spec);
+    if (hasWindow(spec.id)) {
+      replaceWindow(spec);
+    }
     return () => unregisterSpec(type);
-  }, [type, spec, registerSpec, unregisterSpec]);
+  }, [type, spec, registerSpec, unregisterSpec, replaceWindow, hasWindow]);
 
   const isInDock = spec ? hasWindow(spec.id) : false;
   const isAtCap = windows.length >= MAX_WINDOWS;

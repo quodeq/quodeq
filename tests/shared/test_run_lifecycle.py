@@ -123,3 +123,32 @@ def test_transition_methods(tmp_path: Path) -> None:
         status = read_status(tmp_path)
         assert status["phase"] == "analyzing"
         assert status["current_dimension"] == "security"
+
+
+def test_lifecycle_seeds_dimensions_pending(tmp_path: Path) -> None:
+    """RunLifecycleContext seeds dimensions.json with PENDING entries on enter."""
+    from quodeq.shared.dimensions_state import read_dimensions
+
+    with RunLifecycleContext(run_dir=tmp_path, job_id="j1", dimensions=["a", "b"]):
+        data = read_dimensions(tmp_path)
+        assert data["dimensions"]["a"]["state"] == "pending"
+        assert data["dimensions"]["b"]["state"] == "pending"
+
+
+def test_breaker_exit_writes_failed_with_reason(tmp_path: Path) -> None:
+    """CircuitBreakerError raised from inside the lifecycle context maps
+    to state=failed with exit_reason=failure_streak."""
+    from quodeq.analysis.cache._failure_streak import CircuitBreakerError
+
+    raised = False
+    try:
+        with RunLifecycleContext(run_dir=tmp_path, job_id="j1", dimensions=["a"]):
+            raise CircuitBreakerError("circuit_breaker")
+    except CircuitBreakerError:
+        raised = True
+
+    assert raised
+    status = read_status(tmp_path)
+    assert status is not None
+    assert status["state"] == "failed"
+    assert status["exit_reason"] == "failure_streak"

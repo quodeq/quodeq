@@ -8,7 +8,6 @@ Requires the ``quodeq[api]`` extra: ``pip install 'quodeq[api]'``
 """
 from __future__ import annotations
 
-import io
 import json
 import logging
 import os
@@ -134,8 +133,15 @@ def _salvage_partial_findings(raw_json: str) -> list[dict]:
     return findings
 
 
-def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
-    """Call LLM via Instructor — returns validated finding dicts.
+def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
+    """Call LLM via Instructor and return ``(findings, was_salvaged)``.
+
+    A clean Instructor return means we know the LLM analysed every file in
+    the prompt. If we fall through to the salvage path, the response was
+    malformed and we extracted whatever flat finding objects we could --
+    we can no longer trust which files were actually completed end-to-end,
+    so callers must NOT emit per-file ``mark_file_done: ok`` markers in
+    that case. See ``run_api_analysis`` for the marker contract.
 
     The OpenAI client owns an httpx connection pool whose sockets count
     against the process FD limit. Without an explicit close, a long scan
@@ -177,16 +183,16 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
         try:
             result = client.chat.completions.create(**create_kwargs)
             _log.debug("Instructor returned %d findings", len(result.findings))
-            return [f.model_dump() for f in result.findings]
+            return [f.model_dump() for f in result.findings], False
         except Exception as exc:
             # Try to salvage valid findings from the malformed response
             raw = str(exc)
             salvaged = _salvage_partial_findings(raw)
             if salvaged:
                 _log.debug("Instructor validation failed — salvaged %d findings from malformed response", len(salvaged))
-                return salvaged
+                return salvaged, True
             _log.debug("Instructor validation failed — no findings salvaged: %s", str(exc)[:200])
-            return []
+            return [], True
 
 
 # ---------------------------------------------------------------------------
@@ -213,23 +219,25 @@ def _infer_end_line(findings: list[dict]) -> None:
             f["end_line"] = line + n - 1
 
 
-def _enrich_findings(
-    findings: list[dict],
+def _build_router_context(
     compiled_dir: Path | None,
     dimension: str | None,
     work_dir: Path | None,
-    project_dir: Path | None = None,
-) -> list[dict]:
-    """Enrich findings through FindingsRouter (same as MCP path)."""
-    _infer_end_line(findings)
+    project_dir: Path | None,
+) -> CompiledContext | None:
+    """Build the CompiledContext that FindingsRouter needs for enrichment.
+
+    Returns ``None`` when *compiled_dir* is unset, signalling that the
+    caller should write findings without enrichment (legacy behaviour).
+    """
     if not compiled_dir:
-        return findings
+        return None
     try:
         compiled_refs = load_compiled_refs(compiled_dir, dimension) or {}
         compiled_reqs = load_compiled_requirements(compiled_dir, dimension) or {}
         project_shape = detect_shape(work_dir) if work_dir is not None else None
         precedents = load_precedent_fingerprints(project_dir) if project_dir else set()
-        ctx = CompiledContext(
+        return CompiledContext(
             compiled_refs=compiled_refs,
             compiled_reqs=compiled_reqs,
             dimension=dimension,
@@ -237,16 +245,9 @@ def _enrich_findings(
             project_shape=project_shape,
             precedent_fingerprints=precedents,
         )
-
-        buf = io.StringIO()
-        router = FindingsRouter(buf, context=ctx)
-        for f in findings:
-            router.receive(f)
-        buf.seek(0)
-        return [json.loads(line) for line in buf if line.strip()]
     except Exception as exc:
-        _log.warning("Could not enrich findings: %s — writing raw", exc)
-        return findings
+        _log.warning("Could not build enrichment context: %s -- writing raw", exc)
+        return None
 
 
 def _resolve_file_paths(findings: list[dict], source_paths: list[str]) -> list[dict]:
@@ -277,20 +278,53 @@ def run_api_analysis(
     work_dir: Path | None = None,
     source_file_paths: list[str] | None = None,
 ) -> None:
-    """Call an LLM API and write findings to JSONL."""
-    findings = _call_api(prompt, config)
+    """Call an LLM API and persist evidence through ``FindingsRouter``.
+
+    Both the CLI/MCP path and this API path write per-dim evidence through
+    a single canonical sink (``FindingsRouter``). The router owns:
+
+    - Atomic per-line writes (concurrency-safe with sibling writers).
+    - Finding dedup + enrichment via the compiled standards context.
+    - The ``mark_file_done`` per-file completion marker that drives the
+      V2 cache's ``ok_files`` filter (``analysis/cache/dimension_helpers.py``).
+
+    Marker contract:
+        On a clean Instructor return, every file in *source_file_paths* gets
+        an ``ok`` marker -- the API call analysed all of them in one shot.
+        On the salvage path (malformed JSON, partial recovery) we cannot
+        prove which files were actually completed, so no markers are emitted
+        and the cache will dispatch all of them on the next run. Same
+        guarantee as the CLI path: a file is only ever marked ``ok`` when
+        analysis genuinely finished.
+
+    *source_file_paths* should be the full per-dim file list. When omitted,
+    no markers are emitted (preserves caller flexibility but the run will
+    not benefit from V2 cache hits across re-runs).
+    """
+    findings, was_salvaged = _call_api(prompt, config)
 
     if source_file_paths:
         findings = _resolve_file_paths(findings, source_file_paths)
+
+    _infer_end_line(findings)
 
     # jsonl_file is `<project_dir>/<run_id>/evidence/<dim>_evidence.jsonl`,
     # so the project directory is its great-grandparent. Used by the
     # context-enricher pipeline to load prior dismissals as precedents.
     project_dir = jsonl_file.parent.parent.parent if jsonl_file else None
-    findings = _enrich_findings(findings, compiled_dir, dimension, work_dir, project_dir)
+    ctx = _build_router_context(compiled_dir, dimension, work_dir, project_dir)
 
-    _log.debug("Received %d findings from API", len(findings))
+    _log.debug(
+        "API runner: %d findings, salvaged=%s, marking %d files",
+        len(findings), was_salvaged,
+        len(source_file_paths) if source_file_paths and not was_salvaged else 0,
+    )
 
+    jsonl_file.parent.mkdir(parents=True, exist_ok=True)
     with open(jsonl_file, "a") as fh:
-        for finding in findings:
-            fh.write(json.dumps(finding) + "\n")
+        router = FindingsRouter(fh, context=ctx)
+        for f in findings:
+            router.receive(f)
+        if not was_salvaged and source_file_paths:
+            for path in source_file_paths:
+                router.mark_file_done(file=path, status="ok")

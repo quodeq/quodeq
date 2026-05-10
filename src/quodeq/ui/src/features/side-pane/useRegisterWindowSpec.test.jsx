@@ -105,4 +105,98 @@ describe('useRegisterWindowSpec', () => {
     fireEvent.click(screen.getByTestId('null-btn'));
     expect(screen.getByTestId('dock')).toHaveTextContent('empty');
   });
+
+  function VersionedPage({ id, version }) {
+    const spec = useMemo(
+      () => ({ id, type: 'report', title: `v${version}`, render: () => <p>{`body:${version}`}</p> }),
+      [id, version],
+    );
+    useRegisterWindowSpec('report', spec);
+    return null;
+  }
+
+  function VersionedHarness() {
+    const [version, setVersion] = useState(1);
+    return (
+      <>
+        <VersionedPage id="r1" version={version} />
+        <button data-testid="bump" onClick={() => setVersion((n) => n + 1)}>bump</button>
+      </>
+    );
+  }
+
+  function DockBody() {
+    const { windows } = useSidePane();
+    return <div data-testid="dock-body">{windows.map((w) => `${w.id}:${w.title}`).join(',') || 'empty'}</div>;
+  }
+
+  it('re-registering an updated spec updates the docked window in place', () => {
+    function Adder() {
+      const { addWindow } = useSidePane();
+      return (
+        <button
+          data-testid="open"
+          onClick={() => addWindow({ id: 'r1', type: 'report', title: 'v1', render: () => <p>body:1</p> })}
+        >open</button>
+      );
+    }
+    render(
+      <SidePaneProvider>
+        <Adder />
+        <VersionedHarness />
+        <DockBody />
+      </SidePaneProvider>,
+    );
+    fireEvent.click(screen.getByTestId('open'));
+    expect(screen.getByTestId('dock-body')).toHaveTextContent('r1:v1');
+    fireEvent.click(screen.getByTestId('bump'));
+    expect(screen.getByTestId('dock-body')).toHaveTextContent('r1:v2');
+  });
+
+  it('re-registering a spec when no matching window is docked does not add a window', () => {
+    render(
+      <SidePaneProvider>
+        <VersionedHarness />
+        <DockBody />
+      </SidePaneProvider>,
+    );
+    expect(screen.getByTestId('dock-body')).toHaveTextContent('empty');
+    fireEvent.click(screen.getByTestId('bump'));
+    expect(screen.getByTestId('dock-body')).toHaveTextContent('empty');
+  });
+
+  it('re-registering the same spec reference does not trigger a render cascade', () => {
+    let renderCount = 0;
+    function CountingPage({ spec }) {
+      useRegisterWindowSpec('report', spec);
+      renderCount += 1;
+      return null;
+    }
+    function Harness() {
+      const spec = useMemo(
+        () => ({ id: 'r1', type: 'report', title: 'v1', render: () => <p>body</p> }),
+        [],
+      );
+      const { addWindow } = useSidePane();
+      return (
+        <>
+          <CountingPage spec={spec} />
+          <button data-testid="open" onClick={() => addWindow(spec)}>open</button>
+        </>
+      );
+    }
+    render(
+      <SidePaneProvider>
+        <Harness />
+      </SidePaneProvider>,
+    );
+    const before = renderCount;
+    fireEvent.click(screen.getByTestId('open'));
+    const after = renderCount;
+    // Opening the window should cause at most one extra render of the page
+    // (the windows state changes once). If replaceWindow does not short-
+    // circuit on identity, this triggers an unbounded cascade and the diff
+    // will be much larger.
+    expect(after - before).toBeLessThanOrEqual(2);
+  });
 });

@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.1.1] - 2026-05-10
+
+### Features
+- **Content-addressed result cache (V2)**: replaces the legacy fingerprint-based cache. Findings are keyed by file content + dispatch parameters, persist incrementally across runs, and survive interrupted scans. Per-dimension `cache_stats` markers report hit/miss telemetry. The old `QUODEQ_CACHE_V2` flag is gone, V2 is the only path.
+- **Per-file completion markers**: subagents now call `mark_file_done` to signal a file finished cleanly. Only files with an `ok` marker are persisted to cache, so a crashed or killed subagent can no longer poison future runs with partial results.
+- **Consecutive-failure circuit breaker**: a streak of failing dimensions trips the breaker and exits with `exit_reason=failure_streak` instead of grinding through every remaining dimension.
+- **Per-dimension state machine**: each dimension's lifecycle (pending, running, complete, incomplete) is tracked in `dimensions.json` and surfaced via the API status endpoint. Discard wipes V2 cache entries for incomplete dims so resuming reanalyzes them cleanly.
+- **Live history view**: in-progress runs in History show a live dim summary as dimensions complete, refresh on tab open (not just poll tick), and flip to terminal state immediately when a run is cancelled. SSE-driven; the recurring poll is gated off when SSE is enabled.
+- **Severity filter on detail reports**: file and principle detail reports plus their fix plans now honor the active severity filter.
+- **Clickable violation drill-downs**: violation counts on the overview, run, dimension, and table views drill into the matching findings.
+- **Dismiss findings from file detail**: previously only available on the violations table.
+- **3-button cancel modal**: replaces the checkbox-style modal with a clearer 3-button layout.
+
+### Improvements
+- **Periodic per-file cache persist** during dispatch so a hard crash doesn't lose all in-flight work.
+- **Cache pre-writes carry-forward findings before dispatch** so a single dedup pass is enough.
+- **Side-pane window registration**: re-registering a window with the same spec ref is a no-op; differing specs replace the docked window cleanly.
+- **Tighter cancel button and partial-run chip tooltip** on the running-eval header.
+
+### Fixes
+- **BrokenPipeError on success-log no longer marks a successful dim as incomplete**.
+- **Cancel waits for `status.json` to reach a terminal state** before returning, so the UI never races ahead of the worker.
+- **History row shows the correct dim count** for multi-dim runs (3-dim runs no longer rendered as single-dim).
+- **History row shows a "performing an evaluation..." placeholder** for running rows instead of empty space.
+- **Project queries invalidate on eval start** so History reflects the new run immediately.
+- **Dashboard self-heals stale dim cache** by validating against the on-disk eval file count, and bypasses the dim cache entirely for in-progress runs so finished dims surface mid-run.
+- **`--clean-scan` invalidates V2 cache entries up front** instead of only bypassing reads.
+- **Windows cp1252**: replaced unicode arrows and em-dashes in analysis output that crashed on Windows consoles.
+- **`dimensions.json` written to `run_dir`**, not `work_dir`.
+- **API runner emits `file_done` markers** via the FindingsRouter, so API-driven runs get the same crash-safety as CLI runs.
+- **Pre-marker cache entries invalidated** via a schema-version bump.
+
 ## [1.1.0] - 2026-05-08
 
 ### Features
