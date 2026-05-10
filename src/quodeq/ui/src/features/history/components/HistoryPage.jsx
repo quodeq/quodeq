@@ -3,6 +3,8 @@ import { gradeLabel, scoreColorClass } from '../../../utils/formatters.js';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
 import { useRunningRunsRefresh } from '../../../hooks/useRunningRunsRefresh.js';
+import { useHistoryRunLive } from '../hooks/useHistoryRunLive.js';
+import { formatLiveDimSummary } from '../utils/formatLiveDimSummary.js';
 const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
 
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
@@ -13,6 +15,7 @@ import { TermHeader } from '../../../components/terminal/index.js';
 import EmptyState from '../../../components/EmptyState.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import FittedText from '../../../components/FittedText.jsx';
+import { abbrevDim } from '../utils/dimAbbrev.js';
 
 const TOAST_DISMISS_MS = 2600;
 const NOT_READY_MESSAGE = 'No standards fully evaluated yet. Try again once the first one finishes.';
@@ -59,23 +62,6 @@ function computeDeltas(rows) {
   });
 }
 
-// Shorter labels for the multi-dim summary so the row's dimensions cell
-// can fit the count and names instead of truncating after the first dim.
-// The full dim name is still visible after click-through.
-const _DIM_ABBREV = {
-  flexibility: 'flex',
-  maintainability: 'maint',
-  performance: 'perf',
-  reliability: 'rel',
-  security: 'sec',
-  usability: 'usab',
-};
-
-function _abbrevDim(name) {
-  if (!name) return name;
-  const lower = name.toLowerCase();
-  return _DIM_ABBREV[lower] || (lower.length > 5 ? lower.slice(0, 4) : lower);
-}
 
 function formatDimSummary(entry) {
   const dims = (entry?.dimensionDetails || []).filter((d) => d?.dimension);
@@ -92,7 +78,7 @@ function formatDimSummary(entry) {
   // in the dimensions cell instead of getting truncated after the first.
   const parts = dims.map((d) => {
     const score = parseFloat(d.score);
-    const label = _abbrevDim(d.dimension);
+    const label = abbrevDim(d.dimension);
     if (Number.isNaN(score)) return label;
     return `${label} ${score.toFixed(1)}`;
   });
@@ -181,6 +167,48 @@ function HistoryRow({ className = '', onClick, cells, onDelete, title }) {
   );
 }
 
+/**
+ * Row variant for in-progress runs. Calls useHistoryRunLive at the top
+ * level (cannot be conditional inside .map()), reads live dim payloads
+ * from the SSE-fed cache, and renders a partial summary as soon as the
+ * first dim has scored. Falls back to the 'performing an evaluation...'
+ * placeholder while no dim has scored.
+ */
+function InProgressHistoryRow({ entry, onClick, onNotReadyClick }) {
+  const { liveDims, plannedDimensions } = useHistoryRunLive(entry.runId);
+  const liveCount = Object.values(liveDims || {}).filter((d) => d?.dimension).length;
+  const notReady = entry.hasScoredDims === false && liveCount === 0;
+  const { date } = formatDateParts(new Date().toISOString());
+  const liveText = liveCount === 0 ? '' : formatLiveDimSummary(liveDims, plannedDimensions);
+  const dimsCell = liveCount === 0
+    ? <span className="history-row__muted">performing an evaluation...</span>
+    : (
+      <span className="history-row__muted">
+        <FittedText text={liveText} mode="end" />
+      </span>
+    );
+  return (
+    <HistoryRow
+      className={`history-row--in-progress${notReady ? ' history-row--not-ready' : ''}`}
+      onClick={notReady ? () => onNotReadyClick() : () => onClick(entry.runId)}
+      title={notReady ? NOT_READY_MESSAGE : undefined}
+      cells={{
+        date,
+        time: (
+          <span className="history-row__running">
+            <span className="history-row__running-dot" aria-hidden="true" />
+            running
+          </span>
+        ),
+        grade: <span className="history-row__muted">—</span>,
+        score: <span className="history-row__muted">—</span>,
+        delta: <span className="history-delta history-delta--muted">—</span>,
+        dims: dimsCell,
+      }}
+    />
+  );
+}
+
 function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRunClick, onDeleteRun, onNotReadyClick }) {
   return (
     <section className="history-evaluations panel">
@@ -202,39 +230,12 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
         {visible.map((entry, i) => {
           const isInProgress = entry.status === 'in_progress';
           if (isInProgress) {
-            const { date } = formatDateParts(new Date().toISOString());
-            // Stubs (hasScoredDims === false) have no completed standards yet
-            // and would land on an empty dashboard. Block the click and tell
-            // the user to wait. Runs that already have at least one scored
-            // dim remain clickable. We used to surface a partial dim summary
-            // here, but dimensionDetails only fills in once the umbrella run
-            // terminates -- so the cell sat empty for the whole run and then
-            // flipped to a finished summary at the very end. A flat
-            // 'performing an evaluation...' placeholder is honest about the
-            // state and avoids implying live per-dim progress.
-            const notReady = entry.hasScoredDims === false;
-            const dimsCell = (
-              <span className="history-row__muted">performing an evaluation...</span>
-            );
             return (
-              <HistoryRow
+              <InProgressHistoryRow
                 key={entry.runId}
-                className={`history-row--in-progress${notReady ? ' history-row--not-ready' : ''}`}
-                onClick={notReady ? () => onNotReadyClick() : () => onRunClick(entry.runId)}
-                title={notReady ? NOT_READY_MESSAGE : undefined}
-                cells={{
-                  date,
-                  time: (
-                    <span className="history-row__running">
-                      <span className="history-row__running-dot" aria-hidden="true" />
-                      running
-                    </span>
-                  ),
-                  grade: <span className="history-row__muted">—</span>,
-                  score: <span className="history-row__muted">—</span>,
-                  delta: <span className="history-delta history-delta--muted">—</span>,
-                  dims: dimsCell,
-                }}
+                entry={entry}
+                onClick={onRunClick}
+                onNotReadyClick={onNotReadyClick}
               />
             );
           }
