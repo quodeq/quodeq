@@ -46,7 +46,7 @@ MAJOR       src/auth.py:42      Hardcoded credentials in source code       CWE-7
 MINOR       src/utils.py:23     Bare except clause hides errors            CWE-396
             except: pass
 
-COMPLIANCE  src/api.py:88       Parameterized query prevents injection
+COMPLIANCE  src/api.py:88       Parameterized query prevents injection     CWE-89
             cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
 ```
 
