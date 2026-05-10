@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -309,6 +310,13 @@ class FsEvaluationMixin:
         report file already exists), so double-firing with the route-level
         scoring in ``_evaluation_routes`` is a no-op.
 
+        After ``cancel_job`` returns we wait briefly for the run lifecycle
+        handler in the subprocess to write ``status.json`` to a terminal
+        state. Without this wait, the API returns while observers reading
+        ``status.json`` (UI dashboard query, SSE stream, etc.) still see
+        the run as ``in_progress`` for a window of ~100ms-1s, producing
+        the "two running rows" UX after a cancel-then-start.
+
         When ``discard_partial`` is True we also wipe queue + fingerprint
         files for any dim that didn't complete scoring — the next run sees
         no salvageable state and starts fresh for those dims.
@@ -317,6 +325,8 @@ class FsEvaluationMixin:
         job = self.get_evaluation_status(job_id, reports_dir=reports_dir)
         ok = self._jobs.cancel_job(job_id, reports_root=reports_root)
         if ok and reports_dir and job:
+            run_dir = Path(reports_dir) / job.output_project / job.output_run_id
+            _wait_for_terminal_status(run_dir)
             _score_completed_evidence(reports_dir, {
                 "outputProject": job.output_project,
                 "outputRunId": job.output_run_id,
@@ -354,6 +364,46 @@ class FsEvaluationMixin:
         if states:
             jobs = [j for j in jobs if j.status in states]
         return jobs[:limit] if limit > 0 else jobs
+
+
+_TERMINAL_RUN_STATES = frozenset({"done", "failed", "cancelled"})
+_CANCEL_WAIT_TIMEOUT_S = 2.0
+_CANCEL_WAIT_POLL_S = 0.05
+
+
+def _wait_for_terminal_status(
+    run_dir: Path,
+    *,
+    timeout_s: float = _CANCEL_WAIT_TIMEOUT_S,
+    poll_interval_s: float = _CANCEL_WAIT_POLL_S,
+) -> bool:
+    """Block until ``run_dir/status.json`` reports a terminal state, or timeout.
+
+    Returns True when a terminal state ({done, failed, cancelled}) is
+    observed on disk; returns False on timeout. Best-effort: a False
+    return does not abort the calling cancel flow — downstream polling
+    or SSE will eventually catch up.
+
+    Bridges the async gap between ``JobManager.cancel_job`` returning
+    (in-memory state flipped, signal sent to subprocess) and the run
+    lifecycle handler in the subprocess flushing ``status.json`` to
+    terminal. Without this wait, observers reading from disk
+    immediately after the API returns can still see the run as
+    ``in_progress`` for ~100ms-1s, producing a window where a
+    follow-up "Start" surfaces two ``running`` rows in the UI.
+    """
+    deadline = time.monotonic() + timeout_s
+    status_path = run_dir / "status.json"
+    while True:
+        try:
+            data = json.loads(status_path.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and data.get("state") in _TERMINAL_RUN_STATES:
+                return True
+        except (OSError, ValueError):
+            pass
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(poll_interval_s)
 
 
 def _open_cache():
