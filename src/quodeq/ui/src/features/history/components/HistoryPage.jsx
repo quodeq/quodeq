@@ -205,18 +205,17 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
             const { date } = formatDateParts(new Date().toISOString());
             // Stubs (hasScoredDims === false) have no completed standards yet
             // and would land on an empty dashboard. Block the click and tell
-            // the user to wait. Running runs that ARE in trend (i.e. already
-            // have at least one scored dim) remain clickable, and we surface
-            // the dims that *have* completed instead of a generic
-            // "in progress" placeholder.
+            // the user to wait. Runs that already have at least one scored
+            // dim remain clickable. We used to surface a partial dim summary
+            // here, but dimensionDetails only fills in once the umbrella run
+            // terminates -- so the cell sat empty for the whole run and then
+            // flipped to a finished summary at the very end. A flat
+            // 'performing an evaluation...' placeholder is honest about the
+            // state and avoids implying live per-dim progress.
             const notReady = entry.hasScoredDims === false;
-            const dimsCell = notReady
-              ? <span className="history-row__muted">no scores yet</span>
-              : (
-                <span className="history-row__muted">
-                  <FittedText text={formatDimSummary(entry)} mode="end" />
-                </span>
-              );
+            const dimsCell = (
+              <span className="history-row__muted">performing an evaluation...</span>
+            );
             return (
               <HistoryRow
                 key={entry.runId}
