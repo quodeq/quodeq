@@ -1,5 +1,6 @@
 import { useState } from "react";
 import FindingsList from "./verifier/FindingsList";
+import VerificationDetail from "./verifier/VerificationDetail";
 
 export default function Verifier({ evaluationId, findings }) {
   const [selected, setSelected] = useState(null);
@@ -15,10 +16,11 @@ export default function Verifier({ evaluationId, findings }) {
       </div>
       <div style={{ flex: "1 1 60%", overflow: "auto", padding: "1rem" }}>
         {selected ? (
-          <div style={{ color: "#666" }}>
-            Selected {selected.dimension} / {selected.findingId}.
-            (VerificationDetail panel will land in Task 9.)
-          </div>
+          <VerificationDetail
+            evaluationId={evaluationId}
+            dimension={selected.dimension}
+            findingId={selected.findingId}
+          />
         ) : (
           <div style={{ color: "#666", padding: "2rem" }}>
             Select a finding from the list to verify it.
