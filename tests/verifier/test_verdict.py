@@ -40,15 +40,36 @@ def test_q4_no_is_confirmed():
     assert compute_verdict(_resp(answers)) == Verdict.CONFIRMED
 
 
-def test_q3_unknown_is_inconclusive():
+def test_q3_unknown_with_q4q5_yes_is_false_positive():
     answers = {q: "yes" for q in ("Q1", "Q2", "Q3", "Q4", "Q5")}
     answers["Q3"] = "unknown"
-    assert compute_verdict(_resp(answers)) == Verdict.INCONCLUSIVE
+    assert compute_verdict(_resp(answers)) == Verdict.FALSE_POSITIVE
+
+
+def test_q4_unknown_with_q3q5_yes_is_false_positive():
+    answers = {q: "yes" for q in ("Q1", "Q2", "Q3", "Q4", "Q5")}
+    answers["Q4"] = "unknown"
+    assert compute_verdict(_resp(answers)) == Verdict.FALSE_POSITIVE
+
+
+def test_q5_unknown_with_q3q4_yes_is_false_positive():
+    answers = {q: "yes" for q in ("Q1", "Q2", "Q3", "Q4", "Q5")}
+    answers["Q5"] = "unknown"
+    assert compute_verdict(_resp(answers)) == Verdict.FALSE_POSITIVE
 
 
 def test_q5_no_with_q3q4_yes_is_inconclusive():
+    # Q5=no blocks false_positive (we tolerate unknown, not no), but Q3 and Q4
+    # are not the structural-failure questions, so we don't confirm either.
     answers = {q: "yes" for q in ("Q1", "Q2", "Q3", "Q4", "Q5")}
     answers["Q5"] = "no"
+    assert compute_verdict(_resp(answers)) == Verdict.INCONCLUSIVE
+
+
+def test_two_unknowns_is_inconclusive():
+    answers = {q: "yes" for q in ("Q1", "Q2", "Q3", "Q4", "Q5")}
+    answers["Q3"] = "unknown"
+    answers["Q4"] = "unknown"
     assert compute_verdict(_resp(answers)) == Verdict.INCONCLUSIVE
 
 
