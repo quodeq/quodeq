@@ -41,6 +41,7 @@ class PythonAdapter(LanguageAdapter):
         self._q_functions = _load_query(self._language, "function_definitions.scm")
         self._q_params = _load_query(self._language, "parameter_annotations.scm")
         self._q_imports = _load_query(self._language, "imports.scm")
+        self._q_calls = _load_query(self._language, "calls.scm")
 
     def parse(self, source: bytes) -> ParseResult:
         tree = self._parser.parse(source)
@@ -49,13 +50,14 @@ class PythonAdapter(LanguageAdapter):
         classes = self._extract_classes(root, source)
         functions, params = self._extract_functions(root, source)
         imports = self._extract_imports(root, source)
+        calls = self._extract_calls(root, source)
 
         return ParseResult(
             classes=classes,
             functions=functions,
             params=params,
             imports=imports,
-            calls=[],
+            calls=calls,
         )
 
     def _extract_classes(self, root: Node, source: bytes) -> list[ClassDef]:
@@ -202,6 +204,22 @@ class PythonAdapter(LanguageAdapter):
                                 is_lazy=_is_inside_function(stmt),
                             )
                         )
+        return out
+
+    def _extract_calls(self, root: Node, source: bytes) -> list[CallSite]:
+        out: list[CallSite] = []
+        seen: set[tuple[int, str]] = set()
+        for capture_name, nodes in self._q_calls.captures(root).items():
+            if capture_name not in {"call.simple", "call.attr"}:
+                continue
+            for node in nodes:
+                line = node.start_point[0] + 1
+                name = _text(node, source)
+                key = (line, name)
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(CallSite(line=line, callee=name))
         return out
 
     @staticmethod

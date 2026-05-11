@@ -171,3 +171,16 @@ import os.path as path_lib
     assert i.imported_name == "path_lib"
     assert i.source_module is None
     assert i.is_lazy is False
+
+
+def test_extracts_call_sites_with_callee_names():
+    adapter = PythonAdapter()
+    src = b'''
+def create_app(provider=None):
+    provider = provider or _default_provider()
+    helper(arg)
+'''
+    result = adapter.parse(src)
+    callees = sorted(c.callee for c in result.calls)
+    assert "_default_provider" in callees
+    assert "helper" in callees
