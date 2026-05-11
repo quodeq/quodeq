@@ -16,6 +16,7 @@ writes the audit-log directory.
 
 from __future__ import annotations
 
+import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -178,3 +179,42 @@ def _result_to_raw_dict(result: VerifierResult) -> dict:
         "confidence": result.response.confidence,
         "evidence_summary": result.response.evidence_summary,
     }
+
+
+def jsonl_finding_locator(evaluations_root: Path) -> FindingLocator:
+    """Return a locator that reads findings from the JSONL evaluation store.
+
+    Looks for findings in any of `<evaluations_root>/<eval_id>/*/evaluation/<dimension>.json`.
+    The JSON files use the shape `{"findings": [...]}` where each finding has
+    `id`, `file`, `line`, `title`, `principle`, `severity` (and others).
+    """
+
+    def _locate(evaluation_id: str, dimension: str, finding_id: str) -> LocatedFinding | None:
+        eval_dir = evaluations_root / evaluation_id
+        if not eval_dir.exists():
+            return None
+        for run_dir in eval_dir.iterdir():
+            if not run_dir.is_dir():
+                continue
+            dim_file = run_dir / "evaluation" / f"{dimension}.json"
+            if not dim_file.exists():
+                continue
+            try:
+                payload = json.loads(dim_file.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            for finding in payload.get("findings", []):
+                if str(finding.get("id")) != finding_id:
+                    continue
+                principle = finding.get("principle") or ""
+                title = finding.get("title") or ""
+                return LocatedFinding(
+                    file=finding.get("file", ""),
+                    line=int(finding.get("line", 0) or 0),
+                    category=f"{dimension}/{principle}".strip("/"),
+                    severity=str(finding.get("severity", "unknown")),
+                    description=title,
+                )
+        return None
+
+    return _locate
