@@ -118,6 +118,20 @@ def create_app(
     configure_security(app, store, api_key)
     log_buffer, verbose = _configure_logging(app)
     _register_health_route(app, verbose)
+
+    # Optional verifier service (Plan 3). Enabled via QUODEQ_VERIFIER_ENABLED=1.
+    from quodeq.verifier.service import VerifierService, jsonl_finding_locator
+    verifier_service: VerifierService | None = None
+    if os.environ.get("QUODEQ_VERIFIER_ENABLED", "0") == "1":
+        evaluations_root = Path(get_evaluations_dir())
+        verifier_service = VerifierService(
+            evaluations_root=evaluations_root,
+            project_root=Path.cwd(),  # NOTE: Task 7 will refine per-evaluation
+            finding_locator=jsonl_finding_locator(evaluations_root),
+            model=os.environ.get("QUODEQ_VERIFIER_MODEL", "gemma3:4b"),
+        )
+    app.config["_verifier_service"] = verifier_service
+
     register_all_routes(app, provider, eval_store, static_dist, log_buffer)
     return app
 
