@@ -203,3 +203,31 @@ def test_post_verify_returns_504_on_timeout(tmp_path: Path):
     resp = app.test_client().post("/api/evaluations/eval-1/verify/flexibility/f1")
     assert resp.status_code == 504
     assert resp.get_json()["error"] == "verifier_timeout"
+
+
+def test_post_verify_returns_415_for_unsupported_language(tmp_path: Path, stub_client):
+    """A finding in a non-Python file returns 415 with a helpful hint."""
+    # Create a project with only a Ruby file (no Python adapter will match)
+    (tmp_path / "app.rb").write_text("class Foo\n  def bar; end\nend\n")
+
+    def locate(eval_id, dim, fid):
+        return LocatedFinding(
+            file="app.rb", line=1,
+            category="flexibility/Adaptability", severity="major",
+            description="hardcoded",
+        )
+    service = VerifierService(
+        evaluations_root=tmp_path / "evals",
+        project_root=tmp_path,
+        finding_locator=locate,
+        client=stub_client({}),  # never reached
+        model="gemma:4",
+    )
+    app = Flask(__name__)
+    register_routes_verifier(app, service)
+    resp = app.test_client().post("/api/evaluations/eval-1/verify/flexibility/f1")
+    assert resp.status_code == 415
+    body = resp.get_json()
+    assert body["error"] == "language_not_supported"
+    assert ".rb" in body["detail"]
+    assert "Python" in body["hint"]
