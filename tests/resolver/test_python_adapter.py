@@ -78,3 +78,44 @@ class Outer(BaseOuter):
     classes_by_name = {c.name: c for c in result.classes}
     assert classes_by_name["Outer"].bases == ["BaseOuter"]
     assert classes_by_name["Inner"].bases == ["BaseInner"]
+
+
+def test_extracts_function_with_signature():
+    adapter = PythonAdapter()
+    src = b'''
+def _default_provider() -> ActionProvider:
+    """docstring"""
+    return FilesystemActionProvider()
+'''
+    result = adapter.parse(src)
+    assert len(result.functions) == 1
+    fn = result.functions[0]
+    assert fn.name == "_default_provider"
+    assert fn.line == 2
+    assert "ActionProvider" in fn.signature
+    assert fn.return_type == "ActionProvider"
+
+
+def test_extracts_function_with_annotated_parameter():
+    adapter = PythonAdapter()
+    src = b'''
+def create_app(provider: ActionProvider | None = None) -> Flask:
+    pass
+'''
+    result = adapter.parse(src)
+    assert len(result.functions) == 1
+    assert len(result.params) == 1
+    p = result.params[0]
+    assert p.function_name == "create_app"
+    assert p.param_name == "provider"
+    assert "ActionProvider" in p.annotation_names
+
+
+def test_param_without_annotation_omitted():
+    adapter = PythonAdapter()
+    src = b'''
+def f(x):
+    pass
+'''
+    result = adapter.parse(src)
+    assert result.params == []
