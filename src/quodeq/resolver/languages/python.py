@@ -38,9 +38,7 @@ class PythonAdapter(LanguageAdapter):
         self._language = get_language("python")
         self._parser = Parser(self._language)
         self._q_classes = _load_query(self._language, "class_definitions.scm")
-        self._q_functions = _load_query(self._language, "function_definitions.scm")
         self._q_params = _load_query(self._language, "parameter_annotations.scm")
-        self._q_imports = _load_query(self._language, "imports.scm")
         self._q_calls = _load_query(self._language, "calls.scm")
 
     def parse(self, source: bytes) -> ParseResult:
