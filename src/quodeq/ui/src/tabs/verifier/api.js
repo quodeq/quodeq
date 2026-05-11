@@ -14,10 +14,10 @@ export async function getVerification(evalId, verificationId) {
   return resp.json();
 }
 
-export async function verifyFinding(evalId, dimension, findingId) {
+export async function verifyFinding(evalId, dimension, findingId, { signal } = {}) {
   const resp = await fetch(
     `/api/evaluations/${evalId}/verify/${dimension}/${findingId}`,
-    { method: "POST" }
+    { method: "POST", signal }
   );
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({}));

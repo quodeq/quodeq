@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { verifyFinding } from "./api";
 
 const VERDICT_STYLES = {
@@ -7,16 +7,51 @@ const VERDICT_STYLES = {
   inconclusive: { color: "#888", background: "#f3f3f3" },
 };
 
+// Cap a single verify at 4 min. Longer than the worst observed run (~105s for
+// gemma4:26b cold) so we don't kill real work, but bounded so a dropped
+// connection (e.g. dev-server auto-reload) doesn't strand the UI in
+// "Verifying…" forever.
+const VERIFY_TIMEOUT_MS = 240_000;
+
 export default function VerificationDetail({ evaluationId, dimension, findingId }) {
   const [state, setState] = useState({ status: "idle", result: null, error: null });
+  const abortRef = useRef(null);
+
+  // If the user clicks away (different finding, different tab) while a verify
+  // is in flight, abort it so we don't leak the request.
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
 
   async function onVerify() {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const timer = setTimeout(
+      () => controller.abort(new DOMException("timeout", "TimeoutError")),
+      VERIFY_TIMEOUT_MS,
+    );
+
     setState({ status: "loading", result: null, error: null });
     try {
-      const result = await verifyFinding(evaluationId, dimension, findingId);
+      const result = await verifyFinding(
+        evaluationId,
+        dimension,
+        findingId,
+        { signal: controller.signal },
+      );
       setState({ status: "done", result, error: null });
     } catch (err) {
-      setState({ status: "error", result: null, error: err.message });
+      const message =
+        err?.name === "TimeoutError" || err?.cause?.name === "TimeoutError"
+          ? `Verification timed out after ${VERIFY_TIMEOUT_MS / 1000}s. The server may have restarted; click Retry.`
+          : err?.name === "AbortError"
+          ? "Verification cancelled."
+          : err?.message || String(err);
+      setState({ status: "error", result: null, error: message });
+    } finally {
+      clearTimeout(timer);
+      if (abortRef.current === controller) abortRef.current = null;
     }
   }
 
