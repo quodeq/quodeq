@@ -145,3 +145,29 @@ def _default_provider():
     assert len(result.imports) == 1
     assert result.imports[0].imported_name == "FilesystemActionProvider"
     assert result.imports[0].is_lazy is True
+
+
+def test_extracts_plain_aliased_import():
+    adapter = PythonAdapter()
+    src = b'''
+import sys as system_lib
+'''
+    result = adapter.parse(src)
+    assert len(result.imports) == 1
+    i = result.imports[0]
+    assert i.imported_name == "system_lib"
+    assert i.source_module is None
+    assert i.is_lazy is False
+
+
+def test_extracts_dotted_plain_aliased_import():
+    adapter = PythonAdapter()
+    src = b'''
+import os.path as path_lib
+'''
+    result = adapter.parse(src)
+    assert len(result.imports) == 1
+    i = result.imports[0]
+    assert i.imported_name == "path_lib"
+    assert i.source_module is None
+    assert i.is_lazy is False

@@ -191,6 +191,17 @@ class PythonAdapter(LanguageAdapter):
                             is_lazy=_is_inside_function(stmt),
                         )
                     )
+                elif name_node.type == "aliased_import":
+                    alias_node = name_node.child_by_field_name("alias")
+                    if alias_node:
+                        out.append(
+                            ImportRecord(
+                                line=stmt.start_point[0] + 1,
+                                imported_name=_text(alias_node, source),
+                                source_module=None,
+                                is_lazy=_is_inside_function(stmt),
+                            )
+                        )
         return out
 
     @staticmethod

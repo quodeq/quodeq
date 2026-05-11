@@ -10,3 +10,8 @@
 
 (import_statement
   name: (dotted_name) @import.name) @import.plain
+
+(import_statement
+  name: (aliased_import
+          name: (dotted_name) @import.original
+          alias: (identifier) @import.alias)) @import.plain_aliased
