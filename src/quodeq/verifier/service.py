@@ -191,6 +191,23 @@ def _result_to_raw_dict(result: VerifierResult) -> dict:
     }
 
 
+def _fnv1a32(s: str) -> str:
+    """FNV-1a 32-bit hash, hex output. Matches the JS implementation in App.jsx."""
+    h = 0x811c9dc5  # FNV offset basis
+    for ch in s.encode("utf-8"):
+        h ^= ch
+        h = (h * 0x01000193) & 0xFFFFFFFF
+    return f"{h:08x}"
+
+
+def _compute_finding_id(finding: dict) -> str:
+    """Compute the stable composite id for a finding, matching the UI's scheme."""
+    file = finding.get("file") or ""
+    line = finding.get("line") or 0
+    title = finding.get("title") or ""
+    return _fnv1a32(f"{file}|{line}|{title}")
+
+
 def jsonl_finding_locator(evaluations_root: Path) -> FindingLocator:
     """Return a locator that reads findings from the JSONL evaluation store.
 
@@ -214,7 +231,15 @@ def jsonl_finding_locator(evaluations_root: Path) -> FindingLocator:
             except (OSError, json.JSONDecodeError):
                 continue
             for finding in payload.get("findings", []):
-                if str(finding.get("id")) != finding_id:
+                # Match either the explicit id (test/synthetic data) or the
+                # composite hash (real findings that have no explicit id field).
+                if str(finding.get("id")) == finding_id:
+                    match = True
+                elif _compute_finding_id(finding) == finding_id:
+                    match = True
+                else:
+                    match = False
+                if not match:
                     continue
                 principle = finding.get("principle") or ""
                 title = finding.get("title") or ""

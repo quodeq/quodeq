@@ -56,3 +56,47 @@ def test_locator_searches_multiple_runs(tmp_path: Path):
     out2 = locator("eval-1", "flexibility", "f2")
     assert out2 is not None
     assert out2.file == "b.py"
+
+
+def test_locator_finds_finding_by_composite_id(tmp_path: Path):
+    # No explicit id field -- real findings shape
+    _write_eval(
+        tmp_path,
+        "eval-1",
+        "run-1",
+        "flexibility",
+        [
+            {
+                "file": "src/api/app.py",
+                "line": 34,
+                "title": "Hardcoded filesystem dependency",
+                "principle": "Adaptability",
+                "severity": "major",
+            }
+        ],
+    )
+    locator = jsonl_finding_locator(tmp_path)
+
+    # Compute the same composite id the UI would compute
+    from quodeq.verifier.service import _compute_finding_id
+    fid = _compute_finding_id({
+        "file": "src/api/app.py",
+        "line": 34,
+        "title": "Hardcoded filesystem dependency",
+    })
+
+    out = locator("eval-1", "flexibility", fid)
+    assert out is not None
+    assert out.file == "src/api/app.py"
+    assert out.line == 34
+    assert "Adaptability" in out.category
+
+
+def test_fnv1a32_matches_known_value():
+    """Pin the hash function to a known output so JS and Python implementations
+    can be cross-checked."""
+    from quodeq.verifier.service import _fnv1a32
+    # Empty string FNV-1a 32-bit is the offset basis itself
+    assert _fnv1a32("") == "811c9dc5"
+    # Known FNV-1a test vector: "foobar" -> 0xbf9cf968
+    assert _fnv1a32("foobar") == "bf9cf968"
