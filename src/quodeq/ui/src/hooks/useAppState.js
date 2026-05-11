@@ -13,7 +13,7 @@ import { useVisibleRuns } from './useVisibleRuns.js';
 
 export const TAB_OVERVIEW = 'overview';
 const TAB_HISTORY_RUN = 'history-run';
-export const KNOWN_TABS = [TAB_OVERVIEW, 'violations', 'map', 'history', 'projects', 'evaluate', 'standards', 'help', 'settings'];
+export const KNOWN_TABS = [TAB_OVERVIEW, 'violations', 'map', 'history', 'projects', 'evaluate', 'verifier', 'standards', 'help', 'settings'];
 export const PROJECT_TABS = KNOWN_TABS.slice(0, 4);
 
 function computeDerivedState(accumulated, dashboard, selectedProject, projects) {

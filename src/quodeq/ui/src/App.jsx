@@ -14,6 +14,7 @@ const StandardsPage = lazy(() => import('./features/standards/StandardsPage.jsx'
 const ViolationsPage = lazy(() => import('./features/violations/components/ViolationsPage.jsx'));
 const MapPage = lazy(() => import('./features/map/components/MapPage.jsx'));
 const HelpPage = lazy(() => import('./features/help/components/HelpPage.jsx'));
+const VerifierTab = lazy(() => import('./tabs/Verifier.jsx'));
 const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
 import EmptyStateWithTour from './features/onboarding/components/EmptyStateWithTour.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
@@ -293,6 +294,16 @@ const ROUTE_RENDERERS = {
     />
   ),
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />,
+  verifier: (params, props) => {
+    const dims = (props.dashboardData.accumulated?.dimensions) || [];
+    const findings = dims.flatMap((d) => (d.violations || []).map((v) => ({ ...v, dimension: v.dimension || d.dimension })));
+    return (
+      <VerifierTab
+        evaluationId={props.navigation.selectedProject}
+        findings={findings}
+      />
+    );
+  },
   file: (params, props) => (
     <FileDetailPage
       file={params.file}
