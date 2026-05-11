@@ -25,7 +25,8 @@ class StubOllamaClient(OllamaClient):
         user: str,
         schema: dict[str, Any],
         model: str,
-        temperature: float = 0.2,
+        temperature: float = 0.0,
+        seed: int = 0,
         keep_alive: str = "10m",
     ) -> dict[str, Any]:
         self.calls.append(
@@ -35,6 +36,7 @@ class StubOllamaClient(OllamaClient):
                 "schema": schema,
                 "model": model,
                 "temperature": temperature,
+                "seed": seed,
             }
         )
         if not self.script:

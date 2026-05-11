@@ -31,12 +31,14 @@ class Verifier:
         project_root: Path | None = None,
         client: OllamaClient | None = None,
         model: str = "gemma:4",
-        temperature: float = 0.2,
+        temperature: float = 0.0,
+        seed: int = 0,
     ) -> None:
         self.project_root = project_root
         self.client = client or OllamaClient()
         self.model = model
         self.temperature = temperature
+        self.seed = seed
 
     def verify(self, manifest: Manifest, finding: FindingInput) -> VerifierResult:
         user_prompt = render_user_prompt(
@@ -51,6 +53,7 @@ class Verifier:
             schema=RESPONSE_SCHEMA,
             model=self.model,
             temperature=self.temperature,
+            seed=self.seed,
         )
         elapsed_ms = int((time.monotonic() - start) * 1000)
 

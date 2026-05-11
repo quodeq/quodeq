@@ -37,10 +37,15 @@ class OllamaClient:
         user: str,
         schema: dict[str, Any],
         model: str,
-        temperature: float = 0.2,
+        temperature: float = 0.0,
+        seed: int = 0,
         keep_alive: str = "10m",
     ) -> dict[str, Any]:
         """Send a chat request with strict JSON-schema enforcement.
+
+        Defaults are greedy + fixed seed so repeated calls on the same prompt
+        return the same answer. Callers can opt back into sampling by passing
+        a non-zero ``temperature``.
 
         Returns the parsed response dict (the model's structured output).
         Raises VerifierError subclasses on failure.
@@ -52,7 +57,7 @@ class OllamaClient:
                 {"role": "user", "content": user},
             ],
             "format": schema,
-            "options": {"temperature": temperature},
+            "options": {"temperature": temperature, "seed": seed},
             "stream": False,
             "keep_alive": keep_alive,
         }
