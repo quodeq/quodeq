@@ -42,3 +42,10 @@ def test_cache_meta_round_trip(tmp_path: Path):
     cache.set_meta("built_at_sha", "abc123")
     assert cache.get_meta("built_at_sha") == "abc123"
     cache.close()
+
+
+def test_cache_sets_busy_timeout(tmp_path: Path):
+    cache = IndexCache(tmp_path / "symbols.db")
+    timeout_ms = cache.conn.execute("PRAGMA busy_timeout").fetchone()[0]
+    assert timeout_ms >= 30000
+    cache.close()

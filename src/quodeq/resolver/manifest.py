@@ -102,12 +102,12 @@ def build_manifest(
 
 
 def _bases_for(cache: IndexCache, class_name: str) -> list[str]:
-    row = cache.conn.execute(
+    rows = cache.execute(
         "SELECT base_list FROM classes WHERE name = ? LIMIT 1", (class_name,)
-    ).fetchone()
-    if not row:
+    )
+    if not rows:
         return []
-    return [b.strip() for b in row["base_list"].split(",") if b.strip()]
+    return [b.strip() for b in rows[0]["base_list"].split(",") if b.strip()]
 
 
 def _pick_abstraction(cache: IndexCache, bases: list[str]) -> str | None:
