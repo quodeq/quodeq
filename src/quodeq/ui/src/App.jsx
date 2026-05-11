@@ -298,6 +298,10 @@ const ROUTE_RENDERERS = {
     const dims = (props.dashboardData.accumulated?.dimensions) || [];
     const findings = dims.flatMap((d) => (d.violations || []).map((v) => ({ ...v, dimension: v.dimension || d.dimension })));
     return (
+      // selectedProject holds the project UUID, which is also the eval_id used
+      // as the evaluation directory name under ~/.quodeq/evaluations/<eval_id>/.
+      // The verifier API uses this UUID to locate repository_info.json and
+      // resolve the project source root.
       <VerifierTab
         evaluationId={props.navigation.selectedProject}
         findings={findings}
