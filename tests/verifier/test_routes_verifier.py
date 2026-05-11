@@ -141,3 +141,65 @@ def test_get_verification_rejects_invalid_id(app_with_routes):
     client = app_with_routes.test_client()
     resp = client.get("/api/evaluations/eval-1/verifications/..%2F..%2Fetc%2Fpasswd")
     assert resp.status_code in (400, 404)
+
+
+def test_post_verify_returns_503_on_ollama_unreachable(tmp_path: Path):
+    _make_project(tmp_path)
+    from quodeq.verifier.errors import OllamaUnreachableError
+
+    class RaisingClient:
+        def chat(self, **_kwargs):
+            raise OllamaUnreachableError("nope")
+        def close(self):
+            pass
+
+    def locate(eval_id, dim, fid):
+        return LocatedFinding(
+            file="api/app.py", line=5,
+            category="flexibility/Adaptability", severity="major",
+            description="hardcoded",
+        )
+    service = VerifierService(
+        evaluations_root=tmp_path / "evals",
+        project_root=tmp_path,
+        finding_locator=locate,
+        client=RaisingClient(),
+        model="gemma:4",
+    )
+    app = Flask(__name__)
+    register_routes_verifier(app, service)
+    resp = app.test_client().post("/api/evaluations/eval-1/verify/flexibility/f1")
+    assert resp.status_code == 503
+    body = resp.get_json()
+    assert body["error"] == "ollama_unreachable"
+    assert "hint" in body
+
+
+def test_post_verify_returns_504_on_timeout(tmp_path: Path):
+    _make_project(tmp_path)
+    from quodeq.verifier.errors import VerifierTimeoutError
+
+    class TimingOutClient:
+        def chat(self, **_kwargs):
+            raise VerifierTimeoutError("slow")
+        def close(self):
+            pass
+
+    def locate(eval_id, dim, fid):
+        return LocatedFinding(
+            file="api/app.py", line=5,
+            category="flexibility/Adaptability", severity="major",
+            description="hardcoded",
+        )
+    service = VerifierService(
+        evaluations_root=tmp_path / "evals",
+        project_root=tmp_path,
+        finding_locator=locate,
+        client=TimingOutClient(),
+        model="gemma:4",
+    )
+    app = Flask(__name__)
+    register_routes_verifier(app, service)
+    resp = app.test_client().post("/api/evaluations/eval-1/verify/flexibility/f1")
+    assert resp.status_code == 504
+    assert resp.get_json()["error"] == "verifier_timeout"

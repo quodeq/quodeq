@@ -9,14 +9,24 @@ Three endpoints under `/api/evaluations/<eval_id>/`:
 from __future__ import annotations
 
 import json
+import logging
+import traceback
 from pathlib import Path
 from typing import Any
 
 from flask import Flask, jsonify
 
+from quodeq.verifier.errors import (
+    MalformedResponseError,
+    OllamaUnreachableError,
+    VerifierError,
+    VerifierTimeoutError,
+)
 from quodeq.verifier.service import FindingNotFound, VerifierService
 from quodeq.verifier.storage import VerificationsStore
 from quodeq.shared.validation import validate_path_segment
+
+_logger = logging.getLogger(__name__)
 
 
 def register_routes_verifier(app: Flask, service: VerifierService) -> None:
@@ -36,6 +46,40 @@ def register_routes_verifier(app: Flask, service: VerifierService) -> None:
             )
         except FindingNotFound as exc:
             return jsonify({"error": "finding_not_found", "detail": str(exc)}), 404
+        except OllamaUnreachableError as exc:
+            return jsonify({
+                "error": "ollama_unreachable",
+                "detail": str(exc),
+                "hint": "Is Ollama running? Try: ollama serve",
+            }), 503
+        except VerifierTimeoutError as exc:
+            return jsonify({
+                "error": "verifier_timeout",
+                "detail": str(exc),
+                "hint": "Model load + inference exceeded the HTTP timeout. Pre-warm the model with: ollama run <model> 'hi'",
+            }), 504
+        except MalformedResponseError as exc:
+            return jsonify({
+                "error": "malformed_model_response",
+                "detail": str(exc),
+                "hint": "The model returned a response that didn't match the JSON schema. Check Ollama version and model compatibility with `format` parameter.",
+            }), 502
+        except VerifierError as exc:
+            # Other typed verifier errors
+            _logger.exception("Verifier error during verify_finding")
+            return jsonify({
+                "error": "verifier_error",
+                "type": type(exc).__name__,
+                "detail": str(exc),
+            }), 500
+        except Exception as exc:
+            # Safety net: log the traceback server-side, return a useful summary to the client
+            _logger.exception("Unexpected error during verify_finding")
+            return jsonify({
+                "error": "internal_error",
+                "type": type(exc).__name__,
+                "detail": str(exc),
+            }), 500
         return jsonify(
             {
                 "verification_id": sr.verification_id,
