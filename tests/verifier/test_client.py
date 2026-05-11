@@ -99,3 +99,12 @@ def test_client_sends_format_parameter():
     assert captured["payload"]["model"] == "gemma:4"
     assert captured["payload"]["options"]["temperature"] == 0.2
     assert captured["payload"]["stream"] is False
+
+
+def test_client_raises_on_pool_timeout():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.PoolTimeout("pool exhausted", request=request)
+
+    client = OllamaClient(base_url="http://test", transport=_stub_transport(handler))
+    with pytest.raises(VerifierTimeoutError):
+        client.chat(system="sys", user="usr", schema={}, model="gemma:4", temperature=0.2)

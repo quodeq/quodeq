@@ -61,7 +61,7 @@ class OllamaClient:
             resp.raise_for_status()
         except httpx.ConnectError as exc:
             raise OllamaUnreachableError(str(exc)) from exc
-        except (httpx.ReadTimeout, httpx.ConnectTimeout) as exc:
+        except httpx.TimeoutException as exc:
             raise VerifierTimeoutError(str(exc)) from exc
         except httpx.HTTPStatusError as exc:
             raise MalformedResponseError(
