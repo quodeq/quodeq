@@ -40,6 +40,7 @@ class PythonAdapter(LanguageAdapter):
         self._q_classes = _load_query(self._language, "class_definitions.scm")
         self._q_functions = _load_query(self._language, "function_definitions.scm")
         self._q_params = _load_query(self._language, "parameter_annotations.scm")
+        self._q_imports = _load_query(self._language, "imports.scm")
 
     def parse(self, source: bytes) -> ParseResult:
         tree = self._parser.parse(source)
@@ -47,12 +48,13 @@ class PythonAdapter(LanguageAdapter):
 
         classes = self._extract_classes(root, source)
         functions, params = self._extract_functions(root, source)
+        imports = self._extract_imports(root, source)
 
         return ParseResult(
             classes=classes,
             functions=functions,
             params=params,
-            imports=[],
+            imports=imports,
             calls=[],
         )
 
@@ -149,6 +151,48 @@ class PythonAdapter(LanguageAdapter):
 
         return functions, params
 
+    def _extract_imports(self, root: Node, source: bytes) -> list[ImportRecord]:
+        out: list[ImportRecord] = []
+        for stmt in _walk(root, "import_from_statement"):
+            module_node = stmt.child_by_field_name("module_name")
+            module = _text(module_node, source) if module_node else None
+            is_lazy = _is_inside_function(stmt)
+            # Each "name:" field can be a dotted_name or aliased_import
+            for child in stmt.children_by_field_name("name"):
+                if child.type == "dotted_name":
+                    name = _text(child, source).split(".")[-1]
+                    out.append(
+                        ImportRecord(
+                            line=stmt.start_point[0] + 1,
+                            imported_name=name,
+                            source_module=module,
+                            is_lazy=is_lazy,
+                        )
+                    )
+                elif child.type == "aliased_import":
+                    alias_node = child.child_by_field_name("alias")
+                    if alias_node:
+                        out.append(
+                            ImportRecord(
+                                line=stmt.start_point[0] + 1,
+                                imported_name=_text(alias_node, source),
+                                source_module=module,
+                                is_lazy=is_lazy,
+                            )
+                        )
+        for stmt in _walk(root, "import_statement"):
+            for name_node in stmt.children_by_field_name("name"):
+                if name_node.type == "dotted_name":
+                    out.append(
+                        ImportRecord(
+                            line=stmt.start_point[0] + 1,
+                            imported_name=_text(name_node, source).split(".")[-1],
+                            source_module=None,
+                            is_lazy=_is_inside_function(stmt),
+                        )
+                    )
+        return out
+
     @staticmethod
     def _signature_text(fn_node: Node, source: bytes) -> str:
         """Return the function header text (up to and including the return type)."""
@@ -187,3 +231,12 @@ def _identifier_names(node: Node, source: bytes) -> list[str]:
     for child in node.children:
         out.extend(_identifier_names(child, source))
     return out
+
+
+def _is_inside_function(node: Node) -> bool:
+    parent = node.parent
+    while parent is not None:
+        if parent.type == "function_definition":
+            return True
+        parent = parent.parent
+    return False

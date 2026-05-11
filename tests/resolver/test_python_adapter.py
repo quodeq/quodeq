@@ -119,3 +119,29 @@ def f(x):
 '''
     result = adapter.parse(src)
     assert result.params == []
+
+
+def test_extracts_top_level_import():
+    adapter = PythonAdapter()
+    src = b'''
+from quodeq.services.base import ActionProvider
+'''
+    result = adapter.parse(src)
+    assert len(result.imports) == 1
+    i = result.imports[0]
+    assert i.imported_name == "ActionProvider"
+    assert i.source_module == "quodeq.services.base"
+    assert i.is_lazy is False
+
+
+def test_marks_lazy_import_inside_function():
+    adapter = PythonAdapter()
+    src = b'''
+def _default_provider():
+    from quodeq.services.filesystem import FilesystemActionProvider
+    return FilesystemActionProvider()
+'''
+    result = adapter.parse(src)
+    assert len(result.imports) == 1
+    assert result.imports[0].imported_name == "FilesystemActionProvider"
+    assert result.imports[0].is_lazy is True
