@@ -81,7 +81,7 @@ class PythonAdapter(LanguageAdapter):
         for offset in range(parent.start_byte, parent.end_byte):
             if offset in candidates:
                 node = candidates[offset]
-                if node.end_byte <= parent.end_byte:
+                if node.parent is not None and node.parent.id == parent.id:
                     return node
         return None
 
