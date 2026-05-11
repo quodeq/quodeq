@@ -26,6 +26,7 @@ def enclosing_function(
     name_node = best.child_by_field_name("name")
     ret_node = best.child_by_field_name("return_type")
     body = best.child_by_field_name("body")
+    params_node = best.child_by_field_name("parameters")
     name = _text(name_node, source) if name_node else "<anon>"
     signature = source[best.start_byte:(body.start_byte if body else best.end_byte)].decode("utf-8", errors="replace").strip().rstrip(":").strip()
     return FunctionInfo(
@@ -34,7 +35,7 @@ def enclosing_function(
         file="",
         line=best.start_point[0] + 1,
         return_type=_text(ret_node, source) if ret_node else None,
-        parameters=[],
+        parameters=_extract_param_names(params_node, source),
         lazy_imports_inside_body=_has_lazy_imports(best),
     )
 
@@ -87,3 +88,43 @@ def _has_lazy_imports(fn_node: Node) -> bool:
     for child in _walk(body, "import_statement"):
         return True
     return False
+
+
+def _extract_param_names(params_node: Node | None, source: bytes) -> list[str]:
+    """Extract parameter names from a `parameters` node.
+
+    Handles all Python parameter forms: bare identifiers (`x`),
+    typed parameters (`x: int`), default parameters (`x=5`),
+    typed default parameters (`x: int = 5`), and *args/**kwargs.
+    Skips `self`, `cls`, `/`, `*` markers.
+    """
+    if params_node is None:
+        return []
+    names: list[str] = []
+    for child in params_node.children:
+        if child.type == "identifier":
+            text = _text(child, source)
+            names.append(text)
+        elif child.type in ("typed_parameter", "default_parameter", "typed_default_parameter"):
+            # typed_parameter: first child is the identifier
+            # default_parameter & typed_default_parameter: name field
+            name_node = child.child_by_field_name("name")
+            if name_node is None:
+                # typed_parameter doesn't have a `name:` field; find first identifier child
+                for grand in child.children:
+                    if grand.type == "identifier":
+                        name_node = grand
+                        break
+            if name_node is not None:
+                names.append(_text(name_node, source))
+        elif child.type == "list_splat_pattern":
+            # *args
+            for grand in child.children:
+                if grand.type == "identifier":
+                    names.append(_text(grand, source))
+        elif child.type == "dictionary_splat_pattern":
+            # **kwargs
+            for grand in child.children:
+                if grand.type == "identifier":
+                    names.append(_text(grand, source))
+    return names

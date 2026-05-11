@@ -38,3 +38,33 @@ def test_find_or_seam_returns_line_and_pattern():
     line, pattern = seam
     assert line == 2
     assert "provider or _default_provider()" in pattern
+
+
+def test_enclosing_function_populates_parameter_names():
+    adapter = PythonAdapter()
+    src = b'''def create_app(provider, static_dist=None, *, api_key=None):
+    return provider
+'''
+    fn = enclosing_function(adapter, src, line=2)
+    assert fn is not None
+    assert fn.parameters == ["provider", "static_dist", "api_key"]
+
+
+def test_enclosing_function_typed_parameters():
+    adapter = PythonAdapter()
+    src = b'''def create_app(provider: ActionProvider | None = None, port: int = 8080):
+    return provider
+'''
+    fn = enclosing_function(adapter, src, line=2)
+    assert fn is not None
+    assert fn.parameters == ["provider", "port"]
+
+
+def test_enclosing_function_args_kwargs():
+    adapter = PythonAdapter()
+    src = b'''def fn(*args, **kwargs):
+    return args, kwargs
+'''
+    fn = enclosing_function(adapter, src, line=2)
+    assert fn is not None
+    assert fn.parameters == ["args", "kwargs"]
