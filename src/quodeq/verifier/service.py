@@ -17,6 +17,7 @@ writes the audit-log directory.
 from __future__ import annotations
 
 import json
+import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -83,14 +84,16 @@ class VerifierService:
         self.model = model
         self.client = client
         self._resolvers: dict[str, Resolver] = {}
+        self._resolver_lock = threading.Lock()
 
     def _resolver_for(self, evaluation_id: str) -> Resolver:
-        if evaluation_id not in self._resolvers:
-            project_root = self.project_root_resolver(evaluation_id)
-            resolver = Resolver(project_root=project_root)
-            resolver.build_index()
-            self._resolvers[evaluation_id] = resolver
-        return self._resolvers[evaluation_id]
+        with self._resolver_lock:
+            if evaluation_id not in self._resolvers:
+                project_root = self.project_root_resolver(evaluation_id)
+                resolver = Resolver(project_root=project_root)
+                resolver.build_index()
+                self._resolvers[evaluation_id] = resolver
+            return self._resolvers[evaluation_id]
 
     def verify_finding(
         self,

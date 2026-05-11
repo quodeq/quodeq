@@ -166,3 +166,56 @@ def test_service_resolves_project_root_per_evaluation(tmp_path: Path, stub_clien
     a = service.verify_finding("eval-a", "flexibility", "f1")
     b = service.verify_finding("eval-b", "flexibility", "f1")
     assert a.verification_id != b.verification_id
+
+
+def test_service_resolver_construction_is_thread_safe(tmp_path: Path, stub_client):
+    """Two concurrent verify_finding calls for the same eval don't race the resolver init."""
+    import threading
+
+    _make_project(tmp_path)
+
+    def locate(eval_id, dim, fid):
+        return LocatedFinding(
+            file="api/app.py", line=6, category="flexibility/adaptability",
+            severity="major", description="",
+        )
+
+    canned = {
+        "checklist": {q: {"answer": "yes", "cite": "MANIFEST"} for q in ("Q1", "Q2", "Q3", "Q4", "Q5")},
+        "findings": {
+            "default_implementation": {"value": "X", "cite": None},
+            "override_mechanism": {"value": "Y", "cite": None},
+            "abstraction_in_use": {"value": "Z", "cite": "MANIFEST"},
+        },
+        "confidence": 0.5,
+        "evidence_summary": "x",
+    }
+
+    service = VerifierService(
+        evaluations_root=tmp_path / "evals",
+        project_root=tmp_path,
+        finding_locator=locate,
+        client=stub_client(canned, canned, canned, canned),
+        model="gemma:4",
+    )
+
+    results: list = []
+    errors: list = []
+
+    def worker():
+        try:
+            r = service.verify_finding("eval-1", "flexibility", "f1")
+            results.append(r)
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert errors == [], f"Expected no errors; got {errors}"
+    assert len(results) == 4
+    # All four runs should have used the same cached resolver (only one was built)
+    assert len(service._resolvers) == 1
