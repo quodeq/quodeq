@@ -16,6 +16,7 @@ from flask import Flask, jsonify
 
 from quodeq.verifier.service import FindingNotFound, VerifierService
 from quodeq.verifier.storage import VerificationsStore
+from quodeq.shared.validation import validate_path_segment
 
 
 def register_routes_verifier(app: Flask, service: VerifierService) -> None:
@@ -23,6 +24,10 @@ def register_routes_verifier(app: Flask, service: VerifierService) -> None:
 
     @app.post("/api/evaluations/<eval_id>/verify/<dimension>/<finding_id>")
     def post_verify(eval_id: str, dimension: str, finding_id: str):
+        try:
+            validate_path_segment(eval_id, dimension, finding_id)
+        except ValueError as exc:
+            return jsonify({"error": "invalid_path", "detail": str(exc)}), 400
         try:
             sr = service.verify_finding(
                 evaluation_id=eval_id,
@@ -47,6 +52,10 @@ def register_routes_verifier(app: Flask, service: VerifierService) -> None:
 
     @app.get("/api/evaluations/<eval_id>/verifications")
     def list_verifications(eval_id: str):
+        try:
+            validate_path_segment(eval_id)
+        except ValueError as exc:
+            return jsonify({"error": "invalid_path", "detail": str(exc)}), 400
         db_path = service.evaluations_root / eval_id / "verifications.db"
         if not db_path.exists():
             return jsonify({"verifications": []})
@@ -76,6 +85,10 @@ def register_routes_verifier(app: Flask, service: VerifierService) -> None:
 
     @app.get("/api/evaluations/<eval_id>/verifications/<verification_id>")
     def get_verification_detail(eval_id: str, verification_id: str):
+        try:
+            validate_path_segment(eval_id, verification_id)
+        except ValueError as exc:
+            return jsonify({"error": "invalid_path", "detail": str(exc)}), 400
         db_path = service.evaluations_root / eval_id / "verifications.db"
         if not db_path.exists():
             return jsonify({"error": "not_found"}), 404

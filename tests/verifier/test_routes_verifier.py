@@ -121,3 +121,23 @@ def test_get_verification_detail_returns_audit_log_paths(app_with_routes):
     assert "manifest" in data
     assert "checklist" in data
     assert "raw_response" in data
+
+
+def test_post_verify_rejects_path_traversal_in_eval_id(app_with_routes):
+    client = app_with_routes.test_client()
+    resp = client.post("/api/evaluations/..%2F..%2Fetc/verify/flexibility/f1")
+    # Path traversal should be caught (either by validator -> 400, or by Flask URL routing -> 404)
+    assert resp.status_code in (400, 404)
+
+
+def test_post_verify_rejects_slash_in_finding_id(app_with_routes):
+    client = app_with_routes.test_client()
+    # finding_id with path-traversal-style segment
+    resp = client.post("/api/evaluations/eval-1/verify/flexibility/..%2Fbad")
+    assert resp.status_code in (400, 404)
+
+
+def test_get_verification_rejects_invalid_id(app_with_routes):
+    client = app_with_routes.test_client()
+    resp = client.get("/api/evaluations/eval-1/verifications/..%2F..%2Fetc%2Fpasswd")
+    assert resp.status_code in (400, 404)
