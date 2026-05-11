@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.verifier.models import Verdict
-from quodeq.verifier.verifier import _parse_response
+from quodeq.verifier.verifier import parse_verifier_response
 from quodeq.verifier.verdict import compute_verdict
 
 
@@ -71,7 +71,7 @@ def load_eval_cases(directory: Path) -> list[EvalCase]:
 
 def replay_case(case: EvalCase) -> EvalResult:
     """Compute the verdict from the canned response and compare to expected."""
-    response = _parse_response(case.canned_response)
+    response = parse_verifier_response(case.canned_response)
     actual = compute_verdict(response)
     return EvalResult(
         case_id=case.id,

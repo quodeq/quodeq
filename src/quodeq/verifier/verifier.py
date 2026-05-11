@@ -54,7 +54,7 @@ class Verifier:
         )
         elapsed_ms = int((time.monotonic() - start) * 1000)
 
-        response = _parse_response(raw)
+        response = parse_verifier_response(raw)
         cleaned = enforce_citation_validity(response, visible_lines)
         warnings = self_consistency_warnings(cleaned)
         verdict = compute_verdict(cleaned)
@@ -68,7 +68,7 @@ class Verifier:
         )
 
 
-def _parse_response(raw: dict) -> VerifierResponse:
+def parse_verifier_response(raw: dict) -> VerifierResponse:
     checklist = {
         qid: ChecklistAnswer(answer=ans["answer"], cite=ans["cite"])
         for qid, ans in raw["checklist"].items()

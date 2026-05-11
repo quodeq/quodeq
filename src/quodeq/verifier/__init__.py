@@ -14,10 +14,11 @@ from quodeq.verifier.models import (
     VerifierResponse,
     VerifierResult,
 )
-from quodeq.verifier.verifier import Verifier
+from quodeq.verifier.verifier import Verifier, parse_verifier_response
 
 __all__ = [
     "Verifier",
+    "parse_verifier_response",
     "Verdict",
     "VerifierResponse",
     "VerifierResult",
