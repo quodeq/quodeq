@@ -65,23 +65,32 @@ class VerifierService:
     def __init__(
         self,
         evaluations_root: Path,
-        project_root: Path,
         finding_locator: FindingLocator,
+        project_root_resolver: Callable[[str], Path] | None = None,
+        project_root: Path | None = None,
         client: OllamaClient | None = None,
         model: str = "gemma:4",
     ) -> None:
+        if project_root_resolver is None and project_root is None:
+            raise ValueError("Either project_root_resolver or project_root must be provided")
+        if project_root_resolver is None:
+            assert project_root is not None  # type narrowing for mypy
+            _static = project_root
+            project_root_resolver = lambda _eval_id: _static
         self.evaluations_root = evaluations_root
-        self.project_root = project_root
+        self.project_root_resolver = project_root_resolver
         self.finding_locator = finding_locator
         self.model = model
         self.client = client
-        self._resolver: Resolver | None = None
+        self._resolvers: dict[str, Resolver] = {}
 
-    def _resolver_for_project(self) -> Resolver:
-        if self._resolver is None:
-            self._resolver = Resolver(project_root=self.project_root)
-            self._resolver.build_index()
-        return self._resolver
+    def _resolver_for(self, evaluation_id: str) -> Resolver:
+        if evaluation_id not in self._resolvers:
+            project_root = self.project_root_resolver(evaluation_id)
+            resolver = Resolver(project_root=project_root)
+            resolver.build_index()
+            self._resolvers[evaluation_id] = resolver
+        return self._resolvers[evaluation_id]
 
     def verify_finding(
         self,
@@ -102,15 +111,16 @@ class VerifierService:
             severity=located.severity,
             description=located.description,
         )
-        resolver = self._resolver_for_project()
+        resolver = self._resolver_for(evaluation_id)
         manifest = resolver.build_manifest(finding)
+        project_root = self.project_root_resolver(evaluation_id)
 
         user_prompt = render_user_prompt(
-            manifest, finding, project_root=self.project_root
+            manifest, finding, project_root=project_root
         )
 
         verifier = Verifier(
-            project_root=self.project_root,
+            project_root=project_root,
             client=self.client,
             model=self.model,
         )

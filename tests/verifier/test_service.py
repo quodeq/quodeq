@@ -129,3 +129,40 @@ def test_service_runs_full_pipeline(tmp_path: Path, stub_client):
     log_dir = tmp_path / "evals" / "eval-1" / "verifier" / result.verification_id
     assert (log_dir / "manifest.json").exists()
     assert (log_dir / "response.json").exists()
+
+
+def test_service_resolves_project_root_per_evaluation(tmp_path: Path, stub_client):
+    project_a = tmp_path / "project_a"
+    project_b = tmp_path / "project_b"
+    _make_project(project_a)
+    _make_project(project_b)
+
+    def locate(eval_id: str, dim: str, fid: str) -> LocatedFinding | None:
+        return LocatedFinding(
+            file="api/app.py", line=6, category="flexibility/adaptability",
+            severity="major", description=""
+        )
+
+    def project_root_for(eval_id: str) -> Path:
+        return {"eval-a": project_a, "eval-b": project_b}.get(eval_id, project_a)
+
+    canned = {
+        "checklist": {q: {"answer": "yes", "cite": "MANIFEST"} for q in ("Q1", "Q2", "Q3", "Q4", "Q5")},
+        "findings": {
+            "default_implementation": {"value": "X", "cite": None},
+            "override_mechanism": {"value": "Y", "cite": None},
+            "abstraction_in_use": {"value": "Z", "cite": "MANIFEST"},
+        },
+        "confidence": 0.5,
+        "evidence_summary": "x",
+    }
+    service = VerifierService(
+        evaluations_root=tmp_path / "evals",
+        project_root_resolver=project_root_for,
+        finding_locator=locate,
+        client=stub_client(canned, canned),
+        model="gemma:4",
+    )
+    a = service.verify_finding("eval-a", "flexibility", "f1")
+    b = service.verify_finding("eval-b", "flexibility", "f1")
+    assert a.verification_id != b.verification_id
