@@ -25,6 +25,8 @@ dependencies = [
     "flask==3.1.3",
     "pywebview>=6.2",
     "instructor>=1.15.0",
+    "tree-sitter==0.23.2",
+    "tree-sitter-language-pack==0.7.3",
 ]
 
 [project.urls]
