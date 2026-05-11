@@ -60,7 +60,7 @@ def app_with_routes(tmp_path: Path, stub_client):
                 line=5,
                 category="flexibility/Adaptability",
                 severity="major",
-                description="hardcoded",
+                description="hardcoded dependency",
             )
         return None
 
@@ -157,7 +157,7 @@ def test_post_verify_returns_503_on_ollama_unreachable(tmp_path: Path):
         return LocatedFinding(
             file="api/app.py", line=5,
             category="flexibility/Adaptability", severity="major",
-            description="hardcoded",
+            description="hardcoded dependency",
         )
     service = VerifierService(
         evaluations_root=tmp_path / "evals",
@@ -189,7 +189,7 @@ def test_post_verify_returns_504_on_timeout(tmp_path: Path):
         return LocatedFinding(
             file="api/app.py", line=5,
             category="flexibility/Adaptability", severity="major",
-            description="hardcoded",
+            description="hardcoded dependency",
         )
     service = VerifierService(
         evaluations_root=tmp_path / "evals",
@@ -214,7 +214,7 @@ def test_post_verify_returns_415_for_unsupported_language(tmp_path: Path, stub_c
         return LocatedFinding(
             file="app.rb", line=1,
             category="flexibility/Adaptability", severity="major",
-            description="hardcoded",
+            description="hardcoded dependency",
         )
     service = VerifierService(
         evaluations_root=tmp_path / "evals",

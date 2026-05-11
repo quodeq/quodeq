@@ -28,10 +28,79 @@ from quodeq.resolver import Resolver
 from quodeq.resolver.models import FindingInput
 from quodeq.verifier.audit_log import write_audit_log
 from quodeq.verifier.client import OllamaClient
-from quodeq.verifier.models import Verdict, VerifierResult
+from quodeq.verifier.models import (
+    ChecklistAnswer,
+    FindingExtraction,
+    FindingsExtraction,
+    Verdict,
+    VerifierResponse,
+    VerifierResult,
+)
 from quodeq.verifier.prompt import SYSTEM_PROMPT_V7_2, render_user_prompt
 from quodeq.verifier.storage import VerificationRecord, VerificationsStore
 from quodeq.verifier.verifier import Verifier
+
+
+# Substring keywords (case-insensitive) that indicate a finding is in the
+# scope of the v7.2 substitutability / DIP prompt. Matched against the
+# concatenation of finding title and category. Conservative on purpose:
+# we'd rather skip a borderline-applicable finding than waste 10–60s
+# running v7.2 on something it can't reason about ("hardcoded filename",
+# "magic number", "duplicate code", etc.).
+_SUBSTITUTABILITY_KEYWORDS: tuple[str, ...] = (
+    "dependency",          # "Platform-specific filesystem dependency"
+    "abstraction",
+    "concrete coupl",      # concrete coupling, concretely coupled
+    "tight coupl",
+    "violates dip",
+    "violates lsp",
+    "should depend on",
+    "newing up",
+    "missing protocol",
+    "missing interface",
+    "missing abstraction",
+    "depends on concrete",
+    "hardcoded class",
+    "hardcoded implementation",
+    "hardcoded dependency",
+    "polymorphism",
+    "injection",
+    "inject ",             # trailing space avoids matching "injection" twice
+)
+
+
+def _is_substitutability_finding(title: str, category: str) -> bool:
+    """Heuristic: does this finding match what the v7.2 prompt can reason about?
+
+    The v7.2 prompt only knows how to verify substitutability / DIP-style
+    violations (concrete-class-where-an-abstraction-should-be). Findings
+    about hardcoded values, naming, duplicate code, etc. trigger
+    ``unknown`` answers across the board and waste an Ollama call.
+    """
+    haystack = f"{title} {category}".lower()
+    return any(kw in haystack for kw in _SUBSTITUTABILITY_KEYWORDS)
+
+
+def _not_applicable_result(reason: str) -> VerifierResult:
+    """Build a synthetic VerifierResult for findings we skip without an LLM call."""
+    return VerifierResult(
+        verdict=Verdict.NOT_APPLICABLE,
+        response=VerifierResponse(
+            checklist={
+                q: ChecklistAnswer(answer="unknown", cite=None)
+                for q in ("Q1", "Q2", "Q3", "Q4", "Q5")
+            },
+            findings=FindingsExtraction(
+                default_implementation=FindingExtraction(value=None, cite=None),
+                override_mechanism=FindingExtraction(value=None, cite=None),
+                abstraction_in_use=FindingExtraction(value=None, cite=None),
+            ),
+            confidence=1.0,
+            evidence_summary=reason,
+        ),
+        model="",
+        elapsed_ms=0,
+    )
 
 
 class FindingNotFound(Exception):
@@ -114,20 +183,33 @@ class VerifierService:
             severity=located.severity,
             description=located.description,
         )
-        resolver = self._resolver_for(evaluation_id)
-        manifest = resolver.build_manifest(finding)
-        project_root = self.project_root_resolver(evaluation_id)
 
-        user_prompt = render_user_prompt(
-            manifest, finding, project_root=project_root
-        )
+        # Short-circuit out-of-scope findings before paying for the model.
+        # See _is_substitutability_finding for the heuristic.
+        if not _is_substitutability_finding(located.description, located.category):
+            project_root = self.project_root_resolver(evaluation_id)
+            result = _not_applicable_result(
+                f"Finding category {located.category!r} / title "
+                f"{located.description!r} is not a substitutability "
+                "violation; v7.2 verifier prompt does not apply."
+            )
+            manifest = None
+            user_prompt = ""
+        else:
+            resolver = self._resolver_for(evaluation_id)
+            manifest = resolver.build_manifest(finding)
+            project_root = self.project_root_resolver(evaluation_id)
 
-        verifier = Verifier(
-            project_root=project_root,
-            client=self.client,
-            model=self.model,
-        )
-        result = verifier.verify(manifest, finding)
+            user_prompt = render_user_prompt(
+                manifest, finding, project_root=project_root
+            )
+
+            verifier = Verifier(
+                project_root=project_root,
+                client=self.client,
+                model=self.model,
+            )
+            result = verifier.verify(manifest, finding)
 
         verification_id = str(uuid.uuid4())
         eval_dir = self.evaluations_root / evaluation_id
@@ -151,6 +233,16 @@ class VerifierService:
 
         audit_root = eval_dir / "verifier"
         raw_response_dict = _result_to_raw_dict(result)
+        if manifest is None:
+            # Skipped findings: write a minimal audit dir so the UI still
+            # has somewhere to point. The "manifest" file just records the
+            # skip reason for forensics.
+            from quodeq.resolver.models import Manifest
+            manifest = Manifest(
+                target_file=located.file,
+                target_line=located.line,
+                target_file_role="other",
+            )
         audit_dir = write_audit_log(
             root=audit_root,
             verification_id=verification_id,

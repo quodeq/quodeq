@@ -9,6 +9,7 @@ from quodeq.verifier.service import (
     VerifierService,
     LocatedFinding,
     FindingNotFound,
+    _is_substitutability_finding,
 )
 
 
@@ -85,7 +86,7 @@ def test_service_runs_full_pipeline(tmp_path: Path, stub_client):
                 line=6,
                 category="flexibility/adaptability",
                 severity="major",
-                description="hardcoded provider",
+                description="hardcoded provider dependency",
             )
         return None
 
@@ -168,6 +169,73 @@ def test_service_resolves_project_root_per_evaluation(tmp_path: Path, stub_clien
     assert a.verification_id != b.verification_id
 
 
+def test_classifier_accepts_substitutability_findings():
+    cases = [
+        ("Platform-specific filesystem dependency", "flexibility/adaptability"),
+        ("Hardcoded class FilesystemProvider", "flexibility/adaptability"),
+        ("Hardcoded implementation of Provider", "flexibility/adaptability"),
+        ("Concrete coupling to FilesystemActionProvider", "flexibility/adaptability"),
+        ("Tight coupling to concrete class", "flexibility/adaptability"),
+        ("Missing abstraction for storage backend", "flexibility/adaptability"),
+        ("Violates DIP by depending on FileSystem", "flexibility/adaptability"),
+    ]
+    for title, category in cases:
+        assert _is_substitutability_finding(title, category), (
+            f"expected applicable: title={title!r} category={category!r}"
+        )
+
+
+def test_classifier_rejects_out_of_scope_findings():
+    cases = [
+        ("Hardcoded output filename", "flexibility/adaptability"),
+        ("Hardcoded path /tmp/foo", "flexibility/adaptability"),
+        ("Magic number 42", "maintainability/readability"),
+        ("Duplicate code block", "maintainability/readability"),
+        ("Long function exceeds 100 lines", "maintainability/readability"),
+        ("Variable name is unclear", "maintainability/readability"),
+    ]
+    for title, category in cases:
+        assert not _is_substitutability_finding(title, category), (
+            f"expected NOT applicable: title={title!r} category={category!r}"
+        )
+
+
+def test_service_short_circuits_out_of_scope_finding(tmp_path: Path, stub_client):
+    """A finding the classifier rejects skips the LLM and returns NOT_APPLICABLE."""
+    _make_project(tmp_path)
+
+    def locate(eval_id, dim, fid):
+        return LocatedFinding(
+            file="api/app.py",
+            line=6,
+            category="flexibility/adaptability",
+            severity="minor",
+            description="Hardcoded output filename",
+        )
+
+    # Empty script: any call to the stub client would raise (script exhausted).
+    client = stub_client()  # no canned response — proves we never call Ollama
+
+    service = VerifierService(
+        evaluations_root=tmp_path / "evals",
+        project_root=tmp_path,
+        finding_locator=locate,
+        client=client,
+        model="gemma:4",
+    )
+    result = service.verify_finding(
+        evaluation_id="eval-1",
+        dimension="flexibility",
+        finding_id="f1",
+    )
+    assert result.verdict == Verdict.NOT_APPLICABLE
+    assert client.calls == [], "no Ollama call should have happened"
+    # Still recorded in the per-evaluation store and audit log
+    assert (tmp_path / "evals" / "eval-1" / "verifications.db").exists()
+    log_dir = tmp_path / "evals" / "eval-1" / "verifier" / result.verification_id
+    assert (log_dir / "manifest.json").exists()
+
+
 def test_service_resolver_construction_is_thread_safe(tmp_path: Path, stub_client):
     """Two concurrent verify_finding calls for the same eval don't race the resolver init."""
     import threading
@@ -177,7 +245,7 @@ def test_service_resolver_construction_is_thread_safe(tmp_path: Path, stub_clien
     def locate(eval_id, dim, fid):
         return LocatedFinding(
             file="api/app.py", line=6, category="flexibility/adaptability",
-            severity="major", description="",
+            severity="major", description="hardcoded provider dependency",
         )
 
     canned = {

@@ -13,6 +13,7 @@ class Verdict(str, Enum):
     FALSE_POSITIVE = "false_positive"
     CONFIRMED = "confirmed"
     INCONCLUSIVE = "inconclusive"
+    NOT_APPLICABLE = "not_applicable"
 
 
 # Per-checklist-question answer the model produces.

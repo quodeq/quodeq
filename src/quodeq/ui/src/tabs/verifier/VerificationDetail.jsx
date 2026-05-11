@@ -5,6 +5,14 @@ const VERDICT_STYLES = {
   false_positive: { color: "#0a7", background: "#e8f7ee" },
   confirmed: { color: "#c00", background: "#fde8e8" },
   inconclusive: { color: "#888", background: "#f3f3f3" },
+  not_applicable: { color: "#36c", background: "#eef3fd" },
+};
+
+const VERDICT_LABELS = {
+  false_positive: "False positive",
+  confirmed: "Confirmed",
+  inconclusive: "Inconclusive",
+  not_applicable: "Not applicable (verifier prompt does not cover this finding type)",
 };
 
 // Cap a single verify at 4 min. Longer than the worst observed run (~105s for
@@ -117,8 +125,8 @@ function Result({ result }) {
           fontWeight: 600,
         }}
       >
-        Verdict: {result.verdict}
-        {typeof result.confidence === "number" && (
+        Verdict: {VERDICT_LABELS[result.verdict] || result.verdict}
+        {typeof result.confidence === "number" && result.verdict !== "not_applicable" && (
           <span style={{ marginLeft: "0.5rem", fontWeight: 400 }}>
             ({Math.round(result.confidence * 100)}%)
           </span>
