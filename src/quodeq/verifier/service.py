@@ -48,10 +48,12 @@ from quodeq.verifier.verifier import Verifier
 # running v7.2 on something it can't reason about ("hardcoded filename",
 # "magic number", "duplicate code", etc.).
 _SUBSTITUTABILITY_KEYWORDS: tuple[str, ...] = (
-    "dependency",          # "Platform-specific filesystem dependency"
+    # direct DI / DIP language
+    "dependency",
     "abstraction",
-    "concrete coupl",      # concrete coupling, concretely coupled
-    "tight coupl",
+    "polymorphism",
+    "injection",
+    "inject ",             # trailing space avoids matching "injection" twice
     "violates dip",
     "violates lsp",
     "should depend on",
@@ -63,21 +65,37 @@ _SUBSTITUTABILITY_KEYWORDS: tuple[str, ...] = (
     "hardcoded class",
     "hardcoded implementation",
     "hardcoded dependency",
-    "polymorphism",
-    "injection",
-    "inject ",             # trailing space avoids matching "injection" twice
+    # coupling / substitutability language used in real `reason` text
+    "coupl",               # couples, coupled, coupling, decoupled
+    "switch",              # "easy switching", "swap implementations"
+    "swap implement",
+    "platform-specific",
+    "platform specific",
+    "concrete class",
+    "concrete implementation",
+    "specific implementation",
+    "specific storage",
+    "abstraction layer",
+    "not abstracted",
 )
 
 
-def _is_substitutability_finding(title: str, category: str) -> bool:
+def _is_substitutability_finding(
+    title: str, category: str, reason: str = ""
+) -> bool:
     """Heuristic: does this finding match what the v7.2 prompt can reason about?
 
     The v7.2 prompt only knows how to verify substitutability / DIP-style
     violations (concrete-class-where-an-abstraction-should-be). Findings
     about hardcoded values, naming, duplicate code, etc. trigger
     ``unknown`` answers across the board and waste an Ollama call.
+
+    Scans all three of ``title``, ``reason`` (the "why it's a violation"
+    body), and ``category`` because real evaluations often have a terse
+    or misleading title while the substantive substitutability language
+    lives in the reason text.
     """
-    haystack = f"{title} {category}".lower()
+    haystack = f"{title} {reason} {category}".lower()
     return any(kw in haystack for kw in _SUBSTITUTABILITY_KEYWORDS)
 
 
@@ -115,7 +133,8 @@ class LocatedFinding:
     line: int
     category: str
     severity: str
-    description: str = ""
+    description: str = ""   # the finding title (short label)
+    reason: str = ""        # the "why it's a violation" body (rich prose)
 
 
 @dataclass
@@ -186,12 +205,18 @@ class VerifierService:
 
         # Short-circuit out-of-scope findings before paying for the model.
         # See _is_substitutability_finding for the heuristic.
-        if not _is_substitutability_finding(located.description, located.category):
+        if not _is_substitutability_finding(
+            located.description, located.category, located.reason
+        ):
             project_root = self.project_root_resolver(evaluation_id)
             result = _not_applicable_result(
-                f"Finding category {located.category!r} / title "
-                f"{located.description!r} is not a substitutability "
-                "violation; v7.2 verifier prompt does not apply."
+                f"This finding (title {located.description!r}, category "
+                f"{located.category!r}) does not contain substitutability "
+                "language (coupling, abstraction, dependency injection, "
+                "Protocol/ABC, etc.) in its title or reason text. The v7.2 "
+                "verifier prompt only reasons about concrete-class / "
+                "should-depend-on-abstraction violations; running it on this "
+                "finding would produce 'unknown' across the checklist."
             )
             manifest = None
             user_prompt = ""
@@ -338,12 +363,14 @@ def jsonl_finding_locator(evaluations_root: Path) -> FindingLocator:
                     continue
                 principle = finding.get("principle") or ""
                 title = finding.get("title") or ""
+                reason = finding.get("reason") or finding.get("description") or ""
                 return LocatedFinding(
                     file=finding.get("file", ""),
                     line=int(finding.get("line", 0) or 0),
                     category=f"{dimension}/{principle}".strip("/"),
                     severity=str(finding.get("severity", "unknown")),
                     description=title,
+                    reason=reason,
                 )
         return None
 

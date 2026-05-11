@@ -185,6 +185,32 @@ def test_classifier_accepts_substitutability_findings():
         )
 
 
+def test_classifier_uses_reason_text_when_title_is_uninformative():
+    """Real evaluations often have a terse title; the substitutability
+    language lives in the reason body. The classifier must look there."""
+    # The exact finding the user flagged: title says 'Hardcoded output
+    # filename' but reason talks about coupling and switching.
+    title = "Hardcoded output filename"
+    category = "flexibility/adaptability"
+    reason = (
+        "The default provider is hardcoded to use FilesystemActionProvider, "
+        "which couples the application logic directly to the local filesystem "
+        "and prevents easy switching to cloud storage without code modification."
+    )
+    assert _is_substitutability_finding(title, category, reason)
+
+
+def test_classifier_catches_platform_specific_in_reason():
+    title = "Platform-specific logic not abstracted"
+    category = "flexibility/adaptability"
+    reason = (
+        "The function directly calls read_run_data which relies on the local "
+        "file system (Path objects), making the logic dependent on a specific "
+        "storage implementation rather than an abstraction layer."
+    )
+    assert _is_substitutability_finding(title, category, reason)
+
+
 def test_classifier_rejects_out_of_scope_findings():
     cases = [
         ("Hardcoded output filename", "flexibility/adaptability"),
