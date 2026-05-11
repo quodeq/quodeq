@@ -27,16 +27,39 @@ export default function VerificationDetail({ evaluationId, dimension, findingId 
         {dimension} · finding {findingId}
       </div>
 
-      {state.status === "idle" && (
-        <button onClick={onVerify} style={{ padding: "0.5rem 1rem" }}>
-          ▶ Verify
+      <div style={{ marginBottom: "1rem" }}>
+        <button
+          onClick={onVerify}
+          disabled={state.status === "loading"}
+          style={{
+            padding: "0.5rem 1rem",
+            cursor: state.status === "loading" ? "wait" : "pointer",
+          }}
+        >
+          {state.status === "idle" && "▶ Verify"}
+          {state.status === "loading" && "Verifying…"}
+          {state.status === "error" && "Retry"}
+          {state.status === "done" && "Re-verify"}
         </button>
-      )}
-
-      {state.status === "loading" && <div>Running verifier… (10–60s)</div>}
+        {state.status === "loading" && (
+          <span style={{ marginLeft: "0.75rem", color: "#666" }}>
+            (10–60s)
+          </span>
+        )}
+      </div>
 
       {state.status === "error" && (
-        <div style={{ color: "#c00" }}>Error: {state.error}</div>
+        <div
+          style={{
+            color: "#c00",
+            background: "#fde8e8",
+            padding: "0.5rem 1rem",
+            borderRadius: 4,
+            marginBottom: "1rem",
+          }}
+        >
+          Error: {state.error}
+        </div>
       )}
 
       {state.status === "done" && state.result && (
