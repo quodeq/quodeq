@@ -86,3 +86,28 @@ def test_manifest_for_di_with_default_fixture(tmp_path: Path):
     assert manifest.target_parent_seam_at is not None
     assert manifest.target_parent_seam_at.file.endswith("api/app.py")
     assert "or _default_provider()" in (manifest.target_parent_seam_pattern or "")
+
+
+def test_manifest_resolves_symbol_when_finding_cites_docstring_not_import(tmp_path: Path):
+    """Real findings rarely point at the import line. The fallback should
+    scan imports inside the enclosing function and still find the concrete
+    class via its cross-file bases.
+    """
+    _make_fixture(tmp_path)
+    resolver = Resolver(project_root=tmp_path)
+    resolver.build_index()
+
+    # Line 5 is the docstring inside _default_provider — not the import (L6).
+    # The fallback must locate FilesystemActionProvider by looking inside
+    # the enclosing function.
+    finding = FindingInput(
+        file="api/app.py",
+        line=5,
+        category="flexibility/adaptability",
+        severity="major",
+    )
+    manifest = resolver.build_manifest(finding)
+
+    assert manifest.referenced_symbol == "FilesystemActionProvider"
+    assert manifest.abstraction == "ActionProvider"
+    assert manifest.abstraction_kind == "Protocol"

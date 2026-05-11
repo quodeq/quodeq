@@ -47,11 +47,22 @@ def build_manifest(
         target_file_role=classify_path_role(finding.file),
     )
 
-    # Resolve the referenced symbol from the cited line's import statement.
+    # Resolve the referenced symbol. First try imports on the cited line
+    # (covers findings that point directly at an import). If nothing matches,
+    # fall back to scanning imports inside the enclosing function: real
+    # findings rarely cite the import line itself — they cite a docstring,
+    # signature line, or call site inside the function that uses the
+    # concrete class.
     result = adapter.parse(source)
     cited_imports = [i for i in result.imports if i.line == finding.line]
     if cited_imports:
         manifest.referenced_symbol = cited_imports[0].imported_name
+    else:
+        candidate = _pick_referenced_symbol_in_scope(
+            cache, result.imports, result.functions, finding.line
+        )
+        if candidate:
+            manifest.referenced_symbol = candidate
 
     if manifest.referenced_symbol:
         manifest.referenced_symbol_defined_at = where_defined(
@@ -99,6 +110,73 @@ def build_manifest(
                 break
 
     return manifest
+
+
+def _pick_referenced_symbol_in_scope(
+    cache: IndexCache,
+    imports: list,
+    functions: list,
+    target_line: int,
+) -> str | None:
+    """Find the concrete class an enclosing-function import most likely refers to.
+
+    Many real findings cite a line inside a function body (docstring, return
+    type annotation, call site) rather than the import line itself. This
+    walks imports whose line falls inside the enclosing function's span and
+    picks the one whose `imported_name` looks like a concrete class that
+    implements an abstraction.
+
+    Returns the imported_name to use as ``manifest.referenced_symbol``, or
+    ``None`` if no in-scope import has cross-file bases registered.
+
+    Scoring (best first):
+      1. Imported class has bases that include a Protocol/ABC ancestor.
+      2. Imported class has *any* bases recorded in the index.
+      3. (Skip — no cross-file evidence to support a verdict.)
+    """
+    # Bound the enclosing function: the next def whose line > target_line
+    # marks where the enclosing function ends (good enough without nested
+    # function tracking; nested functions inside the body would still be
+    # inside the enclosing span).
+    sorted_starts = sorted(fn.line for fn in functions)
+    enclosing_start = None
+    for start in sorted_starts:
+        if start <= target_line:
+            enclosing_start = start
+        else:
+            break
+    if enclosing_start is None:
+        return None
+    scope_end = None
+    for start in sorted_starts:
+        if start > enclosing_start:
+            scope_end = start
+            break
+
+    in_scope_imports = [
+        i for i in imports
+        if i.line >= enclosing_start and (scope_end is None or i.line < scope_end)
+    ]
+    if not in_scope_imports:
+        return None
+
+    best_with_abstraction: str | None = None
+    best_with_any_bases: str | None = None
+    for imp in in_scope_imports:
+        bases = _bases_for(cache, imp.imported_name)
+        if not bases:
+            continue
+        if best_with_any_bases is None:
+            best_with_any_bases = imp.imported_name
+        if any(
+            n in _PROTOCOL_BASE_NAMES
+            for base in bases
+            for n in _bases_for(cache, base) + [base]
+        ):
+            best_with_abstraction = imp.imported_name
+            break  # first match wins; lazy imports are typically the DI candidate
+
+    return best_with_abstraction or best_with_any_bases
 
 
 def _bases_for(cache: IndexCache, class_name: str) -> list[str]:
