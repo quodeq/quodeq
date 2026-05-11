@@ -100,3 +100,40 @@ def test_fnv1a32_matches_known_value():
     assert _fnv1a32("") == "811c9dc5"
     # Known FNV-1a test vector: "foobar" -> 0xbf9cf968
     assert _fnv1a32("foobar") == "bf9cf968"
+
+
+def _write_eval_violations(root: Path, eval_id: str, run_id: str, dimension: str, violations: list[dict]) -> None:
+    """Write a real-shape evaluation file using the 'violations' key."""
+    eval_dir = root / eval_id / run_id / "evaluation"
+    eval_dir.mkdir(parents=True, exist_ok=True)
+    (eval_dir / f"{dimension}.json").write_text(json.dumps({"violations": violations}))
+
+
+def test_locator_reads_violations_key_for_real_data(tmp_path: Path):
+    _write_eval_violations(
+        tmp_path,
+        "eval-1",
+        "run-1",
+        "flexibility",
+        [
+            {
+                "file": "src/foo.py",
+                "line": 11,
+                "title": "Hardcoded cache limit",
+                "principle": "Adaptability",
+                "severity": "minor",
+            }
+        ],
+    )
+    locator = jsonl_finding_locator(tmp_path)
+    from quodeq.verifier.service import _compute_finding_id
+    fid = _compute_finding_id({
+        "file": "src/foo.py",
+        "line": 11,
+        "title": "Hardcoded cache limit",
+    })
+    out = locator("eval-1", "flexibility", fid)
+    assert out is not None
+    assert out.file == "src/foo.py"
+    assert out.line == 11
+    assert "Adaptability" in out.category

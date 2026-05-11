@@ -230,7 +230,7 @@ def jsonl_finding_locator(evaluations_root: Path) -> FindingLocator:
                 payload = json.loads(dim_file.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
-            for finding in payload.get("findings", []):
+            for finding in payload.get("violations") or payload.get("findings") or []:
                 # Match either the explicit id (test/synthetic data) or the
                 # composite hash (real findings that have no explicit id field).
                 if str(finding.get("id")) == finding_id:
