@@ -8,16 +8,19 @@ import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { ComplianceCard } from './EvalCards.jsx';
+import { VerificationBadge } from './VerificationBadge.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge } from '../../../components/terminal/index.js';
 import { useRegisterWindowSpec, ReportContent, useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
 import { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
+import { useVerifications } from '../hooks/useVerifications.js';
+import { computeFindingId } from '../../../utils/findingId.js';
 
 function filterTitleSuffix(filter) {
   if (!filter || filter === 'all') return '';
   return ` (${filter})`;
 }
 
-const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
+const ViolationCard = memo(function ViolationCard({ v, onDismiss, verificationsMap }) {
   const { addWindow } = useSidePane();
   const { filePath, line } = parseFileRef(v.file, v.line);
   const filename = filePath ? filePath.split('/').pop() : null;
@@ -25,10 +28,13 @@ const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
   const ref = line != null ? `${filePath}:${range}` : filePath;
   const display = line != null ? `${filename}:${range}` : filename;
   const linkedRefs = v.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url)) || [];
+  const findingId = computeFindingId({ file: v.file, line: v.line, title: v.title });
+  const verification = verificationsMap?.get(findingId) || null;
   return (
     <div className={`vdetail-row vdetail-row--${v.severity}`}>
       <div className="vdetail-row-main">
         <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
+        <VerificationBadge verification={verification} />
         {v.dimension && <span className="vrow-label">[{v.dimension}]</span>}
         {v.principle && <span className="vrow-label">[{v.principle}]</span>}
         {filename && (
@@ -213,6 +219,7 @@ function VirtualList({ items, scrollElement, renderItem }) {
 }
 
 const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, onDismiss, severityFilter }) {
+  const { map: verificationsMap } = useVerifications(runId);
   const totalCompliance = file.compliance?.length || 0;
   const dimensionsCount = file.dimensionsCount || 0;
   const [activeFilter, setActiveFilter] = useState(severityFilter || null);
@@ -335,7 +342,7 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, on
         return <LowConfidenceToggle count={item.count} expanded={item.expanded} onToggle={() => setLowConfExpanded((v) => !v)} />;
       case 'violation':
       case 'low-conf-row':
-        return <ViolationCard v={item.v} onDismiss={onDismiss ? handleDismiss : undefined} />;
+        return <ViolationCard v={item.v} onDismiss={onDismiss ? handleDismiss : undefined} verificationsMap={verificationsMap} />;
       case 'compliance':
         return <ComplianceCard c={item.c} principle={item.c.principle} index={0} />;
       default:
