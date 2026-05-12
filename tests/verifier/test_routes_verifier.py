@@ -143,7 +143,7 @@ def test_get_verification_rejects_invalid_id(app_with_routes):
     assert resp.status_code in (400, 404)
 
 
-def test_post_verify_returns_503_on_ollama_unreachable(tmp_path: Path):
+def test_post_verify_returns_503_on_llm_unreachable(tmp_path: Path):
     _make_project(tmp_path)
     from quodeq.verifier.errors import LLMUnreachableError
 
