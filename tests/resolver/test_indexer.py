@@ -53,3 +53,66 @@ def test_records_file_hash(tmp_path: Path):
     assert row["file"].endswith("a.py")
     assert len(row["sha256"]) == 64
     cache.close()
+
+
+def test_build_index_skips_unchanged_files(tmp_path: Path):
+    """A second build_index call on the same content skips all files."""
+    _write(
+        tmp_path / "a.py",
+        "class Foo:\n    pass\n",
+    )
+    cache = IndexCache(tmp_path / "symbols.db", parser_version="0.23.2")
+    first = build_index(cache, tmp_path)
+    assert first["parsed"] == 1
+    assert first["skipped"] == 0
+
+    # Run again with no changes
+    second = build_index(cache, tmp_path)
+    assert second["parsed"] == 0
+    assert second["skipped"] == 1
+    cache.close()
+
+
+def test_build_index_reparses_changed_files(tmp_path: Path):
+    """Changing a file's content causes it to be re-parsed."""
+    _write(
+        tmp_path / "a.py",
+        "class Foo:\n    pass\n",
+    )
+    cache = IndexCache(tmp_path / "symbols.db", parser_version="0.23.2")
+    build_index(cache, tmp_path)
+
+    # Edit the file
+    _write(
+        tmp_path / "a.py",
+        "class Foo:\n    pass\n\nclass Bar:\n    pass\n",
+    )
+    result = build_index(cache, tmp_path)
+    assert result["parsed"] == 1
+    assert result["skipped"] == 0
+    # Verify Bar is now indexed
+    rows = cache.conn.execute("SELECT name FROM classes ORDER BY name").fetchall()
+    assert [r["name"] for r in rows] == ["Bar", "Foo"]
+    cache.close()
+
+
+def test_build_index_removes_deleted_files(tmp_path: Path):
+    """A file removed from disk has its rows removed from the index."""
+    _write(
+        tmp_path / "a.py",
+        "class Foo:\n    pass\n",
+    )
+    _write(
+        tmp_path / "b.py",
+        "class Bar:\n    pass\n",
+    )
+    cache = IndexCache(tmp_path / "symbols.db", parser_version="0.23.2")
+    build_index(cache, tmp_path)
+
+    # Delete a.py
+    (tmp_path / "a.py").unlink()
+    result = build_index(cache, tmp_path)
+    assert result["removed"] == 1
+    rows = cache.conn.execute("SELECT name FROM classes").fetchall()
+    assert [r["name"] for r in rows] == ["Bar"]
+    cache.close()

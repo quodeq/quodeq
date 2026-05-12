@@ -23,8 +23,13 @@ class Resolver:
         self.db_path = db_path or (self.project_root / ".quodeq-resolver" / "symbols.db")
         self.cache = IndexCache(self.db_path, parser_version=parser_version)
 
-    def build_index(self) -> int:
-        """Walk the project, populate the index. Returns the number of files indexed."""
+    def build_index(self) -> dict:
+        """Walk the project, populate the index.
+
+        Returns a summary dict with keys: parsed, skipped, removed, elapsed_s.
+        Files unchanged since the previous index are skipped; deleted files have
+        their rows removed.
+        """
         return build_index(self.cache, self.project_root)
 
     def build_manifest(self, finding: FindingInput) -> Manifest:
