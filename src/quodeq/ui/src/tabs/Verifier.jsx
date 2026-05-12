@@ -22,9 +22,22 @@ export default function Verifier({ evaluationId, findings }) {
           onSelect={(dim, fid) => setSelected({ dimension: dim, findingId: fid })}
         />
       </div>
-      {/* Right column: verification detail. Always visible — no independent
-          scroll. Long-content subsections (audit log) cap themselves. */}
-      <div style={{ flex: "1 1 60%", padding: "1rem", overflow: "visible" }}>
+      {/* Right column: verification detail. Sticky-anchored to the top of
+          the flex container so it remains visible while the left column
+          scrolls AND while the outer page scrolls. Capped at the viewport
+          height with its own scroll fallback for the rare case where the
+          full audit log is expanded. */}
+      <div
+        style={{
+          flex: "1 1 60%",
+          padding: "1rem",
+          position: "sticky",
+          top: 0,
+          alignSelf: "flex-start",
+          maxHeight: "100vh",
+          overflowY: "auto",
+        }}
+      >
         {selected ? (
           <VerificationDetail
             evaluationId={evaluationId}
