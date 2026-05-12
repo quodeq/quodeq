@@ -1,5 +1,6 @@
 import { lazy, Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
+import { computeFindingId } from './utils/findingId.js';
 
 const DashboardPage = lazy(() => import('./features/dashboard/components/DashboardPage.jsx'));
 const ExplorerPage = lazy(() => import('./features/explorer/components/ExplorerPage.jsx'));
@@ -226,27 +227,6 @@ function ViolationsRoute({ params, props }) {
   );
 }
 
-// FNV-1a 32-bit hash -- same algorithm as _fnv1a32 in src/quodeq/verifier/service.py.
-// Used to compute a stable composite id for findings that have no explicit id field
-// (real evaluation output). The round-trip identity with the Python backend is
-// verified by test_fnv1a32_matches_known_value in tests/verifier/test_finding_locator.py.
-function fnv1a32(str) {
-  let hash = 0x811c9dc5; // FNV offset basis
-  for (let i = 0; i < str.length; i++) {
-    hash ^= str.charCodeAt(i);
-    // 32-bit multiply by FNV prime (0x01000193 = 16777619)
-    hash = Math.imul(hash, 0x01000193);
-  }
-  // Convert to unsigned 32-bit and format as 8-char hex
-  return (hash >>> 0).toString(16).padStart(8, '0');
-}
-
-function computeFindingId(v) {
-  const file = v.file || '';
-  const line = v.line ?? 0;
-  const title = v.title || '';
-  return fnv1a32(`${file}|${line}|${title}`);
-}
 
 const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect, onProjectsReload: props.navigation.loadProjects }} runMode={false} />,
