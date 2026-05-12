@@ -79,13 +79,12 @@ def test_verifier_returns_false_positive_for_di_with_default(tmp_path: Path, stu
 
     result = verifier.verify(manifest, finding)
     # The canned response's checklist answers are all "yes" — even after
-    # citation downgrade, Q3 cites "MANIFEST" (always valid). Q4/Q5 may be
+    # citation downgrade, Q3 cites "MANIFEST" (always valid). Q4 may be
     # downgraded to "unknown" depending on what's in the rendered evidence.
     # Either result.verdict is false_positive (all yes survive) or
     # inconclusive (some yes downgraded to unknown). It must NOT be confirmed.
     assert result.verdict in (Verdict.FALSE_POSITIVE, Verdict.INCONCLUSIVE)
     assert result.model == "gemma:4"
-    assert result.response.findings.default_implementation.value == "FilesystemActionProvider"
 
 
 def test_verifier_returns_confirmed_for_hardcoded(tmp_path: Path, stub_client):
@@ -103,6 +102,6 @@ def test_verifier_returns_confirmed_for_hardcoded(tmp_path: Path, stub_client):
     verifier = Verifier(project_root=tmp_path, client=client, model="gemma:4")
 
     result = verifier.verify(manifest, finding)
-    # Q3 == "no" in the canned response, which forces verdict=confirmed
-    # regardless of citation validity.
-    assert result.verdict == Verdict.CONFIRMED
+    # Q3 == "no" in the canned response. The v8 rule requires Q3=yes for
+    # confirmed (Q1=yes AND Q2=no AND Q3=yes). With Q3=no, verdict is inconclusive.
+    assert result.verdict == Verdict.INCONCLUSIVE

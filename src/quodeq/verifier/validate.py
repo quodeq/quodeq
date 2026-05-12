@@ -64,7 +64,3 @@ def enforce_citation_validity(
     return replace(response, checklist=new_checklist)
 
 
-def self_consistency_warnings(response: VerifierResponse) -> list[str]:
-    """DEPRECATED: Removed in Task 5. Function depended on findings block removed in Task 3.
-    Task 6 will remove this stub and its call site in verifier.py."""
-    return []

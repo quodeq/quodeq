@@ -14,10 +14,7 @@ from quodeq.verifier.models import (
 )
 from quodeq.verifier.prompt import SYSTEM_PROMPT_V7_2, render_user_prompt
 from quodeq.verifier.schema import RESPONSE_SCHEMA
-from quodeq.verifier.validate import (
-    enforce_citation_validity,
-    self_consistency_warnings,
-)
+from quodeq.verifier.validate import enforce_citation_validity
 from quodeq.verifier.verdict import compute_verdict
 
 
@@ -57,13 +54,12 @@ class Verifier:
 
         response = parse_verifier_response(raw)
         cleaned = enforce_citation_validity(response, visible_lines)
-        warnings = self_consistency_warnings(cleaned)
         verdict = compute_verdict(cleaned)
 
         return VerifierResult(
             verdict=verdict,
             response=cleaned,
-            consistency_warnings=warnings,
+            consistency_warnings=[],
             model=self.model,
             elapsed_ms=elapsed_ms,
         )
