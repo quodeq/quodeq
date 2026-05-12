@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from pathlib import Path
 
@@ -100,36 +101,45 @@ def parse_verifier_response(raw: dict) -> VerifierResponse:
     )
 
 
-def _extract_visible_lines(prompt: str) -> set[tuple[str, int]]:
-    """Walk the rendered user prompt and collect (file, line) pairs for every
-    `L<N> │ …` line under each `[<path> L<a>-<b>]` header.
+_FILE_HEADER_RE = re.compile(r"^\s*file:\s*(.+\S)\s*$")
+_NUMBERED_LINE_RE = re.compile(r"^(?:>>>|\s{3})\s+(\d+):\s")
 
-    The header path is the full manifest-relative path so that model citations
-    of the form `"src/foo/bar.py:90"` match an entry in this set when the
-    line is visible.
+
+def _extract_visible_lines(prompt: str) -> set[tuple[str, int]]:
+    """Walk the v8-rendered user prompt and collect (file, line) pairs for
+    every numbered context row.
+
+    The v8 prompt has the form::
+
+        EVIDENCE
+          file: src/foo/bar.py
+          cited line (L42): TIMEOUT = 30
+          context (numbered, cited line marked with >>>):
+              40: import requests
+              41:
+        >>>   42: TIMEOUT = 30
+              43:
+
+    We identify the active file from the `  file: <path>` line and then
+    accept every subsequent numbered row (with or without the `>>>` marker)
+    as visible. Citations like ``"src/foo/bar.py:42"`` will match an entry
+    in the returned set; anything outside the shown context window is
+    downgraded by ``enforce_citation_validity``.
     """
     visible: set[tuple[str, int]] = set()
     current_file: str | None = None
-    for line in prompt.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("[") and "]" in stripped:
-            inside = stripped[1:stripped.index("]")]
-            # Header format: "<path> L<start>-<end>". The path itself never
-            # contains spaces (it's a relative file path); split on the last
-            # space to be safe with edge cases.
-            if " L" in inside:
-                current_file = inside.rsplit(" L", 1)[0]
-            else:
-                parts = inside.split(" ")
-                current_file = parts[0] if parts else None
+    for raw in prompt.splitlines():
+        m = _FILE_HEADER_RE.match(raw)
+        if m:
+            current_file = m.group(1)
             continue
-        if current_file and line.lstrip().startswith("L"):
-            rest = line.lstrip()
-            # "L34 │ …"
-            num_part = rest[1:].split(" ", 1)[0].split("\t")[0]
-            try:
-                num = int(num_part)
-            except ValueError:
-                continue
-            visible.add((current_file, num))
+        if current_file is None:
+            continue
+        n = _NUMBERED_LINE_RE.match(raw)
+        if not n:
+            continue
+        try:
+            visible.add((current_file, int(n.group(1))))
+        except ValueError:
+            continue
     return visible

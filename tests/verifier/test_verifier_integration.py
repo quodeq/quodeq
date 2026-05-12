@@ -6,10 +6,49 @@ from quodeq.resolver import Resolver
 from quodeq.resolver.models import FindingInput
 from quodeq.verifier import Verifier
 from quodeq.verifier.models import Verdict
+from quodeq.verifier.prompt import render_user_prompt
+from quodeq.verifier.verifier import _extract_visible_lines
 from tests.verifier.fixtures.gemma_responses import (
     CONFIRMED_HARDCODED,
     DI_WITH_DEFAULT_FALSE_POSITIVE,
 )
+
+
+def test_extract_visible_lines_parses_v8_prompt_format():
+    """The citation validator depends on this helper picking up every numbered
+    context row in the v8 prompt. Regression test: v7.2's helper assumed a
+    different prompt layout and silently downgraded every file:line cite."""
+    finding = {
+        "file": "src/foo/bar.py",
+        "line": 42,
+        "title": "Hardcoded timeout",
+        "reason": "TIMEOUT is hardcoded.",
+        "snippet": "TIMEOUT = 30",
+        "enclosing_role": "module",
+    }
+    # Build context with the SAME format _read_source_context emits:
+    # "<marker> <i:4d>: <source>" where marker is ">>>" or three spaces.
+    context = "\n".join(
+        f"{('>>>' if i == 42 else '   ')} {i:4d}: line {i} src"
+        for i in range(40, 45)
+    )
+    prompt = render_user_prompt(finding, context)
+    visible = _extract_visible_lines(prompt)
+    # Every numbered context row (cited or not) is visible.
+    assert ("src/foo/bar.py", 40) in visible
+    assert ("src/foo/bar.py", 42) in visible  # the cited line
+    assert ("src/foo/bar.py", 44) in visible
+    # Out-of-context lines are not.
+    assert ("src/foo/bar.py", 1) not in visible
+    assert ("src/foo/bar.py", 100) not in visible
+
+
+def test_extract_visible_lines_returns_empty_when_no_file_header():
+    """Defensive: a prompt with no `file:` header yields no visible lines
+    (so all file:line cites get downgraded). Prevents accidental citation
+    acceptance from a malformed prompt."""
+    bad = "EVIDENCE\n   42: foo\n>>>  43: bar\n"
+    assert _extract_visible_lines(bad) == set()
 
 
 def _write(path: Path, content: str) -> None:
