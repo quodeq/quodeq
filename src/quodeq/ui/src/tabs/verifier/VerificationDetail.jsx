@@ -65,45 +65,60 @@ export default function VerificationDetail({ evaluationId, dimension, findingId 
 
   return (
     <div>
-      <h3>Verification</h3>
-      <div style={{ marginBottom: "1rem", color: "#666", fontSize: "0.9rem" }}>
-        {dimension} · finding {findingId}
-      </div>
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 1,
+          background: "#fff",
+          paddingBottom: "0.5rem",
+          marginBottom: "0.5rem",
+          borderBottom: "1px solid #eee",
+        }}
+      >
+        <h3 style={{ margin: "0 0 0.25rem 0" }}>Verification</h3>
+        <div style={{ marginBottom: "0.75rem", color: "#666", fontSize: "0.9rem" }}>
+          {dimension} · finding {findingId}
+        </div>
 
-      <div style={{ marginBottom: "1rem" }}>
-        <button
-          onClick={onVerify}
-          disabled={state.status === "loading"}
-          style={{
-            padding: "0.5rem 1rem",
-            cursor: state.status === "loading" ? "wait" : "pointer",
-          }}
-        >
-          {state.status === "idle" && "▶ Verify"}
-          {state.status === "loading" && "Verifying…"}
-          {state.status === "error" && "Retry"}
-          {state.status === "done" && "Re-verify"}
-        </button>
-        {state.status === "loading" && (
-          <span style={{ marginLeft: "0.75rem", color: "#666" }}>
-            (10–60s)
-          </span>
+        <div style={{ marginBottom: state.status === "done" || state.status === "error" ? "0.75rem" : 0 }}>
+          <button
+            onClick={onVerify}
+            disabled={state.status === "loading"}
+            style={{
+              padding: "0.5rem 1rem",
+              cursor: state.status === "loading" ? "wait" : "pointer",
+            }}
+          >
+            {state.status === "idle" && "▶ Verify"}
+            {state.status === "loading" && "Verifying…"}
+            {state.status === "error" && "Retry"}
+            {state.status === "done" && "Re-verify"}
+          </button>
+          {state.status === "loading" && (
+            <span style={{ marginLeft: "0.75rem", color: "#666" }}>
+              (10–60s)
+            </span>
+          )}
+        </div>
+
+        {state.status === "error" && (
+          <div
+            style={{
+              color: "#c00",
+              background: "#fde8e8",
+              padding: "0.5rem 1rem",
+              borderRadius: 4,
+            }}
+          >
+            Error: {state.error}
+          </div>
+        )}
+
+        {state.status === "done" && state.result && (
+          <ResultHeader result={state.result} />
         )}
       </div>
-
-      {state.status === "error" && (
-        <div
-          style={{
-            color: "#c00",
-            background: "#fde8e8",
-            padding: "0.5rem 1rem",
-            borderRadius: 4,
-            marginBottom: "1rem",
-          }}
-        >
-          Error: {state.error}
-        </div>
-      )}
 
       {state.status === "done" && state.result && (
         <Result result={state.result} />
@@ -112,7 +127,7 @@ export default function VerificationDetail({ evaluationId, dimension, findingId 
   );
 }
 
-function Result({ result }) {
+function ResultHeader({ result }) {
   const verdictStyle = VERDICT_STYLES[result.verdict] || {};
   return (
     <div>
@@ -121,7 +136,6 @@ function Result({ result }) {
           ...verdictStyle,
           padding: "0.5rem 1rem",
           borderRadius: 4,
-          marginBottom: "1rem",
           fontWeight: 600,
         }}
       >
@@ -132,11 +146,18 @@ function Result({ result }) {
           </span>
         )}
       </div>
+      {result.evidence_summary && (
+        <div style={{ marginTop: "0.5rem", fontSize: "0.9rem" }}>
+          <em>{result.evidence_summary}</em>
+        </div>
+      )}
+    </div>
+  );
+}
 
-      <div style={{ marginBottom: "1rem" }}>
-        <em>{result.evidence_summary}</em>
-      </div>
-
+function Result({ result }) {
+  return (
+    <div>
       <Section title="Checklist">
         <table style={{ width: "100%", fontSize: "0.9rem" }}>
           <tbody>
