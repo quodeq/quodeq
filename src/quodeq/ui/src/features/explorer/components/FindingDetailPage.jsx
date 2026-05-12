@@ -40,6 +40,8 @@ export default function FindingDetailPage({ finding, principle, dimension, onDis
       <SectionLabel>{`${shortSev} · 1`}</SectionLabel>
 
       <div className="vlive-violations-group">
+        {/* Verifier-verdict badge is wired through PrincipleDetailPage only in Phase 1;
+            this single-finding view doesn't have the evaluation id in scope. */}
         <EvalViolationCard
           v={finding}
           principle={principle || finding.principle}
