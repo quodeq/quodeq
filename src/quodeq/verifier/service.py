@@ -118,6 +118,25 @@ _CONTEXT_BEFORE_DEFAULT = 30
 _CONTEXT_AFTER_DEFAULT = 30
 
 
+def _read_cited_line(path: Path, line: int) -> str:
+    """Return the raw source at `line` with no numbering, no marker.
+
+    Used as the `snippet` field for the prompt's CLAIM block. Empty string
+    if the file is missing or the line is out of bounds.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        try:
+            text = path.read_bytes().decode("utf-8", errors="replace")
+        except OSError:
+            return ""
+    src = text.splitlines()
+    if 0 < line <= len(src):
+        return src[line - 1]
+    return ""
+
+
 def _read_source_context(
     path: Path,
     line: int,
@@ -257,8 +276,8 @@ class VerifierService:
                 "line": located.line,
                 "title": located.description,
                 "reason": located.reason,
-                "snippet": _read_source_context(
-                    project_root / located.file, located.line, before=0, after=0
+                "snippet": _read_cited_line(
+                    project_root / located.file, located.line
                 ).strip(),
                 "enclosing_role": (
                     manifest.target_enclosing_function.signature
