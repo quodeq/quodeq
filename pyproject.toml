@@ -55,7 +55,9 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
     "integration: end-to-end tests that spawn real subprocesses or require external resources",
+    "empirical: run live Ollama verifier checks (requires `gemma4:e4b`; opt-in with `-m empirical`)",
 ]
+addopts = "-m 'not empirical'"
 # Hard per-test cap so a deadlocked socket/subprocess/signal test fails
 # fast with a traceback at the stuck line instead of hanging the suite.
 # Use thread method (not signal) so it works on Windows. Override per
