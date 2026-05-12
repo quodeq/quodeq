@@ -39,6 +39,9 @@ RESPONSE_SCHEMA: dict = {
             },
         },
         "confidence": {"type": "number", "minimum": 0, "maximum": 1},
-        "evidence_summary": {"type": "string"},
+        # Bounded so a chatty model can't bloat the audit log. 500 chars
+        # comfortably fits the 2-3 sentence summaries the v8 worked example
+        # demonstrates; v7.2's 200-char cap truncated mid-word in practice.
+        "evidence_summary": {"type": "string", "maxLength": 500},
     },
 }

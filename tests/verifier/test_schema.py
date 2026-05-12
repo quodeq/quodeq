@@ -49,3 +49,11 @@ def test_schema_rejects_unknown_answer_value():
     resp["checklist"]["Q1"]["answer"] = "maybe"
     with pytest.raises(ValidationError):
         Draft202012Validator(RESPONSE_SCHEMA).validate(resp)
+
+
+def test_schema_bounds_evidence_summary_length():
+    """Bounded so a chatty model can't bloat the audit log."""
+    resp = _clean_response()
+    resp["evidence_summary"] = "x" * 501
+    with pytest.raises(ValidationError):
+        Draft202012Validator(RESPONSE_SCHEMA).validate(resp)
