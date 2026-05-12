@@ -262,6 +262,36 @@ def test_service_short_circuits_out_of_scope_finding(tmp_path: Path, stub_client
     assert (log_dir / "manifest.json").exists()
 
 
+def test_read_source_context_marks_cited_line(tmp_path: Path):
+    """The service-layer helper reads +-N lines around the cite and marks the
+    cited line with >>>. Test it in isolation."""
+    from quodeq.verifier.service import _read_source_context
+
+    (tmp_path / "f.py").write_text(
+        "\n".join(f"line {i}" for i in range(1, 11)),
+        encoding="utf-8",
+    )
+    ctx = _read_source_context(tmp_path / "f.py", line=5, before=2, after=2)
+    # Should include lines 3-7, with line 5 marked.
+    assert "line 3" in ctx
+    assert "line 7" in ctx
+    assert "line 8" not in ctx
+    assert "line 2" not in ctx
+    # The marker '>>>' precedes the cited line.
+    cited_row = next(row for row in ctx.splitlines() if "line 5" in row)
+    assert cited_row.startswith(">>>")
+
+
+def test_read_source_context_clips_to_file_bounds(tmp_path: Path):
+    """Context near start/end of file is clipped, not padded with blanks."""
+    from quodeq.verifier.service import _read_source_context
+
+    (tmp_path / "g.py").write_text("a\nb\nc\n", encoding="utf-8")
+    ctx = _read_source_context(tmp_path / "g.py", line=1, before=30, after=30)
+    # 3-line file, +-30 window -> returns all 3 lines.
+    assert "a" in ctx and "b" in ctx and "c" in ctx
+
+
 def test_service_resolver_construction_is_thread_safe(tmp_path: Path, stub_client):
     """Two concurrent verify_finding calls for the same eval don't race the resolver init."""
     import threading

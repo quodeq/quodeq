@@ -30,8 +30,6 @@ from quodeq.verifier.audit_log import write_audit_log
 from quodeq.verifier.client import OllamaClient
 from quodeq.verifier.models import (
     ChecklistAnswer,
-    FindingExtraction,
-    FindingsExtraction,
     Verdict,
     VerifierResponse,
     VerifierResult,
@@ -106,19 +104,48 @@ def _not_applicable_result(reason: str) -> VerifierResult:
         response=VerifierResponse(
             checklist={
                 q: ChecklistAnswer(answer="unknown", cite=None)
-                for q in ("Q1", "Q2", "Q3", "Q4", "Q5")
+                for q in ("Q1", "Q2", "Q3", "Q4")
             },
-            findings=FindingsExtraction(
-                default_implementation=FindingExtraction(value=None, cite=None),
-                override_mechanism=FindingExtraction(value=None, cite=None),
-                abstraction_in_use=FindingExtraction(value=None, cite=None),
-            ),
             confidence=1.0,
             evidence_summary=reason,
         ),
         model="",
         elapsed_ms=0,
     )
+
+
+_CONTEXT_BEFORE_DEFAULT = 30
+_CONTEXT_AFTER_DEFAULT = 30
+
+
+def _read_source_context(
+    path: Path,
+    line: int,
+    *,
+    before: int = _CONTEXT_BEFORE_DEFAULT,
+    after: int = _CONTEXT_AFTER_DEFAULT,
+) -> str:
+    """Return numbered source lines around `line`, with the cited line marked.
+
+    Format per line:
+        ">>>  42: <source>" for the cited line
+        "    42: <source>" for surrounding lines
+
+    Clipped at file bounds. Encoding errors fall back to lossy utf-8 decode
+    so the prompt always has *something* to look at.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        text = path.read_bytes().decode("utf-8", errors="replace")
+    src = text.splitlines()
+    start = max(1, line - before)
+    end = min(len(src), line + after)
+    rows = []
+    for i in range(start, end + 1):
+        marker = ">>>" if i == line else "   "
+        rows.append(f"{marker} {i:4d}: {src[i - 1]}")
+    return "\n".join(rows)
 
 
 class FindingNotFound(Exception):
@@ -225,16 +252,29 @@ class VerifierService:
             manifest = resolver.build_manifest(finding)
             project_root = self.project_root_resolver(evaluation_id)
 
-            user_prompt = render_user_prompt(
-                manifest, finding, project_root=project_root
-            )
+            finding_dict = {
+                "file": located.file,
+                "line": located.line,
+                "title": located.description,
+                "reason": located.reason,
+                "snippet": _read_source_context(
+                    project_root / located.file, located.line, before=0, after=0
+                ).strip(),
+                "enclosing_role": (
+                    manifest.target_enclosing_function.signature
+                    if manifest.target_enclosing_function
+                    else manifest.target_file_role
+                ),
+            }
+            context = _read_source_context(project_root / located.file, located.line)
+            user_prompt = render_user_prompt(finding_dict, context)
 
             verifier = Verifier(
                 project_root=project_root,
                 client=self.client,
                 model=self.model,
             )
-            result = verifier.verify(manifest, finding)
+            result = verifier.verify(manifest, finding, user_prompt=user_prompt)
 
         verification_id = str(uuid.uuid4())
         eval_dir = self.evaluations_root / evaluation_id
@@ -291,20 +331,6 @@ def _result_to_raw_dict(result: VerifierResult) -> dict:
         "checklist": {
             q: {"answer": a.answer, "cite": a.cite}
             for q, a in result.response.checklist.items()
-        },
-        "findings": {
-            "default_implementation": {
-                "value": result.response.findings.default_implementation.value,
-                "cite": result.response.findings.default_implementation.cite,
-            },
-            "override_mechanism": {
-                "value": result.response.findings.override_mechanism.value,
-                "cite": result.response.findings.override_mechanism.cite,
-            },
-            "abstraction_in_use": {
-                "value": result.response.findings.abstraction_in_use.value,
-                "cite": result.response.findings.abstraction_in_use.cite,
-            },
         },
         "confidence": result.response.confidence,
         "evidence_summary": result.response.evidence_summary,

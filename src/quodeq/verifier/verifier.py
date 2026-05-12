@@ -12,7 +12,7 @@ from quodeq.verifier.models import (
     VerifierResponse,
     VerifierResult,
 )
-from quodeq.verifier.prompt import SYSTEM_PROMPT_V8, render_user_prompt
+from quodeq.verifier.prompt import SYSTEM_PROMPT_V8
 from quodeq.verifier.schema import RESPONSE_SCHEMA
 from quodeq.verifier.validate import enforce_citation_validity
 from quodeq.verifier.verdict import compute_verdict
@@ -35,10 +35,33 @@ class Verifier:
         self.temperature = temperature
         self.seed = seed
 
-    def verify(self, manifest: Manifest, finding: FindingInput) -> VerifierResult:
-        user_prompt = render_user_prompt(
-            manifest, finding, project_root=self.project_root
-        )
+    def verify(self, manifest: Manifest, finding: FindingInput, user_prompt: str | None = None) -> VerifierResult:
+        if user_prompt is None:
+            # Backward compat for any direct test caller; normally the service
+            # layer renders the prompt and passes it in.
+            from quodeq.verifier.prompt import render_user_prompt as _render
+            from quodeq.verifier.service import _read_source_context
+            # Fall back to a thin best-effort render — used only in unit tests
+            # that call Verifier.verify directly.
+            project_root = self.project_root or Path.cwd()
+            source_path = project_root / finding.file
+            try:
+                context = _read_source_context(source_path, finding.line)
+            except FileNotFoundError:
+                context = "(source unavailable in this test fixture)"
+            finding_dict = {
+                "file": finding.file,
+                "line": finding.line,
+                "title": finding.description,
+                "reason": "",
+                "snippet": finding.cited_text or "",
+                "enclosing_role": (
+                    manifest.target_enclosing_function.signature
+                    if manifest.target_enclosing_function
+                    else manifest.target_file_role
+                ),
+            }
+            user_prompt = _render(finding_dict, context)
         visible_lines = _extract_visible_lines(user_prompt)
 
         start = time.monotonic()
