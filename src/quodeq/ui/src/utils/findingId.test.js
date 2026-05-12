@@ -38,4 +38,29 @@ test('computeFindingId', async (t) => {
       '8420df1b',
     );
   });
+
+  await t.test('unpacks "file:line" packed in the file field when line is null', () => {
+    // Some views (principle drilldown rows in EvalCards) pass `file:line`
+    // packed in the file field with line: null. Must still produce the
+    // same hash as separate fields.
+    const separate = computeFindingId({
+      file: 'src/quodeq/api/app.py',
+      line: 34,
+      title: 'Platform-specific filesystem dependency',
+    });
+    const packed = computeFindingId({
+      file: 'src/quodeq/api/app.py:34',
+      line: null,
+      title: 'Platform-specific filesystem dependency',
+    });
+    assert.strictEqual(separate, packed);
+    assert.strictEqual(separate, 'd3412c14');
+  });
+
+  await t.test('does not split when the trailing colon segment is non-numeric', () => {
+    // A file with a colon but no trailing :digits should be left alone
+    // (e.g. a git ref or weird path). line stays 0.
+    const id = computeFindingId({ file: 'a/b:branch', line: null, title: 't' });
+    assert.strictEqual(id, fnv1a32('a/b:branch|0|t'));
+  });
 });

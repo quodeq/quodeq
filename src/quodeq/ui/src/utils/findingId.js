@@ -14,14 +14,30 @@ export function fnv1a32(str) {
  * Compute the stable composite id for a finding that has no explicit `id`.
  * Real evaluation output uses this same `file|line|title` composition.
  *
- * @param {{ file?: string, line?: number, title?: string }} v
+ * Real-world finding shapes are inconsistent: some views (e.g. the side-pane
+ * detail) keep `file` and `line` separate; others (e.g. the principle
+ * drilldown's violation rows) pack them as `"path:line"` in `file` with
+ * `line: null`. This helper unpacks the latter so the hash always matches
+ * the Python backend's `_fnv1a32` on `"file|line|title"`.
+ *
+ * @param {{ file?: string, line?: number|null, title?: string }} v
  *   A finding-shaped object. Missing fields default to empty string / 0 to
  *   match the Python backend's behavior in `_fnv1a32`.
  * @returns {string} 8-char lowercase hex.
  */
 export function computeFindingId(v) {
-  const file = v.file || '';
-  const line = v.line ?? 0;
+  let file = v.file || '';
+  let line = v.line ?? 0;
+  // If line is missing and file ends with ":N" (a positive integer), split.
+  // Guard against file paths that legitimately contain ":" (Windows drives,
+  // git refs) by only splitting on a trailing numeric segment.
+  if (!line) {
+    const m = /^(.*):(\d+)$/.exec(file);
+    if (m) {
+      file = m[1];
+      line = Number(m[2]);
+    }
+  }
   const title = v.title || '';
   return fnv1a32(`${file}|${line}|${title}`);
 }
