@@ -43,13 +43,6 @@ def citations_resolvable(
         if parsed is None or parsed not in visible_lines:
             invalid.append(f"{qid}: cite {ans.cite!r} not in evidence")
 
-    for fname, fext in _findings_items(response):
-        if fext.cite is None or fext.cite == "MANIFEST":
-            continue
-        parsed = _parse_cite(fext.cite)
-        if parsed is None or parsed not in visible_lines:
-            invalid.append(f"findings.{fname}: cite {fext.cite!r} not in evidence")
-
     return invalid
 
 
@@ -72,23 +65,6 @@ def enforce_citation_validity(
 
 
 def self_consistency_warnings(response: VerifierResponse) -> list[str]:
-    """Return a list of warnings where the structured findings contradict
-    the checklist answers."""
-    warnings: list[str] = []
-    cl = response.checklist
-    f = response.findings
-
-    if f.override_mechanism.value and cl["Q5"].answer != "yes":
-        warnings.append("findings.override_mechanism is non-null but Q5 != yes")
-    if f.abstraction_in_use.value and cl["Q4"].answer != "yes":
-        warnings.append("findings.abstraction_in_use is non-null but Q4 != yes")
-    if f.default_implementation.value and cl["Q2"].answer not in ("yes", "unknown"):
-        warnings.append("findings.default_implementation is non-null but Q2 == no")
-
-    return warnings
-
-
-def _findings_items(response: VerifierResponse):
-    yield "default_implementation", response.findings.default_implementation
-    yield "override_mechanism", response.findings.override_mechanism
-    yield "abstraction_in_use", response.findings.abstraction_in_use
+    """DEPRECATED: Removed in Task 5. Function depended on findings block removed in Task 3.
+    Task 6 will remove this stub and its call site in verifier.py."""
+    return []
