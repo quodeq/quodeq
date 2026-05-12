@@ -8,8 +8,6 @@ from quodeq.verifier.errors import (
 )
 from quodeq.verifier.models import (
     ChecklistAnswer,
-    FindingExtraction,
-    FindingsExtraction,
     Verdict,
     VerifierResponse,
     VerifierResult,
@@ -23,8 +21,6 @@ __all__ = [
     "VerifierResponse",
     "VerifierResult",
     "ChecklistAnswer",
-    "FindingExtraction",
-    "FindingsExtraction",
     "VerifierError",
     "MalformedResponseError",
     "LLMUnreachableError",

@@ -8,7 +8,11 @@ from typing import Literal
 
 
 class Verdict(str, Enum):
-    """Computed verdict over a finding."""
+    """Computed verdict over a finding.
+
+    NOT_APPLICABLE is retained for backward compatibility with v7.2 records
+    already persisted in verifications.db. The v8 service never produces it.
+    """
 
     FALSE_POSITIVE = "false_positive"
     CONFIRMED = "confirmed"
@@ -23,26 +27,10 @@ class ChecklistAnswer:
     cite: str | None  # "file:line" or "MANIFEST" or None
 
 
-# A single structured-finding extraction (value + cite).
-@dataclass
-class FindingExtraction:
-    value: str | None
-    cite: str | None
-
-
-# All three structured findings the v7.2 prompt requests.
-@dataclass
-class FindingsExtraction:
-    default_implementation: FindingExtraction
-    override_mechanism: FindingExtraction
-    abstraction_in_use: FindingExtraction
-
-
 # The model's raw structured response (validated against the JSON Schema).
 @dataclass
 class VerifierResponse:
     checklist: dict[str, ChecklistAnswer]
-    findings: FindingsExtraction
     confidence: float
     evidence_summary: str
 
@@ -52,6 +40,6 @@ class VerifierResponse:
 class VerifierResult:
     verdict: Verdict
     response: VerifierResponse
-    consistency_warnings: list[str] = field(default_factory=list)
+    consistency_warnings: list[str] = field(default_factory=list)  # always [] in v8 — retained for serializer compat
     model: str = ""
     elapsed_ms: int = 0

@@ -9,8 +9,6 @@ from quodeq.resolver.models import FindingInput, Manifest
 from quodeq.verifier.client import OllamaClient
 from quodeq.verifier.models import (
     ChecklistAnswer,
-    FindingExtraction,
-    FindingsExtraction,
     VerifierResponse,
     VerifierResult,
 )
@@ -76,15 +74,8 @@ def parse_verifier_response(raw: dict) -> VerifierResponse:
         qid: ChecklistAnswer(answer=ans["answer"], cite=ans["cite"])
         for qid, ans in raw["checklist"].items()
     }
-    f = raw["findings"]
-    findings = FindingsExtraction(
-        default_implementation=FindingExtraction(**f["default_implementation"]),
-        override_mechanism=FindingExtraction(**f["override_mechanism"]),
-        abstraction_in_use=FindingExtraction(**f["abstraction_in_use"]),
-    )
     return VerifierResponse(
         checklist=checklist,
-        findings=findings,
         confidence=raw["confidence"],
         evidence_summary=raw["evidence_summary"],
     )
