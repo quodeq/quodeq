@@ -28,4 +28,14 @@ test('computeFindingId', async (t) => {
     // Treats missing fields as the empty/zero defaults Python does.
     assert.strictEqual(computeFindingId({}), fnv1a32('|0|'));
   });
+
+  await t.test('round-trip with Python backend: pin end-to-end hash', () => {
+    // Round-trip with the Python backend: computeFindingId composes file|line|title
+    // and FNV-1a hashes it. This pins the composed value end-to-end against the
+    // Python _fnv1a32 in src/quodeq/verifier/service.py.
+    assert.strictEqual(
+      computeFindingId({ file: 'src/api/app.py', line: 34, title: 'hardcoded provider' }),
+      '8420df1b',
+    );
+  });
 });

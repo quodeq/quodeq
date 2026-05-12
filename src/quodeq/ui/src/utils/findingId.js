@@ -10,8 +10,15 @@ export function fnv1a32(str) {
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
-// Compute the stable composite id for a finding that has no explicit `id`.
-// Real evaluation output uses this same `file|line|title` composition.
+/**
+ * Compute the stable composite id for a finding that has no explicit `id`.
+ * Real evaluation output uses this same `file|line|title` composition.
+ *
+ * @param {{ file?: string, line?: number, title?: string }} v
+ *   A finding-shaped object. Missing fields default to empty string / 0 to
+ *   match the Python backend's behavior in `_fnv1a32`.
+ * @returns {string} 8-char lowercase hex.
+ */
 export function computeFindingId(v) {
   const file = v.file || '';
   const line = v.line ?? 0;
