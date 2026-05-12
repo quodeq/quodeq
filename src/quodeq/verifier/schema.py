@@ -1,20 +1,23 @@
-"""JSON Schema for the verifier's model response.
+"""JSON Schema for the verifier model response (v8).
 
-Used by:
-- Ollama's `format` parameter to enforce structural correctness at decode time.
-- The response parser to validate model output before passing it downstream.
+The response contains:
+  - checklist: four questions (Q1-Q4), each with answer + cite.
+  - confidence: model-reported confidence in [0, 1].
+  - evidence_summary: short forensic string the audit log retains.
+
+No structured `findings` block (that was v7.2 substitutability-only).
+The verdict is computed deterministically Python-side, not emitted by the
+model — see verdict.py.
 """
 
 from __future__ import annotations
 
-from typing import Any
 
-
-def _answer_schema() -> dict[str, Any]:
+def _checklist_entry() -> dict:
     return {
         "type": "object",
-        "additionalProperties": False,
         "required": ["answer", "cite"],
+        "additionalProperties": False,
         "properties": {
             "answer": {"type": "string", "enum": ["yes", "no", "unknown"]},
             "cite": {"type": ["string", "null"]},
@@ -22,44 +25,20 @@ def _answer_schema() -> dict[str, Any]:
     }
 
 
-def _finding_schema() -> dict[str, Any]:
-    return {
-        "type": "object",
-        "additionalProperties": False,
-        "required": ["value", "cite"],
-        "properties": {
-            "value": {"type": ["string", "null"]},
-            "cite": {"type": ["string", "null"]},
-        },
-    }
-
-
-RESPONSE_SCHEMA: dict[str, Any] = {
+RESPONSE_SCHEMA: dict = {
     "type": "object",
+    "required": ["checklist", "confidence", "evidence_summary"],
     "additionalProperties": False,
-    "required": ["checklist", "findings", "confidence", "evidence_summary"],
     "properties": {
         "checklist": {
             "type": "object",
+            "required": ["Q1", "Q2", "Q3", "Q4"],
             "additionalProperties": False,
-            "required": ["Q1", "Q2", "Q3", "Q4", "Q5"],
-            "properties": {q: _answer_schema() for q in ("Q1", "Q2", "Q3", "Q4", "Q5")},
-        },
-        "findings": {
-            "type": "object",
-            "additionalProperties": False,
-            "required": [
-                "default_implementation",
-                "override_mechanism",
-                "abstraction_in_use",
-            ],
             "properties": {
-                "default_implementation": _finding_schema(),
-                "override_mechanism": _finding_schema(),
-                "abstraction_in_use": _finding_schema(),
+                q: _checklist_entry() for q in ("Q1", "Q2", "Q3", "Q4")
             },
         },
-        "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
-        "evidence_summary": {"type": "string", "maxLength": 200},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "evidence_summary": {"type": "string"},
     },
 }
