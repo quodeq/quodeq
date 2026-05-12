@@ -40,12 +40,6 @@ def test_replay_case_passes_when_canned_response_matches_expected_verdict(tmp_pa
             "Q2": {"answer": "yes", "cite": None},
             "Q3": {"answer": "yes", "cite": "MANIFEST"},
             "Q4": {"answer": "yes", "cite": "MANIFEST"},
-            "Q5": {"answer": "yes", "cite": "MANIFEST"},
-        },
-        "findings": {
-            "default_implementation": {"value": "X", "cite": "MANIFEST"},
-            "override_mechanism": {"value": "Y", "cite": "MANIFEST"},
-            "abstraction_in_use": {"value": "Z", "cite": "MANIFEST"},
         },
         "confidence": 1.0,
         "evidence_summary": "x",
@@ -69,12 +63,6 @@ def test_replay_case_fails_when_verdict_differs(tmp_path: Path):
             "Q2": {"answer": "yes", "cite": None},
             "Q3": {"answer": "no", "cite": None},
             "Q4": {"answer": "yes", "cite": "MANIFEST"},
-            "Q5": {"answer": "yes", "cite": "MANIFEST"},
-        },
-        "findings": {
-            "default_implementation": {"value": None, "cite": None},
-            "override_mechanism": {"value": None, "cite": None},
-            "abstraction_in_use": {"value": None, "cite": None},
         },
         "confidence": 0.5,
         "evidence_summary": "x",
@@ -87,4 +75,4 @@ def test_replay_case_fails_when_verdict_differs(tmp_path: Path):
     )
     result = replay_case(case)
     assert result.passed is False
-    assert result.actual_verdict == Verdict.CONFIRMED
+    assert result.actual_verdict == Verdict.INCONCLUSIVE

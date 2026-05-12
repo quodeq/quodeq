@@ -37,12 +37,6 @@ def _canned_response() -> dict[str, Any]:
             "Q2": {"answer": "yes", "cite": "api/app.py:5"},
             "Q3": {"answer": "yes", "cite": "MANIFEST"},
             "Q4": {"answer": "yes", "cite": "MANIFEST"},
-            "Q5": {"answer": "yes", "cite": "MANIFEST"},
-        },
-        "findings": {
-            "default_implementation": {"value": "FilesystemActionProvider", "cite": None},
-            "override_mechanism": {"value": "provider param", "cite": None},
-            "abstraction_in_use": {"value": "ActionProvider", "cite": "MANIFEST"},
         },
         "confidence": 0.9,
         "evidence_summary": "ok",
@@ -84,7 +78,6 @@ def test_post_verify_creates_verification(app_with_routes):
     assert "verification_id" in data
     assert data["verdict"] in ("false_positive", "inconclusive")
     assert "checklist" in data
-    assert "findings" in data
 
 
 def test_post_verify_returns_404_for_missing_finding(app_with_routes):

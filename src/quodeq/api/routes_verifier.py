@@ -96,7 +96,6 @@ def register_routes_verifier(app: Flask, service: VerifierService) -> None:
                 "model": sr.result.model,
                 "elapsed_ms": sr.result.elapsed_ms,
                 "checklist": _checklist_to_dict(sr),
-                "findings": _findings_to_dict(sr),
                 "consistency_warnings": list(sr.result.consistency_warnings),
             }
         )
@@ -183,15 +182,6 @@ def _checklist_to_dict(sr) -> dict[str, Any]:
     return {
         q: {"answer": a.answer, "cite": a.cite}
         for q, a in sr.result.response.checklist.items()
-    }
-
-
-def _findings_to_dict(sr) -> dict[str, Any]:
-    f = sr.result.response.findings
-    return {
-        "default_implementation": {"value": f.default_implementation.value, "cite": f.default_implementation.cite},
-        "override_mechanism": {"value": f.override_mechanism.value, "cite": f.override_mechanism.cite},
-        "abstraction_in_use": {"value": f.abstraction_in_use.value, "cite": f.abstraction_in_use.cite},
     }
 
 

@@ -29,89 +29,12 @@ from quodeq.resolver.models import FindingInput
 from quodeq.verifier.audit_log import write_audit_log
 from quodeq.verifier.client import OllamaClient
 from quodeq.verifier.models import (
-    ChecklistAnswer,
     Verdict,
-    VerifierResponse,
     VerifierResult,
 )
 from quodeq.verifier.prompt import SYSTEM_PROMPT_V8, render_user_prompt
 from quodeq.verifier.storage import VerificationRecord, VerificationsStore
 from quodeq.verifier.verifier import Verifier
-
-
-# Substring keywords (case-insensitive) that indicate a finding is in the
-# scope of the v7.2 substitutability / DIP prompt. Matched against the
-# concatenation of finding title and category. Conservative on purpose:
-# we'd rather skip a borderline-applicable finding than waste 10–60s
-# running v7.2 on something it can't reason about ("hardcoded filename",
-# "magic number", "duplicate code", etc.).
-_SUBSTITUTABILITY_KEYWORDS: tuple[str, ...] = (
-    # direct DI / DIP language
-    "dependency",
-    "abstraction",
-    "polymorphism",
-    "injection",
-    "inject ",             # trailing space avoids matching "injection" twice
-    "violates dip",
-    "violates lsp",
-    "should depend on",
-    "newing up",
-    "missing protocol",
-    "missing interface",
-    "missing abstraction",
-    "depends on concrete",
-    "hardcoded class",
-    "hardcoded implementation",
-    "hardcoded dependency",
-    # coupling / substitutability language used in real `reason` text
-    "coupl",               # couples, coupled, coupling, decoupled
-    "switch",              # "easy switching", "swap implementations"
-    "swap implement",
-    "platform-specific",
-    "platform specific",
-    "concrete class",
-    "concrete implementation",
-    "specific implementation",
-    "specific storage",
-    "abstraction layer",
-    "not abstracted",
-)
-
-
-def _is_substitutability_finding(
-    title: str, category: str, reason: str = ""
-) -> bool:
-    """Heuristic: does this finding match what the v7.2 prompt can reason about?
-
-    The v7.2 prompt only knows how to verify substitutability / DIP-style
-    violations (concrete-class-where-an-abstraction-should-be). Findings
-    about hardcoded values, naming, duplicate code, etc. trigger
-    ``unknown`` answers across the board and waste an Ollama call.
-
-    Scans all three of ``title``, ``reason`` (the "why it's a violation"
-    body), and ``category`` because real evaluations often have a terse
-    or misleading title while the substantive substitutability language
-    lives in the reason text.
-    """
-    haystack = f"{title} {reason} {category}".lower()
-    return any(kw in haystack for kw in _SUBSTITUTABILITY_KEYWORDS)
-
-
-def _not_applicable_result(reason: str) -> VerifierResult:
-    """Build a synthetic VerifierResult for findings we skip without an LLM call."""
-    return VerifierResult(
-        verdict=Verdict.NOT_APPLICABLE,
-        response=VerifierResponse(
-            checklist={
-                q: ChecklistAnswer(answer="unknown", cite=None)
-                for q in ("Q1", "Q2", "Q3", "Q4")
-            },
-            confidence=1.0,
-            evidence_summary=reason,
-        ),
-        model="",
-        elapsed_ms=0,
-    )
 
 
 _CONTEXT_BEFORE_DEFAULT = 30
@@ -249,51 +172,33 @@ class VerifierService:
             description=located.description,
         )
 
-        # Short-circuit out-of-scope findings before paying for the model.
-        # See _is_substitutability_finding for the heuristic.
-        if not _is_substitutability_finding(
-            located.description, located.category, located.reason
-        ):
-            project_root = self.project_root_resolver(evaluation_id)
-            result = _not_applicable_result(
-                f"This finding (title {located.description!r}, category "
-                f"{located.category!r}) does not contain substitutability "
-                "language (coupling, abstraction, dependency injection, "
-                "Protocol/ABC, etc.) in its title or reason text. The v7.2 "
-                "verifier prompt only reasons about concrete-class / "
-                "should-depend-on-abstraction violations; running it on this "
-                "finding would produce 'unknown' across the checklist."
-            )
-            manifest = None
-            user_prompt = ""
-        else:
-            resolver = self._resolver_for(evaluation_id)
-            manifest = resolver.build_manifest(finding)
-            project_root = self.project_root_resolver(evaluation_id)
+        resolver = self._resolver_for(evaluation_id)
+        manifest = resolver.build_manifest(finding)
+        project_root = self.project_root_resolver(evaluation_id)
 
-            finding_dict = {
-                "file": located.file,
-                "line": located.line,
-                "title": located.description,
-                "reason": located.reason,
-                "snippet": _read_cited_line(
-                    project_root / located.file, located.line
-                ).strip(),
-                "enclosing_role": (
-                    manifest.target_enclosing_function.signature
-                    if manifest.target_enclosing_function
-                    else manifest.target_file_role
-                ),
-            }
-            context = _read_source_context(project_root / located.file, located.line)
-            user_prompt = render_user_prompt(finding_dict, context)
+        finding_dict = {
+            "file": located.file,
+            "line": located.line,
+            "title": located.description,
+            "reason": located.reason,
+            "snippet": _read_cited_line(
+                project_root / located.file, located.line
+            ).strip(),
+            "enclosing_role": (
+                manifest.target_enclosing_function.signature
+                if manifest.target_enclosing_function
+                else manifest.target_file_role
+            ),
+        }
+        context = _read_source_context(project_root / located.file, located.line)
+        user_prompt = render_user_prompt(finding_dict, context)
 
-            verifier = Verifier(
-                project_root=project_root,
-                client=self.client,
-                model=self.model,
-            )
-            result = verifier.verify(manifest, finding, user_prompt=user_prompt)
+        verifier = Verifier(
+            project_root=project_root,
+            client=self.client,
+            model=self.model,
+        )
+        result = verifier.verify(manifest, finding, user_prompt=user_prompt)
 
         verification_id = str(uuid.uuid4())
         eval_dir = self.evaluations_root / evaluation_id
@@ -317,16 +222,6 @@ class VerifierService:
 
         audit_root = eval_dir / "verifier"
         raw_response_dict = _result_to_raw_dict(result)
-        if manifest is None:
-            # Skipped findings: write a minimal audit dir so the UI still
-            # has somewhere to point. The "manifest" file just records the
-            # skip reason for forensics.
-            from quodeq.resolver.models import Manifest
-            manifest = Manifest(
-                target_file=located.file,
-                target_line=located.line,
-                target_file_role="other",
-            )
         audit_dir = write_audit_log(
             root=audit_root,
             verification_id=verification_id,

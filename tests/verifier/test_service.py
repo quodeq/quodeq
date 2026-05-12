@@ -9,7 +9,6 @@ from quodeq.verifier.service import (
     VerifierService,
     LocatedFinding,
     FindingNotFound,
-    _is_substitutability_finding,
 )
 
 
@@ -96,12 +95,6 @@ def test_service_runs_full_pipeline(tmp_path: Path, stub_client):
             "Q2": {"answer": "yes", "cite": "src/api/app.py:6"},
             "Q3": {"answer": "yes", "cite": "MANIFEST"},
             "Q4": {"answer": "yes", "cite": "MANIFEST"},
-            "Q5": {"answer": "yes", "cite": "MANIFEST"},
-        },
-        "findings": {
-            "default_implementation": {"value": "FilesystemActionProvider", "cite": None},
-            "override_mechanism": {"value": "provider param", "cite": None},
-            "abstraction_in_use": {"value": "ActionProvider", "cite": "MANIFEST"},
         },
         "confidence": 0.9,
         "evidence_summary": "ok",
@@ -148,12 +141,7 @@ def test_service_resolves_project_root_per_evaluation(tmp_path: Path, stub_clien
         return {"eval-a": project_a, "eval-b": project_b}.get(eval_id, project_a)
 
     canned = {
-        "checklist": {q: {"answer": "yes", "cite": "MANIFEST"} for q in ("Q1", "Q2", "Q3", "Q4", "Q5")},
-        "findings": {
-            "default_implementation": {"value": "X", "cite": None},
-            "override_mechanism": {"value": "Y", "cite": None},
-            "abstraction_in_use": {"value": "Z", "cite": "MANIFEST"},
-        },
+        "checklist": {q: {"answer": "yes", "cite": "MANIFEST"} for q in ("Q1", "Q2", "Q3", "Q4")},
         "confidence": 0.5,
         "evidence_summary": "x",
     }
@@ -169,79 +157,26 @@ def test_service_resolves_project_root_per_evaluation(tmp_path: Path, stub_clien
     assert a.verification_id != b.verification_id
 
 
-def test_classifier_accepts_substitutability_findings():
-    cases = [
-        ("Platform-specific filesystem dependency", "flexibility/adaptability"),
-        ("Hardcoded class FilesystemProvider", "flexibility/adaptability"),
-        ("Hardcoded implementation of Provider", "flexibility/adaptability"),
-        ("Concrete coupling to FilesystemActionProvider", "flexibility/adaptability"),
-        ("Tight coupling to concrete class", "flexibility/adaptability"),
-        ("Missing abstraction for storage backend", "flexibility/adaptability"),
-        ("Violates DIP by depending on FileSystem", "flexibility/adaptability"),
-    ]
-    for title, category in cases:
-        assert _is_substitutability_finding(title, category), (
-            f"expected applicable: title={title!r} category={category!r}"
-        )
-
-
-def test_classifier_uses_reason_text_when_title_is_uninformative():
-    """Real evaluations often have a terse title; the substitutability
-    language lives in the reason body. The classifier must look there."""
-    # The exact finding the user flagged: title says 'Hardcoded output
-    # filename' but reason talks about coupling and switching.
-    title = "Hardcoded output filename"
-    category = "flexibility/adaptability"
-    reason = (
-        "The default provider is hardcoded to use FilesystemActionProvider, "
-        "which couples the application logic directly to the local filesystem "
-        "and prevents easy switching to cloud storage without code modification."
-    )
-    assert _is_substitutability_finding(title, category, reason)
-
-
-def test_classifier_catches_platform_specific_in_reason():
-    title = "Platform-specific logic not abstracted"
-    category = "flexibility/adaptability"
-    reason = (
-        "The function directly calls read_run_data which relies on the local "
-        "file system (Path objects), making the logic dependent on a specific "
-        "storage implementation rather than an abstraction layer."
-    )
-    assert _is_substitutability_finding(title, category, reason)
-
-
-def test_classifier_rejects_out_of_scope_findings():
-    cases = [
-        ("Hardcoded output filename", "flexibility/adaptability"),
-        ("Hardcoded path /tmp/foo", "flexibility/adaptability"),
-        ("Magic number 42", "maintainability/readability"),
-        ("Duplicate code block", "maintainability/readability"),
-        ("Long function exceeds 100 lines", "maintainability/readability"),
-        ("Variable name is unclear", "maintainability/readability"),
-    ]
-    for title, category in cases:
-        assert not _is_substitutability_finding(title, category), (
-            f"expected NOT applicable: title={title!r} category={category!r}"
-        )
-
-
-def test_service_short_circuits_out_of_scope_finding(tmp_path: Path, stub_client):
-    """A finding the classifier rejects skips the LLM and returns NOT_APPLICABLE."""
+def test_service_runs_full_pipeline_on_hardcoded_finding(tmp_path: Path, stub_client):
+    """v8 has no classifier -- even findings whose title contains no
+    substitutability language flow through the model. Previously this would
+    have been short-circuited to NOT_APPLICABLE."""
     _make_project(tmp_path)
 
     def locate(eval_id, dim, fid):
         return LocatedFinding(
-            file="api/app.py",
-            line=6,
-            category="flexibility/adaptability",
-            severity="minor",
-            description="Hardcoded output filename",
+            file="api/app.py", line=6,
+            category="flexibility/adaptability", severity="minor",
+            description="Hardcoded output filename",  # no substitutability keyword
+            reason="The output filename is hardcoded.",  # no substitutability keyword
         )
 
-    # Empty script: any call to the stub client would raise (script exhausted).
-    client = stub_client()  # no canned response — proves we never call Ollama
-
+    canned = {
+        "checklist": {q: {"answer": "yes", "cite": "MANIFEST"} for q in ("Q1", "Q2", "Q3", "Q4")},
+        "confidence": 0.7,
+        "evidence_summary": "x",
+    }
+    client = stub_client(canned)
     service = VerifierService(
         evaluations_root=tmp_path / "evals",
         project_root=tmp_path,
@@ -249,17 +184,11 @@ def test_service_short_circuits_out_of_scope_finding(tmp_path: Path, stub_client
         client=client,
         model="gemma:4",
     )
-    result = service.verify_finding(
-        evaluation_id="eval-1",
-        dimension="flexibility",
-        finding_id="f1",
-    )
-    assert result.verdict == Verdict.NOT_APPLICABLE
-    assert client.calls == [], "no Ollama call should have happened"
-    # Still recorded in the per-evaluation store and audit log
-    assert (tmp_path / "evals" / "eval-1" / "verifications.db").exists()
-    log_dir = tmp_path / "evals" / "eval-1" / "verifier" / result.verification_id
-    assert (log_dir / "manifest.json").exists()
+    result = service.verify_finding("eval-1", "flexibility", "f1")
+    # The stub client WAS called -- proof we didn't short-circuit.
+    assert len(client.calls) == 1
+    assert result.verdict in (Verdict.CONFIRMED, Verdict.FALSE_POSITIVE, Verdict.INCONCLUSIVE)
+    assert result.verdict is not Verdict.NOT_APPLICABLE
 
 
 def test_read_source_context_marks_cited_line(tmp_path: Path):
@@ -305,12 +234,7 @@ def test_service_resolver_construction_is_thread_safe(tmp_path: Path, stub_clien
         )
 
     canned = {
-        "checklist": {q: {"answer": "yes", "cite": "MANIFEST"} for q in ("Q1", "Q2", "Q3", "Q4", "Q5")},
-        "findings": {
-            "default_implementation": {"value": "X", "cite": None},
-            "override_mechanism": {"value": "Y", "cite": None},
-            "abstraction_in_use": {"value": "Z", "cite": "MANIFEST"},
-        },
+        "checklist": {q: {"answer": "yes", "cite": "MANIFEST"} for q in ("Q1", "Q2", "Q3", "Q4")},
         "confidence": 0.5,
         "evidence_summary": "x",
     }
