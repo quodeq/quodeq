@@ -6,7 +6,6 @@ const DashboardPage = lazy(() => import('./features/dashboard/components/Dashboa
 const ExplorerPage = lazy(() => import('./features/explorer/components/ExplorerPage.jsx'));
 const FileDetailPage = lazy(() => import('./features/explorer/components/FileDetailPage.jsx'));
 const PrincipleDetailPage = lazy(() => import('./features/explorer/components/PrincipleDetailPage.jsx'));
-const FindingDetailPage = lazy(() => import('./features/explorer/components/FindingDetailPage.jsx'));
 const ProjectsPage = lazy(() => import('./features/dashboard/components/ProjectsPage.jsx'));
 const HistoryPage = lazy(() => import('./features/history/components/HistoryPage.jsx'));
 const EvaluateScreen = lazy(() => import('./features/evaluation/components/EvaluateScreen.jsx'));
@@ -332,18 +331,6 @@ const ROUTE_RENDERERS = {
   ),
   evalprinciple: renderEvalPrincipleDetail,
   'eval-principle-detail': renderEvalPrincipleDetail,
-  finding: (params, props) => (
-    <FindingDetailPage
-      finding={params.finding}
-      principle={params.principle}
-      dimension={params.dimension}
-      onDismiss={(v) => {
-        props.dismissFinding(props.navigation.selectedProject, buildDismissPayload(v, params.dimension))
-          .then(() => props.refreshDashboard?.())
-          .catch((e) => console.error('[Dismiss] failed:', e));
-      }}
-    />
-  ),
   settings: (params, props) => <SettingsCase settings={props.settings} />,
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup }} />,
   standards: () => <StandardsPage />,

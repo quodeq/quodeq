@@ -24,7 +24,6 @@ export function labelFor(entry) {
     case 'file':          return entry.label || entry.file?.path || 'file';
     case 'principle':     return entry.label || 'principle';
     case 'evalprinciple': return entry.label || entry.principleName || 'principle';
-    case 'finding':       return entry.label || 'finding';
     default:              return entry.label || entry.page;
   }
 }
