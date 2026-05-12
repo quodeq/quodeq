@@ -5,8 +5,8 @@ class VerifierError(Exception):
     """Base class for verifier errors."""
 
 
-class OllamaUnreachableError(VerifierError):
-    """Could not connect to the Ollama server."""
+class LLMUnreachableError(VerifierError):
+    """Could not connect to the LLM server."""
 
 
 class VerifierTimeoutError(VerifierError):

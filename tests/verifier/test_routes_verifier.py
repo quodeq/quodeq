@@ -145,11 +145,11 @@ def test_get_verification_rejects_invalid_id(app_with_routes):
 
 def test_post_verify_returns_503_on_ollama_unreachable(tmp_path: Path):
     _make_project(tmp_path)
-    from quodeq.verifier.errors import OllamaUnreachableError
+    from quodeq.verifier.errors import LLMUnreachableError
 
     class RaisingClient:
         def chat(self, **_kwargs):
-            raise OllamaUnreachableError("nope")
+            raise LLMUnreachableError("nope")
         def close(self):
             pass
 
@@ -171,7 +171,7 @@ def test_post_verify_returns_503_on_ollama_unreachable(tmp_path: Path):
     resp = app.test_client().post("/api/evaluations/eval-1/verify/flexibility/f1")
     assert resp.status_code == 503
     body = resp.get_json()
-    assert body["error"] == "ollama_unreachable"
+    assert body["error"] == "llm_unreachable"
     assert "hint" in body
 
 

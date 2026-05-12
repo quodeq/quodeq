@@ -6,7 +6,7 @@ import pytest
 from quodeq.verifier.client import OllamaClient
 from quodeq.verifier.errors import (
     MalformedResponseError,
-    OllamaUnreachableError,
+    LLMUnreachableError,
     VerifierTimeoutError,
 )
 
@@ -46,7 +46,7 @@ def test_client_raises_on_unreachable():
         raise httpx.ConnectError("nope", request=request)
 
     client = OllamaClient(base_url="http://test", transport=_stub_transport(handler))
-    with pytest.raises(OllamaUnreachableError):
+    with pytest.raises(LLMUnreachableError):
         client.chat(system="sys", user="usr", schema={}, model="gemma:4", temperature=0.2)
 
 

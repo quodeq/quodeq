@@ -19,7 +19,7 @@ from flask import Flask, jsonify
 from quodeq.resolver.registry import LanguageNotSupported
 from quodeq.verifier.errors import (
     MalformedResponseError,
-    OllamaUnreachableError,
+    LLMUnreachableError,
     VerifierError,
     VerifierTimeoutError,
 )
@@ -53,9 +53,9 @@ def register_routes_verifier(app: Flask, service: VerifierService) -> None:
                 "detail": str(exc),
                 "hint": "The verifier currently supports Python (.py) only. Other language adapters are in development.",
             }), 415
-        except OllamaUnreachableError as exc:
+        except LLMUnreachableError as exc:
             return jsonify({
-                "error": "ollama_unreachable",
+                "error": "llm_unreachable",
                 "detail": str(exc),
                 "hint": "Is Ollama running? Try: ollama serve",
             }), 503

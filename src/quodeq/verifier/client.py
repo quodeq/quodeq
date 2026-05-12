@@ -9,7 +9,7 @@ import httpx
 
 from quodeq.verifier.errors import (
     MalformedResponseError,
-    OllamaUnreachableError,
+    LLMUnreachableError,
     VerifierTimeoutError,
 )
 
@@ -65,7 +65,7 @@ class OllamaClient:
             resp = self._client.post("/api/chat", json=payload)
             resp.raise_for_status()
         except httpx.ConnectError as exc:
-            raise OllamaUnreachableError(str(exc)) from exc
+            raise LLMUnreachableError(str(exc)) from exc
         except httpx.TimeoutException as exc:
             raise VerifierTimeoutError(str(exc)) from exc
         except httpx.HTTPStatusError as exc:

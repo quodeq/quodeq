@@ -2,7 +2,7 @@
 
 from quodeq.verifier.errors import (
     MalformedResponseError,
-    OllamaUnreachableError,
+    LLMUnreachableError,
     VerifierError,
     VerifierTimeoutError,
 )
@@ -27,6 +27,6 @@ __all__ = [
     "FindingsExtraction",
     "VerifierError",
     "MalformedResponseError",
-    "OllamaUnreachableError",
+    "LLMUnreachableError",
     "VerifierTimeoutError",
 ]
