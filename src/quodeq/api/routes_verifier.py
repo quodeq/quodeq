@@ -1,0 +1,203 @@
+"""Flask routes for the finding verifier (Plan 3).
+
+Three endpoints under `/api/evaluations/<eval_id>/`:
+  - POST /verify/<dimension>/<finding_id>   - run the verifier; persist + return
+  - GET  /verifications                     - list all verifications for the eval
+  - GET  /verifications/<verification_id>   - fetch one with manifest + raw response
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import traceback
+from pathlib import Path
+from typing import Any
+
+from flask import Flask, jsonify
+
+from quodeq.resolver.registry import LanguageNotSupported
+from quodeq.verifier.errors import (
+    MalformedResponseError,
+    LLMUnreachableError,
+    VerifierError,
+    VerifierTimeoutError,
+)
+from quodeq.verifier.service import FindingNotFound, VerifierService
+from quodeq.verifier.storage import VerificationsStore
+from quodeq.shared.validation import validate_path_segment
+
+_logger = logging.getLogger(__name__)
+
+
+def register_routes_verifier(app: Flask, service: VerifierService) -> None:
+    """Register the verifier blueprint on `app` with the given service."""
+
+    @app.post("/api/evaluations/<eval_id>/verify/<dimension>/<finding_id>")
+    def post_verify(eval_id: str, dimension: str, finding_id: str):
+        try:
+            validate_path_segment(eval_id, dimension, finding_id)
+        except ValueError as exc:
+            return jsonify({"error": "invalid_path", "detail": str(exc)}), 400
+        try:
+            sr = service.verify_finding(
+                evaluation_id=eval_id,
+                dimension=dimension,
+                finding_id=finding_id,
+            )
+        except FindingNotFound as exc:
+            return jsonify({"error": "finding_not_found", "detail": str(exc)}), 404
+        except LanguageNotSupported as exc:
+            return jsonify({
+                "error": "language_not_supported",
+                "detail": str(exc),
+                "hint": "The verifier currently supports Python (.py) only. Other language adapters are in development.",
+            }), 415
+        except LLMUnreachableError as exc:
+            return jsonify({
+                "error": "llm_unreachable",
+                "detail": str(exc),
+                "hint": "Is Ollama running? Try: ollama serve",
+            }), 503
+        except VerifierTimeoutError as exc:
+            return jsonify({
+                "error": "verifier_timeout",
+                "detail": str(exc),
+                "hint": "Model load + inference exceeded the HTTP timeout. Pre-warm the model with: ollama run <model> 'hi'",
+            }), 504
+        except MalformedResponseError as exc:
+            return jsonify({
+                "error": "malformed_model_response",
+                "detail": str(exc),
+                "hint": "The model returned a response that didn't match the JSON schema. Check Ollama version and model compatibility with `format` parameter.",
+            }), 502
+        except VerifierError as exc:
+            # Other typed verifier errors
+            _logger.exception("Verifier error during verify_finding")
+            return jsonify({
+                "error": "verifier_error",
+                "type": type(exc).__name__,
+                "detail": str(exc),
+            }), 500
+        except Exception as exc:
+            # Safety net: log the traceback server-side, return a useful summary to the client
+            _logger.exception("Unexpected error during verify_finding")
+            return jsonify({
+                "error": "internal_error",
+                "type": type(exc).__name__,
+                "detail": str(exc),
+            }), 500
+        return jsonify(
+            {
+                "verification_id": sr.verification_id,
+                "verdict": sr.verdict.value,
+                "confidence": sr.result.response.confidence,
+                "evidence_summary": sr.result.response.evidence_summary,
+                "model": sr.result.model,
+                "elapsed_ms": sr.result.elapsed_ms,
+                "checklist": _checklist_to_dict(sr),
+                "consistency_warnings": list(sr.result.consistency_warnings),
+            }
+        )
+
+    @app.get("/api/evaluations/<eval_id>/verifications")
+    def list_verifications(eval_id: str):
+        try:
+            validate_path_segment(eval_id)
+        except ValueError as exc:
+            return jsonify({"error": "invalid_path", "detail": str(exc)}), 400
+        db_path = service.evaluations_root / eval_id / "verifications.db"
+        if not db_path.exists():
+            return jsonify({"verifications": []})
+        store = VerificationsStore(db_path)
+        try:
+            rows = store.list_for_evaluation(eval_id)
+        finally:
+            store.close()
+        return jsonify(
+            {
+                "verifications": [
+                    {
+                        "verification_id": r.verification_id,
+                        "dimension": r.dimension,
+                        "finding_id": r.finding_id,
+                        "verdict": r.verdict.value,
+                        "confidence": r.confidence,
+                        "evidence_summary": r.evidence_summary,
+                        "model": r.model,
+                        "elapsed_ms": r.elapsed_ms,
+                        "created_at": r.created_at.isoformat(),
+                    }
+                    for r in rows
+                ]
+            }
+        )
+
+    @app.get("/api/evaluations/<eval_id>/verifications/<verification_id>")
+    def get_verification_detail(eval_id: str, verification_id: str):
+        try:
+            validate_path_segment(eval_id, verification_id)
+        except ValueError as exc:
+            return jsonify({"error": "invalid_path", "detail": str(exc)}), 400
+        db_path = service.evaluations_root / eval_id / "verifications.db"
+        if not db_path.exists():
+            return jsonify({"error": "not_found"}), 404
+        store = VerificationsStore(db_path)
+        try:
+            record = store.get(verification_id)
+        finally:
+            store.close()
+        if record is None:
+            return jsonify({"error": "not_found"}), 404
+
+        audit_dir = service.evaluations_root / eval_id / "verifier" / verification_id
+        manifest = _read_json_if_exists(audit_dir / "manifest.json")
+        raw_response = _read_json_if_exists(audit_dir / "response.json")
+        system_prompt = _read_text_if_exists(audit_dir / "prompt.system.txt")
+        user_prompt = _read_text_if_exists(audit_dir / "prompt.user.txt")
+
+        return jsonify(
+            {
+                "verification_id": verification_id,
+                "evaluation_id": record.evaluation_id,
+                "dimension": record.dimension,
+                "finding_id": record.finding_id,
+                "verdict": record.verdict.value,
+                "confidence": record.confidence,
+                "evidence_summary": record.evidence_summary,
+                "model": record.model,
+                "elapsed_ms": record.elapsed_ms,
+                "created_at": record.created_at.isoformat(),
+                "manifest": manifest,
+                "raw_response": raw_response,
+                "checklist": (raw_response or {}).get("checklist"),
+                "findings": (raw_response or {}).get("findings"),
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+            }
+        )
+
+
+def _checklist_to_dict(sr) -> dict[str, Any]:
+    return {
+        q: {"answer": a.answer, "cite": a.cite}
+        for q, a in sr.result.response.checklist.items()
+    }
+
+
+def _read_json_if_exists(path: Path) -> Any | None:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _read_text_if_exists(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return None

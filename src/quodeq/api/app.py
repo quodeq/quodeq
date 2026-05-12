@@ -6,6 +6,8 @@ import logging
 import os
 import signal
 import sys
+from collections.abc import Callable
+from pathlib import Path
 
 from flask import Flask, Response, jsonify
 
@@ -26,6 +28,78 @@ _logger = logging.getLogger(__name__)
 
 _EVALUATION_RATE_LIMIT_WINDOW = int(os.environ.get("QUODEQ_RATE_LIMIT_WINDOW", "300"))
 _EVALUATION_RATE_LIMIT_MAX = int(os.environ.get("QUODEQ_RATE_LIMIT_MAX", "10"))
+
+
+def _make_project_root_resolver(evaluations_root: Path) -> Callable[[str], Path]:
+    """Return a callable that maps eval_id -> project source root.
+
+    Each evaluation directory is a project UUID.  The project's local source
+    path is stored in ``<evaluations_root>/<eval_id>/repository_info.json``
+    under the ``"path"`` key (written there by the onboarding wizard and
+    updated by "Relocate project").  Results are cached in a plain dict so the
+    JSON file is read at most once per server lifetime per evaluation.
+
+    Falls back to ``Path.cwd()`` when:
+    - the metadata file is missing or unreadable, or
+    - ``location`` is ``"online"`` (remote clone; the clone root is under
+      ``~/.quodeq/...`` and is resolved separately by the evaluation runner),
+    - the stored path does not exist on disk.
+
+    The fallback is logged at WARNING level so operators notice the gap.
+    """
+    import json as _json
+    from pathlib import Path as _Path
+
+    _cache: dict[str, _Path] = {}
+
+    def _resolve(eval_id: str) -> _Path:
+        if eval_id in _cache:
+            return _cache[eval_id]
+
+        info_path = evaluations_root / eval_id / "repository_info.json"
+        try:
+            info = _json.loads(info_path.read_text(encoding="utf-8"))
+        except (OSError, _json.JSONDecodeError) as exc:
+            _logger.warning(
+                "verifier: could not read %s (%s) -- falling back to cwd", info_path, exc
+            )
+            result = _Path.cwd()
+            _cache[eval_id] = result
+            return result
+
+        location = info.get("location", "local")
+        raw_path = info.get("path", "")
+
+        if location == "online" or not raw_path:
+            # Remote repo: the evaluation runner clones it to a temp dir.
+            # We don't have a reliable way to find that clone here, so fall
+            # back to cwd.  This is a known limitation -- see PLAN3.md.
+            _logger.warning(
+                "verifier: eval %s uses a remote/online repo (%r) -- "
+                "falling back to cwd for project root",
+                eval_id,
+                raw_path,
+            )
+            result = _Path.cwd()
+            _cache[eval_id] = result
+            return result
+
+        candidate = _Path(raw_path)
+        if not candidate.is_dir():
+            _logger.warning(
+                "verifier: project path %r for eval %s does not exist on disk "
+                "-- falling back to cwd",
+                raw_path,
+                eval_id,
+            )
+            result = _Path.cwd()
+            _cache[eval_id] = result
+            return result
+
+        _cache[eval_id] = candidate
+        return candidate
+
+    return _resolve
 
 
 def _default_provider() -> ActionProvider:
@@ -90,7 +164,6 @@ def create_app(
     provider = provider or _default_provider()
     app.config["_provider"] = provider
 
-    from pathlib import Path
     from quodeq.services._ephemeral_cleanup import sweep_orphaned_clones
     from quodeq.shared._env import get_clones_dir, get_evaluations_dir
 
@@ -118,6 +191,20 @@ def create_app(
     configure_security(app, store, api_key)
     log_buffer, verbose = _configure_logging(app)
     _register_health_route(app, verbose)
+
+    # Optional verifier service (Plan 3). Enabled via QUODEQ_VERIFIER_ENABLED=1.
+    from quodeq.verifier.service import VerifierService, jsonl_finding_locator
+    verifier_service: VerifierService | None = None
+    if os.environ.get("QUODEQ_VERIFIER_ENABLED", "0") == "1":
+        evaluations_root = Path(get_evaluations_dir())
+        verifier_service = VerifierService(
+            evaluations_root=evaluations_root,
+            project_root_resolver=_make_project_root_resolver(evaluations_root),
+            finding_locator=jsonl_finding_locator(evaluations_root),
+            model=os.environ.get("QUODEQ_VERIFIER_MODEL", "gemma:4"),
+        )
+    app.config["_verifier_service"] = verifier_service
+
     register_all_routes(app, provider, eval_store, static_dist, log_buffer)
     return app
 

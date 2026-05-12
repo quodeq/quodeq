@@ -25,6 +25,7 @@ from quodeq.api.routes_findings import register_findings_routes
 from quodeq.api.llm_bridge_routes import register_llm_bridge_routes
 from quodeq.api.routes_rescore import register_rescore_routes
 from quodeq.api._scores_routes import register_scores_routes
+from quodeq.api.routes_verifier import register_routes_verifier
 from quodeq.services.base import ActionProvider
 
 
@@ -59,3 +60,7 @@ def register_all_routes(
         register_log_routes(app, log_buffer)
     register_index_routes(app)
     register_static_routes(app, static_dist)
+
+    verifier_service = app.config.get("_verifier_service")
+    if verifier_service is not None:
+        register_routes_verifier(app, verifier_service)

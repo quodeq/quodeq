@@ -20,3 +20,5 @@ CLAUDE.md
 .quodeq.env
 .superpowers/
 .worktrees/
+.quodeq-resolver/
+graphify-out/

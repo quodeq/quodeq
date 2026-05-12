@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, ICON_SETTINGS, ICON_STANDARDS, ICON_HELP, ICON_FOLDER as BASE_ICON_FOLDER } from '../constants/navigation.jsx';
+import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, ICON_SETTINGS, ICON_STANDARDS, ICON_HELP, ICON_VERIFIER, ICON_FOLDER as BASE_ICON_FOLDER } from '../constants/navigation.jsx';
 import { cloneElement } from 'react';
 
 // Folder glyph for the REPOSITORY row — same outline used in the file/folder
@@ -157,6 +157,7 @@ export default function Sidebar({
 
         <nav className="sidebar-nav sidebar-block">
           <NavButton id="evaluate" label="evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={handleNav} />
+          <NavButton id="verifier" label="verifier" icon={ICON_VERIFIER} activeTab={activeTab} onNavTab={handleNav} />
         </nav>
 
         <nav className="sidebar-nav sidebar-block">

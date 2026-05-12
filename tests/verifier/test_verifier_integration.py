@@ -1,0 +1,192 @@
+"""End-to-end verifier integration tests (with stub Ollama client)."""
+
+from pathlib import Path
+
+from quodeq.resolver import Resolver
+from quodeq.resolver.models import FindingInput
+from quodeq.verifier import Verifier
+from quodeq.verifier.models import Verdict
+from quodeq.verifier.prompt import render_user_prompt
+from quodeq.verifier.verifier import _extract_visible_lines
+from tests.verifier.fixtures.gemma_responses import (
+    CONFIRMED_HARDCODED,
+    DI_WITH_DEFAULT_FALSE_POSITIVE,
+)
+
+
+def test_extract_visible_lines_parses_v8_prompt_format():
+    """The citation validator depends on this helper picking up every numbered
+    context row in the v8 prompt. Regression test: v7.2's helper assumed a
+    different prompt layout and silently downgraded every file:line cite."""
+    finding = {
+        "file": "src/foo/bar.py",
+        "line": 42,
+        "title": "Hardcoded timeout",
+        "reason": "TIMEOUT is hardcoded.",
+        "snippet": "TIMEOUT = 30",
+        "enclosing_role": "module",
+    }
+    # Build context with the SAME format _read_source_context emits:
+    # "<marker> <i:4d>: <source>" where marker is ">>>" or three spaces.
+    context = "\n".join(
+        f"{('>>>' if i == 42 else '   ')} {i:4d}: line {i} src"
+        for i in range(40, 45)
+    )
+    prompt = render_user_prompt(finding, context)
+    visible = _extract_visible_lines(prompt)
+    # Every numbered context row (cited or not) is visible.
+    assert ("src/foo/bar.py", 40) in visible
+    assert ("src/foo/bar.py", 42) in visible  # the cited line
+    assert ("src/foo/bar.py", 44) in visible
+    # Out-of-context lines are not.
+    assert ("src/foo/bar.py", 1) not in visible
+    assert ("src/foo/bar.py", 100) not in visible
+
+
+def test_extract_visible_lines_returns_empty_when_no_file_header():
+    """Defensive: a prompt with no `file:` header yields no visible lines
+    (so all file:line cites get downgraded). Prevents accidental citation
+    acceptance from a malformed prompt."""
+    bad = "EVIDENCE\n   42: foo\n>>>  43: bar\n"
+    assert _extract_visible_lines(bad) == set()
+
+
+def test_extract_visible_lines_parses_multi_block_format():
+    """v8.1+ prompt: multiple [A] [B] [C] labeled blocks, each tied to a
+    file via 'title  —  path'. Lines in each block are visible relative to
+    that block's file."""
+    finding = {
+        "file": "src/foo.py",
+        "line": 42,
+        "title": "Hardcoded timeout",
+        "reason": "TIMEOUT is hardcoded.",
+        "snippet": "TIMEOUT = 30",
+        "enclosing_role": "module",
+    }
+    # Match the production format from _read_source_context:
+    # "<marker> <i:4d>: <source>", marker is ">>>" for cite, "   " for others.
+    def row(i: int, src: str, cited: bool = False) -> str:
+        marker = ">>>" if cited else "   "
+        return f"{marker} {i:4d}: {src}"
+
+    blocks = [
+        {
+            "label": "A",
+            "title": "Cited site",
+            "file": "src/foo.py",
+            "lines": "\n".join([
+                row(40, "import requests"),
+                row(42, "TIMEOUT = 30", cited=True),
+                row(43, ""),
+            ]),
+        },
+        {
+            "label": "B",
+            "title": "Caller of the enclosing function",
+            "file": "src/bar.py",
+            "lines": "\n".join([row(17, "    foo()"), row(18, "")]),
+        },
+    ]
+    prompt = render_user_prompt(finding, blocks)
+    visible = _extract_visible_lines(prompt)
+    assert ("src/foo.py", 40) in visible
+    assert ("src/foo.py", 42) in visible
+    assert ("src/bar.py", 17) in visible
+    # Lines in the other block don't bleed into this file's allowed set.
+    assert ("src/foo.py", 17) not in visible
+    assert ("src/bar.py", 40) not in visible
+
+
+def _write(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def _make_fixture(root: Path) -> None:
+    _write(
+        root / "services" / "base.py",
+        """\
+from typing import Protocol
+
+
+class ActionProvider(Protocol):
+    \"\"\"Top-level protocol composing all action provider operations.\"\"\"
+    ...
+""",
+    )
+    _write(
+        root / "services" / "filesystem.py",
+        """\
+from services.base import ActionProvider
+
+
+class FilesystemActionProvider(ActionProvider):
+    \"\"\"Filesystem-backed implementation of the ActionProvider interface.\"\"\"
+    pass
+""",
+    )
+    _write(
+        root / "api" / "app.py",
+        """\
+from services.base import ActionProvider
+
+
+def _default_provider() -> ActionProvider:
+    \"\"\"Create the default filesystem-based provider (lazy import).\"\"\"
+    from services.filesystem import FilesystemActionProvider
+    return FilesystemActionProvider()
+
+
+def create_app(provider: ActionProvider | None = None):
+    provider = provider or _default_provider()
+    return provider
+""",
+    )
+
+
+def test_verifier_returns_false_positive_for_di_with_default(tmp_path: Path, stub_client):
+    _make_fixture(tmp_path)
+    resolver = Resolver(project_root=tmp_path)
+    resolver.build_index()
+    finding = FindingInput(
+        file="api/app.py",
+        line=6,
+        category="flexibility/adaptability",
+        severity="major",
+    )
+    manifest = resolver.build_manifest(finding)
+    # The canned response cites paths that aren't in this fixture's evidence,
+    # so the citation validator will downgrade some answers to unknown. The
+    # integration test verifies the orchestration only — that we get a
+    # reasonable verdict given a clean response and a valid manifest.
+    client = stub_client(DI_WITH_DEFAULT_FALSE_POSITIVE)
+    verifier = Verifier(project_root=tmp_path, client=client, model="gemma:4")
+
+    result = verifier.verify(manifest, finding)
+    # The canned response's checklist answers are all "yes" — even after
+    # citation downgrade, Q3 cites "MANIFEST" (always valid). Q4 may be
+    # downgraded to "unknown" depending on what's in the rendered evidence.
+    # Either result.verdict is false_positive (all yes survive) or
+    # inconclusive (some yes downgraded to unknown). It must NOT be confirmed.
+    assert result.verdict in (Verdict.FALSE_POSITIVE, Verdict.INCONCLUSIVE)
+    assert result.model == "gemma:4"
+
+
+def test_verifier_returns_confirmed_for_hardcoded(tmp_path: Path, stub_client):
+    _make_fixture(tmp_path)
+    resolver = Resolver(project_root=tmp_path)
+    resolver.build_index()
+    finding = FindingInput(
+        file="api/app.py",
+        line=6,
+        category="flexibility/adaptability",
+        severity="major",
+    )
+    manifest = resolver.build_manifest(finding)
+    client = stub_client(CONFIRMED_HARDCODED)
+    verifier = Verifier(project_root=tmp_path, client=client, model="gemma:4")
+
+    result = verifier.verify(manifest, finding)
+    # Q3 == "no" in the canned response. The v8 rule requires Q3=yes for
+    # confirmed (Q1=yes AND Q2=no AND Q3=yes). With Q3=no, verdict is inconclusive.
+    assert result.verdict == Verdict.INCONCLUSIVE

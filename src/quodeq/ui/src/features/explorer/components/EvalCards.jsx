@@ -1,11 +1,13 @@
 import { useRef } from 'react';
 import { parseFileRef } from '../../../utils/formatters.js';
+import { computeFindingId } from '../../../utils/findingId.js';
 import { SparkleIcon } from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import usePretextHeight from '../../../hooks/usePretextHeight.js';
 import { useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
+import { VerificationBadge } from './VerificationBadge.jsx';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
@@ -79,9 +81,11 @@ function ViolationDetail({ item }) {
   );
 }
 
-export function EvalViolationCard({ v, principle, index, onDismiss }) {
+export function EvalViolationCard({ v, principle, index, onDismiss, verificationsMap }) {
   const { addWindow } = useSidePane();
   const { filename, ref, display } = useFileInfo(v.file, v.line, v.endLine);
+  const findingId = computeFindingId({ file: v.file, line: v.line, title: v.title });
+  const verification = verificationsMap?.get(findingId) || null;
   return (
     <div
       className={`vdetail-row vdetail-row--terminal vdetail-row--${v.severity}`}
@@ -89,6 +93,7 @@ export function EvalViolationCard({ v, principle, index, onDismiss }) {
     >
       <div className="vdetail-row-main">
         <SevBadge level={v.severity} format="long" />
+        <VerificationBadge verification={verification} />
         <span className="vrow-label">[{v.principle || principle}]</span>
         {filename && <FileCopyBtn display={display} copyText={ref} />}
         <button

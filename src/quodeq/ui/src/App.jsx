@@ -1,11 +1,11 @@
 import { lazy, Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
+import { computeFindingId } from './utils/findingId.js';
 
 const DashboardPage = lazy(() => import('./features/dashboard/components/DashboardPage.jsx'));
 const ExplorerPage = lazy(() => import('./features/explorer/components/ExplorerPage.jsx'));
 const FileDetailPage = lazy(() => import('./features/explorer/components/FileDetailPage.jsx'));
 const PrincipleDetailPage = lazy(() => import('./features/explorer/components/PrincipleDetailPage.jsx'));
-const FindingDetailPage = lazy(() => import('./features/explorer/components/FindingDetailPage.jsx'));
 const ProjectsPage = lazy(() => import('./features/dashboard/components/ProjectsPage.jsx'));
 const HistoryPage = lazy(() => import('./features/history/components/HistoryPage.jsx'));
 const EvaluateScreen = lazy(() => import('./features/evaluation/components/EvaluateScreen.jsx'));
@@ -14,6 +14,7 @@ const StandardsPage = lazy(() => import('./features/standards/StandardsPage.jsx'
 const ViolationsPage = lazy(() => import('./features/violations/components/ViolationsPage.jsx'));
 const MapPage = lazy(() => import('./features/map/components/MapPage.jsx'));
 const HelpPage = lazy(() => import('./features/help/components/HelpPage.jsx'));
+const VerifierTab = lazy(() => import('./tabs/Verifier.jsx'));
 const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
 import EmptyStateWithTour from './features/onboarding/components/EmptyStateWithTour.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
@@ -225,6 +226,7 @@ function ViolationsRoute({ params, props }) {
   );
 }
 
+
 const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect, onProjectsReload: props.navigation.loadProjects }} runMode={false} />,
   violations: (params, props) => <ViolationsRoute params={params} props={props} />,
@@ -293,10 +295,31 @@ const ROUTE_RENDERERS = {
     />
   ),
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />,
+  verifier: (params, props) => {
+    const dims = (props.dashboardData.accumulated?.dimensions) || [];
+    const findings = dims.flatMap((d) =>
+      (d.violations || []).map((v) => ({
+        ...v,
+        dimension: v.dimension || d.dimension,
+        id: v.id || computeFindingId(v),
+      }))
+    );
+    return (
+      // selectedProject holds the project UUID, which is also the eval_id used
+      // as the evaluation directory name under ~/.quodeq/evaluations/<eval_id>/.
+      // The verifier API uses this UUID to locate repository_info.json and
+      // resolve the project source root.
+      <VerifierTab
+        evaluationId={props.navigation.selectedProject}
+        findings={findings}
+      />
+    );
+  },
   file: (params, props) => (
     <FileDetailPage
       file={params.file}
       runId={params.runId}
+      project={props.navigation.selectedProject}
       dateLabel={params.dateLabel}
       severityFilter={params.severityFilter || params.severity || null}
       onDismiss={(v) => {
@@ -308,18 +331,6 @@ const ROUTE_RENDERERS = {
   ),
   evalprinciple: renderEvalPrincipleDetail,
   'eval-principle-detail': renderEvalPrincipleDetail,
-  finding: (params, props) => (
-    <FindingDetailPage
-      finding={params.finding}
-      principle={params.principle}
-      dimension={params.dimension}
-      onDismiss={(v) => {
-        props.dismissFinding(props.navigation.selectedProject, buildDismissPayload(v, params.dimension))
-          .then(() => props.refreshDashboard?.())
-          .catch((e) => console.error('[Dismiss] failed:', e));
-      }}
-    />
-  ),
   settings: (params, props) => <SettingsCase settings={props.settings} />,
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup }} />,
   standards: () => <StandardsPage />,
