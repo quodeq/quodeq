@@ -59,4 +59,24 @@ describe('VerificationBadge', () => {
     );
     expect(container.textContent).not.toMatch(/%/);
   });
+
+  it('omits the percentage when confidence is zero or negative', () => {
+    const { container: zero } = render(
+      <VerificationBadge verification={{ verdict: 'inconclusive', confidence: 0 }} />
+    );
+    expect(zero.textContent).not.toMatch(/%/);
+
+    const { container: neg } = render(
+      <VerificationBadge verification={{ verdict: 'confirmed', confidence: -0.1 }} />
+    );
+    expect(neg.textContent).not.toMatch(/%/);
+  });
+
+  it('falls back gracefully on an unknown verdict', () => {
+    render(<VerificationBadge verification={{ verdict: 'new_future_verdict', confidence: 0.5 }} />);
+    // Label falls back to the raw verdict string.
+    expect(screen.getByText('new_future_verdict')).toBeInTheDocument();
+    // Confidence still renders for positive numeric values.
+    expect(screen.getByText(/50%/)).toBeInTheDocument();
+  });
 });

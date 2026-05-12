@@ -27,7 +27,9 @@ export function VerificationBadge({ verification }) {
   const label = VERDICT_LABELS[verdict] || verdict;
   const mark = VERDICT_MARKS[verdict] || '·';
   const showPct =
-    verdict !== 'not_applicable' && typeof confidence === 'number';
+    verdict !== 'not_applicable' &&
+    typeof confidence === 'number' &&
+    confidence > 0;
   return (
     <span
       className={`vrow-verdict vrow-verdict--${verdict}`}
