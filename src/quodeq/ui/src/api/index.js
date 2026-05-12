@@ -16,6 +16,7 @@ import { request, BASE } from './request.js';
 
 export { listDismissedFindings, dismissFinding, restoreFinding, restoreAllFindings, getRescore, deleteFinding, deleteAllFindings } from './findings.js';
 export { listStandards, getStandard, createStandard, updateStandard, deleteStandard, duplicateStandard, listLibrary, listCwes, importFromLibrary, importStandard, exportStandard } from './standards.js';
+export { listVerifications } from '../tabs/verifier/api.js';
 
 // ── Health ──────────────────────────────────────────────────────────────
 

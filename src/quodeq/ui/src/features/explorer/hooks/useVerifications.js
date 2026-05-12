@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useApi } from '../../../api/ApiContext.jsx';
 
 /**
  * Fetch all verifications for an evaluation and return a stable
@@ -10,6 +11,7 @@ import { useEffect, useState } from 'react';
  * @returns {{ map: Map<string, {verdict: string, confidence: number}>, loading: boolean }}
  */
 export function useVerifications(evalId) {
+  const { listVerifications } = useApi();
   const [state, setState] = useState({ map: new Map(), loading: !!evalId });
 
   useEffect(() => {
@@ -19,15 +21,11 @@ export function useVerifications(evalId) {
     }
     let cancelled = false;
     setState((s) => ({ ...s, loading: true }));
-    fetch(`/api/evaluations/${evalId}/verifications`)
-      .then(async (resp) => {
-        if (!resp.ok) return { verifications: [] };
-        return resp.json();
-      })
+    listVerifications(evalId)
       .then((body) => {
         if (cancelled) return;
         const map = new Map();
-        for (const v of body.verifications || []) {
+        for (const v of body?.verifications || []) {
           if (map.has(v.finding_id)) continue;
           map.set(v.finding_id, {
             verdict: v.verdict,
@@ -41,7 +39,7 @@ export function useVerifications(evalId) {
         setState({ map: new Map(), loading: false });
       });
     return () => { cancelled = true; };
-  }, [evalId]);
+  }, [evalId, listVerifications]);
 
   return state;
 }

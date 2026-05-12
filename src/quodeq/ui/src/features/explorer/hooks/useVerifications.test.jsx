@@ -1,21 +1,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useVerifications } from './useVerifications';
+import * as ApiContext from '../../../api/ApiContext.jsx';
 
 describe('useVerifications', () => {
+  let mockListVerifications;
+
   beforeEach(() => {
-    globalThis.fetch = vi.fn();
+    mockListVerifications = vi.fn();
+    vi.spyOn(ApiContext, 'useApi').mockReturnValue({
+      listVerifications: mockListVerifications,
+    });
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('returns empty map with loading=true initially, then loading=false on 404', async () => {
-    globalThis.fetch.mockResolvedValue({
-      ok: false,
-      status: 404,
-    });
+  it('returns empty map with loading=true initially, then loading=false on error', async () => {
+    mockListVerifications.mockRejectedValue(new Error('404'));
 
     const { result } = renderHook(() => useVerifications('eval-123'));
 
@@ -23,7 +26,7 @@ describe('useVerifications', () => {
     expect(result.current.loading).toBe(true);
     expect(result.current.map.size).toBe(0);
 
-    // After 404 response
+    // After error response
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
@@ -31,45 +34,24 @@ describe('useVerifications', () => {
   });
 
   it('deduplicates verifications by finding_id, keeping newest first', async () => {
-    globalThis.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        verifications: [
-          {
-            verification_id: 'v-001',
-            dimension: 'dim1',
-            finding_id: 'f-123',
-            verdict: 'APPLICABLE',
-            confidence: 0.95,
-            evidence_summary: 'newer',
-            model: 'gpt-4',
-            elapsed_ms: 1000,
-            created_at: '2026-05-12T10:00:00Z',
-          },
-          {
-            verification_id: 'v-002',
-            dimension: 'dim1',
-            finding_id: 'f-123',
-            verdict: 'NOT_APPLICABLE',
-            confidence: 0.5,
-            evidence_summary: 'older',
-            model: 'gpt-4',
-            elapsed_ms: 800,
-            created_at: '2026-05-12T09:00:00Z',
-          },
-          {
-            verification_id: 'v-003',
-            dimension: 'dim2',
-            finding_id: 'f-456',
-            verdict: 'FALSE_POSITIVE',
-            confidence: 0.85,
-            evidence_summary: 'distinct',
-            model: 'gpt-4',
-            elapsed_ms: 900,
-            created_at: '2026-05-12T08:00:00Z',
-          },
-        ],
-      }),
+    mockListVerifications.mockResolvedValue({
+      verifications: [
+        {
+          finding_id: 'f-123',
+          verdict: 'APPLICABLE',
+          confidence: 0.95,
+        },
+        {
+          finding_id: 'f-123',
+          verdict: 'NOT_APPLICABLE',
+          confidence: 0.5,
+        },
+        {
+          finding_id: 'f-456',
+          verdict: 'FALSE_POSITIVE',
+          confidence: 0.85,
+        },
+      ],
     });
 
     const { result } = renderHook(() => useVerifications('eval-456'));
@@ -98,18 +80,18 @@ describe('useVerifications', () => {
     const { result: resultNull } = renderHook(() => useVerifications(null));
     expect(resultNull.current.map.size).toBe(0);
     expect(resultNull.current.loading).toBe(false);
-    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(mockListVerifications).not.toHaveBeenCalled();
 
-    globalThis.fetch.mockClear();
+    mockListVerifications.mockClear();
 
     const { result: resultUndefined } = renderHook(() => useVerifications(undefined));
     expect(resultUndefined.current.map.size).toBe(0);
     expect(resultUndefined.current.loading).toBe(false);
-    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(mockListVerifications).not.toHaveBeenCalled();
   });
 
   it('handles fetch errors gracefully', async () => {
-    globalThis.fetch.mockRejectedValue(new Error('Network error'));
+    mockListVerifications.mockRejectedValue(new Error('Network error'));
 
     const { result } = renderHook(() => useVerifications('eval-789'));
 
@@ -121,10 +103,7 @@ describe('useVerifications', () => {
   });
 
   it('handles empty verifications array', async () => {
-    globalThis.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ verifications: [] }),
-    });
+    mockListVerifications.mockResolvedValue({ verifications: [] });
 
     const { result } = renderHook(() => useVerifications('eval-empty'));
 
@@ -135,37 +114,56 @@ describe('useVerifications', () => {
     expect(result.current.map.size).toBe(0);
   });
 
-  it('cancels pending fetch when evalId changes', async () => {
-    const abortSpy = vi.fn();
-    globalThis.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        verifications: [
-          {
-            verification_id: 'v-001',
-            dimension: 'dim1',
-            finding_id: 'f-123',
-            verdict: 'APPLICABLE',
-            confidence: 0.95,
-            evidence_summary: 'test',
-            model: 'gpt-4',
-            elapsed_ms: 1000,
-            created_at: '2026-05-12T10:00:00Z',
-          },
-        ],
-      }),
+  it('suppresses stale data when evalId changes before first promise resolves', async () => {
+    // Create two deferred promises we can control
+    let resolveFirstCall, resolveSecondCall;
+    const firstPromise = new Promise((resolve) => {
+      resolveFirstCall = resolve;
+    });
+    const secondPromise = new Promise((resolve) => {
+      resolveSecondCall = resolve;
     });
 
-    const { rerender } = renderHook(
+    let callCount = 0;
+    mockListVerifications.mockImplementation(() => {
+      callCount++;
+      return callCount === 1 ? firstPromise : secondPromise;
+    });
+
+    const { rerender, result } = renderHook(
       ({ evalId }) => useVerifications(evalId),
-      { initialProps: { evalId: 'eval-123' } },
+      { initialProps: { evalId: 'eval-A' } },
     );
 
-    // Change evalId
-    rerender({ evalId: 'eval-456' });
+    expect(result.current.loading).toBe(true);
+
+    // Re-render with eval-B before eval-A resolves
+    rerender({ evalId: 'eval-B' });
+
+    // Resolve eval-A with its verifications (should be ignored)
+    resolveFirstCall({
+      verifications: [
+        { finding_id: 'f-only-in-a', verdict: 'APPLICABLE', confidence: 0.9 },
+      ],
+    });
+
+    // Resolve eval-B with its verifications
+    resolveSecondCall({
+      verifications: [
+        { finding_id: 'f-only-in-b', verdict: 'FALSE_POSITIVE', confidence: 0.8 },
+      ],
+    });
 
     await waitFor(() => {
-      expect(globalThis.fetch).toHaveBeenCalledWith('/api/evaluations/eval-456/verifications');
+      expect(result.current.loading).toBe(false);
     });
+
+    // Map should only contain eval-B's data (no leak from stale eval-A response)
+    expect(result.current.map.size).toBe(1);
+    expect(result.current.map.get('f-only-in-b')).toEqual({
+      verdict: 'FALSE_POSITIVE',
+      confidence: 0.8,
+    });
+    expect(result.current.map.has('f-only-in-a')).toBe(false);
   });
 });
