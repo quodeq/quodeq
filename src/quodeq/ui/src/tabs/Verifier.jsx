@@ -6,15 +6,25 @@ export default function Verifier({ evaluationId, findings }) {
   const [selected, setSelected] = useState(null);
 
   return (
-    <div className="verifier-tab" style={{ display: "flex", height: "100%" }}>
-      <div style={{ flex: "0 0 40%", borderRight: "1px solid #ddd", overflow: "auto" }}>
+    <div className="verifier-tab" style={{ display: "flex", height: "100%", minHeight: 0 }}>
+      {/* Left column: long list of findings, scrolls independently. */}
+      <div
+        style={{
+          flex: "0 0 40%",
+          borderRight: "1px solid #ddd",
+          overflowY: "auto",
+          minHeight: 0,
+        }}
+      >
         <FindingsList
           findings={findings}
           selectedId={selected?.findingId}
           onSelect={(dim, fid) => setSelected({ dimension: dim, findingId: fid })}
         />
       </div>
-      <div style={{ flex: "1 1 60%", overflow: "auto", padding: "1rem" }}>
+      {/* Right column: verification detail. Always visible — no independent
+          scroll. Long-content subsections (audit log) cap themselves. */}
+      <div style={{ flex: "1 1 60%", padding: "1rem", overflow: "visible" }}>
         {selected ? (
           <VerificationDetail
             evaluationId={evaluationId}
