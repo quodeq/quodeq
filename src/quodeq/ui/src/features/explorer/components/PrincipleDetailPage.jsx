@@ -194,9 +194,11 @@ function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) {
 }
 
 const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
-  const { principleData, principle, score, grade, dimension, runId, dateLabel } = evalPrincipal;
+  const { principleData, principle, score, grade, dimension, runId, project, dateLabel } = evalPrincipal;
   const { principleDescriptions } = useStandardDescriptions(dimension);
-  const { map: verificationsMap } = useVerifications(runId);
+  // Verifications are keyed by project UUID (= eval_id at the backend), not
+  // by run UUID. verifications.db lives at ~/.quodeq/evaluations/<project>/.
+  const { map: verificationsMap } = useVerifications(project);
   const principleDescription = principleDescriptions[principle] || '';
 
   const {

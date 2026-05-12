@@ -218,8 +218,10 @@ function VirtualList({ items, scrollElement, renderItem }) {
   );
 }
 
-const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, onDismiss, severityFilter }) {
-  const { map: verificationsMap } = useVerifications(runId);
+const FileDetailPage = memo(function FileDetailPage({ file, runId, project, dateLabel, onDismiss, severityFilter }) {
+  // Verifications are keyed by project UUID (= eval_id at the backend),
+  // not by run UUID. verifications.db lives under the project dir.
+  const { map: verificationsMap } = useVerifications(project);
   const totalCompliance = file.compliance?.length || 0;
   const dimensionsCount = file.dimensionsCount || 0;
   const [activeFilter, setActiveFilter] = useState(severityFilter || null);

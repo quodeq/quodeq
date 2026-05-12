@@ -320,6 +320,7 @@ const ROUTE_RENDERERS = {
     <FileDetailPage
       file={params.file}
       runId={params.runId}
+      project={props.navigation.selectedProject}
       dateLabel={params.dateLabel}
       severityFilter={params.severityFilter || params.severity || null}
       onDismiss={(v) => {
