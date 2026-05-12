@@ -592,3 +592,23 @@
 .violation-table-row--clickable:hover {
   background: var(--color-surface-alt);
 }
+
+.vrow-verdict {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  font-family: var(--term-font, ui-monospace, monospace);
+  border: 1px solid currentColor;
+  opacity: 0.85;
+}
+.vrow-verdict-mark { font-weight: bold; }
+.vrow-verdict-pct  { opacity: 0.7; }
+
+.vrow-verdict--false_positive { color: #28a745; }
+.vrow-verdict--confirmed      { color: #d83a3a; }
+.vrow-verdict--inconclusive   { color: #888888; }
+.vrow-verdict--not_applicable { color: #3a6bd8; }
