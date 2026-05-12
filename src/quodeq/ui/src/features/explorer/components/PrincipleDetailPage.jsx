@@ -8,6 +8,7 @@ import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
+import { useVerifications } from '../hooks/useVerifications.js';
 
 function filterTitleSuffix(filter) {
   if (!filter || filter === 'all') return '';
@@ -19,7 +20,9 @@ function filterTitleSuffix(filter) {
 // "Show all" pagination is needed. Rows render naturally inside the app's
 // existing scroll container.
 
-function ViolationListSection({ violationsBySeverity, principle, onDismiss }) {
+function ViolationListSection({
+  violationsBySeverity, principle, onDismiss, verificationsMap,
+}) {
   return EVAL_SEVERITY_ORDER.map((sev) => {
     const vs = violationsBySeverity[sev];
     if (!vs || vs.length === 0) return null;
@@ -34,6 +37,7 @@ function ViolationListSection({ violationsBySeverity, principle, onDismiss }) {
               principle={principle}
               index={idx}
               onDismiss={onDismiss}
+              verificationsMap={verificationsMap}
             />
           ))}
         </div>
@@ -192,6 +196,7 @@ function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) {
 const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
   const { principleData, principle, score, grade, dimension, runId, dateLabel } = evalPrincipal;
   const { principleDescriptions } = useStandardDescriptions(dimension);
+  const { map: verificationsMap } = useVerifications(runId);
   const principleDescription = principleDescriptions[principle] || '';
 
   const {
@@ -267,6 +272,7 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
           violationsBySeverity={displayedBySeverity}
           principle={principle}
           onDismiss={handleDismiss}
+          verificationsMap={verificationsMap}
         />
       )}
       {(!activeSevFilter || activeSevFilter === 'all' || activeSevFilter === 'compliance') && (
