@@ -36,7 +36,7 @@ from quodeq.verifier.models import (
     VerifierResponse,
     VerifierResult,
 )
-from quodeq.verifier.prompt import SYSTEM_PROMPT_V7_2, render_user_prompt
+from quodeq.verifier.prompt import SYSTEM_PROMPT_V8, render_user_prompt
 from quodeq.verifier.storage import VerificationRecord, VerificationsStore
 from quodeq.verifier.verifier import Verifier
 
@@ -272,7 +272,7 @@ class VerifierService:
             root=audit_root,
             verification_id=verification_id,
             manifest=manifest,
-            system_prompt=SYSTEM_PROMPT_V7_2,
+            system_prompt=SYSTEM_PROMPT_V8,
             user_prompt=user_prompt,
             raw_response=raw_response_dict,
         )

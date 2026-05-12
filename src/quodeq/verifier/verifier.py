@@ -12,7 +12,7 @@ from quodeq.verifier.models import (
     VerifierResponse,
     VerifierResult,
 )
-from quodeq.verifier.prompt import SYSTEM_PROMPT_V7_2, render_user_prompt
+from quodeq.verifier.prompt import SYSTEM_PROMPT_V8, render_user_prompt
 from quodeq.verifier.schema import RESPONSE_SCHEMA
 from quodeq.verifier.validate import enforce_citation_validity
 from quodeq.verifier.verdict import compute_verdict
@@ -43,7 +43,7 @@ class Verifier:
 
         start = time.monotonic()
         raw = self.client.chat(
-            system=SYSTEM_PROMPT_V7_2,
+            system=SYSTEM_PROMPT_V8,
             user=user_prompt,
             schema=RESPONSE_SCHEMA,
             model=self.model,
