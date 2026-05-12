@@ -8,12 +8,6 @@ from quodeq.resolver.models import (
     Manifest,
 )
 from quodeq.verifier.audit_log import write_audit_log
-from quodeq.verifier.models import (
-    ChecklistAnswer,
-    FindingExtraction,
-    FindingsExtraction,
-    VerifierResponse,
-)
 
 
 def _manifest() -> Manifest:
@@ -23,25 +17,6 @@ def _manifest() -> Manifest:
         target_file_role="composition_root",
         referenced_symbol="FilesystemActionProvider",
         referenced_symbol_defined_at=Location("src/services/filesystem.py", 39),
-    )
-
-
-def _response() -> VerifierResponse:
-    return VerifierResponse(
-        checklist={
-            "Q1": ChecklistAnswer(answer="yes", cite="MANIFEST"),
-            "Q2": ChecklistAnswer(answer="yes", cite="src/api/app.py:6"),
-            "Q3": ChecklistAnswer(answer="yes", cite="MANIFEST"),
-            "Q4": ChecklistAnswer(answer="yes", cite="MANIFEST"),
-            "Q5": ChecklistAnswer(answer="yes", cite="src/api/app.py:90"),
-        },
-        findings=FindingsExtraction(
-            default_implementation=FindingExtraction(value="FilesystemActionProvider", cite="src/api/app.py:6"),
-            override_mechanism=FindingExtraction(value="provider param", cite="src/api/app.py:90"),
-            abstraction_in_use=FindingExtraction(value="ActionProvider", cite="MANIFEST"),
-        ),
-        confidence=1.0,
-        evidence_summary="ok",
     )
 
 
