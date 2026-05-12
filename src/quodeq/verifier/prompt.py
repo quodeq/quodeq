@@ -18,8 +18,18 @@ code substantiates that claim.
 
 You receive:
   - CLAIM: the evaluator's title and reason. Treat this as the rubric.
-  - EVIDENCE: the cited line, surrounding context, file path, and structural
-    facts (enclosing function, file role).
+  - EVIDENCE: one or more labeled code blocks ([A], [B], [C], ...) showing
+    the cited site, the enclosing/parent functions, callers of the
+    enclosing function, definitions of cited symbols, and (when relevant)
+    the abstraction (Protocol / ABC) the symbol implements. Tree-sitter
+    chose which neighbors to surface; your job is to READ the code in
+    each block and reason about how they fit together.
+
+Override mechanisms often live in a DIFFERENT block than the cited line.
+For example: the cited line might import a class (block [A]); the actual
+override seam might be in the calling function (block [C] or [D]); the
+abstraction the class implements (proving it's substitutable) might be in
+block [G]. Read across blocks before answering.
 
 You answer four checklist questions, each with `yes` / `no` / `unknown` and a
 citation. Then you write a short evidence summary.
@@ -134,7 +144,10 @@ Your output is JSON matching the schema. No prose outside the JSON.
 """
 
 
-def render_user_prompt(finding: dict, context: str) -> str:
+def render_user_prompt(
+    finding: dict,
+    evidence: "str | list[dict]",
+) -> str:
     """Render the user-side prompt with the finding's claim and evidence.
 
     Args:
@@ -142,18 +155,43 @@ def render_user_prompt(finding: dict, context: str) -> str:
             and `enclosing_role`. The first five come from the evaluator's
             finding record; `enclosing_role` is filled by the service layer
             from the manifest (or 'unknown' if unavailable).
-        context: numbered source context around the cited line, with the cited
-            line marked with `>>>`. Built by the service layer.
+        evidence: either a string (single numbered context block, legacy v8.0
+            shape used by some tests) or a list of labeled-block dicts
+            (v8.1+). Each dict has keys `label`, `title`, `file`, `lines`.
+            Multi-block form is what the service layer produces in
+            production — it surfaces cross-file code so the model can read
+            related definitions, callers, and seams.
     """
+    if isinstance(evidence, str):
+        evidence_section = (
+            f"  file: {finding['file']}\n"
+            f"  cited line (L{finding['line']}): {finding['snippet'].strip()}\n"
+            f"  enclosing function role: {finding.get('enclosing_role', 'unknown')}\n"
+            f"  context (numbered, cited line marked with >>>):\n"
+            f"{evidence}"
+        )
+    else:
+        header = (
+            f"  cited line is in {finding['file']} L{finding['line']}: "
+            f"{finding['snippet'].strip()}\n"
+            f"  enclosing function role: {finding.get('enclosing_role', 'unknown')}\n"
+            f"  the following labeled blocks contain related source code.\n"
+            f"  cite by `file:line` only when the line is visible inside one\n"
+            f"  of these blocks (you can use the block letter for orientation\n"
+            f"  in your evidence_summary, but cites must be `file:line`).\n"
+        )
+        parts = [header]
+        for blk in evidence:
+            parts.append(
+                f"\n  [{blk['label']}] {blk['title']}  —  {blk['file']}\n"
+                f"{blk['lines']}\n"
+            )
+        evidence_section = "".join(parts)
     return f"""\
 CLAIM
   title:  {finding['title']}
   reason: {finding['reason']}
 
 EVIDENCE
-  file: {finding['file']}
-  cited line (L{finding['line']}): {finding['snippet'].strip()}
-  enclosing function role: {finding.get('enclosing_role', 'unknown')}
-  context (numbered, cited line marked with >>>):
-{context}
+{evidence_section}
 """

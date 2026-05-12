@@ -102,6 +102,8 @@ def parse_verifier_response(raw: dict) -> VerifierResponse:
 
 
 _FILE_HEADER_RE = re.compile(r"^\s*file:\s*(.+\S)\s*$")
+# Multi-block format: "  [A] Cited site  —  src/foo/bar.py"
+_BLOCK_HEADER_RE = re.compile(r"^\s*\[[A-Z]\][^—]+—\s*(.+\S)\s*$")
 _NUMBERED_LINE_RE = re.compile(r"^(?:>>>|\s{3})\s+(\d+):\s")
 
 
@@ -109,27 +111,35 @@ def _extract_visible_lines(prompt: str) -> set[tuple[str, int]]:
     """Walk the v8-rendered user prompt and collect (file, line) pairs for
     every numbered context row.
 
-    The v8 prompt has the form::
+    Supports both prompt shapes:
+
+    Single-block (legacy / used by simple test fixtures)::
 
         EVIDENCE
           file: src/foo/bar.py
           cited line (L42): TIMEOUT = 30
           context (numbered, cited line marked with >>>):
               40: import requests
-              41:
         >>>   42: TIMEOUT = 30
               43:
 
-    We identify the active file from the `  file: <path>` line and then
-    accept every subsequent numbered row (with or without the `>>>` marker)
-    as visible. Citations like ``"src/foo/bar.py:42"`` will match an entry
-    in the returned set; anything outside the shown context window is
-    downgraded by ``enforce_citation_validity``.
+    Multi-block (v8.1+, what the service layer produces in production)::
+
+        EVIDENCE
+          [A] Cited site  —  src/foo/bar.py
+              40: import requests
+        >>>   42: TIMEOUT = 30
+
+          [B] Caller of the enclosing function  —  src/foo/main.py
+              17: foo()
+
+    In both shapes, the active file path is taken from the most recent
+    header line; numbered rows below it are recorded as visible.
     """
     visible: set[tuple[str, int]] = set()
     current_file: str | None = None
     for raw in prompt.splitlines():
-        m = _FILE_HEADER_RE.match(raw)
+        m = _FILE_HEADER_RE.match(raw) or _BLOCK_HEADER_RE.match(raw)
         if m:
             current_file = m.group(1)
             continue

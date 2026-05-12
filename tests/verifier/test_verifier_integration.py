@@ -51,6 +51,52 @@ def test_extract_visible_lines_returns_empty_when_no_file_header():
     assert _extract_visible_lines(bad) == set()
 
 
+def test_extract_visible_lines_parses_multi_block_format():
+    """v8.1+ prompt: multiple [A] [B] [C] labeled blocks, each tied to a
+    file via 'title  —  path'. Lines in each block are visible relative to
+    that block's file."""
+    finding = {
+        "file": "src/foo.py",
+        "line": 42,
+        "title": "Hardcoded timeout",
+        "reason": "TIMEOUT is hardcoded.",
+        "snippet": "TIMEOUT = 30",
+        "enclosing_role": "module",
+    }
+    # Match the production format from _read_source_context:
+    # "<marker> <i:4d>: <source>", marker is ">>>" for cite, "   " for others.
+    def row(i: int, src: str, cited: bool = False) -> str:
+        marker = ">>>" if cited else "   "
+        return f"{marker} {i:4d}: {src}"
+
+    blocks = [
+        {
+            "label": "A",
+            "title": "Cited site",
+            "file": "src/foo.py",
+            "lines": "\n".join([
+                row(40, "import requests"),
+                row(42, "TIMEOUT = 30", cited=True),
+                row(43, ""),
+            ]),
+        },
+        {
+            "label": "B",
+            "title": "Caller of the enclosing function",
+            "file": "src/bar.py",
+            "lines": "\n".join([row(17, "    foo()"), row(18, "")]),
+        },
+    ]
+    prompt = render_user_prompt(finding, blocks)
+    visible = _extract_visible_lines(prompt)
+    assert ("src/foo.py", 40) in visible
+    assert ("src/foo.py", 42) in visible
+    assert ("src/bar.py", 17) in visible
+    # Lines in the other block don't bleed into this file's allowed set.
+    assert ("src/foo.py", 17) not in visible
+    assert ("src/bar.py", 40) not in visible
+
+
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")

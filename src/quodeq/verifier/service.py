@@ -40,6 +40,15 @@ from quodeq.verifier.verifier import Verifier
 _CONTEXT_BEFORE_DEFAULT = 30
 _CONTEXT_AFTER_DEFAULT = 30
 
+# Tighter windows for the "satellite" evidence blocks (the cross-file
+# definitions and call sites). The cited site itself uses the wider default.
+_NEIGHBOR_WINDOW_BEFORE = 5
+_NEIGHBOR_WINDOW_AFTER = 20
+
+# Cap on number of "called from" sites to surface. More than this and the
+# prompt fills with low-signal call-site listings.
+_MAX_CALL_SITES = 3
+
 
 def _read_cited_line(path: Path, line: int) -> str:
     """Return the raw source at `line` with no numbering, no marker.
@@ -88,6 +97,121 @@ def _read_source_context(
         marker = ">>>" if i == line else "   "
         rows.append(f"{marker} {i:4d}: {src[i - 1]}")
     return "\n".join(rows)
+
+
+def _build_evidence_blocks(
+    project_root: Path, manifest, located: "LocatedFinding"
+) -> list[dict]:
+    """Surface multiple labeled code windows for the LLM to read.
+
+    Tree-sitter / the manifest tells us WHERE to look; this function pulls
+    the actual source from those locations. The model then reads each block
+    and reasons about the claim — rather than trusting pre-digested facts.
+
+    Returns a list of dicts with keys:
+      - label: short letter (A/B/C/...) used to anchor model citations.
+      - title: human-readable description of what the block shows.
+      - file:  source path.
+      - lines: numbered source rows (cited line marked with >>> when relevant).
+
+    Block ordering is roughly: cited site → enclosing scope → callers →
+    cross-file definitions. Deduped by (file, line-range) so we don't pay
+    tokens twice when the cited file IS the definition file.
+    """
+    blocks: list[dict] = []
+    seen: set[tuple[str, int, int]] = set()  # (file, start_line, end_line)
+
+    def _maybe_add(
+        title: str, file: str, line: int,
+        *, before: int = _NEIGHBOR_WINDOW_BEFORE,
+        after: int = _NEIGHBOR_WINDOW_AFTER,
+    ) -> None:
+        try:
+            src_lines = (project_root / file).read_text(
+                encoding="utf-8", errors="replace"
+            ).splitlines()
+        except OSError:
+            return
+        start = max(1, line - before)
+        end = min(len(src_lines), line + after)
+        key = (file, start, end)
+        if key in seen:
+            return
+        seen.add(key)
+        rows = []
+        for i in range(start, end + 1):
+            marker = ">>>" if i == line else "   "
+            rows.append(f"{marker} {i:4d}: {src_lines[i - 1]}")
+        blocks.append({
+            "label": chr(ord("A") + len(blocks)),
+            "title": title,
+            "file": file,
+            "lines": "\n".join(rows),
+        })
+
+    # [A] Cited site — wider window so nearby context (function header,
+    # imports above, return statements below) is in scope.
+    _maybe_add(
+        "Cited site",
+        located.file, located.line,
+        before=_CONTEXT_BEFORE_DEFAULT,
+        after=_CONTEXT_AFTER_DEFAULT,
+    )
+
+    # [B] Enclosing function — show where it's defined and what it returns.
+    if manifest.target_enclosing_function:
+        f = manifest.target_enclosing_function
+        _maybe_add(
+            f"Enclosing function: {f.name} (returns {f.return_type or 'unknown'})",
+            f.file, f.line,
+        )
+
+    # [C] Parent function — the def whose body calls the enclosing fn.
+    if manifest.target_parent_function:
+        f = manifest.target_parent_function
+        _maybe_add(
+            f"Parent function: {f.name}",
+            f.file, f.line,
+        )
+
+    # [D] Parent seam — the literal "param or factory()" pattern line, if any.
+    if manifest.target_parent_seam_at:
+        seam = manifest.target_parent_seam_at
+        pattern = manifest.target_parent_seam_pattern or "(seam)"
+        _maybe_add(
+            f"Override seam: {pattern}",
+            seam.file, seam.line,
+            before=3, after=3,
+        )
+
+    # [E] Call sites of the enclosing function — bounded to keep prompt small.
+    for callsite in (manifest.enclosing_function_called_from or [])[:_MAX_CALL_SITES]:
+        _maybe_add(
+            "Caller of the enclosing function",
+            callsite.file, callsite.line,
+            before=3, after=3,
+        )
+
+    # [F] Definition of the cited symbol (e.g. a class imported on the cited line).
+    if manifest.referenced_symbol and manifest.referenced_symbol_defined_at:
+        loc = manifest.referenced_symbol_defined_at
+        _maybe_add(
+            f"Definition of {manifest.referenced_symbol}"
+            + (f" (bases: {', '.join(manifest.referenced_symbol_bases)})"
+               if manifest.referenced_symbol_bases else ""),
+            loc.file, loc.line,
+        )
+
+    # [G] Definition of the abstraction (Protocol/ABC) the symbol implements.
+    if manifest.abstraction and manifest.abstraction_defined_at:
+        loc = manifest.abstraction_defined_at
+        kind = manifest.abstraction_kind or "type"
+        _maybe_add(
+            f"Definition of abstraction {manifest.abstraction} ({kind})",
+            loc.file, loc.line,
+        )
+
+    return blocks
 
 
 class FindingNotFound(Exception):
@@ -190,8 +314,8 @@ class VerifierService:
                 else manifest.target_file_role
             ),
         }
-        context = _read_source_context(project_root / located.file, located.line)
-        user_prompt = render_user_prompt(finding_dict, context)
+        evidence_blocks = _build_evidence_blocks(project_root, manifest, located)
+        user_prompt = render_user_prompt(finding_dict, evidence_blocks)
 
         verifier = Verifier(
             project_root=project_root,
