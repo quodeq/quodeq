@@ -309,3 +309,40 @@ cost, gives one clean accuracy ceiling number for this finding set.
 - Subprocess-per-call via claude-cli is the wrong shape for batch — use the API.
 - The verifier was a great learning project that taught us what evidence the
   evaluator should have been getting all along. Now we know.
+
+---
+
+## Post-retrospective decision (2026-05-12)
+
+**The upstream pivot is not happening yet. The verifier stays an external,
+user-triggered process and gets promoted to a first-class user-facing feature.**
+
+The retrospective recommended moving the evidence pipeline into the evaluator.
+After weighing it explicitly, we chose otherwise for now — not because the
+analysis was wrong, but because:
+
+- The upstream pivot doesn't lift the Gemma reasoning ceiling. More context
+  given to a smaller model doesn't fix the systematic override-seam
+  over-detection — it just relocates the bad reasoning.
+- Token bloat on every evaluator call would slow analysis for the 57% of
+  findings that have no useful cross-file evidence to surface.
+- The deterministic-rules-over-manifest direction (drop obvious FPs without
+  any LLM round-trip) is the eventual real win, but it's a separate workstream
+  from making what we already built usable for users today.
+
+**What we're doing instead** — captured in [`UI_DESIGN.md`](UI_DESIGN.md):
+
+- Inline `Verify` button on every violation row in `FileDetailPage` and
+  `PrincipleDetailPage`, alongside the existing `Fix plan` and dismiss
+  actions.
+- A subtle tinted-disc verdict badge to the left of the action cluster.
+  Hover shows verdict, confidence, provider, and model.
+- A new "Verification" block in settings (enable switch + provider/model
+  selection, defaulting to the analysis model).
+- Removal of the standalone Verifier side-tab, the
+  `QUODEQ_VERIFIER_ENABLED` env-var gate, and `QUODEQ_VERIFIER_MODEL`. All
+  configuration goes through user settings.
+
+This decision does not preclude a future upstream pivot. The resolver,
+manifest, and multi-block evidence pipeline are unchanged; if measurement
+later justifies the move, the same code lifts cleanly into the evaluator.
