@@ -6,7 +6,6 @@ import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { useOmlxServerStatus } from '../hooks/useOmlxServerStatus.js';
 import { TimeLimitSetting, AdvancedAnalysisSettings, SUBAGENTS_HINT_OLLAMA } from './ProviderSettings.jsx';
-import { settingsKeys } from '../../../api/queryKeys.js';
 
 const OMLX_MODEL_HINT = (
   <>
@@ -40,25 +39,27 @@ function ModelSelector({ value, models, onChange }) {
 
 export default function OmlxTab({ state, update }) {
   const { getOmlxModels, testOmlxConcurrency } = useApi();
-  const omlxStatus = useOmlxServerStatus();
+  const apiBase = state['api-base'] || '';
+  const apiKey = state['api-key'] || '';
+  const omlxStatus = useOmlxServerStatus(apiBase || undefined);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [testError, setTestError] = useState(null);
 
   const queryClient = useQueryClient();
   const { data: models = [], error: modelsQueryError } = useQuery({
-    queryKey: settingsKeys.omlxModels(),
-    queryFn: () => getOmlxModels(),
+    queryKey: ['settings', 'omlxModels', apiBase, apiKey],
+    queryFn: () => getOmlxModels(apiBase || undefined, apiKey || undefined),
   });
   const modelsError = modelsQueryError
-    ? 'We couldn’t load your omlx models. Make sure omlx is running.'
+    ? "We couldn’t load your omlx models. Make sure omlx is running."
     : null;
 
   const prevStatusRef = useRef(omlxStatus?.status ?? 'offline');
   useEffect(() => {
     const status = omlxStatus?.status ?? 'offline';
     if (prevStatusRef.current !== 'online' && status === 'online') {
-      queryClient.invalidateQueries({ queryKey: settingsKeys.omlxModels() });
+      queryClient.invalidateQueries({ queryKey: ['settings', 'omlxModels'] });
     }
     prevStatusRef.current = status;
   }, [omlxStatus?.status, queryClient]);
@@ -67,13 +68,13 @@ export default function OmlxTab({ state, update }) {
     if (!state.model) return;
     setTesting(true);
     try {
-      const result = await testOmlxConcurrency(state.model);
+      const result = await testOmlxConcurrency(state.model, apiBase || undefined, apiKey || undefined);
       setTestResult(result);
       if (result.recommended) update('subagents', String(result.recommended));
     } catch (err) {
       console.warn('omlx concurrency test failed', err);
       setTestResult(null);
-      setTestError('The concurrency test didn’t finish. Make sure omlx is running and your model is loaded.');
+      setTestError("The concurrency test didn't finish. Make sure omlx is running and your model is loaded.");
     }
     setTesting(false);
   };
@@ -94,6 +95,32 @@ export default function OmlxTab({ state, update }) {
           <span className="settings-error">We couldn&apos;t load your omlx models. Make sure omlx is running.</span>
         </div>
       )}
+      <div className="settings-row">
+        <div className="settings-row-label">
+          <span className="settings-label">Server address</span>
+          <span className="settings-description">Leave blank to use the default (<code>http://localhost:8000</code>).</span>
+        </div>
+        <input
+          type="text"
+          className="settings-model-input"
+          placeholder="http://localhost:8000"
+          value={apiBase}
+          onChange={(e) => update('api-base', e.target.value)}
+        />
+      </div>
+      <div className="settings-row">
+        <div className="settings-row-label">
+          <span className="settings-label">API key</span>
+          <span className="settings-description">Leave blank to use the key from <code>~/.omlx/settings.json</code>.</span>
+        </div>
+        <input
+          type="password"
+          className="settings-model-input"
+          placeholder="sk-..."
+          value={apiKey}
+          onChange={(e) => update('api-key', e.target.value)}
+        />
+      </div>
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label-row">

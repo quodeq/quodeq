@@ -46,9 +46,9 @@ def _normalize_base(base_url: str) -> str:
     return stripped
 
 
-def get_omlx_status(base_url: str = _OMLX_BASE) -> dict:
+def get_omlx_status(base_url: str | None = None) -> dict:
     """Check if an omlx server is running and reachable."""
-    root = _normalize_base(base_url)
+    root = _normalize_base(base_url or _OMLX_BASE)
     try:
         req = urllib.request.Request(f"{root}/health")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
@@ -63,14 +63,14 @@ def get_omlx_status(base_url: str = _OMLX_BASE) -> dict:
         return {"running": False, "error": "Connection failed"}
 
 
-def list_omlx_models(base_url: str = _OMLX_BASE) -> list[dict]:
+def list_omlx_models(base_url: str | None = None, api_key: str | None = None) -> list[dict]:
     """List models available on the omlx server."""
-    root = _normalize_base(base_url)
+    root = _normalize_base(base_url or _OMLX_BASE)
     try:
         req = urllib.request.Request(f"{root}/v1/models")
-        api_key = _read_omlx_api_key()
-        if api_key:
-            req.add_header("Authorization", f"Bearer {api_key}")
+        key = api_key if api_key is not None else _read_omlx_api_key()
+        if key:
+            req.add_header("Authorization", f"Bearer {key}")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             entries = data.get("data", []) or []
@@ -89,10 +89,10 @@ def list_omlx_models(base_url: str = _OMLX_BASE) -> list[dict]:
         return []
 
 
-def run_concurrency_test(model: str, base_url: str = _OMLX_BASE) -> dict:
+def run_concurrency_test(model: str, base_url: str | None = None, api_key: str | None = None) -> dict:
     """Estimate max parallel agents for the omlx server."""
     gpu_memory = _detect_memory()
-    models = list_omlx_models(base_url)
+    models = list_omlx_models(base_url, api_key)
     if not models:
         return {
             "recommended": 1,

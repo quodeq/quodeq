@@ -71,6 +71,10 @@ function preparePayload(payload, storage = localStorage) {
   };
   if (get("per-dimension") === "true") result.perDimension = true;
   if (get("verify") === "false") result.verifyFindings = false;
+  const apiKey = get("api-key");
+  if (apiKey) result.apiKey = apiKey;
+  const apiBase = get("api-base");
+  if (apiBase) result.apiBase = apiBase;
   return result;
 }
 

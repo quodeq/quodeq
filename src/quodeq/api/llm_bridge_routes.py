@@ -73,11 +73,14 @@ def register_llm_bridge_routes(app: Flask) -> None:
 
     @app.get("/api/omlx/status")
     def omlx_status() -> Response:
-        return jsonify(get_omlx_status())
+        base_url = request.args.get("base_url", "").strip() or None
+        return jsonify(get_omlx_status(base_url=base_url))
 
     @app.get("/api/omlx/models")
     def omlx_models() -> Response:
-        return jsonify({"models": list_omlx_models()})
+        base_url = request.args.get("base_url", "").strip() or None
+        api_key = request.args.get("api_key", "").strip() or None
+        return jsonify({"models": list_omlx_models(base_url=base_url, api_key=api_key)})
 
     @app.post("/api/omlx/test-concurrency")
     def omlx_test_concurrency() -> Response:
@@ -87,7 +90,9 @@ def register_llm_bridge_routes(app: Flask) -> None:
             return jsonify({"error": "model must be a string", "code": "INVALID_PARAM"}), 400
         if "\\" in model or ".." in model or "\0" in model:
             return jsonify({"error": "Invalid model name", "code": "INVALID_PARAM"}), 400
-        result = run_omlx_concurrency_test(model)
+        base_url = data.get("base_url", "").strip() or None
+        api_key = data.get("api_key", "").strip() or None
+        result = run_omlx_concurrency_test(model, base_url=base_url, api_key=api_key)
         return jsonify(result)
 
     @app.post("/api/provider/test")

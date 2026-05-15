@@ -260,6 +260,11 @@ class FsEvaluationMixin:
             built_env["QUODEQ_NO_CONSOLIDATE"] = "1"
         if options.context_size > 0:
             built_env["QUODEQ_CONTEXT_SIZE"] = str(options.context_size)
+        if options.ai_cmd == "omlx":
+            if options.provider_api_key:
+                built_env["OMLX_API_KEY"] = options.provider_api_key
+            if options.provider_api_base:
+                built_env["OMLX_BASE_URL"] = options.provider_api_base
         return built_env
 
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:

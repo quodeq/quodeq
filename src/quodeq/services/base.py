@@ -30,6 +30,8 @@ class EvaluationOptions:
     branch: str | None = None
     scope_path: str | None = None
     context_size: int = 0
+    provider_api_key: str = ""
+    provider_api_base: str = ""
 
 
 class ProjectActions(Protocol):

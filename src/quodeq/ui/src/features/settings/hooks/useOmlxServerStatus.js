@@ -6,18 +6,17 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { systemKeys } from '../../../api/queryKeys.js';
 
 const POLL_MS = 5000;
 
-export function useOmlxServerStatus() {
+export function useOmlxServerStatus(baseUrl) {
   const { getOmlxStatus } = useApi();
 
   const { data } = useQuery({
-    queryKey: systemKeys.omlx(),
+    queryKey: ['system', 'omlx', baseUrl || ''],
     queryFn: async () => {
       try {
-        const result = await getOmlxStatus();
+        const result = await getOmlxStatus(baseUrl || undefined);
         if (result?.running) {
           return { status: 'online', address: result.address ?? null };
         }
