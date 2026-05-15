@@ -41,7 +41,7 @@ const DEFAULT_OLLAMA_SUBAGENTS = "1";
 const DEFAULT_CLI_SUBAGENTS = String(DEFAULT_MAX_SUBAGENTS);
 const DEFAULT_OLLAMA_BUDGET = "0";
 const DEFAULT_CLI_BUDGET = String(DEFAULT_TIME_LIMIT_S);
-const LOCAL_API_PROVIDERS = new Set(["ollama", "llamacpp"]);
+const LOCAL_API_PROVIDERS = new Set(["ollama", "llamacpp", "omlx"]);
 
 /**
  * Merge per-provider Settings (provider, model, subagents, budget, etc.)
