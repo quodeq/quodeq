@@ -13,7 +13,7 @@ _logger = logging.getLogger(__name__)
 
 
 class ProjectionEngine:
-    """Reconciles the JSONL event log into evaluation.db."""
+    """Projects the JSONL event log into evaluation.db."""
 
     def rebuild(self, event_log: Path, run_dir: Path) -> int:
         """Full rebuild: clear all state and replay every event."""
@@ -43,8 +43,9 @@ class ProjectionEngine:
                 count += 1
             except Exception:
                 _logger.error(
-                    "Handler failed for event %s — skipping",
+                    "Handler failed for event %s (type=%s) — skipping",
                     event.event_id,
+                    event.event_type,
                     exc_info=True,
                 )
         if last_ts is not None:

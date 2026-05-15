@@ -11,6 +11,7 @@ from typing import Any
 
 from quodeq.core.evidence.model import Judgment
 from quodeq.core.events.models import JudgmentPayload
+from quodeq.core.types.finding import Finding, ReqRef
 
 
 def _dedup_key(practice_id: str, file: str, line: int, verdict: str) -> str:
@@ -85,7 +86,7 @@ def judgment_to_row(j: Judgment) -> dict[str, Any]:
     }
 
 
-def judgment_payload_to_row(p: JudgmentPayload) -> dict[str, Any]:
+def finding_payload_to_row(p: JudgmentPayload) -> dict[str, Any]:
     """Translate a JudgmentPayload event model into a SQL row dict."""
     return {
         "schema_version": 1,
@@ -109,22 +110,23 @@ def judgment_payload_to_row(p: JudgmentPayload) -> dict[str, Any]:
     }
 
 
-def row_to_judgment(row: dict[str, Any]) -> Judgment:
-    """Reconstruct a Judgment from a SQL row dict."""
+def row_to_finding(row: dict[str, Any]) -> Finding:
+    """Reconstruct a Finding from a SQL row dict."""
     refs_json = row.get("req_refs_json")
-    refs = json.loads(refs_json) if refs_json else None
-    return Judgment(
+    raw_refs: list[dict] = json.loads(refs_json) if refs_json else []
+    req_refs = [ReqRef(label=r.get("label", ""), url=r.get("url", "")) for r in raw_refs if isinstance(r, dict)]
+    return Finding(
         practice_id=row["practice_id"],
+        verdict=row.get("verdict", "violation"),
         file=row.get("file", ""),
         line=row.get("line", 0),
         end_line=row.get("end_line", 0),
         snippet=row.get("snippet", ""),
-        verdict=row.get("verdict", "violation"),
         severity=row.get("severity", "medium"),
         reason=row.get("reason", ""),
         dimension=row.get("dimension", ""),
         req=row.get("requirement"),
-        req_refs=refs,
+        req_refs=req_refs,
         violation_type=row.get("violation_type", ""),
         title=row.get("title", ""),
         context=row.get("context", ""),

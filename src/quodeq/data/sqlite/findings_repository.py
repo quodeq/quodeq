@@ -4,10 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quodeq.core.evidence.model import Judgment
+from quodeq.core.types.finding import Finding
 from quodeq.data.sqlite._row_mappers import (
     finding_dict_to_row,
-    row_to_judgment,
+    row_to_finding,
 )
 from quodeq.data.sqlite.connection import open_evaluation_db
 
@@ -43,14 +43,14 @@ class SqliteFindingsRepository:
             conn.commit()
             return cur.rowcount == 1
 
-    def list_by_dimension(self, dimension: str) -> list[Judgment]:
+    def list_by_dimension(self, dimension: str) -> list[Finding]:
         with open_evaluation_db(self._run_dir) as conn:
             conn.row_factory = _dict_row
             rows = conn.execute(
                 f"SELECT {_SELECT_COLUMNS} FROM findings WHERE dimension = ? ORDER BY id",
                 (dimension,),
             ).fetchall()
-        return [row_to_judgment(r) for r in rows]
+        return [row_to_finding(r) for r in rows]
 
     def count_by_dimension(self) -> dict[str, int]:
         with open_evaluation_db(self._run_dir) as conn:
@@ -59,7 +59,7 @@ class SqliteFindingsRepository:
             ).fetchall()
         return {dim: n for dim, n in rows}
 
-    def search(self, query: str, limit: int = 100) -> list[Judgment]:
+    def search(self, query: str, limit: int = 100) -> list[Finding]:
         fts_query = _quote_fts_query(query)
         with open_evaluation_db(self._run_dir) as conn:
             conn.row_factory = _dict_row
@@ -69,7 +69,7 @@ class SqliteFindingsRepository:
                 "ORDER BY id LIMIT ?",
                 (fts_query, limit),
             ).fetchall()
-        return [row_to_judgment(r) for r in rows]
+        return [row_to_finding(r) for r in rows]
 
     def set_verdict(self, *, practice_id: str, file: str, line: int, verdict: str) -> int:
         with open_evaluation_db(self._run_dir) as conn:

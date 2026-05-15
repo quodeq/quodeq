@@ -97,6 +97,7 @@ def load_evidence_map_from_db(run_dir: Path) -> dict[str, dict[str, Any]]:
 
 
 def _judgment_to_finding_dict(j) -> dict[str, Any]:
+    req_refs = [{"label": r.label, "url": r.url} for r in j.req_refs] if j.req_refs else None
     return {
         "practice_id": j.practice_id,
         "file": j.file,
@@ -108,5 +109,5 @@ def _judgment_to_finding_dict(j) -> dict[str, Any]:
         "reason": j.reason,
         "title": j.title,
         "req": j.req,
-        "req_refs": j.req_refs,
+        "req_refs": req_refs,
     }

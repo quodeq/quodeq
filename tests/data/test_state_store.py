@@ -37,19 +37,19 @@ def test_save_checkpoint_overwrites_previous(tmp_path: Path):
     assert store.get_checkpoint() == ts2
 
 
-def test_apply_judgment_inserts_finding(tmp_path: Path):
+def test_record_finding_inserts_finding(tmp_path: Path):
     store = SQLiteStateStore(tmp_path)
-    store.apply_judgment(_payload())
+    store.record_finding(_payload())
     with open_evaluation_db(tmp_path) as conn:
         row = conn.execute("SELECT practice_id, verdict FROM findings").fetchone()
     assert row[0] == "P1"
     assert row[1] == "violation"
 
 
-def test_apply_judgment_is_idempotent(tmp_path: Path):
+def test_record_finding_is_idempotent(tmp_path: Path):
     store = SQLiteStateStore(tmp_path)
-    store.apply_judgment(_payload())
-    store.apply_judgment(_payload())  # same dedup_key
+    store.record_finding(_payload())
+    store.record_finding(_payload())  # same dedup_key
     with open_evaluation_db(tmp_path) as conn:
         count = conn.execute("SELECT COUNT(*) FROM findings").fetchone()[0]
     assert count == 1
@@ -57,7 +57,7 @@ def test_apply_judgment_is_idempotent(tmp_path: Path):
 
 def test_clear_all_empties_findings_and_scores(tmp_path: Path):
     store = SQLiteStateStore(tmp_path)
-    store.apply_judgment(_payload())
+    store.record_finding(_payload())
     with open_evaluation_db(tmp_path) as conn:
         conn.execute(
             "INSERT INTO dimension_scores (dimension, score, grade, confidence) "

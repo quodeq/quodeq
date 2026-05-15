@@ -17,7 +17,7 @@ class ViolationContext:
 @dataclass(frozen=True)
 class FindingSpec:
     """Input fields for building a normalized finding dict."""
-    principle: str | None
+    practice_id: str | None
     file: str | None = None
     line: int | str | None = None
     end_line: int | str | None = None
@@ -47,7 +47,7 @@ def build_finding_base(spec: FindingSpec) -> Finding:
             for ref in spec.req_refs
         ]
     return Finding(
-        principle=spec.principle,
+        practice_id=spec.practice_id,
         file=spec.file,
         line=spec.line,
         end_line=spec.end_line,

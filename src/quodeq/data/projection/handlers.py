@@ -4,13 +4,13 @@ import logging
 from typing import Callable
 
 from quodeq.core.events.models import BaseEvent, EventType, JudgmentCreatedEvent
-from quodeq.data.ports.state_store import StateStore
+from quodeq.data.sqlite.state_store import SQLiteStateStore
 
 _logger = logging.getLogger(__name__)
 
 
-def _handle_judgment_created(event: JudgmentCreatedEvent, store: StateStore) -> None:
-    store.apply_judgment(event.payload)
+def _handle_judgment_created(event: JudgmentCreatedEvent, store: SQLiteStateStore) -> None:
+    store.record_finding(event.payload)
 
 
 _HANDLERS: dict[EventType, Callable] = {
@@ -18,7 +18,7 @@ _HANDLERS: dict[EventType, Callable] = {
 }
 
 
-def handle(event: BaseEvent, store: StateStore) -> None:
+def handle(event: BaseEvent, store: SQLiteStateStore) -> None:
     """Dispatch an event to its registered handler. Unknown types are skipped."""
     handler = _HANDLERS.get(event.event_type)
     if handler is None:

@@ -25,7 +25,7 @@ def empty_severity_buckets() -> dict[str, list]:
 def build_finding(item: dict, *, include_severity: bool) -> Finding:
     """Build a normalized finding from a violation or compliance item."""
     return build_finding_base(FindingSpec(
-        principle=item.get("principle"),
+        practice_id=item.get("principle"),
         file=item.get("file"),
         line=item.get("line"),
         end_line=item.get("end_line"),

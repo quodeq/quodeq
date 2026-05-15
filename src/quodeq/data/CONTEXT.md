@@ -5,26 +5,25 @@ This context defines the terminology used within the persistence and data manage
 ## Language
 
 **Event Log (JSONL)**:
-The immutable, append-only record of all facts and actions occurring during an evaluation.
+The immutable, append-only record of per-run analysis facts (e.g., judgments). User preferences (dismiss, delete) are out of scope — they are project-level and live outside the Event Log.
 
 **State Store (SQLite)**:
-The mutable, consolidated projection of the Event Log, optimized for UI/API querying.
+The mutable, consolidated view derived from the Event Log via **Projection**, optimized for UI/API querying.
 
-**Reconciliation**:
-The process of synchronizing the **State Store** with the **Event Log** to ensure consistency.
+**Projection**:
+The process of deriving the current **State Store** by replaying events from the **Event Log** in order.
+_Avoid_: Reconciliation, synchronization.
 
-**Reconciler**:
-The component (e.g., `RunIndexReconciler`) responsible for executing the reconciliation process.
+**Projector**:
+The component (`ProjectionEngine`) responsible for executing a **Projection** — either a full rebuild or an incremental update from the last checkpoint.
+_Avoid_: Reconciler.
 
 **Repository**:
 A data access layer (e.g., `FindingsRepository`) that interacts with the **State Store** to perform CRUD operations.
 
-**Projection**:
-The resulting view or data set created by the reconciliation process.
-
 ## Relationships
 
-- The **Reconciler** reads from the **Event Log** to update the **State Store**.
+- The **Projector** reads from the **Event Log** to update the **State Store**.
 - The **Repository** provides a structured interface to the **State Store** for the rest of the application.
 
 ## Flagged ambiguities

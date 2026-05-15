@@ -16,20 +16,10 @@ from contextlib import contextmanager
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Protocol, runtime_checkable
 
 from quodeq.core.types.finding import Finding
 from quodeq.data._file_lock import lock_file, unlock_file
 from quodeq.services.dismissed import load_dismissed, recount_totals
-
-
-@runtime_checkable
-class DeletedStoreProtocol(Protocol):
-    """Abstraction for permanent-suppression storage."""
-
-    def load(self, project_dir: Path) -> list[dict]: ...
-    def delete(self, project_dir: Path, finding: dict) -> None: ...
-    def delete_all_dismissed(self, project_dir: Path) -> int: ...
 
 
 _FILENAME = "deleted.json"
@@ -209,4 +199,4 @@ def filter_deleted_from_dimensions(
 
 
 def _principle_of(f: Finding) -> str:
-    return getattr(f, "principle", "") or ""
+    return f.practice_id or ""

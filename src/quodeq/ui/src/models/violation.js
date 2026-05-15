@@ -44,7 +44,7 @@ export function createViolation(raw) {
     line:          raw.line ?? null,
     endLine:       raw.endLine ?? raw.end_line ?? null,
     severity:      raw.severity ?? 'minor',
-    principle:     raw.principle ?? null,
+    principle:     raw.practiceId ?? raw.principle ?? null,
     title:         raw.title ?? null,
     reason:        raw.reason ?? raw.findings ?? null,
     snippet:       raw.snippet ?? raw.code ?? null,

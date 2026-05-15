@@ -12,7 +12,7 @@ _Avoid_: The core.
 An autonomous or semi-autonomous AI agent specialized in a specific task within the Analysis pipeline (e.g., identifying evidence, performing a security scan).
 
 **Pipeline**:
-The sequence of execution steps (e.g., discovery -> analysis -> reconciliation) that constitute a complete evaluation run.
+The sequence of execution steps (e.g., discovery -> analysis -> projection) that constitute a complete evaluation run.
 
 **Prompt**:
 The structured instruction set provided to LLMs to drive subagent behavior.

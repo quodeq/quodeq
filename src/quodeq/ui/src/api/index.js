@@ -71,7 +71,11 @@ export function relocateProject(projectId, newPath) {
 /** @returns {Promise<{accumulated: Object, trend: Array, availableRuns: Array}>} */
 export async function getProjectScores(projectId, asOfRun = null) {
   const q = asOfRun ? `?asOf=${encodeURIComponent(asOfRun)}` : '';
-  return request(`/projects/${encodeURIComponent(projectId)}/scores${q}`);
+  const data = await request(`/projects/${encodeURIComponent(projectId)}/scores${q}`);
+  if (data?.accumulated && Array.isArray(data.accumulated.dimensions)) {
+    data.accumulated.dimensions = data.accumulated.dimensions.map(createDimension);
+  }
+  return data;
 }
 
 /** @returns {Promise<{dimensions: Array, summary: Object}>} */

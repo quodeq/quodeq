@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-from quodeq.core.evidence.model import Judgment
+from quodeq.core.types.finding import Finding
 
 
 @runtime_checkable
@@ -17,15 +17,15 @@ class FindingsRepository(Protocol):
         """
         ...
 
-    def list_by_dimension(self, dimension: str) -> list[Judgment]:
-        """Return all findings for a dimension as Judgment objects."""
+    def list_by_dimension(self, dimension: str) -> list[Finding]:
+        """Return all findings for a dimension."""
         ...
 
     def count_by_dimension(self) -> dict[str, int]:
         """Return total finding counts grouped by dimension."""
         ...
 
-    def search(self, query: str, limit: int = 100) -> list[Judgment]:
+    def search(self, query: str, limit: int = 100) -> list[Finding]:
         """FTS5 search across reason and snippet."""
         ...
 

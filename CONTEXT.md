@@ -25,6 +25,44 @@ _Avoid_: Error, bug.
 **Run**:
 A single execution of the evaluation pipeline on a specific codebase.
 
+**Project**:
+A codebase registered in Quodeq. It owns a collection of **Runs** and persists user preferences (dismissed/deleted findings, standards selection).
+_Avoid_: repo, codebase (use Project when referring to the Quodeq entity).
+
+## UI Layer
+
+Screen names in the sidebar map to domain concepts as follows:
+
+**Overview**: the screen showing the aggregated **Findings** of the latest (or selected) **Run** across all **Dimensions**.
+
+**Violations (screen)**: browses **Findings** with `verdict=violation` only. Compliance findings are not shown here — they are visible inside the dimension **Explorer**.
+
+**Evaluate (screen)**: the screen that triggers a new **Run**. "Evaluate" is the action; **Run** is the artifact it produces.
+
+**History**: the screen listing all past **Runs** for a project.
+_Avoid_: calling it "runs list" — the canonical UI name is History.
+
+**Map**: a code visualisation of health and violation distribution across the codebase. No backend domain equivalent.
+
+**Projects (screen)**: lists all registered **Projects** with their latest grade and score. Entry point for adding, deleting, or switching projects.
+
+**Standards (screen)**: CRUD interface for **Standards** — create, edit, import, and toggle visibility of evaluation rule sets.
+
+**Explorer**: the per-**Dimension** detail screen. Shows principle breakdown, top offending files, and trend. Called "Explorer" in the UI; route ID is `explorer`.
+_Avoid_: calling it "Dimension page" — the canonical UI name is Explorer.
+
+**Principle detail**: drills into a single **Principle** within a Dimension — violations grouped by severity, compliance list, fix-plan side-pane. Route ID: `evalprinciple`.
+
+**File detail**: all **Findings** for a single file across all Dimensions. Route ID: `file`.
+
+**Finding detail**: single **Finding** card with breadcrumb (Overview › Dimension › Principle). Leaf view, no further navigation. Route ID: `finding`.
+
+**Run detail**: single-**Run** snapshot, reuses the Overview screen in run mode. Route ID: `history-run`. Reached from History.
+
+**Settings**: provider configuration (Cloud/CLI/Ollama), appearance, and server info. No domain equivalent.
+
+**Help**: in-app documentation. No domain equivalent.
+
 ## Relationships
 
 - An **Analysis** process uses **Core** logic to generate **Findings**.

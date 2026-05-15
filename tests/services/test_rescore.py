@@ -6,12 +6,12 @@ from quodeq.core.types.dimension import DimensionResult
 from quodeq.services.rescore import rescore_dimensions
 
 
-def _make_violation(principle="P1", severity="major", req="R1", file="a.py", line=1, reason="bug"):
-    return Finding(principle=principle, severity=severity, req=req, file=file, line=line, reason=reason)
+def _make_violation(practice_id="P1", severity="major", req="R1", file="a.py", line=1, reason="bug"):
+    return Finding(practice_id=practice_id, severity=severity, req=req, file=file, line=line, reason=reason)
 
 
-def _make_compliance(principle="P1", req="R1", file="a.py", line=10, reason="ok"):
-    return Finding(principle=principle, req=req, file=file, line=line, reason=reason)
+def _make_compliance(practice_id="P1", req="R1", file="a.py", line=10, reason="ok"):
+    return Finding(practice_id=practice_id, req=req, file=file, line=line, reason=reason)
 
 
 def _make_dimension(name="Reliability", violations=None, compliance=None, source_file_count=100):
