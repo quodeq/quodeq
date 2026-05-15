@@ -1,12 +1,20 @@
-"""Unified scoring module -- single source of truth for all score data.
+"""Scoring reader — single read-side entry point for all score data.
+
+Hides the chain of underlying steps (run-dimension fetch, dismissal/deletion
+filter, rescore, accumulated aggregation, trend build, summary recompute)
+behind a 2-method interface. External callers should never reach into the
+private helpers in this package.
 
 Public API
 ----------
-- ``get_scores_raw(reports_root, project, run_id)`` -- rescored data for one run
-- ``get_project_scores(reports_root, project, as_of)`` -- full dashboard payload
+- ``get_scores_raw(reports_root, project, run_id)`` -- rescored dimensions
+  and summary for a single run (Explorer detail).
+- ``get_project_scores(reports_root, project, as_of)`` -- full dashboard
+  payload: accumulated dimensions, summary, trend, available runs.
 
-All functions apply dismissals server-side and return the same data shapes
-as the existing endpoints, so the frontend sees no schema change.
+All functions apply dismissals/deletions server-side and return the same
+data shapes as the existing endpoints, so the frontend sees no schema
+change.
 """
 from __future__ import annotations
 
