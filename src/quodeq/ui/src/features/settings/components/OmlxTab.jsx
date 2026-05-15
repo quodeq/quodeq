@@ -16,21 +16,34 @@ const OMLX_MODEL_HINT = (
 
 function ModelSelector({ value, models, onChange }) {
   const needsModel = !value;
+  const hasModels = models.length > 0;
   return (
     <div className="settings-model-field">
-      <select
-        className={`settings-model-input${needsModel ? ' settings-model-input--required' : ''}`}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="">Pick a model</option>
-        {models.map((m) => (
-          <option key={m.name} value={m.name}>{m.name}</option>
-        ))}
-      </select>
+      {hasModels ? (
+        <select
+          className={`settings-model-input${needsModel ? ' settings-model-input--required' : ''}`}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          <option value="">Pick a model</option>
+          {models.map((m) => (
+            <option key={m.name} value={m.name}>{m.name}</option>
+          ))}
+        </select>
+      ) : (
+        <input
+          type="text"
+          className={`settings-model-input${needsModel ? ' settings-model-input--required' : ''}`}
+          placeholder="mlx-community/gemma-3-4b-it-4bit"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
       {needsModel && (
         <span className="settings-model-hint">
-          You&apos;ll need a model before you can run an evaluation.
+          {hasModels
+            ? "You'll need a model before you can run an evaluation."
+            : "omlx didn't return any models. Enter the model name directly (e.g. from your omlx admin UI)."}
         </span>
       )}
     </div>
