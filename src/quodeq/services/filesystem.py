@@ -11,12 +11,18 @@ Composition (one collaborator per concern):
 The provider itself is a thin coordinator: it constructs the collaborators,
 wires ``JobManager(on_job_complete=PostRunHook(...))``, and delegates each
 ``ActionProvider`` method to the collaborator that owns the concern.
+
+``FsEvaluationMixin`` and ``FsToolingMixin`` are held as instance attributes
+(not base classes) so all dependencies are explicit and each collaborator is
+independently testable.  ``FsEvaluationMixin`` receives a ``get_status_fn``
+that routes through ``EvaluationsIndex`` — this is what makes ``ext-`` job
+IDs resolve correctly inside ``cancel_evaluation`` without MRO coupling.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from quodeq.core.types import ProjectEntry, ViolationSummary
 from quodeq.core.types.job import JobSnapshot
@@ -24,18 +30,19 @@ from quodeq.services import _fs_projects, _fs_reports
 from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services._post_run_hook import PostRunHook
 from quodeq.services._projects_cache import ProjectsCache
-from quodeq.services.base import ActionProvider
+from quodeq.services.base import ActionProvider, EvaluationOptions
 from quodeq.services.evaluation_mixin import FsEvaluationMixin
 from quodeq.services.jobs import JobManager
 from quodeq.services.tooling_mixin import FsToolingMixin
 
 
-class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider):
+class FilesystemActionProvider(ActionProvider):
     """Filesystem-backed action provider — thin coordinator.
 
-    Composes ``ProjectsCache``, ``EvaluationsIndex``, and ``PostRunHook``
-    behind the ``ActionProvider`` interface. Each collaborator is
-    independently testable; this class only wires them.
+    Composes ``ProjectsCache``, ``EvaluationsIndex``, ``PostRunHook``,
+    ``FsEvaluationMixin``, and ``FsToolingMixin`` behind the
+    ``ActionProvider`` interface. Each collaborator is independently
+    testable; this class only wires them.
     """
 
     def __init__(
@@ -45,7 +52,6 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         index_db_path: Path | None = None,
         reports_root: Path | None = None,
     ) -> None:
-        super().__init__()
         self._reports_root = reports_root
         self._compiled_dir = compiled_dir
 
@@ -65,9 +71,18 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             index_db_path=index_db_path,
             reports_root=reports_root,
         )
-        self._model_fetchers: dict[str, Callable] = {
-            "claude": self._get_claude_models,
-        }
+
+        # Evaluation collaborator: receives a get_status_fn so cancel_evaluation
+        # resolves ext- job IDs via EvaluationsIndex without MRO coupling.
+        self._eval_handler = FsEvaluationMixin(
+            jobs=self._jobs,
+            get_status_fn=lambda job_id, reports_dir=None:
+                self._evaluations.get_status(job_id, reports_dir=reports_dir),
+        )
+
+        # Tooling collaborator: register Claude model fetcher after construction.
+        self._tooling = FsToolingMixin()
+        self._tooling._model_fetchers["claude"] = self._tooling._get_claude_models
 
     # -- evaluations (delegate to EvaluationsIndex) ---------------------
 
@@ -87,20 +102,28 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
     ) -> JobSnapshot | None:
         return self._evaluations.get_status(job_id, reports_dir=reports_dir)
 
+    def start_evaluation(
+        self, repo: str, reports_dir: str, options: EvaluationOptions,
+    ) -> JobSnapshot:
+        return self._eval_handler.start_evaluation(repo, reports_dir, options)
+
+    def score_failed_evaluation(self, job_id: str, reports_dir: str) -> bool:
+        return self._eval_handler.score_failed_evaluation(job_id, reports_dir)
+
     def cancel_evaluation(
         self, job_id: str, reports_dir: str | None = None,
         *, discard_partial: bool = False,
     ) -> bool:
         """Cancel a running job; promote stale rows when SIGTERM has nothing to signal.
 
-        The mixin's ``cancel_evaluation`` returns False when the underlying
+        ``FsEvaluationMixin.cancel_evaluation`` returns False when the underlying
         process is already gone (the route would turn that into 409 and the
         UI would stay stuck on "Evaluation in Progress"). When that happens
         and the snapshot is still ``running``, the index row is force-promoted
         to ``cancelled(stale_detected)`` so the UI flips out of "running".
         Findings on disk are not touched.
         """
-        ok = super().cancel_evaluation(
+        ok = self._eval_handler.cancel_evaluation(
             job_id, reports_dir=reports_dir, discard_partial=discard_partial,
         )
         if ok:
@@ -154,3 +177,14 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
 
     def get_violations(self, reports_dir: str, project: str, run_id: str) -> ViolationSummary:
         return _fs_reports.get_violations(reports_dir, project, run_id)
+
+    # -- tooling (delegate to FsToolingMixin) ---------------------------
+
+    def browse_repo(self, path: str | None, include_files: bool = False) -> dict[str, Any]:
+        return self._tooling.browse_repo(path, include_files)
+
+    def get_ai_clients(self, env: dict[str, str] | None = None) -> dict[str, list[dict[str, str]]]:
+        return self._tooling.get_ai_clients(env)
+
+    def get_client_models(self, client_id: str) -> dict[str, list[str]]:
+        return self._tooling.get_client_models(client_id)

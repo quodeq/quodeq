@@ -33,7 +33,14 @@ class PostRunHook:
             return
         reports = Path(self._reports_root) if self._reports_root is not None else _default_reports_root()
         self.cleanup_clone(project_uuid, reports)
-        self.project_events(job_id, job, reports)
+        try:
+            self.project_events(job_id, job, reports)
+        except Exception:
+            _logger.warning(
+                "Post-run projection failed for job %s — State Store may be incomplete",
+                job_id,
+                exc_info=True,
+            )
 
     @staticmethod
     def cleanup_clone(project_uuid: str, reports_root: Path) -> None:
@@ -49,8 +56,7 @@ class PostRunHook:
     def project_events(job_id: str, job: Any, reports_root: Path) -> None:
         """Project ``events.jsonl`` into ``evaluation.db`` for the run.
 
-        No-op when the run has no events log. Logs and swallows projection
-        failures so the job-completion callback never raises.
+        No-op when the run has no events log. Raises on projection failure.
         """
         project_uuid = getattr(job, "output_project", None)
         run_id = getattr(job, "output_run_id", None)
@@ -60,14 +66,12 @@ class PostRunHook:
         events_log = run_dir / "events.jsonl"
         if not events_log.is_file():
             return
-        try:
-            from quodeq.data.projection.engine import ProjectionEngine
-            ProjectionEngine().rebuild(events_log, run_dir)
-        except Exception:
-            _logger.warning(
-                "Post-run projection failed for %s/%s",
-                project_uuid, run_id, exc_info=True,
-            )
+        from quodeq.data.projection.projector import Projector
+        result = Projector().project(events_log, run_dir)
+        _logger.info(
+            "Projected %d events for %s/%s (rebuilt=%s)",
+            result.events_projected, project_uuid, run_id, result.rebuilt,
+        )
 
 
 def _default_reports_root() -> Path:

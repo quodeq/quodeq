@@ -3,7 +3,7 @@ import io
 from pathlib import Path
 
 from quodeq.analysis.mcp.findings_server import _build_router
-from quodeq.analysis.mcp.router import CompiledContext
+from quodeq.analysis.mcp.enricher import CompiledContext
 from quodeq.core.events.models import EventType
 from quodeq.core.events.reader import EventLogReader
 
@@ -35,7 +35,7 @@ def test_build_router_loads_precedent_fingerprints_from_project_dir(tmp_path: Pa
 
     router = _build_router(io.StringIO(), findings_path, CompiledContext())
 
-    assert fingerprint("S-CON-1", "password = 'secret'") in router._precedent_fingerprints
+    assert fingerprint("S-CON-1", "password = 'secret'") in router._enricher._precedent_fingerprints
 
 
 def test_build_router_emits_findings_to_jsonl_and_event_log(tmp_path: Path):

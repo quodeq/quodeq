@@ -48,10 +48,10 @@ class TestSuccessLogBrokenPipe:
         a logging failure must not mask that."""
         ev = _make_evidence()
         with patch(
-            "quodeq.analysis._dimension_ops.process_dimension_with_cache",
+            "quodeq.analysis.dimension_runner.process_dimension_with_cache",
             return_value=ev,
         ), patch(
-            "quodeq.analysis._dimension_ops._log_dimension_result",
+            "quodeq.analysis.dimension_runner._log_dimension_result",
             side_effect=BrokenPipeError("dashboard pipe closed"),
         ), patch(
             "quodeq.analysis._loops._silence_broken_stdout",
@@ -71,10 +71,10 @@ class TestSuccessLogBrokenPipe:
         recovery path."""
         ev = _make_evidence()
         with patch(
-            "quodeq.analysis._dimension_ops.process_dimension_with_cache",
+            "quodeq.analysis.dimension_runner.process_dimension_with_cache",
             return_value=ev,
         ), patch(
-            "quodeq.analysis._dimension_ops._log_dimension_result",
+            "quodeq.analysis.dimension_runner._log_dimension_result",
         ), patch(
             "quodeq.analysis._loops._silence_broken_stdout",
         ) as mock_silence:
@@ -90,10 +90,10 @@ class TestSuccessLogBrokenPipe:
         not run either, and the original behaviour is unchanged."""
         ev = _make_evidence()
         with patch(
-            "quodeq.analysis._dimension_ops.process_dimension_with_cache",
+            "quodeq.analysis.dimension_runner.process_dimension_with_cache",
             return_value=ev,
         ), patch(
-            "quodeq.analysis._dimension_ops._log_dimension_result",
+            "quodeq.analysis.dimension_runner._log_dimension_result",
         ) as mock_log, patch(
             "quodeq.analysis._loops._silence_broken_stdout",
         ) as mock_silence:
@@ -110,10 +110,10 @@ class TestSuccessLogBrokenPipe:
         BrokenPipeError case where the analysis itself succeeded."""
         ev = _make_evidence()
         with patch(
-            "quodeq.analysis._dimension_ops.process_dimension_with_cache",
+            "quodeq.analysis.dimension_runner.process_dimension_with_cache",
             return_value=ev,
         ), patch(
-            "quodeq.analysis._dimension_ops._log_dimension_result",
+            "quodeq.analysis.dimension_runner._log_dimension_result",
             side_effect=RuntimeError("real bug"),
         ):
             with pytest.raises(RuntimeError, match="real bug"):

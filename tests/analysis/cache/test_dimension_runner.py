@@ -354,7 +354,7 @@ class TestWiring:
             return _make_dummy_evidence(files_read=1)
 
         with patch(
-            "quodeq.analysis._dimension_ops.process_dimension_with_cache",
+            "quodeq.analysis.dimension_runner.process_dimension_with_cache",
             new=fake_cache,
         ):
             _process_single_dimension(config, "security", 1, _make_ctx(), emit_log=False)

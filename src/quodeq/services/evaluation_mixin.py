@@ -8,7 +8,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Callable, Protocol
 
 from quodeq.core.types import JobSnapshot
 from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_TIME_LIMIT
@@ -203,16 +203,27 @@ def _ensure_onboarding_field(project_dir: Path) -> None:
 
 
 class FsEvaluationMixin:
-    """Mixin for evaluation start/status/cancel methods.
+    """Evaluation lifecycle collaborator: start, status, cancel, score.
 
-    Requires the host class to provide a ``_jobs`` attribute (a ``JobManager``)
-    and optionally a ``_dispatcher`` attribute (an ``EvaluationDispatcher``).
-    When no dispatcher is set, a ``SubprocessDispatcher`` wrapping ``_jobs``
-    is used automatically.
+    Can be used as a standalone object (pass ``jobs`` to ``__init__``) or as a
+    mixin (set ``self._jobs`` on the host before calling any method).  The
+    ``get_status_fn`` hook lets a composing host override the status lookup so
+    that external-job IDs (``ext-`` prefix, resolved via SQLite) work correctly
+    inside ``cancel_evaluation`` without re-introducing MRO coupling.
     """
 
     _jobs: JobManager
     _dispatcher: EvaluationDispatcher | None
+
+    def __init__(
+        self,
+        jobs: JobManager | None = None,
+        get_status_fn: Callable | None = None,
+    ) -> None:
+        if jobs is not None:
+            self._jobs = jobs
+        self._dispatcher = None
+        self._get_status_fn = get_status_fn
 
     @property
     def dispatcher(self) -> EvaluationDispatcher:
@@ -289,9 +300,15 @@ class FsEvaluationMixin:
     def get_evaluation_status(self, job_id: str, reports_dir: str | None = None) -> JobSnapshot | None:
         """Return the current status of an evaluation job.
 
-        Passes *reports_dir* to ``JobManager.get_job`` so that external jobs
-        (``ext-`` prefix) can be looked up from the filesystem.
+        When a ``get_status_fn`` was injected at construction time, delegates
+        to that function (allows a composing host to supply a richer lookup,
+        e.g. via ``EvaluationsIndex``, without MRO coupling).  Otherwise falls
+        back to ``JobManager.get_job`` which handles the ``ext-`` prefix via
+        the filesystem.
         """
+        fn = getattr(self, "_get_status_fn", None)
+        if fn is not None:
+            return fn(job_id, reports_dir=reports_dir)
         reports_root = Path(reports_dir) if reports_dir else None
         return self._jobs.get_job(job_id, reports_root=reports_root)
 
