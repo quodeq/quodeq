@@ -63,8 +63,26 @@ def get_omlx_status(base_url: str | None = None) -> dict:
         return {"running": False, "error": "Connection failed"}
 
 
+def _list_model_dirs() -> list[dict]:
+    """Read ~/.omlx/models/ and return one entry per directory (follows symlinks)."""
+    models_dir = Path.home() / ".omlx" / "models"
+    try:
+        return [
+            {"name": entry.name, "size": 0, "quantization": "", "family": ""}
+            for entry in sorted(models_dir.iterdir())
+            if entry.is_dir()  # is_dir() follows symlinks
+        ]
+    except OSError:
+        return []
+
+
 def list_omlx_models(base_url: str | None = None, api_key: str | None = None) -> list[dict]:
-    """List models available on the omlx server."""
+    """List models available on the omlx server.
+
+    Tries GET /v1/models first. Falls back to reading ~/.omlx/models/ directly
+    when the API returns nothing, which handles symlinked model directories that
+    omlx does not enumerate via the OpenAI-compatible endpoint.
+    """
     root = _normalize_base(base_url or _OMLX_BASE)
     try:
         req = urllib.request.Request(f"{root}/v1/models")
@@ -74,19 +92,16 @@ def list_omlx_models(base_url: str | None = None, api_key: str | None = None) ->
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             entries = data.get("data", []) or []
-            return [
-                {
-                    "name": m.get("id", ""),
-                    "size": 0,
-                    "quantization": "",
-                    "family": "",
-                }
+            models = [
+                {"name": m.get("id", ""), "size": 0, "quantization": "", "family": ""}
                 for m in entries
                 if m.get("id")
             ]
+            if models:
+                return models
     except (urllib.error.URLError, ConnectionRefusedError, OSError, ValueError) as exc:
         _log.warning("Could not list omlx models: %s", exc)
-        return []
+    return _list_model_dirs()
 
 
 def run_concurrency_test(model: str, base_url: str | None = None, api_key: str | None = None) -> dict:

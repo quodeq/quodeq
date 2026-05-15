@@ -6,6 +6,7 @@ from unittest.mock import patch, MagicMock
 
 from quodeq.llm_bridge._omlx import (
     _normalize_base,
+    _list_model_dirs,
     get_omlx_status,
     list_omlx_models,
     run_concurrency_test,
@@ -94,19 +95,36 @@ class TestListOmlxModels:
         assert len(models) == 1
         assert models[0]["name"] == "mlx-community/valid-model"
 
-    def test_empty_list(self):
+    def test_empty_api_response_falls_back_to_dirs(self):
+        mock_data = {"data": []}
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(mock_data).encode()
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        dir_models = [{"name": "mlx-community/gemma-3-4b-it-4bit", "size": 0, "quantization": "", "family": ""}]
+
+        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp), \
+             patch("quodeq.llm_bridge._omlx._list_model_dirs", return_value=dir_models):
+            result = list_omlx_models()
+
+        assert result == dir_models
+
+    def test_empty_api_and_no_dirs(self):
         mock_data = {"data": []}
         mock_resp = MagicMock()
         mock_resp.read.return_value = json.dumps(mock_data).encode()
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
 
-        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp):
+        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp), \
+             patch("quodeq.llm_bridge._omlx._list_model_dirs", return_value=[]):
             assert list_omlx_models() == []
 
-    def test_server_offline(self):
-        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", side_effect=ConnectionRefusedError):
-            assert list_omlx_models() == []
+    def test_server_offline_falls_back_to_dirs(self):
+        dir_models = [{"name": "my-model", "size": 0, "quantization": "", "family": ""}]
+        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", side_effect=ConnectionRefusedError), \
+             patch("quodeq.llm_bridge._omlx._list_model_dirs", return_value=dir_models):
+            assert list_omlx_models() == dir_models
 
     def test_sends_auth_header_when_key_available(self):
         mock_data = {"object": "list", "data": [{"id": "gemma-4-26B", "object": "model"}]}
@@ -135,6 +153,30 @@ class TestListOmlxModels:
 
         req = mock_open.call_args[0][0]
         assert req.get_header("Authorization") is None
+
+
+class TestListModelDirs:
+    def test_returns_directories_including_symlinks(self, tmp_path):
+        models_dir = tmp_path / ".omlx" / "models"
+        models_dir.mkdir(parents=True)
+        (models_dir / "real-model").mkdir()
+        target = tmp_path / "elsewhere"
+        target.mkdir()
+        (models_dir / "symlinked-model").symlink_to(target)
+
+        with patch("quodeq.llm_bridge._omlx.Path") as mock_path_cls:
+            mock_path_cls.home.return_value = tmp_path
+            result = _list_model_dirs()
+
+        names = [m["name"] for m in result]
+        assert "real-model" in names
+        assert "symlinked-model" in names
+
+    def test_returns_empty_when_dir_missing(self, tmp_path):
+        with patch("quodeq.llm_bridge._omlx.Path") as mock_path_cls:
+            mock_path_cls.home.return_value = tmp_path  # no .omlx/models subdir
+            result = _list_model_dirs()
+        assert result == []
 
 
 class TestConcurrency:
