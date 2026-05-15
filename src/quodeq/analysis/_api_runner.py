@@ -182,13 +182,17 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
         create_kwargs["max_tokens"] = config.max_tokens
 
     timeout = None if is_openai else _LOCAL_TIMEOUT
-    _log.debug("Calling %s model=%s via Instructor", config.api_base, config.model)
+    # Local providers (omlx DMG, llamacpp, etc.) don't support structured
+    # output constraints. MD_JSON uses prompt engineering instead of
+    # response_format, so it works on any provider.
+    mode = instructor.Mode.JSON if is_openai else instructor.Mode.MD_JSON
+    _log.debug("Calling %s model=%s via Instructor mode=%s", config.api_base, config.model, mode)
     with openai.OpenAI(
         base_url=config.api_base,
         api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY,
         timeout=timeout,
     ) as oa_client:
-        client = instructor.from_openai(oa_client, mode=instructor.Mode.JSON)
+        client = instructor.from_openai(oa_client, mode=mode)
         try:
             result = client.chat.completions.create(**create_kwargs)
             _log.debug("Instructor returned %d findings", len(result.findings))
