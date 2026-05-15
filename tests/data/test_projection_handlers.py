@@ -18,11 +18,11 @@ def _judgment_event() -> JudgmentCreatedEvent:
     return JudgmentCreatedEvent(payload=payload)
 
 
-def test_judgment_created_calls_apply_judgment():
+def test_judgment_created_calls_record_finding():
     store = MagicMock()
     event = _judgment_event()
     handle(event, store)
-    store.apply_judgment.assert_called_once_with(event.payload)
+    store.record_finding.assert_called_once_with(event.payload)
 
 
 def test_unknown_event_type_does_not_raise():
@@ -30,4 +30,4 @@ def test_unknown_event_type_does_not_raise():
     event = MagicMock()
     event.event_type = EventType.RUN_STARTED  # no handler registered
     handle(event, store)
-    store.apply_judgment.assert_not_called()
+    store.record_finding.assert_not_called()

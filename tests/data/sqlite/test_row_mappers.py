@@ -3,7 +3,7 @@ from quodeq.core.evidence.model import Judgment
 from quodeq.core.events.models import JudgmentPayload
 from quodeq.data.sqlite._row_mappers import (
     finding_dict_to_row,
-    judgment_payload_to_row,
+    finding_payload_to_row,
     judgment_to_row,
     row_to_judgment,
 )
@@ -124,7 +124,7 @@ def test_row_to_judgment_preserves_explicit_confidence():
     assert row_to_judgment(row).confidence == 30
 
 
-def test_judgment_payload_to_row_maps_required_fields():
+def test_finding_payload_to_row_maps_required_fields():
     payload = JudgmentPayload(
         practice_id="P1",
         verdict="violation",
@@ -133,7 +133,7 @@ def test_judgment_payload_to_row_maps_required_fields():
         line=42,
         reason="hardcoded secret",
     )
-    row = judgment_payload_to_row(payload)
+    row = finding_payload_to_row(payload)
     assert row["practice_id"] == "P1"
     assert row["verdict"] == "violation"
     assert row["dimension"] == "Security"
@@ -145,12 +145,12 @@ def test_judgment_payload_to_row_maps_required_fields():
     assert row["end_line"] == 0
 
 
-def test_judgment_payload_to_row_optional_fields_default():
+def test_finding_payload_to_row_optional_fields_default():
     payload = JudgmentPayload(
         practice_id="P2", verdict="compliance", dimension="Reliability",
         file="f.py", line=1, reason="ok",
     )
-    row = judgment_payload_to_row(payload)
+    row = finding_payload_to_row(payload)
     assert row["title"] == ""
     assert row["snippet"] == ""
     assert row["context"] == ""

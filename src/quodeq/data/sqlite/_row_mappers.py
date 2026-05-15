@@ -85,7 +85,7 @@ def judgment_to_row(j: Judgment) -> dict[str, Any]:
     }
 
 
-def judgment_payload_to_row(p: JudgmentPayload) -> dict[str, Any]:
+def finding_payload_to_row(p: JudgmentPayload) -> dict[str, Any]:
     """Translate a JudgmentPayload event model into a SQL row dict."""
     return {
         "schema_version": 1,
