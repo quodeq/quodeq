@@ -5,6 +5,13 @@
     "model": "gemma4:26b",
     "api_base": "http://localhost:11434/v1"
   },
+  "omlx": {
+    "type": "api",
+    "order": 1,
+    "model": "",
+    "api_base": "http://localhost:8000/v1",
+    "requires_platform": "darwin-arm64"
+  },
   "llamacpp": {
     "type": "api",
     "order": 5,
