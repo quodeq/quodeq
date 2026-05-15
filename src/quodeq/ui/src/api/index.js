@@ -258,6 +258,25 @@ export function testLlamacppConcurrency(model) {
   });
 }
 
+/** @returns {Promise<Object>} omlx connection status */
+export function getOmlxStatus() {
+  return request('/omlx/status');
+}
+
+/** @returns {Promise<Object[]>} Available omlx models */
+export async function getOmlxModels() {
+  const data = await request('/omlx/models');
+  return data?.models ?? [];
+}
+
+/** @returns {Promise<Object>} Concurrency test results for the given model */
+export function testOmlxConcurrency(model) {
+  return request('/omlx/test-concurrency', {
+    method: 'POST',
+    body: JSON.stringify({ model }),
+  });
+}
+
 /** @returns {Promise<Object>} Connection test result for the provider */
 export function testProviderConnection({ provider, apiBase, model, apiKey }) {
   return request('/provider/test', {
