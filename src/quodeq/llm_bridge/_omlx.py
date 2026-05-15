@@ -16,12 +16,26 @@ import os
 import urllib.request
 import urllib.error
 
+from pathlib import Path
+
 from quodeq.llm_bridge._ollama import _detect_memory, estimate_max_agents
 
 _log = logging.getLogger(__name__)
 
 _OMLX_BASE = os.environ.get("OMLX_BASE_URL", "http://localhost:8000")
 _TIMEOUT_S = 3
+
+
+def _read_omlx_api_key() -> str:
+    """Return the omlx API key from OMLX_API_KEY env var or ~/.omlx/settings.json."""
+    env_key = os.environ.get("OMLX_API_KEY", "")
+    if env_key:
+        return env_key
+    try:
+        cfg = json.loads((Path.home() / ".omlx" / "settings.json").read_text())
+        return cfg.get("auth", {}).get("api_key", "")
+    except (OSError, json.JSONDecodeError):
+        return ""
 
 
 def _normalize_base(base_url: str) -> str:
@@ -54,6 +68,9 @@ def list_omlx_models(base_url: str = _OMLX_BASE) -> list[dict]:
     root = _normalize_base(base_url)
     try:
         req = urllib.request.Request(f"{root}/v1/models")
+        api_key = _read_omlx_api_key()
+        if api_key:
+            req.add_header("Authorization", f"Bearer {api_key}")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             entries = data.get("data", []) or []

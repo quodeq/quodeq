@@ -108,6 +108,34 @@ class TestListOmlxModels:
         with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", side_effect=ConnectionRefusedError):
             assert list_omlx_models() == []
 
+    def test_sends_auth_header_when_key_available(self):
+        mock_data = {"object": "list", "data": [{"id": "gemma-4-26B", "object": "model"}]}
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(mock_data).encode()
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp) as mock_open, \
+             patch("quodeq.llm_bridge._omlx._read_omlx_api_key", return_value="test-key"):
+            list_omlx_models()
+
+        req = mock_open.call_args[0][0]
+        assert req.get_header("Authorization") == "Bearer test-key"
+
+    def test_no_auth_header_when_no_key(self):
+        mock_data = {"object": "list", "data": []}
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(mock_data).encode()
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp) as mock_open, \
+             patch("quodeq.llm_bridge._omlx._read_omlx_api_key", return_value=""):
+            list_omlx_models()
+
+        req = mock_open.call_args[0][0]
+        assert req.get_header("Authorization") is None
+
 
 class TestConcurrency:
     def test_no_models_available(self):
