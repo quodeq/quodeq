@@ -240,6 +240,9 @@ def _resolve_provider_config(cfg: AnalysisConfig) -> tuple[str, str, str]:
     api_base = provider_cfg.get("api_base", "")
     api_key_env = provider_cfg.get("api_key_env", "")
     api_key = os.environ.get(api_key_env, "") if api_key_env else ""
+    if not api_key and ai_cmd == "omlx":
+        from quodeq.llm_bridge._omlx import _read_omlx_api_key
+        api_key = _read_omlx_api_key()
 
     if not model:
         raise AnalysisError(
