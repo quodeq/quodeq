@@ -103,7 +103,7 @@ def judgment_payload_to_row(p: JudgmentPayload) -> dict[str, Any]:
         "violation_type": p.violation_type or "",
         "context": p.context or "",
         "scope": p.scope or "",
-        "req_refs_json": json.dumps(p.req_refs) if p.req_refs else None,
+        "req_refs_json": json.dumps(p.req_refs) if p.req_refs is not None else None,
         "dedup_key": _dedup_key(p.practice_id, p.file, p.line, p.verdict),
         "confidence": _coerce_confidence(p.confidence),
     }
