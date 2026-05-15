@@ -120,3 +120,44 @@ def test_row_to_judgment_preserves_explicit_confidence():
         "file": "f.py", "line": 1, "confidence": 30,
     }
     assert row_to_judgment(row).confidence == 30
+
+
+from quodeq.core.events.models import JudgmentPayload
+from quodeq.data.sqlite._row_mappers import judgment_payload_to_row
+
+
+def test_judgment_payload_to_row_maps_required_fields():
+    payload = JudgmentPayload(
+        practice_id="P1",
+        verdict="violation",
+        dimension="Security",
+        file="src/auth.py",
+        line=42,
+        reason="hardcoded secret",
+    )
+    row = judgment_payload_to_row(payload)
+    assert row["practice_id"] == "P1"
+    assert row["verdict"] == "violation"
+    assert row["dimension"] == "Security"
+    assert row["file"] == "src/auth.py"
+    assert row["line"] == 42
+    assert row["reason"] == "hardcoded secret"
+    assert row["dedup_key"] == "P1|src/auth.py|42|violation"
+    assert row["requirement"] is None
+    assert row["end_line"] == 0
+
+
+def test_judgment_payload_to_row_optional_fields_default():
+    payload = JudgmentPayload(
+        practice_id="P2", verdict="compliance", dimension="Reliability",
+        file="f.py", line=1, reason="ok",
+    )
+    row = judgment_payload_to_row(payload)
+    assert row["title"] == ""
+    assert row["snippet"] == ""
+    assert row["context"] == ""
+    assert row["scope"] == ""
+    assert row["violation_type"] == ""
+    assert row["req_refs_json"] is None
+    assert row["confidence"] == 100
+    assert row["severity"] == "medium"
