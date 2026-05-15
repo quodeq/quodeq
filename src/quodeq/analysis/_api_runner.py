@@ -158,6 +158,13 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     extra_body: dict = {}
     if is_openai:
         extra_body["reasoning_effort"] = "none"
+    else:
+        # Disable chat-template-driven thinking on reasoning-mode local models
+        # (Gemma 4, Qwen3). Without this, the model spends 1000s of tokens on
+        # reasoning_content before emitting the JSON we asked for, which can
+        # push per-batch latency from seconds into minutes. Unknown to models
+        # that don't support thinking — they simply ignore it.
+        extra_body["chat_template_kwargs"] = {"enable_thinking": False}
     ctx_size = config.context_size
     if ctx_size <= 0:
         env_val = os.environ.get("QUODEQ_CONTEXT_SIZE", "").strip()
