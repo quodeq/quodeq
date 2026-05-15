@@ -14,9 +14,11 @@ if sys.platform == "win32":
 
     class _WindowsFileLock:
         def acquire(self, f: IO) -> None:
+            f.seek(0)
             msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)
 
         def release(self, f: IO) -> None:
+            f.seek(0)
             msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
 
     def get_file_lock() -> FileLock:
