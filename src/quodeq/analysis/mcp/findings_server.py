@@ -22,12 +22,8 @@ from quodeq.context.project_shape import detect_shape
 from quodeq.core.standards.refs import load_compiled_requirements as _load_compiled_requirements
 
 # Re-export public API so existing imports keep working.
-from quodeq.analysis.mcp.router import (  # noqa: F401
-    CompiledContext,
-    DeduplicationStore,
-    FileReader,
-    FindingsRouter,
-)
+from quodeq.analysis.mcp.enricher import CompiledContext, FileReader  # noqa: F401
+from quodeq.analysis.mcp.router import DeduplicationStore, FindingsRouter  # noqa: F401
 
 
 def _build_compiled_context(sa: ServerArgs) -> CompiledContext:
