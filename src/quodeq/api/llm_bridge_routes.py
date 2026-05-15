@@ -13,6 +13,9 @@ from quodeq.llm_bridge import (
     get_llamacpp_status,
     list_llamacpp_models,
     run_llamacpp_concurrency_test,
+    get_omlx_status,
+    list_omlx_models,
+    run_omlx_concurrency_test,
     get_known_models,
     get_provider_configs,
     check_cloud_connection,
@@ -66,6 +69,25 @@ def register_llm_bridge_routes(app: Flask) -> None:
         if "\\" in model or ".." in model or "\0" in model:
             return jsonify({"error": "Invalid model name", "code": "INVALID_PARAM"}), 400
         result = run_llamacpp_concurrency_test(model)
+        return jsonify(result)
+
+    @app.get("/api/omlx/status")
+    def omlx_status() -> Response:
+        return jsonify(get_omlx_status())
+
+    @app.get("/api/omlx/models")
+    def omlx_models() -> Response:
+        return jsonify({"models": list_omlx_models()})
+
+    @app.post("/api/omlx/test-concurrency")
+    def omlx_test_concurrency() -> Response:
+        data = request.get_json() or {}
+        model = data.get("model", "")
+        if not isinstance(model, str):
+            return jsonify({"error": "model must be a string", "code": "INVALID_PARAM"}), 400
+        if "\\" in model or ".." in model or "\0" in model:
+            return jsonify({"error": "Invalid model name", "code": "INVALID_PARAM"}), 400
+        result = run_omlx_concurrency_test(model)
         return jsonify(result)
 
     @app.post("/api/provider/test")
