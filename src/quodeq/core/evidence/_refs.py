@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from quodeq.engine._ref_utils import load_compiled_refs
+from quodeq.core.standards.refs import load_compiled_refs
 
 _CWE_URL_TEMPLATE_DEFAULT = "https://cwe.mitre.org/data/definitions/{cwe_id}.html"
 

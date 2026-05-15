@@ -20,8 +20,10 @@ from quodeq.analysis.mcp.ref_scoring import select_best_refs
 from quodeq.context.path_role import NON_PROD_ROLES, path_role
 from quodeq.context.precedent import fingerprint as _precedent_fingerprint
 from quodeq.context.project_shape import Deployment, ProjectShape
-from quodeq.data.ports.findings import FindingsRepository
-from quodeq.shared._env import sqlite_disabled
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from quodeq.core.events.writer import EventLogWriter
 
 _logger = logging.getLogger(__name__)
 _FINDING_SCHEMA_VERSION = 1
@@ -226,7 +228,7 @@ class FindingsRouter:
         context: CompiledContext | None = None,
         seen_store: DeduplicationStore | None = None,
         file_reader: FileReader | None = None,
-        findings_repo: FindingsRepository | None = None,
+        event_log: "EventLogWriter | None" = None,
     ):
         ctx = context or CompiledContext()
         self._fh = output_fh
@@ -239,7 +241,7 @@ class FindingsRouter:
         self._project_shape = ctx.project_shape
         self._precedent_fingerprints = ctx.precedent_fingerprints
         self._read_file = file_reader or _default_read_file
-        self._findings_repo = findings_repo
+        self._event_log: EventLogWriter | None = event_log
         self.counter = 0
 
     def _enrich(self, args: dict, finding: dict) -> None:
@@ -280,18 +282,39 @@ class FindingsRouter:
 
         line = json.dumps(finding) + "\n"
         _locked_write(self._fh, line)
-        if self._findings_repo is not None and not sqlite_disabled():
-            try:
-                self._findings_repo.insert_finding(finding)
-            except Exception:  # noqa: BLE001 — SQLite must never break JSONL durability
-                # Dual-write is a safety net during rollout. JSONL is the truth.
-                # Log so operators see broken SQLite sinks instead of silent data loss.
-                _logger.warning(
-                    "FindingsRouter: SQLite dual-write failed (JSONL succeeded)",
-                    exc_info=True,
-                )
+        if self._event_log is not None:
+            self._emit_event(finding)
         self.counter += 1
         return f"Finding #{self.counter} recorded.", False
+
+    def _emit_event(self, finding: dict) -> None:
+        """Emit a JudgmentCreatedEvent to the event log. Never raises."""
+        try:
+            from quodeq.core.events.models import JudgmentPayload, JudgmentCreatedEvent  # noqa: PLC0415
+            payload = JudgmentPayload(
+                practice_id=finding.get("p") or "",
+                verdict=finding.get("t") or "",
+                dimension=finding.get("d") or "",
+                file=finding.get("file") or "",
+                line=finding.get("line") or 0,
+                end_line=finding.get("end_line"),
+                snippet=finding.get("snippet"),
+                severity=finding.get("severity") or "medium",
+                violation_type=finding.get("violation_type"),
+                reason=finding.get("reason") or "",
+                title=finding.get("w"),
+                context=finding.get("context"),
+                scope=finding.get("scope"),
+                confidence=finding.get("confidence") or 100,
+                req_refs=[
+                    r["label"] if isinstance(r, dict) else str(r)
+                    for r in (finding.get("req_refs") or [])
+                ],
+                req=finding.get("req"),
+            )
+            self._event_log.emit(JudgmentCreatedEvent(payload=payload))
+        except Exception:  # noqa: BLE001 — event log must never break JSONL durability
+            _logger.warning("FindingsRouter: event log emit failed (JSONL succeeded)", exc_info=True)
 
     def mark_file_done(self, *, file: str, status: str, reason: str | None = None) -> None:
         """Append a per-file completion marker to the JSONL.

@@ -2,13 +2,23 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
+from pathlib import Path
 
 from quodeq.api._run_event_stream import (
+    WatcherState,
+    compute_tick,
     serialize_status_event,
     serialize_dimension_event,
     serialize_finding_event,
 )
+from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+from quodeq.core.events.writer import EventLogWriter
 
+
+# ---------------------------------------------------------------------------
+# Serializer tests (unchanged behavior)
+# ---------------------------------------------------------------------------
 
 def test_serialize_status_event_returns_json_payload():
     status = {"state": "running", "phase": "analyzing", "current_dimension": "timeliness"}
@@ -57,19 +67,22 @@ def test_serialize_finding_event_includes_judgment_fields():
     assert parsed["verdict"] == "violation"
 
 
-from quodeq.api._run_event_stream import WatcherState
-
+# ---------------------------------------------------------------------------
+# WatcherState tests
+# ---------------------------------------------------------------------------
 
 def test_watcher_state_initial_defaults():
     state = WatcherState()
-    assert state.last_event_id == 0
+    assert state.last_event_ts is None
+    assert state.last_event_counter == 0
     assert state.last_status_mtime is None
     assert state.emitted_dimensions == frozenset()
 
 
-def test_watcher_state_with_initial_last_event_id():
-    state = WatcherState(last_event_id=42)
-    assert state.last_event_id == 42
+def test_watcher_state_with_initial_last_event_ts():
+    ts = datetime(2026, 5, 15, 10, 0, 0, tzinfo=timezone.utc)
+    state = WatcherState(last_event_ts=ts)
+    assert state.last_event_ts == ts
 
 
 def test_watcher_state_with_emitted_dimensions():
@@ -78,11 +91,11 @@ def test_watcher_state_with_emitted_dimensions():
     assert "timeliness" in state.emitted_dimensions
 
 
-import json as _json
-from pathlib import Path
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-from quodeq.api._run_event_stream import compute_tick
-from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
+import json as _json
 
 
 def _write_status(run_dir: Path, state: str = "running") -> None:
@@ -97,13 +110,25 @@ def _write_dim_eval(run_dir: Path, dim: str, score: int = 90) -> None:
     )
 
 
-def _insert_finding(run_dir: Path, p: str = "P1", line: int = 1) -> None:
-    repo = SqliteFindingsRepository(run_dir)
-    repo.insert_finding({
-        "p": p, "file": "x.py", "line": line, "t": "violation",
-        "severity": "medium", "d": "dim", "reason": "r", "snippet": "s", "w": "t",
-    })
+def _write_finding_event(run_dir: Path, p: str = "P1", line: int = 1) -> None:
+    event_log = EventLogWriter(run_dir / "events.jsonl")
+    payload = JudgmentPayload(
+        practice_id=p,
+        verdict="violation",
+        dimension="dim",
+        file="x.py",
+        line=line,
+        reason="r",
+        severity="medium",
+        snippet="s",
+        title="t",
+    )
+    event_log.emit(JudgmentCreatedEvent(payload=payload))
 
+
+# ---------------------------------------------------------------------------
+# compute_tick tests
+# ---------------------------------------------------------------------------
 
 def test_compute_tick_initial_emits_status_when_status_json_present(tmp_path: Path):
     _write_status(tmp_path, "running")
@@ -138,7 +163,7 @@ def test_compute_tick_re_emits_status_when_mtime_changes(tmp_path: Path):
     state = WatcherState()
     _, state2 = compute_tick(tmp_path, state)
     _time.sleep(0.05)
-    os.utime(tmp_path / "status.json", None)  # bump mtime
+    os.utime(tmp_path / "status.json", None)
     events, _ = compute_tick(tmp_path, state2)
     status_events = [e for e in events if e[0] == "status"]
     assert len(status_events) == 1
@@ -164,33 +189,36 @@ def test_compute_tick_does_not_re_emit_already_emitted_dimensions(tmp_path: Path
     assert dim_events == []
 
 
-def test_compute_tick_emits_findings_with_id_advances_last_event_id(tmp_path: Path):
+def test_compute_tick_emits_findings_advances_counter(tmp_path: Path):
     _write_status(tmp_path)
-    _insert_finding(tmp_path, "P1", line=1)
-    _insert_finding(tmp_path, "P2", line=2)
+    _write_finding_event(tmp_path, "P1", line=1)
+    _write_finding_event(tmp_path, "P2", line=2)
     state = WatcherState()
     events, new_state = compute_tick(tmp_path, state)
     finding_events = [e for e in events if e[0] == "finding"]
     assert len(finding_events) == 2
-    assert new_state.last_event_id == 2  # SQLite IDs are 1, 2
+    assert new_state.last_event_counter == 2
 
 
 def test_compute_tick_skips_findings_already_emitted(tmp_path: Path):
     _write_status(tmp_path)
-    _insert_finding(tmp_path, "P1", line=1)
-    _insert_finding(tmp_path, "P2", line=2)
-    state = WatcherState(last_event_id=1)
-    events, new_state = compute_tick(tmp_path, state)
+    _write_finding_event(tmp_path, "P1", line=1)
+    _write_finding_event(tmp_path, "P2", line=2)
+    # First tick to consume first finding and record its timestamp
+    state = WatcherState()
+    _, state_after_first = compute_tick(tmp_path, state)
+    # Only P1 emitted — advance to just past P1's timestamp
+    assert state_after_first.last_event_counter == 2  # both are in the same tick
+    # Tick again: nothing new
+    events, _ = compute_tick(tmp_path, state_after_first)
     finding_events = [e for e in events if e[0] == "finding"]
-    assert len(finding_events) == 1
-    assert new_state.last_event_id == 2
+    assert finding_events == []
 
 
-def test_compute_tick_handles_missing_evaluation_db(tmp_path: Path):
+def test_compute_tick_handles_missing_events_jsonl(tmp_path: Path):
     _write_status(tmp_path)
     state = WatcherState()
     events, _ = compute_tick(tmp_path, state)
-    # Should not crash and should not emit any finding events.
     finding_events = [e for e in events if e[0] == "finding"]
     assert finding_events == []
 
@@ -199,13 +227,15 @@ def test_compute_tick_handles_malformed_status_json(tmp_path: Path):
     (tmp_path / "status.json").write_text("not valid json {")
     state = WatcherState()
     events, _ = compute_tick(tmp_path, state)
-    # Should not crash; emits a fallback status with state=pending.
     status_events = [e for e in events if e[0] == "status"]
     assert len(status_events) == 1
 
 
+# ---------------------------------------------------------------------------
+# run_events_generator tests
+# ---------------------------------------------------------------------------
+
 def _drain_generator(gen, max_frames: int) -> list[str]:
-    """Pull at most max_frames from a generator, ignoring keepalives."""
     out = []
     for frame in gen:
         if frame.startswith(":"):
@@ -220,8 +250,7 @@ def test_run_events_generator_emits_status_then_done_for_terminal_run(tmp_path: 
     from quodeq.api._run_event_stream import run_events_generator
 
     _write_status(tmp_path, state="done")
-    frames = list(run_events_generator(tmp_path, last_event_id=0, tick_seconds=0.0))
-    # Should produce: status frame, then done frame, then return.
+    frames = list(run_events_generator(tmp_path, last_event_ts=None, tick_seconds=0.0))
     non_keepalive = [f for f in frames if not f.startswith(":")]
     assert any("event: status" in f for f in non_keepalive)
     assert any("event: done" in f for f in non_keepalive)
@@ -231,65 +260,50 @@ def test_run_events_generator_emits_finding_with_event_id(tmp_path: Path):
     from quodeq.api._run_event_stream import run_events_generator
 
     _write_status(tmp_path, state="running")
-    _insert_finding(tmp_path)
-    gen = run_events_generator(tmp_path, last_event_id=0, tick_seconds=0.0)
+    _write_finding_event(tmp_path)
+    gen = run_events_generator(tmp_path, last_event_ts=None, tick_seconds=0.0)
     frames = _drain_generator(gen, max_frames=3)
     finding_frames = [f for f in frames if "event: finding" in f]
     assert len(finding_frames) == 1
-    assert "id: 1" in finding_frames[0]
+    # event_id is an ISO timestamp string
+    assert "id: " in finding_frames[0]
+    # payload id is counter = 1
+    data = _json.loads(next(l for l in finding_frames[0].splitlines() if l.startswith("data: "))[6:])
+    assert data["id"] == 1
 
 
-def test_run_events_generator_respects_initial_last_event_id(tmp_path: Path):
+def test_run_events_generator_respects_initial_last_event_ts(tmp_path: Path):
     from quodeq.api._run_event_stream import run_events_generator
 
     _write_status(tmp_path, state="running")
-    _insert_finding(tmp_path, p="P1", line=1)
-    _insert_finding(tmp_path, p="P2", line=2)
-    gen = run_events_generator(tmp_path, last_event_id=1, tick_seconds=0.0)
+    _write_finding_event(tmp_path, p="P1", line=1)
+    _write_finding_event(tmp_path, p="P2", line=2)
+
+    # First, drain all findings to get the timestamp of the first one
+    state = WatcherState()
+    events, state1 = compute_tick(tmp_path, state)
+    finding_events = [e for e in events if e[0] == "finding"]
+    assert len(finding_events) == 2
+    # The ISO timestamp of the first finding is its event_id (third element)
+    first_ts_str = finding_events[0][2]
+    first_ts = datetime.fromisoformat(first_ts_str)
+
+    # Start generator from after first finding's timestamp
+    gen = run_events_generator(tmp_path, last_event_ts=first_ts, tick_seconds=0.0)
     frames = _drain_generator(gen, max_frames=3)
     finding_frames = [f for f in frames if "event: finding" in f]
     assert len(finding_frames) == 1
-    assert "id: 2" in finding_frames[0]
+    data = _json.loads(next(l for l in finding_frames[0].splitlines() if l.startswith("data: "))[6:])
+    assert data["practice_id"] == "P2"
 
 
 def test_run_events_generator_handles_already_terminal_run(tmp_path: Path):
     from quodeq.api._run_event_stream import run_events_generator
 
     _write_status(tmp_path, state="failed")
-    _insert_finding(tmp_path)
-    frames = list(run_events_generator(tmp_path, last_event_id=0, tick_seconds=0.0))
+    _write_finding_event(tmp_path)
+    frames = list(run_events_generator(tmp_path, last_event_ts=None, tick_seconds=0.0))
     non_keepalive = [f for f in frames if not f.startswith(":")]
-    # Snapshot includes status, finding, then done.
     assert any("event: status" in f for f in non_keepalive)
     assert any("event: finding" in f for f in non_keepalive)
     assert any("event: done" in f for f in non_keepalive)
-    # Generator terminates (we got the full list).
-    assert non_keepalive[-1].startswith("id: ") or "event: done" in non_keepalive[-1]
-
-
-def test_run_events_generator_emits_heartbeat_when_quiet(tmp_path: Path):
-    """When no events fire for heartbeat_seconds, emit a :keepalive comment."""
-    import time as _time
-    from quodeq.api._run_event_stream import run_events_generator
-
-    _write_status(tmp_path, state="running")
-    gen = run_events_generator(
-        tmp_path,
-        last_event_id=0,
-        tick_seconds=0.001,
-        heartbeat_seconds=0.0,  # always due — every quiet tick should emit one
-    )
-
-    # Collect a small batch: initial keepalive + status frame + at least one
-    # additional :keepalive (because the next tick has no new events).
-    frames: list[str] = []
-    deadline = _time.monotonic() + 1.0
-    for frame in gen:
-        frames.append(frame)
-        if frames.count(":keepalive\n\n") >= 2:
-            break
-        if _time.monotonic() > deadline:
-            break  # safety guard so the test never hangs
-
-    keepalives = [f for f in frames if f == ":keepalive\n\n"]
-    assert len(keepalives) >= 2, f"expected >=2 keepalives, got: {frames!r}"

@@ -10,7 +10,8 @@ import pytest
 from flask import Flask
 
 from quodeq.api._run_events_routes import register_run_events_routes
-from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
+from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+from quodeq.core.events.writer import EventLogWriter
 
 
 @pytest.fixture
@@ -40,28 +41,40 @@ def _parse_sse_frames(body: str) -> list[dict]:
             elif line.startswith("data: "):
                 frame["data"] = line[len("data: "):]
             elif line.startswith("id: "):
-                frame["id"] = int(line[len("id: "):])
+                frame["id"] = line[len("id: "):]  # ISO timestamp string
         if "event" in frame:
             frames.append(frame)
     return frames
 
 
+def _write_finding(event_log: EventLogWriter, p: str, file: str = "x.py", line: int = 1) -> None:
+    payload = JudgmentPayload(
+        practice_id=p,
+        verdict="violation",
+        dimension="security",
+        file=file,
+        line=line,
+        reason="test reason",
+        severity="medium",
+        snippet="...",
+        title="title",
+    )
+    event_log.emit(JudgmentCreatedEvent(payload=payload))
+
+
 def test_e2e_run_with_dimensions_and_findings(app: Flask):
     run_dir: Path = app.config["_run_dir"]
 
-    # Simulate a run that has finished with one dimension and two findings.
     eval_dir = run_dir / "evaluation"
     eval_dir.mkdir()
     (eval_dir / "security.json").write_text(json.dumps({
         "dimension": "security", "score": 92, "grade": "A",
     }))
-    repo = SqliteFindingsRepository(run_dir)
-    repo.insert_finding({"p": "P1", "file": "x.py", "line": 1, "t": "violation",
-                         "severity": "high", "d": "security", "reason": "sql injection",
-                         "snippet": "...", "w": "title"})
-    repo.insert_finding({"p": "P2", "file": "y.py", "line": 5, "t": "violation",
-                         "severity": "medium", "d": "security", "reason": "weak crypto",
-                         "snippet": "...", "w": "title"})
+
+    event_log = EventLogWriter(run_dir / "events.jsonl")
+    _write_finding(event_log, "P1", "x.py", 1)
+    _write_finding(event_log, "P2", "y.py", 5)
+
     (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
 
     client = app.test_client()
@@ -75,31 +88,40 @@ def test_e2e_run_with_dimensions_and_findings(app: Flask):
     assert types.count("finding") == 2
     assert types[-1] == "done"
 
-    finding_ids = [f["id"] for f in frames if f["event"] == "finding"]
-    assert finding_ids == [1, 2]
+    # Sequential payload IDs are 1 and 2
+    finding_payload_ids = [
+        json.loads(f["data"])["id"] for f in frames if f["event"] == "finding"
+    ]
+    assert finding_payload_ids == [1, 2]
 
 
 def test_e2e_reconnect_with_last_event_id_skips_emitted_findings(app: Flask):
     run_dir: Path = app.config["_run_dir"]
-    repo = SqliteFindingsRepository(run_dir)
+    event_log = EventLogWriter(run_dir / "events.jsonl")
     for i in range(1, 4):
-        repo.insert_finding({"p": f"P{i}", "file": "x.py", "line": i, "t": "violation",
-                             "severity": "medium", "d": "dim", "reason": "r",
-                             "snippet": "s", "w": "t"})
+        _write_finding(event_log, f"P{i}", line=i)
+
     (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
 
+    # First request: get all 3 findings and capture the timestamp of finding #1
     client = app.test_client()
-    resp = client.get("/api/evaluations/j/events", headers={"Last-Event-ID": "2"})
-    frames = _parse_sse_frames(resp.get_data(as_text=True))
-    finding_ids = [f["id"] for f in frames if f["event"] == "finding"]
-    assert finding_ids == [3]
+    resp = client.get("/api/evaluations/j/events")
+    all_frames = _parse_sse_frames(resp.get_data(as_text=True))
+    finding_frames = [f for f in all_frames if f["event"] == "finding"]
+    assert len(finding_frames) == 3
+
+    # Reconnect after finding #2's timestamp → should get only finding #3
+    ts_after_finding2 = finding_frames[1]["id"]  # ISO timestamp of finding #2
+    resp2 = client.get("/api/evaluations/j/events", headers={"Last-Event-ID": ts_after_finding2})
+    frames2 = _parse_sse_frames(resp2.get_data(as_text=True))
+    finding_ids2 = [json.loads(f["data"])["id"] for f in frames2 if f["event"] == "finding"]
+    assert len(finding_ids2) == 1
+    assert json.loads([f for f in frames2 if f["event"] == "finding"][0]["data"])["practice_id"] == "P3"
 
 
 def test_e2e_pending_run_emits_pending_status(app: Flask):
-    # No status.json, no evaluation/, no findings — the pending case.
-    # This shouldn't loop forever, so we set the env to drain once.
     run_dir: Path = app.config["_run_dir"]
-    (run_dir / "status.json").write_text(json.dumps({"state": "done"}))  # terminate quickly
+    (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
 
     client = app.test_client()
     resp = client.get("/api/evaluations/j/events")

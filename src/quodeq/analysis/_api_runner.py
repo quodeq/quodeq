@@ -24,7 +24,7 @@ from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
 from quodeq.context.precedent import load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
 from quodeq.core.standards.refs import load_compiled_requirements
-from quodeq.engine._ref_utils import load_compiled_refs
+from quodeq.core.standards.refs import load_compiled_refs
 from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
@@ -320,11 +320,23 @@ def run_api_analysis(
         len(source_file_paths) if source_file_paths and not was_salvaged else 0,
     )
 
+    run_dir = jsonl_file.parent.parent
+    events_log = run_dir / "events.jsonl"
+
     jsonl_file.parent.mkdir(parents=True, exist_ok=True)
+    from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
+    event_log = EventLogWriter(events_log)
     with open(jsonl_file, "a") as fh:
-        router = FindingsRouter(fh, context=ctx)
+        router = FindingsRouter(fh, context=ctx, event_log=event_log)
         for f in findings:
             router.receive(f)
         if not was_salvaged and source_file_paths:
             for path in source_file_paths:
                 router.mark_file_done(file=path, status="ok")
+
+    if events_log.is_file():
+        try:
+            from quodeq.data.projection.engine import ProjectionEngine  # noqa: PLC0415
+            ProjectionEngine().update(events_log, run_dir)
+        except Exception:
+            _log.warning("API runner: incremental projection failed for %s", run_dir, exc_info=True)

@@ -37,14 +37,17 @@ def register_run_events_routes(app: Flask) -> None:
         if run_dir is None:
             return jsonify({"error": "run unavailable", "code": "NOT_FOUND"}), err
 
+        from datetime import datetime  # noqa: PLC0415
         last_event_id_raw = request.headers.get("Last-Event-ID", "")
-        try:
-            last_event_id = int(last_event_id_raw) if last_event_id_raw else 0
-        except ValueError:
-            last_event_id = 0
+        last_event_ts: datetime | None = None
+        if last_event_id_raw:
+            try:
+                last_event_ts = datetime.fromisoformat(last_event_id_raw)
+            except ValueError:
+                last_event_ts = None
 
         resp = Response(
-            run_events_generator(run_dir, last_event_id=last_event_id),
+            run_events_generator(run_dir, last_event_ts=last_event_ts),
             mimetype="text/event-stream",
         )
         resp.headers["Cache-Control"] = "no-cache"
