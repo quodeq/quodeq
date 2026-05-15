@@ -11,7 +11,7 @@ instructor = pytest.importorskip("instructor", reason="requires quodeq[api] extr
 
 from quodeq.analysis._api_runner import (
     run_api_analysis, ApiRunnerConfig,
-    _Finding, _Findings, _FindingType, _Severity,
+    _Finding, _Findings, _FindingType, _Severity, _LOCAL_TIMEOUT,
 )
 
 
@@ -80,6 +80,7 @@ class TestRunApiAnalysis:
             mock_openai.OpenAI.assert_called_once_with(
                 base_url="http://localhost:8000/v1",
                 api_key="test-key",
+                timeout=_LOCAL_TIMEOUT,
             )
 
     def test_handles_empty_findings(self, tmp_path, api_config):
