@@ -2,24 +2,34 @@
 
 This map serves as the central index for all contextual information within the project. Use it to navigate to the relevant domain.
 
-## Global Context
+## Core & Engine (Primary Layers)
 
-- [Global Context](./CONTEXT.md) - Fundamental concepts and transversal terminology.
+### Domain Core
+- [Core Context](./src/quodeq/core/CONTEXT.md) - Immutable domain logic, data models, and fundamental scoring rules.
 
-## Domain Contexts
+### Execution Engine
+- [Engine Context](./src/quodeq/engine/CONTEXT.md) - High-level orchestration, pipeline management, and lifecycle coordination.
+
+## Analysis & Intelligence
 
 ### Analysis Layer
-- [Analysis Context](./src/quodeq/analysis/CONTEXT.md) - Pipeline orchestration, subagents, and prompts.
+- [Analysis Context](./src/quodeq/analysis/CONTEXT.md) - Pipeline orchestration, subagents, and prompt engineering.
 
-### Data & Persistence Layer
-- [Data Context](./src/quodeq/data/CONTEXT.md) - Event Log, State Store, and Reconciliation.
+## Data & Infrastructure
 
-### Core Layer
-- [Core Context](./src/quodeq/core/CONTEXT.md) - *Coming soon*
+### Data Repository
+- [Data Context](./src/quodeq/data/CONTEXT.md) - Persistence layers (SQLite, JSONL) and repository implementations.
 
-### API & Dashboard Layer
-- [Dashboard Context](./src/quodeq/dashboard/CONTEXT.md) - *Coming soon*
+### Configuration & Environment
+- [Config Context](./src/quodeq/config/CONTEXT.md) - Discipline registry, provider settings, and path management.
 
-## Maintenance
-- To add a new context, create a `CONTEXT.md` in the relevant directory and register it here.
-- Always ensure new terms do not conflict with the **Global Context**.
+### Infrastructure Tools
+- [Tools Context](./src/quodeq/tools/CONTEXT.md) - Internal utilities and helper functions.
+
+## Specialized Domains
+
+### MCP & Integration
+- [MCP Context](./src/quodeq/analysis/mcp/CONTEXT.md) - Model Context Protocol servers and finding routing.
+
+### Verification
+- [Verifier Context](./src/quodeq/verifier/CONTEXT.md) - Automated verification and empirical validation logic.

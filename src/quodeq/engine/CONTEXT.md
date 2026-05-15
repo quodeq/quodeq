@@ -1,6 +1,8 @@
 # Engine Context
 
-This context defines the high-level orchestration and pipeline management layer of Quodeq. The engine is responsible for coordinating the execution flow and the lifecycle of an evaluation run.
+This context defines the orchestration and pipeline management layer of Quodeq. The engine acts as the primary coordinator, managing the lifecycle of an evaluation run by bridging the analysis outputs with the final scoring and reporting stages.
+
+**The engine is a consumer of the Core domain. It uses Core models to execute workflows but does not define the underlying domain rules.**
 
 ## Language
 
@@ -17,7 +19,7 @@ The finalized, persisted output for a completed dimension. It includes the calcu
 A real-time data flow (typically via JSONL or similar stream formats) that provides immediate updates on findings and progress, enabling live UI feedback during the evaluation.
 
 **Scoring Pipeline**:
-The sequence of operations that takes raw evidence and applies the hierarchical scoring logic to produce final results.
+The sequence of operations that takes raw evidence and applies the hierarchical scoring logic (defined in Core) to produce final results.
 
 ## Relationships
 
@@ -29,4 +31,4 @@ The sequence of operations that takes raw evidence and applies the hierarchical 
 ## Implementation Notes
 
 - Much of the detailed execution logic (subagent management, stream parsing) is delegated to the **Analysis** layer. 
-- The engine acts as the primary orchestrator that bridges analysis outputs with the final scoring and reporting stages.
+- The engine acts as the primary orchestrator that bridges analysis outputs with the final scoring and reporting stages, consuming **Core** entities to drive the process.
