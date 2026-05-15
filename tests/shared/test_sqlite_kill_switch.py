@@ -25,17 +25,16 @@ def test_sqlite_disabled_falsy_values(monkeypatch, value):
     assert sqlite_disabled() is False
 
 
-def test_router_skips_sqlite_when_disabled(tmp_path: Path, monkeypatch):
-    monkeypatch.setenv("QUODEQ_DISABLE_SQLITE", "1")
+def test_router_writes_jsonl_without_sqlite(tmp_path: Path):
+    # FindingsRouter no longer writes to SQLite at all (dual-write removed).
+    # JSONL is always written; SQLite is populated post-run via ProjectionEngine.
     fh = io.StringIO()
-    repo = SqliteFindingsRepository(tmp_path)
-    router = FindingsRouter(fh, findings_repo=repo)
+    router = FindingsRouter(fh)
     router.receive({"p": "P1", "file": "x.py", "line": 1, "t": "violation",
                     "severity": "medium", "d": "dim", "reason": "r",
                     "snippet": "s", "w": "t"})
-    # JSONL written
     assert fh.getvalue().count("\n") == 1
-    # SQLite untouched
+    repo = SqliteFindingsRepository(tmp_path)
     assert repo.count_by_dimension() == {}
 
 

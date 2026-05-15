@@ -75,6 +75,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
                 project_uuid=project_uuid,
                 clones_root=get_clones_dir(),
             )
+            self._trigger_post_run_projection(job_id, job, reports_root=str(reports))
 
         # When a JobManager is injected (tests, alternative wiring), the caller
         # is responsible for wiring cleanup callbacks. We do not mutate an
@@ -89,6 +90,33 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         }
         self._project_cache: dict[str, Any] | None = None
         self._project_cache_time: float = 0
+
+    # -- post-run projection --------------------------------------------
+
+    def _trigger_post_run_projection(
+        self, job_id: str, job: Any, *, reports_root: str,
+    ) -> None:
+        """Project events.jsonl → evaluation.db after a run completes.
+
+        Called from the _on_complete callback. No-op when events.jsonl does
+        not exist. Logs a warning on failure but never raises.
+        """
+        project_uuid = getattr(job, "output_project", None)
+        run_id = getattr(job, "output_run_id", None)
+        if not project_uuid or not run_id:
+            return
+        run_dir = Path(reports_root) / project_uuid / run_id
+        events_log = run_dir / "events.jsonl"
+        if not events_log.is_file():
+            return
+        try:
+            from quodeq.data.projection.engine import ProjectionEngine  # noqa: PLC0415
+            ProjectionEngine().rebuild(events_log, run_dir)
+        except Exception:
+            import logging  # noqa: PLC0415
+            logging.getLogger(__name__).warning(
+                "Post-run projection failed for %s/%s", project_uuid, run_id, exc_info=True,
+            )
 
     # -- index helpers --------------------------------------------------
 

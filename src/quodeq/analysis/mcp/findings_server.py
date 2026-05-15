@@ -16,11 +16,10 @@ from pathlib import Path
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import read_message, dispatch as _dispatch
-from quodeq.engine._ref_utils import load_compiled_refs as _load_compiled_refs
+from quodeq.core.standards.refs import load_compiled_refs as _load_compiled_refs
 from quodeq.context.precedent import load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
 from quodeq.core.standards.refs import load_compiled_requirements as _load_compiled_requirements
-from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
 # Re-export public API so existing imports keep working.
 from quodeq.analysis.mcp.router import (  # noqa: F401
@@ -94,20 +93,18 @@ def main() -> None:
 
 
 def _build_router(findings_fh, findings_path: Path, ctx: CompiledContext) -> FindingsRouter:
-    """Construct a FindingsRouter wired to dual-write into the run's evaluation.db.
+    """Construct a FindingsRouter that emits JudgmentCreatedEvents to the run event log.
 
     The findings_path is `<run_dir>/evidence/<dim>_evidence.jsonl`, so the run
-    directory is its grandparent and the project directory its great-
-    grandparent. SqliteFindingsRepository creates / opens
-    `<run_dir>/evaluation.db` lazily on first insert. We also load the
-    project's prior dismissals from `<project_dir>/dismissed.json` so the
-    router can downweight findings the user has already judged.
+    directory is its grandparent and the project directory its great-grandparent.
+    The event log lives at `<run_dir>/events.jsonl`.
     """
     run_dir = Path(findings_path).parent.parent
     project_dir = run_dir.parent
-    repo = SqliteFindingsRepository(run_dir)
     ctx.precedent_fingerprints = load_precedent_fingerprints(project_dir)
-    return FindingsRouter(findings_fh, context=ctx, findings_repo=repo)
+    from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
+    event_log = EventLogWriter(run_dir / "events.jsonl")
+    return FindingsRouter(findings_fh, context=ctx, event_log=event_log)
 
 
 if __name__ == "__main__":

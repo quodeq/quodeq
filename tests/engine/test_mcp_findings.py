@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.engine import mcp_findings
-from quodeq.engine._ref_utils import load_compiled_refs
+from quodeq.core.standards.refs import load_compiled_refs
 
 from tests.engine.conftest import _make_request, _run_server
 
