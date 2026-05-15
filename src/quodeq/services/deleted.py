@@ -209,4 +209,4 @@ def filter_deleted_from_dimensions(
 
 
 def _principle_of(f: Finding) -> str:
-    return getattr(f, "principle", "") or ""
+    return f.practice_id or ""

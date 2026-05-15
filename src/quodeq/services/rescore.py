@@ -66,7 +66,7 @@ def _group_by_principle(
     """Group a list of findings by their principle name."""
     groups: dict[str, list[Finding]] = {}
     for f in findings:
-        groups.setdefault(f.principle or "unknown", []).append(f)
+        groups.setdefault(f.practice_id or "unknown", []).append(f)
     return groups
 
 
@@ -103,7 +103,7 @@ def _rescore_dimension(
     filtered_violations = [
         v for v in dim.violations
         if (v.req or "", v.file or "", v.line or 0) not in dismissed
-        and (dim_id, v.principle or "", v.file or "") not in deleted
+        and (dim_id, v.practice_id or "", v.file or "") not in deleted
     ]
     if len(filtered_violations) == len(dim.violations):
         return dim

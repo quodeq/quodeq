@@ -50,6 +50,7 @@ class JudgmentPayload(BaseModel):
     confidence: int = 100
     req_refs: List[str] = Field(default_factory=list)
     req: Optional[str] = None
+    cwe: Optional[str] = None
 
 
 class JudgmentCreatedEvent(BaseEvent[JudgmentPayload]):

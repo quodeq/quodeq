@@ -26,7 +26,8 @@ class ReqRef:
 
 @dataclass(frozen=True, slots=True)
 class Finding:
-    principle: str | None = None
+    practice_id: str | None = None
+    verdict: str | None = None  # "violation" | "compliance" | "dismissed"
     file: str | None = None
     line: int | str | None = None
     end_line: int | str | None = None

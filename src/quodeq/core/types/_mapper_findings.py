@@ -33,7 +33,8 @@ def parse_finding(raw: dict[str, object]) -> Finding:
         req_refs = [parse_req_ref(r) for r in req_refs_raw if isinstance(r, dict)]
 
     return Finding(
-        principle=_opt_str(raw.get("principle")),
+        practice_id=_opt_str(raw.get("practiceId") or raw.get("principle")),
+        verdict=_opt_str(raw.get("verdict")),
         file=_opt_str(raw.get("file")),
         line=_opt_str_or_int(raw.get("line")),
         title=_opt_str(raw.get("title")),

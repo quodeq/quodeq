@@ -40,7 +40,7 @@ from quodeq.core.types.violation import ProgressInfo, ViolationFileEntry
 # ---------------------------------------------------------------------------
 
 FINDING = Finding(
-    principle="Naming",
+    practice_id="Naming",
     file="src/app.py",
     line=42,
     title="Bad variable name",
@@ -243,5 +243,5 @@ class TestMissingRequiredFields:
         """Finding has no required fields — empty dict should produce defaults."""
         result = parse_finding({})
         assert result.severity == "minor"
-        assert result.principle is None
+        assert result.practice_id is None
         assert result.req_refs == []
