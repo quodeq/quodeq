@@ -112,6 +112,8 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
         context_size=max(0, min(_MAX_CONTEXT_SIZE, _coerce_int(payload.get("contextSize"), 0))),
         branch=payload.get("branch") or None,
         scope_path=payload.get("scopePath") or None,
+        provider_api_key=str(payload.get("apiKey") or ""),
+        provider_api_base=str(payload.get("apiBase") or ""),
     )
 
 

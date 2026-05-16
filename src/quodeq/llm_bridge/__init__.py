@@ -19,6 +19,11 @@ from quodeq.llm_bridge._llamacpp import (
     list_llamacpp_models,
     run_concurrency_test as run_llamacpp_concurrency_test,
 )
+from quodeq.llm_bridge._omlx import (
+    get_omlx_status,
+    list_omlx_models,
+    run_concurrency_test as run_omlx_concurrency_test,
+)
 from quodeq.llm_bridge._cloud import check_cloud_connection
 from quodeq.llm_bridge._models import get_known_models
 
@@ -33,6 +38,9 @@ __all__ = [
     "get_llamacpp_status",
     "list_llamacpp_models",
     "run_llamacpp_concurrency_test",
+    "get_omlx_status",
+    "list_omlx_models",
+    "run_omlx_concurrency_test",
     "check_cloud_connection",
     "get_known_models",
 ]

@@ -258,6 +258,30 @@ export function testLlamacppConcurrency(model) {
   });
 }
 
+/** @returns {Promise<Object>} omlx connection status */
+export function getOmlxStatus(baseUrl) {
+  const params = baseUrl ? `?base_url=${encodeURIComponent(baseUrl)}` : '';
+  return request(`/omlx/status${params}`);
+}
+
+/** @returns {Promise<Object[]>} Available omlx models */
+export async function getOmlxModels(baseUrl, apiKey) {
+  const params = new URLSearchParams();
+  if (baseUrl) params.set('base_url', baseUrl);
+  if (apiKey) params.set('api_key', apiKey);
+  const qs = params.toString() ? `?${params}` : '';
+  const data = await request(`/omlx/models${qs}`);
+  return data?.models ?? [];
+}
+
+/** @returns {Promise<Object>} Concurrency test results for the given model */
+export function testOmlxConcurrency(model, baseUrl, apiKey) {
+  return request('/omlx/test-concurrency', {
+    method: 'POST',
+    body: JSON.stringify({ model, base_url: baseUrl || undefined, api_key: apiKey || undefined }),
+  });
+}
+
 /** @returns {Promise<Object>} Connection test result for the provider */
 export function testProviderConnection({ provider, apiBase, model, apiKey }) {
   return request('/provider/test', {

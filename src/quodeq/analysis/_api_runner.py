@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from enum import Enum as _Enum
 from pathlib import Path
 
+import httpx
 import instructor
 import openai
 from pydantic import BaseModel, Field
@@ -32,6 +33,8 @@ _log = logging.getLogger(__name__)
 _MAX_RETRIES = 1
 _OLLAMA_DEFAULT_BASE = "http://localhost:11434/v1"
 _OLLAMA_DEFAULT_API_KEY = "ollama"
+_OPENAI_API_HOST = "api.openai.com"
+_LOCAL_TIMEOUT = httpx.Timeout(connect=10.0, read=300.0, write=30.0, pool=10.0)
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +154,17 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     if config.api_base and config.api_base != _OLLAMA_DEFAULT_BASE:
         validate_url_safe(config.api_base, allow_private=True)
 
-    extra_body: dict = {"reasoning_effort": "none"}
+    is_openai = _OPENAI_API_HOST in (config.api_base or "")
+    extra_body: dict = {}
+    if is_openai:
+        extra_body["reasoning_effort"] = "none"
+    else:
+        # Disable chat-template-driven thinking on reasoning-mode local models
+        # (Gemma 4, Qwen3). Without this, the model spends 1000s of tokens on
+        # reasoning_content before emitting the JSON we asked for, which can
+        # push per-batch latency from seconds into minutes. Unknown to models
+        # that don't support thinking — they simply ignore it.
+        extra_body["chat_template_kwargs"] = {"enable_thinking": False}
     ctx_size = config.context_size
     if ctx_size <= 0:
         env_val = os.environ.get("QUODEQ_CONTEXT_SIZE", "").strip()
@@ -169,17 +182,24 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
         ],
         temperature=config.temperature,
         max_retries=_MAX_RETRIES,
-        extra_body=extra_body,
     )
+    if extra_body:
+        create_kwargs["extra_body"] = extra_body
     if config.max_tokens is not None:
         create_kwargs["max_tokens"] = config.max_tokens
 
-    _log.debug("Calling %s model=%s via Instructor", config.api_base, config.model)
+    timeout = None if is_openai else _LOCAL_TIMEOUT
+    # Local providers (omlx DMG, llamacpp, etc.) don't support structured
+    # output constraints. MD_JSON uses prompt engineering instead of
+    # response_format, so it works on any provider.
+    mode = instructor.Mode.JSON if is_openai else instructor.Mode.MD_JSON
+    _log.debug("Calling %s model=%s via Instructor mode=%s", config.api_base, config.model, mode)
     with openai.OpenAI(
         base_url=config.api_base,
         api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY,
+        timeout=timeout,
     ) as oa_client:
-        client = instructor.from_openai(oa_client, mode=instructor.Mode.JSON)
+        client = instructor.from_openai(oa_client, mode=mode)
         try:
             result = client.chat.completions.create(**create_kwargs)
             _log.debug("Instructor returned %d findings", len(result.findings))

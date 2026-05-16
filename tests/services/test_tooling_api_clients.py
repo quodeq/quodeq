@@ -59,3 +59,44 @@ class TestGetAiClientsIncludesApiProviders:
         claude = next((c for c in result["clients"] if c["id"] == "claude"), None)
         assert claude is not None
         assert claude["installed"] is False
+
+
+class TestRequiresPlatformFiltering:
+    """Providers with requires_platform are hidden on non-matching platforms."""
+
+    def test_excluded_when_platform_mismatches(self):
+        mixin = FsToolingMixin()
+        with patch("quodeq.services.tooling_mixin.get_provider_configs") as mock_cfg, \
+             patch("quodeq.services.tooling_mixin._platform_matches", return_value=False):
+            mock_cfg.return_value = {
+                "omlx": {"type": "api", "order": 1, "model": "", "api_base": "http://localhost:8000/v1", "requires_platform": "darwin-arm64"},
+                "ollama": {"type": "api", "order": 0, "model": "", "api_base": "http://localhost:11434/v1"},
+            }
+            with patch("shutil.which", return_value=None):
+                result = mixin.get_ai_clients()
+        client_ids = [c["id"] for c in result["clients"]]
+        assert "omlx" not in client_ids
+        assert "ollama" in client_ids
+
+    def test_included_when_platform_matches(self):
+        mixin = FsToolingMixin()
+        with patch("quodeq.services.tooling_mixin.get_provider_configs") as mock_cfg, \
+             patch("quodeq.services.tooling_mixin._platform_matches", return_value=True):
+            mock_cfg.return_value = {
+                "omlx": {"type": "api", "order": 1, "model": "", "api_base": "http://localhost:8000/v1", "requires_platform": "darwin-arm64"},
+            }
+            with patch("shutil.which", return_value=None):
+                result = mixin.get_ai_clients()
+        client_ids = [c["id"] for c in result["clients"]]
+        assert "omlx" in client_ids
+
+    def test_provider_without_requires_always_included(self):
+        mixin = FsToolingMixin()
+        with patch("quodeq.services.tooling_mixin.get_provider_configs") as mock_cfg:
+            mock_cfg.return_value = {
+                "ollama": {"type": "api", "order": 0, "model": "", "api_base": "http://localhost:11434/v1"},
+            }
+            with patch("shutil.which", return_value=None):
+                result = mixin.get_ai_clients()
+        client_ids = [c["id"] for c in result["clients"]]
+        assert "ollama" in client_ids

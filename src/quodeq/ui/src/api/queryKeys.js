@@ -31,6 +31,7 @@ export const systemKeys = {
   health: () => ["system", "health"],
   ollama: () => ["system", "ollama"],
   llamacpp: () => ["system", "llamacpp"],
+  omlx: () => ["system", "omlx"],
 };
 
 export const standardsKeys = {
@@ -46,4 +47,5 @@ export const settingsKeys = {
   knownModels: (providerId) => ["settings", "knownModels", providerId],
   ollamaModels: () => ["settings", "ollamaModels"],
   llamacppModels: () => ["settings", "llamacppModels"],
+  omlxModels: () => ["settings", "omlxModels"],
 };
