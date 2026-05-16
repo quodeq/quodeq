@@ -11,6 +11,7 @@ instructor = pytest.importorskip("instructor", reason="requires quodeq[api] extr
 
 from quodeq.analysis._api_runner import (
     ApiRunnerConfig,
+    _LOCAL_TIMEOUT,
     _build_router_context,
     _call_api,
     _Finding,
@@ -94,7 +95,7 @@ class TestCallApi:
             _call_api("test", config)
 
         kwargs = mock_client.chat.completions.create.call_args.kwargs
-        assert "num_ctx" not in kwargs["extra_body"]
+        assert "num_ctx" not in kwargs.get("extra_body", {})
 
     def test_includes_max_tokens_when_set(self):
         config = ApiRunnerConfig(
@@ -146,6 +147,7 @@ class TestCallApi:
         mock_openai.OpenAI.assert_called_once_with(
             base_url="http://localhost:11434/v1",
             api_key="ollama",
+            timeout=_LOCAL_TIMEOUT,
         )
 
     def test_returns_clean_flag_on_success(self):
