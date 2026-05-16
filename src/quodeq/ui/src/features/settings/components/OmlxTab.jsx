@@ -110,32 +110,6 @@ export default function OmlxTab({ state, update }) {
       )}
       <div className="settings-row">
         <div className="settings-row-label">
-          <span className="settings-label">Server address</span>
-          <span className="settings-description">Leave blank to use the default (<code>http://localhost:8000</code>).</span>
-        </div>
-        <input
-          type="text"
-          className="settings-model-input"
-          placeholder="http://localhost:8000"
-          value={apiBase}
-          onChange={(e) => update('api-base', e.target.value)}
-        />
-      </div>
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">API key</span>
-          <span className="settings-description">Leave blank to use the key from <code>~/.omlx/settings.json</code>.</span>
-        </div>
-        <input
-          type="password"
-          className="settings-model-input"
-          placeholder="sk-..."
-          value={apiKey}
-          onChange={(e) => update('api-key', e.target.value)}
-        />
-      </div>
-      <div className="settings-row">
-        <div className="settings-row-label">
           <span className="settings-label-row">
             <span className="settings-label">Model</span>
             <HelpHint label="Model help">{OMLX_MODEL_HINT}</HelpHint>
@@ -148,6 +122,32 @@ export default function OmlxTab({ state, update }) {
       <details className="settings-advanced">
         <summary className="settings-advanced-toggle">Advanced</summary>
         <div className="settings-advanced-content">
+          <div className="settings-row">
+            <div className="settings-row-label">
+              <span className="settings-label">Server address</span>
+              <span className="settings-description">Leave blank to use the default (<code>http://localhost:8000</code>).</span>
+            </div>
+            <input
+              type="text"
+              className="settings-model-input"
+              placeholder="http://localhost:8000"
+              value={apiBase}
+              onChange={(e) => update('api-base', e.target.value)}
+            />
+          </div>
+          <div className="settings-row">
+            <div className="settings-row-label">
+              <span className="settings-label">API key</span>
+              <span className="settings-description">Leave blank to use the key from <code>~/.omlx/settings.json</code> (default <code>1234</code>).</span>
+            </div>
+            <input
+              type="password"
+              className="settings-model-input"
+              placeholder="1234"
+              value={apiKey}
+              onChange={(e) => update('api-key', e.target.value)}
+            />
+          </div>
           <div className="settings-row">
             <div className="settings-row-label">
               <span className="settings-label-row">
