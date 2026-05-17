@@ -77,14 +77,14 @@ class WatcherState:
     last_event_ts is the ISO 8601 timestamp cursor for resuming from events.jsonl
     on reconnect (via Last-Event-ID). last_event_counter is a sequential integer
     used as finding `id` in the payload for client backward-compatibility.
-    last_grade_completed_at is the MAX(completed_at) from dimension_scores the
+    last_grade_fingerprint is a repr() of the sorted dimension_scores rows the
     last time a scores.updated event was emitted; None means never checked.
     """
     last_event_ts: datetime | None = None
     last_event_counter: int = 0
     last_status_mtime: float | None = None
     emitted_dimensions: frozenset[str] = field(default_factory=frozenset)
-    last_grade_completed_at: str | None = None
+    last_grade_fingerprint: str | None = None
 
 
 _logger = logging.getLogger(__name__)
@@ -241,15 +241,11 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
     # Trigger projection (cheap no-op if no JSONL/actions log activity since last tick).
     # This applies any actions.jsonl events so grade tables stay current.
     grade_event: EventTuple | None = None
-    new_grade_completed_at = state.last_grade_completed_at
+    new_grade_fingerprint = state.last_grade_fingerprint
     try:
         from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
         repo = SqliteFindingsRepository(run_dir)
-        if repo._events_log.is_file():  # noqa: SLF001
-            project_dir = run_dir.parent.parent
-            repo._projector.ensure_projected(  # noqa: SLF001
-                repo._events_log, run_dir, project_dir=project_dir,  # noqa: SLF001
-            )
+        repo._ensure_fresh()  # noqa: SLF001
     except Exception:
         _logger.warning("SSE tick: ensure_fresh failed for %s", run_dir, exc_info=True)
 
@@ -259,11 +255,14 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
             rows = conn.execute(
                 "SELECT dimension, score, grade, completed_at FROM dimension_scores ORDER BY dimension",
             ).fetchall()
-        # Fingerprint captures both the grade values and the MAX(completed_at).
-        # This detects: grades advancing, grades changing value, and all grades
-        # being dismissed (table becomes empty after a full-dismiss recompute).
+        # Fingerprint of all dimension_scores rows, not just MAX(completed_at). This
+        # detects grade value changes that happen within the same second (recompute
+        # fires fast enough that two consecutive ticks can produce identical timestamps
+        # but different scores). MAX(completed_at) alone would miss these.
+        # It also detects transitions to the empty state (full-dismiss), which
+        # MAX(completed_at) handles correctly too (None != prior-timestamp).
         current_fingerprint = repr(rows) if rows else None
-        if current_fingerprint != state.last_grade_completed_at:
+        if current_fingerprint != state.last_grade_fingerprint:
             from quodeq.services.scoring import get_scores_raw  # noqa: PLC0415
             # run_dir layout: <reports_root>/<project>/runs/<run_id>
             reports_root = run_dir.parent.parent.parent
@@ -271,7 +270,7 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
             run_id = run_dir.name
             payload = get_scores_raw(reports_root, project, run_id)
             grade_event = ("scores.updated", serialize_scores_updated_event(payload), None)
-            new_grade_completed_at = current_fingerprint
+            new_grade_fingerprint = current_fingerprint
     except Exception:
         _logger.warning("SSE tick: scores.updated build failed for %s", run_dir, exc_info=True)
 
@@ -283,7 +282,7 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
         last_event_counter=new_counter,
         last_status_mtime=status_mtime,
         emitted_dimensions=frozenset(state.emitted_dimensions | set(new_dims)),
-        last_grade_completed_at=new_grade_completed_at,
+        last_grade_fingerprint=new_grade_fingerprint,
     )
     return events, new_state
 

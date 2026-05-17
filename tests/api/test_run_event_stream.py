@@ -340,7 +340,7 @@ def test_compute_tick_emits_scores_updated_when_grades_advance(tmp_path: Path) -
 
     grade_events = [e for e in events if e[0] == "scores.updated"]
     assert len(grade_events) == 1, f"Expected one scores.updated event, got: {[e[0] for e in events]}"
-    assert new_state.last_grade_completed_at is not None
+    assert new_state.last_grade_fingerprint is not None
 
 
 def test_compute_tick_does_not_reemit_scores_when_unchanged(tmp_path: Path) -> None:
@@ -383,3 +383,31 @@ def test_compute_tick_no_scores_event_when_no_grades_table(tmp_path: Path) -> No
 
     grade_events = [e for e in events if e[0] == "scores.updated"]
     assert grade_events == []
+
+
+def test_compute_tick_emits_scores_updated_when_all_findings_dismissed(tmp_path: Path) -> None:
+    """When all findings are dismissed, dimension_scores ends up empty.
+    The next tick must still emit scores.updated to inform clients
+    that the previous score state is no longer valid.
+
+    This is the primary justification for using a fingerprint instead of
+    MAX(completed_at) for change detection."""
+    from quodeq.services.dismissed import dismiss_finding
+
+    project_dir, run_dir = _seed_run_with_finding(tmp_path)
+
+    state = WatcherState()
+    _, state = compute_tick(run_dir, state)  # baseline: dimension_scores populated
+
+    # Dismiss the only finding → dimension_scores will become empty after re-projection.
+    dismiss_finding(project_dir, {"req": "R1", "file": "a.py", "line": 10})
+
+    events, new_state = compute_tick(run_dir, state)
+    grade_events = [e for e in events if e[0] == "scores.updated"]
+
+    assert len(grade_events) == 1, (
+        "scores.updated must fire when dimension_scores transitions to empty; "
+        f"events were: {[e[0] for e in events]}"
+    )
+    # The fingerprint should reflect the empty state.
+    assert new_state.last_grade_fingerprint != state.last_grade_fingerprint
