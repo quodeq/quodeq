@@ -511,7 +511,7 @@ class TestDashboardSqlGradeOverride:
 
         project = "myproject"
         run_id = "r1"
-        run_dir = tmp_path / project / run_id
+        run_dir = tmp_path / project / "runs" / run_id
         run_dir.mkdir(parents=True)
 
         # Seed SQL grade tables with a post-dismissal grade.
@@ -555,7 +555,7 @@ class TestDashboardSqlGradeOverride:
 
         project = "myproject"
         run_id = "r1"
-        run_dir = tmp_path / project / run_id
+        run_dir = tmp_path / project / "runs" / run_id
         run_dir.mkdir(parents=True)
         # No SQL rows seeded — grade tables are empty.
 
@@ -617,7 +617,7 @@ class TestDashboardSqlGradeOverride:
 
         project = "myproject"
         run_id = "r1"
-        run_dir = tmp_path / project / run_id
+        run_dir = tmp_path / project / "runs" / run_id
         run_dir.mkdir(parents=True)
 
         store = SQLiteStateStore(run_dir)
@@ -656,10 +656,9 @@ class TestDashboardSqlGradeOverride:
         parity test documents the contract that the symptom (Overview != Standard
         detail) is fixed at the storage layer.
         """
-        from pathlib import Path as P
-
         from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
         from quodeq.core.events.writer import EventLogWriter
+        from quodeq.data.fs.report_parser import RunInfo as _RI
         from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
         from quodeq.services.dismissed import dismiss_finding
         from quodeq.services.scoring import get_scores_raw
@@ -696,13 +695,33 @@ class TestDashboardSqlGradeOverride:
         SqliteFindingsRepository(run_dir).list_by_dimension("Security")
         SqliteFindingsRepository(run_dir).list_by_dimension("Reliability")
 
-        # Fetch both endpoints' payloads.
-        dashboard_payload = build_dashboard(str(tmp_path), project, run_id)
+        # Stub the FS layer so build_dashboard sees real run data.  The SQL
+        # override (what we are testing here) runs on top of these stale FS
+        # grades and replaces them with the post-dismissal SQL values.
+        stale_sec = DimensionResult(dimension="Security", overall_grade="Critical", overall_score="1.0")
+        stale_rel = DimensionResult(dimension="Reliability", overall_grade="Poor", overall_score="2.0")
+        stale_summary = DimensionSummary(dimensions_count=2, overall_grade="Critical", numeric_average=1.5)
+
+        with (
+            patch(
+                "quodeq.services.dashboard.list_runs",
+                return_value=[_RI(run_id=run_id, date_iso="2024-01-01", date_label="2024-01-01")],
+            ),
+            patch("quodeq.services.dashboard.read_run_data", return_value=[stale_sec, stale_rel]),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=stale_summary),
+        ):
+            dashboard_payload = build_dashboard(str(tmp_path), project, run_id)
+
         scores_payload = get_scores_raw(tmp_path, project, run_id)
 
         # Per-dimension grade parity.
         dash_dims = {d["dimension"]: d for d in dashboard_payload["dimensions"]}
         scores_dims = {d["dimension"]: d for d in scores_payload["dimensions"]}
+
+        # Guard: both sides must have populated data — otherwise the loop below
+        # iterates zero times and the assertion is never reached (vacuous pass).
+        assert len(dash_dims) > 0, "dashboard returned no dimensions — check list_runs mock"
+        assert len(scores_dims) > 0, "scores endpoint returned no dimensions"
 
         for dim_name in scores_dims:
             if dim_name not in dash_dims:
@@ -717,3 +736,63 @@ class TestDashboardSqlGradeOverride:
                 f"dashboard={dash_dims[dim_name]['overallScore']}, "
                 f"scores={scores_dims[dim_name]['overallScore']}"
             )
+
+    def test_dashboard_override_fires_with_runs_subdir(
+        self, tmp_path: Path,
+    ) -> None:
+        """Regression guard: _apply_sql_grade_override must resolve the run
+        directory as reports_root / project / 'runs' / run_id, not the old
+        (wrong) reports_root / project / run_id path.
+
+        If the path were wrong, the 'not run_dir.is_dir()' guard would bail out
+        and the SQL override would silently never fire — the dashboard would
+        return the stale FS grade instead of the SQL-backed grade.
+        """
+        from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+        from quodeq.core.events.writer import EventLogWriter
+        from quodeq.data.fs.report_parser import RunInfo as _RI
+        from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
+
+        project = "myproject"
+        run_id = "r1"
+        # Correct path: reports_root / project / "runs" / run_id
+        run_dir = tmp_path / project / "runs" / run_id
+        run_dir.mkdir(parents=True)
+
+        # Seed one finding so the projector creates grade tables.
+        log = run_dir / "events.jsonl"
+        EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+            practice_id="P1", verdict="violation", dimension="Security",
+            file="a.py", line=10, reason="r", req="R1", severity="critical",
+        )))
+
+        # Trigger projection so SQL grade tables are populated.
+        SqliteFindingsRepository(run_dir).list_by_dimension("Security")
+
+        # FS layer returns a stale grade that differs from what SQL will produce.
+        fs_dim = DimensionResult(dimension="Security", overall_grade="Exemplary", overall_score="9.9")
+        stale_summary = DimensionSummary(dimensions_count=1, overall_grade="Exemplary", numeric_average=9.9)
+
+        with (
+            patch(
+                "quodeq.services.dashboard.list_runs",
+                return_value=[_RI(run_id=run_id, date_iso="2024-01-01", date_label="2024-01-01")],
+            ),
+            patch("quodeq.services.dashboard.read_run_data", return_value=[fs_dim]),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=stale_summary),
+        ):
+            result = build_dashboard(str(tmp_path), project, run_id)
+
+        dims = result["dimensions"]
+        assert len(dims) == 1, "dashboard returned no dimensions"
+        sec = dims[0]
+        # The SQL grade for a single critical violation must NOT be 'Exemplary'
+        # (which is the stale FS value).  If the override path is wrong, the FS
+        # value leaks through and this assertion fails.
+        assert sec["overallGrade"] != "Exemplary", (
+            "SQL override did not fire — dashboard returned stale FS grade 'Exemplary'. "
+            "Check that _apply_sql_grade_override uses reports_root / project / 'runs' / run_id."
+        )
+        # The override must have set a real SQL-backed grade and score.
+        assert sec["overallGrade"] is not None
+        assert sec["overallScore"] is not None

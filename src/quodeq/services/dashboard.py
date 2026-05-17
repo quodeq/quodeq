@@ -376,7 +376,7 @@ def _apply_sql_grade_override(
     from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
     from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
 
-    run_dir = reports_root / project / run_id
+    run_dir = reports_root / project / "runs" / run_id
     if not run_dir.is_dir():
         return payload
 
