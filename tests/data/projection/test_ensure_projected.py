@@ -209,3 +209,39 @@ def test_ensure_projected_runs_migration_first(tmp_path: Path) -> None:
 
     # Migration folded the JSON entry into actions.jsonl, projection applied it.
     assert _verdict_for(run_dir, "R1", "a.py", 10) == "dismissed"
+
+
+def test_ensure_projected_populates_grade_tables(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    run_dir = project_dir / "runs" / "r1"
+    run_dir.mkdir(parents=True)
+    events_log = _seed_run_with_finding(run_dir, req="R1", file="a.py", line=10)
+
+    Projector().ensure_projected(events_log, run_dir, project_dir=project_dir)
+
+    from quodeq.data.sqlite.state_store import SQLiteStateStore
+    store = SQLiteStateStore(run_dir)
+    assert len(store.read_dimension_scores()) == 1
+    assert len(store.read_principle_grades()) == 1
+
+
+def test_ensure_projected_grade_updates_after_dismiss(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    run_dir = project_dir / "runs" / "r1"
+    run_dir.mkdir(parents=True)
+    events_log = _seed_run_with_finding(run_dir, req="R1", file="a.py", line=10)
+    Projector().ensure_projected(events_log, run_dir, project_dir=project_dir)
+
+    from quodeq.data.sqlite.state_store import SQLiteStateStore
+    store = SQLiteStateStore(run_dir)
+    # Sanity: grade exists initially.
+    assert len(store.read_dimension_scores()) == 1
+
+    ActionLogWriter(project_dir).emit(
+        FindingDismissedEvent(payload=FindingDismissed(req="R1", file="a.py", line=10))
+    )
+    Projector().ensure_projected(events_log, run_dir, project_dir=project_dir)
+
+    # All findings dismissed → no dimension rows.
+    assert store.read_dimension_scores() == []
+    assert store.read_principle_grades() == []

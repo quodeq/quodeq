@@ -18,12 +18,19 @@ change.
 """
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
 
-from quodeq.core.types import DimensionResult, to_camel_dict
+_logger = logging.getLogger(__name__)
+
+from quodeq.core.types import to_camel_dict
+from quodeq.core.types.finding import Finding, SeverityTally, Totals
+from quodeq.core.scoring.internals import score_to_grade_label
+from quodeq.core.types.report import PrincipleGrade
+from quodeq.core.types.dimension import DimensionResult, DimensionSummary, GradeBreakdown
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.dashboard import (
     DashboardCacheConfig,
@@ -43,11 +50,236 @@ def _max_history_runs() -> int:
     return int(os.environ.get("QUODEQ_MAX_HISTORY_RUNS", "100"))
 
 
+# ---------------------------------------------------------------------------
+# SQL-backed response builder
+# ---------------------------------------------------------------------------
+
+def _severity_bucket(severity: str) -> str:
+    """Map DB severity strings to the legacy tally buckets.
+
+    The DB stores ``critical``, ``high``, ``medium``, ``low``, ``minor``. Only
+    ``critical``, ``major``, and ``minor`` have dedicated buckets; everything
+    else (including ``high``, ``medium``, ``low``) falls into ``unknown``.
+    This mirrors the legacy ``recount_totals`` in ``services/dismissed.py`` —
+    a pre-existing bucketing semantics worth a follow-up but out of PR 2 scope.
+    """
+    s = (severity or "").lower()
+    if s == "critical":
+        return "critical"
+    if s == "major":
+        return "major"
+    if s == "minor":
+        return "minor"
+    return "unknown"
+
+
+def _build_totals_from_findings(
+    violations: list[Finding], compliance_count: int,
+) -> Totals:
+    """Build a Totals dataclass from a list of active (non-dismissed) violations."""
+    critical = major = minor = unknown = 0
+    for v in violations:
+        bucket = _severity_bucket(v.severity or "")
+        if bucket == "critical":
+            critical += 1
+        elif bucket == "major":
+            major += 1
+        elif bucket == "minor":
+            minor += 1
+        else:
+            unknown += 1
+    return Totals(
+        violation_count=len(violations),
+        compliance_count=compliance_count,
+        severity=SeverityTally(critical=critical, major=major, minor=minor, unknown=unknown),
+    )
+
+
+def _build_dimension_dict(
+    dim_row: dict,
+    p_rows: list[dict],
+    violations: list[Finding],
+    compliance: list[Finding],
+) -> dict:
+    """Build a single camelCase dimension dict from SQL grade-table rows + findings.
+
+    Produces the same shape as ``to_camel_dict(DimensionResult(...))`` so the
+    frontend sees no schema change.
+    """
+    score_val: float | None = dim_row.get("score")
+    overall_score_str = f"{score_val}/10" if score_val is not None else None
+    overall_grade = dim_row.get("grade")
+
+    principles = [
+        PrincipleGrade(
+            principle=p["principle_id"],
+            score=f"{p['score']}/10" if p.get("score") is not None else None,
+            grade=p.get("grade"),
+        )
+        for p in p_rows
+    ]
+
+    totals = _build_totals_from_findings(violations, compliance_count=len(compliance))
+
+    dim = DimensionResult(
+        dimension=dim_row["dimension"],
+        overall_score=overall_score_str,
+        overall_grade=overall_grade,
+        principles=principles,
+        violations=violations,
+        compliance=compliance,
+        totals=totals,
+    )
+    return to_camel_dict(dim)
+
+
+def _build_summary_from_dim_dicts(dim_dicts: list[dict]) -> dict:
+    """Build a camelCase summary dict from a list of dimension camelCase dicts.
+
+    Mirrors ``summarize_dimensions`` logic but works directly on the already-
+    serialised dicts produced by ``_build_dimension_dict``.
+    """
+    _SCORE_DECIMAL_PLACES = 1
+    overall_grades = [d["overallGrade"] for d in dim_dicts if d.get("overallGrade")]
+    numeric_scores: list[float] = []
+    for d in dim_dicts:
+        s = d.get("overallScore")
+        if s and isinstance(s, str) and "/" in s:
+            try:
+                numeric_scores.append(float(s.split("/")[0]))
+            except ValueError:
+                pass
+
+    numeric_average = None
+    if numeric_scores:
+        numeric_average = round(sum(numeric_scores) / len(numeric_scores), _SCORE_DECIMAL_PLACES)
+
+    if numeric_average is not None:
+        overall_grade = score_to_grade_label(numeric_average)
+    elif overall_grades:
+        from collections import Counter  # noqa: PLC0415
+        overall_grade = Counter(overall_grades).most_common(1)[0][0]
+    else:
+        overall_grade = None
+
+    grade_counts: dict[str, int] = {}
+    for g in overall_grades:
+        grade_counts[g] = grade_counts.get(g, 0) + 1
+
+    summary = DimensionSummary(
+        dimensions_count=len(dim_dicts),
+        overall_grade=overall_grade,
+        numeric_average=numeric_average,
+        grade_breakdown=[
+            GradeBreakdown(grade=grade, count=count)
+            for grade, count in sorted(grade_counts.items(), key=lambda item: (-item[1], item[0]))
+        ],
+    )
+    return to_camel_dict(summary)
+
+
+def _build_response_from_grade_tables(run_dir: Path) -> dict:
+    """Build the full scores response from SQL grade tables + findings.
+
+    Reads dimension_scores and principle_grades from the state store, reads
+    active (non-dismissed) findings from the findings table, and assembles
+    the same camelCase dict shape as the legacy rescore path.
+    """
+    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
+    from quodeq.data.sqlite.connection import open_evaluation_db  # noqa: PLC0415
+    from quodeq.data.sqlite._row_mappers import row_to_finding  # noqa: PLC0415
+
+    store = SQLiteStateStore(run_dir)
+    dim_rows = store.read_dimension_scores()
+    p_rows = store.read_principle_grades()
+
+    # Group principle rows by dimension for fast lookup.
+    p_rows_by_dim: dict[str, list[dict]] = {}
+    for p in p_rows:
+        p_rows_by_dim.setdefault(p["dimension"], []).append(p)
+
+    # Read active findings grouped by dimension and verdict.
+    _SELECT_ACTIVE = (
+        "SELECT id, practice_id, dimension, requirement, verdict, severity, "
+        "file, line, end_line, title, reason, snippet, violation_type, context, "
+        "scope, req_refs_json, confidence "
+        "FROM findings WHERE verdict != 'dismissed' ORDER BY id"
+    )
+
+    def _dict_row(cursor, row):  # noqa: ANN001
+        return {col[0]: row[i] for i, col in enumerate(cursor.description)}
+
+    violations_by_dim: dict[str, list[Finding]] = {}
+    compliance_by_dim: dict[str, list[Finding]] = {}
+    with open_evaluation_db(run_dir) as conn:
+        conn.row_factory = _dict_row
+        rows = conn.execute(_SELECT_ACTIVE).fetchall()
+
+    for row in rows:
+        f = row_to_finding(row)
+        dim = f.dimension or ""
+        if f.verdict == "violation":
+            violations_by_dim.setdefault(dim, []).append(f)
+        else:
+            compliance_by_dim.setdefault(dim, []).append(f)
+
+    dim_dicts = []
+    for dim_row in dim_rows:
+        dim_name = dim_row["dimension"]
+        dim_dicts.append(_build_dimension_dict(
+            dim_row,
+            p_rows_by_dim.get(dim_name, []),
+            violations_by_dim.get(dim_name, []),
+            compliance_by_dim.get(dim_name, []),
+        ))
+
+    summary = _build_summary_from_dim_dicts(dim_dicts)
+    return {"dimensions": dim_dicts, "summary": summary}
+
+
+def _legacy_get_scores_raw(
+    reports_root: Path, project: str, run_id: str,
+) -> dict:
+    """Legacy in-memory rescore path. Preserved for Task 8 (parity logger)."""
+    return rescore_run_raw(reports_root, project, run_id)
+
+
 def get_scores_raw(
     reports_root: Path, project: str, run_id: str,
 ) -> dict:
-    """Return raw rescore dict for a single run (explorer detail compat)."""
-    return rescore_run_raw(reports_root, project, run_id)
+    """Return raw rescore dict for a single run (explorer detail compat).
+
+    Reads from SQL grade tables when available (post-projection). Falls back
+    to the legacy in-memory rescore path only when the grade tables are empty
+    (run not yet projected or has no findings).
+    """
+    run_dir = reports_root / project / "runs" / run_id
+    if not run_dir.is_dir():
+        raise FileNotFoundError(f"Run directory not found: {run_dir}")
+
+    from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
+    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
+
+    repo = SqliteFindingsRepository(run_dir)
+    repo._ensure_fresh()  # noqa: SLF001
+
+    store = SQLiteStateStore(run_dir)
+    dim_rows = store.read_dimension_scores()
+    if not dim_rows:
+        return _legacy_get_scores_raw(reports_root, project, run_id)
+
+    sql_payload = _build_response_from_grade_tables(run_dir)
+
+    # Optional: when the env flag is set, run the legacy path and log divergences.
+    from quodeq.services.scoring._parity_logger import is_enabled, log_divergence_if_any  # noqa: PLC0415
+    if is_enabled():
+        try:
+            legacy_payload = _legacy_get_scores_raw(reports_root, project, run_id)
+            log_divergence_if_any(legacy=legacy_payload, sql=sql_payload, run_id=run_id)
+        except Exception:
+            _logger.warning("Parity comparison failed for %s", run_id, exc_info=True)
+
+    return sql_payload
 
 
 def _make_rescoring_fetcher(

@@ -21,8 +21,27 @@ def _upgrade_v1_to_v2(conn: sqlite3.Connection) -> None:
     conn.execute("ALTER TABLE findings ADD COLUMN confidence INTEGER NOT NULL DEFAULT 100")
 
 
+def _upgrade_v2_to_v3(conn: sqlite3.Connection) -> None:
+    """Add principle_grades table for per-principle scoring."""
+    conn.executescript("""
+        CREATE TABLE principle_grades (
+            dimension        TEXT NOT NULL,
+            principle_id     TEXT NOT NULL,
+            score            REAL,
+            grade            TEXT,
+            finding_count    INTEGER NOT NULL DEFAULT 0,
+            dismissed_count  INTEGER NOT NULL DEFAULT 0,
+            completed_at     TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (dimension, principle_id)
+        );
+
+        CREATE INDEX idx_principle_grades_dimension ON principle_grades(dimension);
+    """)
+
+
 _UPGRADES = {
     1: _upgrade_v1_to_v2,
+    2: _upgrade_v2_to_v3,
 }
 
 

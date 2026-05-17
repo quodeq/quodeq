@@ -110,3 +110,77 @@ class SQLiteStateStore:
                 (_ACTIONS_SIZE_KEY, str(size)),
             )
             conn.commit()
+
+    # --- grade tables -----------------------------------------------------
+
+    def record_dimension_score(
+        self, *, dimension: str, score: float | None, grade: str | None,
+    ) -> None:
+        with open_evaluation_db(self._run_dir) as conn:
+            conn.execute(
+                "INSERT INTO dimension_scores (dimension, score, grade, completed_at) "
+                "VALUES (?, ?, ?, datetime('now')) "
+                "ON CONFLICT(dimension) DO UPDATE SET "
+                "score=excluded.score, grade=excluded.grade, completed_at=excluded.completed_at",
+                (dimension, score, grade),
+            )
+            conn.commit()
+
+    def record_principle_grade(
+        self, *,
+        dimension: str,
+        principle_id: str,
+        score: float | None,
+        grade: str | None,
+        finding_count: int,
+        dismissed_count: int,
+    ) -> None:
+        with open_evaluation_db(self._run_dir) as conn:
+            conn.execute(
+                "INSERT INTO principle_grades "
+                "(dimension, principle_id, score, grade, finding_count, dismissed_count, completed_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, datetime('now')) "
+                "ON CONFLICT(dimension, principle_id) DO UPDATE SET "
+                "score=excluded.score, grade=excluded.grade, "
+                "finding_count=excluded.finding_count, dismissed_count=excluded.dismissed_count, "
+                "completed_at=excluded.completed_at",
+                (dimension, principle_id, score, grade, finding_count, dismissed_count),
+            )
+            conn.commit()
+
+    def clear_grades(self) -> None:
+        with open_evaluation_db(self._run_dir) as conn:
+            conn.execute("DELETE FROM dimension_scores")
+            conn.execute("DELETE FROM principle_grades")
+            conn.commit()
+
+    def read_dimension_scores(self) -> list[dict]:
+        with open_evaluation_db(self._run_dir) as conn:
+            rows = conn.execute(
+                "SELECT dimension, score, grade FROM dimension_scores ORDER BY dimension"
+            ).fetchall()
+        return [{"dimension": r[0], "score": r[1], "grade": r[2]} for r in rows]
+
+    def read_principle_grades(self) -> list[dict]:
+        with open_evaluation_db(self._run_dir) as conn:
+            rows = conn.execute(
+                "SELECT dimension, principle_id, score, grade, finding_count, dismissed_count "
+                "FROM principle_grades ORDER BY dimension, principle_id"
+            ).fetchall()
+        return [
+            {
+                "dimension": r[0], "principle_id": r[1], "score": r[2], "grade": r[3],
+                "finding_count": r[4], "dismissed_count": r[5],
+            }
+            for r in rows
+        ]
+
+    def read_run_score_from_dim_scores(self) -> dict:
+        """Compute run-level score as the mean of non-null dimension scores."""
+        from quodeq.core.scoring.internals import score_to_grade_label  # noqa: PLC0415
+        rows = self.read_dimension_scores()
+        scores = [r["score"] for r in rows if r["score"] is not None]
+        if not scores:
+            return {"score": None, "grade": None}
+        avg = round(sum(scores) / len(scores), 1)
+        return {"score": avg, "grade": score_to_grade_label(avg)}

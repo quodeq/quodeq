@@ -149,3 +149,76 @@ def test_clear_all_resets_actions_projected_size(tmp_path: Path) -> None:
     store.save_actions_projected_size(1234)
     store.clear_all()
     assert store.get_actions_projected_size() is None
+
+
+def test_record_dimension_score_round_trip(tmp_path: Path) -> None:
+    store = SQLiteStateStore(tmp_path)
+    store.record_dimension_score(dimension="Security", score=7.4, grade="B")
+
+    rows = store.read_dimension_scores()
+    assert rows == [{"dimension": "Security", "score": 7.4, "grade": "B"}]
+
+
+def test_record_dimension_score_upserts(tmp_path: Path) -> None:
+    store = SQLiteStateStore(tmp_path)
+    store.record_dimension_score(dimension="Security", score=7.4, grade="B")
+    store.record_dimension_score(dimension="Security", score=8.2, grade="B+")
+
+    rows = store.read_dimension_scores()
+    assert rows == [{"dimension": "Security", "score": 8.2, "grade": "B+"}]
+
+
+def test_record_principle_grade_round_trip(tmp_path: Path) -> None:
+    store = SQLiteStateStore(tmp_path)
+    store.record_principle_grade(
+        dimension="Security", principle_id="P1",
+        score=6.0, grade="C", finding_count=3, dismissed_count=1,
+    )
+
+    rows = store.read_principle_grades()
+    assert len(rows) == 1
+    assert rows[0]["dimension"] == "Security"
+    assert rows[0]["principle_id"] == "P1"
+    assert rows[0]["score"] == 6.0
+    assert rows[0]["grade"] == "C"
+    assert rows[0]["finding_count"] == 3
+    assert rows[0]["dismissed_count"] == 1
+
+
+def test_clear_grades_truncates_both_tables(tmp_path: Path) -> None:
+    store = SQLiteStateStore(tmp_path)
+    store.record_dimension_score(dimension="S", score=1.0, grade="F")
+    store.record_principle_grade(
+        dimension="S", principle_id="P", score=1.0, grade="F",
+        finding_count=1, dismissed_count=0,
+    )
+
+    store.clear_grades()
+
+    assert store.read_dimension_scores() == []
+    assert store.read_principle_grades() == []
+
+
+def test_read_run_score_from_dim_scores_averages(tmp_path: Path) -> None:
+    store = SQLiteStateStore(tmp_path)
+    store.record_dimension_score(dimension="Security", score=7.0, grade="B-")
+    store.record_dimension_score(dimension="Reliability", score=9.0, grade="A")
+
+    run = store.read_run_score_from_dim_scores()
+    assert run["score"] == 8.0
+    assert run["grade"] is not None
+
+
+def test_read_run_score_returns_none_when_empty(tmp_path: Path) -> None:
+    store = SQLiteStateStore(tmp_path)
+    assert store.read_run_score_from_dim_scores() == {"score": None, "grade": None}
+
+
+def test_read_run_score_skips_null_dimension_scores(tmp_path: Path) -> None:
+    """A dimension can have score=None (Insufficient evidence) — exclude from the average."""
+    store = SQLiteStateStore(tmp_path)
+    store.record_dimension_score(dimension="Security", score=8.0, grade="A-")
+    store.record_dimension_score(dimension="Reliability", score=None, grade="Insufficient")
+
+    run = store.read_run_score_from_dim_scores()
+    assert run["score"] == 8.0  # only Security counts
