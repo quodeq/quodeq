@@ -199,4 +199,44 @@ describe('useRegisterWindowSpec', () => {
     // will be much larger.
     expect(after - before).toBeLessThanOrEqual(2);
   });
+
+  it('a fresh spec object on every parent render does not loop the provider', () => {
+    // Mirrors the production hazard: AccumulatedOverviewPanel etc. recompute
+    // their spec on every render (it closes over filtered data refs that
+    // flip each render). The old hook called registerSpec/replaceWindow on
+    // every render, looping with SidePaneProvider's setState until React
+    // tripped its "Maximum update depth" guard.
+    let pageRenderCount = 0;
+    function ChurningPage() {
+      // Brand new object every render — no useMemo. Same id+title across renders.
+      const spec = { id: 'r1', type: 'report', title: 'stable', render: () => <p>body</p> };
+      useRegisterWindowSpec('report', spec);
+      pageRenderCount += 1;
+      return null;
+    }
+    function ParentBumper() {
+      const [, setN] = useState(0);
+      return (
+        <>
+          <ChurningPage />
+          <button data-testid="bump-parent" onClick={() => setN((n) => n + 1)}>bump</button>
+        </>
+      );
+    }
+    render(
+      <SidePaneProvider>
+        <ParentBumper />
+      </SidePaneProvider>,
+    );
+    const start = pageRenderCount;
+    // 5 parent re-renders. Each gives ChurningPage a new spec ref. If the
+    // hook re-registered on every spec change, every parent bump would
+    // ripple back as another render (and several more in StrictMode).
+    for (let i = 0; i < 5; i += 1) {
+      fireEvent.click(screen.getByTestId('bump-parent'));
+    }
+    const delta = pageRenderCount - start;
+    // 5 forced renders + at most ~1 extra per from StrictMode double-invoke.
+    expect(delta).toBeLessThanOrEqual(12);
+  });
 });
