@@ -22,16 +22,33 @@ def test_build_router_wires_event_log_with_run_dir(tmp_path: Path):
 
 
 def test_build_router_loads_precedent_fingerprints_from_project_dir(tmp_path: Path):
-    import json
-
     from quodeq.context.precedent import fingerprint
+    from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+    from quodeq.core.events.writer import EventLogWriter
+    from quodeq.data.projection.projector import Projector
+    from quodeq.services.dismissed import dismiss_finding
 
-    project_dir = tmp_path
+    # The project layout expected by _build_router:
+    # project_dir/runs/<run_id>/ -- for dismissed_keys / load_precedent_fingerprints
+    # project_dir/<run_name>/evidence/<dim>_evidence.jsonl -- for the MCP server path
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    # Seed a finding in a named run under project_dir/runs/ so SQL has a dismissed row.
+    run_dir = project_dir / "runs" / "r1"
+    run_dir.mkdir(parents=True)
+    log = run_dir / "events.jsonl"
+    EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+        practice_id="P1", verdict="violation", dimension="Security",
+        file="auth.py", line=1, reason="r", req="S-CON-1", snippet="password = 'secret'",
+    )))
+    dismiss_finding(project_dir, {"req": "S-CON-1", "file": "auth.py", "line": 1})
+    Projector().ensure_projected(log, run_dir, project_dir=project_dir)
+
+    # The MCP server path: <project_dir>/<scan_run>/evidence/<dim>_evidence.jsonl
+    # _build_router resolves project_dir = findings_path.parent.parent.parent
     findings_path = project_dir / "run-1" / "evidence" / "security_evidence.jsonl"
     findings_path.parent.mkdir(parents=True)
-    (project_dir / "dismissed.json").write_text(json.dumps([
-        {"req": "S-CON-1", "snippet": "password = 'secret'"},
-    ]))
 
     router = _build_router(io.StringIO(), findings_path, CompiledContext())
 

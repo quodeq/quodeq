@@ -1,7 +1,13 @@
 from pathlib import Path
 
-from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+from quodeq.core.events.models import (
+    FindingDismissed,
+    FindingDismissedEvent,
+    JudgmentCreatedEvent,
+    JudgmentPayload,
+)
 from quodeq.core.events.writer import EventLogWriter
+from quodeq.data.actions_log import ActionLogWriter
 from quodeq.data.projection.projector import ProjectionResult, Projector
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
@@ -90,7 +96,7 @@ class _SpyProjector(Projector):
         super().__init__()
         self.ensure_calls = 0
 
-    def ensure_projected(self, events_path, run_dir):  # type: ignore[override]
+    def ensure_projected(self, events_path, run_dir, *, project_dir=None):  # type: ignore[override]
         self.ensure_calls += 1
         return ProjectionResult(events_projected=0, rebuilt=False)
 
@@ -133,3 +139,27 @@ def test_read_skips_ensure_when_no_event_log(tmp_path: Path):
     repo.count_by_dimension()
 
     assert spy.ensure_calls == 0
+
+
+def test_repo_reads_reflect_dismissal_via_actions_log(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    run_dir = project_dir / "runs" / "r1"
+    run_dir.mkdir(parents=True)
+    events_log = run_dir / "events.jsonl"
+
+    EventLogWriter(events_log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+        practice_id="P1", verdict="violation", dimension="Security",
+        file="a.py", line=10, reason="r", req="R1",
+    )))
+    ActionLogWriter(project_dir).emit(
+        FindingDismissedEvent(payload=FindingDismissed(req="R1", file="a.py", line=10))
+    )
+
+    repo = SqliteFindingsRepository(run_dir)
+    findings = repo.list_by_dimension("Security")
+
+    # The dismissed finding should still surface in list_by_dimension (the verdict
+    # column tells the caller it's dismissed); the assertion is that ensure_fresh
+    # applied the dismissal.
+    assert len(findings) == 1
+    assert findings[0].verdict == "dismissed"

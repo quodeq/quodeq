@@ -26,6 +26,32 @@ class ProjectionEngine:
         store = SQLiteStateStore(run_dir)
         return self._project(event_log, store, since=store.get_checkpoint())
 
+    def update_actions(self, actions_log: Path, run_dir: Path, *, force: bool = False) -> int:
+        """Replay actions.jsonl events into run_dir's state store.
+
+        With ``force=False`` (default), skips when the actions log size hasn't
+        changed since the last checkpoint. With ``force=True``, replays even if
+        the size is unchanged -- needed when events.jsonl just grew, because new
+        findings must be matched against existing dismissals.
+
+        Handlers are idempotent (UPDATE by stable key), so full replay is safe.
+        """
+        from quodeq.data.actions_log import read_action_events  # noqa: PLC0415
+
+        store = SQLiteStateStore(run_dir)
+        last_size = store.get_actions_projected_size() or 0
+        current_size = actions_log.stat().st_size if actions_log.is_file() else 0
+
+        if not force and current_size == last_size:
+            return 0
+
+        applied = 0
+        for event in read_action_events(actions_log.parent):
+            handle(event, store)
+            applied += 1
+        store.save_actions_projected_size(current_size)
+        return applied
+
     def _project(
         self,
         event_log: Path,

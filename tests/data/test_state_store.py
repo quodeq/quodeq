@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from quodeq.core.events.models import JudgmentPayload
+from quodeq.core.events.models import Judgment, JudgmentPayload
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
 
@@ -107,3 +107,45 @@ def test_clear_all_resets_projected_size(tmp_path: Path):
     store.save_projected_size(99)
     store.clear_all()
     assert store.get_projected_size() is None
+
+
+def test_update_verdict_dismisses_existing_finding(tmp_path: Path) -> None:
+    store = SQLiteStateStore(tmp_path)
+    store.record_finding(Judgment(
+        practice_id="P1", verdict="violation", dimension="Security",
+        file="a.py", line=10, reason="r", req="R1",
+    ))
+
+    rows = store.update_verdict(req="R1", file="a.py", line=10, verdict="dismissed")
+
+    assert rows == 1
+    with open_evaluation_db(tmp_path) as conn:
+        row = conn.execute(
+            "SELECT verdict FROM findings WHERE requirement=? AND file=? AND line=?",
+            ("R1", "a.py", 10),
+        ).fetchone()
+        assert row[0] == "dismissed"
+
+
+def test_update_verdict_returns_zero_when_no_match(tmp_path: Path) -> None:
+    store = SQLiteStateStore(tmp_path)
+    rows = store.update_verdict(req="R1", file="a.py", line=10, verdict="dismissed")
+    assert rows == 0
+
+
+def test_actions_projected_size_round_trips(tmp_path: Path) -> None:
+    store = SQLiteStateStore(tmp_path)
+    assert store.get_actions_projected_size() is None
+
+    store.save_actions_projected_size(1234)
+    assert store.get_actions_projected_size() == 1234
+
+    store.save_actions_projected_size(5678)
+    assert store.get_actions_projected_size() == 5678
+
+
+def test_clear_all_resets_actions_projected_size(tmp_path: Path) -> None:
+    store = SQLiteStateStore(tmp_path)
+    store.save_actions_projected_size(1234)
+    store.clear_all()
+    assert store.get_actions_projected_size() is None

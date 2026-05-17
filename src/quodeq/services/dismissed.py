@@ -1,45 +1,69 @@
-"""Persistent storage for dismissed findings — per-project JSON file.
+"""Persistent storage for dismissed findings -- project-level actions.jsonl.
 
-All read-modify-write operations are protected by a POSIX file lock
-(``dismissed.json.lock``) to prevent data corruption from concurrent
-API requests or parallel evaluations.
+dismiss_finding() and restore_finding() append events to actions.jsonl.
+dismissed_keys() reads the current dismissed state from each run's
+evaluation.db (aggregated across runs).
 """
 from __future__ import annotations
 
 import json
-import os
-from contextlib import contextmanager
 from dataclasses import replace
-from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.core.events.models import (
+    FindingDismissed,
+    FindingDismissedEvent,
+    FindingUndismissed,
+    FindingUndismissedEvent,
+)
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
-from quodeq.data._file_lock import lock_file, unlock_file
+from quodeq.data.actions_log import ActionLogWriter
+from quodeq.data.sqlite.connection import open_evaluation_db
 
 
-_FILENAME = "dismissed.json"
+def dismiss_finding(project_dir: Path, finding: dict) -> None:
+    """Append a FindingDismissed event to project_dir/actions.jsonl."""
+    payload = FindingDismissed(
+        req=str(finding.get("req", "")),
+        file=str(finding.get("file", "")),
+        line=int(finding.get("line", 0)),
+        reason=finding.get("dismissReason"),
+    )
+    ActionLogWriter(project_dir).emit(FindingDismissedEvent(payload=payload))
 
 
-def _dismissed_path(project_dir: Path) -> Path:
-    return project_dir / _FILENAME
+def restore_finding(project_dir: Path, finding: dict) -> None:
+    """Append a FindingUndismissed event to project_dir/actions.jsonl."""
+    payload = FindingUndismissed(
+        req=str(finding.get("req", "")),
+        file=str(finding.get("file", "")),
+        line=int(finding.get("line", 0)),
+    )
+    ActionLogWriter(project_dir).emit(FindingUndismissedEvent(payload=payload))
 
 
-@contextmanager
-def _locked(project_dir: Path):
-    """Exclusive file lock for dismissed.json read-modify-write operations."""
-    lock_path = project_dir / "dismissed.json.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
-    try:
-        lock_file(fd)
-        yield
-    finally:
-        unlock_file(fd)
-        os.close(fd)
+def dismissed_keys(project_dir: Path) -> set[tuple]:
+    """Aggregate dismissed (req, file, line) keys across all run DBs under project_dir."""
+    runs_root = project_dir / "runs"
+    if not runs_root.is_dir():
+        return set()
 
-
-def _key(entry: dict) -> tuple:
-    return (entry.get("req", ""), entry.get("file", ""), entry.get("line", 0))
+    keys: set[tuple] = set()
+    for run_dir in runs_root.iterdir():
+        if not run_dir.is_dir():
+            continue
+        db_path = run_dir / "evaluation.db"
+        if not db_path.is_file():
+            continue
+        try:
+            with open_evaluation_db(run_dir) as conn:
+                for row in conn.execute(
+                    "SELECT requirement, file, line FROM findings WHERE verdict = 'dismissed'"
+                ):
+                    keys.add((row[0] or "", row[1] or "", int(row[2] or 0)))
+        except Exception:
+            continue
+    return keys
 
 
 def load_dismissed(
@@ -48,21 +72,41 @@ def load_dismissed(
     offset: int = 0,
     limit: int | None = None,
 ) -> list[dict]:
-    """Load dismissed findings for a project. Returns empty list if none.
+    """List dismissed findings as dicts (shape matches /api/findings/dismissed response).
 
-    *offset* and *limit* let API callers slice the result without first
-    materializing the full list. The on-disk file is still read in full
-    (it's a small per-project JSON), but the returned slice is bounded.
+    Reads from each run's evaluation.db, aggregated across all runs.
     """
-    path = _dismissed_path(project_dir)
-    if not path.exists():
+    runs_root = project_dir / "runs"
+    if not runs_root.is_dir():
         return []
-    try:
-        items = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-    if not isinstance(items, list):
-        return []
+    items: list[dict] = []
+    for run_dir in runs_root.iterdir():
+        if not run_dir.is_dir():
+            continue
+        db_path = run_dir / "evaluation.db"
+        if not db_path.is_file():
+            continue
+        try:
+            with open_evaluation_db(run_dir) as conn:
+                for row in conn.execute(
+                    "SELECT requirement, file, line, dimension, practice_id, severity, "
+                    "title, reason, snippet, context, scope, end_line, req_refs_json "
+                    "FROM findings WHERE verdict = 'dismissed'"
+                ):
+                    req_refs_raw = row[12]
+                    try:
+                        req_refs = json.loads(req_refs_raw) if req_refs_raw else []
+                    except (json.JSONDecodeError, TypeError):
+                        req_refs = []
+                    items.append({
+                        "req": row[0] or "", "file": row[1] or "", "line": row[2] or 0,
+                        "dimension": row[3] or "", "principle": row[4] or "",
+                        "severity": row[5] or "", "title": row[6] or "", "reason": row[7] or "",
+                        "snippet": row[8] or "", "context": row[9] or "", "scope": row[10] or "",
+                        "endLine": row[11] or 0, "reqRefs": req_refs,
+                    })
+        except Exception:
+            continue
     if offset <= 0 and limit is None:
         return items
     start = max(0, offset)
@@ -70,67 +114,20 @@ def load_dismissed(
     return items[start:end]
 
 
-def dismiss_finding(project_dir: Path, finding: dict) -> None:
-    """Add a finding to the dismissed list. Deduplicates by (req, file, line)."""
-    with _locked(project_dir):
-        entries = load_dismissed(project_dir)
-        new_key = _key(finding)
-        existing_keys = {_key(e) for e in entries}
-        if new_key in existing_keys:
-            return
-        entry = {
-            "req": finding.get("req", ""),
-            "file": finding.get("file", ""),
-            "line": finding.get("line", 0),
-            "dimension": finding.get("dimension", ""),
-            "principle": finding.get("principle", ""),
-            "severity": finding.get("severity", ""),
-            "title": finding.get("title", ""),
-            "reason": finding.get("reason", ""),
-            "reqRefs": finding.get("reqRefs", []),
-            "context": finding.get("context", ""),
-            "snippet": finding.get("snippet", ""),
-            "scope": finding.get("scope", ""),
-            "endLine": finding.get("endLine", 0),
-            "dismissed_at": datetime.now(timezone.utc).isoformat(),
-        }
-        entries.append(entry)
-        _dismissed_path(project_dir).write_text(
-            json.dumps(entries, indent=2), encoding="utf-8",
-        )
-
-
-def restore_finding(project_dir: Path, finding: dict) -> None:
-    """Remove a finding from the dismissed list by (req, file, line)."""
-    with _locked(project_dir):
-        entries = load_dismissed(project_dir)
-        target = _key(finding)
-        updated = [e for e in entries if _key(e) != target]
-        if len(updated) == len(entries):
-            return
-        path = _dismissed_path(project_dir)
-        if updated:
-            path.write_text(json.dumps(updated, indent=2), encoding="utf-8")
-        elif path.exists():
-            path.unlink()
-
-
 def restore_all_findings(project_dir: Path) -> int:
-    """Remove all dismissed findings. Returns the count of restored items."""
-    with _locked(project_dir):
-        entries = load_dismissed(project_dir)
-        count = len(entries)
-        if count == 0:
-            return 0
-        path = _dismissed_path(project_dir)
-        if path.exists():
-            path.unlink()
-        return count
+    """Append FindingUndismissed events for all currently-dismissed findings.
 
-
-def dismissed_keys(project_dir: Path) -> set[tuple]:
-    """Return a set of (req, file, line) tuples for all dismissed findings."""
-    return {_key(e) for e in load_dismissed(project_dir)}
+    Returns the count of restored items.
+    """
+    keys = dismissed_keys(project_dir)
+    count = len(keys)
+    if count == 0:
+        return 0
+    writer = ActionLogWriter(project_dir)
+    for req, file, line in keys:
+        payload = FindingUndismissed(req=req, file=file, line=line)
+        writer.emit(FindingUndismissedEvent(payload=payload))
+    return count
 
 
 def _finding_key(f: Finding) -> tuple:

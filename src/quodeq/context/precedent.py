@@ -17,14 +17,12 @@ embeddings) is a follow-up; this module ships exact-match only.
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import re
 from pathlib import Path
 
 _logger = logging.getLogger(__name__)
 
-_DISMISSED_FILENAME = "dismissed.json"
 _WS_RE = re.compile(r"\s+")
 
 
@@ -53,27 +51,41 @@ def fingerprint(req: str | None, snippet: str | None) -> str | None:
 def load_precedent_fingerprints(project_dir: Path) -> set[str]:
     """Load fingerprints for every dismissed finding in *project_dir*.
 
-    Reads ``<project_dir>/dismissed.json``. Missing / malformed files
-    return an empty set: precedent matching degrades gracefully and never
-    breaks an evaluation.
+    Aggregates across ``runs/<run_id>/evaluation.db``. Missing or locked DBs
+    are skipped -- precedent matching degrades gracefully and never breaks a
+    scan.
+
+    Legacy note: prior to PR 1 (live-grades), dismissals were stored in
+    ``<project_dir>/dismissed.json``. The migration in
+    ``data/migrations/dismissed_json_to_actions_log.py`` folds those legacy
+    entries into ``actions.jsonl`` on first projection, so once a project has
+    been opened post-deploy the SQL rows also capture the historical data.
     """
     if not project_dir or not project_dir.is_dir():
         return set()
-    path = project_dir / _DISMISSED_FILENAME
-    if not path.exists():
+    runs_root = project_dir / "runs"
+    if not runs_root.is_dir():
         return set()
-    try:
-        entries = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        _logger.warning("Could not read precedent corpus at %s: %s", path, exc)
-        return set()
-    if not isinstance(entries, list):
-        return set()
+
     out: set[str] = set()
-    for entry in entries:
-        if not isinstance(entry, dict):
+    for run_dir in runs_root.iterdir():
+        if not run_dir.is_dir():
             continue
-        fp = fingerprint(entry.get("req"), entry.get("snippet"))
-        if fp is not None:
-            out.add(fp)
+        db_path = run_dir / "evaluation.db"
+        if not db_path.is_file():
+            continue
+        try:
+            from quodeq.data.sqlite.connection import open_evaluation_db  # noqa: PLC0415
+            with open_evaluation_db(run_dir) as conn:
+                for row in conn.execute(
+                    "SELECT requirement, snippet FROM findings WHERE verdict = 'dismissed'"
+                ):
+                    fp = fingerprint(row[0], row[1])
+                    if fp is not None:
+                        out.add(fp)
+        except Exception as exc:
+            _logger.warning(
+                "Could not read precedent corpus from %s: %s", db_path, exc
+            )
+            continue
     return out

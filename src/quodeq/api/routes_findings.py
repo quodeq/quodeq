@@ -55,7 +55,7 @@ def register_findings_routes(app: Flask) -> None:
         if not project or not req or not file or line is None:
             return jsonify({"error": "project, req, file, and line are required"}), 400
         dismiss_finding(_project_dir(_eval_dir(), project), body)
-        return jsonify({"ok": True}), 200
+        return ("", 204)
 
     @app.post("/api/findings/restore")
     def restore() -> tuple[Response, int]:
@@ -67,7 +67,7 @@ def register_findings_routes(app: Flask) -> None:
         if not project or not req or not file or line is None:
             return jsonify({"error": "project, req, file, and line are required"}), 400
         restore_finding(_project_dir(_eval_dir(), project), body)
-        return jsonify({"ok": True}), 200
+        return ("", 204)
 
     @app.post("/api/findings/restore-all")
     def restore_all() -> tuple[Response, int]:
