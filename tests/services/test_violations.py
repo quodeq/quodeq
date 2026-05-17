@@ -1,4 +1,4 @@
-"""Tests for quodeq.provider.violations — resolution and aggregation."""
+"""Tests for quodeq.services.violations — resolution and aggregation."""
 from __future__ import annotations
 
 import json

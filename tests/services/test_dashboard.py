@@ -1,4 +1,4 @@
-"""Tests for quodeq.provider.dashboard — dashboard construction logic."""
+"""Tests for quodeq.services.dashboard — dashboard construction logic."""
 from __future__ import annotations
 
 from typing import Any
