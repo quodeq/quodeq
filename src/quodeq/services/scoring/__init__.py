@@ -41,7 +41,6 @@ from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.ports import RunInfo, list_runs
 from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
-from quodeq.services.scoring._rescore import rescore_run_raw
 from quodeq.services.scoring._summary import recompute_summary
 
 
@@ -237,21 +236,13 @@ def _build_response_from_grade_tables(run_dir: Path) -> dict:
     return {"dimensions": dim_dicts, "summary": summary}
 
 
-def _legacy_get_scores_raw(
-    reports_root: Path, project: str, run_id: str,
-) -> dict:
-    """Legacy in-memory rescore path. Preserved for Task 8 (parity logger)."""
-    return rescore_run_raw(reports_root, project, run_id)
-
-
 def get_scores_raw(
     reports_root: Path, project: str, run_id: str,
 ) -> dict:
     """Return raw rescore dict for a single run (explorer detail compat).
 
-    Reads from SQL grade tables when available (post-projection). Falls back
-    to the legacy in-memory rescore path only when the grade tables are empty
-    (run not yet projected or has no findings).
+    Reads from SQL grade tables after projection. Returns an empty shape when
+    grade tables are empty (run not yet projected or has no findings).
     """
     run_dir = reports_root / project / "runs" / run_id
     if not run_dir.is_dir():
@@ -266,20 +257,10 @@ def get_scores_raw(
     store = SQLiteStateStore(run_dir)
     dim_rows = store.read_dimension_scores()
     if not dim_rows:
-        return _legacy_get_scores_raw(reports_root, project, run_id)
+        # No findings projected yet — return an empty shape.
+        return {"dimensions": [], "summary": {}}
 
-    sql_payload = _build_response_from_grade_tables(run_dir)
-
-    # Optional: when the env flag is set, run the legacy path and log divergences.
-    from quodeq.services.scoring._parity_logger import is_enabled, log_divergence_if_any  # noqa: PLC0415
-    if is_enabled():
-        try:
-            legacy_payload = _legacy_get_scores_raw(reports_root, project, run_id)
-            log_divergence_if_any(legacy=legacy_payload, sql=sql_payload, run_id=run_id)
-        except Exception:
-            _logger.warning("Parity comparison failed for %s", run_id, exc_info=True)
-
-    return sql_payload
+    return _build_response_from_grade_tables(run_dir)
 
 
 def _make_rescoring_fetcher(
