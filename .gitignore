@@ -11,7 +11,8 @@ __pycache__/
 .venv/
 evaluations/
 
-docs/
+docs/*
+!docs/adr/
 specs/
 reports/
 src/tmp/

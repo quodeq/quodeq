@@ -4,6 +4,7 @@
   "type": "object",
   "required": ["applies"],
   "properties": {
+    "_note": { "type": "string" },
     "applies": {
       "type": "array",
       "items": {
