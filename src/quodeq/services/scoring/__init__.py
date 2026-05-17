@@ -57,9 +57,11 @@ def _max_history_runs() -> int:
 def _severity_bucket(severity: str) -> str:
     """Map DB severity strings to the legacy tally buckets.
 
-    The DB stores ``critical``, ``high``, ``medium``, ``low``, ``minor``.
-    The legacy ``recount_totals`` buckets are critical / major / minor / unknown.
-    This mapping mirrors that function so the shape is identical.
+    The DB stores ``critical``, ``high``, ``medium``, ``low``, ``minor``. Only
+    ``critical``, ``major``, and ``minor`` have dedicated buckets; everything
+    else (including ``high``, ``medium``, ``low``) falls into ``unknown``.
+    This mirrors the legacy ``recount_totals`` in ``services/dismissed.py`` —
+    a pre-existing bucketing semantics worth a follow-up but out of PR 2 scope.
     """
     s = (severity or "").lower()
     if s == "critical":
