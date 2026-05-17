@@ -155,23 +155,35 @@ def test_ensure_works_without_project_dir(tmp_path: Path) -> None:
 
 
 def test_ensure_applies_existing_dismissals_to_freshly_scanned_findings(tmp_path: Path) -> None:
-    """A dismissal made before a re-scan must apply to findings the re-scan produces.
+    """Regression: when events.jsonl grows but actions.jsonl doesn't, brand-new findings
+    must still be matched against pre-existing dismissals.
 
-    Without forcing an actions replay when events grow, a fresh JUDGMENT_CREATED
-    would insert a finding with verdict='violation' and the pre-existing dismiss
-    event would not be re-applied (size unchanged -> fast-path skip).
+    Without ``force=events_changed`` in ensure_projected, the size-unchanged fast-path
+    in update_actions would skip the replay and the new finding would stay as 'violation'.
     """
     project_dir = tmp_path / "project"
     run_dir = project_dir / "runs" / "r1"
     run_dir.mkdir(parents=True)
     events_log = run_dir / "events.jsonl"
 
-    # Dismissal recorded before any finding exists.
+    # Pre-existing dismissal for a key that doesn't exist as a finding yet.
     ActionLogWriter(project_dir).emit(
         FindingDismissedEvent(payload=FindingDismissed(req="R1", file="a.py", line=10))
     )
 
-    # Scan then produces the matching finding.
+    # Seed events.jsonl with an unrelated finding so the events checkpoint gets set.
+    EventLogWriter(events_log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+        practice_id="P0", verdict="violation", dimension="Security",
+        file="b.py", line=20, reason="seed", req="R0",
+    )))
+
+    # First projection: both logs project. The R1 dismiss is a no-op (no matching finding).
+    # Both checkpoints are saved.
+    Projector().ensure_projected(events_log, run_dir, project_dir=project_dir)
+    assert _verdict_for(run_dir, "R1", "a.py", 10) is None
+    assert _verdict_for(run_dir, "R0", "b.py", 20) == "violation"
+
+    # Now a re-scan produces the matching finding. actions.jsonl is unchanged.
     EventLogWriter(events_log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
         practice_id="P1", verdict="violation", dimension="Security",
         file="a.py", line=10, reason="r", req="R1",
@@ -179,4 +191,5 @@ def test_ensure_applies_existing_dismissals_to_freshly_scanned_findings(tmp_path
 
     Projector().ensure_projected(events_log, run_dir, project_dir=project_dir)
 
+    # The pre-existing dismissal applies to the freshly-projected finding.
     assert _verdict_for(run_dir, "R1", "a.py", 10) == "dismissed"
