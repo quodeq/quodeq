@@ -90,3 +90,20 @@ def test_clear_all_resets_checkpoint(tmp_path: Path):
     store.save_checkpoint(datetime(2026, 5, 15, 10, 0, 0, tzinfo=timezone.utc))
     store.clear_all()
     assert store.get_checkpoint() is None
+
+
+def test_projected_size_is_none_when_not_set(tmp_path: Path):
+    assert SQLiteStateStore(tmp_path).get_projected_size() is None
+
+
+def test_projected_size_round_trip(tmp_path: Path):
+    store = SQLiteStateStore(tmp_path)
+    store.save_projected_size(1234)
+    assert store.get_projected_size() == 1234
+
+
+def test_clear_all_resets_projected_size(tmp_path: Path):
+    store = SQLiteStateStore(tmp_path)
+    store.save_projected_size(99)
+    store.clear_all()
+    assert store.get_projected_size() is None

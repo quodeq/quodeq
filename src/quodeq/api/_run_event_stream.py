@@ -191,18 +191,6 @@ def _read_new_findings_from_events(
         return []
 
 
-def _update_sqlite_projection(run_dir: Path) -> None:
-    """Incrementally project events.jsonl → evaluation.db so polling clients see live data."""
-    events_log = run_dir / "events.jsonl"
-    if not events_log.is_file():
-        return
-    try:
-        from quodeq.data.projection.engine import ProjectionEngine  # noqa: PLC0415
-        ProjectionEngine().update(events_log, run_dir)
-    except Exception:  # noqa: BLE001
-        _logger.warning("SSE tick: incremental projection failed for %s", run_dir, exc_info=True)
-
-
 def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], WatcherState]:
     """Single tick: read artifacts, return (events, new_state).
 
@@ -231,8 +219,6 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
     new_findings = _read_new_findings_from_events(
         run_dir, state.last_event_ts, state.last_event_counter,
     )
-    if new_findings:
-        _update_sqlite_projection(run_dir)
     new_last_ts = state.last_event_ts
     new_counter = state.last_event_counter
     for event_ts, counter, judgment_dict in new_findings:

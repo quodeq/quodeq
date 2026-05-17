@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.types.finding import Finding
+from quodeq.data.projection.projector import Projector
 from quodeq.data.sqlite._row_mappers import (
     finding_dict_to_row,
     row_to_finding,
@@ -31,10 +32,27 @@ _SELECT_COLUMNS = (
 
 
 class SqliteFindingsRepository:
-    """Per-run findings store backed by evaluation.db in run_dir."""
+    """Per-run findings store backed by evaluation.db in run_dir.
 
-    def __init__(self, run_dir: Path):
+    Reads self-ensure the State Store is fresh against the Event Log
+    (``events.jsonl``) before returning rows, so callers above the data
+    layer never need to project explicitly. Writes do not trigger projection.
+    """
+
+    def __init__(
+        self,
+        run_dir: Path,
+        *,
+        projector: Projector | None = None,
+        events_log: Path | None = None,
+    ) -> None:
         self._run_dir = run_dir
+        self._projector = projector or Projector()
+        self._events_log = events_log or (run_dir / "events.jsonl")
+
+    def _ensure_fresh(self) -> None:
+        if self._events_log.is_file():
+            self._projector.ensure_projected(self._events_log, self._run_dir)
 
     def insert_finding(self, finding: dict[str, Any]) -> bool:
         row = finding_dict_to_row(finding)
@@ -44,6 +62,7 @@ class SqliteFindingsRepository:
             return cur.rowcount == 1
 
     def list_by_dimension(self, dimension: str) -> list[Finding]:
+        self._ensure_fresh()
         with open_evaluation_db(self._run_dir) as conn:
             conn.row_factory = _dict_row
             rows = conn.execute(
@@ -53,6 +72,7 @@ class SqliteFindingsRepository:
         return [row_to_finding(r) for r in rows]
 
     def count_by_dimension(self) -> dict[str, int]:
+        self._ensure_fresh()
         with open_evaluation_db(self._run_dir) as conn:
             rows = conn.execute(
                 "SELECT dimension, COUNT(*) FROM findings GROUP BY dimension",
@@ -60,6 +80,7 @@ class SqliteFindingsRepository:
         return {dim: n for dim, n in rows}
 
     def search(self, query: str, limit: int = 100) -> list[Finding]:
+        self._ensure_fresh()
         fts_query = _quote_fts_query(query)
         with open_evaluation_db(self._run_dir) as conn:
             conn.row_factory = _dict_row

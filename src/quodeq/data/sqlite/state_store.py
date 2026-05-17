@@ -11,6 +11,7 @@ from quodeq.data.sqlite._row_mappers import judgment_to_row
 
 _logger = logging.getLogger(__name__)
 _CHECKPOINT_KEY = "projection_checkpoint"
+_PROJECTED_SIZE_KEY = "projection_event_log_size"
 
 _INSERT_FINDING = """
 INSERT OR IGNORE INTO findings (
@@ -42,7 +43,8 @@ class SQLiteStateStore:
             conn.execute("DELETE FROM findings")
             conn.execute("DELETE FROM dimension_scores")
             conn.execute(
-                "DELETE FROM run_meta WHERE key = ?", (_CHECKPOINT_KEY,)
+                "DELETE FROM run_meta WHERE key IN (?, ?)",
+                (_CHECKPOINT_KEY, _PROJECTED_SIZE_KEY),
             )
             conn.commit()
 
@@ -60,5 +62,22 @@ class SQLiteStateStore:
             conn.execute(
                 "INSERT OR REPLACE INTO run_meta (key, value) VALUES (?, ?)",
                 (_CHECKPOINT_KEY, ts.isoformat()),
+            )
+            conn.commit()
+
+    def get_projected_size(self) -> int | None:
+        with open_evaluation_db(self._run_dir) as conn:
+            row = conn.execute(
+                "SELECT value FROM run_meta WHERE key = ?", (_PROJECTED_SIZE_KEY,)
+            ).fetchone()
+        if row is None:
+            return None
+        return int(row[0])
+
+    def save_projected_size(self, size: int) -> None:
+        with open_evaluation_db(self._run_dir) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO run_meta (key, value) VALUES (?, ?)",
+                (_PROJECTED_SIZE_KEY, str(size)),
             )
             conn.commit()
