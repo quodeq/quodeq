@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
+import { useGradeStream } from '../hooks/useGradeStream.js';
 
 export function computeAllViolations(evalData) {
   if (!evalData) return [];
@@ -135,4 +136,73 @@ export function useExplorerData(project, dimension, runId, refreshSignal) {
   const allViolations = useMemo(() => computeAllViolations(evalData), [evalData]);
   const stats = useDerivedExplorerStats(evalData, allViolations);
   return { evalData, loading, isFetching, error, overallGrade, principleGrades, allViolations, ...stats };
+}
+
+/**
+ * Manages per-principle live state for PrincipleDetailPage: dismissed violations,
+ * live score/grade after dismiss, severity filtering.
+ *
+ * When VITE_USE_LIVE_GRADES === 'true', subscribes to the per-run SSE stream via
+ * useGradeStream and folds incoming `scores.updated` payloads into liveScore/liveGrade.
+ * The handleDismiss handler also skips the post-dismiss getRunScores() refetch in that
+ * mode — the SSE stream will deliver the updated grades.
+ *
+ * When the flag is off (default), today's behaviour is unchanged: handleDismiss calls
+ * getRunScores() after the dismiss and sets liveScore/liveGrade from the response.
+ *
+ * @param {Object} evalPrincipal - the evalPrincipal object (principle, dimension, project, runId, ...)
+ * @param {string|null} severityFilter - initial severity filter
+ * @param {Function|null} onDismiss - callback invoked with the violation before the refetch
+ * @returns {{ liveScore, liveGrade, activeSevFilter, setActiveSevFilter, handleDismiss, dismissedSet }}
+ */
+export function usePrincipleData(evalPrincipal, severityFilter, onDismiss) {
+  const { getRunScores } = useApi();
+  const { principle, dimension, project, runId } = evalPrincipal;
+  const [dismissedSet, setDismissedSet] = useState(new Set());
+  const [liveScore, setLiveScore] = useState(null);
+  const [liveGrade, setLiveGrade] = useState(null);
+  const [activeSevFilter, setActiveSevFilter] = useState(severityFilter || null);
+
+  // Subscribe to the grade stream when the flag is on. useGradeStream is a no-op
+  // (status='idle', payload=null) when VITE_USE_LIVE_GRADES !== 'true' or runId is null.
+  const gradeStream = useGradeStream({ project, runId });
+
+  // Fold incoming SSE payloads into liveScore/liveGrade.
+  useEffect(() => {
+    if (!gradeStream.payload) return;
+    const dimMap = new Map((gradeStream.payload.dimensions || []).map((d) => [d.dimension, d]));
+    const dimData = dimMap.get(dimension);
+    if (!dimData) return;
+    const pgMap = new Map((dimData.principles || []).map((p) => [p.principle, p]));
+    const pg = pgMap.get(principle);
+    if (pg) {
+      setLiveScore(pg.score);
+      setLiveGrade(pg.grade);
+    }
+  }, [gradeStream.payload, dimension, principle]);
+
+  const handleDismiss = useCallback((v) => {
+    if (!onDismiss) return;
+    onDismiss(v);
+    setDismissedSet((prev) => new Set(prev).add(`${v.file}:${v.line}`));
+
+    if (import.meta.env.VITE_USE_LIVE_GRADES === 'true') {
+      // SSE will deliver the updated grades — no synchronous refetch needed.
+      return;
+    }
+
+    // Legacy path: refetch /scores immediately after dismiss.
+    if (project && runId) {
+      getRunScores(project, runId).then((rescored) => {
+        const dimMap = new Map((rescored.dimensions || []).map((d) => [d.dimension, d]));
+        const dimData = dimMap.get(dimension);
+        if (!dimData) return;
+        const pgMap = new Map((dimData.principles || []).map((p) => [p.principle, p]));
+        const pg = pgMap.get(principle);
+        if (pg) { setLiveScore(pg.score); setLiveGrade(pg.grade); }
+      }).catch(() => {});
+    }
+  }, [onDismiss, project, runId, dimension, principle, getRunScores]);
+
+  return { liveScore, liveGrade, activeSevFilter, setActiveSevFilter, handleDismiss, dismissedSet };
 }
