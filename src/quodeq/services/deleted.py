@@ -17,9 +17,16 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.core.events.models import (
+    EventType,
+    FindingDismissedEvent,
+    FindingUndismissed,
+    FindingUndismissedEvent,
+)
 from quodeq.core.types.finding import Finding
 from quodeq.data._file_lock import lock_file, unlock_file
-from quodeq.services.dismissed import load_dismissed, recount_totals
+from quodeq.data.actions_log import ActionLogWriter, read_action_events
+from quodeq.services.dismissed import recount_totals
 
 
 _FILENAME = "deleted.json"
@@ -89,9 +96,9 @@ def _write_deleted(project_dir: Path, entries: list[dict]) -> None:
 def delete_finding(project_dir: Path, finding: dict) -> int:
     """Permanently suppress a finding by (dimension, principle, file).
 
-    Also removes any entries from ``dismissed.json`` that share the same
-    suppression key, so the dismissed list stays clean. Returns the number
-    of dismissed entries swept (0 if none).
+    Also undismisses any dismissed findings that share the same suppression
+    key, so the dismissed list stays clean. Returns the number of dismissed
+    entries swept (0 if none).
     """
     new_key = _key(finding)
     if not new_key[1] or not new_key[2]:
@@ -109,10 +116,13 @@ def delete_finding(project_dir: Path, finding: dict) -> int:
 def delete_all_dismissed(project_dir: Path) -> int:
     """Convert every currently-dismissed entry into a permanent suppression.
 
-    Adds a deleted entry for each unique ``(dimension, principle, file)``
-    pair found in ``dismissed.json``, then clears the dismissed list.
+    Reads dismissed findings from each run's evaluation.db, adds a deleted
+    entry for each unique ``(dimension, principle, file)`` pair, then
+    undismisses all of them via the action log.
     Returns the count of dismissed entries removed.
     """
+    from quodeq.services.dismissed import load_dismissed  # noqa: PLC0415
+
     with _locked(project_dir):
         dismissed_entries = load_dismissed(project_dir)
         if not dismissed_entries:
@@ -126,34 +136,59 @@ def delete_all_dismissed(project_dir: Path) -> int:
             existing.append(_entry_from_finding(entry))
             existing_keys.add(k)
         _write_deleted(project_dir, existing)
-        # Clear dismissed.json now that everything is permanently suppressed.
-        dismissed_path = project_dir / "dismissed.json"
+        # Undismiss all via the action log.
         count = len(dismissed_entries)
-        if dismissed_path.exists():
-            dismissed_path.unlink()
+        writer = ActionLogWriter(project_dir)
+        for entry in dismissed_entries:
+            payload = FindingUndismissed(
+                req=entry.get("req", ""),
+                file=entry.get("file", ""),
+                line=int(entry.get("line", 0)),
+            )
+            writer.emit(FindingUndismissedEvent(payload=payload))
         return count
 
 
 def _sweep_dismissed_matching(project_dir: Path, key: tuple) -> int:
-    """Remove every dismissed entry whose ``(dimension, principle, file)`` matches *key*."""
-    dismissed_path = project_dir / "dismissed.json"
-    if not dismissed_path.exists():
+    """Undismiss every dismissed finding whose ``(dimension, principle, file)`` matches *key*.
+
+    Reads from each run's evaluation.db to find dismissed findings that match
+    the deletion key, then appends FindingUndismissedEvent to actions.jsonl for each.
+    """
+    from quodeq.data.sqlite.connection import open_evaluation_db  # noqa: PLC0415
+
+    dimension, principle, file = key
+    runs_root = project_dir / "runs"
+    if not runs_root.is_dir():
         return 0
-    try:
-        entries = json.loads(dismissed_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+
+    matching: list[tuple[str, str, int]] = []
+    for run_dir in runs_root.iterdir():
+        if not run_dir.is_dir():
+            continue
+        db_path = run_dir / "evaluation.db"
+        if not db_path.is_file():
+            continue
+        try:
+            with open_evaluation_db(run_dir) as conn:
+                for row in conn.execute(
+                    "SELECT requirement, file, line FROM findings "
+                    "WHERE verdict = 'dismissed' AND dimension = ? "
+                    "AND practice_id = ? AND file = ?",
+                    (dimension, principle, file),
+                ):
+                    matching.append((row[0] or "", row[1] or "", int(row[2] or 0)))
+        except Exception:
+            continue
+
+    if not matching:
         return 0
-    if not isinstance(entries, list):
-        return 0
-    kept = [e for e in entries if _key(e) != key]
-    swept = len(entries) - len(kept)
-    if swept == 0:
-        return 0
-    if kept:
-        dismissed_path.write_text(json.dumps(kept, indent=2), encoding="utf-8")
-    else:
-        dismissed_path.unlink()
-    return swept
+
+    writer = ActionLogWriter(project_dir)
+    for req, f, line in matching:
+        payload = FindingUndismissed(req=req, file=f, line=line)
+        writer.emit(FindingUndismissedEvent(payload=payload))
+    return len(matching)
 
 
 def is_finding_deleted(

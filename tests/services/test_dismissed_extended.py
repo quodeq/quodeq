@@ -1,13 +1,15 @@
-"""Extended tests for dismissed findings — restore_all, recount_totals, filter_dismissed."""
+"""Extended tests for dismissed findings -- restore_all, recount_totals, filter_dismissed."""
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
 
+from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+from quodeq.core.events.writer import EventLogWriter
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
+from quodeq.data.projection.projector import Projector
 from quodeq.services.dismissed import (
     dismiss_finding,
     filter_dismissed_from_dimensions,
@@ -18,22 +20,52 @@ from quodeq.services.dismissed import (
 )
 
 
+def _seed_projected_run(
+    project_dir: Path,
+    run_id: str,
+    *,
+    req: str,
+    file: str,
+    line: int,
+) -> Path:
+    """Create a run with one violation finding projected into evaluation.db."""
+    run_dir = project_dir / "runs" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    log = run_dir / "events.jsonl"
+    EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+        practice_id="P1", verdict="violation", dimension="Security",
+        file=file, line=line, reason="r", req=req,
+    )))
+    Projector().project(log, run_dir)
+    return run_dir
+
+
+def _apply_actions(project_dir: Path, run_dir: Path) -> None:
+    """Re-project actions log into the given run dir."""
+    Projector().ensure_projected(
+        run_dir / "events.jsonl", run_dir, project_dir=project_dir,
+    )
+
+
 class TestRestoreAllFindings:
     def test_restore_all_returns_count(self, tmp_path):
         project_dir = tmp_path / "project"
         project_dir.mkdir()
+        r1 = _seed_projected_run(project_dir, "r1", req="A", file="a.py", line=1)
+        r2 = _seed_projected_run(project_dir, "r2", req="B", file="b.py", line=2)
         dismiss_finding(project_dir, {"req": "A", "file": "a.py", "line": 1})
         dismiss_finding(project_dir, {"req": "B", "file": "b.py", "line": 2})
+        _apply_actions(project_dir, r1)
+        _apply_actions(project_dir, r2)
         count = restore_all_findings(project_dir)
         assert count == 2
-        assert not (project_dir / "dismissed.json").exists()
 
     def test_restore_all_empty_returns_zero(self, tmp_path):
         project_dir = tmp_path / "project"
         project_dir.mkdir()
         assert restore_all_findings(project_dir) == 0
 
-    def test_restore_single_deletes_file_when_empty(self, tmp_path):
+    def test_restore_single_does_not_write_dismissed_json(self, tmp_path):
         project_dir = tmp_path / "project"
         project_dir.mkdir()
         dismiss_finding(project_dir, {"req": "A", "file": "a.py", "line": 1})
@@ -42,10 +74,9 @@ class TestRestoreAllFindings:
 
 
 class TestLoadDismissedEdgeCases:
-    def test_load_corrupt_json(self, tmp_path):
+    def test_load_returns_empty_when_no_runs(self, tmp_path):
         project_dir = tmp_path / "project"
         project_dir.mkdir()
-        (project_dir / "dismissed.json").write_text("not json")
         result = load_dismissed(project_dir)
         assert result == []
 
@@ -103,7 +134,9 @@ class TestFilterDismissedFromDimensions:
     def test_filters_dismissed_findings(self, tmp_path):
         project_dir = tmp_path / "project"
         project_dir.mkdir()
+        run_dir = _seed_projected_run(project_dir, "r1", req="A", file="a.py", line=1)
         dismiss_finding(project_dir, {"req": "A", "file": "a.py", "line": 1})
+        _apply_actions(project_dir, run_dir)
         dim = _FakeDimension(
             violations=[
                 Finding(req="A", file="a.py", line=1, severity="minor"),

@@ -23,7 +23,7 @@ def client(app):
 
 
 class TestDismissEndpoint:
-    def test_dismiss_creates_entry(self, client, tmp_path):
+    def test_dismiss_creates_actions_log(self, client, tmp_path):
         project_dir = tmp_path / "my-project"
         project_dir.mkdir()
         resp = client.post("/api/findings/dismiss", json={
@@ -33,9 +33,11 @@ class TestDismissEndpoint:
             "reason": "False positive",
         })
         assert resp.status_code == 200
-        data = json.loads((project_dir / "dismissed.json").read_text())
-        assert len(data) == 1
-        assert data[0]["req"] == "M-MOD-4"
+        log = project_dir / "actions.jsonl"
+        assert log.exists()
+        text = log.read_text()
+        assert "FINDING_DISMISSED" in text
+        assert "M-MOD-4" in text
 
     def test_dismiss_missing_fields_returns_400(self, client):
         resp = client.post("/api/findings/dismiss", json={"project": "x"})
@@ -43,7 +45,7 @@ class TestDismissEndpoint:
 
 
 class TestRestoreEndpoint:
-    def test_restore_removes_entry(self, client, tmp_path):
+    def test_restore_appends_undismiss_event(self, client, tmp_path):
         project_dir = tmp_path / "my-project"
         project_dir.mkdir()
         client.post("/api/findings/dismiss", json={
@@ -56,11 +58,15 @@ class TestRestoreEndpoint:
             "req": "M-MOD-4", "file": "foo.js", "line": 4,
         })
         assert resp.status_code == 200
+        text = (project_dir / "actions.jsonl").read_text()
+        assert "FINDING_DISMISSED" in text
+        assert "FINDING_UNDISMISSED" in text
         assert not (project_dir / "dismissed.json").exists()
 
 
 class TestListDismissedEndpoint:
-    def test_list_returns_dismissed(self, client, tmp_path):
+    def test_list_returns_empty_without_sql_projection(self, client, tmp_path):
+        # Without projection, load_dismissed returns [] since no evaluation.db rows exist.
         project_dir = tmp_path / "my-project"
         project_dir.mkdir()
         client.post("/api/findings/dismiss", json={
@@ -70,8 +76,8 @@ class TestListDismissedEndpoint:
         })
         resp = client.get("/api/findings/dismissed?project=my-project")
         assert resp.status_code == 200
-        data = resp.get_json()
-        assert len(data) == 1
+        # Action log was written but no SQL projection happened, so list is empty.
+        assert resp.get_json() == []
 
     def test_list_empty_project(self, client):
         resp = client.get("/api/findings/dismissed?project=nonexistent")

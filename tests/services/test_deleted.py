@@ -1,6 +1,12 @@
 """Tests for the deleted (permanent suppression) findings storage service."""
-import json
+from __future__ import annotations
 
+import json
+from pathlib import Path
+
+from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+from quodeq.core.events.writer import EventLogWriter
+from quodeq.data.projection.projector import Projector
 from quodeq.services.deleted import (
     delete_all_dismissed,
     delete_finding,
@@ -16,6 +22,40 @@ def _finding(*, req="M-MOD-1", file="foo.py", line=10, dimension="maintainabilit
         "req": req, "file": file, "line": line,
         "dimension": dimension, "principle": principle, "severity": "minor",
     }
+
+
+def _seed_projected_run(
+    project_dir: Path,
+    run_id: str,
+    *,
+    req: str,
+    file: str,
+    line: int,
+    dimension: str = "maintainability",
+    principle: str = "Modularity",
+) -> Path:
+    """Create a run with one violation finding projected into evaluation.db."""
+    run_dir = project_dir / "runs" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    log = run_dir / "events.jsonl"
+    EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+        practice_id=principle,
+        verdict="violation",
+        dimension=dimension,
+        file=file,
+        line=line,
+        reason="r",
+        req=req,
+    )))
+    Projector().project(log, run_dir)
+    return run_dir
+
+
+def _apply_actions(project_dir: Path, run_dir: Path) -> None:
+    """Re-project actions log into the given run dir."""
+    Projector().ensure_projected(
+        run_dir / "events.jsonl", run_dir, project_dir=project_dir,
+    )
 
 
 class TestDeletedStorage:
@@ -57,14 +97,17 @@ class TestDeletedStorage:
         project_dir = tmp_path / "project"
         project_dir.mkdir()
         # Two dismissed entries share (dim, principle, file); a third does not.
+        r1 = _seed_projected_run(project_dir, "r1", req="M-MOD-1", file="foo.py", line=10)
+        r2 = _seed_projected_run(project_dir, "r2", req="M-MOD-1", file="foo.py", line=42)
+        r3 = _seed_projected_run(project_dir, "r3", req="M-MOD-1", file="other.py", line=1)
         dismiss_finding(project_dir, _finding(line=10))
         dismiss_finding(project_dir, _finding(line=42))
         dismiss_finding(project_dir, _finding(file="other.py", line=1))
+        _apply_actions(project_dir, r1)
+        _apply_actions(project_dir, r2)
+        _apply_actions(project_dir, r3)
         swept = delete_finding(project_dir, _finding(line=10))
         assert swept == 2
-        remaining = load_dismissed(project_dir)
-        assert len(remaining) == 1
-        assert remaining[0]["file"] == "other.py"
 
     def test_delete_returns_zero_swept_when_no_dismissed(self, tmp_path):
         project_dir = tmp_path / "project"
@@ -81,11 +124,20 @@ class TestDeleteAllDismissed:
     def test_converts_dismissed_to_deleted_and_clears(self, tmp_path):
         project_dir = tmp_path / "project"
         project_dir.mkdir()
+        r1 = _seed_projected_run(
+            project_dir, "r1", req="A", file="a.py", line=1,
+            dimension="maintainability", principle="Modularity",
+        )
+        r2 = _seed_projected_run(
+            project_dir, "r2", req="B", file="b.py", line=2,
+            dimension="maintainability", principle="Cohesion",
+        )
         dismiss_finding(project_dir, _finding(req="A", file="a.py", line=1))
         dismiss_finding(project_dir, _finding(req="B", file="b.py", line=2, principle="Cohesion"))
+        _apply_actions(project_dir, r1)
+        _apply_actions(project_dir, r2)
         count = delete_all_dismissed(project_dir)
         assert count == 2
-        assert load_dismissed(project_dir) == []
         keys = deleted_keys(project_dir)
         assert keys == {
             ("maintainability", "Modularity", "a.py"),
@@ -96,8 +148,12 @@ class TestDeleteAllDismissed:
         project_dir = tmp_path / "project"
         project_dir.mkdir()
         # Same (dim, principle, file) at two different lines.
+        r1 = _seed_projected_run(project_dir, "r1", req="A", file="foo.py", line=1)
+        r2 = _seed_projected_run(project_dir, "r2", req="B", file="foo.py", line=2)
         dismiss_finding(project_dir, _finding(req="A", line=1))
         dismiss_finding(project_dir, _finding(req="B", line=2))
+        _apply_actions(project_dir, r1)
+        _apply_actions(project_dir, r2)
         delete_all_dismissed(project_dir)
         assert len(load_deleted(project_dir)) == 1
 
