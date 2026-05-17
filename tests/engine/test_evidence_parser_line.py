@@ -69,7 +69,7 @@ class TestParseJsonlLine:
         result = _parse_jsonl_line(_evidence_line(req_refs=refs))
         assert result is not None
         j, llm_refs = result
-        assert j.req_refs == refs
+        assert [{"label": r.label, "url": r.url} for r in j.req_refs] == refs
         assert llm_refs is None  # no LLM refs field
 
     def test_pre_resolved_req_refs_empty_list_ignored(self):
@@ -77,4 +77,4 @@ class TestParseJsonlLine:
         result = _parse_jsonl_line(_evidence_line(req_refs=[]))
         assert result is not None
         j, _ = result
-        assert j.req_refs is None  # not set
+        assert j.req_refs == []

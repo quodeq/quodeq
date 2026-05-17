@@ -140,7 +140,7 @@ def _read_dim_eval(run_dir: Path, dimension: str) -> dict[str, Any] | None:
 
 
 def _payload_as_sse_finding(payload: Any, finding_id: int) -> dict[str, Any]:
-    """Project a JudgmentPayload into the finding dict the SSE client expects."""
+    """Project a Judgment into the finding dict the SSE client expects."""
     return {
         "id": finding_id,
         "practice_id": payload.practice_id,

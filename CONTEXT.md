@@ -18,8 +18,11 @@ The mutable, consolidated projection of the Event Log. It represents the "curren
 A specific axis of evaluation (e.g., Security, Reliability, Maintainability) based on ISO 25010.
 _Avoid_: Error, bug.
 
+**Judgment**:
+What the LLM produced about a single piece of code. Immutable, recorded in the Event Log. The canonical type. Verdict is "violation" or "compliance".
+
 **Finding/Violation**:
-An instance where the code fails to meet a requirement of a dimension, mapped to a CWE.
+A **Judgment** as the service layer sees it, after user preferences (dismiss/delete) and confidence enrichment apply. Verdict may additionally be "dismissed".
 _Avoid_: Error, bug.
 
 **Run**:

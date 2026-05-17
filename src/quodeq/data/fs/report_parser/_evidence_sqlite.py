@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from quodeq.core.finding_mappings import finding_to_response_dict
 from quodeq.data.fs.report_parser._date_utils import find_date_in_dir, normalize_date
 from quodeq.data.fs.report_parser._run_info import safe_read_dir
 from quodeq.data.sqlite.connection import EVALUATION_DB_FILENAME
@@ -73,8 +74,8 @@ def load_evidence_map_from_db(run_dir: Path) -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
     for dimension in counts:
         judgments = repo.list_by_dimension(dimension)
-        violations = [_judgment_to_finding_dict(j) for j in judgments if j.verdict == "violation"]
-        compliance = [_judgment_to_finding_dict(j) for j in judgments if j.verdict == "compliance"]
+        violations = [finding_to_response_dict(j) for j in judgments if j.verdict == "violation"]
+        compliance = [finding_to_response_dict(j) for j in judgments if j.verdict == "compliance"]
         principles: dict[str, dict[str, Any]] = {}
         for j in judgments:
             entry = principles.setdefault(j.practice_id, {
@@ -83,7 +84,7 @@ def load_evidence_map_from_db(run_dir: Path) -> dict[str, dict[str, Any]]:
                 "compliance": [],
             })
             target = entry["violations"] if j.verdict == "violation" else entry["compliance"]
-            target.append(_judgment_to_finding_dict(j))
+            target.append(finding_to_response_dict(j))
         result[dimension] = {
             "dimension": dimension,
             "principles": principles,
@@ -94,20 +95,3 @@ def load_evidence_map_from_db(run_dir: Path) -> dict[str, dict[str, Any]]:
             "discipline": run_metadata["discipline"],
         }
     return result
-
-
-def _judgment_to_finding_dict(j) -> dict[str, Any]:
-    req_refs = [{"label": r.label, "url": r.url} for r in j.req_refs] if j.req_refs else None
-    return {
-        "practice_id": j.practice_id,
-        "file": j.file,
-        "line": j.line,
-        "end_line": j.end_line,
-        "snippet": j.snippet,
-        "verdict": j.verdict,
-        "severity": j.severity,
-        "reason": j.reason,
-        "title": j.title,
-        "req": j.req,
-        "req_refs": req_refs,
-    }
