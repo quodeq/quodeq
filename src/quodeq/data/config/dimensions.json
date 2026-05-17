@@ -1,4 +1,5 @@
 {
+  "_note": "The per-dimension 'weight' field is declared but NOT yet applied to scoring. Both aggregation paths (legacy summarize_dimensions and SQL compute_run_score) take a plain unweighted mean of dimension scores. The values here are aspirational, retained for a future weighted-aggregation feature. See docs/adr/0001-dimension-level-weighting-not-yet-applied.md.",
   "applies": [
     {
       "id": "security",
