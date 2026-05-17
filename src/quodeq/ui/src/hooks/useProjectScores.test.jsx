@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { useProjectScores } from "./useProjectScores";
 import { withQueryClient } from "../test-utils/withQueryClient.jsx";
+import { getProjectScores } from "../api/index.js";
 
 vi.mock("../api/index.js", () => ({
   getProjectScores: vi.fn(async (project, asOf) => {
@@ -9,16 +10,26 @@ vi.mock("../api/index.js", () => ({
       return {
         accumulated: { score: 80 },
         trend: [{ runId: asOf }],
-        availableRuns: [],
+        availableRuns: [
+          { runId: "r9", status: "complete" },
+          { runId: "r1", status: "complete" },
+        ],
       };
     }
     return {
       accumulated: { score: 90 },
       trend: [],
-      availableRuns: [{ runId: "r1" }],
+      availableRuns: [
+        { runId: "r9", status: "complete" },
+        { runId: "r1", status: "complete" },
+      ],
     };
   }),
 }));
+
+beforeEach(() => {
+  getProjectScores.mockClear();
+});
 
 describe("useProjectScores", () => {
   it("returns null when project is empty", () => {
@@ -47,8 +58,69 @@ describe("useProjectScores", () => {
       { wrapper: withQueryClient() },
     );
     await waitFor(() => {
-      expect(result.current.availableRuns).toEqual([{ runId: "r1" }]);
+      expect(result.current.availableRuns.map((r) => r.runId)).toEqual(["r9", "r1"]);
     });
+  });
+
+  it("falls back to latest when selectedRun points at an in_progress run", async () => {
+    // Latest query returns availableRuns marking r_running as in_progress; the
+    // scoped query should NOT request asOf=r_running (would leak partial dims
+    // into Overview while the eval is alive). It re-uses the latest payload.
+    getProjectScores.mockImplementation(async (project, asOf) => ({
+      accumulated: { score: asOf ? 80 : 90 },
+      trend: [],
+      availableRuns: [
+        { runId: "r_running", status: "in_progress" },
+        { runId: "r_done", status: "complete" },
+      ],
+    }));
+    const { result } = renderHook(
+      () => useProjectScores({ selectedProject: "p1", selectedRun: "r_running" }),
+      { wrapper: withQueryClient() },
+    );
+    await waitFor(() => {
+      expect(result.current.scores?.accumulated?.score).toBe(90);
+    });
+    // Confirm the scoped call was never issued with asOf=r_running.
+    const asOfArgs = getProjectScores.mock.calls.map((c) => c[1]);
+    expect(asOfArgs).not.toContain("r_running");
+  });
+
+  it("falls back to latest when selectedRun is unknown (not in availableRuns)", async () => {
+    getProjectScores.mockImplementation(async (project, asOf) => ({
+      accumulated: { score: asOf ? 80 : 90 },
+      trend: [],
+      availableRuns: [{ runId: "r_done", status: "complete" }],
+    }));
+    const { result } = renderHook(
+      () => useProjectScores({ selectedProject: "p1", selectedRun: "r_ghost" }),
+      { wrapper: withQueryClient() },
+    );
+    await waitFor(() => {
+      expect(result.current.scores?.accumulated?.score).toBe(90);
+    });
+    const asOfArgs = getProjectScores.mock.calls.map((c) => c[1]);
+    expect(asOfArgs).not.toContain("r_ghost");
+  });
+
+  it("still scopes the query when selectedRun is a known completed run", async () => {
+    getProjectScores.mockImplementation(async (project, asOf) => ({
+      accumulated: { score: asOf ? 80 : 90 },
+      trend: [],
+      availableRuns: [
+        { runId: "r_done", status: "complete" },
+        { runId: "r_old", status: "complete" },
+      ],
+    }));
+    const { result } = renderHook(
+      () => useProjectScores({ selectedProject: "p1", selectedRun: "r_old" }),
+      { wrapper: withQueryClient() },
+    );
+    await waitFor(() => {
+      expect(result.current.scores?.accumulated?.score).toBe(80);
+    });
+    const asOfArgs = getProjectScores.mock.calls.map((c) => c[1]);
+    expect(asOfArgs).toContain("r_old");
   });
 
 });
