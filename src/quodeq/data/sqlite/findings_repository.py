@@ -52,7 +52,7 @@ class SqliteFindingsRepository:
 
     def _ensure_fresh(self) -> None:
         if self._events_log.is_file():
-            project_dir = self._run_dir.parent.parent
+            project_dir = self._run_dir.parent
             self._projector.ensure_projected(
                 self._events_log,
                 self._run_dir,

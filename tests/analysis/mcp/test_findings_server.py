@@ -29,13 +29,13 @@ def test_build_router_loads_precedent_fingerprints_from_project_dir(tmp_path: Pa
     from quodeq.services.dismissed import dismiss_finding
 
     # The project layout expected by _build_router:
-    # project_dir/runs/<run_id>/ -- for dismissed_keys / load_precedent_fingerprints
+    # project_dir/<run_id>/ -- for dismissed_keys / load_precedent_fingerprints
     # project_dir/<run_name>/evidence/<dim>_evidence.jsonl -- for the MCP server path
     project_dir = tmp_path / "project"
     project_dir.mkdir()
 
-    # Seed a finding in a named run under project_dir/runs/ so SQL has a dismissed row.
-    run_dir = project_dir / "runs" / "r1"
+    # Seed a finding in a named run under project_dir/ so SQL has a dismissed row.
+    run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
     log = run_dir / "events.jsonl"
     EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(

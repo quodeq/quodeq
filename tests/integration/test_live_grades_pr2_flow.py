@@ -12,7 +12,7 @@ from quodeq.services.dismissed import dismiss_finding
 
 def test_full_grade_flow(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
-    run_dir = project_dir / "runs" / "r1"
+    run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
 
     # Two findings in Security (varied severity), one in Reliability.

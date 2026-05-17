@@ -264,9 +264,9 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
         current_fingerprint = repr(rows) if rows else None
         if current_fingerprint != state.last_grade_fingerprint:
             from quodeq.services.scoring import get_scores_raw  # noqa: PLC0415
-            # run_dir layout: <reports_root>/<project>/runs/<run_id>
-            reports_root = run_dir.parent.parent.parent
-            project = run_dir.parent.parent.name
+            # run_dir layout: <reports_root>/<project>/<run_id>
+            reports_root = run_dir.parent.parent
+            project = run_dir.parent.name
             run_id = run_dir.name
             payload = get_scores_raw(reports_root, project, run_id)
             grade_event = ("scores.updated", serialize_scores_updated_event(payload), None)

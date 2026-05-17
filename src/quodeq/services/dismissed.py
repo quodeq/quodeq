@@ -44,12 +44,11 @@ def restore_finding(project_dir: Path, finding: dict) -> None:
 
 def dismissed_keys(project_dir: Path) -> set[tuple]:
     """Aggregate dismissed (req, file, line) keys across all run DBs under project_dir."""
-    runs_root = project_dir / "runs"
-    if not runs_root.is_dir():
+    if not project_dir.is_dir():
         return set()
 
     keys: set[tuple] = set()
-    for run_dir in runs_root.iterdir():
+    for run_dir in project_dir.iterdir():
         if not run_dir.is_dir():
             continue
         db_path = run_dir / "evaluation.db"
@@ -76,11 +75,10 @@ def load_dismissed(
 
     Reads from each run's evaluation.db, aggregated across all runs.
     """
-    runs_root = project_dir / "runs"
-    if not runs_root.is_dir():
+    if not project_dir.is_dir():
         return []
     items: list[dict] = []
-    for run_dir in runs_root.iterdir():
+    for run_dir in project_dir.iterdir():
         if not run_dir.is_dir():
             continue
         db_path = run_dir / "evaluation.db"

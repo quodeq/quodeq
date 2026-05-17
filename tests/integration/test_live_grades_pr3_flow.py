@@ -13,7 +13,7 @@ from quodeq.services.dismissed import dismiss_finding
 
 def test_dismiss_triggers_scores_updated_on_next_tick(tmp_path: Path) -> None:
     project_dir = tmp_path / "myproject"
-    run_dir = project_dir / "runs" / "r1"
+    run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
 
     # Seed a finding.
@@ -46,7 +46,7 @@ def test_dismiss_triggers_scores_updated_on_next_tick(tmp_path: Path) -> None:
 def test_grade_no_change_does_not_emit_scores_updated(tmp_path: Path) -> None:
     """Ticks without grade changes do not emit scores.updated."""
     project_dir = tmp_path / "myproject"
-    run_dir = project_dir / "runs" / "r1"
+    run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
 
     # Seed two findings with critical and low severities in separate dimensions.

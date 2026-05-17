@@ -511,7 +511,7 @@ class TestDashboardSqlGradeOverride:
 
         project = "myproject"
         run_id = "r1"
-        run_dir = tmp_path / project / "runs" / run_id
+        run_dir = tmp_path / project / run_id
         run_dir.mkdir(parents=True)
 
         # Seed SQL grade tables with a post-dismissal grade.
@@ -555,7 +555,7 @@ class TestDashboardSqlGradeOverride:
 
         project = "myproject"
         run_id = "r1"
-        run_dir = tmp_path / project / "runs" / run_id
+        run_dir = tmp_path / project / run_id
         run_dir.mkdir(parents=True)
         # No SQL rows seeded — grade tables are empty.
 
@@ -617,7 +617,7 @@ class TestDashboardSqlGradeOverride:
 
         project = "myproject"
         run_id = "r1"
-        run_dir = tmp_path / project / "runs" / run_id
+        run_dir = tmp_path / project / run_id
         run_dir.mkdir(parents=True)
 
         store = SQLiteStateStore(run_dir)
@@ -666,7 +666,7 @@ class TestDashboardSqlGradeOverride:
         project = "myproject"
         run_id = "r1"
         project_dir = tmp_path / project
-        run_dir = project_dir / "runs" / run_id
+        run_dir = project_dir / run_id
         run_dir.mkdir(parents=True)
 
         # Seed 3 findings: 2 in Security (varied severity), 1 in Reliability.
@@ -737,16 +737,16 @@ class TestDashboardSqlGradeOverride:
                 f"scores={scores_dims[dim_name]['overallScore']}"
             )
 
-    def test_dashboard_override_fires_with_runs_subdir(
+    def test_dashboard_override_fires_with_flat_run_layout(
         self, tmp_path: Path,
     ) -> None:
         """Regression guard: _apply_sql_grade_override must resolve the run
-        directory as reports_root / project / 'runs' / run_id, not the old
-        (wrong) reports_root / project / run_id path.
+        directory as reports_root / project / run_id (the production layout).
 
-        If the path were wrong, the 'not run_dir.is_dir()' guard would bail out
-        and the SQL override would silently never fire — the dashboard would
-        return the stale FS grade instead of the SQL-backed grade.
+        Earlier code mistakenly inserted a `runs/` segment, so the
+        ``not run_dir.is_dir()`` guard always bailed out and the SQL override
+        silently never fired — the dashboard returned the stale FS grade
+        instead of the SQL-backed grade.
         """
         from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
         from quodeq.core.events.writer import EventLogWriter
@@ -755,8 +755,8 @@ class TestDashboardSqlGradeOverride:
 
         project = "myproject"
         run_id = "r1"
-        # Correct path: reports_root / project / "runs" / run_id
-        run_dir = tmp_path / project / "runs" / run_id
+        # Production layout: reports_root / project / run_id (no `runs/` segment).
+        run_dir = tmp_path / project / run_id
         run_dir.mkdir(parents=True)
 
         # Seed one finding so the projector creates grade tables.

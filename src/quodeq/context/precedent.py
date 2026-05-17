@@ -51,9 +51,9 @@ def fingerprint(req: str | None, snippet: str | None) -> str | None:
 def load_precedent_fingerprints(project_dir: Path) -> set[str]:
     """Load fingerprints for every dismissed finding in *project_dir*.
 
-    Aggregates across ``runs/<run_id>/evaluation.db``. Missing or locked DBs
-    are skipped -- precedent matching degrades gracefully and never breaks a
-    scan.
+    Aggregates across ``<run_id>/evaluation.db`` under *project_dir*. Missing
+    or locked DBs are skipped -- precedent matching degrades gracefully and
+    never breaks a scan.
 
     Legacy note: prior to PR 1 (live-grades), dismissals were stored in
     ``<project_dir>/dismissed.json``. The migration in
@@ -63,12 +63,9 @@ def load_precedent_fingerprints(project_dir: Path) -> set[str]:
     """
     if not project_dir or not project_dir.is_dir():
         return set()
-    runs_root = project_dir / "runs"
-    if not runs_root.is_dir():
-        return set()
 
     out: set[str] = set()
-    for run_dir in runs_root.iterdir():
+    for run_dir in project_dir.iterdir():
         if not run_dir.is_dir():
             continue
         db_path = run_dir / "evaluation.db"

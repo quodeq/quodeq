@@ -22,6 +22,26 @@ def test_get_log_run_dir_external_not_found(tmp_path: Path) -> None:
     assert provider.get_log_run_dir("ext-run-nonexistent") is None
 
 
+def test_get_log_run_dir_bare_run_id_falls_back_to_filesystem(tmp_path: Path) -> None:
+    """A bare run_id (no ext- prefix, no job entry) must still resolve.
+
+    The UI subscribes to the per-run SSE stream using the plain run UUID. For
+    completed runs without an active job entry, falling back to a filesystem
+    scan keeps live-grade updates working.
+    """
+    project = tmp_path / "proj-1"
+    run = project / "run-A"
+    run.mkdir(parents=True)
+    (run / "evidence").mkdir()
+    provider = FilesystemActionProvider(reports_root=tmp_path)
+    assert provider.get_log_run_dir("run-A") == run
+
+
+def test_get_log_run_dir_bare_run_id_unknown_returns_none(tmp_path: Path) -> None:
+    provider = FilesystemActionProvider(reports_root=tmp_path)
+    assert provider.get_log_run_dir("run-nonexistent") is None
+
+
 def test_is_job_complete_external_when_scan_present(tmp_path: Path) -> None:
     project = tmp_path / "p"
     run = project / "r"

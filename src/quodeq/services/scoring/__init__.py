@@ -244,7 +244,7 @@ def get_scores_raw(
     Reads from SQL grade tables after projection. Returns an empty shape when
     grade tables are empty (run not yet projected or has no findings).
     """
-    run_dir = reports_root / project / "runs" / run_id
+    run_dir = reports_root / project / run_id
     if not run_dir.is_dir():
         raise FileNotFoundError(f"Run directory not found: {run_dir}")
 

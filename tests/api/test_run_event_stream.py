@@ -319,7 +319,7 @@ from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 def _seed_run_with_finding(tmp_path: Path) -> tuple[Path, Path]:
     """Create a minimal run dir with one finding and trigger initial projection."""
     project_dir = tmp_path / "myproject"
-    run_dir = project_dir / "runs" / "r1"
+    run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
     EventLogWriter(run_dir / "events.jsonl").emit(JudgmentCreatedEvent(payload=JudgmentPayload(
         practice_id="P1", verdict="violation", dimension="Security",
@@ -375,7 +375,7 @@ def test_compute_tick_emits_scores_updated_after_dismiss(tmp_path: Path) -> None
 def test_compute_tick_no_scores_event_when_no_grades_table(tmp_path: Path) -> None:
     """When the run has no projected grades (no findings, no DB), no scores.updated emits."""
     project_dir = tmp_path / "myproject"
-    run_dir = project_dir / "runs" / "r1"
+    run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
     # No events.jsonl at all -- empty run_dir.
     state = WatcherState()

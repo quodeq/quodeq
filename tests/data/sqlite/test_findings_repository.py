@@ -143,7 +143,7 @@ def test_read_skips_ensure_when_no_event_log(tmp_path: Path):
 
 def test_repo_reads_reflect_dismissal_via_actions_log(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
-    run_dir = project_dir / "runs" / "r1"
+    run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
     events_log = run_dir / "events.jsonl"
 

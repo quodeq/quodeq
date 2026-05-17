@@ -181,26 +181,41 @@ class EvaluationsIndex:
             db.close()
 
     def get_log_run_dir(self, job_id: str) -> Path | None:
-        """Return the run_dir for *job_id*, or None if unknown."""
-        if job_id.startswith("ext-"):
-            run_id = job_id[len("ext-"):]
-            reports_root = self._resolve_reports_root()
-            if reports_root is None or not reports_root.is_dir():
-                return None
-            for project_dir in reports_root.iterdir():
-                if not project_dir.is_dir():
-                    continue
-                candidate = project_dir / run_id
-                if candidate.is_dir():
-                    return candidate
-            return None
-        snapshot = self._jobs.get_job(job_id)
-        if snapshot is None or snapshot.output_project is None or snapshot.output_run_id is None:
-            return None
+        """Return the run_dir for *job_id*, or None if unknown.
+
+        Accepts either a bare run_id ("d5b8a421-...") or an "ext-<run_id>"
+        form. For active jobs we look up output_project/output_run_id via the
+        jobs index (efficient); for completed runs without a job entry we fall
+        back to a filesystem scan so the SSE endpoint keeps working for any
+        run that exists on disk.
+        """
+        run_id = job_id[len("ext-"):] if job_id.startswith("ext-") else job_id
+
+        # Active-job fast path: trust the jobs index when present.
+        if not job_id.startswith("ext-"):
+            snapshot = self._jobs.get_job(job_id)
+            if (
+                snapshot is not None
+                and snapshot.output_project is not None
+                and snapshot.output_run_id is not None
+            ):
+                reports_root = self._resolve_reports_root()
+                if reports_root is not None:
+                    candidate = reports_root / snapshot.output_project / snapshot.output_run_id
+                    if candidate.is_dir():
+                        return candidate
+
+        # Filesystem fallback: scan reports_root for <project>/<run_id>/.
         reports_root = self._resolve_reports_root()
-        if reports_root is None:
+        if reports_root is None or not reports_root.is_dir():
             return None
-        return reports_root / snapshot.output_project / snapshot.output_run_id
+        for project_dir in reports_root.iterdir():
+            if not project_dir.is_dir():
+                continue
+            candidate = project_dir / run_id
+            if candidate.is_dir():
+                return candidate
+        return None
 
     def rebuild(self, reports_root: Path | None = None) -> tuple[int, int]:
         """Rebuild the index from scratch by walking *reports_root*.
