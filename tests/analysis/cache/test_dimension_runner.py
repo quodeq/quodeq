@@ -339,12 +339,12 @@ class TestNoSourceFiles:
 
 
 class TestWiring:
-    def test_process_single_dimension_routes_to_cache_runner(
+    def test_dimension_runner_routes_to_cache_runner(
         self, tmp_path: Path,
     ):
-        """V2 is the canonical path: _process_single_dimension always
-        routes through process_dimension_with_cache."""
-        from quodeq.analysis._dimension_ops import _process_single_dimension
+        """V2 is the canonical path: DimensionRunner.run always routes
+        through process_dimension_with_cache."""
+        from quodeq.analysis.dimension_runner import DimensionRunner
 
         config, src = _setup(tmp_path, {"a.py": "x"})
 
@@ -357,7 +357,7 @@ class TestWiring:
             "quodeq.analysis.dimension_runner.process_dimension_with_cache",
             new=fake_cache,
         ):
-            _process_single_dimension(config, "security", 1, _make_ctx(), emit_log=False)
+            DimensionRunner().run(config, "security", 1, _make_ctx(), emit_log=False)
 
         assert called["hit"] is True
 

@@ -1,9 +1,9 @@
 """Runner — public façade for the analysis pipeline.
 
 Implementation modules:
-  _dimension_steps.py — prompt building, AI execution, evidence parsing
-  _dimension_ops.py   — single-dimension orchestration and caching
-  _pipeline.py        — cross-dimension orchestration and merging
+  _dimension_steps.py  — prompt building, AI execution, evidence parsing
+  dimension_runner.py  — single-dimension orchestration (DimensionRunner)
+  _pipeline.py         — cross-dimension orchestration and merging
 """
 from __future__ import annotations
 

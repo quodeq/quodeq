@@ -178,10 +178,10 @@ class TestDryRunPipeline:
         )
 
     def test_no_ai_calls_made(self, tmp_path):
-        """Dry-run should never invoke _process_single_dimension or any AI runner."""
+        """Dry-run should never construct a DimensionRunner or invoke any AI runner."""
         config = self._make_config(tmp_path)
 
-        with patch("quodeq.analysis._pipeline._process_single_dimension") as mock_proc, \
+        with patch("quodeq.analysis._pipeline.DimensionRunner") as mock_runner_cls, \
              patch("quodeq.analysis._pipeline.emit_marker"), \
              patch("quodeq.analysis._pipeline.load_analysis_context") as mock_ctx:
             dims = ["security", "reliability"]
@@ -192,7 +192,7 @@ class TestDryRunPipeline:
             from quodeq.analysis._pipeline import run_per_dimension
             result = run_per_dimension(config)
 
-        mock_proc.assert_not_called()
+        mock_runner_cls.assert_not_called()
         assert set(result.keys()) == {"security", "reliability"}
 
     def test_returns_evidence_per_dimension(self, tmp_path):
