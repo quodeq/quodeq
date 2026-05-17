@@ -1,4 +1,4 @@
-"""Tests for quodeq.provider.accumulated — cross-run aggregation logic."""
+"""Tests for quodeq.services.accumulated — cross-run aggregation logic."""
 from __future__ import annotations
 
 import json
