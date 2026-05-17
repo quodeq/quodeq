@@ -48,13 +48,11 @@ function wrapper({ children }) {
 // EventSource / flag lifecycle
 // ---------------------------------------------------------------------------
 
-describe('usePrincipleData with VITE_USE_LIVE_GRADES', () => {
+describe('usePrincipleData', () => {
   let originalEventSource;
-  let originalFlag;
 
   beforeEach(() => {
     originalEventSource = global.EventSource;
-    originalFlag = import.meta.env.VITE_USE_LIVE_GRADES;
     global.EventSource = MockEventSource;
     MockEventSource.last = null;
     getRunScoresMock.mockClear();
@@ -62,23 +60,17 @@ describe('usePrincipleData with VITE_USE_LIVE_GRADES', () => {
 
   afterEach(() => {
     global.EventSource = originalEventSource;
-    import.meta.env.VITE_USE_LIVE_GRADES = originalFlag;
     vi.clearAllMocks();
   });
 
-  // -------------------------------------------------------------------------
-  // Test 1: flag ON — handleDismiss must NOT call getRunScores
-  // -------------------------------------------------------------------------
-  it('does NOT call getRunScores after dismiss when flag is on', async () => {
-    import.meta.env.VITE_USE_LIVE_GRADES = 'true';
-
+  it('does NOT call getRunScores after dismiss', async () => {
     const onDismiss = vi.fn();
     const { result } = renderHook(
       () => usePrincipleData(EVAL_PRINCIPAL, null, onDismiss),
       { wrapper },
     );
 
-    // Wait for the hook to stabilise (EventSource created when flag is on).
+    // Wait for the hook to stabilise (EventSource created by useGradeStream).
     await waitFor(() => expect(MockEventSource.last).not.toBeNull());
 
     await act(async () => {
@@ -90,33 +82,7 @@ describe('usePrincipleData with VITE_USE_LIVE_GRADES', () => {
     expect(getRunScoresMock).not.toHaveBeenCalled();
   });
 
-  // -------------------------------------------------------------------------
-  // Test 2: flag OFF — handleDismiss MUST call getRunScores
-  // -------------------------------------------------------------------------
-  it('DOES call getRunScores after dismiss when flag is off', async () => {
-    import.meta.env.VITE_USE_LIVE_GRADES = 'false';
-
-    const onDismiss = vi.fn();
-    const { result } = renderHook(
-      () => usePrincipleData(EVAL_PRINCIPAL, null, onDismiss),
-      { wrapper },
-    );
-
-    await act(async () => {
-      result.current.handleDismiss({ file: 'a.py', line: 10, principle: 'Input Validation' });
-    });
-
-    // getRunScores must have been called once for the post-dismiss refetch.
-    await waitFor(() => expect(getRunScoresMock).toHaveBeenCalledTimes(1));
-    expect(getRunScoresMock).toHaveBeenCalledWith('proj', 'r1');
-  });
-
-  // -------------------------------------------------------------------------
-  // Test 3: flag ON — SSE payload folds into liveScore / liveGrade
-  // -------------------------------------------------------------------------
-  it('updates liveScore and liveGrade from useGradeStream payload when flag is on', async () => {
-    import.meta.env.VITE_USE_LIVE_GRADES = 'true';
-
+  it('updates liveScore and liveGrade from useGradeStream payload', async () => {
     const { result } = renderHook(
       () => usePrincipleData(EVAL_PRINCIPAL, null, vi.fn()),
       { wrapper },

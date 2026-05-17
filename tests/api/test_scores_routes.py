@@ -1,7 +1,7 @@
 """Tests for /api/projects/<project>/scores/<run_id> (SQL-backed path).
 
 Verifies that get_scores_raw reads from the SQL grade tables after projection,
-and only falls back to the legacy in-memory rescore when grade tables are empty.
+and returns an empty shape when grade tables are empty (unprojected run).
 """
 from __future__ import annotations
 
@@ -80,20 +80,15 @@ def test_get_scores_raw_uses_sql_when_grades_present(tmp_path: Path, monkeypatch
     assert "summary" in result
 
 
-def test_get_scores_raw_falls_back_to_legacy_when_grades_empty(tmp_path: Path) -> None:
-    """If grade tables are empty (unprojected run), fallback to legacy path."""
+def test_get_scores_raw_returns_empty_shape_when_no_findings(tmp_path: Path) -> None:
+    """When a run has no findings, get_scores_raw returns the empty shape."""
     run_dir = tmp_path / "myproject" / "runs" / "r1"
     run_dir.mkdir(parents=True)
-    log = run_dir / "events.jsonl"
-    # Write a violation but do NOT project (so grade tables remain empty).
-    EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
-        **_DEFAULT_VIOLATION,
-    )))
+    # Create an empty events log (no findings emitted).
+    (run_dir / "events.jsonl").touch()
 
-    # The legacy path reads JSONL directly via get_run_dimensions; it should
-    # not raise even without an evaluation.db.
     result = get_scores_raw(tmp_path, "myproject", "r1")
-    assert "dimensions" in result or result == {"dimensions": [], "summary": {}}
+    assert result == {"dimensions": [], "summary": {}}
 
 
 def test_get_scores_raw_raises_file_not_found_for_missing_run(tmp_path: Path) -> None:

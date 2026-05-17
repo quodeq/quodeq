@@ -36,6 +36,19 @@ function wrap(children) {
   );
 }
 
+// useGradeStream always subscribes (no flag gate), so every test that resolves
+// a runId will open an EventSource. Install MockEventSource globally so jsdom
+// doesn't error on the real EventSource constructor.
+let originalEventSource;
+beforeEach(() => {
+  originalEventSource = global.EventSource;
+  MockEventSource.last = null;
+  global.EventSource = MockEventSource;
+});
+afterEach(() => {
+  global.EventSource = originalEventSource;
+});
+
 describe("useDashboard", () => {
   it("returns nulls when project is empty", () => {
     const { result } = renderHook(
@@ -67,23 +80,7 @@ describe("useDashboard", () => {
   });
 });
 
-describe("useDashboard — live grades (VITE_USE_LIVE_GRADES=true)", () => {
-  let originalEventSource;
-  let originalFlag;
-
-  beforeEach(() => {
-    originalEventSource = global.EventSource;
-    originalFlag = import.meta.env.VITE_USE_LIVE_GRADES;
-    MockEventSource.last = null;
-    global.EventSource = MockEventSource;
-    import.meta.env.VITE_USE_LIVE_GRADES = "true";
-  });
-
-  afterEach(() => {
-    global.EventSource = originalEventSource;
-    import.meta.env.VITE_USE_LIVE_GRADES = originalFlag;
-  });
-
+describe("useDashboard — live grades", () => {
   it("subscribes to useGradeStream once the dashboard runId is known", async () => {
     const { result } = renderHook(
       () => useDashboard({ selectedProject: "p1", selectedRun: "r1" }),
@@ -93,16 +90,6 @@ describe("useDashboard — live grades (VITE_USE_LIVE_GRADES=true)", () => {
     await waitFor(() => expect(result.current.dashboard).not.toBeNull());
     expect(MockEventSource.last).not.toBeNull();
     expect(MockEventSource.last.url).toBe("/api/evaluations/r1/events");
-  });
-
-  it("does not subscribe when flag is off", async () => {
-    import.meta.env.VITE_USE_LIVE_GRADES = "false";
-    const { result } = renderHook(
-      () => useDashboard({ selectedProject: "p1", selectedRun: "r1" }),
-      { wrapper: ({ children }) => wrap(children) },
-    );
-    await waitFor(() => expect(result.current.dashboard).not.toBeNull());
-    expect(MockEventSource.last).toBeNull();
   });
 
   it("updates dashboard.dimensions grades when scores.updated SSE arrives", async () => {
