@@ -482,3 +482,166 @@ class TestStaleCacheSelfHeal:
         assert read_calls == [], (
             f"expected no disk reads (cache hit), got {read_calls}"
         )
+
+
+# ============================================================
+# SQL grade override: Overview parity with Standard Detail
+# ============================================================
+
+
+class TestDashboardSqlGradeOverride:
+    """The dashboard must read dimension grades from the SQL grade tables
+    when they are available, not from the on-disk evaluation JSON.
+
+    This is the fix for the Overview/Standard-detail divergence: the /scores
+    endpoint reads from SQL (dismissals applied), but the old dashboard read
+    from FS files (dismissals ignored). After _apply_sql_grade_override,
+    both endpoints use the same source of truth.
+    """
+
+    def test_dashboard_overrides_grades_from_sql_when_tables_populated(
+        self, tmp_path: Path,
+    ) -> None:
+        """When SQL grade tables have data, the dashboard's per-dimension
+        overallScore and overallGrade must come from SQL, not the FS value."""
+        from pathlib import Path as P
+
+        from quodeq.data.sqlite.state_store import SQLiteStateStore
+        from quodeq.data.fs.report_parser import RunInfo as _RI
+
+        project = "myproject"
+        run_id = "r1"
+        run_dir = tmp_path / project / run_id
+        run_dir.mkdir(parents=True)
+
+        # Seed SQL grade tables with a post-dismissal grade.
+        # Score 7.5 -> "Good" (threshold: 7=Good, 9=Exemplary).
+        store = SQLiteStateStore(run_dir)
+        store.record_dimension_score(dimension="Security", score=7.5, grade="Good")
+
+        # FS-based DimensionResult has a bad pre-dismissal grade.
+        fs_dim = DimensionResult(
+            dimension="Security", overall_grade="Critical", overall_score="2.0",
+        )
+        summary = DimensionSummary(dimensions_count=1, overall_grade="Critical", numeric_average=2.0)
+
+        with (
+            patch(
+                "quodeq.services.dashboard.list_runs",
+                return_value=[_RI(run_id=run_id, date_iso="2024-01-01", date_label="2024-01-01")],
+            ),
+            patch("quodeq.services.dashboard.read_run_data", return_value=[fs_dim]),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), project, run_id)
+
+        dims = result["dimensions"]
+        assert len(dims) == 1
+        sec = dims[0]
+        # Dashboard must reflect SQL grade (post-dismissal), not FS grade.
+        assert sec["overallGrade"] == "Good", (
+            f"Expected SQL grade 'Good', got {sec['overallGrade']!r} (FS would be 'Critical')"
+        )
+        assert sec["overallScore"] == "7.5/10", (
+            f"Expected SQL score '7.5/10', got {sec['overallScore']!r}"
+        )
+
+    def test_dashboard_falls_back_to_fs_when_sql_tables_empty(
+        self, tmp_path: Path,
+    ) -> None:
+        """When SQL grade tables are empty (run not yet projected), the
+        dashboard must fall back to the FS-based grades without raising."""
+        from quodeq.data.fs.report_parser import RunInfo as _RI
+
+        project = "myproject"
+        run_id = "r1"
+        run_dir = tmp_path / project / run_id
+        run_dir.mkdir(parents=True)
+        # No SQL rows seeded — grade tables are empty.
+
+        fs_dim = DimensionResult(
+            dimension="Security", overall_grade="A", overall_score="9.0",
+        )
+        summary = DimensionSummary(dimensions_count=1, overall_grade="A", numeric_average=9.0)
+
+        with (
+            patch(
+                "quodeq.services.dashboard.list_runs",
+                return_value=[_RI(run_id=run_id, date_iso="2024-01-01", date_label="2024-01-01")],
+            ),
+            patch("quodeq.services.dashboard.read_run_data", return_value=[fs_dim]),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), project, run_id)
+
+        sec = result["dimensions"][0]
+        assert sec["overallGrade"] == "A", (
+            f"Expected FS fallback grade 'A', got {sec['overallGrade']!r}"
+        )
+
+    def test_dashboard_falls_back_when_run_dir_missing(
+        self, tmp_path: Path,
+    ) -> None:
+        """When the run directory does not exist on disk, the SQL override is
+        skipped and FS-based grades are used without raising."""
+        from quodeq.data.fs.report_parser import RunInfo as _RI
+
+        project = "myproject"
+        run_id = "r-nomatch"
+        # run_dir is NOT created — does not exist on disk.
+
+        fs_dim = DimensionResult(
+            dimension="Security", overall_grade="C", overall_score="5.5",
+        )
+        summary = DimensionSummary(dimensions_count=1, overall_grade="C", numeric_average=5.5)
+
+        with (
+            patch(
+                "quodeq.services.dashboard.list_runs",
+                return_value=[_RI(run_id=run_id, date_iso="2024-01-01", date_label="2024-01-01")],
+            ),
+            patch("quodeq.services.dashboard.read_run_data", return_value=[fs_dim]),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), project, run_id)
+
+        sec = result["dimensions"][0]
+        assert sec["overallGrade"] == "C"
+
+    def test_dashboard_summary_reflects_sql_run_grade(
+        self, tmp_path: Path,
+    ) -> None:
+        """The run-level summary overall grade must also be overridden from SQL."""
+        from quodeq.data.sqlite.state_store import SQLiteStateStore
+        from quodeq.data.fs.report_parser import RunInfo as _RI
+
+        project = "myproject"
+        run_id = "r1"
+        run_dir = tmp_path / project / run_id
+        run_dir.mkdir(parents=True)
+
+        store = SQLiteStateStore(run_dir)
+        # Score 8.0 -> grade label "Good" (see _GRADE_THRESHOLDS: 7=Good, 9=Exemplary).
+        store.record_dimension_score(dimension="Reliability", score=8.0, grade="Good")
+
+        fs_dim = DimensionResult(
+            dimension="Reliability", overall_grade="Poor", overall_score="3.0",
+        )
+        # Summary initially computed from FS grades.
+        summary = DimensionSummary(dimensions_count=1, overall_grade="Poor", numeric_average=3.0)
+
+        with (
+            patch(
+                "quodeq.services.dashboard.list_runs",
+                return_value=[_RI(run_id=run_id, date_iso="2024-01-01", date_label="2024-01-01")],
+            ),
+            patch("quodeq.services.dashboard.read_run_data", return_value=[fs_dim]),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), project, run_id)
+
+        # Summary grade must reflect SQL data (post-dismissal), not FS data.
+        # read_run_score_from_dim_scores derives the run grade from score_to_grade_label(8.0)="Good".
+        assert result["summary"]["overallGrade"] == "Good", (
+            f"Expected SQL summary grade 'Good', got {result['summary']['overallGrade']!r} (FS would be 'Poor')"
+        )
