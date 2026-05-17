@@ -1,13 +1,13 @@
-import { memo, useState, useCallback, useMemo } from 'react';
+import { memo, useState, useMemo } from 'react';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { buildPrincipleReport } from '../../../utils/reportBuilder.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeLetter } from '../../../utils/formatters.js';
-import { useApi } from '../../../api/ApiContext.jsx';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
+import { usePrincipleData } from './explorerDataHooks.js';
 
 function filterTitleSuffix(filter) {
   if (!filter || filter === 'all') return '';
@@ -140,29 +140,12 @@ function filterBySeveritySelection(filteredBySeverity, activeSevFilter) {
 }
 
 function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) {
-  const { getRunScores } = useApi();
-  const { principle, dimension, project, runId } = evalPrincipal;
-  const [dismissedSet, setDismissedSet] = useState(new Set());
-  const [liveScore, setLiveScore] = useState(null);
-  const [liveGrade, setLiveGrade] = useState(null);
-  const [activeSevFilter, setActiveSevFilter] = useState(severityFilter || null);
   const { violations, compliance, violationsBySeverity } = useMemo(() => computeEvalPrincipleData(evalPrincipal), [evalPrincipal]);
 
-  const handleDismiss = useCallback((v) => {
-    if (!onDismiss) return;
-    onDismiss(v);
-    setDismissedSet((prev) => new Set(prev).add(`${v.file}:${v.line}`));
-    if (project && runId) {
-      getRunScores(project, runId).then((rescored) => {
-        const dimMap = new Map((rescored.dimensions || []).map((d) => [d.dimension, d]));
-        const dimData = dimMap.get(dimension);
-        if (!dimData) return;
-        const pgMap = new Map((dimData.principles || []).map((p) => [p.principle, p]));
-        const pg = pgMap.get(principle);
-        if (pg) { setLiveScore(pg.score); setLiveGrade(pg.grade); }
-      }).catch(() => {});
-    }
-  }, [onDismiss, project, runId, dimension, principle]);
+  const {
+    liveScore, liveGrade, activeSevFilter, setActiveSevFilter,
+    handleDismiss, dismissedSet,
+  } = usePrincipleData(evalPrincipal, severityFilter, onDismiss);
 
   const { filteredBySeverity, filteredViolations, liveSevCounts } = useMemo(() => {
     const bySev = {};

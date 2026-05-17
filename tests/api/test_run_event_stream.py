@@ -307,3 +307,107 @@ def test_run_events_generator_handles_already_terminal_run(tmp_path: Path):
     assert any("event: status" in f for f in non_keepalive)
     assert any("event: finding" in f for f in non_keepalive)
     assert any("event: done" in f for f in non_keepalive)
+
+
+# ---------------------------------------------------------------------------
+# scores.updated event tests
+# ---------------------------------------------------------------------------
+
+from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
+
+
+def _seed_run_with_finding(tmp_path: Path) -> tuple[Path, Path]:
+    """Create a minimal run dir with one finding and trigger initial projection."""
+    project_dir = tmp_path / "myproject"
+    run_dir = project_dir / "runs" / "r1"
+    run_dir.mkdir(parents=True)
+    EventLogWriter(run_dir / "events.jsonl").emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+        practice_id="P1", verdict="violation", dimension="Security",
+        file="a.py", line=10, reason="r", req="R1", severity="high",
+    )))
+    # Trigger projection + grade compute via a read.
+    SqliteFindingsRepository(run_dir).list_by_dimension("Security")
+    return project_dir, run_dir
+
+
+def test_compute_tick_emits_scores_updated_when_grades_advance(tmp_path: Path) -> None:
+    """When dimension_scores' MAX(completed_at) advances since the last tick,
+    compute_tick emits a scores.updated event with the full /scores payload."""
+    _project_dir, run_dir = _seed_run_with_finding(tmp_path)
+
+    state = WatcherState()
+    events, new_state = compute_tick(run_dir, state)
+
+    grade_events = [e for e in events if e[0] == "scores.updated"]
+    assert len(grade_events) == 1, f"Expected one scores.updated event, got: {[e[0] for e in events]}"
+    assert new_state.last_grade_fingerprint is not None
+
+
+def test_compute_tick_does_not_reemit_scores_when_unchanged(tmp_path: Path) -> None:
+    """Subsequent ticks against the same projected state do not re-emit scores.updated."""
+    _project_dir, run_dir = _seed_run_with_finding(tmp_path)
+
+    state = WatcherState()
+    _, state = compute_tick(run_dir, state)  # first tick captures the score
+
+    events, _ = compute_tick(run_dir, state)  # second tick, no change
+
+    grade_events = [e for e in events if e[0] == "scores.updated"]
+    assert grade_events == []
+
+
+def test_compute_tick_emits_scores_updated_after_dismiss(tmp_path: Path) -> None:
+    """A dismiss event between ticks causes a fresh scores.updated emission."""
+    from quodeq.services.dismissed import dismiss_finding
+
+    project_dir, run_dir = _seed_run_with_finding(tmp_path)
+
+    state = WatcherState()
+    _, state = compute_tick(run_dir, state)  # baseline
+
+    dismiss_finding(project_dir, {"req": "R1", "file": "a.py", "line": 10})
+
+    events, _ = compute_tick(run_dir, state)
+    grade_events = [e for e in events if e[0] == "scores.updated"]
+    assert len(grade_events) == 1
+
+
+def test_compute_tick_no_scores_event_when_no_grades_table(tmp_path: Path) -> None:
+    """When the run has no projected grades (no findings, no DB), no scores.updated emits."""
+    project_dir = tmp_path / "myproject"
+    run_dir = project_dir / "runs" / "r1"
+    run_dir.mkdir(parents=True)
+    # No events.jsonl at all -- empty run_dir.
+    state = WatcherState()
+    events, _ = compute_tick(run_dir, state)
+
+    grade_events = [e for e in events if e[0] == "scores.updated"]
+    assert grade_events == []
+
+
+def test_compute_tick_emits_scores_updated_when_all_findings_dismissed(tmp_path: Path) -> None:
+    """When all findings are dismissed, dimension_scores ends up empty.
+    The next tick must still emit scores.updated to inform clients
+    that the previous score state is no longer valid.
+
+    This is the primary justification for using a fingerprint instead of
+    MAX(completed_at) for change detection."""
+    from quodeq.services.dismissed import dismiss_finding
+
+    project_dir, run_dir = _seed_run_with_finding(tmp_path)
+
+    state = WatcherState()
+    _, state = compute_tick(run_dir, state)  # baseline: dimension_scores populated
+
+    # Dismiss the only finding → dimension_scores will become empty after re-projection.
+    dismiss_finding(project_dir, {"req": "R1", "file": "a.py", "line": 10})
+
+    events, new_state = compute_tick(run_dir, state)
+    grade_events = [e for e in events if e[0] == "scores.updated"]
+
+    assert len(grade_events) == 1, (
+        "scores.updated must fire when dimension_scores transitions to empty; "
+        f"events were: {[e[0] for e in events]}"
+    )
+    # The fingerprint should reflect the empty state.
+    assert new_state.last_grade_fingerprint != state.last_grade_fingerprint

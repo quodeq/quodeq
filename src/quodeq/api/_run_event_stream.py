@@ -62,6 +62,14 @@ def serialize_finding_event(judgment_dict: dict[str, Any]) -> str:
     return json.dumps(judgment_dict, separators=(",", ":"))
 
 
+def serialize_scores_updated_event(payload: dict[str, Any]) -> str:
+    """Return the SSE data: payload for an `event: scores.updated` frame.
+
+    Payload matches the /api/projects/<p>/scores/<run> response shape.
+    """
+    return json.dumps(payload, separators=(",", ":"))
+
+
 @dataclass
 class WatcherState:
     """Mutable per-stream state. Tracks what has been emitted to one client.
@@ -69,11 +77,14 @@ class WatcherState:
     last_event_ts is the ISO 8601 timestamp cursor for resuming from events.jsonl
     on reconnect (via Last-Event-ID). last_event_counter is a sequential integer
     used as finding `id` in the payload for client backward-compatibility.
+    last_grade_fingerprint is a repr() of the sorted dimension_scores rows the
+    last time a scores.updated event was emitted; None means never checked.
     """
     last_event_ts: datetime | None = None
     last_event_counter: int = 0
     last_status_mtime: float | None = None
     emitted_dimensions: frozenset[str] = field(default_factory=frozenset)
+    last_grade_fingerprint: str | None = None
 
 
 _logger = logging.getLogger(__name__)
@@ -226,11 +237,52 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
         new_last_ts = event_ts
         new_counter = counter
 
+    # --- scores.updated branch ---
+    # Trigger projection (cheap no-op if no JSONL/actions log activity since last tick).
+    # This applies any actions.jsonl events so grade tables stay current.
+    grade_event: EventTuple | None = None
+    new_grade_fingerprint = state.last_grade_fingerprint
+    try:
+        from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
+        repo = SqliteFindingsRepository(run_dir)
+        repo._ensure_fresh()  # noqa: SLF001
+    except Exception:
+        _logger.warning("SSE tick: ensure_fresh failed for %s", run_dir, exc_info=True)
+
+    try:
+        from quodeq.data.sqlite.connection import open_evaluation_db  # noqa: PLC0415
+        with open_evaluation_db(run_dir) as conn:
+            rows = conn.execute(
+                "SELECT dimension, score, grade, completed_at FROM dimension_scores ORDER BY dimension",
+            ).fetchall()
+        # Fingerprint of all dimension_scores rows, not just MAX(completed_at). This
+        # detects grade value changes that happen within the same second (recompute
+        # fires fast enough that two consecutive ticks can produce identical timestamps
+        # but different scores). MAX(completed_at) alone would miss these.
+        # It also detects transitions to the empty state (full-dismiss), which
+        # MAX(completed_at) handles correctly too (None != prior-timestamp).
+        current_fingerprint = repr(rows) if rows else None
+        if current_fingerprint != state.last_grade_fingerprint:
+            from quodeq.services.scoring import get_scores_raw  # noqa: PLC0415
+            # run_dir layout: <reports_root>/<project>/runs/<run_id>
+            reports_root = run_dir.parent.parent.parent
+            project = run_dir.parent.parent.name
+            run_id = run_dir.name
+            payload = get_scores_raw(reports_root, project, run_id)
+            grade_event = ("scores.updated", serialize_scores_updated_event(payload), None)
+            new_grade_fingerprint = current_fingerprint
+    except Exception:
+        _logger.warning("SSE tick: scores.updated build failed for %s", run_dir, exc_info=True)
+
+    if grade_event is not None:
+        events.append(grade_event)
+
     new_state = WatcherState(
         last_event_ts=new_last_ts,
         last_event_counter=new_counter,
         last_status_mtime=status_mtime,
         emitted_dimensions=frozenset(state.emitted_dimensions | set(new_dims)),
+        last_grade_fingerprint=new_grade_fingerprint,
     )
     return events, new_state
 
