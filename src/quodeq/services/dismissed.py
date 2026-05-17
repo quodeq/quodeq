@@ -6,6 +6,7 @@ evaluation.db (aggregated across runs).
 """
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -92,12 +93,17 @@ def load_dismissed(
                     "title, reason, snippet, context, scope, end_line, req_refs_json "
                     "FROM findings WHERE verdict = 'dismissed'"
                 ):
+                    req_refs_raw = row[12]
+                    try:
+                        req_refs = json.loads(req_refs_raw) if req_refs_raw else []
+                    except (json.JSONDecodeError, TypeError):
+                        req_refs = []
                     items.append({
                         "req": row[0] or "", "file": row[1] or "", "line": row[2] or 0,
                         "dimension": row[3] or "", "principle": row[4] or "",
                         "severity": row[5] or "", "title": row[6] or "", "reason": row[7] or "",
                         "snippet": row[8] or "", "context": row[9] or "", "scope": row[10] or "",
-                        "endLine": row[11] or 0, "reqRefs": row[12] or [],
+                        "endLine": row[11] or 0, "reqRefs": req_refs,
                     })
         except Exception:
             continue

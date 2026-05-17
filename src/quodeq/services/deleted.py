@@ -18,14 +18,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.core.events.models import (
-    EventType,
-    FindingDismissedEvent,
     FindingUndismissed,
     FindingUndismissedEvent,
 )
 from quodeq.core.types.finding import Finding
 from quodeq.data._file_lock import lock_file, unlock_file
-from quodeq.data.actions_log import ActionLogWriter, read_action_events
+from quodeq.data.actions_log import ActionLogWriter
 from quodeq.services.dismissed import recount_totals
 
 
