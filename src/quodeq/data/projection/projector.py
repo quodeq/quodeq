@@ -100,4 +100,10 @@ class Projector:
             if actions_log is not None and (actions_changed or events_changed):
                 self._engine.update_actions(actions_log, run_dir, force=events_changed)
 
+            # Grade tables are derived from findings + dismissals. Recompute whenever
+            # either source changed.
+            if events_changed or actions_changed:
+                from quodeq.data.projection.grade_projector import recompute_grades  # noqa: PLC0415
+                recompute_grades(run_dir)
+
             return result
