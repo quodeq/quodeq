@@ -18,10 +18,13 @@ change.
 """
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
+
+_logger = logging.getLogger(__name__)
 
 from quodeq.core.types import to_camel_dict
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
@@ -263,7 +266,18 @@ def get_scores_raw(
     if not dim_rows:
         return _legacy_get_scores_raw(reports_root, project, run_id)
 
-    return _build_response_from_grade_tables(run_dir)
+    sql_payload = _build_response_from_grade_tables(run_dir)
+
+    # Optional: when the env flag is set, run the legacy path and log divergences.
+    from quodeq.services.scoring._parity_logger import is_enabled, log_divergence_if_any  # noqa: PLC0415
+    if is_enabled():
+        try:
+            legacy_payload = _legacy_get_scores_raw(reports_root, project, run_id)
+            log_divergence_if_any(legacy=legacy_payload, sql=sql_payload, run_id=run_id)
+        except Exception:
+            _logger.warning("Parity comparison failed for %s", run_id, exc_info=True)
+
+    return sql_payload
 
 
 def _make_rescoring_fetcher(
