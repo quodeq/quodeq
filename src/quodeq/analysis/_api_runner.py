@@ -348,8 +348,7 @@ def run_api_analysis(
         len(source_file_paths) if source_file_paths and not was_salvaged else 0,
     )
 
-    run_dir = jsonl_file.parent.parent
-    events_log = run_dir / "events.jsonl"
+    events_log = jsonl_file.parent.parent / "events.jsonl"
 
     jsonl_file.parent.mkdir(parents=True, exist_ok=True)
     from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
@@ -361,10 +360,3 @@ def run_api_analysis(
         if not was_salvaged and source_file_paths:
             for path in source_file_paths:
                 router.mark_file_done(file=path, status="ok")
-
-    if events_log.is_file():
-        try:
-            from quodeq.data.projection.engine import ProjectionEngine  # noqa: PLC0415
-            ProjectionEngine().update(events_log, run_dir)
-        except Exception:
-            _log.warning("API runner: incremental projection failed for %s", run_dir, exc_info=True)

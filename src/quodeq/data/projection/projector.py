@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -11,6 +13,9 @@ from quodeq.data.sqlite.state_store import SQLiteStateStore
 class ProjectionResult:
     events_projected: int
     rebuilt: bool
+
+
+_ensure_locks: dict[Path, threading.Lock] = defaultdict(threading.Lock)
 
 
 class Projector:
@@ -47,3 +52,22 @@ class Projector:
         else:
             count = self._engine.update(events_path, run_dir)
             return ProjectionResult(events_projected=count, rebuilt=False)
+
+    def ensure_projected(self, events_path: Path, run_dir: Path) -> ProjectionResult:
+        """Fast no-op if State Store is fresh; otherwise project incrementally.
+
+        Compares the Event Log's byte size to the last projected size stored
+        in run_meta. The Event Log is append-only, so size monotonicity makes
+        this race-free for the single-process case. An in-process lock per
+        run_dir prevents concurrent reads from double-projecting.
+        """
+        if not events_path.is_file():
+            raise FileNotFoundError(f"Event log not found: {events_path}")
+
+        with _ensure_locks[run_dir]:
+            store = SQLiteStateStore(run_dir)
+            projected_size = store.get_projected_size()
+            current_size = events_path.stat().st_size
+            if projected_size is not None and projected_size == current_size:
+                return ProjectionResult(events_projected=0, rebuilt=False)
+            return self.project(events_path, run_dir)

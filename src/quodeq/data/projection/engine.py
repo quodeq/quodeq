@@ -50,5 +50,6 @@ class ProjectionEngine:
                 )
         if last_ts is not None:
             store.save_checkpoint(last_ts)
+            store.save_projected_size(event_log.stat().st_size)
         _logger.info("Projected %d events from %s", count, event_log)
         return count
