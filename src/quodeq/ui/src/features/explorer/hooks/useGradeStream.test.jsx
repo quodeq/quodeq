@@ -6,19 +6,15 @@ import { useGradeStream } from './useGradeStream';
 
 describe('useGradeStream', () => {
   let originalEventSource;
-  let originalFlag;
 
   beforeEach(() => {
     originalEventSource = global.EventSource;
-    originalFlag = import.meta.env.VITE_USE_LIVE_GRADES;
     MockEventSource.last = null;
     global.EventSource = MockEventSource;
-    import.meta.env.VITE_USE_LIVE_GRADES = 'true';
   });
 
   afterEach(() => {
     global.EventSource = originalEventSource;
-    import.meta.env.VITE_USE_LIVE_GRADES = originalFlag;
   });
 
   it('returns idle when runId is null', () => {
@@ -59,14 +55,6 @@ describe('useGradeStream', () => {
     expect(es.closed).not.toBe(true);
     unmount();
     expect(es.closed).toBe(true);
-  });
-
-  it('does nothing when flag is off', () => {
-    import.meta.env.VITE_USE_LIVE_GRADES = 'false';
-    const { result } = renderHook(() => useGradeStream({ project: 'p', runId: 'r1' }));
-    expect(MockEventSource.last).toBeNull();
-    expect(result.current.payload).toBeNull();
-    expect(result.current.status).toBe('idle');
   });
 
   it('sets isStale on error', () => {

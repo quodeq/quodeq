@@ -9,7 +9,6 @@ import { useEffect, useState } from 'react';
  *   - status: 'idle' | 'streaming' | 'error'
  *   - isStale: true when the connection has dropped (UI may show a stale indicator)
  *
- * Gated by VITE_USE_LIVE_GRADES — when not 'true', the hook is a no-op (status='idle').
  * Pass { project, runId } — project is accepted for call-site symmetry but the SSE
  * endpoint is keyed by runId only (/api/evaluations/<runId>/events), matching the
  * existing useRunEventStream URL pattern.
@@ -26,11 +25,6 @@ export function useGradeStream({ project: _project, runId }) {
       setIsStale(false);
       return undefined;
     }
-    if (import.meta.env.VITE_USE_LIVE_GRADES !== 'true') {
-      setStatus('idle');
-      return undefined;
-    }
-
     setStatus('streaming');
     setIsStale(false);
 
