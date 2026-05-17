@@ -53,8 +53,7 @@ export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = t
   // always maps to the correct run.
   const resolvedRunId = dashboardWithTrend?.selectedRun?.runId ?? null;
 
-  // Live grade updates via SSE. useGradeStream is a no-op when
-  // VITE_USE_LIVE_GRADES !== 'true' or resolvedRunId is null.
+  // Live grade updates via SSE. useGradeStream is a no-op when resolvedRunId is null.
   const gradeStream = useGradeStream({ project: selectedProject, runId: resolvedRunId });
 
   // Override grade fields on dashboard.dimensions when an SSE payload arrives.
