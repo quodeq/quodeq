@@ -193,3 +193,19 @@ def test_ensure_applies_existing_dismissals_to_freshly_scanned_findings(tmp_path
 
     # The pre-existing dismissal applies to the freshly-projected finding.
     assert _verdict_for(run_dir, "R1", "a.py", 10) == "dismissed"
+
+
+def test_ensure_projected_runs_migration_first(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    run_dir = project_dir / "runs" / "r1"
+    run_dir.mkdir(parents=True)
+    events_log = _seed_run_with_finding(run_dir, req="R1", file="a.py", line=10)
+    # Legacy: dismissed.json exists, actions.jsonl does not.
+    (project_dir / "dismissed.json").write_text(
+        '[{"req":"R1","file":"a.py","line":10}]', encoding="utf-8",
+    )
+
+    Projector().ensure_projected(events_log, run_dir, project_dir=project_dir)
+
+    # Migration folded the JSON entry into actions.jsonl, projection applied it.
+    assert _verdict_for(run_dir, "R1", "a.py", 10) == "dismissed"

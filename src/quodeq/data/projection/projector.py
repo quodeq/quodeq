@@ -65,6 +65,11 @@ class Projector:
             raise FileNotFoundError(f"Event log not found: {events_path}")
 
         with _ensure_locks[run_dir]:
+            if project_dir is not None:
+                from quodeq.data.migrations.dismissed_json_to_actions_log import (  # noqa: PLC0415
+                    migrate_if_needed,
+                )
+                migrate_if_needed(project_dir)
             store = SQLiteStateStore(run_dir)
 
             # Events.jsonl branch (today's behavior)
