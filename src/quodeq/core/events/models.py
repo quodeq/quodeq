@@ -20,6 +20,8 @@ class EventType(str, Enum):
     JUDGMENT_CREATED = "JUDGMENT_CREATED"
     DIMENSION_COMPLETED = "DIMENSION_COMPLETED"
     DIMENSION_FAILED = "DIMENSION_FAILED"
+    FINDING_DISMISSED = "FINDING_DISMISSED"
+    FINDING_UNDISMISSED = "FINDING_UNDISMISSED"
 
 
 class BaseEvent(BaseModel, Generic[T]):
@@ -78,8 +80,37 @@ class JudgmentCreatedEvent(BaseEvent[Judgment]):
     event_type: EventType = EventType.JUDGMENT_CREATED
 
 
+class FindingDismissed(BaseModel):
+    """User dismissed a finding identified by (req, file, line)."""
+    model_config = ConfigDict(frozen=True)
+
+    req: str
+    file: str
+    line: int
+    reason: Optional[str] = None
+
+
+class FindingUndismissed(BaseModel):
+    """User restored a previously dismissed finding."""
+    model_config = ConfigDict(frozen=True)
+
+    req: str
+    file: str
+    line: int
+
+
+class FindingDismissedEvent(BaseEvent[FindingDismissed]):
+    event_type: EventType = EventType.FINDING_DISMISSED
+
+
+class FindingUndismissedEvent(BaseEvent[FindingUndismissed]):
+    event_type: EventType = EventType.FINDING_UNDISMISSED
+
+
 # Mapping to allow the Reader to resolve the correct model for validation
 # This is crucial for correct payload parsing
 EVENT_MODEL_MAP: Dict[EventType, type[BaseEvent]] = {
     EventType.JUDGMENT_CREATED: JudgmentCreatedEvent,
+    EventType.FINDING_DISMISSED: FindingDismissedEvent,
+    EventType.FINDING_UNDISMISSED: FindingUndismissedEvent,
 }
