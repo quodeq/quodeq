@@ -645,3 +645,75 @@ class TestDashboardSqlGradeOverride:
         assert result["summary"]["overallGrade"] == "Good", (
             f"Expected SQL summary grade 'Good', got {result['summary']['overallGrade']!r} (FS would be 'Poor')"
         )
+
+    def test_dashboard_dimension_grades_match_scores_endpoint_after_dismiss(
+        self, tmp_path: Path,
+    ) -> None:
+        """Overview ↔ Standard-detail invariant: dashboard and /scores output
+        must agree on grades after dismissal.
+
+        After PR 2, both endpoints back off to the same SQL grade tables, so this
+        parity test documents the contract that the symptom (Overview != Standard
+        detail) is fixed at the storage layer.
+        """
+        from pathlib import Path as P
+
+        from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+        from quodeq.core.events.writer import EventLogWriter
+        from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
+        from quodeq.services.dismissed import dismiss_finding
+        from quodeq.services.scoring import get_scores_raw
+
+        project = "myproject"
+        run_id = "r1"
+        project_dir = tmp_path / project
+        run_dir = project_dir / "runs" / run_id
+        run_dir.mkdir(parents=True)
+
+        # Seed 3 findings: 2 in Security (varied severity), 1 in Reliability.
+        log = run_dir / "events.jsonl"
+        EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+            practice_id="P1", verdict="violation", dimension="Security",
+            file="a.py", line=10, reason="r", req="R1", severity="critical",
+        )))
+        EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+            practice_id="P1", verdict="violation", dimension="Security",
+            file="b.py", line=20, reason="r", req="R2", severity="medium",
+        )))
+        EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+            practice_id="P2", verdict="violation", dimension="Reliability",
+            file="c.py", line=30, reason="r", req="R3", severity="low",
+        )))
+
+        # Project findings to populate SQL grade tables.
+        SqliteFindingsRepository(run_dir).list_by_dimension("Security")
+        SqliteFindingsRepository(run_dir).list_by_dimension("Reliability")
+
+        # Dismiss the critical Security finding.
+        dismiss_finding(project_dir, {"req": "R1", "file": "a.py", "line": 10})
+
+        # Re-project to update SQL grades after dismissal.
+        SqliteFindingsRepository(run_dir).list_by_dimension("Security")
+        SqliteFindingsRepository(run_dir).list_by_dimension("Reliability")
+
+        # Fetch both endpoints' payloads.
+        dashboard_payload = build_dashboard(str(tmp_path), project, run_id)
+        scores_payload = get_scores_raw(tmp_path, project, run_id)
+
+        # Per-dimension grade parity.
+        dash_dims = {d["dimension"]: d for d in dashboard_payload["dimensions"]}
+        scores_dims = {d["dimension"]: d for d in scores_payload["dimensions"]}
+
+        for dim_name in scores_dims:
+            if dim_name not in dash_dims:
+                continue
+            assert dash_dims[dim_name]["overallGrade"] == scores_dims[dim_name]["overallGrade"], (
+                f"Grade divergence for {dim_name}: "
+                f"dashboard={dash_dims[dim_name]['overallGrade']}, "
+                f"scores={scores_dims[dim_name]['overallGrade']}"
+            )
+            assert dash_dims[dim_name]["overallScore"] == scores_dims[dim_name]["overallScore"], (
+                f"Score divergence for {dim_name}: "
+                f"dashboard={dash_dims[dim_name]['overallScore']}, "
+                f"scores={scores_dims[dim_name]['overallScore']}"
+            )
