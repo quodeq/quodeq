@@ -148,7 +148,7 @@ export function useExplorerData(project, dimension, runId, refreshSignal) {
  *
  * @param {Object} evalPrincipal - the evalPrincipal object (principle, dimension, project, runId, ...)
  * @param {string|null} severityFilter - initial severity filter
- * @param {Function|null} onDismiss - callback invoked with the violation before the refetch
+ * @param {Function|null} onDismiss - callback invoked with the violation after the dismiss POST
  * @returns {{ liveScore, liveGrade, activeSevFilter, setActiveSevFilter, handleDismiss, dismissedSet }}
  */
 export function usePrincipleData(evalPrincipal, severityFilter, onDismiss) {
