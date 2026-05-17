@@ -9,10 +9,13 @@ import EmptyState from '../../../components/EmptyState.jsx';
 function NoCompletedEvalPanel({ availableRuns = [], onNavigate }) {
   const hasRunning = availableRuns.some((r) => r?.status === 'in_progress');
   if (hasRunning) {
+    // First-ever evaluation is still running. There's no prior data to
+    // show, but we still avoid claiming the project has "no" evaluations
+    // — they just haven't finished yet.
     return (
       <EmptyState
-        title="Evaluation in progress"
-        description="Results will appear here once the evaluation finishes. You can watch dimensions complete one by one in the History tab."
+        title="First evaluation in progress"
+        description="The overview will fill in once a run finishes. You can watch dimensions complete in History."
         actionLabel="Open history"
         onAction={() => onNavigate?.('history')}
       />
