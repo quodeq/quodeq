@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from quodeq.core.types.req_ref import ReqRef as ReqRef
+
 
 @dataclass(frozen=True, slots=True)
 class SeverityTally:
@@ -16,12 +18,6 @@ class Totals:
     violation_count: int = 0
     compliance_count: int = 0
     severity: SeverityTally = field(default_factory=SeverityTally)
-
-
-@dataclass(frozen=True, slots=True)
-class ReqRef:
-    label: str
-    url: str
 
 
 @dataclass(frozen=True, slots=True)

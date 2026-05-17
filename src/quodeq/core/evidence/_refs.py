@@ -3,8 +3,13 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from quodeq.core.standards.refs import load_compiled_refs
+from quodeq.core.types.req_ref import ReqRef
+
+if TYPE_CHECKING:
+    from quodeq.core.events.models import Judgment
 
 _CWE_URL_TEMPLATE_DEFAULT = "https://cwe.mitre.org/data/definitions/{cwe_id}.html"
 
@@ -67,19 +72,26 @@ def resolve_llm_refs(
 
 
 def enrich_judgment(
-    j: "Judgment",  # noqa: F821 -- avoids circular import
+    j: "Judgment",
     llm_refs: list[str] | None,
     compiled_dir: Path | None,
     req_refs_cache: dict[str, dict[str, list[dict]]],
-) -> None:
-    """Resolve and attach req_refs to a Judgment in-place."""
+) -> "Judgment":
+    """Resolve req_refs for a Judgment, returning the (possibly new) Judgment.
+
+    Judgment is frozen (Pydantic), so we return a model_copy when we have
+    something new to attach. When the judgment already carries refs, or no
+    refs were resolved, the original instance is returned unchanged.
+    """
     if j.req_refs:
-        return  # MCP server already enriched
+        return j  # MCP server already enriched
     all_req_refs = None
     if compiled_dir and j.req and j.dimension:
         if j.dimension not in req_refs_cache:
             req_refs_cache[j.dimension] = build_req_refs_lookup(compiled_dir, j.dimension)
         all_req_refs = req_refs_cache[j.dimension].get(j.req)
     resolved = resolve_llm_refs(llm_refs, all_req_refs)
-    if resolved:
-        j.req_refs = resolved
+    if not resolved:
+        return j
+    refs = [ReqRef(label=r.get("label", ""), url=r.get("url", "")) for r in resolved]
+    return j.model_copy(update={"req_refs": refs})

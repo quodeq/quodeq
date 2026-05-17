@@ -1,9 +1,7 @@
 import json
-from quodeq.core.evidence.model import Judgment
-from quodeq.core.events.models import JudgmentPayload
+from quodeq.core.events.models import Judgment
 from quodeq.data.sqlite._row_mappers import (
     finding_dict_to_row,
-    finding_payload_to_row,
     judgment_to_row,
     row_to_finding,
 )
@@ -74,6 +72,8 @@ def test_judgment_to_row_uses_long_names():
     row = judgment_to_row(j)
     assert row["practice_id"] == "P1"
     assert row["requirement"] == "R1"
+    assert row["title"] == "t"
+    assert row["snippet"] == "s"
     assert row["dedup_key"] == "P1|f.py|3|violation"
 
 
@@ -101,7 +101,9 @@ def test_finding_dict_to_row_treats_non_int_confidence_as_default():
 
 def test_judgment_to_row_propagates_confidence():
     j = Judgment(
-        practice_id="P1", verdict="violation", severity="medium", confidence=42,
+        practice_id="P1", verdict="violation", dimension="d",
+        file="f.py", line=1, reason="r",
+        severity="medium", confidence=42,
     )
     row = judgment_to_row(j)
     assert row["confidence"] == 42
@@ -125,8 +127,8 @@ def test_row_to_finding_preserves_explicit_confidence():
     assert row_to_finding(row).confidence == 30
 
 
-def test_finding_payload_to_row_maps_required_fields():
-    payload = JudgmentPayload(
+def test_judgment_to_row_maps_required_fields():
+    payload = Judgment(
         practice_id="P1",
         verdict="violation",
         dimension="Security",
@@ -134,7 +136,7 @@ def test_finding_payload_to_row_maps_required_fields():
         line=42,
         reason="hardcoded secret",
     )
-    row = finding_payload_to_row(payload)
+    row = judgment_to_row(payload)
     assert row["practice_id"] == "P1"
     assert row["verdict"] == "violation"
     assert row["dimension"] == "Security"
@@ -146,12 +148,12 @@ def test_finding_payload_to_row_maps_required_fields():
     assert row["end_line"] == 0
 
 
-def test_finding_payload_to_row_optional_fields_default():
-    payload = JudgmentPayload(
+def test_judgment_to_row_optional_fields_default():
+    payload = Judgment(
         practice_id="P2", verdict="compliance", dimension="Reliability",
         file="f.py", line=1, reason="ok",
     )
-    row = finding_payload_to_row(payload)
+    row = judgment_to_row(payload)
     assert row["title"] == ""
     assert row["snippet"] == ""
     assert row["context"] == ""

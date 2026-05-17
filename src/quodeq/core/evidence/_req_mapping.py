@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.core.evidence.model import Judgment
+from quodeq.core.events.models import Judgment
 
 _SEV_RANKS = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 

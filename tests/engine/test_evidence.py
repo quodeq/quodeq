@@ -4,11 +4,15 @@ from quodeq.core.evidence.model import Evidence, Judgment, PrincipleEvidence
 
 
 def test_judgment_defaults():
-    j = Judgment(practice_id="ts-001")
+    j = Judgment(
+        practice_id="ts-001", verdict="violation", dimension="security",
+        file="a.py", line=1, reason="r",
+    )
     assert j.verdict == "violation"
     assert j.severity == "medium"
-    assert j.line == 0
-    assert j.file == ""
+    assert j.confidence == 100
+    assert j.req_refs == []
+    assert j.is_violation() is True
 
 
 def test_principle_evidence_compute_metrics():

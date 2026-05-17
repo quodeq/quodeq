@@ -4,6 +4,14 @@ Calls LLM APIs directly via Instructor (Pydantic-based structured output)
 and writes findings as JSONL evidence -- the same format the CLI runner
 produces via MCP.
 
+``_Finding`` (below) is a lenient short-key variant of the canonical
+``Judgment`` (``quodeq.core.events.models``). Local models drop required
+fields and balk at long field names under load -- this type's short keys
+(``req``/``t``/``w``) and Field descriptions are tuned for that constraint,
+so the salvage path stays rare. The downstream wire-dict → Judgment lift
+happens via ``quodeq.core.finding_mappings.wire_dict_to_judgment`` after
+``FindingEnricher`` maps ``req`` to ``practice_id``.
+
 Requires the ``quodeq[api]`` extra: ``pip install 'quodeq[api]'``
 """
 from __future__ import annotations

@@ -1,8 +1,16 @@
-"""Evidence model — dataclasses for judgments, principles, and evaluation output."""
+"""Evidence model — dataclasses for principles and evaluation output.
+
+Judgment is re-exported from quodeq.core.events.models, where the canonical
+type lives (the Event Log is the source of truth per ADR 0001).
+"""
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+
+# Re-exported for backward compatibility with callers that still import
+# Judgment from this module.
+from quodeq.core.events.models import Judgment as Judgment  # noqa: F401
 
 DEFAULT_WEIGHT = "Medium (x2)"
 _HIGH_CONFIDENCE_THRESHOLD = 10  # minimum total instances for "high" confidence
@@ -28,40 +36,6 @@ def compute_coverage_pct(files_read: int, source_file_count: int) -> float:
 
 _VALID_VERDICTS = frozenset({"violation", "compliance", "dismissed"})
 _VALID_SEVERITIES = frozenset({"critical", "high", "medium", "low", "minor"})
-
-
-@dataclass
-class Judgment:
-    """One LLM judgment per finding."""
-    practice_id: str
-    file: str = ""
-    line: int = 0
-    end_line: int = 0
-    snippet: str = ""
-    verdict: str = "violation"  # violation | compliance | dismissed
-    severity: str = "medium"
-    reason: str = ""
-    dimension: str = ""
-    req: str | None = None
-    req_refs: list[dict] | None = None
-    violation_type: str = ""
-    title: str = ""
-    context: str = ""
-    scope: str = ""
-    # 0-100 confidence score the scanner attaches to this finding. 100 means
-    # "no reason to doubt." Subsequent slices of the context-enricher plan
-    # populate values < 100 to downweight known false-positive patterns.
-    confidence: int = 100
-
-    def __post_init__(self) -> None:
-        if not self.practice_id:
-            raise ValueError("Judgment requires a practice_id")
-
-    def is_violation(self) -> bool:
-        return self.verdict == "violation"
-
-    def is_compliance(self) -> bool:
-        return self.verdict == "compliance"
 
 
 @dataclass

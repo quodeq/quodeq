@@ -5,9 +5,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from quodeq.core.events.models import JudgmentPayload
+from quodeq.core.events.models import Judgment
 from quodeq.data.sqlite.connection import open_evaluation_db
-from quodeq.data.sqlite._row_mappers import finding_payload_to_row
+from quodeq.data.sqlite._row_mappers import judgment_to_row
 
 _logger = logging.getLogger(__name__)
 _CHECKPOINT_KEY = "projection_checkpoint"
@@ -31,8 +31,8 @@ class SQLiteStateStore:
     def __init__(self, run_dir: Path) -> None:
         self._run_dir = run_dir
 
-    def record_finding(self, payload: JudgmentPayload) -> None:
-        row = finding_payload_to_row(payload)
+    def record_finding(self, payload: Judgment) -> None:
+        row = judgment_to_row(payload)
         with open_evaluation_db(self._run_dir) as conn:
             conn.execute(_INSERT_FINDING, row)
             conn.commit()

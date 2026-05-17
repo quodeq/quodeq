@@ -7,8 +7,9 @@ from pathlib import Path
 from quodeq.core.evidence._jsonl import judgment_to_dict, parse_jsonl_line, read_judgments
 from quodeq.core.evidence._refs import build_req_refs_lookup, enrich_judgment, resolve_llm_refs
 from quodeq.shared.utils import open_text
+from quodeq.core.events.models import Judgment
 from quodeq.core.evidence._req_mapping import _GroupedJudgments, _group_judgments
-from quodeq.core.evidence.model import Evidence, Judgment, PrincipleEvidence, compute_coverage_pct
+from quodeq.core.evidence.model import Evidence, PrincipleEvidence, compute_coverage_pct
 
 # Re-export for backward compatibility (external code imports these from parser)
 __all__ = ["build_req_refs_lookup", "resolve_llm_refs", "EvidenceContext",
@@ -76,7 +77,7 @@ def parse_jsonl_to_evidence_by_dimension(
             result = parse_jsonl_line(line)
             if result is not None:
                 j, llm_refs = result
-                enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache)
+                j = enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache)
                 by_dim.setdefault(j.dimension or "unknown", []).append(j)
     if not by_dim:
         return {}

@@ -124,28 +124,9 @@ class FindingsRouter:
     def _emit_event(self, finding: dict) -> None:
         """Emit a JudgmentCreatedEvent to the event log. Never raises."""
         try:
-            from quodeq.core.events.models import JudgmentPayload, JudgmentCreatedEvent  # noqa: PLC0415
-            payload = JudgmentPayload(
-                practice_id=finding.get("p") or "",
-                verdict=finding.get("t") or "",
-                dimension=finding.get("d") or "",
-                file=finding.get("file") or "",
-                line=finding.get("line") or 0,
-                end_line=finding.get("end_line"),
-                snippet=finding.get("snippet"),
-                severity=finding.get("severity") or "medium",
-                violation_type=finding.get("violation_type"),
-                reason=finding.get("reason") or "",
-                title=finding.get("w"),
-                context=finding.get("context"),
-                scope=finding.get("scope"),
-                confidence=finding.get("confidence") or 100,
-                req_refs=[
-                    r["label"] if isinstance(r, dict) else str(r)
-                    for r in (finding.get("req_refs") or [])
-                ],
-                req=finding.get("req"),
-            )
+            from quodeq.core.events.models import JudgmentCreatedEvent  # noqa: PLC0415
+            from quodeq.core.finding_mappings import wire_dict_to_judgment  # noqa: PLC0415
+            payload = wire_dict_to_judgment(finding)
             self._event_log.emit(JudgmentCreatedEvent(payload=payload))
         except Exception:  # noqa: BLE001 — event log must never break JSONL durability
             _logger.warning("FindingsRouter: event log emit failed (JSONL succeeded)", exc_info=True)

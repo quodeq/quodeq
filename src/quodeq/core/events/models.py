@@ -7,6 +7,8 @@ from uuid import uuid4, UUID
 
 from pydantic import BaseModel, Field, ConfigDict
 
+from quodeq.core.types.req_ref import ReqRef
+
 
 T = TypeVar("T")
 
@@ -30,30 +32,48 @@ class BaseEvent(BaseModel, Generic[T]):
     payload: T
 
 
-class JudgmentPayload(BaseModel):
-    """Payload for JUDGMENT_CREATED event, expanded from the legacy JSONL structure."""
+class Judgment(BaseModel):
+    """What the LLM produced about a single piece of code.
+
+    Immutable. The canonical type for findings in the Event Log. Verdict is
+    "violation" or "compliance" -- "dismissed" is NOT a valid Judgment verdict;
+    that's a derived view-only state on Finding.
+    """
     model_config = ConfigDict(frozen=True)
 
+    # Required
     practice_id: str
     verdict: str  # "violation" | "compliance"
     dimension: str
     file: str
     line: int
+    reason: str
+
+    # Optional
     end_line: Optional[int] = None
     snippet: Optional[str] = None
     severity: str = "medium"
     violation_type: Optional[str] = None
-    reason: str
     title: Optional[str] = None
     context: Optional[str] = None
     scope: Optional[str] = None
     confidence: int = 100
-    req_refs: List[str] = Field(default_factory=list)
     req: Optional[str] = None
+    req_refs: List[ReqRef] = Field(default_factory=list)
     cwe: Optional[str] = None
 
+    def is_violation(self) -> bool:
+        return self.verdict == "violation"
 
-class JudgmentCreatedEvent(BaseEvent[JudgmentPayload]):
+    def is_compliance(self) -> bool:
+        return self.verdict == "compliance"
+
+
+# Deprecation alias -- remove in a follow-up PR once all callers migrate.
+JudgmentPayload = Judgment
+
+
+class JudgmentCreatedEvent(BaseEvent[Judgment]):
     """Event emitted whenever a new judgment is found and recorded."""
     event_type: EventType = EventType.JUDGMENT_CREATED
 
