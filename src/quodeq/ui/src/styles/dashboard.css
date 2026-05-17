@@ -2236,11 +2236,10 @@
   margin-bottom: 0;
 }
 
-.history-panels-row > .run-history-panel,
-.history-panels-row > .dim-score-panel {
-  flex: 1 1 0;
-  min-width: 0;
-}
+/* Child flex sizing for .history-panels-row > .run-history-panel/.dim-score-panel
+   lives in terminal.css (responsive 500px basis with !important). Do not re-add
+   it here: a same-selector duplicate gets deduped at minify time and silently
+   wins over the !important one, killing the wrap-to-two-rows behavior in prod. */
 
 /* ── Dimension Score Panel (horizontal bars) ─────────── */
 
