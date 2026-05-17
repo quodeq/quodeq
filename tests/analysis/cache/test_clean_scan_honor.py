@@ -125,7 +125,7 @@ class TestClassifyBypassReads:
 
 # Removed TestOrchestratorFastPathHonorsCleanScan: the orchestrator-level
 # _try_v2_full_hit no longer exists. After B6 the orchestrator delegates
-# to _process_single_dimension which routes through process_dimension_with_cache,
+# to DimensionRunner.run which routes through process_dimension_with_cache,
 # and clean-scan honoring is verified at that layer (TestDispatchBypassesCacheOnCleanScan).
 
 

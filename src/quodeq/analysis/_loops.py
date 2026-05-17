@@ -10,8 +10,8 @@ from dataclasses import replace
 from collections.abc import Callable
 from pathlib import Path
 
-from quodeq.analysis._dimension_ops import _run_dimension_incremental as run_dimension_incremental
 from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.analysis.errors import EvaluationError
 from quodeq.core.evidence.model import Evidence
 from quodeq.engine._runner_markers import emit_marker
@@ -132,8 +132,7 @@ def check_zero_findings(
 
 def run_incremental_loop(
     config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
-    *, process_fn: Callable[..., Evidence | None],
-    log_result_fn: Callable[..., None],
+    *, runner: DimensionRunner,
     on_dimension_done: Callable[[str, Evidence], None] | None = None,
 ) -> dict[str, Evidence]:
     """Run incremental per-dimension analysis.
@@ -142,9 +141,12 @@ def run_incremental_loop(
         config: Run configuration for this evaluation.
         dimensions: Dimension identifiers to analyze.
         ctx: Shared analysis context (total count, etc.).
-        process_fn: Callback to process a single dimension (signature:
-            ``(config, dimension, idx, ctx) -> Evidence | None``).
-        log_result_fn: Callback to log a completed dimension result.
+        runner: DimensionRunner used to analyze each dimension. The loop calls
+            ``runner.run(config, dim, idx, ctx, emit_log=False)`` for the
+            incremental path (the loop emits its own ``analyzing`` marker
+            with "(incremental)" suffix), then calls ``_log_dimension_result``
+            after a successful dim. The full-scan fallback uses
+            ``emit_log=True`` so the runner emits its own analyzing marker.
     """
     result: dict[str, Evidence] = {}
     log_info(f"[loop] incremental: {len(dimensions)} dim(s) to process: {', '.join(dimensions)}")
@@ -161,7 +163,7 @@ def run_incremental_loop(
         ev: Evidence | None = None
         last_exc: BaseException | None = None
         try:
-            ev = run_dimension_incremental(config, dimension, idx, ctx)
+            ev = runner.run(config, dimension, idx, ctx, emit_log=False)
         except BrokenPipeError as exc:
             _silence_broken_stdout()
             last_exc = exc
@@ -173,7 +175,7 @@ def run_incremental_loop(
             fallback_options.incremental_file_filter = None
             fallback_config = replace(config, options=fallback_options)
             try:
-                ev = process_fn(fallback_config, dimension, idx, ctx)
+                ev = runner.run(fallback_config, dimension, idx, ctx, emit_log=True)
             except BrokenPipeError as inner_exc:
                 _silence_broken_stdout()
                 last_exc = inner_exc
@@ -193,13 +195,13 @@ def run_incremental_loop(
             )
             last_exc = exc
             ev = None
-        # log_result_fn / on_dimension_done are caller-provided (e.g., the
-        # dashboard's scoring callback). Wrap them too - an exception in a
-        # callback shouldn't drop the next iteration on the floor.
+        # on_dimension_done is caller-provided (e.g., the dashboard's
+        # scoring callback). Wrap it too - an exception in a callback
+        # shouldn't drop the next iteration on the floor.
         if ev:
             _safe_write_dim_state(run_dir, dimension, DimState.DONE)
             try:
-                log_result_fn(ev, dimension, idx, ctx.total)
+                _log_dimension_result(ev, dimension, idx, ctx.total)
                 result[dimension] = ev
                 if on_dimension_done:
                     on_dimension_done(dimension, ev)
@@ -249,7 +251,7 @@ def run_incremental_loop(
 
 def run_per_dimension_loop(
     config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
-    *, process_fn: Callable[..., Evidence | None],
+    *, runner: DimensionRunner,
     on_dimension_done: Callable[[str, Evidence], None] | None = None,
 ) -> dict[str, Evidence]:
     """Per-dimension loop (fallback or single-dimension).
@@ -258,8 +260,9 @@ def run_per_dimension_loop(
         config: Run configuration for this evaluation.
         dimensions: Dimension identifiers to analyze.
         ctx: Shared analysis context (total count, etc.).
-        process_fn: Callback to process a single dimension (signature:
-            ``(config, dimension, idx, ctx) -> Evidence | None``).
+        runner: DimensionRunner used to analyze each dimension. The loop calls
+            ``runner.run(config, dim, idx, ctx, emit_log=True)`` so the runner
+            emits its own analyzing/scoring markers and success log.
     """
     result: dict[str, Evidence] = {}
     skipped_count = 0
@@ -275,7 +278,7 @@ def run_per_dimension_loop(
         _safe_write_dim_state(run_dir, dimension, DimState.RUNNING)
         ev: Evidence | None = None
         try:
-            ev = process_fn(config, dimension, idx, ctx)
+            ev = runner.run(config, dimension, idx, ctx, emit_log=True)
         except BrokenPipeError as exc:
             _silence_broken_stdout()
             skipped_count += 1

@@ -9,13 +9,7 @@ from quodeq.analysis._dim_estimates import compute_dim_estimates, write_dim_esti
 from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
 from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
 from quodeq.analysis._types import RunConfig, _AnalysisContext
-from quodeq.analysis._dimension_ops import (
-    _build_dimension_prompt,
-    _log_dimension_result,
-    _parse_dimension_evidence,
-    _process_single_dimension,
-    _run_dimension_analysis,
-)
+from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
 from quodeq.analysis.subagents.runner import process_consolidated_dimensions
 from quodeq.analysis.subprocess import _get_provider_type
@@ -90,6 +84,11 @@ def _run_dimensions(
     dimensions, ctx = load_analysis_context(config)
     _persist_dim_estimates(config, dimensions)
 
+    # One runner per run. Per-run construction (vs. a module-level
+    # singleton) makes test substitution and concurrency-safety obvious:
+    # each evaluation owns its own DimensionCallbacks instance.
+    runner = DimensionRunner()
+
     # Set the run-level deadline once, just before the dim loop starts.
     # Skipped for dry runs (already returned above), unlimited budget, or
     # when an outer caller (tests) has pre-set deadline_at.
@@ -109,7 +108,7 @@ def _run_dimensions(
         emit_marker("setup", dimensions=dimensions)
         return run_per_dimension_loop(
             config, dimensions, ctx,
-            process_fn=_process_single_dimension,
+            runner=runner,
             on_dimension_done=on_dimension_done,
         )
 
@@ -121,8 +120,7 @@ def _run_dimensions(
         emit_marker("setup", dimensions=dimensions)
         return run_incremental_loop(
             config, dimensions, ctx,
-            process_fn=_process_single_dimension,
-            log_result_fn=_log_dimension_result,
+            runner=runner,
             on_dimension_done=on_dimension_done,
         )
 
@@ -153,7 +151,7 @@ def _run_dimensions(
 
     return run_per_dimension_loop(
         config, dimensions, ctx,
-        process_fn=_process_single_dimension,
+        runner=runner,
         on_dimension_done=on_dimension_done,
     )
 
