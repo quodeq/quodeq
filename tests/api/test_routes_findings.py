@@ -23,7 +23,7 @@ def client(app):
 
 
 class TestDismissEndpoint:
-    def test_dismiss_creates_actions_log(self, client, tmp_path):
+    def test_dismiss_returns_204(self, client, tmp_path):
         project_dir = tmp_path / "my-project"
         project_dir.mkdir()
         resp = client.post("/api/findings/dismiss", json={
@@ -32,7 +32,18 @@ class TestDismissEndpoint:
             "dimension": "maintainability", "severity": "minor",
             "reason": "False positive",
         })
-        assert resp.status_code == 200
+        assert resp.status_code == 204
+        assert resp.data == b""
+
+    def test_dismiss_appends_to_actions_log(self, client, tmp_path):
+        project_dir = tmp_path / "my-project"
+        project_dir.mkdir()
+        client.post("/api/findings/dismiss", json={
+            "project": "my-project",
+            "req": "M-MOD-4", "file": "foo.js", "line": 4,
+            "dimension": "maintainability", "severity": "minor",
+            "reason": "False positive",
+        })
         log = project_dir / "actions.jsonl"
         assert log.exists()
         text = log.read_text()
@@ -45,7 +56,7 @@ class TestDismissEndpoint:
 
 
 class TestRestoreEndpoint:
-    def test_restore_appends_undismiss_event(self, client, tmp_path):
+    def test_restore_returns_204(self, client, tmp_path):
         project_dir = tmp_path / "my-project"
         project_dir.mkdir()
         client.post("/api/findings/dismiss", json={
@@ -57,7 +68,21 @@ class TestRestoreEndpoint:
             "project": "my-project",
             "req": "M-MOD-4", "file": "foo.js", "line": 4,
         })
-        assert resp.status_code == 200
+        assert resp.status_code == 204
+        assert resp.data == b""
+
+    def test_restore_appends_undismiss_event(self, client, tmp_path):
+        project_dir = tmp_path / "my-project"
+        project_dir.mkdir()
+        client.post("/api/findings/dismiss", json={
+            "project": "my-project",
+            "req": "M-MOD-4", "file": "foo.js", "line": 4,
+            "dimension": "maintainability", "severity": "minor",
+        })
+        client.post("/api/findings/restore", json={
+            "project": "my-project",
+            "req": "M-MOD-4", "file": "foo.js", "line": 4,
+        })
         text = (project_dir / "actions.jsonl").read_text()
         assert "FINDING_DISMISSED" in text
         assert "FINDING_UNDISMISSED" in text
