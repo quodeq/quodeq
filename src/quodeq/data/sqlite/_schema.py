@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 EVALUATION_DDL = """
-PRAGMA user_version = 3;
+PRAGMA user_version = 4;
 
 CREATE TABLE findings (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -11,7 +11,13 @@ CREATE TABLE findings (
     dimension       TEXT NOT NULL DEFAULT '',
     requirement     TEXT,
     verdict         TEXT NOT NULL CHECK (verdict IN ('violation','compliance','dismissed')),
-    severity        TEXT NOT NULL CHECK (severity IN ('critical','high','medium','low','minor')),
+    -- Severity buckets used by the scoring engine, eval JSON, and UI are
+    -- 'critical' / 'major' / 'minor'. The legacy 'high' / 'medium' / 'low'
+    -- values remain accepted so older DBs round-trip cleanly. Without
+    -- 'major' here, INSERT OR IGNORE silently dropped every major-severity
+    -- finding on insert, which made principle scores jump to 10.0 after
+    -- the criticals were dismissed (the majors were never in the DB).
+    severity        TEXT NOT NULL CHECK (severity IN ('critical','major','high','medium','low','minor')),
     file            TEXT NOT NULL DEFAULT '',
     line            INTEGER NOT NULL DEFAULT 0,
     end_line        INTEGER NOT NULL DEFAULT 0,
@@ -87,4 +93,4 @@ CREATE TABLE principle_grades (
 CREATE INDEX idx_principle_grades_dimension ON principle_grades(dimension);
 """
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
