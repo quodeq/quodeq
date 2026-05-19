@@ -134,7 +134,7 @@ function renderEvalPrincipleDetail(params, props) {
       severityFilter={params.severity || null}
       onDismiss={(v) => {
         props.dismissFinding(selectedProject, buildDismissPayload(v, evalPrincipal.dimension))
-          .then(() => props.refreshDashboard?.())
+          .then(() => { props.refreshDashboard?.(); props.bumpDismissRefresh?.(); })
           .catch((e) => console.error('[Dismiss] failed:', e));
       }}
     />
@@ -204,6 +204,7 @@ function ViolationsRoute({ params, props }) {
         projectName: props.dashboardData.selectedDisplayName,
         loading: props.dashboardData.loading,
         isFetching: props.dashboardData.isFetching,
+        dismissRefreshKey: props.dismissRefreshKey,
       }}
       callbacks={{
         onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
@@ -301,7 +302,7 @@ const ROUTE_RENDERERS = {
       severityFilter={params.severityFilter || params.severity || null}
       onDismiss={(v) => {
         props.dismissFinding(props.navigation.selectedProject, buildDismissPayload(v))
-          .then(() => props.refreshDashboard?.())
+          .then(() => { props.refreshDashboard?.(); props.bumpDismissRefresh?.(); })
           .catch((e) => console.error('[Dismiss] failed:', e));
       }}
     />
@@ -315,7 +316,7 @@ const ROUTE_RENDERERS = {
       dimension={params.dimension}
       onDismiss={(v) => {
         props.dismissFinding(props.navigation.selectedProject, buildDismissPayload(v, params.dimension))
-          .then(() => props.refreshDashboard?.())
+          .then(() => { props.refreshDashboard?.(); props.bumpDismissRefresh?.(); })
           .catch((e) => console.error('[Dismiss] failed:', e));
       }}
     />
@@ -378,6 +379,13 @@ export default function App() {
   const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [wizardEntry, setWizardEntry] = useState(null);
+  // Incremented after every successful dismiss POST so the violations
+  // page's dismissed sub-tab knows to refetch its list. Without this, a
+  // dismiss made on the principle / file detail page never appeared in the
+  // dismissed list until the user switched projects — the list was only
+  // fetched once on mount.
+  const [dismissRefreshKey, setDismissRefreshKey] = useState(0);
+  const bumpDismissRefresh = () => setDismissRefreshKey((k) => k + 1);
   // Auto-open is a once-per-session decision. Without this guard, closing the
   // wizard sets wizardEntry → null, which re-fires this effect and re-opens
   // the wizard immediately because projects.length is still 0. The user's
@@ -523,6 +531,8 @@ export default function App() {
     settings: state.settings,
     refreshDashboard: state.refreshDashboard,
     dismissFinding,
+    bumpDismissRefresh,
+    dismissRefreshKey,
   };
 
   // Resolve the project's friendly name. Until the /api/projects response

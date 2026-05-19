@@ -131,6 +131,20 @@ export function useExplorerData(project, dimension, runId, refreshSignal) {
     }).catch(() => {});
   }, [refreshSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Live updates via SSE. When a user dismisses a finding on the principle
+  // detail page (or anywhere else in the same run), the backend's SSE tick
+  // emits `scores.updated` with the rescored payload. We fold the matching
+  // dimension into evalData using the same merge helper as the manual
+  // refreshSignal path — so the standard-detail page reflects dismisses
+  // within ~250 ms instead of waiting on a full refetch.
+  const gradeStream = useGradeStream({ project, runId });
+  useEffect(() => {
+    if (!gradeStream.payload) return;
+    const dimData = (gradeStream.payload.dimensions || []).find((d) => d.dimension === dimension);
+    if (!dimData) return;
+    setEvalData((prev) => mergeRescoreIntoEval(prev, dimData));
+  }, [gradeStream.payload, dimension]);
+
   const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes('Overall')), [evalData]);
   const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes('Overall')), [evalData]);
   const allViolations = useMemo(() => computeAllViolations(evalData), [evalData]);

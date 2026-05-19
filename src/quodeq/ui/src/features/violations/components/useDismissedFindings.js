@@ -8,13 +8,17 @@ import {
 } from '../../../api/index.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
 
-export function useDismissedFindings(selectedProject, onRefresh, setRestoreError) {
+export function useDismissedFindings(selectedProject, onRefresh, setRestoreError, refreshKey = 0) {
   const [dismissed, setDismissed] = useState([]);
 
+  // refreshKey lets the parent force a refetch when something dismissed an
+  // entry elsewhere (e.g. the principle-detail page). Without it, the
+  // dismissed sub-tab only fetched on mount, so dismisses made on other
+  // pages never appeared until the user switched projects.
   useEffect(() => {
     if (!selectedProject) return;
     listDismissedFindings(selectedProject).then(setDismissed).catch(() => setDismissed([]));
-  }, [selectedProject]);
+  }, [selectedProject, refreshKey]);
 
   const handleRestore = useCallback(async (d) => {
     try {
