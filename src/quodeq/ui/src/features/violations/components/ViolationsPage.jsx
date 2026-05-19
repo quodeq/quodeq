@@ -97,7 +97,7 @@ function FileSubTab({ dimensions, onFileClick, currentPath, setCurrentPath }) {
   );
 }
 
-function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, initialSubTab, initialFilePath }) {
+function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, initialSubTab, initialFilePath, dismissRefreshKey }) {
   const [activeSubTab, _setActiveSubTab] = useState(initialSubTab);
   const setActiveSubTab = (v) => {
     writeCachedState('violations', selectedProject, { activeSubTab: v });
@@ -110,7 +110,12 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, 
   };
 
   const [restoreError, setRestoreError] = useState(null);
-  const { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll } = useDismissedFindings(selectedProject, onRefresh, setRestoreError);
+  // dismissRefreshKey is bumped by App.jsx after a dismiss POST elsewhere.
+  // useDismissedFindings refetches when this changes, so the dismissed
+  // sub-tab reflects new entries without needing the user to re-open the
+  // page or switch projects.
+  const { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll } =
+    useDismissedFindings(selectedProject, onRefresh, setRestoreError, dismissRefreshKey);
 
   const visibleDimensions = useMemo(() => {
     const visibleSet = new Set(readVisibleStandardIds());
@@ -179,7 +184,7 @@ function ViolationsSubTabContent(props) {
 }
 
 export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
-  const { accumulatedDimensions = [], selectedProject } = data;
+  const { accumulatedDimensions = [], selectedProject, dismissRefreshKey = 0 } = data;
   const { projects = [], projectsLoaded, projectName, loading, isFetching } = data;
   const { onNavigate, onRefresh } = callbacks;
 
@@ -214,6 +219,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
     onRefresh,
     initialSubTab: cached.activeSubTab,
     initialFilePath: cached.fileCurrentPath,
+    dismissRefreshKey,
   });
 
   if (!projectsLoaded) return <LoadingScreen />;

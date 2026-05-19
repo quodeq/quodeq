@@ -252,16 +252,30 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
     try:
         from quodeq.data.sqlite.connection import open_evaluation_db  # noqa: PLC0415
         with open_evaluation_db(run_dir) as conn:
-            rows = conn.execute(
-                "SELECT dimension, score, grade, completed_at FROM dimension_scores ORDER BY dimension",
+            dim_rows = conn.execute(
+                "SELECT dimension, score, grade FROM dimension_scores ORDER BY dimension",
             ).fetchall()
-        # Fingerprint of all dimension_scores rows, not just MAX(completed_at). This
-        # detects grade value changes that happen within the same second (recompute
-        # fires fast enough that two consecutive ticks can produce identical timestamps
-        # but different scores). MAX(completed_at) alone would miss these.
-        # It also detects transitions to the empty state (full-dismiss), which
-        # MAX(completed_at) handles correctly too (None != prior-timestamp).
-        current_fingerprint = repr(rows) if rows else None
+            principle_rows = conn.execute(
+                "SELECT dimension, principle_id, score, grade, finding_count, dismissed_count "
+                "FROM principle_grades ORDER BY dimension, principle_id",
+            ).fetchall()
+        # Fingerprint covers BOTH grade tables (dimension and principle), and excludes
+        # ``completed_at``. Two design points:
+        #
+        # 1. Including principle_grades catches dismisses that change a principle's
+        #    finding_count / dismissed_count even when the rolled-up dimension score
+        #    happens to round to the same value. Without this, the SSE silently
+        #    swallowed real per-principle changes — the UI's `usePrincipleData` hook
+        #    would never see the dismiss and the detail-page grade stayed stale.
+        # 2. Excluding completed_at because SQLite ``CURRENT_TIMESTAMP`` has 1-second
+        #    resolution. Two recomputes within the same second produced identical
+        #    timestamps, neutralising completed_at as a tiebreaker. Letting score +
+        #    grade + finding_count + dismissed_count drive the fingerprint is both
+        #    more correct (it tracks actual content) and avoids spurious events when
+        #    nothing semantic changed.
+        current_fingerprint = (
+            repr((dim_rows, principle_rows)) if (dim_rows or principle_rows) else None
+        )
         if current_fingerprint != state.last_grade_fingerprint:
             from quodeq.services.scoring import get_scores_raw  # noqa: PLC0415
             # run_dir layout: <reports_root>/<project>/<run_id>
