@@ -11,7 +11,7 @@ from quodeq.services.dismissed import dismiss_finding, restore_finding
 
 def test_full_dismiss_flow(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
-    run_dir = project_dir / "runs" / "r1"
+    run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
 
     # Seed a finding from the scan.

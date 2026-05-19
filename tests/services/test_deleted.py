@@ -35,7 +35,7 @@ def _seed_projected_run(
     principle: str = "Modularity",
 ) -> Path:
     """Create a run with one violation finding projected into evaluation.db."""
-    run_dir = project_dir / "runs" / run_id
+    run_dir = project_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     log = run_dir / "events.jsonl"
     EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(

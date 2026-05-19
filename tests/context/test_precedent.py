@@ -25,7 +25,7 @@ def _seed_dismissed(
     line: int,
 ) -> Path:
     """Seed a violation into a run, dismiss it, then project into SQL."""
-    run_dir = project_dir / "runs" / run_id
+    run_dir = project_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     log = run_dir / "events.jsonl"
     EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
@@ -126,14 +126,14 @@ def test_load_returns_empty_for_missing_dir(tmp_path: Path):
     assert load_precedent_fingerprints(tmp_path / "missing") == set()
 
 
-def test_load_returns_empty_for_no_runs(tmp_path: Path):
-    """Project dir with no runs/ sub-directory returns an empty set."""
+def test_load_returns_empty_for_project_with_no_runs(tmp_path: Path):
+    """Project dir with no run sub-directories returns an empty set."""
     assert load_precedent_fingerprints(tmp_path) == set()
 
 
-def test_load_returns_empty_when_runs_dir_is_empty(tmp_path: Path):
-    """runs/ exists but contains no run directories -- still empty."""
-    (tmp_path / "runs").mkdir()
+def test_load_skips_subdirs_without_db(tmp_path: Path):
+    """Subdirectories without an evaluation.db are silently skipped."""
+    (tmp_path / "r_no_db").mkdir()
     assert load_precedent_fingerprints(tmp_path) == set()
 
 
@@ -156,7 +156,7 @@ def test_load_returns_fingerprints_from_sql(tmp_path: Path):
 def test_load_skips_run_dirs_without_db(tmp_path: Path):
     """A run directory with no evaluation.db is silently skipped."""
     project_dir = tmp_path / "proj"
-    (project_dir / "runs" / "r_no_db").mkdir(parents=True)
+    (project_dir / "r_no_db").mkdir(parents=True)
     # Only a real dismissed run seeds the expected fingerprint.
     _seed_dismissed(project_dir, "r_real", req="X", snippet="s", file="f.py", line=1)
 

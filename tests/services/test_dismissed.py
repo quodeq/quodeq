@@ -14,7 +14,7 @@ from quodeq.services.dismissed import (
 
 
 def _seed_run(project_dir: Path, run_id: str, *, req: str, file: str, line: int) -> Path:
-    run_dir = project_dir / "runs" / run_id
+    run_dir = project_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     log = run_dir / "events.jsonl"
     EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(

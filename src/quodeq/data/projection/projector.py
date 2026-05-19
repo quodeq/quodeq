@@ -77,6 +77,12 @@ class Projector:
             current_size = events_path.stat().st_size
             events_changed = projected_size is None or projected_size != current_size
 
+            # Pre-PR-1 DBs have a checkpoint (older code projected them) but no
+            # ``projection_event_log_size`` key (added in PR 1). Their findings
+            # may be missing columns the current mappers write (e.g. requirement).
+            # Force a full rebuild on first contact so every column is correct.
+            pre_pr1_db = projected_size is None and store.get_checkpoint() is not None
+
             # Actions.jsonl branch (new)
             actions_changed = False
             actions_log: Path | None = None
@@ -91,7 +97,7 @@ class Projector:
 
             # Project events first (so new findings exist before action events touch them).
             if events_changed:
-                result = self.project(events_path, run_dir)
+                result = self.project(events_path, run_dir, force_rebuild=pre_pr1_db)
             else:
                 result = ProjectionResult(events_projected=0, rebuilt=False)
 

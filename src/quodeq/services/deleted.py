@@ -156,12 +156,11 @@ def _sweep_dismissed_matching(project_dir: Path, key: tuple) -> int:
     from quodeq.data.sqlite.connection import open_evaluation_db  # noqa: PLC0415
 
     dimension, principle, file = key
-    runs_root = project_dir / "runs"
-    if not runs_root.is_dir():
+    if not project_dir.is_dir():
         return 0
 
     matching: list[tuple[str, str, int]] = []
-    for run_dir in runs_root.iterdir():
+    for run_dir in project_dir.iterdir():
         if not run_dir.is_dir():
             continue
         db_path = run_dir / "evaluation.db"

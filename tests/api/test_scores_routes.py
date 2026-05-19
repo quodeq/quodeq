@@ -28,7 +28,7 @@ def _seed_run(
     project_after: bool = True,
 ) -> Path:
     """Create run directory, write events.jsonl, optionally trigger projection."""
-    run_dir = reports_root / project / "runs" / run_id
+    run_dir = reports_root / project / run_id
     run_dir.mkdir(parents=True)
     log = run_dir / "events.jsonl"
     writer = EventLogWriter(log)
@@ -82,7 +82,7 @@ def test_get_scores_raw_uses_sql_when_grades_present(tmp_path: Path, monkeypatch
 
 def test_get_scores_raw_returns_empty_shape_when_no_findings(tmp_path: Path) -> None:
     """When a run has no findings, get_scores_raw returns the empty shape."""
-    run_dir = tmp_path / "myproject" / "runs" / "r1"
+    run_dir = tmp_path / "myproject" / "r1"
     run_dir.mkdir(parents=True)
     # Create an empty events log (no findings emitted).
     (run_dir / "events.jsonl").touch()
@@ -93,7 +93,7 @@ def test_get_scores_raw_returns_empty_shape_when_no_findings(tmp_path: Path) -> 
 
 def test_get_scores_raw_raises_file_not_found_for_missing_run(tmp_path: Path) -> None:
     """FileNotFoundError raised when run directory does not exist."""
-    (tmp_path / "myproject" / "runs").mkdir(parents=True)
+    (tmp_path / "myproject").mkdir(parents=True)
     with pytest.raises(FileNotFoundError):
         get_scores_raw(tmp_path, "myproject", "nonexistent-run")
 
@@ -166,7 +166,7 @@ def test_get_scores_raw_reflects_dismissal_via_sql(tmp_path: Path) -> None:
     from quodeq.services.dismissed import dismiss_finding  # noqa: PLC0415
     project_dir = tmp_path / "myproject"
     dismiss_finding(project_dir, {"req": "R1", "file": "a.py", "line": 10})
-    run_dir = project_dir / "runs" / "r1"
+    run_dir = project_dir / "r1"
     Projector().ensure_projected(run_dir / "events.jsonl", run_dir, project_dir=project_dir)
 
     after = get_scores_raw(tmp_path, "myproject", "r1")

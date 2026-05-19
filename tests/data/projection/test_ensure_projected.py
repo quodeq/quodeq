@@ -115,7 +115,7 @@ def _verdict_for(run_dir: Path, req: str, file: str, line: int) -> str | None:
 
 def test_ensure_replays_actions_jsonl(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
-    run_dir = project_dir / "runs" / "r1"
+    run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
 
     events_log = _seed_run_with_finding(run_dir, req="R1", file="a.py", line=10)
@@ -132,7 +132,7 @@ def test_ensure_replays_actions_jsonl(tmp_path: Path) -> None:
 
 def test_ensure_no_op_when_actions_log_unchanged(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
-    run_dir = project_dir / "runs" / "r1"
+    run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
     events_log = _seed_run_with_finding(run_dir, req="R1", file="a.py", line=10)
     projector = Projector()
@@ -162,7 +162,7 @@ def test_ensure_applies_existing_dismissals_to_freshly_scanned_findings(tmp_path
     in update_actions would skip the replay and the new finding would stay as 'violation'.
     """
     project_dir = tmp_path / "project"
-    run_dir = project_dir / "runs" / "r1"
+    run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
     events_log = run_dir / "events.jsonl"
 
@@ -197,7 +197,7 @@ def test_ensure_applies_existing_dismissals_to_freshly_scanned_findings(tmp_path
 
 def test_ensure_projected_runs_migration_first(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
-    run_dir = project_dir / "runs" / "r1"
+    run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
     events_log = _seed_run_with_finding(run_dir, req="R1", file="a.py", line=10)
     # Legacy: dismissed.json exists, actions.jsonl does not.
@@ -213,7 +213,7 @@ def test_ensure_projected_runs_migration_first(tmp_path: Path) -> None:
 
 def test_ensure_projected_populates_grade_tables(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
-    run_dir = project_dir / "runs" / "r1"
+    run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
     events_log = _seed_run_with_finding(run_dir, req="R1", file="a.py", line=10)
 
@@ -225,9 +225,44 @@ def test_ensure_projected_populates_grade_tables(tmp_path: Path) -> None:
     assert len(store.read_principle_grades()) == 1
 
 
+def test_ensure_force_rebuilds_pre_pr1_db(tmp_path: Path) -> None:
+    """Pre-PR-1 DBs were projected by older code that left ``findings.requirement``
+    empty. They have a checkpoint but no ``projection_event_log_size`` key. On
+    first contact, ensure_projected must force a rebuild so the new mappers
+    populate every column (otherwise dismissals via UPDATE WHERE requirement=?
+    match zero rows and silently no-op).
+    """
+    project_dir = tmp_path / "project"
+    run_dir = project_dir / "r1"
+    run_dir.mkdir(parents=True)
+    events_log = _seed_run_with_finding(run_dir, req="R1", file="a.py", line=10)
+
+    # Project normally so the DB has rows.
+    Projector().project(events_log, run_dir)
+    # Simulate the pre-PR-1 state: requirement was never written, and the
+    # projection_event_log_size key (added in PR 1) is absent.
+    with open_evaluation_db(run_dir) as conn:
+        conn.execute("UPDATE findings SET requirement = ''")
+        conn.execute(
+            "DELETE FROM run_meta WHERE key = 'projection_event_log_size'"
+        )
+        conn.commit()
+    assert _verdict_for(run_dir, "R1", "a.py", 10) is None  # match-by-req fails
+
+    # Dismiss the finding via the action log.
+    ActionLogWriter(project_dir).emit(
+        FindingDismissedEvent(payload=FindingDismissed(req="R1", file="a.py", line=10))
+    )
+
+    Projector().ensure_projected(events_log, run_dir, project_dir=project_dir)
+
+    # Force-rebuild rewrites requirement from events.jsonl, then the dismiss applies.
+    assert _verdict_for(run_dir, "R1", "a.py", 10) == "dismissed"
+
+
 def test_ensure_projected_grade_updates_after_dismiss(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
-    run_dir = project_dir / "runs" / "r1"
+    run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
     events_log = _seed_run_with_finding(run_dir, req="R1", file="a.py", line=10)
     Projector().ensure_projected(events_log, run_dir, project_dir=project_dir)
