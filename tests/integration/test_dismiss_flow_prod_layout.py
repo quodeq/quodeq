@@ -66,25 +66,23 @@ def test_load_dismissed_returns_entries_under_prod_layout(tmp_path: Path) -> Non
     assert items[0]["line"] == 10
 
 
-def test_dismiss_emits_scores_updated_under_prod_layout(tmp_path: Path) -> None:
-    """Production layout: SSE tick must emit scores.updated after dismiss."""
+def test_dismiss_under_prod_layout_recomputes_scores(tmp_path: Path) -> None:
+    """Production layout: dismiss + projection must drop the finding from the
+    score path. (The score now arrives via the dismiss HTTP response instead
+    of an SSE event — see tests/api/test_routes_findings.py for that contract.)
+    """
     eval_dir = tmp_path / "evaluations"
     project_dir = eval_dir / "proj1"
     run_dir = project_dir / "run1"
     _seed_finding(run_dir, req="R1", file="a.py", line=10)
 
-    # Baseline tick.
-    state = WatcherState()
-    _, state = compute_tick(run_dir, state)
-
     dismiss_finding(project_dir, {"req": "R1", "file": "a.py", "line": 10})
+    SqliteFindingsRepository(run_dir).list_by_dimension("Security")
 
-    events, _ = compute_tick(run_dir, state)
-    grade_events = [e for e in events if e[0] == "scores.updated"]
-    assert len(grade_events) == 1, (
-        f"Expected scores.updated after dismiss under prod layout, got: "
-        f"{[e[0] for e in events]}"
-    )
-    payload = json.loads(grade_events[0][1])
+    from quodeq.services.scoring import get_scores_raw  # noqa: PLC0415
+    payload = get_scores_raw(eval_dir, "proj1", "run1")
     security = next((d for d in payload.get("dimensions", []) if d.get("dimension") == "Security"), None)
-    assert security is None or security.get("overallScore") is None
+    assert security is None or security.get("overallScore") is None, (
+        "After dismissing the only finding, the Security dimension should "
+        f"have no score in the rescored payload. Got: {security}"
+    )

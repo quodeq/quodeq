@@ -1,8 +1,7 @@
 import React from 'react';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MockEventSource } from '../../../test-utils/MockEventSource.js';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { usePrincipleData } from './explorerDataHooks.js';
 
@@ -23,91 +22,96 @@ const EVAL_PRINCIPAL = {
   dateLabel: '',
 };
 
-const RESCORE_RESPONSE = {
-  dimensions: [{
-    dimension: 'Security',
-    overallScore: '7.5/10',
-    overallGrade: 'B+',
-    principles: [{ principle: 'Input Validation', score: '8.0/10', grade: 'A-' }],
-  }],
-  summary: { overallGrade: 'B+', numericAverage: 7.5 },
+// Shape returned by POST /api/findings/dismiss with run_id supplied.
+const DISMISS_RESPONSE = {
+  scores: {
+    dimensions: [{
+      dimension: 'Security',
+      overallScore: '6.0/10',
+      overallGrade: 'C',
+      principles: [{ principle: 'Input Validation', score: '6.5/10', grade: 'C+' }],
+    }],
+    summary: { overallGrade: 'C', numericAverage: 6.0 },
+  },
 };
 
 // ---------------------------------------------------------------------------
-// API mock
+// API mock — usePrincipleData no longer touches the API directly. It receives
+// the dismiss handler from the caller (App.jsx) and treats its resolved value
+// as the source of truth for the new score.
 // ---------------------------------------------------------------------------
-
-const getRunScoresMock = vi.fn(async () => RESCORE_RESPONSE);
-const fakeApi = { getRunScores: getRunScoresMock };
 
 function wrapper({ children }) {
-  return <ApiProvider value={fakeApi}>{children}</ApiProvider>;
+  return <ApiProvider value={{}}>{children}</ApiProvider>;
 }
 
-// ---------------------------------------------------------------------------
-// EventSource / flag lifecycle
-// ---------------------------------------------------------------------------
-
 describe('usePrincipleData', () => {
-  let originalEventSource;
-
   beforeEach(() => {
-    originalEventSource = global.EventSource;
-    global.EventSource = MockEventSource;
-    MockEventSource.last = null;
-    getRunScoresMock.mockClear();
-  });
-
-  afterEach(() => {
-    global.EventSource = originalEventSource;
     vi.clearAllMocks();
   });
 
-  it('does NOT call getRunScores after dismiss', async () => {
-    const onDismiss = vi.fn();
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('updates liveScore/liveGrade from the dismiss response payload', async () => {
+    const onDismiss = vi.fn(async () => DISMISS_RESPONSE);
     const { result } = renderHook(
       () => usePrincipleData(EVAL_PRINCIPAL, null, onDismiss),
       { wrapper },
     );
 
-    // Wait for the hook to stabilise (EventSource created by useGradeStream).
-    await waitFor(() => expect(MockEventSource.last).not.toBeNull());
-
     await act(async () => {
-      result.current.handleDismiss({ file: 'a.py', line: 10, principle: 'Input Validation' });
+      await result.current.handleDismiss({ file: 'a.py', line: 10, principle: 'Input Validation' });
     });
 
-    // onDismiss forwarded, but getRunScores must NOT have been called.
     expect(onDismiss).toHaveBeenCalledTimes(1);
-    expect(getRunScoresMock).not.toHaveBeenCalled();
+    expect(result.current.liveScore).toBe('6.5/10');
+    expect(result.current.liveGrade).toBe('C+');
   });
 
-  it('updates liveScore and liveGrade from useGradeStream payload', async () => {
+  it('keeps the violation in the dismissed set so it disappears from the list', async () => {
+    const onDismiss = vi.fn(async () => DISMISS_RESPONSE);
     const { result } = renderHook(
-      () => usePrincipleData(EVAL_PRINCIPAL, null, vi.fn()),
+      () => usePrincipleData(EVAL_PRINCIPAL, null, onDismiss),
       { wrapper },
     );
 
-    // Wait until useGradeStream has opened the EventSource connection.
-    await waitFor(() => expect(MockEventSource.last).not.toBeNull());
-
-    const payload = {
-      dimensions: [{
-        dimension: 'Security',
-        overallScore: '6.0/10',
-        overallGrade: 'C',
-        principles: [{ principle: 'Input Validation', score: '6.5/10', grade: 'C+' }],
-      }],
-      summary: { overallGrade: 'C', numericAverage: 6.0 },
-    };
-
-    act(() => {
-      MockEventSource.last.emit('scores.updated', payload);
+    await act(async () => {
+      await result.current.handleDismiss({ file: 'a.py', line: 10, principle: 'Input Validation' });
     });
 
-    await waitFor(() => {
-      expect(result.current.liveScore).toBe('6.5/10');
-      expect(result.current.liveGrade).toBe('C+');
+    expect(result.current.dismissedSet.has('a.py:10')).toBe(true);
+  });
+
+  it('rolls back the optimistic dismiss when the POST fails', async () => {
+    const onDismiss = vi.fn(async () => { throw new Error('network down'); });
+    const { result } = renderHook(
+      () => usePrincipleData(EVAL_PRINCIPAL, null, onDismiss),
+      { wrapper },
+    );
+
+    await act(async () => {
+      await result.current.handleDismiss({ file: 'a.py', line: 10, principle: 'Input Validation' });
     });
+
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(result.current.dismissedSet.has('a.py:10')).toBe(false);
+    expect(result.current.liveScore).toBeNull();
+    expect(result.current.liveGrade).toBeNull();
+  });
+
+  it('does nothing when no onDismiss prop is provided', async () => {
+    const { result } = renderHook(
+      () => usePrincipleData(EVAL_PRINCIPAL, null, null),
+      { wrapper },
+    );
+
+    await act(async () => {
+      await result.current.handleDismiss({ file: 'a.py', line: 10, principle: 'Input Validation' });
+    });
+
+    // No throw, no state change — the dismissed-set stays empty.
+    expect(result.current.dismissedSet.size).toBe(0);
   });
 });
