@@ -307,8 +307,17 @@ from typing import Iterator
 
 from quodeq.api._sse_log_helpers import sse_line
 
-_TICK_MS = int(os.environ.get("QUODEQ_SSE_TICK_MS", "250"))
 _HEARTBEAT_S = float(os.environ.get("QUODEQ_SSE_HEARTBEAT_S", "15"))
+
+
+def _tick_ms() -> int:
+    """Read tick interval at call time so tests can set QUODEQ_SSE_TICK_MS=0
+    to force a single-tick drain. Reading at module import time made the env
+    var a no-op for tests that set it inside the test body."""
+    try:
+        return int(os.environ.get("QUODEQ_SSE_TICK_MS", "250"))
+    except ValueError:
+        return 250
 _TERMINAL_STATES = frozenset({"done", "failed", "cancelled"})
 
 
@@ -342,11 +351,12 @@ def run_events_generator(
     so cleanup is a no-op. The block exists so a future change that adds
     a longer-lived resource has a place to release it.
     """
-    sleep_s = tick_seconds if tick_seconds is not None else (_TICK_MS / 1000.0)
+    sleep_s = tick_seconds if tick_seconds is not None else (_tick_ms() / 1000.0)
     heartbeat_s = heartbeat_seconds if heartbeat_seconds is not None else _HEARTBEAT_S
     state = WatcherState(last_event_ts=last_event_ts)
     last_emit_at = time.monotonic()
     yield ":keepalive\n\n"
+    done_emitted = False  # Track whether we've already sent the terminal "done" frame.
 
     try:
         while True:
@@ -360,12 +370,19 @@ def run_events_generator(
                     if done:
                         terminal_state = terminal
 
-            if terminal_state:
+            # Emit "done" once per stream when the run enters a terminal state, so
+            # clients tracking eval lifecycle (e.g. useRunEventStream) can react.
+            # Do NOT close the stream — completed runs are the primary case where
+            # users dismiss findings, and dismisses need scores.updated to flow.
+            # Closing here is what made the live-grade pipeline a Potemkin village:
+            # every "subscriber" was subscribing to a stream that had already shut.
+            if terminal_state and not done_emitted:
                 yield sse_line(
                     json.dumps({"state": terminal_state}, separators=(",", ":")),
                     event="done",
                 )
-                return
+                last_emit_at = time.monotonic()
+                done_emitted = True
 
             if time.monotonic() - last_emit_at >= heartbeat_s:
                 yield ":keepalive\n\n"
