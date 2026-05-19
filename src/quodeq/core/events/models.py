@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
 from uuid import uuid4, UUID
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from quodeq.core.types.req_ref import ReqRef
 
@@ -63,6 +63,32 @@ class Judgment(BaseModel):
     req: Optional[str] = None
     req_refs: List[ReqRef] = Field(default_factory=list)
     cwe: Optional[str] = None
+
+    @field_validator("req_refs", mode="before")
+    @classmethod
+    def _coerce_legacy_req_refs(cls, value: Any) -> Any:
+        """Accept the legacy bare-string format for ``req_refs``.
+
+        Historical events.jsonl files stored req_refs as a list of bare
+        strings (e.g. ``["CWE-89", "CISQ"]``) before the ReqRef struct was
+        introduced. Strict validation rejected the whole event, which made
+        EventLogReader silently skip it — producing empty grade tables and
+        nonsensical scores for any pre-refactor run.
+
+        Coerce strings to ``ReqRef(label=<string>, url="")`` so legacy events
+        round-trip cleanly. The empty url means the UI's filterValidRefs()
+        drops them from links (it requires http(s)://), which is the right
+        behaviour: there is no URL to recover.
+        """
+        if not isinstance(value, list):
+            return value
+        coerced = []
+        for item in value:
+            if isinstance(item, str):
+                coerced.append(ReqRef(label=item, url=""))
+            else:
+                coerced.append(item)
+        return coerced
 
     def is_violation(self) -> bool:
         return self.verdict == "violation"
