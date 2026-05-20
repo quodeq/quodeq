@@ -11,13 +11,14 @@ from dataclasses import replace
 from pathlib import Path
 
 from quodeq.core.events.models import (
+    EventType,
     FindingDismissed,
     FindingDismissedEvent,
     FindingUndismissed,
     FindingUndismissedEvent,
 )
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
-from quodeq.data.actions_log import ActionLogWriter
+from quodeq.data.actions_log import ActionLogWriter, read_action_events
 from quodeq.data.sqlite.connection import open_evaluation_db
 
 
@@ -43,25 +44,31 @@ def restore_finding(project_dir: Path, finding: dict) -> None:
 
 
 def dismissed_keys(project_dir: Path) -> set[tuple]:
-    """Aggregate dismissed (req, file, line) keys across all run DBs under project_dir."""
+    """Return the net set of dismissed (req, file, line) keys for a project.
+
+    Reads ``actions.jsonl`` directly and replays
+    ``FINDING_DISMISSED`` / ``FINDING_UNDISMISSED`` in order, so the result
+    reflects user intent regardless of whether any individual run has
+    been projected into SQL.
+
+    The previous implementation read ``WHERE verdict = 'dismissed'`` from
+    each run's ``findings`` table. That broke for older runs that don't
+    have an ``events.jsonl``: the findings table stayed empty, so SQL had
+    nothing to surface, so rescore saw an empty dismissed set, so the
+    score never moved after a dismiss. The actions log is the source of
+    truth — the SQL projection is just a downstream view.
+    """
     if not project_dir.is_dir():
         return set()
 
     keys: set[tuple] = set()
-    for run_dir in project_dir.iterdir():
-        if not run_dir.is_dir():
-            continue
-        db_path = run_dir / "evaluation.db"
-        if not db_path.is_file():
-            continue
-        try:
-            with open_evaluation_db(run_dir) as conn:
-                for row in conn.execute(
-                    "SELECT requirement, file, line FROM findings WHERE verdict = 'dismissed'"
-                ):
-                    keys.add((row[0] or "", row[1] or "", int(row[2] or 0)))
-        except Exception:
-            continue
+    for event in read_action_events(project_dir):
+        payload = event.payload
+        key = (str(payload.req or ""), str(payload.file or ""), int(payload.line or 0))
+        if event.event_type == EventType.FINDING_DISMISSED:
+            keys.add(key)
+        elif event.event_type == EventType.FINDING_UNDISMISSED:
+            keys.discard(key)
     return keys
 
 
