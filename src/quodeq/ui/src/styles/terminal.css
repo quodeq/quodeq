@@ -960,9 +960,12 @@ button.term-sev-badge--clickable:focus-visible {
 
 
 /* ------------------------------------------------------------
-   Responsive .history-panels-row — wrap chart + dimensions onto
-   two rows once combined min width is no longer available.
-   Each child keeps a soft floor so it doesn't collapse too thin.
+   Responsive .history-panels-row — chart + dimensions sit side by
+   side on wide viewports and stack on narrow ones. Mirrors the
+   media-query pattern used by .qd-top-grid on the detail page so
+   the behaviour is predictable across webview engines (the prior
+   min(100%, 500px) floor was fragile against history.css's
+   `> *` rule and didn't always trigger the wrap).
    ------------------------------------------------------------ */
 .history-panels-row {
   flex-wrap: wrap !important;
@@ -970,11 +973,18 @@ button.term-sev-badge--clickable:focus-visible {
 }
 .history-panels-row > .run-history-panel,
 .history-panels-row > .dim-score-panel {
-  /* Wrap sooner — below ~1040px combined, the two panels stack vertically
-     so each has full width rather than cramming side-by-side and clipping
-     the DIMENSIONS row numerics. */
-  flex: 1 1 500px !important;
-  min-width: min(100%, 500px) !important;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+}
+@media (max-width: 1120px) {
+  .history-panels-row {
+    flex-direction: column !important;
+  }
+  .history-panels-row > .run-history-panel,
+  .history-panels-row > .dim-score-panel {
+    flex-basis: auto !important;
+    width: 100% !important;
+  }
 }
 
 /* ------------------------------------------------------------
