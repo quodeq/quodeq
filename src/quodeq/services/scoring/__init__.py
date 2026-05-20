@@ -236,13 +236,46 @@ def _build_response_from_grade_tables(run_dir: Path) -> dict:
     return {"dimensions": dim_dicts, "summary": summary}
 
 
+def _build_response_from_eval_files(
+    reports_root: Path, project: str, run_id: str,
+) -> dict:
+    """Read eval JSON files for a run and apply rescore (legacy path).
+
+    Used for older runs that pre-date the event-log scoring engine. Those runs
+    never get an ``events.jsonl`` so SQL projection has nothing to chew on —
+    the dim_scores / principle_grades tables stay empty forever. But the JSON
+    files (``evaluation/<dim>.json``) hold the original scores, and dismisses
+    on actions.jsonl can be applied via the same ``rescore_dimensions`` helper
+    the dashboard already uses for accumulated data.
+
+    Returns the same camelCase ``{dimensions, summary}`` shape as the SQL
+    path, so callers (UI dismiss handlers) don't need to branch.
+    """
+    base_fetcher = _make_run_dimension_fetcher(reports_root, project)
+    project_dir = reports_root / project
+    dismissed = dismissed_keys(project_dir)
+    deleted = deleted_keys(project_dir)
+
+    dims = base_fetcher(run_id)
+    rescored = rescore_dimensions(dims, dismissed, deleted)
+    return {
+        "dimensions": rescored.get("dimensions", []),
+        "summary": rescored.get("summary", {}),
+    }
+
+
 def get_scores_raw(
     reports_root: Path, project: str, run_id: str,
 ) -> dict:
     """Return raw rescore dict for a single run (explorer detail compat).
 
-    Reads from SQL grade tables after projection. Returns an empty shape when
-    grade tables are empty (run not yet projected or has no findings).
+    Tries SQL grade tables first (fast path for runs projected from
+    events.jsonl). Falls back to reading the eval JSON files + applying
+    rescore when SQL is empty — this is the case for older runs that
+    pre-date the event-log scoring engine. Without this fallback, ~all
+    pre-event-log runs returned an empty ``{dimensions: [], summary: {}}``
+    payload, which made live-grade updates impossible for them: the dismiss
+    POST returned no scores, the UI had nothing to apply.
     """
     run_dir = reports_root / project / run_id
     if not run_dir.is_dir():
@@ -251,16 +284,17 @@ def get_scores_raw(
     from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
     from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
 
-    repo = SqliteFindingsRepository(run_dir)
-    repo._ensure_fresh()  # noqa: SLF001
+    # SQL path is meaningful only when events.jsonl exists. For older runs
+    # without one, skip straight to the JSON-file fallback so we don't have
+    # to wait on a no-op projection that will leave the grade tables empty.
+    if (run_dir / "events.jsonl").is_file():
+        repo = SqliteFindingsRepository(run_dir)
+        repo._ensure_fresh()  # noqa: SLF001
+        store = SQLiteStateStore(run_dir)
+        if store.read_dimension_scores():
+            return _build_response_from_grade_tables(run_dir)
 
-    store = SQLiteStateStore(run_dir)
-    dim_rows = store.read_dimension_scores()
-    if not dim_rows:
-        # No findings projected yet — return an empty shape.
-        return {"dimensions": [], "summary": {}}
-
-    return _build_response_from_grade_tables(run_dir)
+    return _build_response_from_eval_files(reports_root, project, run_id)
 
 
 def _make_rescoring_fetcher(

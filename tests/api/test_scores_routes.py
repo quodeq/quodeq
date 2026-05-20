@@ -81,14 +81,65 @@ def test_get_scores_raw_uses_sql_when_grades_present(tmp_path: Path, monkeypatch
 
 
 def test_get_scores_raw_returns_empty_shape_when_no_findings(tmp_path: Path) -> None:
-    """When a run has no findings, get_scores_raw returns the empty shape."""
+    """When a run has no findings, get_scores_raw returns an empty shape.
+
+    The summary now carries the rescore-engine's zero-state structure
+    (``dimensionsCount=0``, empty ``gradeBreakdown``) instead of ``{}``,
+    matching what runs without ``events.jsonl`` (the legacy JSON-file
+    fallback path) return. Same empty meaning, slightly richer shape.
+    """
     run_dir = tmp_path / "myproject" / "r1"
     run_dir.mkdir(parents=True)
     # Create an empty events log (no findings emitted).
     (run_dir / "events.jsonl").touch()
 
     result = get_scores_raw(tmp_path, "myproject", "r1")
-    assert result == {"dimensions": [], "summary": {}}
+    assert result["dimensions"] == []
+    assert result["summary"].get("dimensionsCount", 0) == 0
+    assert result["summary"].get("gradeBreakdown", []) == []
+
+
+def test_get_scores_raw_reads_eval_json_when_no_events_log(tmp_path: Path) -> None:
+    """Old runs that pre-date the event-log scoring engine have only
+    ``evaluation/<dim>.json`` files — no ``events.jsonl``. ``get_scores_raw``
+    must fall back to the JSON-file path so the dismiss-returns-scores flow
+    works for these runs too. Without this fallback, every run in the 100+
+    older history of a long-lived project returned an empty payload, and
+    dismissing a finding silently failed to update the visible score.
+    """
+    import json
+    run_dir = tmp_path / "myproject" / "r1"
+    (run_dir / "evaluation").mkdir(parents=True)
+    # Synthesize a minimal eval JSON file (matches the schema the parser
+    # expects). One Security violation under principle "Integrity".
+    (run_dir / "evaluation" / "Security.json").write_text(json.dumps({
+        "schema_version": 1,
+        "dimension": "Security",
+        "project": "myproject",
+        "runId": "r1",
+        "overallScore": "7.0/10",
+        "overallGrade": "Good",
+        "principles": [{
+            "name": "Integrity", "score": "7.0/10", "grade": "Good",
+            "violations": [], "compliance": [],
+        }],
+        "violations": [{
+            "principle": "Integrity", "req": "R1",
+            "file": "a.py", "line": 10, "severity": "major",
+            "reason": "bad", "title": "Bad",
+        }],
+        "compliance": [],
+    }))
+
+    result = get_scores_raw(tmp_path, "myproject", "r1")
+
+    assert len(result["dimensions"]) > 0, (
+        f"Expected dimensions in payload from eval JSON fallback, got {result}"
+    )
+    security = next((d for d in result["dimensions"] if d["dimension"] == "Security"), None)
+    assert security is not None, (
+        f"Security dimension missing from fallback payload: {result['dimensions']}"
+    )
 
 
 def test_get_scores_raw_raises_file_not_found_for_missing_run(tmp_path: Path) -> None:

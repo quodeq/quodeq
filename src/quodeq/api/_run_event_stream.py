@@ -62,14 +62,6 @@ def serialize_finding_event(judgment_dict: dict[str, Any]) -> str:
     return json.dumps(judgment_dict, separators=(",", ":"))
 
 
-def serialize_scores_updated_event(payload: dict[str, Any]) -> str:
-    """Return the SSE data: payload for an `event: scores.updated` frame.
-
-    Payload matches the /api/projects/<p>/scores/<run> response shape.
-    """
-    return json.dumps(payload, separators=(",", ":"))
-
-
 @dataclass
 class WatcherState:
     """Mutable per-stream state. Tracks what has been emitted to one client.
@@ -77,14 +69,16 @@ class WatcherState:
     last_event_ts is the ISO 8601 timestamp cursor for resuming from events.jsonl
     on reconnect (via Last-Event-ID). last_event_counter is a sequential integer
     used as finding `id` in the payload for client backward-compatibility.
-    last_grade_fingerprint is a repr() of the sorted dimension_scores rows the
-    last time a scores.updated event was emitted; None means never checked.
+
+    Grade updates intentionally do NOT live on the SSE stream — mutations
+    (dismiss / restore / delete) return the rescored payload synchronously
+    from their HTTP response. SSE is reserved for in-progress eval tracking:
+    new findings, dimension completions, status transitions, terminal done.
     """
     last_event_ts: datetime | None = None
     last_event_counter: int = 0
     last_status_mtime: float | None = None
     emitted_dimensions: frozenset[str] = field(default_factory=frozenset)
-    last_grade_fingerprint: str | None = None
 
 
 _logger = logging.getLogger(__name__)
@@ -237,66 +231,18 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
         new_last_ts = event_ts
         new_counter = counter
 
-    # --- scores.updated branch ---
-    # Trigger projection (cheap no-op if no JSONL/actions log activity since last tick).
-    # This applies any actions.jsonl events so grade tables stay current.
-    grade_event: EventTuple | None = None
-    new_grade_fingerprint = state.last_grade_fingerprint
-    try:
-        from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
-        repo = SqliteFindingsRepository(run_dir)
-        repo._ensure_fresh()  # noqa: SLF001
-    except Exception:
-        _logger.warning("SSE tick: ensure_fresh failed for %s", run_dir, exc_info=True)
-
-    try:
-        from quodeq.data.sqlite.connection import open_evaluation_db  # noqa: PLC0415
-        with open_evaluation_db(run_dir) as conn:
-            dim_rows = conn.execute(
-                "SELECT dimension, score, grade FROM dimension_scores ORDER BY dimension",
-            ).fetchall()
-            principle_rows = conn.execute(
-                "SELECT dimension, principle_id, score, grade, finding_count, dismissed_count "
-                "FROM principle_grades ORDER BY dimension, principle_id",
-            ).fetchall()
-        # Fingerprint covers BOTH grade tables (dimension and principle), and excludes
-        # ``completed_at``. Two design points:
-        #
-        # 1. Including principle_grades catches dismisses that change a principle's
-        #    finding_count / dismissed_count even when the rolled-up dimension score
-        #    happens to round to the same value. Without this, the SSE silently
-        #    swallowed real per-principle changes — the UI's `usePrincipleData` hook
-        #    would never see the dismiss and the detail-page grade stayed stale.
-        # 2. Excluding completed_at because SQLite ``CURRENT_TIMESTAMP`` has 1-second
-        #    resolution. Two recomputes within the same second produced identical
-        #    timestamps, neutralising completed_at as a tiebreaker. Letting score +
-        #    grade + finding_count + dismissed_count drive the fingerprint is both
-        #    more correct (it tracks actual content) and avoids spurious events when
-        #    nothing semantic changed.
-        current_fingerprint = (
-            repr((dim_rows, principle_rows)) if (dim_rows or principle_rows) else None
-        )
-        if current_fingerprint != state.last_grade_fingerprint:
-            from quodeq.services.scoring import get_scores_raw  # noqa: PLC0415
-            # run_dir layout: <reports_root>/<project>/<run_id>
-            reports_root = run_dir.parent.parent
-            project = run_dir.parent.name
-            run_id = run_dir.name
-            payload = get_scores_raw(reports_root, project, run_id)
-            grade_event = ("scores.updated", serialize_scores_updated_event(payload), None)
-            new_grade_fingerprint = current_fingerprint
-    except Exception:
-        _logger.warning("SSE tick: scores.updated build failed for %s", run_dir, exc_info=True)
-
-    if grade_event is not None:
-        events.append(grade_event)
-
+    # NOTE: scores.updated used to be emitted here on every tick by reading
+    # dimension_scores / principle_grades and fingerprinting them. That whole
+    # design ate four PRs (#525-#528) of bugs — fingerprint blind spots,
+    # 1-second SQLite timestamps, terminal-status closure, principle-id
+    # mismatches. The pipeline is now mutation-driven: ``POST /api/findings/*``
+    # returns the rescored payload synchronously. SSE only carries lifecycle
+    # events for in-progress evals (status, finding, dimension-completed, done).
     new_state = WatcherState(
         last_event_ts=new_last_ts,
         last_event_counter=new_counter,
         last_status_mtime=status_mtime,
         emitted_dimensions=frozenset(state.emitted_dimensions | set(new_dims)),
-        last_grade_fingerprint=new_grade_fingerprint,
     )
     return events, new_state
 
@@ -356,7 +302,6 @@ def run_events_generator(
     state = WatcherState(last_event_ts=last_event_ts)
     last_emit_at = time.monotonic()
     yield ":keepalive\n\n"
-    done_emitted = False  # Track whether we've already sent the terminal "done" frame.
 
     try:
         while True:
@@ -370,19 +315,15 @@ def run_events_generator(
                     if done:
                         terminal_state = terminal
 
-            # Emit "done" once per stream when the run enters a terminal state, so
-            # clients tracking eval lifecycle (e.g. useRunEventStream) can react.
-            # Do NOT close the stream — completed runs are the primary case where
-            # users dismiss findings, and dismisses need scores.updated to flow.
-            # Closing here is what made the live-grade pipeline a Potemkin village:
-            # every "subscriber" was subscribing to a stream that had already shut.
-            if terminal_state and not done_emitted:
+            # Terminal status closes the stream. Score updates no longer flow
+            # through SSE — they ride on dismiss/restore HTTP responses — so
+            # there is nothing left to deliver after the eval finishes.
+            if terminal_state:
                 yield sse_line(
                     json.dumps({"state": terminal_state}, separators=(",", ":")),
                     event="done",
                 )
-                last_emit_at = time.monotonic()
-                done_emitted = True
+                return
 
             if time.monotonic() - last_emit_at >= heartbeat_s:
                 yield ":keepalive\n\n"

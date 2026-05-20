@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
-import { useGradeStream } from '../hooks/useGradeStream.js';
 
 export function computeAllViolations(evalData) {
   if (!evalData) return [];
@@ -131,69 +130,79 @@ export function useExplorerData(project, dimension, runId, refreshSignal) {
     }).catch(() => {});
   }, [refreshSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Live updates via SSE. When a user dismisses a finding on the principle
-  // detail page (or anywhere else in the same run), the backend's SSE tick
-  // emits `scores.updated` with the rescored payload. We fold the matching
-  // dimension into evalData using the same merge helper as the manual
-  // refreshSignal path — so the standard-detail page reflects dismisses
-  // within ~250 ms instead of waiting on a full refetch.
-  const gradeStream = useGradeStream({ project, runId });
-  useEffect(() => {
-    if (!gradeStream.payload) return;
-    const dimData = (gradeStream.payload.dimensions || []).find((d) => d.dimension === dimension);
+  // Live updates after a dismiss arrive synchronously in the dismiss HTTP
+  // response. Callers fold the rescored payload back into this hook via
+  // ``applyRescoredPayload`` so the page re-renders with the new scores
+  // without a follow-up GET. (Previously this was an SSE subscription, which
+  // turned out to be broken for completed runs — see the long-form
+  // commit message for the architectural history.)
+  const applyRescoredPayload = useCallback((payload) => {
+    if (!payload) return;
+    const dimData = (payload.dimensions || []).find((d) => d.dimension === dimension);
     if (!dimData) return;
     setEvalData((prev) => mergeRescoreIntoEval(prev, dimData));
-  }, [gradeStream.payload, dimension]);
+  }, [dimension]);
 
   const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes('Overall')), [evalData]);
   const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes('Overall')), [evalData]);
   const allViolations = useMemo(() => computeAllViolations(evalData), [evalData]);
   const stats = useDerivedExplorerStats(evalData, allViolations);
-  return { evalData, loading, isFetching, error, overallGrade, principleGrades, allViolations, ...stats };
+  return {
+    evalData, loading, isFetching, error,
+    overallGrade, principleGrades, allViolations,
+    applyRescoredPayload,
+    ...stats,
+  };
 }
 
 /**
- * Manages per-principle live state for PrincipleDetailPage: dismissed violations,
- * live score/grade after dismiss, severity filtering.
+ * Manages per-principle local state for PrincipleDetailPage: dismissed
+ * violations and the post-dismiss live score/grade.
  *
- * Subscribes to the per-run SSE stream via useGradeStream and folds incoming
- * `scores.updated` payloads into liveScore/liveGrade. handleDismiss appends to
- * dismissedSet and POSTs to the dismiss endpoint — SSE delivers the updated grades.
+ * The dismiss handler is async and resolves to ``{ scores }`` returned by
+ * the backend. This hook folds the returned principle's score/grade into
+ * liveScore/liveGrade so the page reflects the change as soon as the POST
+ * completes — no SSE roundtrip, no fingerprint state machine.
  *
- * @param {Object} evalPrincipal - the evalPrincipal object (principle, dimension, project, runId, ...)
+ * @param {Object} evalPrincipal - { principle, dimension, project, runId, ... }
  * @param {string|null} severityFilter - initial severity filter
- * @param {Function|null} onDismiss - callback invoked with the violation after the dismiss POST
+ * @param {Function|null} onDismiss - async ``(v) => { scores }``. Returning
+ *   ``null`` or missing ``scores`` leaves the page at its initial score
+ *   (callers should also call refreshDashboard for the cross-run rollup).
  * @returns {{ liveScore, liveGrade, activeSevFilter, setActiveSevFilter, handleDismiss, dismissedSet }}
  */
 export function usePrincipleData(evalPrincipal, severityFilter, onDismiss) {
-  const { principle, dimension, project, runId } = evalPrincipal;
+  const { principle, dimension } = evalPrincipal;
   const [dismissedSet, setDismissedSet] = useState(new Set());
   const [liveScore, setLiveScore] = useState(null);
   const [liveGrade, setLiveGrade] = useState(null);
   const [activeSevFilter, setActiveSevFilter] = useState(severityFilter || null);
 
-  const gradeStream = useGradeStream({ project, runId });
-
-  // Fold incoming SSE payloads into liveScore/liveGrade.
-  useEffect(() => {
-    if (!gradeStream.payload) return;
-    const dimMap = new Map((gradeStream.payload.dimensions || []).map((d) => [d.dimension, d]));
-    const dimData = dimMap.get(dimension);
-    if (!dimData) return;
-    const pgMap = new Map((dimData.principles || []).map((p) => [p.principle, p]));
-    const pg = pgMap.get(principle);
-    if (pg) {
-      setLiveScore(pg.score);
-      setLiveGrade(pg.grade);
-    }
-  }, [gradeStream.payload, dimension, principle]);
-
-  const handleDismiss = useCallback((v) => {
+  const handleDismiss = useCallback(async (v) => {
     if (!onDismiss) return;
-    onDismiss(v);
+    // Optimistic local removal so the violation disappears immediately.
     setDismissedSet((prev) => new Set(prev).add(`${v.file}:${v.line}`));
-    // SSE delivers the updated grades via the useGradeStream subscription above.
-  }, [onDismiss]);
+    try {
+      const result = await onDismiss(v);
+      const scores = result?.scores;
+      if (!scores) return;
+      const dimData = (scores.dimensions || []).find((d) => d.dimension === dimension);
+      const pg = dimData?.principles?.find((p) => p.principle === principle);
+      if (pg) {
+        setLiveScore(pg.score);
+        setLiveGrade(pg.grade);
+      }
+    } catch (err) {
+      // Roll back the optimistic update so the violation re-appears.
+      setDismissedSet((prev) => {
+        const next = new Set(prev);
+        next.delete(`${v.file}:${v.line}`);
+        return next;
+      });
+      // eslint-disable-next-line no-console
+      console.error('[usePrincipleData] dismiss failed:', err);
+    }
+  }, [onDismiss, dimension, principle]);
 
   return { liveScore, liveGrade, activeSevFilter, setActiveSevFilter, handleDismiss, dismissedSet };
 }

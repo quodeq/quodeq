@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { useProjectScores } from "../../../hooks/useProjectScores.js";
 import { projectKeys } from "../../../api/queryKeys.js";
-import { useGradeStream } from "../../explorer/hooks/useGradeStream.js";
 
 /**
  * @param {{
@@ -17,6 +16,10 @@ import { useGradeStream } from "../../explorer/hooks/useGradeStream.js";
  * navigation where consecutive runs are similar. Set false in contexts
  * where stale data is misleading (e.g. History run details, where users
  * compare specific runs and the flash of previous data confuses them).
+ *
+ * Live grade updates after a dismiss arrive via the dismiss HTTP response,
+ * not via SSE. ``refreshDashboard`` is what the dismiss handlers call to
+ * trigger a refetch of the accumulated (cross-run) dashboard payload.
  */
 export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = true }) {
   const { getDashboard } = useApi();
@@ -48,51 +51,13 @@ export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = t
     return { ...dashboardQuery.data, trend };
   }, [dashboardQuery.data, scores, latestScores]);
 
-  // The canonical run ID is resolved by the server and echoed in the dashboard
-  // payload as selectedRun.runId. Use that for the SSE subscription so "latest"
-  // always maps to the correct run.
-  const resolvedRunId = dashboardWithTrend?.selectedRun?.runId ?? null;
-
-  // Live grade updates via SSE. useGradeStream is a no-op when resolvedRunId is null.
-  const gradeStream = useGradeStream({ project: selectedProject, runId: resolvedRunId });
-
-  // Override grade fields on dashboard.dimensions when an SSE payload arrives.
-  // Violations lists are preserved — only scores/grades change.
-  const [livePatches, setLivePatches] = useState(null);
-  useEffect(() => {
-    if (!gradeStream.payload) return;
-    const patchMap = new Map(
-      (gradeStream.payload.dimensions || []).map((d) => [d.dimension, d]),
-    );
-    setLivePatches(patchMap);
-  }, [gradeStream.payload]);
-
-  const liveDashboard = useMemo(() => {
-    if (!dashboardWithTrend) return null;
-    if (!livePatches) return dashboardWithTrend;
-    return {
-      ...dashboardWithTrend,
-      dimensions: (dashboardWithTrend.dimensions || []).map((dim) => {
-        const patch = livePatches.get(dim.dimension);
-        if (!patch) return dim;
-        // Merge only the grade/score fields; preserve violations, compliance,
-        // principles, and all other Dimension properties from the initial fetch.
-        return {
-          ...dim,
-          overallScore: patch.overallScore ?? dim.overallScore,
-          overallGrade: patch.overallGrade ?? dim.overallGrade,
-        };
-      }),
-    };
-  }, [dashboardWithTrend, livePatches]);
-
   const refreshDashboard = useCallback(() => {
     if (!selectedProject) return;
     queryClient.invalidateQueries({ queryKey: projectKeys.project(selectedProject) });
   }, [queryClient, selectedProject]);
 
   return {
-    dashboard: liveDashboard,
+    dashboard: dashboardWithTrend,
     accumulated: scores?.accumulated || null,
     latestAccumulated: latestScores?.accumulated || null,
     rescoreLookup: {},
