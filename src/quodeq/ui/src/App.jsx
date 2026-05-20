@@ -132,10 +132,16 @@ function renderEvalPrincipleDetail(params, props) {
     <PrincipleDetailPage
       evalPrincipal={evalPrincipal}
       severityFilter={params.severity || null}
-      onDismiss={(v) => {
-        props.dismissFinding(selectedProject, buildDismissPayload(v, evalPrincipal.dimension))
-          .then(() => { props.refreshDashboard?.(); props.bumpDismissRefresh?.(); })
-          .catch((e) => console.error('[Dismiss] failed:', e));
+      onDismiss={async (v) => {
+        // POST returns { scores: { dimensions, summary } } — the rescored
+        // payload for this run. PrincipleDetailPage applies it to its
+        // local liveScore/liveGrade. The dashboard refetch covers the
+        // accumulated (cross-run) rollup separately.
+        const payload = { ...buildDismissPayload(v, evalPrincipal.dimension), run_id: evalPrincipal.runId };
+        const result = await props.dismissFinding(selectedProject, payload);
+        props.refreshDashboard?.();
+        props.bumpDismissRefresh?.();
+        return result;
       }}
     />
   );
@@ -300,10 +306,12 @@ const ROUTE_RENDERERS = {
       runId={params.runId}
       dateLabel={params.dateLabel}
       severityFilter={params.severityFilter || params.severity || null}
-      onDismiss={(v) => {
-        props.dismissFinding(props.navigation.selectedProject, buildDismissPayload(v))
-          .then(() => { props.refreshDashboard?.(); props.bumpDismissRefresh?.(); })
-          .catch((e) => console.error('[Dismiss] failed:', e));
+      onDismiss={async (v) => {
+        const payload = { ...buildDismissPayload(v), run_id: params.runId };
+        const result = await props.dismissFinding(props.navigation.selectedProject, payload);
+        props.refreshDashboard?.();
+        props.bumpDismissRefresh?.();
+        return result;
       }}
     />
   ),
@@ -314,10 +322,12 @@ const ROUTE_RENDERERS = {
       finding={params.finding}
       principle={params.principle}
       dimension={params.dimension}
-      onDismiss={(v) => {
-        props.dismissFinding(props.navigation.selectedProject, buildDismissPayload(v, params.dimension))
-          .then(() => { props.refreshDashboard?.(); props.bumpDismissRefresh?.(); })
-          .catch((e) => console.error('[Dismiss] failed:', e));
+      onDismiss={async (v) => {
+        const payload = { ...buildDismissPayload(v, params.dimension), run_id: params.runId };
+        const result = await props.dismissFinding(props.navigation.selectedProject, payload);
+        props.refreshDashboard?.();
+        props.bumpDismissRefresh?.();
+        return result;
       }}
     />
   ),
