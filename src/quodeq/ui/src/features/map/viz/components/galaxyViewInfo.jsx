@@ -127,6 +127,10 @@ export function computeLevelInfo(scene, nav, projectName, onNavigate, navRef) {
             score: p.rawScore || (p.score != null ? p.score.toFixed(1) : null),
             grade: p.grade,
             dimension: d.name,
+            // Carry the originating run id so PrincipleDetail's dismiss POST
+            // sends a real run_id — without it the backend can't rescore and
+            // the dismissed entry never lands on the Dismissed tab.
+            runId: d._raw?.fromRunId || '',
             principleData: { name: p.name, grade: p.grade, violations: p._rawViolations, compliance: p._rawCompliance },
             dimViolations: p._rawViolations,
             dimCompliance: p._rawCompliance,

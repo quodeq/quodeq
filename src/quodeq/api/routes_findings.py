@@ -65,14 +65,52 @@ def _slim_scores(scores: dict[str, Any]) -> dict[str, Any]:
     return {"dimensions": slim_dims, "summary": scores.get("summary", {})}
 
 
-def _rescore_run(evaluations_dir: str, project: str, run_id: str | None) -> dict[str, Any] | None:
+def _project_all_runs(project_dir: Path) -> None:
+    """Trigger projection across every run dir of the project.
+
+    Used as a safety net when the dismiss POST didn't carry a usable
+    ``run_id`` (callers from the Violations / Map pages don't always have
+    one in hand). Without this, the action lands in ``actions.jsonl`` but
+    no run's SQL ``findings`` table is updated, so the dismissed-tab list
+    — which reads ``WHERE verdict = 'dismissed'`` from each run's
+    evaluation.db — stays empty until the user navigates somewhere that
+    happens to trigger projection for the right run.
+
+    Projection is incremental (gated by checkpoint + log-size), so this is
+    cheap in steady state; the first call after a fresh dismiss replays only
+    the actions-log delta.
+    """
+    if not project_dir.is_dir():
+        return
+    from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
+
+    for run_dir in project_dir.iterdir():
+        if not run_dir.is_dir():
+            continue
+        if not (run_dir / "events.jsonl").is_file():
+            continue
+        try:
+            SqliteFindingsRepository(run_dir)._ensure_fresh()  # noqa: SLF001
+        except Exception:
+            _logger.warning("Projection after mutation failed for %s", run_dir, exc_info=True)
+
+
+def _rescore_run(
+    evaluations_dir: str, project: str, run_id: str | None,
+) -> dict[str, Any] | None:
     """Compute the slim rescored payload for the run referenced in a mutation body.
 
     Returns ``None`` when ``run_id`` is missing or the run directory cannot
-    be resolved. The payload omits per-finding arrays since dismiss handlers
-    only need score/grade fields — see ``_slim_scores`` for the rationale.
-    Callers fold the result into the response body so the UI can apply the
-    new scores without a follow-up GET.
+    be resolved. When it returns ``None``, the caller also calls
+    ``_project_all_runs`` so the action still lands in SQL — otherwise the
+    dismissed-tab list (which reads ``WHERE verdict='dismissed'`` from each
+    run's evaluation.db) wouldn't see the entry until the user happened to
+    trigger projection some other way.
+
+    The payload omits per-finding arrays since dismiss handlers only need
+    score/grade fields — see ``_slim_scores`` for the rationale. Callers
+    fold the result into the response body so the UI can apply the new
+    scores without a follow-up GET.
     """
     if not run_id:
         return None
@@ -100,6 +138,23 @@ def register_findings_routes(app: Flask) -> None:
 
     def _eval_dir() -> str:
         return app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()
+
+    def _scores_with_fallback(
+        project: str, run_id: str | None,
+    ) -> dict[str, Any] | None:
+        """Rescore the requested run, falling back to a project-wide projection.
+
+        When the caller can't supply a usable ``run_id`` (Violations / Map
+        nav paths don't carry one today), ``_rescore_run`` returns ``None`` —
+        but the action *must* still propagate to SQL or the dismissed-tab
+        list won't see it. Project every run as the fallback so the entry
+        becomes visible without forcing the UI to retry.
+        """
+        evaluations_dir = _eval_dir()
+        scores = _rescore_run(evaluations_dir, project, run_id)
+        if scores is None:
+            _project_all_runs(_project_dir(evaluations_dir, project))
+        return scores
 
     @app.get("/api/findings/dismissed")
     def list_dismissed() -> Response:
@@ -129,7 +184,7 @@ def register_findings_routes(app: Flask) -> None:
         if not project or not req or not file or line is None:
             return jsonify({"error": "project, req, file, and line are required"}), 400
         dismiss_finding(_project_dir(_eval_dir(), project), body)
-        scores = _rescore_run(_eval_dir(), project, run_id)
+        scores = _scores_with_fallback(project, run_id)
         return jsonify({"scores": scores}), 200
 
     @app.post("/api/findings/restore")
@@ -143,7 +198,7 @@ def register_findings_routes(app: Flask) -> None:
         if not project or not req or not file or line is None:
             return jsonify({"error": "project, req, file, and line are required"}), 400
         restore_finding(_project_dir(_eval_dir(), project), body)
-        scores = _rescore_run(_eval_dir(), project, run_id)
+        scores = _scores_with_fallback(project, run_id)
         return jsonify({"scores": scores}), 200
 
     @app.post("/api/findings/restore-all")
@@ -154,7 +209,7 @@ def register_findings_routes(app: Flask) -> None:
         if not project:
             return jsonify({"error": "project is required"}), 400
         count = restore_all_findings(_project_dir(_eval_dir(), project))
-        scores = _rescore_run(_eval_dir(), project, run_id)
+        scores = _scores_with_fallback(project, run_id)
         return jsonify({"ok": True, "restored": count, "scores": scores}), 200
 
     @app.post("/api/findings/delete")
@@ -168,7 +223,7 @@ def register_findings_routes(app: Flask) -> None:
         if not project or not dimension or not principle or not file:
             return jsonify({"error": "project, dimension, principle, and file are required"}), 400
         swept = delete_finding(_project_dir(_eval_dir(), project), body)
-        scores = _rescore_run(_eval_dir(), project, run_id)
+        scores = _scores_with_fallback(project, run_id)
         return jsonify({"ok": True, "swept": swept, "scores": scores}), 200
 
     @app.post("/api/findings/delete-all")
@@ -179,5 +234,5 @@ def register_findings_routes(app: Flask) -> None:
         if not project:
             return jsonify({"error": "project is required"}), 400
         count = delete_all_dismissed(_project_dir(_eval_dir(), project))
-        scores = _rescore_run(_eval_dir(), project, run_id)
+        scores = _scores_with_fallback(project, run_id)
         return jsonify({"ok": True, "deleted": count, "scores": scores}), 200
