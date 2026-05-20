@@ -112,12 +112,61 @@ def _jsonl_path(config: RunConfig, dim_id: str) -> Path:
     return _evidence_dir(config) / f"{dim_id}_evidence.jsonl"
 
 
-def _write_findings(jsonl: Path, findings: list[dict], *, append: bool) -> None:
+def _events_log_path(jsonl: Path) -> Path:
+    """Return the run's events.jsonl path given a per-dim evidence JSONL.
+
+    Evidence files live at ``<run_dir>/evidence/<dim>_evidence.jsonl``; the
+    event log lives at ``<run_dir>/events.jsonl``. Centralising the join so
+    the two callers below can't drift apart.
+    """
+    return jsonl.parent.parent / "events.jsonl"
+
+
+def _emit_cached_findings(events_log: Path, findings: list[dict]) -> None:
+    """Emit cached findings as JUDGMENT_CREATED events to the run's event log.
+
+    Cached findings replayed by the V2 cache in incremental runs were
+    landing only in the per-dim JSONL and never reaching ``events.jsonl``.
+    The SQL projection runs off ``events.jsonl``, so the dashboard's grade
+    tables saw only the freshly-dispatched findings and produced scores
+    that disagreed with the CLI's JSON file (e.g. flexibility scoring 9.0
+    in the UI vs 7.7 from the CLI on the same run). Mirroring each cached
+    finding into the event log closes that gap.
+
+    Exceptions are caught per finding and logged — the JSONL write
+    already succeeded above, so an event-emit failure should not propagate
+    and roll back the cache restore.
+    """
+    if not findings:
+        return
+    from quodeq.core.events.models import JudgmentCreatedEvent  # noqa: PLC0415
+    from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
+    from quodeq.core.finding_mappings import wire_dict_to_judgment  # noqa: PLC0415
+
+    writer = EventLogWriter(events_log)
+    for finding in findings:
+        try:
+            payload = wire_dict_to_judgment(finding)
+            writer.emit(JudgmentCreatedEvent(payload=payload))
+        except Exception:  # noqa: BLE001 — event-log emit must never break a cache replay
+            _logger.warning(
+                "cache replay: event emit failed for finding p=%r file=%r line=%r",
+                finding.get("p"), finding.get("file"), finding.get("line"),
+                exc_info=True,
+            )
+
+
+def _write_findings(
+    jsonl: Path, findings: list[dict], *, append: bool,
+    emit_events: bool = True,
+) -> None:
     jsonl.parent.mkdir(parents=True, exist_ok=True)
     mode = "a" if append else "w"
     with jsonl.open(mode) as out:
         for finding in findings:
             out.write(json.dumps(finding) + "\n")
+    if emit_events:
+        _emit_cached_findings(_events_log_path(jsonl), findings)
 
 
 def process_dimension_with_cache(

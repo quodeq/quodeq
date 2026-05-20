@@ -584,3 +584,132 @@ class TestCarryOrder:
         assert carry_idx < fresh_idx, (
             f"carry (index {carry_idx}) should appear before fresh (index {fresh_idx})"
         )
+
+
+class TestCachedFindingsReachEventLog:
+    """Pin that cache-replayed findings land in ``events.jsonl`` as
+    ``JUDGMENT_CREATED`` events, not only in the per-dim JSONL.
+
+    Without this, an incremental run's SQL projection (which reads
+    ``events.jsonl``) sees only the freshly-dispatched findings — the
+    dashboard grade tables disagree with the CLI's JSON output because
+    they're scoring different sets of findings. The user reported this as
+    "flexibility shows 7.7 in the CLI but 9.0 in the UI" on a real
+    incremental run; the gap was exactly the cache-restored findings.
+    """
+
+    def _read_events(self, events_log: Path) -> list[dict]:
+        if not events_log.exists():
+            return []
+        out = []
+        for line in events_log.read_text().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            out.append(json.loads(line))
+        return out
+
+    def test_all_hits_run_emits_judgment_events_for_cache_replay(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        config, src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
+
+        # Pre-populate cache for both files so the run short-circuits dispatch.
+        for f in ["a.py", "b.py"]:
+            key = build_cache_key_for_file(config, f, "security")
+            cache.put(key, CacheEntry(
+                key=key, schema_version=1,
+                findings=[{
+                    "file": f, "line": 7, "t": "violation",
+                    "w": f"cached-{f}", "p": "Confidentiality", "d": "security",
+                    "req": f"S-CON-{f}", "severity": "minor",
+                    "snippet": "s", "reason": "r",
+                }],
+                files_read=1, file_path=f, dimension="security",
+                model_id="test-model",
+            ))
+
+        dispatcher = FakeDispatcher(src)
+        # events.jsonl lives at <evidence_dir>/.. which is <work_dir>/..
+        # The runner derives this from the per-dim JSONL path internally.
+        events_log = (config.work_dir or config.src).parent / "events.jsonl"
+
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=dispatcher,
+        ):
+            process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+            )
+
+        assert dispatcher.calls == [], "all-hits path must not dispatch"
+
+        events = self._read_events(events_log)
+        # Every cached finding must produce a JUDGMENT_CREATED event so the
+        # SQL projection sees it. Without the fix this list would be empty.
+        judgments = [e for e in events if e.get("event_type") == "JUDGMENT_CREATED"]
+        files_in_events = {e["payload"]["file"] for e in judgments}
+        assert files_in_events == {"a.py", "b.py"}, (
+            f"events.jsonl must contain a JUDGMENT_CREATED per cached finding; "
+            f"got {files_in_events}"
+        )
+
+    def test_partial_run_emits_judgment_events_for_carried_findings(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        """Mixed run: one cached hit (a.py) + one dispatched miss (b.py).
+
+        The cached carry was the silently-dropped path — pin that it shows
+        up in events.jsonl alongside the dispatcher's own emit.
+        """
+        config, src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
+
+        key = build_cache_key_for_file(config, "a.py", "security")
+        cache.put(key, CacheEntry(
+            key=key, schema_version=1,
+            findings=[{
+                "file": "a.py", "line": 1, "t": "violation",
+                "w": "carry-a", "p": "Confidentiality", "d": "security",
+                "req": "S-CON-A", "severity": "minor",
+                "snippet": "x", "reason": "r",
+            }],
+            files_read=1, file_path="a.py", dimension="security",
+            model_id="test-model",
+        ))
+
+        events_log = (config.work_dir or config.src).parent / "events.jsonl"
+
+        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+            # The dispatcher in production routes through FindingsRouter,
+            # which emits events. This fake only writes JSONL — we're
+            # specifically testing the cache-replay side.
+            jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
+            jsonl.parent.mkdir(parents=True, exist_ok=True)
+            with jsonl.open("a") as out:
+                out.write(json.dumps({
+                    "file": "b.py", "line": 1, "t": "violation",
+                    "w": "fresh-b", "p": "Confidentiality", "d": "security",
+                    "req": "S-CON-B", "severity": "minor",
+                    "snippet": "y", "reason": "r",
+                }) + "\n")
+            return _make_dummy_evidence(files_read=1)
+
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=fake_dispatch,
+        ):
+            process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+            )
+
+        events = self._read_events(events_log)
+        carry_files = {
+            e["payload"]["file"] for e in events
+            if e.get("event_type") == "JUDGMENT_CREATED"
+        }
+        assert "a.py" in carry_files, (
+            f"cached carry for a.py must emit a JUDGMENT_CREATED event; "
+            f"got {carry_files}"
+        )
