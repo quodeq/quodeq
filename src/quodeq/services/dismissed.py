@@ -7,6 +7,7 @@ evaluation.db (aggregated across runs).
 from __future__ import annotations
 
 import json
+import sqlite3
 from dataclasses import replace
 from pathlib import Path
 
@@ -72,6 +73,87 @@ def dismissed_keys(project_dir: Path) -> set[tuple]:
     return keys
 
 
+def _enrich_from_sql(run_dir: Path, keys: set[tuple], out: dict[tuple, dict]) -> None:
+    """Add finding detail from a run's SQL findings table for any dismissed key not yet enriched.
+
+    Modern runs (those with an ``events.jsonl`` projected into ``findings``)
+    expose the full Judgment row here. We look up by the canonical (req,
+    file, line) tuple — the SQL ``verdict`` column is ignored because we
+    treat ``actions.jsonl`` as the source of truth for *which* findings
+    are dismissed, and the SQL row only for *what* the finding was.
+    """
+    db_path = run_dir / "evaluation.db"
+    if not db_path.is_file():
+        return
+    try:
+        with open_evaluation_db(run_dir) as conn:
+            cursor = conn.execute(
+                "SELECT requirement, file, line, dimension, practice_id, severity, "
+                "title, reason, snippet, context, scope, end_line, req_refs_json "
+                "FROM findings"
+            )
+            for row in cursor:
+                key = (str(row[0] or ""), str(row[1] or ""), int(row[2] or 0))
+                if key not in keys or key in out:
+                    continue
+                req_refs_raw = row[12]
+                try:
+                    req_refs = json.loads(req_refs_raw) if req_refs_raw else []
+                except (json.JSONDecodeError, TypeError):
+                    req_refs = []
+                out[key] = {
+                    "req": row[0] or "", "file": row[1] or "", "line": row[2] or 0,
+                    "dimension": row[3] or "", "principle": row[4] or "",
+                    "severity": row[5] or "", "title": row[6] or "", "reason": row[7] or "",
+                    "snippet": row[8] or "", "context": row[9] or "", "scope": row[10] or "",
+                    "endLine": row[11] or 0, "reqRefs": req_refs,
+                }
+    except sqlite3.DatabaseError:
+        # Corrupt evaluation.db — skip rather than fail the whole list.
+        return
+
+
+def _enrich_from_json_eval(run_dir: Path, keys: set[tuple], out: dict[tuple, dict]) -> None:
+    """Add finding detail from a run's ``evaluation/<dim>.json`` files.
+
+    Used for legacy runs that pre-date the event-log scoring engine and so
+    never produced a SQL ``findings`` table. The JSON files carry every
+    field the Dismissed tab needs (principle, severity, title, reason,
+    snippet, context, req_refs); ``dimension`` comes from the filename so
+    the entry stays linked to its standard for the restore/delete flows.
+    """
+    eval_dir = run_dir / "evaluation"
+    if not eval_dir.is_dir():
+        return
+    for path in eval_dir.iterdir():
+        if path.suffix != ".json":
+            continue
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        dimension = path.stem
+        for v in (data.get("violations") or []):
+            req = str(v.get("req") or "")
+            file = str(v.get("file") or "")
+            try:
+                line = int(v.get("line") or 0)
+            except (TypeError, ValueError):
+                line = 0
+            key = (req, file, line)
+            if key not in keys or key in out:
+                continue
+            out[key] = {
+                "req": req, "file": file, "line": line,
+                "dimension": dimension, "principle": v.get("principle") or "",
+                "severity": v.get("severity") or "", "title": v.get("title") or "",
+                "reason": v.get("reason") or "", "snippet": v.get("snippet") or "",
+                "context": v.get("context") or "", "scope": v.get("scope") or "",
+                "endLine": int(v.get("end_line") or v.get("endLine") or 0),
+                "reqRefs": v.get("req_refs") or v.get("reqRefs") or [],
+            }
+
+
 def load_dismissed(
     project_dir: Path,
     *,
@@ -80,38 +162,48 @@ def load_dismissed(
 ) -> list[dict]:
     """List dismissed findings as dicts (shape matches /api/findings/dismissed response).
 
-    Reads from each run's evaluation.db, aggregated across all runs.
+    ``actions.jsonl`` is the source of truth for *which* findings are
+    dismissed (via ``dismissed_keys``). The original finding detail is
+    looked up from each run's SQL ``findings`` table when the run has been
+    projected, with a JSON-eval-file fallback for legacy runs that never
+    produced an ``events.jsonl``. Without that fallback, the Dismissed tab
+    was permanently empty for any project whose runs pre-date the event-log
+    scoring engine — even though the rescore + dismissed-set math always
+    worked because both go through ``actions.jsonl``.
     """
     if not project_dir.is_dir():
         return []
-    items: list[dict] = []
+    keys = dismissed_keys(project_dir)
+    if not keys:
+        return []
+
+    details: dict[tuple, dict] = {}
     for run_dir in project_dir.iterdir():
         if not run_dir.is_dir():
             continue
-        db_path = run_dir / "evaluation.db"
-        if not db_path.is_file():
-            continue
-        try:
-            with open_evaluation_db(run_dir) as conn:
-                for row in conn.execute(
-                    "SELECT requirement, file, line, dimension, practice_id, severity, "
-                    "title, reason, snippet, context, scope, end_line, req_refs_json "
-                    "FROM findings WHERE verdict = 'dismissed'"
-                ):
-                    req_refs_raw = row[12]
-                    try:
-                        req_refs = json.loads(req_refs_raw) if req_refs_raw else []
-                    except (json.JSONDecodeError, TypeError):
-                        req_refs = []
-                    items.append({
-                        "req": row[0] or "", "file": row[1] or "", "line": row[2] or 0,
-                        "dimension": row[3] or "", "principle": row[4] or "",
-                        "severity": row[5] or "", "title": row[6] or "", "reason": row[7] or "",
-                        "snippet": row[8] or "", "context": row[9] or "", "scope": row[10] or "",
-                        "endLine": row[11] or 0, "reqRefs": req_refs,
-                    })
-        except Exception:
-            continue
+        if len(details) >= len(keys):
+            break
+        _enrich_from_sql(run_dir, keys, details)
+        if len(details) >= len(keys):
+            break
+        _enrich_from_json_eval(run_dir, keys, details)
+
+    items: list[dict] = []
+    for req, file, line in keys:
+        match = details.get((req, file, line))
+        if match is not None:
+            items.append(match)
+        else:
+            # Couldn't find the original finding anywhere — surface a minimal
+            # stub so the user can still see (and restore/delete) the entry.
+            items.append({
+                "req": req, "file": file, "line": line,
+                "dimension": "", "principle": "",
+                "severity": "", "title": "", "reason": "",
+                "snippet": "", "context": "", "scope": "",
+                "endLine": 0, "reqRefs": [],
+            })
+
     if offset <= 0 and limit is None:
         return items
     start = max(0, offset)

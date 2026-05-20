@@ -147,7 +147,11 @@ function renderEvalPrincipleDetail(params, props) {
   );
 }
 
-function buildEvalPrincipal(principleObj, principleGrade) {
+// Exported so unit tests can pin the runId-threading contract without having
+// to mount the whole App. Callers from the Violations page must pass the
+// dimension's ``fromRunId`` — see ``ViolationsRoute.navigateToPrinciple`` for
+// the regression history.
+export function buildEvalPrincipal(principleObj, principleGrade, runId) {
   const violations = principleObj.violations || [];
   const compliance = principleObj.compliance || [];
   return {
@@ -155,6 +159,7 @@ function buildEvalPrincipal(principleObj, principleGrade) {
     score: principleGrade?.score || null,
     grade: principleGrade?.grade || null,
     dimension: principleObj.dimension || '',
+    runId: runId || '',
     principleData: {
       name: principleObj.principle,
       grade: principleGrade?.grade || null,
@@ -178,7 +183,16 @@ function ViolationsRoute({ params, props }) {
   function navigateToPrinciple(principleObj, severity) {
     const dim = dimMap.get(principleObj.dimension);
     const pg = principleMap.get(`${principleObj.dimension}\0${principleObj.principle}`);
-    nav('evalprinciple', { evalPrincipal: buildEvalPrincipal(principleObj, pg), severity, sourceTab: 'violations' });
+    // dim.fromRunId is the run whose data populated this accumulated entry;
+    // threading it through lets the dismiss POST carry a real run id so the
+    // backend can rescore and project the action into SQL — without this the
+    // PrincipleDetail score never moves on dismiss and the entry never lands
+    // on the Dismissed tab.
+    nav('evalprinciple', {
+      evalPrincipal: buildEvalPrincipal(principleObj, pg, dim?.fromRunId),
+      severity,
+      sourceTab: 'violations',
+    });
   }
 
   function navigateToDimension(row, severity) {
