@@ -53,7 +53,20 @@ export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = t
 
   const refreshDashboard = useCallback(() => {
     if (!selectedProject) return;
-    queryClient.invalidateQueries({ queryKey: projectKeys.project(selectedProject) });
+    // Mark project queries stale but DON'T trigger an immediate refetch.
+    // The dashboard payload is 10-20 MB on large projects (one run's full
+    // violation + compliance arrays × multiple dimensions); refetching on
+    // every dismiss froze the UI for 1-3 s while the browser parsed the
+    // JSON and React re-rendered. The dismiss POST already returned the
+    // rescored run for the active page (PrincipleDetail / FileDetail /
+    // FindingDetail) to apply locally — the dashboard rollup just needs
+    // to be eventually-correct, which React Query handles automatically:
+    // ``refetchType: 'none'`` marks the cache stale, the next mount
+    // refetches naturally on navigation.
+    queryClient.invalidateQueries({
+      queryKey: projectKeys.project(selectedProject),
+      refetchType: 'none',
+    });
   }, [queryClient, selectedProject]);
 
   return {

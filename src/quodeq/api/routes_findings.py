@@ -34,12 +34,45 @@ def _project_dir(evaluations_dir: str, project: str) -> Path:
     return resolved
 
 
+def _slim_scores(scores: dict[str, Any]) -> dict[str, Any]:
+    """Drop violation/compliance arrays from the rescored payload.
+
+    The UI's dismiss handlers (PrincipleDetail, FileDetail, FindingDetail)
+    only need the per-dimension and per-principle ``score`` / ``grade``
+    fields to update local state. Returning the full payload meant 300+ KB
+    on large projects (quodeq: 322 KB → 543 B after slimming, a 600× cut),
+    which was the bulk of the perceived dismiss latency: parse + transfer +
+    re-render against violations the page already has from its initial fetch.
+    """
+    if not scores:
+        return scores
+    slim_dims = []
+    for dim in scores.get("dimensions", []) or []:
+        slim_principles = [
+            {
+                "principle": p.get("principle"),
+                "score": p.get("score"),
+                "grade": p.get("grade"),
+            }
+            for p in (dim.get("principles") or [])
+        ]
+        slim_dims.append({
+            "dimension": dim.get("dimension"),
+            "overallScore": dim.get("overallScore"),
+            "overallGrade": dim.get("overallGrade"),
+            "principles": slim_principles,
+        })
+    return {"dimensions": slim_dims, "summary": scores.get("summary", {})}
+
+
 def _rescore_run(evaluations_dir: str, project: str, run_id: str | None) -> dict[str, Any] | None:
-    """Compute the rescored payload for the run referenced in a mutation body.
+    """Compute the slim rescored payload for the run referenced in a mutation body.
 
     Returns ``None`` when ``run_id`` is missing or the run directory cannot
-    be resolved. Callers fold the result into the response body so the UI
-    can apply the new scores without a follow-up GET.
+    be resolved. The payload omits per-finding arrays since dismiss handlers
+    only need score/grade fields — see ``_slim_scores`` for the rationale.
+    Callers fold the result into the response body so the UI can apply the
+    new scores without a follow-up GET.
     """
     if not run_id:
         return None
@@ -51,7 +84,7 @@ def _rescore_run(evaluations_dir: str, project: str, run_id: str | None) -> dict
 
     reports_root = Path(evaluations_dir).resolve()
     try:
-        return get_scores_raw(reports_root, project, run_id)
+        return _slim_scores(get_scores_raw(reports_root, project, run_id))
     except FileNotFoundError:
         return None
     except Exception:
