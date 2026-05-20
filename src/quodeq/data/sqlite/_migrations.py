@@ -134,6 +134,30 @@ def _upgrade_v3_to_v4(conn: sqlite3.Connection) -> None:
             VALUES (new.id, new.reason, new.snippet);
         END;
     """)
+    # Invalidate the projection checkpoint and projected-log size so the next
+    # ensure_projected call treats the DB as "never projected" and triggers a
+    # full rebuild. The old schema's CHECK constraint silently dropped every
+    # ``major`` severity finding at insert time, so the existing rows are
+    # incomplete — the wider CHECK alone won't bring those findings back, but
+    # a fresh rebuild from events.jsonl will.
+    #
+    # We don't truncate the findings table here: the rebuild path
+    # (engine.rebuild) calls clear_all() before re-inserting, so doing it now
+    # would be redundant. Leaving the existing rows in place also keeps the
+    # migration non-destructive for callers that never trigger a re-read.
+    #
+    # run_meta may not exist on DBs upgraded from very old (v1/v2) schemas —
+    # the per-version upgrade scripts never created it, only the fresh-DB DDL
+    # does. Skip gracefully in that case; without a checkpoint, ensure_projected
+    # rebuilds from scratch anyway.
+    has_run_meta = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='run_meta'"
+    ).fetchone() is not None
+    if has_run_meta:
+        conn.execute(
+            "DELETE FROM run_meta WHERE key IN "
+            "('projection_checkpoint', 'projection_event_log_size', 'actions_log_projected_size')"
+        )
 
 
 _UPGRADES = {

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -307,6 +308,116 @@ def test_run_events_generator_handles_already_terminal_run(tmp_path: Path):
     assert any("event: status" in f for f in non_keepalive)
     assert any("event: finding" in f for f in non_keepalive)
     assert any("event: done" in f for f in non_keepalive)
+
+
+def test_run_events_generator_keeps_ticking_after_terminal_done(tmp_path: Path) -> None:
+    """Regression: terminal status must NOT close the SSE stream.
+
+    The previous behaviour returned from the generator right after yielding
+    the 'done' frame. For a completed run, that meant the SSE lived for only
+    one tick — long enough to deliver the initial snapshot, then the server
+    closed the connection. Every page that subscribed to ``useGradeStream``
+    on a completed run was subscribing to a dead pipe.
+
+    Completed runs are the primary case where users dismiss findings, and
+    dismisses must still propagate as scores.updated events. This test pins
+    that contract by:
+      1. Setting up a run with state='done' and a single finding.
+      2. Driving the generator in a thread.
+      3. Asserting the initial 'done' frame arrives (clients still get the
+         lifecycle signal).
+      4. Appending a FINDING_DISMISSED to actions.jsonl.
+      5. Asserting a subsequent scores.updated frame arrives — proving the
+         generator stayed alive past the terminal event.
+
+    Before the fix this test times out at step 5 because the generator has
+    already returned.
+    """
+    import queue, threading
+    from quodeq.api._run_event_stream import run_events_generator
+    from quodeq.services.dismissed import dismiss_finding
+
+    project_dir, run_dir = _seed_run_with_finding(tmp_path)
+    _write_status(run_dir, state="done")
+
+    frame_q: "queue.Queue[str]" = queue.Queue()
+    gen = run_events_generator(run_dir, last_event_ts=None, tick_seconds=0.02)
+
+    def drain() -> None:
+        try:
+            for frame in gen:
+                frame_q.put(frame)
+        except Exception as exc:  # noqa: BLE001 — surface drain errors to the test
+            frame_q.put(f"__error__: {exc!r}")
+
+    t = threading.Thread(target=drain, daemon=True)
+    t.start()
+
+    def wait_for(predicate, deadline_s: float = 2.0) -> list[str]:
+        seen: list[str] = []
+        deadline = time.monotonic() + deadline_s
+        while time.monotonic() < deadline:
+            try:
+                frame = frame_q.get(timeout=0.05)
+            except queue.Empty:
+                continue
+            seen.append(frame)
+            if predicate(frame):
+                return seen
+        return seen
+
+    # 1. Initial 'done' frame must arrive.
+    initial = wait_for(lambda f: "event: done" in f, deadline_s=1.5)
+    assert any("event: done" in f for f in initial), (
+        f"Initial 'done' frame missing. Frames seen: {initial}"
+    )
+
+    # 2. Now dismiss while the generator is (or should be) still ticking.
+    dismiss_finding(project_dir, {"req": "R1", "file": "a.py", "line": 10})
+
+    # 3. A scores.updated MUST arrive — proves the generator survived the
+    # terminal status and the dismiss propagated through the SSE tick.
+    after = wait_for(lambda f: "event: scores.updated" in f, deadline_s=2.0)
+    assert any("event: scores.updated" in f for f in after), (
+        "Dismiss did not produce a scores.updated frame within 2 s of POST. "
+        "Either the generator returned after 'done' (old buggy behaviour), "
+        "or compute_tick failed to detect the projection change. "
+        f"Frames after dismiss: {after}"
+    )
+
+
+def test_run_events_generator_emits_done_only_once(tmp_path: Path) -> None:
+    """Even though the generator now stays open after terminal status, it must
+    only emit the 'done' frame ONCE per stream. Otherwise clients tracking
+    eval lifecycle would see duplicate terminal signals on every tick."""
+    import queue, threading
+    from quodeq.api._run_event_stream import run_events_generator
+
+    project_dir, run_dir = _seed_run_with_finding(tmp_path)
+    _write_status(run_dir, state="done")
+
+    frame_q: "queue.Queue[str]" = queue.Queue()
+    gen = run_events_generator(run_dir, last_event_ts=None, tick_seconds=0.02)
+
+    def drain() -> None:
+        for frame in gen:
+            frame_q.put(frame)
+
+    threading.Thread(target=drain, daemon=True).start()
+
+    # Drain for ~500 ms (25-ish ticks) and count 'done' frames.
+    deadline = time.monotonic() + 0.5
+    done_count = 0
+    while time.monotonic() < deadline:
+        try:
+            frame = frame_q.get(timeout=0.05)
+        except queue.Empty:
+            continue
+        if "event: done" in frame:
+            done_count += 1
+    assert done_count == 1, (
+        f"Expected exactly one 'done' frame per stream, got {done_count}"
+    )
 
 
 # ---------------------------------------------------------------------------
