@@ -45,6 +45,7 @@ from quodeq.analysis.cache._failure_streak import (
 )
 from quodeq.analysis.cache.dimension_helpers import (
     ClassifyResult,
+    _group_findings_by_file,
     build_cache_key_for_file,
     classify_files_via_cache,
     persist_dispatch_results,
@@ -110,6 +111,39 @@ def _evidence_dir(config: RunConfig) -> Path:
 
 def _jsonl_path(config: RunConfig, dim_id: str) -> Path:
     return _evidence_dir(config) / f"{dim_id}_evidence.jsonl"
+
+
+def _compute_files_read(
+    classify: ClassifyResult, jsonl_path: Path, all_files: list[str],
+) -> int:
+    """Return the count of source files reproducible from the cache after
+    this run ends.
+
+    A source file is "reproducible" if either:
+      - it was a cache hit (``classify.cached_findings`` already carried it
+        forward — its cache entry already exists), or
+      - it was dispatched and the worker emitted ``file_done="ok"``
+        (which triggers a synchronous ``persist_one_file``, or the
+        watcher's next persist tick).
+
+    Files with ``file_done="error"`` or no marker at all are NOT counted:
+    their analysis was incomplete and the cache contains no entry for
+    them, so the next run must re-dispatch.
+
+    Pre-fix, ``files_read`` was set to ``len(input_files)`` at every
+    callsite, making coverage % (computed downstream as
+    ``files_read / source_file_count``) meaningless: it always read 100%
+    even on deadline-truncated runs. The user reported a flexibility
+    score of "6.6/Adequate" on a run that actually analyzed ~850/3037
+    files — the dashboard couldn't tell it was partial.
+    """
+    n_hits = len(all_files) - len(classify.misses)
+    if not jsonl_path.is_file():
+        return n_hits
+    _grouped, ok_files = _group_findings_by_file(jsonl_path)
+    miss_set = set(classify.misses)
+    n_dispatch_ok = len(ok_files & miss_set)
+    return n_hits + n_dispatch_ok
 
 
 def _events_log_path(jsonl: Path) -> Path:
@@ -244,7 +278,8 @@ def process_dimension_with_cache(
         if jsonl.exists():
             deduplicate_jsonl(jsonl)
         return parse_evidence_from_jsonl(
-            config, dim_id, ctx, jsonl, files_read=len(files),
+            config, dim_id, ctx, jsonl,
+            files_read=_compute_files_read(classify, jsonl, files),
         )
 
     # Dispatch misses via the existing path, with file filter restricted
@@ -334,7 +369,8 @@ def process_dimension_with_cache(
         # them so the run still has SOMETHING to score; otherwise None.
         if classify.cached_findings and jsonl.exists():
             return parse_evidence_from_jsonl(
-                config, dim_id, ctx, jsonl, files_read=len(files),
+                config, dim_id, ctx, jsonl,
+                files_read=_compute_files_read(classify, jsonl, files),
             )
         return None
 
@@ -342,5 +378,6 @@ def process_dimension_with_cache(
     # not just len(misses) which is what the dispatcher's Evidence carries.
     # The dispatcher already deduped on its way out, so no extra dedup here.
     return parse_evidence_from_jsonl(
-        config, dim_id, ctx, jsonl, files_read=len(files),
+        config, dim_id, ctx, jsonl,
+        files_read=_compute_files_read(classify, jsonl, files),
     )
