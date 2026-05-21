@@ -305,8 +305,20 @@ def process_dimension_with_cache(
         # Signal the watcher to do a final persist and exit. Whatever
         # completed before this point gets cached, whether the dispatch
         # returned cleanly or raised.
+        #
+        # No join timeout: the prior 5s cap was the c88be50e regression
+        # that dropped the final persist tick when it ran longer than 5s.
+        # On a 790-file flexibility run the user lost ~16% of the cache
+        # entries (790 file_done="ok" markers in the JSONL, only 662
+        # entries persisted) because the final tick was scanning the whole
+        # JSONL and rewriting per-file entries — each persist_dispatch_results
+        # call does O(n_files) work and an interrupted final tick silently
+        # abandoned every entry it hadn't yet written.
+        #
+        # The breaker join keeps its 5s cap: it's a separate thread with
+        # independent lifecycle whose final tick is bounded I/O.
         stop_event.set()
-        watcher.join(timeout=5.0)
+        watcher.join()
         breaker.stop_and_join(timeout=5.0)
 
     if breaker.trip_event is not None:

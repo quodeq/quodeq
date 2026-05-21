@@ -586,6 +586,53 @@ class TestCarryOrder:
         )
 
 
+class TestWatcherJoinHasNoTimeoutCeiling:
+    """Regression for the c88be50e "16% loss" bug.
+
+    The watcher's final persist tick can take longer than 5s when the
+    JSONL has a few hundred file_done="ok" markers (each tick re-scans
+    the full file and writes per-file cache entries). A 5s join ceiling
+    silently abandoned the final tick mid-flight, so every `ok` marker
+    that hadn't been persisted by the previous tick was lost.
+
+    The user reported a flexibility run where 790 file_done="ok" markers
+    landed in the JSONL but only 662 cache entries persisted (~16% loss).
+
+    Pin via source inspection so a future refactor can't re-introduce the
+    timeout. The watcher.join() call MUST stay un-timeout-bounded; the
+    breaker is a separate thread and keeps its own timeout.
+    """
+
+    def test_final_cache_flush_has_no_join_timeout_ceiling(self):
+        import inspect
+
+        from quodeq.analysis.cache import dimension_runner
+
+        src = inspect.getsource(dimension_runner.process_dimension_with_cache)
+        assert "watcher.join(timeout=5.0)" not in src, (
+            "watcher.join must not have a timeout ceiling — the 5s cap "
+            "was the c88be50e regression that dropped the final persist tick"
+        )
+        assert "watcher.join()" in src, (
+            "watcher.join() (no timeout) must still run in the finally "
+            "block so the final persist tick completes"
+        )
+
+    def test_breaker_join_keeps_its_timeout(self):
+        """The breaker is a separate thread with its own lifecycle —
+        its 5s join cap is unrelated to the cache-loss bug and should
+        remain intact."""
+        import inspect
+
+        from quodeq.analysis.cache import dimension_runner
+
+        src = inspect.getsource(dimension_runner.process_dimension_with_cache)
+        assert "breaker.stop_and_join(timeout=5.0)" in src, (
+            "breaker.stop_and_join's 5s timeout is independent of the "
+            "watcher fix and must stay in place"
+        )
+
+
 class TestCachedFindingsReachEventLog:
     """Pin that cache-replayed findings land in ``events.jsonl`` as
     ``JUDGMENT_CREATED`` events, not only in the per-dim JSONL.
