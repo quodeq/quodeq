@@ -209,10 +209,20 @@ def persist_one_file(
 ) -> None:
     """Write a per-file cache entry IF the file has a ``file_done="ok"`` marker.
 
-    Called synchronously from the FindingsRouter when a worker emits the
-    ok marker. Mirrors ``persist_dispatch_results`` but scoped to a single
-    file, so cache writes happen the instant a file completes — not on the
-    next 30s watcher tick. The watcher continues to run as a safety net.
+    Intended to be called synchronously from the FindingsRouter via the
+    ``on_file_done`` callback when a worker emits the ok marker. Mirrors
+    ``persist_dispatch_results`` but scoped to a single file, so cache
+    writes happen the instant a file completes — not on the next 30s
+    watcher tick.
+
+    TODO(phase-1.5): not yet wired into the dispatch flow. The router is
+    constructed inside subprocesses (``_api_runner.py`` and
+    ``mcp/findings_server.py``), so the callback can't be passed across
+    the process boundary without rearchitecting ``AnalysisConfig``. Until
+    that wiring lands, the watcher's periodic-persist tick is the only
+    writer — its final-tick guillotine was removed in commit ``5a3e3c64``
+    so the regression window is bounded by ``_PERSIST_INTERVAL_S``
+    instead of being lost entirely.
 
     No-op when:
       - the file has no entry in ``miss_keys`` (it wasn't dispatched, so

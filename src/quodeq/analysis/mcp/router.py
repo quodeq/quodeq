@@ -98,6 +98,12 @@ class FindingsRouter:
         seen_store: DeduplicationStore | None = None,
         file_reader: FileReader | None = None,
         event_log: "EventLogWriter | None" = None,
+        # TODO(phase-1.5): on_file_done has no production caller yet — the
+        # routers in _api_runner.py and mcp/findings_server.py are constructed
+        # inside subprocesses, so the callback can't cross the process
+        # boundary without threading it through AnalysisConfig. See the
+        # cache.dimension_helpers.persist_one_file docstring for the intended
+        # consumer.
         on_file_done: "Callable[[str], None] | None" = None,
     ):
         self._fh = output_fh
