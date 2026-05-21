@@ -131,3 +131,23 @@
   margin-top: var(--space-2);
   letter-spacing: 0.04em;
 }
+
+/* "Partial — N of M files (P%)" badge.
+   Surfaced when a run was deadline-truncated or otherwise didn't reach
+   exit_reason=done. Score is still rendered above — the badge is purely
+   informational, so users know the coverage was incomplete. */
+.dim-gauge-card__partial-badge {
+  display: inline-block;
+  align-self: center;
+  padding: 2px var(--space-2);
+  margin-top: var(--space-1);
+  border-radius: 4px;
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-align: center;
+}

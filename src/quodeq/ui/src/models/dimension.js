@@ -28,6 +28,9 @@
  * @property {string|null}   fromRunId
  * @property {string|null}   fromDateLabel
  * @property {string|null}   fromDateISO
+ * @property {number|null}   [filesRead]         - files analyzed in this dim (Phase 1+)
+ * @property {number|null}   [sourceFileCount]   - total project source-file count (Phase 1+)
+ * @property {string|null}   [exitReason]        - run-level exit_reason (e.g. "deadline"); null/undefined => complete
  *
  * @typedef {Object} DimensionEval
  * @property {string}           dimension

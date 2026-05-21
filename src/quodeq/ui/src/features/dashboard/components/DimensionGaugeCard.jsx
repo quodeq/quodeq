@@ -8,6 +8,49 @@ import { SevBadge } from '../../../components/terminal/index.js';
 import { splitScore, scoreGradeColorVar, complianceRatio, formatRunId } from '../../../utils/formatters.js';
 import { dimensionGradeLabel } from './dimensionGradeLabel.js';
 
+/**
+ * Decide whether a dimension run was partial (incomplete coverage).
+ *
+ * A run is considered "partial" when EITHER:
+ *   - the analyzer read fewer files than the project's total source-file
+ *     count (typically a deadline-truncated run), OR
+ *   - the run's lifecycle exit_reason is anything other than "done"
+ *     (e.g. "deadline", "failure_streak"). Legacy runs that lack any
+ *     exit_reason at all are NOT flagged — we don't want to splash a
+ *     "Partial" badge on every historical complete-but-pre-Phase-1 run.
+ *
+ * Returns null when there's no signal at all (no filesRead, no
+ * sourceFileCount, no exitReason) — i.e. legacy runs.
+ */
+function computePartialInfo(filesRead, sourceFileCount, exitReason) {
+  const hasCoverageSignal =
+    typeof filesRead === 'number' && typeof sourceFileCount === 'number' && sourceFileCount > 0;
+  const coverageIncomplete = hasCoverageSignal && filesRead < sourceFileCount;
+  const exitIncomplete = typeof exitReason === 'string' && exitReason !== 'done';
+  if (!coverageIncomplete && !exitIncomplete) return null;
+  const coveragePct = hasCoverageSignal
+    ? Math.round((filesRead / sourceFileCount) * 100)
+    : null;
+  return { filesRead, sourceFileCount, coveragePct, exitReason };
+}
+
+function PartialBadge({ info }) {
+  const { filesRead, sourceFileCount, coveragePct, exitReason } = info;
+  const hasCounts =
+    typeof filesRead === 'number' && typeof sourceFileCount === 'number' && sourceFileCount > 0;
+  const label = hasCounts
+    ? `Partial — ${filesRead.toLocaleString()} of ${sourceFileCount.toLocaleString()} files (${coveragePct}%)`
+    : 'Partial';
+  return (
+    <span
+      className="dim-gauge-card__partial-badge"
+      title={exitReason ?? undefined}
+    >
+      {label}
+    </span>
+  );
+}
+
 // SVG geometry — tuned to look right inside the card without scaling JS.
 const RING_SIZE = 100;
 const RING_STROKE = 8;
@@ -57,6 +100,7 @@ export default function DimensionGaugeCard({
   const activate = () => onDimensionClick?.(item, selectedRunId);
   const staleClass = evaluatedToday ? '' : 'dim-gauge-card--stale';
   const dateText = item.fromDateLabel || dateLabel || formatRunId(item.fromRunId || selectedRunId);
+  const partialInfo = computePartialInfo(item.filesRead, item.sourceFileCount, item.exitReason);
 
   return (
     <article
@@ -128,6 +172,8 @@ export default function DimensionGaugeCard({
           </div>
         </>
       )}
+
+      {partialInfo && <PartialBadge info={partialInfo} />}
 
       {!evaluatedToday && dateText && (
         <div className="dim-gauge-card__stale-label">Older run · {dateText}</div>
