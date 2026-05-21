@@ -135,6 +135,51 @@ def test_lifecycle_seeds_dimensions_pending(tmp_path: Path) -> None:
         assert data["dimensions"]["b"]["state"] == "pending"
 
 
+def test_set_exit_reason_persists_into_status_on_done(tmp_path: Path) -> None:
+    """set_exit_reason('deadline') called during the run → status.json
+    after a clean exit has state=done AND exit_reason='deadline'."""
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    with RunLifecycleContext(run_dir, job_id="ext-test", dimensions=["flex"]) as ctx:
+        ctx.set_exit_reason("deadline")
+        ctx.transition_to_finalizing()
+
+    status = read_status(run_dir)
+    assert status is not None
+    assert status["state"] == "done"
+    assert status["exit_reason"] == "deadline"
+
+
+def test_no_set_exit_reason_yields_null_on_done(tmp_path: Path) -> None:
+    """Without set_exit_reason, a clean run still completes with
+    exit_reason=null (preserving today's contract for completed runs)."""
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    with RunLifecycleContext(run_dir, job_id="ext-test", dimensions=["flex"]) as ctx:
+        ctx.transition_to_finalizing()
+
+    status = read_status(run_dir)
+    assert status is not None
+    assert status["state"] == "done"
+    assert status.get("exit_reason") in (None, "")
+
+
+def test_exception_exit_reason_overrides_user_set(tmp_path: Path) -> None:
+    """An uncaught exception's exit_reason takes precedence over any
+    previously-set 'normal' reason — failures aren't mislabeled."""
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    with pytest.raises(ValueError):
+        with RunLifecycleContext(run_dir, job_id="ext-test", dimensions=["flex"]) as ctx:
+            ctx.set_exit_reason("deadline")
+            raise ValueError("boom")
+
+    status = read_status(run_dir)
+    assert status is not None
+    assert status["state"] == "failed"
+    assert "exception" in status["exit_reason"]
+
+
 def test_breaker_exit_writes_failed_with_reason(tmp_path: Path) -> None:
     """CircuitBreakerError raised from inside the lifecycle context maps
     to state=failed with exit_reason=failure_streak."""
