@@ -37,15 +37,34 @@ def _finding_to_dict(f: Finding) -> dict[str, Any]:
     return d
 
 
-def _score_principle(violations: list[Finding], compliance: list[Finding]) -> tuple[float | None, str]:
+def _score_principle(
+    violations: list[Finding], compliance: list[Finding],
+    *, source_file_count: int = 0, scale_multiplier: int = 1,
+) -> tuple[float | None, str]:
     """Score a single principle from its filtered violations and compliance lists.
+
+    Applies the same confidence-level Insufficient rule the CLI engine
+    uses (see ``core.evidence.model.classify_confidence_level``) — keeps
+    the rescore-after-dismiss path in sync with the CLI's original grade
+    so the dashboard, the dim-detail view, and the CLI's JSON report all
+    agree on the same number.
 
     Returns (final_score, grade).
     """
+    from quodeq.core.evidence.model import classify_confidence_level  # noqa: PLC0415
+
     v_dicts = [_finding_to_dict(v) for v in violations]
     c_dicts = [_finding_to_dict(c) for c in compliance]
     vt_counts, ct_counts, _using_taxonomy = compute_tallies(v_dicts, c_dicts)
     if not vt_counts and not ct_counts:
+        return None, "Insufficient"
+
+    confidence = classify_confidence_level(
+        len(violations), len(compliance),
+        scale_multiplier=scale_multiplier,
+        source_file_count=source_file_count,
+    )
+    if confidence == "low":
         return None, "Insufficient"
 
     base = violation_base(vt_counts)
@@ -73,6 +92,9 @@ def _group_by_principle(
 def _score_all_principles(
     principles_violations: dict[str, list[Finding]],
     principles_compliance: dict[str, list[Finding]],
+    *,
+    source_file_count: int = 0,
+    scale_multiplier: int = 1,
 ) -> tuple[dict[str, PrincipleScore], list[PrincipleGrade]]:
     """Score each principle and return (scores_dict, grades_list)."""
     all_principle_names = set(principles_violations) | set(principles_compliance)
@@ -82,7 +104,11 @@ def _score_all_principles(
     for name in sorted(all_principle_names):
         p_violations = principles_violations.get(name, [])
         p_compliance = principles_compliance.get(name, [])
-        final_score, grade = _score_principle(p_violations, p_compliance)
+        final_score, grade = _score_principle(
+            p_violations, p_compliance,
+            source_file_count=source_file_count,
+            scale_multiplier=scale_multiplier,
+        )
         score_str = f"{final_score}/10" if final_score is not None else None
 
         principle_scores[name] = PrincipleScore(
@@ -112,6 +138,7 @@ def _rescore_dimension(
     principles_compliance = _group_by_principle(dim.compliance)
     principle_scores, principle_grades = _score_all_principles(
         principles_violations, principles_compliance,
+        source_file_count=dim.source_file_count or 0,
     )
 
     overall = weighted_overall(principle_scores, MODE_NUMERICAL)

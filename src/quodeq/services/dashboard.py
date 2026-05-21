@@ -365,13 +365,16 @@ def _apply_sql_grade_override(
 ) -> _DashboardPayload:
     """Override per-dimension grade fields from SQL grade tables when available.
 
-    This makes the dashboard consistent with the /scores endpoint, which reads
-    from the same SQL tables. Without this, Overview shows pre-dismissal grades
-    (read from on-disk evaluation JSON) while Standard Detail shows
-    post-dismissal grades (from SQL). This function closes that gap.
+    Keeps the dashboard rollup in lockstep with dim-detail dismisses: a
+    dismiss updates SQL via the projection layer, the next dashboard read
+    reflects the new scores. Safe to overlay because the SQL projector
+    now applies the same confidence-level Insufficient rule the CLI
+    engine uses (see ``services.scoring.projector_scoring`` +
+    ``core.evidence.model.classify_confidence_level``) — SQL grades and
+    JSON grades agree on the same input.
 
-    Falls back to the existing FS-based grades when grade tables are empty or
-    the run directory does not exist.
+    Falls back to the FS-based grades when grade tables are empty or the
+    run directory does not exist.
     """
     from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
     from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
@@ -401,9 +404,6 @@ def _apply_sql_grade_override(
 
     overridden_dims = [_override_dim(d) for d in payload.dimensions_with_trend]
 
-    # Recompute run-level summary from the SQL-backed dimension scores so
-    # the summary card (overall grade shown in the header) agrees with the
-    # per-dimension cards and the /scores endpoint.
     run_score = store.read_run_score_from_dim_scores()
     if run_score.get("grade") is not None:
         sql_numeric_avg: float | None = run_score.get("score")

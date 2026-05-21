@@ -34,6 +34,46 @@ def compute_coverage_pct(files_read: int, source_file_count: int) -> float:
     return 0.0
 
 
+def classify_confidence_level(
+    n_violations: int,
+    n_compliance: int,
+    *,
+    scale_multiplier: int = 1,
+    source_file_count: int = 0,
+) -> str:
+    """Return ``"high" | "medium" | "low"`` for a principle's evidence size.
+
+    Mirrors ``PrincipleEvidence.compute_metrics`` but exposed as a pure
+    function so the SQL projector can apply the same Insufficient rule
+    the CLI uses — keeping both engines on one formula. Without this,
+    the projector scored thin-evidence principles (e.g. 1 compliance,
+    0 violations) as ``10.0/Exemplary`` while the CLI marked them
+    ``Insufficient``, and the dashboard's overlaid SQL scores drifted
+    away from the CLI's own report.
+    """
+    base_high = _HIGH_CONFIDENCE_THRESHOLD * scale_multiplier
+    base_medium = _MEDIUM_CONFIDENCE_THRESHOLD * scale_multiplier
+    if source_file_count > 0:
+        high_threshold = max(
+            _MIN_HIGH_INSTANCES,
+            min(base_high, math.ceil(source_file_count * _HIGH_INSTANCES_PER_FILE)),
+        )
+        medium_threshold = max(
+            _MIN_MEDIUM_INSTANCES,
+            min(base_medium, math.ceil(source_file_count * _MEDIUM_INSTANCES_PER_FILE)),
+        )
+    else:
+        high_threshold = base_high
+        medium_threshold = base_medium
+
+    total = n_violations + n_compliance
+    if total >= high_threshold:
+        return "high"
+    if total >= medium_threshold:
+        return "medium"
+    return "low"
+
+
 _VALID_VERDICTS = frozenset({"violation", "compliance", "dismissed"})
 _VALID_SEVERITIES = frozenset({"critical", "high", "medium", "low", "minor"})
 
@@ -73,40 +113,19 @@ class PrincipleEvidence:
     def compute_metrics(self, scale_multiplier: int = 1, source_file_count: int = 0) -> None:
         """Calculate compliance percentage and confidence level from violation/compliance counts.
 
-        Thresholds scale with project size:
-        - large projects (via ``scale_multiplier``) need more instances
-          to reach high/medium confidence;
-        - small projects (via ``source_file_count``) need fewer, since
-          a 5-file repo can't physically produce 5 findings per
-          principle. Without this, small projects always read as
-          "Insufficient" even when critical violations are present.
+        Confidence-level computation is shared with the SQL projector via
+        ``classify_confidence_level`` so both engines apply the same
+        Insufficient rule.
         """
-        base_high = _HIGH_CONFIDENCE_THRESHOLD * scale_multiplier
-        base_medium = _MEDIUM_CONFIDENCE_THRESHOLD * scale_multiplier
-        if source_file_count > 0:
-            high_threshold = max(
-                _MIN_HIGH_INSTANCES,
-                min(base_high, math.ceil(source_file_count * _HIGH_INSTANCES_PER_FILE)),
-            )
-            medium_threshold = max(
-                _MIN_MEDIUM_INSTANCES,
-                min(base_medium, math.ceil(source_file_count * _MEDIUM_INSTANCES_PER_FILE)),
-            )
-        else:
-            high_threshold = base_high
-            medium_threshold = base_medium
-
         n_violations = len(self.violations)
         n_compliance = len(self.compliance)
         total = n_violations + n_compliance
         pct = round(n_compliance / total * PERCENT_SCALE, 1) if total > 0 else 0.0
-
-        if total >= high_threshold:
-            confidence = "high"
-        elif total >= medium_threshold:
-            confidence = "medium"
-        else:
-            confidence = "low"
+        confidence = classify_confidence_level(
+            n_violations, n_compliance,
+            scale_multiplier=scale_multiplier,
+            source_file_count=source_file_count,
+        )
 
         self.metrics = {
             "total_instances": total,

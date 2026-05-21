@@ -23,7 +23,12 @@ def _f(req: str, principle: str, severity: str = "medium", verdict: str = "viola
     )
 
 
-def test_compute_principle_grade_single_violation() -> None:
+def test_compute_principle_grade_single_violation_is_insufficient() -> None:
+    """One finding total is below the medium-confidence threshold; the
+    projector must short-circuit to Insufficient to match the CLI engine's
+    ``core.scoring._principle._score_numerical`` behaviour. Previously this
+    came out as a real score, which is what made the SQL grade tables
+    disagree with the CLI's evaluation JSON."""
     finding = _f("R1", "P1", severity="high", verdict="violation")
 
     result = compute_principle_grade(
@@ -31,10 +36,23 @@ def test_compute_principle_grade_single_violation() -> None:
     )
 
     assert result["principle_id"] == "P1"
-    assert result["score"] is not None
-    assert result["grade"] is not None
+    assert result["grade"] == "Insufficient"
+    assert result["score"] is None
     assert result["finding_count"] == 1
     assert result["dismissed_count"] == 0
+
+
+def test_compute_principle_grade_sufficient_evidence_scores_normally() -> None:
+    """With enough findings to clear the confidence floor, scoring runs."""
+    findings = [_f(f"R{i}", "P1", severity="medium") for i in range(5)]
+
+    result = compute_principle_grade(
+        principle_id="P1", findings=findings, compliance=[],
+    )
+
+    assert result["grade"] != "Insufficient"
+    assert result["score"] is not None
+    assert result["finding_count"] == 5
 
 
 def test_compute_principle_grade_only_dismissed_returns_insufficient() -> None:
@@ -101,14 +119,21 @@ def test_compute_run_score_skips_null_scores() -> None:
 
 
 # --- Parity tests: projector_scoring vs legacy rescore_dimensions ----------
+#
+# Both engines now apply the same confidence-level check (see
+# ``core.evidence.model.classify_confidence_level``) so they agree on which
+# principles qualify for scoring vs Insufficient.  Inputs below carry enough
+# findings to clear the medium-confidence threshold (5 by default at
+# source_file_count=0), so both engines score the principles instead of
+# bailing out to Insufficient.
+
 
 def _legacy_dim_score(violations, compliance) -> float | None:
     """Compute a dimension score via the underlying legacy scoring path.
 
     Calls _score_principle per principle and weighted_overall to aggregate,
     mirroring exactly what _rescore_dimension does after filtering dismissed
-    findings. Does NOT call rescore_dimensions, which short-circuits when no
-    findings are dismissed and would return a stale pre-computed score string.
+    findings.
     """
     from quodeq.services.rescore import _score_all_principles, _group_by_principle
     from quodeq.core.scoring.overall import weighted_overall, MODE_NUMERICAL
@@ -139,8 +164,9 @@ def _new_dim_score(violations, compliance) -> float | None:
     return compute_dimension_score(dimension="Security", principle_grades=p_grades)["score"]
 
 
-def test_parity_single_principle_single_violation() -> None:
-    violations = [_f("R1", "P1", "high")]
+def test_parity_single_principle_sufficient_violations() -> None:
+    """5 same-severity violations clears the medium-confidence floor."""
+    violations = [_f(f"R{i}", "P1", "high") for i in range(5)]
     compliance = []
     legacy = _legacy_dim_score(violations, compliance)
     new = _new_dim_score(violations, compliance)
@@ -148,30 +174,46 @@ def test_parity_single_principle_single_violation() -> None:
 
 
 def test_parity_single_principle_violation_and_compliance() -> None:
-    violations = [_f("R1", "P1", "high"), _f("R2", "P1", "medium")]
-    compliance = [_f("R3", "P1", "low", verdict="compliance")]
+    violations = [_f(f"V{i}", "P1", "high") for i in range(3)]
+    compliance = [_f(f"C{i}", "P1", "low", verdict="compliance") for i in range(2)]
     legacy = _legacy_dim_score(violations, compliance)
     new = _new_dim_score(violations, compliance)
     assert new == legacy, f"Parity broken: legacy={legacy}, new={new}"
 
 
 def test_parity_multiple_principles() -> None:
-    violations = [
-        _f("R1", "P1", "high"), _f("R2", "P1", "medium"),
-        _f("R3", "P2", "critical"),
-    ]
-    compliance = [_f("R4", "P1", "low", verdict="compliance")]
+    """Each principle has enough findings to clear the confidence floor."""
+    violations = [_f(f"V{i}", "P1", "high") for i in range(3)] \
+        + [_f(f"W{i}", "P2", "critical") for i in range(3)]
+    compliance = [_f(f"C{i}", "P1", "low", verdict="compliance") for i in range(2)] \
+        + [_f(f"D{i}", "P2", "low", verdict="compliance") for i in range(2)]
     legacy = _legacy_dim_score(violations, compliance)
     new = _new_dim_score(violations, compliance)
     assert new == legacy, f"Parity broken: legacy={legacy}, new={new}"
 
 
-def test_parity_mixed_with_insufficient_principle() -> None:
-    """Critical landmine: legacy aggregates principles into dimensions then averages dimensions,
-    while compute_run_score in the new path averages dimension scores directly. For a single
-    dimension this should be equivalent -- verify here. (The run-level parity is tested elsewhere.)"""
+def test_parity_low_confidence_returns_insufficient_in_both() -> None:
+    """Thin evidence (1 finding) must yield Insufficient in both engines.
+
+    This is the contract that closed the dashboard-vs-CLI score split.
+    Score may be ``None`` (projector) or ``0.0`` (legacy weighted_overall
+    fallback), but the *grade* must be Insufficient.
+    """
+    from quodeq.services.rescore import _score_all_principles, _group_by_principle
+    from quodeq.core.scoring.overall import weighted_overall, MODE_NUMERICAL
+
     violations = [_f("R1", "P1", "high")]
-    compliance = [_f("R2", "P2", "low", verdict="compliance")]  # P2 has only compliance -> may be Insufficient
-    legacy = _legacy_dim_score(violations, compliance)
-    new = _new_dim_score(violations, compliance)
-    assert new == legacy, f"Parity broken: legacy={legacy}, new={new}"
+    compliance = []
+
+    # Legacy
+    pv = _group_by_principle(violations)
+    pc = _group_by_principle(compliance)
+    legacy_principle_scores, _ = _score_all_principles(pv, pc)
+    legacy_overall = weighted_overall(legacy_principle_scores, MODE_NUMERICAL)
+    assert legacy_overall.grade == "Insufficient"
+
+    # New
+    p_grade = compute_principle_grade(principle_id="P1", findings=violations, compliance=[])
+    assert p_grade["grade"] == "Insufficient"
+    new_dim = compute_dimension_score(dimension="Security", principle_grades=[p_grade])
+    assert new_dim["grade"] == "Insufficient"

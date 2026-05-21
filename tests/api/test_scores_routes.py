@@ -46,13 +46,33 @@ _DEFAULT_VIOLATION = dict(
 )
 
 
+def _scorable_violations(n: int = 5, *, practice: str = "P1", dimension: str = "Security") -> list[dict]:
+    """N distinct violations for the same principle — enough to clear the
+    medium-confidence floor in ``classify_confidence_level`` so the
+    projector scores the principle instead of returning Insufficient."""
+    return [
+        dict(
+            practice_id=practice, verdict="violation", dimension=dimension,
+            file=f"f{i}.py", line=10 + i, reason="r", req=f"R{i}",
+            severity="high",
+        )
+        for i in range(n)
+    ]
+
+
 # ---------------------------------------------------------------------------
 # SQL path tests
 # ---------------------------------------------------------------------------
 
 def test_get_scores_raw_reads_from_sql_after_projection(tmp_path: Path) -> None:
-    """After ensure_projected runs, get_scores_raw returns SQL-backed grades."""
-    _seed_run(tmp_path, "myproject", "r1", violations=[_DEFAULT_VIOLATION])
+    """After ensure_projected runs, get_scores_raw returns SQL-backed grades.
+
+    Uses 5 violations so the principle clears the medium-confidence floor
+    (the CLI engine and the projector both treat thinner evidence as
+    Insufficient, in which case ``overallScore`` is intentionally absent
+    from the serialised camelCase dict).
+    """
+    _seed_run(tmp_path, "myproject", "r1", violations=_scorable_violations())
 
     result = get_scores_raw(tmp_path, "myproject", "r1")
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from quodeq.core.evidence.model import classify_confidence_level
 from quodeq.core.scoring.engine import compute_tallies
 from quodeq.core.scoring.internals import (
     compliance_lift,
@@ -43,8 +44,17 @@ def compute_principle_grade(
     findings: list[Finding],
     compliance: list[Finding],
     dismissed_count: int = 0,
+    source_file_count: int = 0,
+    scale_multiplier: int = 1,
 ) -> dict[str, Any]:
     """Score a single principle. ``findings`` excludes dismissed.
+
+    Mirrors the CLI's ``core/scoring/_principle._score_numerical``: low
+    confidence (thin evidence relative to project size) short-circuits to
+    ``Insufficient`` before any scoring math runs. Without this gate,
+    principles with one or two findings scored ``10.0/Exemplary`` here
+    but ``Insufficient`` in the CLI's evaluation JSON — and the
+    dashboard's overlaid SQL grades drifted away from the CLI's report.
 
     Returns a dict suitable for SQLiteStateStore.record_principle_grade.
     """
@@ -54,6 +64,20 @@ def compute_principle_grade(
             "score": None,
             "grade": "Insufficient",
             "finding_count": 0,
+            "dismissed_count": dismissed_count,
+        }
+
+    confidence_level = classify_confidence_level(
+        len(findings), len(compliance),
+        scale_multiplier=scale_multiplier,
+        source_file_count=source_file_count,
+    )
+    if confidence_level == "low":
+        return {
+            "principle_id": principle_id,
+            "score": None,
+            "grade": "Insufficient",
+            "finding_count": len(findings),
             "dismissed_count": dismissed_count,
         }
 
