@@ -8,7 +8,7 @@ import io
 import json
 import logging
 import sys
-from typing import Protocol, runtime_checkable
+from typing import Callable, Protocol, runtime_checkable
 
 if sys.platform != "win32":
     import fcntl
@@ -98,11 +98,13 @@ class FindingsRouter:
         seen_store: DeduplicationStore | None = None,
         file_reader: FileReader | None = None,
         event_log: "EventLogWriter | None" = None,
+        on_file_done: "Callable[[str], None] | None" = None,
     ):
         self._fh = output_fh
         self._enricher = FindingEnricher(context or CompiledContext(), file_reader)
         self._seen: DeduplicationStore = seen_store if seen_store is not None else set()
         self._event_log: EventLogWriter | None = event_log
+        self._on_file_done: Callable[[str], None] | None = on_file_done
         self.counter = 0
 
     def receive(self, args: dict) -> tuple[str, bool]:
@@ -136,6 +138,12 @@ class FindingsRouter:
 
         Used by the cache layer to decide which files are safely cached.
         Lines without a matching ok marker are not persisted as cache hits.
+
+        When ``on_file_done`` was provided at construction and ``status`` is
+        ``"ok"``, the callback is invoked synchronously with the file path.
+        Callback exceptions are caught and logged -- the JSONL marker write
+        always succeeds first, so a cache-side failure cannot lose the
+        worker's completion record.
         """
         if status not in ("ok", "error"):
             raise ValueError(f"mark_file_done: status must be 'ok' or 'error', got {status!r}")
@@ -144,3 +152,11 @@ class FindingsRouter:
             payload["reason"] = reason
         line = json.dumps(payload) + "\n"
         _locked_write(self._fh, line)
+        if status == "ok" and self._on_file_done is not None:
+            try:
+                self._on_file_done(file)
+            except Exception:  # noqa: BLE001 — callback failure must never lose the ok marker
+                _logger.warning(
+                    "FindingsRouter: on_file_done callback raised for %s", file,
+                    exc_info=True,
+                )

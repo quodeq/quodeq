@@ -52,3 +52,42 @@ class TestMarkFileDone:
         router = _make_router(fh)
         with pytest.raises(ValueError):
             router.mark_file_done(file="src/foo.py", status="bogus")
+
+
+def test_mark_file_done_invokes_on_file_done_callback_when_ok():
+    """When mark_file_done is called with status='ok', the on_file_done
+    callback is invoked with the file path. status='error' does not
+    invoke the callback."""
+    import io
+    from quodeq.analysis.mcp.router import FindingsRouter
+
+    calls = []
+    def on_file_done(file: str) -> None:
+        calls.append(file)
+
+    fh = io.StringIO()
+    router = FindingsRouter(fh, on_file_done=on_file_done)
+
+    router.mark_file_done(file="Foo.kt", status="ok")
+    router.mark_file_done(file="Bar.kt", status="error")
+    router.mark_file_done(file="Baz.kt", status="ok")
+
+    assert calls == ["Foo.kt", "Baz.kt"]
+
+
+def test_mark_file_done_callback_exception_does_not_break_marker_write():
+    """A raising on_file_done callback must not prevent the file_done
+    marker from reaching the JSONL. Cache failures must never roll back
+    the worker's completion record."""
+    import io
+    from quodeq.analysis.mcp.router import FindingsRouter
+
+    def boom(_file: str) -> None:
+        raise RuntimeError("simulated cache write failure")
+
+    fh = io.StringIO()
+    router = FindingsRouter(fh, on_file_done=boom)
+    router.mark_file_done(file="Foo.kt", status="ok")
+    assert '"_marker": "file_done"' in fh.getvalue()
+    assert '"file": "Foo.kt"' in fh.getvalue()
+    assert '"status": "ok"' in fh.getvalue()
