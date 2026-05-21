@@ -201,3 +201,41 @@ def persist_dispatch_results(
             model_id=model_id,
         )
         cache.put(key, entry)
+
+
+def persist_one_file(
+    config: RunConfig, dimension: str, *, file: str,
+    jsonl_path: Path, miss_keys: dict[str, str], cache: CacheBackend,
+) -> None:
+    """Write a per-file cache entry IF the file has a ``file_done="ok"`` marker.
+
+    Called synchronously from the FindingsRouter when a worker emits the
+    ok marker. Mirrors ``persist_dispatch_results`` but scoped to a single
+    file, so cache writes happen the instant a file completes — not on the
+    next 30s watcher tick. The watcher continues to run as a safety net.
+
+    No-op when:
+      - the file has no entry in ``miss_keys`` (it wasn't dispatched, so
+        the V1 fallback path is responsible);
+      - the file's most recent marker in the JSONL is not "ok" (still
+        running, or "error").
+    """
+    key = miss_keys.get(file)
+    if key is None:
+        _logger.debug("persist_one_file: no key for %s; skipping", file)
+        return
+    if not jsonl_path.is_file():
+        return
+    grouped, ok_files = _group_findings_by_file(jsonl_path)
+    if file not in ok_files:
+        return
+    entry = CacheEntry(
+        key=key,
+        schema_version=_SCHEMA_VERSION,
+        findings=grouped.get(file, []),
+        files_read=1,
+        file_path=file,
+        dimension=dimension,
+        model_id=_model_id_from(config),
+    )
+    cache.put(key, entry)
