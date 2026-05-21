@@ -357,6 +357,70 @@ def _compute_dashboard_payload(
     )
 
 
+def _apply_sql_grade_override(
+    reports_root: Path,
+    project: str,
+    run_id: str,
+    payload: _DashboardPayload,
+) -> _DashboardPayload:
+    """Override per-dimension grade fields from SQL grade tables when available.
+
+    Keeps the dashboard rollup in lockstep with dim-detail dismisses: a
+    dismiss updates SQL via the projection layer, the next dashboard read
+    reflects the new scores. Safe to overlay because the SQL projector
+    now applies the same confidence-level Insufficient rule the CLI
+    engine uses (see ``services.scoring.projector_scoring`` +
+    ``core.evidence.model.classify_confidence_level``) — SQL grades and
+    JSON grades agree on the same input.
+
+    Falls back to the FS-based grades when grade tables are empty or the
+    run directory does not exist.
+    """
+    from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
+    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
+
+    run_dir = reports_root / project / run_id
+    if not run_dir.is_dir():
+        return payload
+
+    repo = SqliteFindingsRepository(run_dir)
+    repo._ensure_fresh()  # noqa: SLF001
+
+    store = SQLiteStateStore(run_dir)
+    dim_rows = store.read_dimension_scores()
+    if not dim_rows:
+        return payload
+
+    sql_grades: dict[str, dict] = {r["dimension"]: r for r in dim_rows}
+
+    def _override_dim(d: DimensionResult) -> DimensionResult:
+        row = sql_grades.get(d.dimension)
+        if row is None:
+            return d
+        score_val: float | None = row.get("score")
+        sql_score = f"{score_val}/10" if score_val is not None else d.overall_score
+        sql_grade = row.get("grade") or d.overall_grade
+        return replace(d, overall_score=sql_score, overall_grade=sql_grade)
+
+    overridden_dims = [_override_dim(d) for d in payload.dimensions_with_trend]
+
+    run_score = store.read_run_score_from_dim_scores()
+    if run_score.get("grade") is not None:
+        sql_numeric_avg: float | None = run_score.get("score")
+        sql_run_grade: str | None = run_score.get("grade")
+        overridden_summary = replace(
+            payload.selected_summary,
+            overall_grade=sql_run_grade,
+            numeric_average=sql_numeric_avg,
+        )
+    else:
+        overridden_summary = payload.selected_summary
+
+    payload.dimensions_with_trend = overridden_dims
+    payload.selected_summary = overridden_summary
+    return payload
+
+
 def build_dashboard(
     reports_dir: str,
     project: str,
@@ -389,17 +453,5 @@ def build_dashboard(
         summary=summarize_dimensions(selected_dims),
     )
     payload = _compute_dashboard_payload(reports_root, project, runs, ctx, cc)
-    # Per-dim grades flow through unchanged from the CLI's evaluation JSON
-    # (canonical scoring with the confidence-level check).  A previous
-    # ``_apply_sql_grade_override`` step re-derived them from the SQL grade
-    # tables to keep the dashboard in lockstep with the dim-detail view on
-    # dismisses — but the SQL projector used a simpler formula
-    # (no confidence-level check), so on runs with thin-evidence principles
-    # the rollup score diverged from the CLI's own report (e.g. flexibility
-    # 7.7/Good in the CLI vs 8.8/Good on the dashboard).  Removing the
-    # override restores CLI parity.  Dismisses still update the dim-detail
-    # score live via the slim payload from the mutation endpoint
-    # (see ``routes_findings.py``); the dashboard rollup is intentionally
-    # eventually consistent — it refreshes when the user navigates away
-    # and back.
+    payload = _apply_sql_grade_override(reports_root, project, selected_run.run_id, payload)
     return _build_dashboard_result(project, runs, selected_run, payload)

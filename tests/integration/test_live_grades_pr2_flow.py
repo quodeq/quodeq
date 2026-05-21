@@ -11,24 +11,40 @@ from quodeq.services.dismissed import dismiss_finding
 
 
 def test_full_grade_flow(tmp_path: Path) -> None:
+    """End-to-end grade flow with enough findings to clear the
+    confidence-level floor in both engines (5+ per principle). Thinner
+    evidence would correctly trip the new Insufficient gate and
+    invalidate the before/after numeric comparison this test makes.
+    """
     project_dir = tmp_path / "project"
     run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
 
-    # Two findings in Security (varied severity), one in Reliability.
     log = run_dir / "events.jsonl"
-    EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+    writer = EventLogWriter(log)
+    # Security/P1: critical violation + 4 majors → clears the floor.
+    writer.emit(JudgmentCreatedEvent(payload=JudgmentPayload(
         practice_id="P1", verdict="violation", dimension="Security",
         file="a.py", line=10, reason="r", req="R1", severity="critical",
     )))
-    EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
-        practice_id="P2", verdict="violation", dimension="Security",
-        file="b.py", line=20, reason="r", req="R2", severity="medium",
-    )))
-    EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
-        practice_id="P3", verdict="violation", dimension="Reliability",
-        file="c.py", line=30, reason="r", req="R3", severity="low",
-    )))
+    for i in range(4):
+        writer.emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+            practice_id="P1", verdict="violation", dimension="Security",
+            file=f"a{i}.py", line=10 + i, reason="r", req=f"R1{i}", severity="major",
+        )))
+    # Security/P2 also above the floor so the dim score has multiple
+    # scored principles to average.
+    for i in range(5):
+        writer.emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+            practice_id="P2", verdict="violation", dimension="Security",
+            file=f"b{i}.py", line=20 + i, reason="r", req=f"R2{i}", severity="medium",
+        )))
+    # Reliability above the floor so it shows up in dim_rows.
+    for i in range(5):
+        writer.emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+            practice_id="P3", verdict="violation", dimension="Reliability",
+            file=f"c{i}.py", line=30 + i, reason="r", req=f"R3{i}", severity="low",
+        )))
 
     # Trigger projection + grade compute via a read.
     SqliteFindingsRepository(run_dir).list_by_dimension("Security")

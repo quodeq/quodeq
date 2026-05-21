@@ -491,61 +491,23 @@ class TestStaleCacheSelfHeal:
 # ============================================================
 
 
-class TestDashboardUsesCliGradesFromJson:
-    """The dashboard surfaces the per-dimension grades the CLI wrote to
-    ``evaluation/<dim>.json`` verbatim.
+class TestDashboardSqlOverlayAfterConfidenceFix:
+    """The SQL grade overlay is back, but only after the SQL projector and
+    the CLI engine were unified on the same confidence-level rule (see
+    ``core.evidence.model.classify_confidence_level``).  These tests pin
+    the new contract: when SQL grade tables are populated, the dashboard
+    surfaces them — which is now safe because they're computed with the
+    same formula the CLI used to write the evaluation JSON.
 
-    A previous ``_apply_sql_grade_override`` step re-derived dim grades
-    from SQL grade tables to keep the dashboard rollup live on dismisses.
-    But the SQL projector uses a simpler scoring formula
-    (``services.scoring.projector_scoring.compute_principle_grade``) than
-    the CLI engine — no confidence-level check — so on runs with
-    thin-evidence principles the dashboard score drifted away from the
-    CLI's own report.  The override is removed; the dashboard returns
-    canonical CLI scores.  Dim-detail still updates live on dismiss via
-    the slim payload from the mutation endpoint (see ``routes_findings``);
-    the dashboard rollup is intentionally eventually consistent.
+    Previous incarnation of these tests (``TestDashboardSqlGradeOverride``)
+    pinned the same overlay against the buggy projector formula; that
+    behaviour caused the 7.7-vs-9.0 dashboard-vs-CLI split the user
+    reported.  Now that both engines agree, the overlay is a feature
+    (live updates on dismiss) rather than a divergence.
     """
 
-    def test_dashboard_returns_fs_grade_unchanged(self, tmp_path: Path) -> None:
-        from quodeq.data.fs.report_parser import RunInfo as _RI
-
-        project = "myproject"
-        run_id = "r1"
-        run_dir = tmp_path / project / run_id
-        run_dir.mkdir(parents=True)
-
-        fs_dim = DimensionResult(
-            dimension="Security", overall_grade="Good", overall_score="7.7/10",
-        )
-        summary = DimensionSummary(
-            dimensions_count=1, overall_grade="Good", numeric_average=7.7,
-        )
-
-        with (
-            patch(
-                "quodeq.services.dashboard.list_runs",
-                return_value=[_RI(run_id=run_id, date_iso="2024-01-01", date_label="2024-01-01")],
-            ),
-            patch("quodeq.services.dashboard.read_run_data", return_value=[fs_dim]),
-            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
-        ):
-            result = build_dashboard(str(tmp_path), project, run_id)
-
-        sec = result["dimensions"][0]
-        assert sec["overallScore"] == "7.7/10"
-        assert sec["overallGrade"] == "Good"
-        assert result["summary"]["overallGrade"] == "Good"
-
-    def test_dashboard_ignores_sql_grade_tables_even_when_populated(
-        self, tmp_path: Path,
-    ) -> None:
-        """Pin the regression: even if SQL grade tables are populated (from a
-        prior projection pass), the dashboard must keep using the CLI's FS
-        grade.  Without this, the projector's confidence-blind formula would
-        leak back in and the user would see the same 7.7-vs-9.0 split that
-        motivated removing the override.
-        """
+    def test_dashboard_overlays_sql_grades_when_populated(self, tmp_path: Path) -> None:
+        """Post-dismissal SQL grade overrides the FS-derived grade."""
         from quodeq.data.sqlite.state_store import SQLiteStateStore
         from quodeq.data.fs.report_parser import RunInfo as _RI
 
@@ -554,12 +516,48 @@ class TestDashboardUsesCliGradesFromJson:
         run_dir = tmp_path / project / run_id
         run_dir.mkdir(parents=True)
 
-        # Seed SQL grade tables with a divergent value — would override
-        # the FS grade under the old behaviour.
+        # Seed SQL grade tables with the post-dismissal grade — what
+        # would be computed if the user had dismissed one of the
+        # critical findings, lifting the score.
         store = SQLiteStateStore(run_dir)
-        store.record_dimension_score(
-            dimension="Security", score=9.9, grade="Exemplary",
+        store.record_dimension_score(dimension="Security", score=7.5, grade="Good")
+
+        # FS-derived grade is the original pre-dismissal value.
+        fs_dim = DimensionResult(
+            dimension="Security", overall_grade="Critical", overall_score="2.0",
         )
+        summary = DimensionSummary(
+            dimensions_count=1, overall_grade="Critical", numeric_average=2.0,
+        )
+
+        with (
+            patch(
+                "quodeq.services.dashboard.list_runs",
+                return_value=[_RI(run_id=run_id, date_iso="2024-01-01", date_label="2024-01-01")],
+            ),
+            patch("quodeq.services.dashboard.read_run_data", return_value=[fs_dim]),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), project, run_id)
+
+        sec = result["dimensions"][0]
+        assert sec["overallGrade"] == "Good", (
+            f"Expected SQL post-dismissal grade 'Good', got {sec['overallGrade']!r}"
+        )
+        assert sec["overallScore"] == "7.5/10"
+
+    def test_dashboard_falls_back_to_fs_when_sql_tables_empty(
+        self, tmp_path: Path,
+    ) -> None:
+        """No SQL rows → use FS grade unchanged (this is the steady state
+        for runs that haven't been projected, e.g. legacy runs without
+        events.jsonl)."""
+        from quodeq.data.fs.report_parser import RunInfo as _RI
+
+        project = "myproject"
+        run_id = "r1"
+        run_dir = tmp_path / project / run_id
+        run_dir.mkdir(parents=True)
 
         fs_dim = DimensionResult(
             dimension="Security", overall_grade="Good", overall_score="7.7/10",
@@ -579,6 +577,5 @@ class TestDashboardUsesCliGradesFromJson:
             result = build_dashboard(str(tmp_path), project, run_id)
 
         sec = result["dimensions"][0]
-        # SQL says 9.9/Exemplary, FS says 7.7/Good — dashboard must use FS.
         assert sec["overallScore"] == "7.7/10"
         assert sec["overallGrade"] == "Good"

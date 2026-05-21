@@ -9,6 +9,7 @@ bugs at the cost of a few ms per call.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from quodeq.core.types.finding import Finding
@@ -19,6 +20,33 @@ from quodeq.services.scoring.projector_scoring import (
     compute_dimension_score,
     compute_principle_grade,
 )
+
+
+def _read_source_file_count(run_dir: Path) -> int:
+    """Best-effort: pick up the run's ``sourceFileCount`` from any dim JSON.
+
+    The projector needs this to apply the CLI's confidence-level thresholds
+    (which scale with project size). Every ``evaluation/<dim>.json`` in the
+    run carries the same value; we read the first one we find. Returns 0
+    when no JSON exists yet (early projection of a run-in-progress) — that
+    falls back to the unsclaed base thresholds in
+    ``classify_confidence_level``, matching the CLI's behaviour for runs
+    without a known file count.
+    """
+    eval_dir = run_dir / "evaluation"
+    if not eval_dir.is_dir():
+        return 0
+    for path in eval_dir.iterdir():
+        if path.suffix != ".json":
+            continue
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        count = data.get("sourceFileCount")
+        if isinstance(count, int) and count > 0:
+            return count
+    return 0
 
 
 _SELECT_NON_DISMISSED = (
@@ -41,6 +69,7 @@ def _dict_row(cursor, row):
 def recompute_grades(run_dir: Path) -> None:
     """Full recompute of dimension_scores + principle_grades from findings."""
     store = SQLiteStateStore(run_dir)
+    source_file_count = _read_source_file_count(run_dir)
 
     with open_evaluation_db(run_dir) as conn:
         # Fetch dismissed counts as plain tuples before switching row_factory.
@@ -73,6 +102,7 @@ def recompute_grades(run_dir: Path) -> None:
             findings=p_violations,
             compliance=p_compliance,
             dismissed_count=dismissed,
+            source_file_count=source_file_count,
         )
         principle_grades_by_dim.setdefault(dim, []).append(grade)
         principle_rows_to_write.append((dim, grade))

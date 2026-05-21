@@ -15,9 +15,15 @@ def _seed(store: SQLiteStateStore, *, req: str, principle: str, dimension: str, 
 
 
 def test_recompute_grades_writes_dimension_and_principle_rows(tmp_path: Path) -> None:
+    """Seed 5+ findings per principle so they clear the confidence floor —
+    otherwise the projector now correctly returns Insufficient (no
+    numeric score) for thin evidence, matching the CLI engine.
+    """
     store = SQLiteStateStore(tmp_path)
-    _seed(store, req="R1", principle="P1", dimension="Security", severity="high")
-    _seed(store, req="R2", principle="P2", dimension="Security", severity="medium")
+    for i in range(5):
+        _seed(store, req=f"P1-{i}", principle="P1", dimension="Security", severity="high")
+    for i in range(5):
+        _seed(store, req=f"P2-{i}", principle="P2", dimension="Security", severity="medium")
 
     recompute_grades(tmp_path)
 
@@ -29,6 +35,25 @@ def test_recompute_grades_writes_dimension_and_principle_rows(tmp_path: Path) ->
     p_rows = store.read_principle_grades()
     assert len(p_rows) == 2
     assert {r["principle_id"] for r in p_rows} == {"P1", "P2"}
+
+
+def test_recompute_grades_below_confidence_floor_writes_insufficient(
+    tmp_path: Path,
+) -> None:
+    """A principle with one finding clears the empty-tally guard but trips
+    the confidence-level check, so the projector now returns
+    ``Insufficient`` instead of a real score — matching the CLI engine.
+    """
+    store = SQLiteStateStore(tmp_path)
+    _seed(store, req="R1", principle="P1", dimension="Security", severity="high")
+
+    recompute_grades(tmp_path)
+
+    p_rows = store.read_principle_grades()
+    assert len(p_rows) == 1
+    assert p_rows[0]["principle_id"] == "P1"
+    assert p_rows[0]["grade"] == "Insufficient"
+    assert p_rows[0]["score"] is None
 
 
 def test_recompute_grades_excludes_dismissed(tmp_path: Path) -> None:
