@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Iterable
 
@@ -130,20 +132,38 @@ class DisciplineRegistry:
         Honors the same vendor/skip-dir set used by recursive subproject discovery
         so a vendored copy under ``node_modules`` / ``.venv`` / ``vendor`` doesn't
         satisfy the prereq and falsely classify the host repo.
+
+        For recursive ``**/*.<ext>``-style patterns we walk the tree with
+        ``os.walk`` and prune skip / hidden dirs *before* descending. The
+        old implementation used ``Path.glob``, which scandirs every subtree
+        before the in-loop filter could discard matches — on an Android
+        repo with 88 subproject roots and ``build/`` + ``.gradle/`` under
+        each, that turned a millisecond gate into an 85 s walk
+        (~2 M scandir calls). Pruning at the directory level keeps the
+        boolean answer identical while bringing cost back to milliseconds.
+        Non-recursive patterns (e.g. ``lib/*.sh``) keep using ``Path.glob``;
+        they don't descend into skip dirs in the first place.
         """
-        if not rule.detect_requires_file:
+        pattern = rule.detect_requires_file
+        if not pattern:
             return True
-        for match in repo.glob(rule.detect_requires_file):
-            try:
-                rel = match.relative_to(repo)
-            except ValueError:
-                continue
-            if any(
-                part in _SUBPROJECT_SKIP_DIRS or part.startswith(".")
-                for part in rel.parts[:-1]
-            ):
-                continue
-            return True
+        if pattern.startswith("**/"):
+            file_pat = pattern[len("**/") :]
+            return self._has_pruned_recursive_match(repo, file_pat)
+        return any(repo.glob(pattern))
+
+    @staticmethod
+    def _has_pruned_recursive_match(repo: Path, file_pat: str) -> bool:
+        """Return True iff any file under *repo* matches *file_pat*, skipping
+        vendor / cache / hidden directories at the directory level.
+        """
+        for _dirpath, dirnames, filenames in os.walk(repo):
+            dirnames[:] = [
+                d for d in dirnames
+                if d not in _SUBPROJECT_SKIP_DIRS and not d.startswith(".")
+            ]
+            if any(fnmatchcase(f, file_pat) for f in filenames):
+                return True
         return False
 
     def _any_detect_file_matches(self, repo: Path, rule: DisciplineRule) -> bool:
