@@ -14,6 +14,8 @@ class ServerArgs:
     queue_path: str | None = None
     agent_id: str = ""
     work_dir: str | None = None
+    cache_root: str | None = None
+    model_id: str | None = None
 
     @property
     def dimensions(self) -> list[str]:
@@ -29,6 +31,8 @@ _FLAG_MAP = {
     "--queue": "queue_path",
     "--agent-id": "agent_id",
     "--work-dir": "work_dir",
+    "--cache-root": "cache_root",
+    "--model-id": "model_id",
 }
 
 _USAGE = """\
@@ -40,6 +44,9 @@ Options:
   --queue PATH         Path to the file queue JSON
   --agent-id ID        Agent identifier
   --work-dir DIR       Source repo root for snippet enrichment
+  --cache-root DIR     Directory where the per-file cache backend writes entries
+                       (typically ~/.quodeq/cache/results/)
+  --model-id ID        Model identifier participating in the cache key
   -h, --help           Show this help message and exit
 """
 
