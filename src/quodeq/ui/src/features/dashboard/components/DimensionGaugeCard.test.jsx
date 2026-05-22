@@ -32,8 +32,10 @@ describe('DimensionGaugeCard', () => {
     expect(screen.queryByText(/VIOL/)).toBeNull();
   });
 
-  describe('partial badge', () => {
-    it("shows 'Partial — N of M files (P%)' when filesRead < sourceFileCount", () => {
+  describe('coverage line', () => {
+    const dateLabel = '13 May 2026';
+
+    it('shows "<date> · <pct>%" when filesRead < sourceFileCount', () => {
       render(
         <DimensionGaugeCard
           item={{
@@ -41,17 +43,37 @@ describe('DimensionGaugeCard', () => {
             filesRead: 850,
             sourceFileCount: 3037,
           }}
+          dateLabel={dateLabel}
           onDimensionClick={() => {}}
         />,
       );
-      const badge = screen.getByText(/Partial/i);
-      expect(badge).toBeInTheDocument();
-      expect(badge.textContent).toMatch(/850/);
-      expect(badge.textContent).toMatch(/3,?037/);
-      expect(badge.textContent).toMatch(/28%/);
+      const line = screen.getByText(`${dateLabel} · 28%`);
+      expect(line).toBeInTheDocument();
+      expect(line.getAttribute('title')).toBe(
+        'Partial run · 850 of 3,037 files',
+      );
     });
 
-    it("shows the badge when exitReason is 'deadline' even if file counts match", () => {
+    it('appends "stopped: <exitReason>" to the tooltip when exitReason is set', () => {
+      render(
+        <DimensionGaugeCard
+          item={{
+            ...baseItem,
+            filesRead: 850,
+            sourceFileCount: 3037,
+            exitReason: 'deadline',
+          }}
+          dateLabel={dateLabel}
+          onDimensionClick={() => {}}
+        />,
+      );
+      const line = screen.getByText(`${dateLabel} · 28%`);
+      expect(line.getAttribute('title')).toBe(
+        'Partial run · 850 of 3,037 files · stopped: deadline',
+      );
+    });
+
+    it('flags partial when exitReason is "deadline" even if file counts match', () => {
       render(
         <DimensionGaugeCard
           item={{
@@ -60,30 +82,70 @@ describe('DimensionGaugeCard', () => {
             sourceFileCount: 100,
             exitReason: 'deadline',
           }}
+          dateLabel={dateLabel}
           onDimensionClick={() => {}}
         />,
       );
-      expect(screen.getByText(/Partial/i)).toBeInTheDocument();
+      const line = screen.getByText(`${dateLabel} · 100%`);
+      expect(line.getAttribute('title')).toBe(
+        'Partial run · 100 of 100 files · stopped: deadline',
+      );
     });
 
-    it('does NOT show the badge when filesRead equals sourceFileCount and exitReason is null', () => {
+    it('shows "<date> · 100%" with no tooltip on a complete run', () => {
       render(
         <DimensionGaugeCard
           item={{
             ...baseItem,
             filesRead: 3037,
             sourceFileCount: 3037,
-            exitReason: null,
+            exitReason: 'done',
           }}
+          dateLabel={dateLabel}
           onDimensionClick={() => {}}
         />,
       );
-      expect(screen.queryByText(/Partial/i)).not.toBeInTheDocument();
+      const line = screen.getByText(`${dateLabel} · 100%`);
+      expect(line.getAttribute('title')).toBeNull();
     });
 
-    it('does NOT show the badge when neither filesRead nor exitReason is present (legacy run)', () => {
-      render(<DimensionGaugeCard item={baseItem} onDimensionClick={() => {}} />);
-      expect(screen.queryByText(/Partial/i)).not.toBeInTheDocument();
+    it('omits the "· %" suffix on legacy runs without file counts', () => {
+      render(
+        <DimensionGaugeCard
+          item={baseItem}
+          dateLabel={dateLabel}
+          onDimensionClick={() => {}}
+        />,
+      );
+      expect(screen.getByText(dateLabel)).toBeInTheDocument();
+      expect(screen.queryByText(/%/)).toBeNull();
+    });
+
+    it('builds a tooltip with no file counts when only an exit signal exists', () => {
+      render(
+        <DimensionGaugeCard
+          item={{ ...baseItem, exitReason: 'deadline' }}
+          dateLabel={dateLabel}
+          onDimensionClick={() => {}}
+        />,
+      );
+      const line = screen.getByText(dateLabel);
+      expect(line.getAttribute('title')).toBe(
+        'Partial run · stopped: deadline',
+      );
+    });
+
+    it('does NOT render the coverage line when there is no date to show', () => {
+      const { container } = render(
+        <DimensionGaugeCard
+          item={baseItem}
+          dateLabel=""
+          onDimensionClick={() => {}}
+        />,
+      );
+      expect(
+        container.querySelector('.dim-gauge-card__coverage-line'),
+      ).toBeNull();
     });
   });
 });
