@@ -70,6 +70,12 @@ def _build_mcp_args(
         queue_path=config.queue_path,
         agent_id=config.agent_id,
         work_dir=config.work_dir or work_dir,
+        # Phase 1.5 (Task 3.5): propagate cache fingerprint inputs through the
+        # config-file path too. Without this, the JSON-config MCP variant
+        # would still emit defaults and the CLI cache writes would diverge
+        # from classify_files_via_cache keys.
+        model_id=_resolve_model_id(config),
+        language=_resolve_language(config),
     )
     mcp_config_path = _create_mcp_config(
         config.jsonl_file, config.compiled_dir, config.dimension, agent_params,
@@ -177,7 +183,48 @@ def _build_mcp_server_args(
     wd = config.work_dir or work_dir
     if wd:
         mcp_args.extend(["--work-dir", str(wd.resolve())])
+    # Phase 1.5 (Task 3.5): pass cache fingerprint inputs so findings_server
+    # can write cache entries synchronously on each mark_file_done(ok). These
+    # MUST match classify_files_via_cache's inputs so CLI- and API-path keys
+    # agree for the same project state. See cache_writer.build_cache_writer
+    # and cache.dimension_helpers._model_id_from for the reference.
+    mcp_args.extend([
+        "--cache-root", str(Path.home() / ".quodeq" / "cache" / "results"),
+        "--model-id", _resolve_model_id(config),
+        "--language", _resolve_language(config),
+    ])
     return mcp_args
+
+
+def _resolve_model_id(config: AnalysisConfig) -> str:
+    """Pick the most specific model identifier available for cache keys.
+
+    Mirrors ``cache.dimension_helpers._model_id_from`` when a RunConfig is
+    carried; otherwise falls back to ``AnalysisConfig.ai_model``; otherwise
+    ``"unknown"``.
+    """
+    rc = config.run_config
+    if rc is not None:
+        opts = getattr(rc, "options", None)
+        if opts is not None:
+            return (
+                getattr(opts, "subagent_model", None)
+                or getattr(opts, "ai_model", None)
+                or "unknown"
+            )
+    return config.ai_model or "unknown"
+
+
+def _resolve_language(config: AnalysisConfig) -> str:
+    """Return the RunConfig language for cache fingerprints, or "" if unset.
+
+    Empty string is the Task 5 contract for "language not provided"; it
+    must round-trip through the subprocess unchanged.
+    """
+    rc = config.run_config
+    if rc is not None:
+        return getattr(rc, "language", "") or ""
+    return ""
 
 
 def _register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = None) -> str | None:

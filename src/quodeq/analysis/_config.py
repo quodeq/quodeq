@@ -56,6 +56,12 @@ class _AgentParams:
     queue_path: Path | None = None
     agent_id: str = ""
     work_dir: Path | None = None
+    # Phase 1.5 (Task 3.5): cache fingerprint inputs propagated to
+    # ``findings_server.py`` so the subprocess writes cache entries with the
+    # same keys as ``classify_files_via_cache``. ``None`` resolves to
+    # ``"unknown"`` / ``""`` at emit time.
+    model_id: str | None = None
+    language: str | None = None
 
 
 @dataclass(frozen=True)
