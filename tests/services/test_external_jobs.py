@@ -12,6 +12,17 @@ from pathlib import Path
 import pytest
 
 
+# The signal-escalation tests exercise POSIX process-group semantics
+# (start_new_session=True, killpg, SIGKILL). Windows has no equivalent
+# concept -- _kill_tree falls back to `taskkill /F /T` which is one-shot
+# rather than a graceful-then-force escalation. The cross-platform fix is
+# verified by test_cancel_evaluation_orphan.py via _kill_tree mocking.
+_skip_on_windows = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="POSIX process-group escalation; Windows uses taskkill /T directly",
+)
+
+
 def _spawn_test_process(script: str) -> subprocess.Popen:
     """Spawn a Python subprocess running *script* in its own process group."""
     return subprocess.Popen(
@@ -132,6 +143,7 @@ def test_cancel_external_run_returns_false_without_pid_file(tmp_path):
 _TEST_GRACE_S = 0.5
 
 
+@_skip_on_windows
 def test_cancel_external_run_escalates_to_sigkill_when_sigterm_ignored(tmp_path):
     """Process that traps and ignores SIGTERM is killed via SIGKILL escalation."""
     from quodeq.services._external_jobs import cancel_external_run
@@ -163,6 +175,7 @@ def test_cancel_external_run_escalates_to_sigkill_when_sigterm_ignored(tmp_path)
         _force_cleanup(proc)
 
 
+@_skip_on_windows
 def test_cancel_external_run_returns_quickly_when_sigterm_honored(tmp_path):
     """SIGTERM-honoring process is reaped within the grace window without SIGKILL."""
     from quodeq.services._external_jobs import cancel_external_run
@@ -197,6 +210,7 @@ def test_cancel_external_run_returns_quickly_when_sigterm_honored(tmp_path):
         _force_cleanup(proc)
 
 
+@_skip_on_windows
 def test_cancel_external_run_kills_child_processes_in_same_group(tmp_path):
     """A run that has spawned a child subprocess must take the child down too.
 

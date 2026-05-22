@@ -6,9 +6,9 @@ Only the cancel path -- reading the ``.pid`` file and delivering signals --
 remains here.
 
 The cancel path is SIGTERM first, then SIGKILL after a grace window if the
-process hasn't died. Both signals target the process *group* (the run's
-session leader from ``start_new_session=True``) so subagent children get
-reaped alongside the parent. Returning True means the process is now gone;
+process hasn't died. Tree kill is delegated to ``_kill_tree`` so subagent
+children get reaped alongside the parent on both POSIX (``killpg``) and
+Windows (``taskkill /T``). Returning True means the process is now gone;
 returning False means there was nothing to cancel or signal delivery failed.
 """
 from __future__ import annotations
@@ -18,6 +18,8 @@ import os
 import signal
 import time
 from pathlib import Path
+
+from quodeq.analysis._process import _kill_tree
 
 _logger = logging.getLogger(__name__)
 
@@ -29,6 +31,9 @@ _PID_FILENAME = ".pid"
 # waiting on a hung run. Overridable for ops via env var.
 _DEFAULT_GRACE_PERIOD_S = float(os.environ.get("QUODEQ_CANCEL_GRACE_S", "30"))
 _POLL_INTERVAL_S = 0.05
+# SIGKILL on POSIX; Windows has no SIGKILL but _kill_tree treats any signal as
+# "taskkill /F /T" -- the fallback to SIGTERM keeps the call valid.
+_FORCE_KILL_SIGNAL = getattr(signal, "SIGKILL", signal.SIGTERM)
 
 
 def resolve_external_pid(project_uuid: str, run_id: str, reports_root: Path) -> int | None:
@@ -72,19 +77,8 @@ def cancel_external_run(
     pid = resolve_external_pid(project_uuid, run_id, reports_root)
     if pid is None:
         return False
-    try:
-        pgid = os.getpgid(pid)
-    except (ProcessLookupError, PermissionError):
-        return not _is_pid_alive(pid)
 
-    try:
-        os.killpg(pgid, signal.SIGTERM)
-    except ProcessLookupError:
-        return True
-    except OSError as exc:
-        _logger.warning("Failed to SIGTERM pgid %s (pid %s): %s", pgid, pid, exc)
-        return False
-
+    _kill_tree(pid, signal.SIGTERM)
     deadline = time.monotonic() + grace
     while time.monotonic() < deadline:
         if not _is_pid_alive(pid):
@@ -95,13 +89,7 @@ def cancel_external_run(
         "SIGTERM grace window (%ss) expired for pid %s; escalating to SIGKILL",
         grace, pid,
     )
-    try:
-        os.killpg(pgid, signal.SIGKILL)
-    except ProcessLookupError:
-        return True
-    except OSError as exc:
-        _logger.warning("Failed to SIGKILL pgid %s (pid %s): %s", pgid, pid, exc)
-        return False
+    _kill_tree(pid, _FORCE_KILL_SIGNAL)
     # Brief wait so callers that immediately read status.json see a settled state.
     final_deadline = time.monotonic() + 1.0
     while time.monotonic() < final_deadline:
