@@ -246,9 +246,13 @@ class TestBuildMcpServerArgs:
         assert args[model_idx + 1] == "sonnet"
         lang_idx = args.index("--language")
         assert args[lang_idx + 1] == "kotlin"
-        # Cache root defaults to ~/.quodeq/cache/results
+        # Cache root defaults to ~/.quodeq/cache/results. Compare via
+        # Path so the assertion is platform-agnostic — on Windows the
+        # produced path uses backslashes, so a literal forward-slash
+        # tail check would fail there.
         cr_idx = args.index("--cache-root")
-        assert args[cr_idx + 1].endswith(".quodeq/cache/results")
+        expected_tail = str(Path(".quodeq") / "cache" / "results")
+        assert args[cr_idx + 1].endswith(expected_tail)
 
     def test_cache_flags_fall_back_when_no_run_config(self, tmp_path):
         """Without a RunConfig carrier, --cache-root is still emitted, model_id

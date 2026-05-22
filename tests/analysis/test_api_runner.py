@@ -280,9 +280,14 @@ class TestSyncCacheWrite:
         (src_root / "Foo.kt").write_text("class Foo")
 
         # build_cache_writer hardcodes Path.home() / ".quodeq/cache/results",
-        # so redirect HOME to keep this test self-contained.
-        monkeypatch.setenv("HOME", str(tmp_path / "home"))
-        cache_root = tmp_path / "home" / ".quodeq" / "cache" / "results"
+        # so redirect the user-home lookup to keep this test self-contained.
+        # POSIX's expanduser reads HOME; Windows' reads USERPROFILE first and
+        # ignores HOME when USERPROFILE is set (which it always is on CI).
+        # Setting both keeps the test cross-platform.
+        fake_home = tmp_path / "home"
+        monkeypatch.setenv("HOME", str(fake_home))
+        monkeypatch.setenv("USERPROFILE", str(fake_home))
+        cache_root = fake_home / ".quodeq" / "cache" / "results"
 
         run_config = RunConfig(
             src=src_root,
