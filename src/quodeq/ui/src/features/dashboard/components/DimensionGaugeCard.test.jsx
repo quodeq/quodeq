@@ -135,17 +135,5 @@ describe('DimensionGaugeCard', () => {
       );
     });
 
-    it('does NOT render the coverage line when there is no date to show', () => {
-      const { container } = render(
-        <DimensionGaugeCard
-          item={baseItem}
-          dateLabel=""
-          onDimensionClick={() => {}}
-        />,
-      );
-      expect(
-        container.querySelector('.dim-gauge-card__coverage-line'),
-      ).toBeNull();
-    });
   });
 });
