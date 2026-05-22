@@ -117,6 +117,20 @@ class TestKeyComposition:
         k1 = build_cache_key_for_file(c1, "a.py", "security")
 
         _write_compiled_standards(std_dir, "security", '{"v": 2}')
+        # The in-process standards hash is memoized via _hash_file_by_stat,
+        # keyed on (path, size, mtime_ns). Both writes here produce 8-byte
+        # JSON, and on Windows file timestamps are quantized to ~16ms by
+        # the OS — so two rewrites in the same millisecond can share both
+        # size and mtime_ns, falsely hitting the cache. Explicitly bump
+        # mtime past the quantum so the cache invariant we're asserting
+        # ("standards rewrite invalidates the cache key") is testable on
+        # every platform. In real ``quodeq evaluate`` runs the standards
+        # file is not rewritten mid-process; this only matters for tests
+        # that simulate mid-run mutation.
+        import os
+        compiled = std_dir / "compiled" / "security.json"
+        st = compiled.stat()
+        os.utime(compiled, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000_000))
         k2 = build_cache_key_for_file(c1, "a.py", "security")
         assert k1 != k2
 
