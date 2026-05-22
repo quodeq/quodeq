@@ -9,10 +9,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from quodeq.analysis._dimensions import DimensionsConfig
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis.subprocess import HeartbeatCallback
+
+if TYPE_CHECKING:
+    from quodeq.analysis.cache.dimension_helpers import ClassifyResult
 
 
 @dataclass
@@ -67,6 +71,15 @@ class RunConfig:
     dimensions_data: DimensionsConfig | None = None
     target: AnalysisTarget | None = None
     evaluators_dir: Path | None = None
+    # Per-run stash for ``classify_files_via_cache``. The pipeline classifies
+    # files twice per dim (once upfront in ``_persist_dim_estimates`` for the
+    # dashboard's totals, once inside the dim runner for actual dispatch).
+    # When this is set to a dict, ``classify_files_via_cache`` populates it
+    # on the first call for a given dim and short-circuits the second call
+    # when the file list still matches. ``None`` means "stashing disabled" —
+    # tests and one-shot callers that construct a fresh RunConfig get the
+    # original behaviour without any wiring.
+    _classify_cache: "dict[str, tuple[tuple[str, ...], ClassifyResult]] | None" = None
 
     @property
     def source_file_count(self) -> int:
