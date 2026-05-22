@@ -82,4 +82,22 @@ def parse_args(argv: list[str] | None = None) -> ServerArgs:
 
     if not result.findings_file:
         result.findings_file = get_findings_file() or ""
+
+    # Task 3.5: enforce --cache-root and --model-id are present when
+    # --dimension is set. Defense-in-depth alongside _build_router's
+    # runtime check — fail at parse time, not construction time, so
+    # subprocesses spawned without the cache args exit cleanly before
+    # doing any work.
+    if result.dimension and (not result.cache_root or not result.model_id):
+        missing = []
+        if not result.cache_root:
+            missing.append("--cache-root")
+        if not result.model_id:
+            missing.append("--model-id")
+        sys.stderr.write(
+            f"error: {' and '.join(missing)} required when --dimension is "
+            "set (needed for synchronous cache writes)\n",
+        )
+        raise SystemExit(2)
+
     return result

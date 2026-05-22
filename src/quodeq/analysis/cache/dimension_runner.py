@@ -123,8 +123,8 @@ def _compute_files_read(
       - it was a cache hit (``classify.cached_findings`` already carried it
         forward — its cache entry already exists), or
       - it was dispatched and the worker emitted ``file_done="ok"``
-        (which triggers a synchronous ``persist_one_file``, or the
-        watcher's next persist tick).
+        (which triggers a synchronous cache write via
+        ``build_cache_writer``, or the watcher's next persist tick).
 
     Files with ``file_done="error"`` or no marker at all are NOT counted:
     their analysis was incomplete and the cache contains no entry for

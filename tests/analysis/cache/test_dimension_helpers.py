@@ -26,7 +26,6 @@ from quodeq.analysis.cache.dimension_helpers import (
     build_cache_key_for_file,
     classify_files_via_cache,
     persist_dispatch_results,
-    persist_one_file,
 )
 
 
@@ -340,57 +339,3 @@ class TestRoundTrip:
         second = classify_files_via_cache(config, "security", files, cache)
         assert second.misses == []
         assert {f["file"] for f in second.cached_findings} == set(files)
-
-
-# ============================================================
-# persist_one_file
-# ============================================================
-
-class TestPersistOneFile:
-    def test_persist_one_file_writes_cache_entry(self, tmp_path: Path, cache: LocalFileBackend):
-        """persist_one_file writes exactly one cache entry for the given file."""
-        src = tmp_path / "src"
-        _write_files(src, {"Foo.kt": "class Foo"})
-        config = _make_config(src, work_dir=tmp_path / "work")
-
-        jsonl = tmp_path / "evidence" / "flexibility_evidence.jsonl"
-        jsonl.parent.mkdir()
-        jsonl.write_text(
-            json.dumps({"file": "Foo.kt", "p": "Adaptability", "t": "violation", "line": 1, "req": "F-ADP-1"}) + "\n"
-            + json.dumps({"_marker": "file_done", "file": "Foo.kt", "status": "ok"}) + "\n"
-        )
-
-        miss_keys = {"Foo.kt": "test-key-foo-kt"}
-
-        persist_one_file(
-            config, "flexibility", file="Foo.kt",
-            jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
-        )
-
-        entry = cache.get("test-key-foo-kt")
-        assert entry is not None, "cache entry must be written"
-        assert entry.file_path == "Foo.kt"
-        assert len(entry.findings) == 1
-        assert entry.findings[0]["p"] == "Adaptability"
-
-    def test_persist_one_file_skips_when_file_has_no_ok_marker(
-        self, tmp_path: Path, cache: LocalFileBackend,
-    ):
-        """persist_one_file is a no-op when the file's most recent marker isn't 'ok'."""
-        src = tmp_path / "src"
-        _write_files(src, {"Bar.kt": "class Bar"})
-        config = _make_config(src, work_dir=tmp_path / "work")
-
-        jsonl = tmp_path / "evidence" / "flexibility_evidence.jsonl"
-        jsonl.parent.mkdir()
-        jsonl.write_text(
-            json.dumps({"file": "Bar.kt", "p": "Adaptability", "t": "violation", "line": 1, "req": "F-ADP-1"}) + "\n"
-            + json.dumps({"_marker": "file_done", "file": "Bar.kt", "status": "error"}) + "\n"
-        )
-
-        persist_one_file(
-            config, "flexibility", file="Bar.kt",
-            jsonl_path=jsonl, miss_keys={"Bar.kt": "test-key-bar-kt"}, cache=cache,
-        )
-
-        assert cache.get("test-key-bar-kt") is None

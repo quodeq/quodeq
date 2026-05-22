@@ -1,6 +1,8 @@
 """Tests for the MCP findings server CLI argument parser."""
 from __future__ import annotations
 
+import pytest
+
 from quodeq.analysis.mcp.args import ServerArgs, parse_args
 
 
@@ -53,3 +55,41 @@ def test_server_args_default_language_is_none():
     """ServerArgs() with no overrides exposes language defaulted to None."""
     sa = ServerArgs()
     assert sa.language is None
+
+
+def test_parse_args_raises_when_dimension_set_without_cache_args():
+    """parse_args enforces: --dimension requires --cache-root and --model-id.
+
+    Without both, the subprocess fails fast at parse time (defense-in-depth
+    alongside _build_router's runtime check).
+    """
+    # Each subcase should fail because at least one of cache-root/model-id is missing.
+    missing_cases = [
+        # No cache args at all
+        ["/tmp/findings.jsonl", "--dimension", "flexibility"],
+        # cache-root only
+        ["/tmp/findings.jsonl", "--dimension", "flexibility", "--cache-root", "/tmp/cache"],
+        # model-id only
+        ["/tmp/findings.jsonl", "--dimension", "flexibility", "--model-id", "sonnet"],
+    ]
+    for args in missing_cases:
+        with pytest.raises((SystemExit, ValueError)):
+            parse_args(args)
+
+
+def test_parse_args_succeeds_when_dimension_set_with_all_required_cache_args():
+    """When --dimension is set AND --cache-root + --model-id are provided,
+    parse_args returns ServerArgs successfully. --language is optional at
+    parse time (defaults to None), required only for cross-path key equality.
+    """
+    args = parse_args([
+        "/tmp/findings.jsonl",
+        "--dimension", "flexibility",
+        "--cache-root", "/tmp/cache",
+        "--model-id", "sonnet",
+        # --language omitted: should still succeed (defaults to None)
+    ])
+    assert args.dimension == "flexibility"
+    assert args.cache_root == "/tmp/cache"
+    assert args.model_id == "sonnet"
+    assert args.language is None
