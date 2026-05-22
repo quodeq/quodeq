@@ -308,10 +308,15 @@ def process_dimension_with_cache(
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(json.dumps(classify.miss_keys, indent=2), encoding="utf-8")
 
-    # Periodic persist watcher: persists what's in JSONL every
-    # _PERSIST_INTERVAL_S seconds. If the dispatch is cancelled (SIGTERM,
-    # exception, etc.) the cache retains the work that completed before
-    # the cancel - instead of losing the entire dim's progress.
+    # Periodic persist watcher (safety net only — NOT authoritative).
+    # After Phase 1.5 Task 3.5, FindingsRouter.on_file_done writes cache
+    # entries synchronously the instant a worker emits mark_file_done(ok)
+    # (both API path and CLI/subprocess path). The watcher remains as a
+    # belt-and-suspenders guard for any future code path that constructs
+    # a router WITHOUT on_file_done (or for paths that bypass the router
+    # entirely). On a cancel/SIGTERM the synchronous writes are already on
+    # disk; the final watcher tick re-scans the JSONL and is a no-op for
+    # files that the sync path already persisted.
     def _persist_now() -> None:
         persist_dispatch_results(
             config, dim_id, miss_files=classify.misses,
