@@ -67,15 +67,23 @@ class EvaluationsIndex:
         finally:
             db.close()
         snapshots = [self._run_row_to_snapshot(r) for r in rows]
-        # Internal dashboard-spawned jobs always take priority over index rows.
+        # Internal dashboard-spawned jobs always take priority over index rows
+        # that project the same on-disk run. The dedup key is (project, run_id)
+        # rather than job_id because internal jobs carry bare UUIDs while
+        # indexed rows carry "ext-<run_id>" — keying on job_id never matches
+        # the two views of the same run and both end up in the merged list.
         try:
             internal_jobs = self._jobs.list_jobs(reports_root=None)
         except (AttributeError, TypeError):
             internal_jobs = []
-        by_id = {s.job_id: s for s in snapshots}
-        for j in internal_jobs:
-            by_id[j.job_id] = j
-        merged = list(by_id.values())
+        covered = {
+            (j.output_project, j.output_run_id) for j in internal_jobs
+            if j.output_project and j.output_run_id
+        }
+        merged = [
+            s for s in snapshots
+            if (s.output_project, s.output_run_id) not in covered
+        ] + list(internal_jobs)
         if states:
             merged = [s for s in merged if s.status in states]
         merged.sort(key=lambda s: s.started_at or "", reverse=True)
