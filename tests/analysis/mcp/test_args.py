@@ -32,3 +32,24 @@ def test_server_args_defaults_for_new_fields():
     sa = ServerArgs()
     assert sa.cache_root is None
     assert sa.model_id is None
+
+
+def test_parse_args_accepts_language(tmp_path):
+    """--language is an optional CLI arg parsed into ServerArgs.language."""
+    args = parse_args([
+        str(tmp_path / "findings.jsonl"),
+        "--language", "kotlin",
+    ])
+    assert args.language == "kotlin"
+
+
+def test_parse_args_language_defaults_to_none():
+    """When --language is omitted, ServerArgs.language is None."""
+    args = parse_args(["/tmp/findings.jsonl"])
+    assert args.language is None
+
+
+def test_server_args_default_language_is_none():
+    """ServerArgs() with no overrides exposes language defaulted to None."""
+    sa = ServerArgs()
+    assert sa.language is None

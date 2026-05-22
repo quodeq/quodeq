@@ -129,7 +129,7 @@ def _build_router(
             standards_dir=standards_dir,
             dimension=server_args.dimension,
             model_id=server_args.model_id,
-            language=getattr(ctx, "language", None) or "",
+            language=server_args.language or "",
         )
 
     return FindingsRouter(

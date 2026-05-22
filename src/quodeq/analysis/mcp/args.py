@@ -16,6 +16,7 @@ class ServerArgs:
     work_dir: str | None = None
     cache_root: str | None = None
     model_id: str | None = None
+    language: str | None = None
 
     @property
     def dimensions(self) -> list[str]:
@@ -33,6 +34,7 @@ _FLAG_MAP = {
     "--work-dir": "work_dir",
     "--cache-root": "cache_root",
     "--model-id": "model_id",
+    "--language": "language",
 }
 
 _USAGE = """\
@@ -47,6 +49,8 @@ Options:
   --cache-root DIR     Directory where the per-file cache backend writes entries
                        (typically ~/.quodeq/cache/results/)
   --model-id ID        Model identifier participating in the cache key
+  --language LANG      Language identifier participating in the cache key
+                       (must match the parent RunConfig.language)
   -h, --help           Show this help message and exit
 """
 

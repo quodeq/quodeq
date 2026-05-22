@@ -177,3 +177,127 @@ def test_build_router_no_cache_writer_when_dimension_absent(tmp_path):
     router = _build_router(io.StringIO(), findings_path, CompiledContext(), sa)
 
     assert router._on_file_done is None
+
+
+def test_cli_path_and_api_path_compute_same_cache_key(tmp_path):
+    """LOAD-BEARING: the CLI-path's cache writer (constructed inside findings_server
+    via _build_router + ServerArgs) MUST produce identical cache keys to the
+    API-path's cache writer (constructed inline in _api_runner) for the same
+    (file, dim, model, language, ...) inputs.
+
+    Without this, the same file would land in DIFFERENT cache entries depending
+    on which path ran first, and incremental runs across mixed paths would
+    re-dispatch unnecessarily. This pins the Task 3.5 cross-path consistency
+    guarantee against drift in either build_cache_writer caller.
+    """
+    from quodeq.analysis._types import AnalysisOptions, RunConfig
+    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
+    from quodeq.analysis.cache.local import LocalFileBackend
+    from quodeq.analysis.mcp.args import ServerArgs
+    from quodeq.analysis.mcp.enricher import CompiledContext
+    from quodeq.analysis.mcp.findings_server import _build_router
+
+    src_root = tmp_path / "src"
+    src_root.mkdir()
+    (src_root / "Foo.kt").write_text("class Foo")
+    cache_root = tmp_path / "cache"
+
+    # Parent-side key (what classify_files_via_cache computes for API path)
+    config = RunConfig(
+        src=src_root,
+        language="kotlin",
+        standards_dir=None,
+        work_dir=src_root,
+        options=AnalysisOptions(subagent_model="sonnet", ai_model="sonnet"),
+    )
+    parent_key = build_cache_key_for_file(config, "Foo.kt", "flexibility")
+
+    # CLI-path writer (constructed via _build_router + ServerArgs)
+    project_dir = tmp_path / "project"
+    findings_jsonl = project_dir / "run-1" / "evidence" / "flexibility_evidence.jsonl"
+    findings_jsonl.parent.mkdir(parents=True)
+
+    sa = ServerArgs()
+    sa.findings_file = str(findings_jsonl)
+    sa.dimension = "flexibility"
+    sa.work_dir = str(src_root)
+    sa.cache_root = str(cache_root)
+    sa.model_id = "sonnet"
+    sa.language = "kotlin"
+
+    router = _build_router(io.StringIO(), findings_jsonl, CompiledContext(), sa)
+
+    # Trigger the CLI-path's on_file_done with a finding
+    router.receive({
+        "file": "Foo.kt", "line": 1, "req": "F-ADP-1", "t": "violation",
+        "p": "Adaptability", "d": "flexibility", "severity": "major",
+        "w": "x", "reason": "x", "snippet": "x",
+    })
+    router.mark_file_done(file="Foo.kt", status="ok")
+
+    # The CLI-path's cache entry MUST be findable via the parent's key
+    cache = LocalFileBackend(root=cache_root)
+    entry = cache.get(parent_key)
+    assert entry is not None, (
+        f"CLI-path cache writer produced a key DIFFERENT from "
+        f"build_cache_key_for_file. This breaks cross-path consistency. "
+        f"parent_key={parent_key}, cache_root={cache_root}."
+    )
+    assert entry.file_path == "Foo.kt"
+    assert len(entry.findings) == 1
+
+
+def test_cli_path_key_diverges_when_language_missing(tmp_path):
+    """Counter-test: when ServerArgs.language is None, the CLI-path's cache
+    writer falls back to "" -- which MUST diverge from the API-path key for
+    a project where RunConfig.language is set. This pins that the regression
+    fixed here cannot silently come back by anyone re-introducing the
+    getattr(ctx, "language", None) pattern.
+    """
+    from quodeq.analysis._types import AnalysisOptions, RunConfig
+    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
+    from quodeq.analysis.cache.local import LocalFileBackend
+    from quodeq.analysis.mcp.args import ServerArgs
+    from quodeq.analysis.mcp.enricher import CompiledContext
+    from quodeq.analysis.mcp.findings_server import _build_router
+
+    src_root = tmp_path / "src"
+    src_root.mkdir()
+    (src_root / "Foo.kt").write_text("class Foo")
+    cache_root = tmp_path / "cache"
+
+    config = RunConfig(
+        src=src_root,
+        language="kotlin",
+        standards_dir=None,
+        work_dir=src_root,
+        options=AnalysisOptions(subagent_model="sonnet", ai_model="sonnet"),
+    )
+    parent_key = build_cache_key_for_file(config, "Foo.kt", "flexibility")
+
+    findings_jsonl = tmp_path / "project" / "run-1" / "evidence" / "flexibility_evidence.jsonl"
+    findings_jsonl.parent.mkdir(parents=True)
+
+    sa = ServerArgs()
+    sa.findings_file = str(findings_jsonl)
+    sa.dimension = "flexibility"
+    sa.work_dir = str(src_root)
+    sa.cache_root = str(cache_root)
+    sa.model_id = "sonnet"
+    # sa.language intentionally left as None -- simulates Task 6 not wired yet
+
+    router = _build_router(io.StringIO(), findings_jsonl, CompiledContext(), sa)
+    router.receive({
+        "file": "Foo.kt", "line": 1, "req": "F-ADP-1", "t": "violation",
+        "p": "Adaptability", "d": "flexibility", "severity": "major",
+        "w": "x", "reason": "x", "snippet": "x",
+    })
+    router.mark_file_done(file="Foo.kt", status="ok")
+
+    cache = LocalFileBackend(root=cache_root)
+    # Parent key MUST miss when CLI side didn't get the language flag.
+    assert cache.get(parent_key) is None, (
+        "Expected divergence: when CLI side has no --language, its key must "
+        "NOT collide with the API-path key. If this fails, language is no "
+        "longer load-bearing in the key composition."
+    )
