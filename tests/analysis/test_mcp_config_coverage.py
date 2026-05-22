@@ -125,8 +125,12 @@ class TestCreateMcpConfig:
             assert args[model_idx + 1] == "sonnet"
             lang_idx = args.index("--language")
             assert args[lang_idx + 1] == "kotlin"
+            # Cache root path uses platform-native separators (backslash
+            # on Windows); compare via Path so the tail check holds on
+            # every OS.
             cr_idx = args.index("--cache-root")
-            assert args[cr_idx + 1].endswith(".quodeq/cache/results")
+            expected_tail = str(Path(".quodeq") / "cache" / "results")
+            assert args[cr_idx + 1].endswith(expected_tail)
         finally:
             config_path.unlink(missing_ok=True)
 
