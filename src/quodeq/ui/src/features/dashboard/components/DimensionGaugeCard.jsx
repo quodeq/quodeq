@@ -9,45 +9,56 @@ import { splitScore, scoreGradeColorVar, complianceRatio, formatRunId } from '..
 import { dimensionGradeLabel } from './dimensionGradeLabel.js';
 
 /**
- * Decide whether a dimension run was partial (incomplete coverage).
+ * Build a coverage record for the gauge card's footer line.
  *
- * A run is considered "partial" when EITHER:
- *   - the analyzer read fewer files than the project's total source-file
- *     count (typically a deadline-truncated run), OR
- *   - the run's lifecycle exit_reason is anything other than "done"
- *     (e.g. "deadline", "failure_streak"). Legacy runs that lack any
- *     exit_reason at all are NOT flagged — we don't want to splash a
- *     "Partial" badge on every historical complete-but-pre-Phase-1 run.
+ * Every card with a date gets a footer line; `coveragePct` and `isPartial`
+ * are derived from the same signals as the old partial badge:
+ *   - "partial" when filesRead < sourceFileCount, OR
+ *   - "partial" when exitReason is set to anything other than 'done'.
+ * Legacy runs with neither signal end up complete-by-default.
  *
- * Returns null when there's no signal at all (no filesRead, no
- * sourceFileCount, no exitReason) — i.e. legacy runs.
+ * `coveragePct` is null when there are no file counts (legacy runs);
+ * in that case the footer renders the date only.
  */
-function computePartialInfo(filesRead, sourceFileCount, exitReason) {
-  const hasCoverageSignal =
-    typeof filesRead === 'number' && typeof sourceFileCount === 'number' && sourceFileCount > 0;
-  const coverageIncomplete = hasCoverageSignal && filesRead < sourceFileCount;
-  const exitIncomplete = typeof exitReason === 'string' && exitReason !== 'done';
-  if (!coverageIncomplete && !exitIncomplete) return null;
-  const coveragePct = hasCoverageSignal
+function computeCoverageInfo(filesRead, sourceFileCount, exitReason) {
+  const hasCounts =
+    typeof filesRead === 'number' &&
+    typeof sourceFileCount === 'number' &&
+    sourceFileCount > 0;
+  const coveragePct = hasCounts
     ? Math.round((filesRead / sourceFileCount) * 100)
     : null;
-  return { filesRead, sourceFileCount, coveragePct, exitReason };
+  const coverageIncomplete = hasCounts && filesRead < sourceFileCount;
+  const exitIncomplete = typeof exitReason === 'string' && exitReason !== 'done';
+  const isPartial = coverageIncomplete || exitIncomplete;
+  return { filesRead, sourceFileCount, coveragePct, exitReason, isPartial };
 }
 
-function PartialBadge({ info }) {
-  const { filesRead, sourceFileCount, coveragePct, exitReason } = info;
+function buildPartialTooltip({ filesRead, sourceFileCount, exitReason }) {
   const hasCounts =
-    typeof filesRead === 'number' && typeof sourceFileCount === 'number' && sourceFileCount > 0;
-  const label = hasCounts
-    ? `Partial — ${filesRead.toLocaleString()} of ${sourceFileCount.toLocaleString()} files (${coveragePct}%)`
-    : 'Partial';
+    typeof filesRead === 'number' &&
+    typeof sourceFileCount === 'number' &&
+    sourceFileCount > 0;
+  const parts = ['Partial run'];
+  if (hasCounts) {
+    parts.push(`${filesRead.toLocaleString()} of ${sourceFileCount.toLocaleString()} files`);
+  }
+  if (typeof exitReason === 'string') {
+    parts.push(`stopped: ${exitReason}`);
+  }
+  return parts.join(' · ');
+}
+
+function CoverageLine({ dateText, coveragePct, isPartial, tooltip }) {
+  if (!dateText) return null;
+  const label = coveragePct !== null ? `${dateText} · ${coveragePct}%` : dateText;
   return (
-    <span
-      className="dim-gauge-card__partial-badge"
-      title={exitReason ?? undefined}
+    <div
+      className="dim-gauge-card__coverage-line"
+      title={isPartial ? tooltip : undefined}
     >
       {label}
-    </span>
+    </div>
   );
 }
 
@@ -100,7 +111,8 @@ export default function DimensionGaugeCard({
   const activate = () => onDimensionClick?.(item, selectedRunId);
   const staleClass = evaluatedToday ? '' : 'dim-gauge-card--stale';
   const dateText = item.fromDateLabel || dateLabel || formatRunId(item.fromRunId || selectedRunId);
-  const partialInfo = computePartialInfo(item.filesRead, item.sourceFileCount, item.exitReason);
+  const coverage = computeCoverageInfo(item.filesRead, item.sourceFileCount, item.exitReason);
+  const partialTooltip = coverage.isPartial ? buildPartialTooltip(coverage) : undefined;
 
   return (
     <article
@@ -173,11 +185,12 @@ export default function DimensionGaugeCard({
         </>
       )}
 
-      {partialInfo && <PartialBadge info={partialInfo} />}
-
-      {!evaluatedToday && dateText && (
-        <div className="dim-gauge-card__stale-label">Older run · {dateText}</div>
-      )}
+      <CoverageLine
+        dateText={dateText}
+        coveragePct={coverage.coveragePct}
+        isPartial={coverage.isPartial}
+        tooltip={partialTooltip}
+      />
     </article>
   );
 }
