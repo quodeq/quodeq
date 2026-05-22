@@ -95,6 +95,10 @@ def _launch_pool(
         max_files_per_agent=params.max_files_per_agent,
         time_limit=time_limit,
         deadline_at=config.options.deadline_at,
+        # Carry the RunConfig + dimension so the API runner can construct a
+        # per-file cache writer (synchronous cache.put on file_done='ok').
+        run_config=config,
+        dimension=dim_id,
     )
     n_agents = config.options.max_subagents
 
