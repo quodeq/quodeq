@@ -4,6 +4,7 @@ from pathlib import Path
 
 from quodeq.analysis.mcp.findings_server import _build_router
 from quodeq.analysis.mcp.enricher import CompiledContext
+from quodeq.analysis.mcp.args import ServerArgs
 from quodeq.core.events.models import EventType
 from quodeq.core.events.reader import EventLogReader
 
@@ -14,7 +15,7 @@ def test_build_router_wires_event_log_with_run_dir(tmp_path: Path):
     findings_fh = io.StringIO()
     ctx = CompiledContext()
 
-    router = _build_router(findings_fh, findings_path, ctx)
+    router = _build_router(findings_fh, findings_path, ctx, ServerArgs())
 
     assert router._event_log is not None
     # The event log should write to run_dir/events.jsonl
@@ -50,7 +51,7 @@ def test_build_router_loads_precedent_fingerprints_from_project_dir(tmp_path: Pa
     findings_path = project_dir / "run-1" / "evidence" / "security_evidence.jsonl"
     findings_path.parent.mkdir(parents=True)
 
-    router = _build_router(io.StringIO(), findings_path, CompiledContext())
+    router = _build_router(io.StringIO(), findings_path, CompiledContext(), ServerArgs())
 
     assert fingerprint("S-CON-1", "password = 'secret'") in router._enricher._precedent_fingerprints
 
@@ -59,7 +60,7 @@ def test_build_router_emits_findings_to_jsonl_and_event_log(tmp_path: Path):
     findings_path = tmp_path / "run-1" / "evidence" / "timeliness_evidence.jsonl"
     findings_path.parent.mkdir(parents=True)
     fh = io.StringIO()
-    router = _build_router(fh, findings_path, CompiledContext())
+    router = _build_router(fh, findings_path, CompiledContext(), ServerArgs())
 
     msg, dup = router.receive({
         "p": "P1", "file": "x.py", "line": 1, "t": "violation",

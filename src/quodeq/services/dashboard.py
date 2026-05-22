@@ -230,13 +230,54 @@ class _DashboardPayload:
     stale_dimensions: list[DimensionResult]
 
 
+def _read_run_exit_reason(reports_root: Path, project: str, run_id: str) -> str | None:
+    """Return the run's ``status.json`` ``exit_reason``, or ``None`` if absent.
+
+    Used by the dashboard to surface deadline-truncated runs to the UI:
+    the "Partial" badge on each DimensionGaugeCard fires when the run
+    didn't complete naturally (e.g. ``exit_reason="deadline"`` from a
+    timeout, or ``"failure_streak"`` from repeated failures).
+    """
+    import json as _json  # noqa: PLC0415
+    status_path = reports_root / project / run_id / "status.json"
+    if not status_path.is_file():
+        return None
+    try:
+        with status_path.open("r", encoding="utf-8") as fp:
+            data = _json.load(fp)
+    except (OSError, ValueError):
+        return None
+    reason = data.get("exit_reason")
+    return reason if isinstance(reason, str) else None
+
+
+def _attach_exit_reason_to_dim(dim_dict: dict[str, Any], exit_reason: str | None) -> dict[str, Any]:
+    """Add ``exitReason`` to a serialized dimension dict (in place safe via shallow copy).
+
+    Done at the response-assembly layer so we don't need to add a per-dim
+    field to the DimensionResult dataclass: the exit reason is a
+    run-level signal, but the UI consumes it per-card.
+    """
+    if exit_reason is None:
+        return dim_dict
+    out = dict(dim_dict)
+    out["exitReason"] = exit_reason
+    return out
+
+
 def _build_dashboard_result(
     project: str,
     runs: list[RunInfo],
     selected_run: RunInfo,
     payload: _DashboardPayload,
+    *,
+    exit_reason: str | None = None,
 ) -> dict[str, Any]:
     """Assemble the final dashboard response dict from pre-computed parts."""
+    dim_dicts = [
+        _attach_exit_reason_to_dim(to_camel_dict(d), exit_reason)
+        for d in payload.dimensions_with_trend
+    ]
     return {
         "project": project,
         "availableRuns": [
@@ -247,6 +288,7 @@ def _build_dashboard_result(
             "runId": selected_run.run_id,
             "dateISO": selected_run.date_iso,
             "dateLabel": selected_run.date_label,
+            "exitReason": exit_reason,
         },
         "summary": {
             **to_camel_dict(payload.selected_summary),
@@ -254,7 +296,7 @@ def _build_dashboard_result(
             "dateLabel": selected_run.date_label,
         },
         "trend": payload.trend,
-        "dimensions": [to_camel_dict(d) for d in payload.dimensions_with_trend],
+        "dimensions": dim_dicts,
         "previousByDimension": {k: to_camel_dict(v) for k, v in payload.previous_by_dimension.items()},
         "stalePreviousByDimension": {k: to_camel_dict(v) for k, v in payload.stale_previous_by_dimension.items()},
         "staleDimensions": [to_camel_dict(d) for d in payload.stale_dimensions],
@@ -454,4 +496,7 @@ def build_dashboard(
     )
     payload = _compute_dashboard_payload(reports_root, project, runs, ctx, cc)
     payload = _apply_sql_grade_override(reports_root, project, selected_run.run_id, payload)
-    return _build_dashboard_result(project, runs, selected_run, payload)
+    exit_reason = _read_run_exit_reason(reports_root, project, selected_run.run_id)
+    return _build_dashboard_result(
+        project, runs, selected_run, payload, exit_reason=exit_reason,
+    )

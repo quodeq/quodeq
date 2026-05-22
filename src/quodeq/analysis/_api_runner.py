@@ -23,6 +23,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum as _Enum
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import httpx
 import instructor
@@ -30,6 +31,9 @@ import openai
 from pydantic import BaseModel, Field
 
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
+
+if TYPE_CHECKING:
+    from quodeq.analysis._types import RunConfig
 from quodeq.context.precedent import load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
 from quodeq.core.standards.refs import load_compiled_requirements
@@ -305,6 +309,8 @@ def run_api_analysis(
     dimension: str | None = None,
     work_dir: Path | None = None,
     source_file_paths: list[str] | None = None,
+    run_config: RunConfig | None = None,
+    dim_id: str | None = None,
 ) -> None:
     """Call an LLM API and persist evidence through ``FindingsRouter``.
 
@@ -328,6 +334,12 @@ def run_api_analysis(
     *source_file_paths* should be the full per-dim file list. When omitted,
     no markers are emitted (preserves caller flexibility but the run will
     not benefit from V2 cache hits across re-runs).
+
+    *run_config* and *dim_id*, when both provided, enable the synchronous
+    cache-write path: a closure built from the run's fingerprint inputs is
+    passed to ``FindingsRouter(on_file_done=...)`` so every clean ``ok``
+    marker writes its per-file cache entry to disk before returning. Legacy
+    callers that omit either remain unchanged -- no cache is written.
     """
     findings, was_salvaged = _call_api(prompt, config)
 
@@ -353,8 +365,28 @@ def run_api_analysis(
     jsonl_file.parent.mkdir(parents=True, exist_ok=True)
     from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
     event_log = EventLogWriter(events_log)
+
+    cache_writer = None
+    if run_config is not None and dim_id is not None:
+        from quodeq.analysis.cache.cache_writer import build_cache_writer  # noqa: PLC0415
+        model_id = (
+            run_config.options.subagent_model
+            or run_config.options.ai_model
+            or "unknown"
+        )
+        cache_writer = build_cache_writer(
+            cache_root=Path.home() / ".quodeq" / "cache" / "results",
+            src_root=run_config.src,
+            standards_dir=run_config.standards_dir,
+            dimension=dim_id,
+            model_id=model_id,
+            language=run_config.language or "",
+        )
+
     with open(jsonl_file, "a") as fh:
-        router = FindingsRouter(fh, context=ctx, event_log=event_log)
+        router = FindingsRouter(
+            fh, context=ctx, event_log=event_log, on_file_done=cache_writer,
+        )
         for f in findings:
             router.receive(f)
         if not was_salvaged and source_file_paths:

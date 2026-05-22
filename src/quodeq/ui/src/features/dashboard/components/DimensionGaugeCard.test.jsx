@@ -31,4 +31,59 @@ describe('DimensionGaugeCard', () => {
     // No VIOL meta line in insufficient state
     expect(screen.queryByText(/VIOL/)).toBeNull();
   });
+
+  describe('partial badge', () => {
+    it("shows 'Partial — N of M files (P%)' when filesRead < sourceFileCount", () => {
+      render(
+        <DimensionGaugeCard
+          item={{
+            ...baseItem,
+            filesRead: 850,
+            sourceFileCount: 3037,
+          }}
+          onDimensionClick={() => {}}
+        />,
+      );
+      const badge = screen.getByText(/Partial/i);
+      expect(badge).toBeInTheDocument();
+      expect(badge.textContent).toMatch(/850/);
+      expect(badge.textContent).toMatch(/3,?037/);
+      expect(badge.textContent).toMatch(/28%/);
+    });
+
+    it("shows the badge when exitReason is 'deadline' even if file counts match", () => {
+      render(
+        <DimensionGaugeCard
+          item={{
+            ...baseItem,
+            filesRead: 100,
+            sourceFileCount: 100,
+            exitReason: 'deadline',
+          }}
+          onDimensionClick={() => {}}
+        />,
+      );
+      expect(screen.getByText(/Partial/i)).toBeInTheDocument();
+    });
+
+    it('does NOT show the badge when filesRead equals sourceFileCount and exitReason is null', () => {
+      render(
+        <DimensionGaugeCard
+          item={{
+            ...baseItem,
+            filesRead: 3037,
+            sourceFileCount: 3037,
+            exitReason: null,
+          }}
+          onDimensionClick={() => {}}
+        />,
+      );
+      expect(screen.queryByText(/Partial/i)).not.toBeInTheDocument();
+    });
+
+    it('does NOT show the badge when neither filesRead nor exitReason is present (legacy run)', () => {
+      render(<DimensionGaugeCard item={baseItem} onDimensionClick={() => {}} />);
+      expect(screen.queryByText(/Partial/i)).not.toBeInTheDocument();
+    });
+  });
 });

@@ -61,6 +61,12 @@ def parse_report_json(json_path: Path) -> dict[str, Any] | None:
         "dimension": data.get("dimension"),
         "overallScore": data.get("overallScore"),
         "overallGrade": data.get("overallGrade"),
+        # filesRead / sourceFileCount: surface evidence coverage so the
+        # dashboard can render a "Partial" badge when a run was deadline-
+        # truncated. Pre-Phase-1 reports lack filesRead; the UI treats
+        # missing values as "no coverage signal" and skips the badge.
+        "filesRead": data.get("filesRead"),
+        "sourceFileCount": data.get("sourceFileCount"),
         "principles": [
             {"name": p.get("name"), "score": p.get("score"), "grade": p.get("grade")}
             for p in data.get("principles", [])

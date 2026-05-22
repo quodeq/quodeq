@@ -105,3 +105,43 @@ class TestCreateMcpConfig:
             assert "--work-dir" not in args
         finally:
             config_path.unlink(missing_ok=True)
+
+    def test_includes_cache_root_model_id_language(self, tmp_path):
+        """Task 3.5 #6: the JSON config file's args list MUST include
+        --cache-root, --model-id, and --language so the subprocess can build
+        a cache writer whose fingerprint matches classify_files_via_cache.
+        """
+        jsonl = tmp_path / "findings.jsonl"
+        jsonl.touch()
+        params = _AgentParams(model_id="sonnet", language="kotlin")
+        config_path = _create_mcp_config(jsonl, agent_params=params)
+        try:
+            data = json.loads(config_path.read_text())
+            args = data["mcpServers"]["findings"]["args"]
+            assert "--cache-root" in args
+            assert "--model-id" in args
+            assert "--language" in args
+            model_idx = args.index("--model-id")
+            assert args[model_idx + 1] == "sonnet"
+            lang_idx = args.index("--language")
+            assert args[lang_idx + 1] == "kotlin"
+            cr_idx = args.index("--cache-root")
+            assert args[cr_idx + 1].endswith(".quodeq/cache/results")
+        finally:
+            config_path.unlink(missing_ok=True)
+
+    def test_cache_flag_fallbacks(self, tmp_path):
+        """No _AgentParams overrides => model_id='unknown', language=''."""
+        jsonl = tmp_path / "findings.jsonl"
+        jsonl.touch()
+        config_path = _create_mcp_config(jsonl, agent_params=None)
+        try:
+            data = json.loads(config_path.read_text())
+            args = data["mcpServers"]["findings"]["args"]
+            assert "--cache-root" in args
+            model_idx = args.index("--model-id")
+            assert args[model_idx + 1] == "unknown"
+            lang_idx = args.index("--language")
+            assert args[lang_idx + 1] == ""
+        finally:
+            config_path.unlink(missing_ok=True)

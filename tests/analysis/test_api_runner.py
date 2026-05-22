@@ -257,6 +257,69 @@ class TestMarkerContract:
         assert len(self._findings_only(lines)) == 1
 
 
+class TestSyncCacheWrite:
+    """API path wires build_cache_writer into FindingsRouter so each
+    ``mark_file_done(status='ok')`` triggers a synchronous cache.put.
+
+    Closes the 30s polling window between watcher ticks: after this, the
+    API runner's in-process router writes its per-file cache entry on disk
+    BEFORE returning from ``mark_file_done``. SIGKILL between the JSONL
+    marker and the cache put cannot lose the work.
+    """
+
+    def test_api_path_writes_cache_synchronously_when_file_done_ok(
+        self, tmp_path, api_config, monkeypatch,
+    ):
+        """After router processes findings + mark_file_done(file=F, status='ok')
+        in the API path, a cache entry for F exists on disk under cache_root.
+        """
+        from quodeq.analysis._types import AnalysisOptions, RunConfig
+
+        src_root = tmp_path / "src"
+        src_root.mkdir()
+        (src_root / "Foo.kt").write_text("class Foo")
+
+        # build_cache_writer hardcodes Path.home() / ".quodeq/cache/results",
+        # so redirect HOME to keep this test self-contained.
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        cache_root = tmp_path / "home" / ".quodeq" / "cache" / "results"
+
+        run_config = RunConfig(
+            src=src_root,
+            language="kotlin",
+            standards_dir=None,
+            work_dir=src_root,
+            options=AnalysisOptions(subagent_model="sonnet"),
+        )
+
+        jsonl_file = tmp_path / "evidence.jsonl"
+        findings = _make_findings(
+            ("M-MOD-1", "violation", "Foo.kt", 1, "minor", "x"),
+        )
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = findings
+
+        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
+            mock_inst.from_openai.return_value = mock_client
+            mock_inst.Mode.JSON = "json"
+
+            run_api_analysis(
+                prompt="t",
+                jsonl_file=jsonl_file,
+                config=api_config,
+                source_file_paths=["Foo.kt"],
+                run_config=run_config,
+                dim_id="flexibility",
+            )
+
+        entries = list(cache_root.rglob("entry.json"))
+        assert len(entries) == 1, (
+            f"Expected synchronous cache write on file_done='ok'. "
+            f"Found {len(entries)} entries under {cache_root}."
+        )
+
+
 class TestApiRunnerConfig:
     """ApiRunnerConfig dataclass."""
 

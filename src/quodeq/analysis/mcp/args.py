@@ -14,6 +14,9 @@ class ServerArgs:
     queue_path: str | None = None
     agent_id: str = ""
     work_dir: str | None = None
+    cache_root: str | None = None
+    model_id: str | None = None
+    language: str | None = None
 
     @property
     def dimensions(self) -> list[str]:
@@ -29,6 +32,9 @@ _FLAG_MAP = {
     "--queue": "queue_path",
     "--agent-id": "agent_id",
     "--work-dir": "work_dir",
+    "--cache-root": "cache_root",
+    "--model-id": "model_id",
+    "--language": "language",
 }
 
 _USAGE = """\
@@ -40,6 +46,11 @@ Options:
   --queue PATH         Path to the file queue JSON
   --agent-id ID        Agent identifier
   --work-dir DIR       Source repo root for snippet enrichment
+  --cache-root DIR     Directory where the per-file cache backend writes entries
+                       (typically ~/.quodeq/cache/results/)
+  --model-id ID        Model identifier participating in the cache key
+  --language LANG      Language identifier participating in the cache key
+                       (must match the parent RunConfig.language)
   -h, --help           Show this help message and exit
 """
 
@@ -71,4 +82,22 @@ def parse_args(argv: list[str] | None = None) -> ServerArgs:
 
     if not result.findings_file:
         result.findings_file = get_findings_file() or ""
+
+    # Task 3.5: enforce --cache-root and --model-id are present when
+    # --dimension is set. Defense-in-depth alongside _build_router's
+    # runtime check — fail at parse time, not construction time, so
+    # subprocesses spawned without the cache args exit cleanly before
+    # doing any work.
+    if result.dimension and (not result.cache_root or not result.model_id):
+        missing = []
+        if not result.cache_root:
+            missing.append("--cache-root")
+        if not result.model_id:
+            missing.append("--model-id")
+        sys.stderr.write(
+            f"error: {' and '.join(missing)} required when --dimension is "
+            "set (needed for synchronous cache writes)\n",
+        )
+        raise SystemExit(2)
+
     return result

@@ -8,7 +8,7 @@ import io
 import json
 import logging
 import sys
-from typing import Protocol, runtime_checkable
+from typing import Callable, Protocol, runtime_checkable
 
 if sys.platform != "win32":
     import fcntl
@@ -98,11 +98,14 @@ class FindingsRouter:
         seen_store: DeduplicationStore | None = None,
         file_reader: FileReader | None = None,
         event_log: "EventLogWriter | None" = None,
+        on_file_done: "Callable[[str, list[dict]], None] | None" = None,
     ):
         self._fh = output_fh
         self._enricher = FindingEnricher(context or CompiledContext(), file_reader)
         self._seen: DeduplicationStore = seen_store if seen_store is not None else set()
         self._event_log: EventLogWriter | None = event_log
+        self._on_file_done: "Callable[[str, list[dict]], None] | None" = on_file_done
+        self._findings_by_file: dict[str, list[dict]] = {}
         self.counter = 0
 
     def receive(self, args: dict) -> tuple[str, bool]:
@@ -118,6 +121,8 @@ class FindingsRouter:
         _locked_write(self._fh, line)
         if self._event_log is not None:
             self._emit_event(finding)
+        if self._on_file_done is not None:
+            self._findings_by_file.setdefault(finding["file"], []).append(finding)
         self.counter += 1
         return f"Finding #{self.counter} recorded.", False
 
@@ -136,6 +141,14 @@ class FindingsRouter:
 
         Used by the cache layer to decide which files are safely cached.
         Lines without a matching ok marker are not persisted as cache hits.
+
+        When ``on_file_done`` was provided at construction:
+          - on ``status="ok"``: the callback is invoked synchronously with
+            (file, accumulated_findings). The JSONL marker is durable BEFORE
+            the callback fires, so a cache-side failure cannot lose the
+            worker's completion record.
+          - on ``status="error"``: the accumulated findings are popped and
+            dropped without invoking the callback. The next run re-dispatches.
         """
         if status not in ("ok", "error"):
             raise ValueError(f"mark_file_done: status must be 'ok' or 'error', got {status!r}")
@@ -144,3 +157,13 @@ class FindingsRouter:
             payload["reason"] = reason
         line = json.dumps(payload) + "\n"
         _locked_write(self._fh, line)
+        if self._on_file_done is not None:
+            accumulated = self._findings_by_file.pop(file, [])
+            if status == "ok":
+                try:
+                    self._on_file_done(file, accumulated)
+                except Exception:  # noqa: BLE001 — callback failure must never lose the ok marker
+                    _logger.warning(
+                        "FindingsRouter: on_file_done callback raised for %s", file,
+                        exc_info=True,
+                    )

@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
@@ -244,6 +245,23 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
     )
 
 
+def _record_deadline_if_hit(lifecycle: "RunLifecycleContext", config: "RunConfig") -> None:
+    """Tag the lifecycle with exit_reason='deadline' if the run's
+    --max-duration was reached before natural completion.
+
+    The loops at ``analysis/_loops.py:156, 273`` break out of dim iteration
+    silently when ``time.monotonic() >= deadline_at`` — they don't raise.
+    Without this hook, a deadline-truncated run finalizes with
+    ``exit_reason=null``, indistinguishable from a clean completion. The
+    dashboard then can't render the "Partial" badge.
+    """
+    deadline_at = getattr(getattr(config, "options", None), "deadline_at", None)
+    if not isinstance(deadline_at, (int, float)):
+        return
+    if time.monotonic() >= deadline_at:
+        lifecycle.set_exit_reason("deadline")
+
+
 def _run_pipeline_with_cleanup(
     args: argparse.Namespace, inputs: ResolvedInputs, paths: tuple[Path, Path, Path],
 ) -> int:
@@ -305,6 +323,11 @@ def _run_pipeline_with_cleanup(
                         ).isoformat()
                         lifecycle.set_deadline(deadline_iso)
                     result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+                    # If the loops broke out on --max-duration, the pipeline
+                    # returns cleanly with no exception. Tag the lifecycle so
+                    # the dashboard can distinguish a deadline-truncated run
+                    # from a clean completion (exit_reason=null vs "deadline").
+                    _record_deadline_if_hit(lifecycle, config)
                     # run_full writes per-dimension reports as each dimension
                     # completes, so by the time it returns scoring is already
                     # done. Record the last pre-finalize phase as "scoring"

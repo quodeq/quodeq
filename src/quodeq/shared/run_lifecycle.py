@@ -70,6 +70,7 @@ class RunLifecycleContext:
         self._resources = ResourceSampler()
         self._previous_handlers: dict[int, Any] = {}
         self._atexit_registered = False
+        self._pending_exit_reason: str | None = None
 
     # ---- Context protocol --------------------------------------------------
 
@@ -99,7 +100,7 @@ class RunLifecycleContext:
                 if self._current_state != RunState.FINALIZING:
                     # Caller didn't explicitly call transition_to_finalizing(); do it now.
                     self._transition(RunState.FINALIZING)
-                self._transition(RunState.DONE)
+                self._transition(RunState.DONE, exit_reason=self._pending_exit_reason)
         elif issubclass(exc_type, SystemExit):
             # SystemExit raised by our signal handler; state already written there.
             if self._current_state not in TERMINAL_STATES:
@@ -114,7 +115,7 @@ class RunLifecycleContext:
             if self._current_state not in TERMINAL_STATES:
                 if self._current_state != RunState.FINALIZING:
                     self._transition(RunState.FINALIZING)
-                self._transition(RunState.DONE)
+                self._transition(RunState.DONE, exit_reason=self._pending_exit_reason)
         elif self._is_circuit_breaker_error(exc_type):
             # Circuit breaker tripped — auto-protection, not user cancel.
             # Distinct exit_reason makes the History entry distinguishable
@@ -144,6 +145,16 @@ class RunLifecycleContext:
         """Record the run-level deadline. Visible immediately in status.json."""
         self._deadline_at = deadline_at
         self._write(self._current_state)
+
+    def set_exit_reason(self, reason: str | None) -> None:
+        """Record a non-failure exit reason to apply at the next terminal transition.
+
+        Use this for clean-stop reasons that aren't exceptions, signals, or
+        atexit (e.g. "deadline"). Exception/signal/atexit paths set their
+        own exit_reason via ``_transition(state, exit_reason=...)`` and
+        ignore any pending value here — failures must not be mislabeled.
+        """
+        self._pending_exit_reason = reason
 
     # ---- Internals ---------------------------------------------------------
 

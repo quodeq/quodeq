@@ -329,6 +329,11 @@ def _run_api_analysis_bridge(
         dimension=cfg.dimension,
         work_dir=work_dir,
         source_file_paths=rel_paths,
+        # Wire the synchronous cache-write closure when the pool layer
+        # supplied a RunConfig carrier. Legacy callers pass nothing and
+        # the API runner simply skips the cache write.
+        run_config=cfg.run_config,
+        dim_id=cfg.dimension,
     )
 
     stream_file.write_text('{"type":"api_runner","status":"complete"}\n')

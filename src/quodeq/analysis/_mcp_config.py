@@ -28,6 +28,16 @@ def _create_mcp_config(
         mcp_args.extend(["--agent-id", ap.agent_id])
     if ap.work_dir:
         mcp_args.extend(["--work-dir", str(ap.work_dir.resolve())])
+    # Phase 1.5 (Task 3.5): cache fingerprint inputs (cache_root + model_id +
+    # language) MUST be emitted on every spawn so the subprocess writes cache
+    # entries with the same keys as classify_files_via_cache. Defaults match
+    # cache.dimension_helpers._model_id_from ('unknown') and Task 5's
+    # language-unset contract ('').
+    mcp_args.extend([
+        "--cache-root", str(Path.home() / ".quodeq" / "cache" / "results"),
+        "--model-id", ap.model_id or "unknown",
+        "--language", ap.language or "",
+    ])
     config = {
         "mcpServers": {
             "findings": {

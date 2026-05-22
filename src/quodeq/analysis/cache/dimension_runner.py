@@ -45,6 +45,7 @@ from quodeq.analysis.cache._failure_streak import (
 )
 from quodeq.analysis.cache.dimension_helpers import (
     ClassifyResult,
+    _group_findings_by_file,
     build_cache_key_for_file,
     classify_files_via_cache,
     persist_dispatch_results,
@@ -110,6 +111,39 @@ def _evidence_dir(config: RunConfig) -> Path:
 
 def _jsonl_path(config: RunConfig, dim_id: str) -> Path:
     return _evidence_dir(config) / f"{dim_id}_evidence.jsonl"
+
+
+def _compute_files_read(
+    classify: ClassifyResult, jsonl_path: Path, all_files: list[str],
+) -> int:
+    """Return the count of source files reproducible from the cache after
+    this run ends.
+
+    A source file is "reproducible" if either:
+      - it was a cache hit (``classify.cached_findings`` already carried it
+        forward — its cache entry already exists), or
+      - it was dispatched and the worker emitted ``file_done="ok"``
+        (which triggers a synchronous cache write via
+        ``build_cache_writer``, or the watcher's next persist tick).
+
+    Files with ``file_done="error"`` or no marker at all are NOT counted:
+    their analysis was incomplete and the cache contains no entry for
+    them, so the next run must re-dispatch.
+
+    Pre-fix, ``files_read`` was set to ``len(input_files)`` at every
+    callsite, making coverage % (computed downstream as
+    ``files_read / source_file_count``) meaningless: it always read 100%
+    even on deadline-truncated runs. The user reported a flexibility
+    score of "6.6/Adequate" on a run that actually analyzed ~850/3037
+    files — the dashboard couldn't tell it was partial.
+    """
+    n_hits = len(all_files) - len(classify.misses)
+    if not jsonl_path.is_file():
+        return n_hits
+    _grouped, ok_files = _group_findings_by_file(jsonl_path)
+    miss_set = set(classify.misses)
+    n_dispatch_ok = len(ok_files & miss_set)
+    return n_hits + n_dispatch_ok
 
 
 def _events_log_path(jsonl: Path) -> Path:
@@ -244,7 +278,8 @@ def process_dimension_with_cache(
         if jsonl.exists():
             deduplicate_jsonl(jsonl)
         return parse_evidence_from_jsonl(
-            config, dim_id, ctx, jsonl, files_read=len(files),
+            config, dim_id, ctx, jsonl,
+            files_read=_compute_files_read(classify, jsonl, files),
         )
 
     # Dispatch misses via the existing path, with file filter restricted
@@ -273,10 +308,15 @@ def process_dimension_with_cache(
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(json.dumps(classify.miss_keys, indent=2), encoding="utf-8")
 
-    # Periodic persist watcher: persists what's in JSONL every
-    # _PERSIST_INTERVAL_S seconds. If the dispatch is cancelled (SIGTERM,
-    # exception, etc.) the cache retains the work that completed before
-    # the cancel - instead of losing the entire dim's progress.
+    # Periodic persist watcher (safety net only — NOT authoritative).
+    # After Phase 1.5 Task 3.5, FindingsRouter.on_file_done writes cache
+    # entries synchronously the instant a worker emits mark_file_done(ok)
+    # (both API path and CLI/subprocess path). The watcher remains as a
+    # belt-and-suspenders guard for any future code path that constructs
+    # a router WITHOUT on_file_done (or for paths that bypass the router
+    # entirely). On a cancel/SIGTERM the synchronous writes are already on
+    # disk; the final watcher tick re-scans the JSONL and is a no-op for
+    # files that the sync path already persisted.
     def _persist_now() -> None:
         persist_dispatch_results(
             config, dim_id, miss_files=classify.misses,
@@ -305,8 +345,20 @@ def process_dimension_with_cache(
         # Signal the watcher to do a final persist and exit. Whatever
         # completed before this point gets cached, whether the dispatch
         # returned cleanly or raised.
+        #
+        # No join timeout: the prior 5s cap was the c88be50e regression
+        # that dropped the final persist tick when it ran longer than 5s.
+        # On a 790-file flexibility run the user lost ~16% of the cache
+        # entries (790 file_done="ok" markers in the JSONL, only 662
+        # entries persisted) because the final tick was scanning the whole
+        # JSONL and rewriting per-file entries — each persist_dispatch_results
+        # call does O(n_files) work and an interrupted final tick silently
+        # abandoned every entry it hadn't yet written.
+        #
+        # The breaker join keeps its 5s cap: it's a separate thread with
+        # independent lifecycle whose final tick is bounded I/O.
         stop_event.set()
-        watcher.join(timeout=5.0)
+        watcher.join()
         breaker.stop_and_join(timeout=5.0)
 
     if breaker.trip_event is not None:
@@ -322,7 +374,8 @@ def process_dimension_with_cache(
         # them so the run still has SOMETHING to score; otherwise None.
         if classify.cached_findings and jsonl.exists():
             return parse_evidence_from_jsonl(
-                config, dim_id, ctx, jsonl, files_read=len(files),
+                config, dim_id, ctx, jsonl,
+                files_read=_compute_files_read(classify, jsonl, files),
             )
         return None
 
@@ -330,5 +383,6 @@ def process_dimension_with_cache(
     # not just len(misses) which is what the dispatcher's Evidence carries.
     # The dispatcher already deduped on its way out, so no extra dedup here.
     return parse_evidence_from_jsonl(
-        config, dim_id, ctx, jsonl, files_read=len(files),
+        config, dim_id, ctx, jsonl,
+        files_read=_compute_files_read(classify, jsonl, files),
     )

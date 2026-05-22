@@ -71,7 +71,7 @@ def main() -> None:
 
     try:
         with open(sa.findings_file, "a") as findings_fh:
-            router = _build_router(findings_fh, Path(sa.findings_file), ctx)
+            router = _build_router(findings_fh, Path(sa.findings_file), ctx, sa)
             while True:
                 msg = read_message()
                 if msg is None:
@@ -88,19 +88,54 @@ def main() -> None:
         sys.exit(1)
 
 
-def _build_router(findings_fh, findings_path: Path, ctx: CompiledContext) -> FindingsRouter:
-    """Construct a FindingsRouter that emits JudgmentCreatedEvents to the run event log.
+def _build_router(
+    findings_fh, findings_path: Path, ctx: CompiledContext,
+    server_args: ServerArgs,
+) -> FindingsRouter:
+    """Construct a FindingsRouter wired to the event log and (when configured)
+    the per-file synchronous cache writer.
 
     The findings_path is `<run_dir>/evidence/<dim>_evidence.jsonl`, so the run
     directory is its grandparent and the project directory its great-grandparent.
     The event log lives at `<run_dir>/events.jsonl`.
+
+    When ``server_args.dimension`` is set, the cache writer becomes mandatory:
+    a findings_server scoped to a dimension MUST have ``--cache-root`` and
+    ``--model-id`` so each ok marker writes the cache entry synchronously.
+    Silent degradation to watcher-only is the failure mode the Phase 1 audit
+    warned against -- argparse-level enforcement comes in Task 7; this check
+    is defense-in-depth.
     """
     run_dir = Path(findings_path).parent.parent
     project_dir = run_dir.parent
     ctx.precedent_fingerprints = load_precedent_fingerprints(project_dir)
     from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
     event_log = EventLogWriter(run_dir / "events.jsonl")
-    return FindingsRouter(findings_fh, context=ctx, event_log=event_log)
+
+    cache_writer = None
+    if server_args.dimension:
+        if not server_args.cache_root or not server_args.model_id:
+            raise RuntimeError(
+                "findings_server requires --cache-root and --model-id when "
+                "--dimension is set; got cache_root=%r, model_id=%r"
+                % (server_args.cache_root, server_args.model_id),
+            )
+        from quodeq.analysis.cache.cache_writer import build_cache_writer  # noqa: PLC0415
+        src_root = Path(server_args.work_dir) if server_args.work_dir else Path.cwd()
+        standards_dir = Path(server_args.compiled_dir) if server_args.compiled_dir else None
+        cache_writer = build_cache_writer(
+            cache_root=Path(server_args.cache_root),
+            src_root=src_root,
+            standards_dir=standards_dir,
+            dimension=server_args.dimension,
+            model_id=server_args.model_id,
+            language=server_args.language or "",
+        )
+
+    return FindingsRouter(
+        findings_fh, context=ctx, event_log=event_log,
+        on_file_done=cache_writer,
+    )
 
 
 if __name__ == "__main__":
