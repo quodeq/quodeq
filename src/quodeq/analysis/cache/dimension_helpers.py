@@ -114,7 +114,22 @@ def classify_files_via_cache(
     file is forced into the misses bucket regardless of cache state. The
     miss_keys map is still populated so callers can write fresh entries
     after dispatch — clean-scan refreshes the cache rather than ignoring it.
+
+    The pipeline classifies twice per dim (estimates + dim runner). When
+    ``config._classify_cache`` is set to a dict, this function stashes
+    its result there on the first call for a given ``(dimension, files)``
+    pair and short-circuits the second call. The stash MUST NOT short-
+    circuit when ``bypass_reads`` is True — clean-scan deletes entries
+    immediately before this call, so an upfront classify's hits are
+    stale by the time the dim runner asks again.
     """
+    files_tuple = tuple(files)
+    run_cache = config._classify_cache
+    if not bypass_reads and run_cache is not None:
+        stashed = run_cache.get(dimension)
+        if stashed is not None and stashed[0] == files_tuple:
+            return stashed[1]
+
     cached_findings: list[dict] = []
     misses: list[str] = []
     miss_keys: dict[str, str] = {}
@@ -126,11 +141,14 @@ def classify_files_via_cache(
             miss_keys[f] = key
         else:
             cached_findings.extend(hit.findings)
-    return ClassifyResult(
+    result = ClassifyResult(
         cached_findings=cached_findings,
         misses=misses,
         miss_keys=miss_keys,
     )
+    if not bypass_reads and run_cache is not None:
+        run_cache[dimension] = (files_tuple, result)
+    return result
 
 
 def _group_findings_by_file(jsonl_path: Path) -> tuple[dict[str, list[dict]], set[str]]:

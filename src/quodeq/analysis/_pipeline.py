@@ -82,6 +82,15 @@ def _run_dimensions(
         return _run_dry_run(config, on_dimension_done=on_dimension_done)
 
     dimensions, ctx = load_analysis_context(config)
+    # Activate the per-run classify stash so ``_persist_dim_estimates``
+    # below and the dim runner inside ``cache/dimension_runner.py`` share
+    # a single walk of the source files per dim. Without this, the same
+    # ``classify_files_via_cache`` call happens twice per dim (once for
+    # the dashboard's upfront totals, once for the actual hit/miss
+    # dispatch), each repeating thousands of source-file hashes and
+    # cache.get() lookups. Tests and dry-run paths leave it as None.
+    if config._classify_cache is None:
+        config._classify_cache = {}
     _persist_dim_estimates(config, dimensions)
 
     # One runner per run. Per-run construction (vs. a module-level
