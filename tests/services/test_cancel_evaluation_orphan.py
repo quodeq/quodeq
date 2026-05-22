@@ -9,6 +9,7 @@ UI flips to a terminal state. Findings on disk and the index row are preserved.
 from __future__ import annotations
 
 import os
+import signal
 from pathlib import Path
 
 import pytest
@@ -146,21 +147,38 @@ def test_cancel_live_pid_unchanged_behavior(tmp_path: Path) -> None:
     provider = FilesystemActionProvider(index_db_path=db_path)
     provider.list_evaluations(limit=0, reports_dir=str(reports))
 
-    # We don't want to actually SIGTERM ourselves; intercept the syscall.
+    # We don't want to actually kill ourselves; intercept the tree-kill helper
+    # (which is what cancel_external_run uses, and is cross-platform: killpg
+    # on POSIX, taskkill on Windows). Also simulate SIGTERM being honored so
+    # the grace-period poll doesn't burn 30s.
     import quodeq.services._external_jobs as _ext_mod
-    original_kill = os.kill
+    import quodeq.services._index_sync as _sync_mod
+    original_kill_tree = _ext_mod._kill_tree
+    original_alive = _sync_mod._is_pid_alive
     sent_signals: list[tuple[int, int]] = []
+    pid_killed = False
 
-    def fake_kill(pid: int, sig: int) -> None:
-        if sig == 0:
-            return original_kill(pid, sig)  # liveness probe
-        sent_signals.append((pid, sig))
+    def fake_kill_tree(target_pid: int, sig: int = signal.SIGTERM) -> None:
+        nonlocal pid_killed
+        sent_signals.append((target_pid, sig))
+        if sig == signal.SIGTERM:
+            pid_killed = True
 
-    _ext_mod.os.kill = fake_kill  # type: ignore[attr-defined]
+    def fake_alive(query_pid: int) -> bool:
+        if pid_killed:
+            return False
+        return original_alive(query_pid)
+
+    _ext_mod._kill_tree = fake_kill_tree  # type: ignore[attr-defined]
+    _sync_mod._is_pid_alive = fake_alive  # type: ignore[attr-defined]
     try:
         ok = provider.cancel_evaluation("ext-live-run", reports_dir=str(reports))
     finally:
-        _ext_mod.os.kill = original_kill  # type: ignore[attr-defined]
+        _ext_mod._kill_tree = original_kill_tree  # type: ignore[attr-defined]
+        _sync_mod._is_pid_alive = original_alive  # type: ignore[attr-defined]
 
     assert ok is True
-    assert sent_signals, "SIGTERM path must be taken when PID is alive"
+    assert sent_signals, "tree-kill path must be taken when PID is alive"
+    assert any(sig == signal.SIGTERM for _, sig in sent_signals), (
+        f"expected SIGTERM to be sent, got: {sent_signals}"
+    )
