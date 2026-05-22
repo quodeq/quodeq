@@ -54,40 +54,118 @@ class TestMarkFileDone:
             router.mark_file_done(file="src/foo.py", status="bogus")
 
 
-def test_mark_file_done_invokes_on_file_done_callback_when_ok():
-    """When mark_file_done is called with status='ok', the on_file_done
-    callback is invoked with the file path. status='error' does not
-    invoke the callback."""
+def test_router_accumulates_findings_per_file_then_drains_on_ok():
+    """Receive 3 findings for Foo.kt and 2 for Bar.kt. Call mark_file_done(Foo.kt, ok).
+    Callback fires with ('Foo.kt', [3 enriched finding dicts]); _findings_by_file
+    no longer contains Foo.kt; Bar.kt's findings still accumulated."""
     import io
     from quodeq.analysis.mcp.router import FindingsRouter
+    from quodeq.analysis.mcp.enricher import CompiledContext
 
-    calls = []
-    def on_file_done(file: str) -> None:
-        calls.append(file)
+    calls: list[tuple[str, list[dict]]] = []
+    def on_file_done(file: str, findings: list[dict]) -> None:
+        calls.append((file, findings))
 
     fh = io.StringIO()
-    router = FindingsRouter(fh, on_file_done=on_file_done)
+    router = FindingsRouter(
+        fh, context=CompiledContext(), on_file_done=on_file_done,
+    )
+    for i in range(3):
+        router.receive({
+            "file": "Foo.kt", "line": 10 + i,
+            "req": f"F-ADP-{i}", "t": "violation",
+            "p": "Adaptability", "d": "flexibility",
+            "severity": "major", "w": f"finding {i}",
+            "reason": "test", "snippet": "code",
+        })
+    for i in range(2):
+        router.receive({
+            "file": "Bar.kt", "line": 20 + i,
+            "req": f"F-RPL-{i}", "t": "violation",
+            "p": "Replaceability", "d": "flexibility",
+            "severity": "major", "w": f"finding {i}",
+            "reason": "test", "snippet": "code",
+        })
 
     router.mark_file_done(file="Foo.kt", status="ok")
-    router.mark_file_done(file="Bar.kt", status="error")
-    router.mark_file_done(file="Baz.kt", status="ok")
 
-    assert calls == ["Foo.kt", "Baz.kt"]
+    assert len(calls) == 1
+    file, findings = calls[0]
+    assert file == "Foo.kt"
+    assert len(findings) == 3
+    assert "Foo.kt" not in router._findings_by_file
+    assert len(router._findings_by_file["Bar.kt"]) == 2
 
 
-def test_mark_file_done_callback_exception_does_not_break_marker_write():
-    """A raising on_file_done callback must not prevent the file_done
-    marker from reaching the JSONL. Cache failures must never roll back
-    the worker's completion record."""
+def test_router_discards_findings_on_mark_file_done_error():
+    """When mark_file_done is called with status='error', accumulated findings
+    are popped and dropped — callback is NOT called."""
     import io
     from quodeq.analysis.mcp.router import FindingsRouter
+    from quodeq.analysis.mcp.enricher import CompiledContext
 
-    def boom(_file: str) -> None:
+    calls: list[tuple[str, list[dict]]] = []
+    def on_file_done(file: str, findings: list[dict]) -> None:
+        calls.append((file, findings))
+
+    fh = io.StringIO()
+    router = FindingsRouter(
+        fh, context=CompiledContext(), on_file_done=on_file_done,
+    )
+    router.receive({
+        "file": "Bar.kt", "line": 1,
+        "req": "F-ADP-1", "t": "violation",
+        "p": "Adaptability", "d": "flexibility",
+        "severity": "major", "w": "finding", "reason": "test", "snippet": "code",
+    })
+    router.mark_file_done(file="Bar.kt", status="error")
+
+    assert calls == []
+    assert "Bar.kt" not in router._findings_by_file
+
+
+def test_router_callback_exception_does_not_break_marker_write_or_accumulation():
+    """A raising on_file_done callback must not prevent the file_done marker
+    from reaching the JSONL, and must still clear _findings_by_file."""
+    import io
+    from quodeq.analysis.mcp.router import FindingsRouter
+    from quodeq.analysis.mcp.enricher import CompiledContext
+
+    def boom(_file: str, _findings: list[dict]) -> None:
         raise RuntimeError("simulated cache write failure")
 
     fh = io.StringIO()
-    router = FindingsRouter(fh, on_file_done=boom)
+    router = FindingsRouter(fh, context=CompiledContext(), on_file_done=boom)
+    router.receive({
+        "file": "Foo.kt", "line": 1,
+        "req": "F-ADP-1", "t": "violation",
+        "p": "Adaptability", "d": "flexibility",
+        "severity": "major", "w": "finding", "reason": "test", "snippet": "code",
+    })
     router.mark_file_done(file="Foo.kt", status="ok")
-    assert '"_marker": "file_done"' in fh.getvalue()
+
+    output = fh.getvalue()
+    assert '"_marker": "file_done"' in output
+    assert '"file": "Foo.kt"' in output
+    assert '"status": "ok"' in output
+    assert "Foo.kt" not in router._findings_by_file
+
+
+def test_router_skips_accumulation_when_no_callback():
+    """When on_file_done is None, _findings_by_file is never populated
+    (memory optimization)."""
+    import io
+    from quodeq.analysis.mcp.router import FindingsRouter
+    from quodeq.analysis.mcp.enricher import CompiledContext
+
+    fh = io.StringIO()
+    router = FindingsRouter(fh, context=CompiledContext(), on_file_done=None)
+    router.receive({
+        "file": "Foo.kt", "line": 1,
+        "req": "F-ADP-1", "t": "violation",
+        "p": "Adaptability", "d": "flexibility",
+        "severity": "major", "w": "finding", "reason": "test", "snippet": "code",
+    })
+
+    assert "Foo.kt" not in router._findings_by_file
     assert '"file": "Foo.kt"' in fh.getvalue()
-    assert '"status": "ok"' in fh.getvalue()
