@@ -24,6 +24,7 @@ class _CollectionContext:
     results: list[Any]
     ctx: Any
     files: list[str] | None = None
+    exit_reason: str | None = None
 
 
 def _collect_evidence(
@@ -46,6 +47,7 @@ def _collect_evidence(
             source_file_count=config.source_file_count,
             files_read=total_files_read,
             module=config.target.name if config.target else "",
+            exit_reason=collection.exit_reason,
         ),
         compiled_dir=compiled_dir,
         evaluators_dir=config.evaluators_dir,

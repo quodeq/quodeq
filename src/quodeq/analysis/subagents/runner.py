@@ -96,7 +96,10 @@ def _execute_pool_and_collect(
     pool, results = _launch_pool(config, dc.dim_id, params)
     return _collect_evidence(
         config, dc.dim_id, dc.evidence_dir,
-        _CollectionContext(results=results, ctx=dc.ctx, files=dc.files),
+        _CollectionContext(
+            results=results, ctx=dc.ctx, files=dc.files,
+            exit_reason=pool.exit_reason,
+        ),
     )
 
 
