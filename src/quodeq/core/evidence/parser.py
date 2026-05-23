@@ -28,6 +28,7 @@ class EvidenceContext:
     source_file_count: int
     files_read: int
     module: str = ""
+    exit_reason: str | None = None
 
 
 def _build_principles(
@@ -55,6 +56,7 @@ def _build_evidence(context: EvidenceContext, principles: dict[str, PrincipleEvi
         source_file_count=context.source_file_count, files_read=context.files_read,
         coverage_pct=compute_coverage_pct(context.files_read, context.source_file_count),
         principles=principles, dismissed_count=0, module=context.module,
+        exit_reason=context.exit_reason,
     )
 
 
