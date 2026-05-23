@@ -104,3 +104,32 @@ def test_evidence_to_v1_dict():
     assert d["principles"]["ts-001"]["violations"][0]["severity"] == "high"
     assert d["source_file_count"] == 100
     assert d["files_read"] == 50
+
+
+def test_evidence_exit_reason_defaults_to_none():
+    ev = Evidence(
+        repository="r", language="python", date="2026-05-23",
+        source_file_count=10, files_read=5, coverage_pct=50.0,
+    )
+    assert ev.exit_reason is None
+
+
+def test_evidence_to_scoring_dict_includes_exit_reason():
+    from quodeq.core.evidence.model import evidence_to_scoring_dict
+    ev = Evidence(
+        repository="r", language="python", date="2026-05-23",
+        source_file_count=10, files_read=5, coverage_pct=50.0,
+        exit_reason="time_limit",
+    )
+    d = evidence_to_scoring_dict(ev)
+    assert d["exit_reason"] == "time_limit"
+
+
+def test_evidence_to_scoring_dict_omits_exit_reason_when_none():
+    from quodeq.core.evidence.model import evidence_to_scoring_dict
+    ev = Evidence(
+        repository="r", language="python", date="2026-05-23",
+        source_file_count=10, files_read=5, coverage_pct=50.0,
+    )
+    d = evidence_to_scoring_dict(ev)
+    assert "exit_reason" not in d or d["exit_reason"] is None

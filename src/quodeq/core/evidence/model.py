@@ -150,6 +150,7 @@ class Evidence:
     dismissed_count: int = 0
     meta: dict = field(default_factory=dict)
     module: str = ""
+    exit_reason: str | None = None
 
     def summary(self) -> dict:
         """Return an aggregate summary of findings, confidence, and balance across all principles."""
@@ -200,6 +201,7 @@ def evidence_to_scoring_dict(evidence: Evidence) -> dict:
         "source_file_count": evidence.source_file_count,
         "files_read": evidence.files_read,
         "coverage_pct": evidence.coverage_pct,
+        "exit_reason": evidence.exit_reason,
         "meta": evidence.meta,
         "principles": principles,
         "evidence_summary": evidence.summary(),
