@@ -2907,6 +2907,13 @@ button.eval-provider-badge--clickable:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.scan-progress__coverage {
+  color: inherit;
+}
+.scan-progress__coverage--partial {
+  color: #f0b95f;
+  cursor: help;
+}
 .scan-progress__dim-meta-pending {
   color: var(--color-text-dim, var(--color-text-muted));
   font-style: italic;
