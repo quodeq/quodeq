@@ -67,6 +67,7 @@ def parse_report_json(json_path: Path) -> dict[str, Any] | None:
         # missing values as "no coverage signal" and skips the badge.
         "filesRead": data.get("filesRead"),
         "sourceFileCount": data.get("sourceFileCount"),
+        "exitReason": data.get("exitReason"),
         "principles": [
             {"name": p.get("name"), "score": p.get("score"), "grade": p.get("grade")}
             for p in data.get("principles", [])
