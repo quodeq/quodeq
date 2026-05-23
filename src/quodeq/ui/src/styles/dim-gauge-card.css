@@ -122,6 +122,12 @@
   color: var(--color-text-muted);
   text-align: center;
 }
+.dim-gauge-card__coverage-pct {
+  color: inherit;
+}
+.dim-gauge-card__coverage-pct--partial {
+  color: #f0b95f;
+}
 
 .dim-gauge-card__gauge--insuf .dim-gauge-card__score {
   fill: var(--color-text-subtle);

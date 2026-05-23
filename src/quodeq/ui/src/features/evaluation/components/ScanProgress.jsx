@@ -76,11 +76,22 @@ function DimRow({ dim }) {
       ? <span className="scan-progress__dim-meta-projected">0 / {total}{reasonBadge}</span>
       : <span className="scan-progress__dim-meta-projected">estimating…</span>;
   } else if (isDone) {
+    const coveragePct = total > 0 ? Math.round((taken / total) * 100) : null;
+    const isPartial = typeof dim.exitReason === 'string' && dim.exitReason !== 'done';
+    const partialTooltip = isPartial
+      ? `stopped: ${dim.exitReason} · ${taken} of ${total} files`
+      : undefined;
     meta = (
       <>
         {total > 0 ? `${taken} files` : ''}
         {dim.violations > 0 && <> · <span className="scan-progress__v">{dim.violations}v</span></>}
         {dim.compliance > 0 && <> · <span className="scan-progress__c">{dim.compliance}c</span></>}
+        {coveragePct !== null && (
+          <> · <span
+            className={`scan-progress__coverage${isPartial ? ' scan-progress__coverage--partial' : ''}`}
+            title={partialTooltip}
+          >{coveragePct}%</span></>
+        )}
         {dim.elapsedS != null && <> · {formatClock(dim.elapsedS)}</>}
       </>
     );

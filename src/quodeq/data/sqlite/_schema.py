@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 EVALUATION_DDL = """
-PRAGMA user_version = 4;
+PRAGMA user_version = 5;
 
 CREATE TABLE findings (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,6 +71,7 @@ CREATE TABLE dimension_scores (
     files_read      INTEGER NOT NULL DEFAULT 0,
     source_count    INTEGER NOT NULL DEFAULT 0,
     coverage_pct    REAL NOT NULL DEFAULT 0.0,
+    exit_reason     TEXT,
     completed_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -93,4 +94,4 @@ CREATE TABLE principle_grades (
 CREATE INDEX idx_principle_grades_dimension ON principle_grades(dimension);
 """
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5

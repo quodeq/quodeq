@@ -22,7 +22,8 @@ from quodeq.shared.dimensions_state import DimState, write_dim_state, IllegalDim
 
 
 def _safe_write_dim_state(
-    run_dir: Path | None, dim: str, state: DimState, *, reason: str | None = None,
+    run_dir: Path | None, dim: str, state: DimState, *,
+    reason: str | None = None, exit_reason: str | None = None,
 ) -> None:
     """Best-effort dim-state write. Never raises into the loop.
 
@@ -39,7 +40,7 @@ def _safe_write_dim_state(
     except (TypeError, ValueError):
         return
     try:
-        write_dim_state(run_dir, dim, state, reason=reason)
+        write_dim_state(run_dir, dim, state, reason=reason, exit_reason=exit_reason)
     except IllegalDimTransitionError as exc:
         log_warning(f"[loop] dim-state transition rejected: {exc}")
     except (OSError, AttributeError, TypeError) as exc:
@@ -199,7 +200,10 @@ def run_incremental_loop(
         # scoring callback). Wrap it too - an exception in a callback
         # shouldn't drop the next iteration on the floor.
         if ev:
-            _safe_write_dim_state(run_dir, dimension, DimState.DONE)
+            _safe_write_dim_state(
+                run_dir, dimension, DimState.DONE,
+                exit_reason=ev.exit_reason,
+            )
             try:
                 _log_dimension_result(ev, dimension, idx, ctx.total)
                 result[dimension] = ev
@@ -308,7 +312,10 @@ def run_per_dimension_loop(
             log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: ev=None)")
             continue
         # ev is set - dim succeeded analytically.
-        _safe_write_dim_state(run_dir, dimension, DimState.DONE)
+        _safe_write_dim_state(
+            run_dir, dimension, DimState.DONE,
+            exit_reason=ev.exit_reason,
+        )
         try:
             result[dimension] = ev
             if on_dimension_done:

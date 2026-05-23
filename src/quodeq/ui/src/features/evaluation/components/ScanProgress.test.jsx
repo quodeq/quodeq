@@ -4,6 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import { EvalLogContext } from '../eval-log/EvalLogContext.js';
 import ScanProgress from './ScanProgress.jsx';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
+import { getEvaluationProgress } from '../../../api/index.js';
 
 vi.mock('../../../api/index.js', () => ({
   getEvaluationProgress: vi.fn(() => Promise.resolve({ dimensions: [], totalElapsedS: 0 })),
@@ -65,5 +66,46 @@ describe('ScanProgress terminal button', () => {
       activeJobId: 'job-1', status: 'streaming', openLog: vi.fn(), closeLog: vi.fn(), updateJobStatus: vi.fn(),
     });
     expect(document.querySelector('.console-shell')).toBeNull();
+  });
+});
+
+describe('ScanProgress partial coverage signal', () => {
+  function payload(dim) {
+    return {
+      runId: 'r1', phase: 'analyzing', currentDimension: null,
+      totalElapsedS: 60, projectFiles: 100, state: 'running',
+      dimensions: [dim],
+    };
+  }
+
+  const ctx = { openLog: vi.fn(), closeLog: vi.fn(), updateJobStatus: vi.fn() };
+
+  it('renders coverage % in amber when dim.exitReason is a non-done value', async () => {
+    getEvaluationProgress.mockResolvedValueOnce(payload({
+      id: 'maintainability', state: 'done',
+      files: { taken: 8, total: 100 },
+      violations: 74, compliance: 9,
+      elapsedS: 754, exitReason: 'time_limit',
+    }));
+    const { container } = withEvalLog(<ScanProgress job={baseJob} />, ctx);
+    // Wait for react-query to settle, then open the per-dim detail panel.
+    fireEvent.click(await screen.findByTitle('Show per-dimension detail'));
+    await screen.findByText('maintainability');
+    const pctEl = container.querySelector('.scan-progress__coverage--partial');
+    expect(pctEl).not.toBeNull();
+    expect(pctEl.textContent).toMatch(/8\s*%/);
+  });
+
+  it('renders coverage % in default colour when exitReason is "done"', async () => {
+    getEvaluationProgress.mockResolvedValueOnce(payload({
+      id: 'maintainability', state: 'done',
+      files: { taken: 100, total: 100 },
+      violations: 0, compliance: 5,
+      elapsedS: 60, exitReason: 'done',
+    }));
+    const { container } = withEvalLog(<ScanProgress job={baseJob} />, ctx);
+    fireEvent.click(await screen.findByTitle('Show per-dimension detail'));
+    await screen.findByText('maintainability');
+    expect(container.querySelector('.scan-progress__coverage--partial')).toBeNull();
   });
 });

@@ -16,11 +16,12 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.analysis.subagents.jsonl_utils import tally_unique_findings
+from quodeq.shared.dimensions_state import read_dimensions
 
 _AGENT_ACTIVE_WINDOW_S = 30
 
@@ -37,6 +38,7 @@ class _DimProgress:
     budget_s: int | None = None
     active_agents: int = 0
     estimate_reason: str | None = None  # see _dim_estimates module docstring
+    exit_reason: str | None = None
 
 
 @dataclass
@@ -213,6 +215,7 @@ def build_scan_progress(
 
     project_files = _project_total_files(run_dir)
     dim_estimates = _read_dim_estimates(run_dir)
+    dim_records = read_dimensions(run_dir).get("dimensions") or {}
     dim_ids = list(status.get("dimensions") or [])
     evidence_dir = run_dir / "evidence"
 
@@ -226,6 +229,8 @@ def build_scan_progress(
             has_queue=queue is not None,
             has_evaluation=eval_path.is_file(),
         )
+        record = dim_records.get(dim_id) if isinstance(dim_records, dict) else None
+        exit_reason = record.get("exit_reason") if isinstance(record, dict) else None
 
         if queue is not None:
             # `taken` is a list of batch entries [{"files": [...], "agent": ..., "ts": ...}, ...].
@@ -269,6 +274,7 @@ def build_scan_progress(
             budget_s=budget,
             active_agents=active,
             estimate_reason=estimate_reason,
+            exit_reason=exit_reason,
         ))
 
     return _ScanProgress(
@@ -283,5 +289,15 @@ def build_scan_progress(
 
 
 def progress_to_dict(progress: _ScanProgress) -> dict:
-    """Serialize for the API response (snake_case → camelCase done at the route)."""
-    return asdict(progress)
+    """Serialize the dataclass tree to a camelCase dict for jsonify.
+
+    Uses to_camel_dict so dataclass field names like ``exit_reason`` and
+    ``estimate_reason`` become ``exitReason`` and ``estimateReason`` in the
+    JSON the client sees. The route still wraps the result in to_camel_dict;
+    that second pass is a no-op for already-camelCased dicts.
+    """
+    from quodeq.core.types import to_camel_dict
+    result = to_camel_dict(progress)
+    if not isinstance(result, dict):
+        return {}
+    return result

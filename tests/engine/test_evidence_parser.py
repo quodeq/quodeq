@@ -267,3 +267,24 @@ class TestParseJsonlToEvidence:
         assert "violations" in d["principles"]["ts-001"]
         assert "compliance" in d["principles"]["ts-001"]
         assert "metrics" in d["principles"]["ts-001"]
+
+
+def test_build_evidence_propagates_exit_reason(tmp_path):
+    """EvidenceContext.exit_reason flows into the built Evidence."""
+    from quodeq.core.evidence.parser import EvidenceContext, _build_evidence
+    ctx = EvidenceContext(
+        language="python", repository="r", date_str="2026-05-23",
+        source_file_count=100, files_read=8, exit_reason="time_limit",
+    )
+    ev = _build_evidence(ctx, principles={})
+    assert ev.exit_reason == "time_limit"
+
+
+def test_build_evidence_defaults_exit_reason_to_none(tmp_path):
+    from quodeq.core.evidence.parser import EvidenceContext, _build_evidence
+    ctx = EvidenceContext(
+        language="python", repository="r", date_str="2026-05-23",
+        source_file_count=100, files_read=8,
+    )
+    ev = _build_evidence(ctx, principles={})
+    assert ev.exit_reason is None

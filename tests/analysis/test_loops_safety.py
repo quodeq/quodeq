@@ -59,6 +59,9 @@ class _FakeEvidence:
     # check_zero_findings (called after the loop) iterates principles —
     # an empty dict satisfies it without any findings logic.
     principles: dict = None  # type: ignore[assignment]
+    # The DONE write site forwards Evidence.exit_reason into dimensions.json;
+    # default None matches the real Evidence model so safe-write skips the field.
+    exit_reason: str | None = None
 
     def __post_init__(self) -> None:
         if self.principles is None:

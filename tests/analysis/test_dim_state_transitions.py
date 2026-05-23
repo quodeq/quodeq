@@ -49,6 +49,7 @@ class TestPerDimensionLoopTransitions:
         config = _mk_config(tmp_path)
         ctx = MagicMock(total=1)
         ev = MagicMock()
+        ev.exit_reason = None  # DONE-write path forwards this into dimensions.json
 
         run_per_dimension_loop(config, ["security"], ctx, runner=_runner_returning(ev))
 
@@ -97,6 +98,7 @@ class TestPerDimensionLoopTransitions:
         config = _mk_config(tmp_path)
         ctx = MagicMock(total=2)
         ev = MagicMock()
+        ev.exit_reason = None
 
         def proc(_cfg, dim, _idx, _ctx, *, emit_log=True):
             if dim == "security":
@@ -119,6 +121,7 @@ class TestIncrementalLoopTransitions:
         config = _mk_config(tmp_path)
         ctx = MagicMock(total=1)
         ev = MagicMock()
+        ev.exit_reason = None
         # Patch the success-log call so the test doesn't depend on its side
         # effects (markers, log_success). The loop calls _log_dimension_result
         # directly after a successful incremental dim.
@@ -144,6 +147,7 @@ class TestIncrementalLoopTransitions:
         config = RunConfig(src=tmp_path, language="python", work_dir=tmp_path, options=options)
         ctx = MagicMock(total=1)
         ev = MagicMock()
+        ev.exit_reason = None
         monkeypatch.setattr("quodeq.analysis._loops._log_dimension_result", MagicMock())
         # First call (incremental) fails with RuntimeError → loop triggers
         # the fallback call, which succeeds and returns ev.
@@ -246,6 +250,7 @@ class TestRunDirResolution:
 
             # Now drive the loop -- transition to DONE.
             ev = MagicMock()
+            ev.exit_reason = None
             ctx = MagicMock(total=1)
             run_per_dimension_loop(
                 config, ["security"], ctx,

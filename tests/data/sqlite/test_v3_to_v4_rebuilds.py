@@ -77,10 +77,16 @@ def test_v3_to_v4_migration_clears_projection_checkpoint(tmp_path: Path) -> None
 
     from quodeq.data.sqlite.connection import open_evaluation_db
 
-    # First open triggers the migration.
+    # First open triggers the migration. The chain runs through to the
+    # current SCHEMA_VERSION (the v3->v4 step is what this test cares about
+    # — the projection checkpoint clear happens during that step).
     with open_evaluation_db(tmp_path) as conn:
+        from quodeq.data.sqlite._schema import SCHEMA_VERSION
+
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        assert version == 4, f"Expected v4 after migration, got v{version}"
+        assert version == SCHEMA_VERSION, (
+            f"Expected current schema version after migration, got v{version}"
+        )
 
         # Existing findings stay; the rebuild path clears them when triggered
         # by the next ensure_projected. What matters for this migration is

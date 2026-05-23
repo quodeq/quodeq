@@ -51,13 +51,18 @@ function buildPartialTooltip({ filesRead, sourceFileCount, exitReason }) {
 
 function CoverageLine({ dateText, coveragePct, isPartial, tooltip }) {
   if (!dateText) return null;
-  const label = coveragePct !== null ? `${dateText} · ${coveragePct}%` : dateText;
+  if (coveragePct === null) {
+    return (
+      <div className="dim-gauge-card__coverage-line" title={isPartial ? tooltip : undefined}>
+        {dateText}
+      </div>
+    );
+  }
   return (
-    <div
-      className="dim-gauge-card__coverage-line"
-      title={isPartial ? tooltip : undefined}
-    >
-      {label}
+    <div className="dim-gauge-card__coverage-line" title={isPartial ? tooltip : undefined}>
+      {dateText} · <span
+        className={`dim-gauge-card__coverage-pct${isPartial ? ' dim-gauge-card__coverage-pct--partial' : ''}`}
+      >{coveragePct}%</span>
     </div>
   );
 }
