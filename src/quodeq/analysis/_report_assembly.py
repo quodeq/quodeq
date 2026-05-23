@@ -48,6 +48,7 @@ def _assemble_report_dict(data: _ReportData) -> dict:
         "sourceFileCount": data.evidence.get("source_file_count"),
         "filesRead": data.evidence.get("files_read", 0),
         "coveragePct": data.evidence.get("coverage_pct", 0.0),
+        "exitReason": data.evidence.get("exit_reason"),
         "meta": {
             "analysis_prompt_version": raw_meta.get("analysis_prompt_version"),
             "scoring_prompt_version": raw_meta.get("scoring_prompt_version"),

@@ -43,6 +43,7 @@ def parse_dimension_result(raw: dict[str, object]) -> DimensionResult:
         totals=totals,
         source_file_count=_opt_int(raw.get("sourceFileCount")),
         files_read=_opt_int(raw.get("filesRead")),
+        exit_reason=_opt_str(raw.get("exitReason")),
         evidence_date=_opt_str(raw.get("evidenceDate")),
         discipline=_opt_str(raw.get("discipline")),
         trend=_opt_str(raw.get("trend")),
