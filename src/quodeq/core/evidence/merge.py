@@ -34,6 +34,22 @@ def merge_evidence(
     if not module and evidence_list:
         module = evidence_list[0].module
 
+    # Pick exit_reason: any non-"done" reason wins (incomplete dominates done),
+    # otherwise the first non-None value, otherwise None. Mirrors how the UI
+    # treats anything-not-done as partial.
+    incomplete = next(
+        (ev.exit_reason for ev in evidence_list
+         if ev.exit_reason and ev.exit_reason != "done"),
+        None,
+    )
+    if incomplete is not None:
+        merged_exit_reason: str | None = incomplete
+    else:
+        merged_exit_reason = next(
+            (ev.exit_reason for ev in evidence_list if ev.exit_reason is not None),
+            None,
+        )
+
     merged = Evidence(
         repository=src,
         language=language,
@@ -43,6 +59,7 @@ def merge_evidence(
         coverage_pct=coverage_pct,
         principles=merged_principles,
         dismissed_count=total_dismissed,
+        exit_reason=merged_exit_reason,
         module=module,
     )
     return merged
