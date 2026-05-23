@@ -34,6 +34,7 @@ class _ConsolidatedRunContext:
     ctx: Any
     results: list[Any]
     files: list[str]
+    exit_reason: str | None = None
 
 
 def _build_consolidated_config(
@@ -89,6 +90,7 @@ def _collect_consolidated_results(
         source_file_count=config.source_file_count,
         files_read=total_files_read,
         module=config.target.name if config.target else "",
+        exit_reason=run_ctx.exit_reason,
     )
 
     return parse_jsonl_to_evidence_by_dimension(
@@ -151,5 +153,8 @@ def process_consolidated_dimensions(
     results = pool.run()
 
     # 4. Collect and return per-dimension evidence
-    run_context = _ConsolidatedRunContext(dimensions=dimensions, ctx=ctx, results=results, files=files)
+    run_context = _ConsolidatedRunContext(
+        dimensions=dimensions, ctx=ctx, results=results, files=files,
+        exit_reason=pool.exit_reason,
+    )
     return _collect_consolidated_results(config, run_context, _ConsolidatedPaths(evidence_dir=evidence_dir, compiled_dir=compiled_dir))
