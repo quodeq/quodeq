@@ -160,10 +160,30 @@ def _upgrade_v3_to_v4(conn: sqlite3.Connection) -> None:
         )
 
 
+def _upgrade_v4_to_v5(conn: sqlite3.Connection) -> None:
+    """Add exit_reason TEXT column to dimension_scores.
+
+    Per-dim signal indicating why the subagent pool stopped (drained,
+    time_limit, failure_streak, cancelled, error). NULL is interpreted
+    as 'done' / drained by downstream consumers.
+
+    dimension_scores may not exist on DBs upgraded from very old (v1/v2)
+    schemas — only the fresh-DB DDL creates it, and the v1->v3 upgrade
+    scripts never did. Skip the ALTER in that case; if a future caller
+    needs the table they will get the fresh DDL on a new DB.
+    """
+    has_dim_scores = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='dimension_scores'"
+    ).fetchone() is not None
+    if has_dim_scores:
+        conn.execute("ALTER TABLE dimension_scores ADD COLUMN exit_reason TEXT")
+
+
 _UPGRADES = {
     1: _upgrade_v1_to_v2,
     2: _upgrade_v2_to_v3,
     3: _upgrade_v3_to_v4,
+    4: _upgrade_v4_to_v5,
 }
 
 

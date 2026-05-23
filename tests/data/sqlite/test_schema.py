@@ -26,8 +26,8 @@ def test_evaluation_ddl_includes_confidence_column():
     assert "confidence" in _schema.EVALUATION_DDL
 
 
-def test_schema_version_is_4() -> None:
-    assert SCHEMA_VERSION == 4
+def test_schema_version_is_5() -> None:
+    assert SCHEMA_VERSION == 5
 
 
 def test_principle_grades_table_exists(tmp_path: Path) -> None:
