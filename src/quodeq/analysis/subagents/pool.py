@@ -59,6 +59,7 @@ class SubagentPool:
         self._futures: dict[Future[SubagentResult], int] = {}
         self._finished: dict[str, bool] = {}
         self._next_idx = 0
+        self.exit_reason: str = "done"
 
     def _shared_jsonl_path(self) -> Path:
         return self._evidence_dir / f"{self._dimension_key}_evidence.jsonl"
@@ -94,7 +95,9 @@ class SubagentPool:
 
     def run(self) -> list[SubagentResult]:
         """Launch agents in parallel, returning a SubagentResult per agent."""
+        self.exit_reason = "done"
         max_dur = self._base_config.time_limit if self._base_config.time_limit is not None else _DEFAULT_TIME_LIMIT
+        pool_start = time.monotonic()
         if self._scout_first:
             log_info(f"[{self._phase}] Launching scout agent for {self._dimension_key} (max {self._n} agents)")
         else:
@@ -108,7 +111,7 @@ class SubagentPool:
             with ThreadPoolExecutor(max_workers=self._n) as pool:
                 ctx = LoopContext(
                     futures=self._futures, finished=self._finished, results=results,
-                    max_duration=max_dur, pool_start=time.monotonic(),
+                    max_duration=max_dur, pool_start=pool_start,
                     n_agents=self._n,
                     queue=self._queue, queue_path=self._queue_path,
                     shared_jsonl_path=self._shared_jsonl_path(),
@@ -121,9 +124,16 @@ class SubagentPool:
                     scout_loop(ctx)
                 else:
                     immediate_loop(ctx)
+        except BaseException:
+            self.exit_reason = "error"
+            raise
         finally:
             stop.set()
             hb.join(timeout=_HEARTBEAT_JOIN_TIMEOUT_S)
+        # If we got here without an exception, decide between "done" and "time_limit".
+        elapsed = time.monotonic() - pool_start
+        if max_dur > 0 and elapsed >= max_dur:
+            self.exit_reason = "time_limit"
         succeeded = sum(1 for r in results if r.success)
         log_info(f"Subagent pool done: {succeeded}/{self._next_idx} agents ran, {succeeded} succeeded")
         return results
