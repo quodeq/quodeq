@@ -56,13 +56,17 @@ def read_dimensions(run_dir: Path) -> dict[str, Any]:
 
 def write_dim_state(
     run_dir: Path, dimension: str, state: DimState,
-    *, reason: str | None = None,
+    *, reason: str | None = None, exit_reason: str | None = None,
 ) -> None:
     """Transition *dimension* to *state* atomically.
 
     Validates the transition against the state machine. Initial writes
     (no prior entry) are allowed regardless of *state* -- callers can seed
     in any state, but typically use PENDING first.
+
+    Optional ``exit_reason`` attaches to the per-dim record on DONE, e.g.
+    "done", "time_limit", "failure_streak", "cancelled", "error". The UI
+    treats anything other than "done" as a partial-coverage signal.
     """
     with _lock:
         data = read_dimensions(run_dir)
@@ -85,6 +89,8 @@ def write_dim_state(
             entry["started_at"] = _now_iso()
         elif state == DimState.DONE:
             entry["completed_at"] = _now_iso()
+            if exit_reason is not None:
+                entry["exit_reason"] = exit_reason
         elif state == DimState.INCOMPLETE:
             entry["interrupted_at"] = _now_iso()
             if reason:
