@@ -93,8 +93,8 @@ class TestCancelJob:
         mgr = JobManager(job_store=store)
         assert mgr.cancel_job("j1") is False
 
-    @patch("quodeq.services.jobs._kill_tree")
-    def test_cancel_running_job(self, mock_kill):
+    @patch("quodeq.services.jobs._terminate_process")
+    def test_cancel_running_job(self, mock_terminate):
         store = InMemoryJobStore()
         store.put(Job("j1", STATUS_RUNNING, [], "now", None, None))
         mgr = JobManager(job_store=store)
@@ -104,7 +104,10 @@ class TestCancelJob:
         mgr._processes["j1"] = fake_proc
         assert mgr.cancel_job("j1") is True
         assert store.get("j1").status == STATUS_CANCELLED
-        mock_kill.assert_called_once_with(999)
+        # Internal cancel must go through _terminate_process (TERM → grace →
+        # SIGKILL); bare _kill_tree leaves orphans when the child is blocked
+        # in a long socket read.
+        mock_terminate.assert_called_once_with(fake_proc)
 
 
 # ---------------------------------------------------------------------------

@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import re
+import time
 from dataclasses import dataclass
 from enum import Enum as _Enum
 from pathlib import Path
@@ -212,18 +213,38 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
         timeout=timeout,
     ) as oa_client:
         client = instructor.from_openai(oa_client, mode=mode)
+        start = time.monotonic()
         try:
             result = client.chat.completions.create(**create_kwargs)
-            _log.debug("Instructor returned %d findings", len(result.findings))
+            _log.debug("Instructor returned %d findings in %.0fs", len(result.findings), time.monotonic() - start)
             return [f.model_dump() for f in result.findings], False
         except Exception as exc:
+            elapsed = time.monotonic() - start
+            # Timeouts are unrecoverable -- no JSON to salvage, and the
+            # message wouldn't tell the user what's wrong. Call them out
+            # explicitly so the failure mode is visible in default INFO logs.
+            if isinstance(exc, (httpx.ReadTimeout, httpx.TimeoutException)):
+                _log.warning(
+                    "Ollama call timed out after %.0fs (model=%s). "
+                    "Likely causes: --n-subagents > 1 with OLLAMA_NUM_PARALLEL=1 "
+                    "(requests queue and second-in-line exceeds the timeout), "
+                    "or context too large (try QUODEQ_CONTEXT_SIZE).",
+                    elapsed, config.model,
+                )
+                return [], True
             # Try to salvage valid findings from the malformed response
             raw = str(exc)
             salvaged = _salvage_partial_findings(raw)
             if salvaged:
-                _log.debug("Instructor validation failed — salvaged %d findings from malformed response", len(salvaged))
+                _log.warning(
+                    "Model %s returned malformed JSON after %.0fs -- salvaged %d findings from the response",
+                    config.model, elapsed, len(salvaged),
+                )
                 return salvaged, True
-            _log.debug("Instructor validation failed — no findings salvaged: %s", str(exc)[:200])
+            _log.warning(
+                "Model %s call failed after %.0fs, no findings recovered: %s",
+                config.model, elapsed, str(exc)[:300],
+            )
             return [], True
 
 
