@@ -17,7 +17,7 @@ import subprocess
 
 from quodeq.core.types import JobSnapshot
 
-from quodeq.analysis._process import _kill_tree
+from quodeq.analysis._process import _kill_tree, _terminate_process
 from quodeq.shared.run_log import RunLogWriter
 from quodeq.services._job_model import (
     Job,
@@ -155,7 +155,15 @@ class JobManager:
         return self._cancel_internal(job_id)
 
     def _cancel_internal(self, job_id: str) -> bool:
-        """Kill an internal tracked subprocess."""
+        """Kill an internal tracked subprocess, escalating SIGTERM -> SIGKILL.
+
+        Bare SIGTERM doesn't reliably interrupt a child blocked in a long
+        httpx socket read (e.g. waiting on an Ollama inference that takes
+        minutes) -- the signal queues behind the syscall and the process
+        keeps holding the upstream connection. ``_terminate_process`` runs
+        SIGTERM with a grace window then escalates to SIGKILL, matching the
+        external-cancel path in ``_external_jobs.cancel_external_run``.
+        """
         with self._lock:
             job = self._store.get(job_id)
             process = self._processes.get(job_id)
@@ -165,7 +173,7 @@ class JobManager:
             job.ended_at = datetime.now(timezone.utc).isoformat()
             self._store.put(job)
         if process:
-            _kill_tree(process.pid)
+            _terminate_process(process)
         return True
 
     def _cancel_external(self, job_id: str, reports_root: Path) -> bool:
