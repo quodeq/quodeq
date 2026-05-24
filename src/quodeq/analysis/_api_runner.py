@@ -126,8 +126,15 @@ class ApiRunnerConfig:
     context_size: int = 0
 
 
+_TIMEOUT_EXCEPTIONS: tuple[type[BaseException], ...] = (
+    httpx.ReadTimeout,
+    httpx.TimeoutException,
+    openai.APITimeoutError,
+)
+
+
 def _is_timeout_error(exc: BaseException) -> bool:
-    """Detect httpx timeouts even when Instructor's retry layer wrapped them.
+    """Detect timeouts even when Instructor's retry layer wrapped them.
 
     Instructor raises ``InstructorRetryException`` when ``max_retries`` is
     exhausted, stashing each underlying error in a ``failed_attempts`` list.
@@ -136,13 +143,18 @@ def _is_timeout_error(exc: BaseException) -> bool:
     timeout-specific WARN that tells the user how to fix it. We duck-type
     ``failed_attempts`` so an Instructor version bump that renames or moves
     the exception class still works.
+
+    ``openai.APITimeoutError`` is included alongside the httpx classes
+    because the OpenAI SDK wraps ``httpx.ReadTimeout`` into its own
+    ``APITimeoutError`` after exhausting its internal retries -- the
+    wrapped form never satisfies an httpx isinstance check.
     """
-    if isinstance(exc, (httpx.ReadTimeout, httpx.TimeoutException)):
+    if isinstance(exc, _TIMEOUT_EXCEPTIONS):
         return True
     attempts = getattr(exc, "failed_attempts", None) or []
     for attempt in attempts:
         inner = getattr(attempt, "exception", None)
-        if isinstance(inner, (httpx.ReadTimeout, httpx.TimeoutException)):
+        if isinstance(inner, _TIMEOUT_EXCEPTIONS):
             return True
     return False
 
@@ -332,6 +344,13 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
         base_url=config.api_base,
         api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY,
         timeout=timeout,
+        # OpenAI SDK retries httpx timeouts internally (default max_retries=2,
+        # so 1 initial + 2 retries = 3 attempts). Each attempt waits the full
+        # read timeout, compounding a single 500s timeout into ~1500s of dead
+        # wall time before APITimeoutError finally surfaces. Disable that
+        # layer so a timeout fails fast at the configured read budget;
+        # Instructor still owns logical retries above us.
+        max_retries=0,
     ) as oa_client:
         client = instructor.from_openai(oa_client, mode=mode)
         start = time.monotonic()
