@@ -127,27 +127,6 @@ class ApiRunnerConfig:
     context_size: int = 0
 
 
-def _is_timeout_error(exc: BaseException) -> bool:
-    """Detect httpx timeouts even when Instructor's retry layer wrapped them.
-
-    Instructor raises ``InstructorRetryException`` when ``max_retries`` is
-    exhausted, stashing each underlying error in a ``failed_attempts`` list.
-    A bare ``isinstance(exc, httpx.ReadTimeout)`` misses these wrapped cases,
-    so timeouts surface as "no findings recovered" instead of the
-    timeout-specific WARN that tells the user how to fix it. We duck-type
-    ``failed_attempts`` so an Instructor version bump that renames or moves
-    the exception class still works.
-    """
-    if isinstance(exc, (httpx.ReadTimeout, httpx.TimeoutException)):
-        return True
-    attempts = getattr(exc, "failed_attempts", None) or []
-    for attempt in attempts:
-        inner = getattr(attempt, "exception", None)
-        if isinstance(inner, (httpx.ReadTimeout, httpx.TimeoutException)):
-            return True
-    return False
-
-
 def _salvage_partial_findings(raw_json: str) -> list[dict]:
     """Try to extract valid findings from malformed JSON.
 
@@ -244,11 +223,7 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
             # Timeouts are unrecoverable -- no JSON to salvage, and the
             # message wouldn't tell the user what's wrong. Call them out
             # explicitly so the failure mode is visible in default INFO logs.
-            # Note: when Instructor exhausts retries it wraps the underlying
-            # ReadTimeout in InstructorRetryException; ``_is_timeout_error``
-            # walks ``failed_attempts`` so wrapped timeouts still surface
-            # with the actionable hint rather than as generic failures.
-            if _is_timeout_error(exc):
+            if isinstance(exc, (httpx.ReadTimeout, httpx.TimeoutException)):
                 _log.warning(
                     "Ollama call timed out after %.0fs (model=%s). "
                     "Likely causes: --n-subagents > 1 with OLLAMA_NUM_PARALLEL=1 "

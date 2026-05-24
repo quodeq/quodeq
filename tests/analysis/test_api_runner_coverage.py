@@ -1,4 +1,4 @@
-"""Extended tests for _api_runner.py: salvage, enrichment, path resolution."""
+"""Extended tests for _api_runner.py — salvage, enrichment, path resolution."""
 from __future__ import annotations
 
 import json
@@ -9,8 +9,6 @@ import pytest
 
 instructor = pytest.importorskip("instructor", reason="requires quodeq[api] extra")
 
-import httpx
-
 from quodeq.analysis._api_runner import (
     ApiRunnerConfig,
     _LOCAL_TIMEOUT,
@@ -19,7 +17,6 @@ from quodeq.analysis._api_runner import (
     _Finding,
     _Findings,
     _FindingType,
-    _is_timeout_error,
     _resolve_file_paths,
     _salvage_partial_findings,
     _Severity,
@@ -59,63 +56,6 @@ class TestSalvagePartialFindings:
         )
         result = _salvage_partial_findings(raw)
         assert len(result) == 2
-
-
-# ---------------------------------------------------------------------------
-# _is_timeout_error
-# ---------------------------------------------------------------------------
-
-class TestIsTimeoutError:
-    """Timeout detection must see through Instructor's retry wrapper.
-
-    When Instructor exhausts retries it raises ``InstructorRetryException``
-    with the original ``ReadTimeout`` buried in ``failed_attempts``. A bare
-    ``isinstance(exc, httpx.ReadTimeout)`` misses these wrapped cases and the
-    user sees a generic "no findings recovered" instead of the actionable
-    timeout WARN.
-    """
-
-    def test_bare_read_timeout(self):
-        assert _is_timeout_error(httpx.ReadTimeout("read timeout")) is True
-
-    def test_bare_timeout_exception(self):
-        assert _is_timeout_error(httpx.TimeoutException("timeout")) is True
-
-    def test_unrelated_exception(self):
-        assert _is_timeout_error(ValueError("not a timeout")) is False
-
-    def test_no_failed_attempts_attribute(self):
-        """Plain exceptions without failed_attempts return False cleanly."""
-        assert _is_timeout_error(RuntimeError("boom")) is False
-
-    def test_wrapped_read_timeout_in_failed_attempts(self):
-        """Instructor's retry wrapper stashes the original exception per attempt."""
-        wrapper = RuntimeError("InstructorRetryException")
-        # Duck-typed failed_attempts: any object with .exception attribute
-        attempt = MagicMock(exception=httpx.ReadTimeout("upstream timed out"))
-        wrapper.failed_attempts = [attempt]
-        assert _is_timeout_error(wrapper) is True
-
-    def test_failed_attempts_with_non_timeout(self):
-        """Validation errors in failed_attempts must not be misread as timeouts."""
-        wrapper = RuntimeError("InstructorRetryException")
-        attempt = MagicMock(exception=ValueError("schema mismatch"))
-        wrapper.failed_attempts = [attempt]
-        assert _is_timeout_error(wrapper) is False
-
-    def test_failed_attempts_mixed_one_timeout_wins(self):
-        """At least one wrapped timeout means we should categorise the whole call as a timeout."""
-        wrapper = RuntimeError("InstructorRetryException")
-        wrapper.failed_attempts = [
-            MagicMock(exception=ValueError("first attempt bad json")),
-            MagicMock(exception=httpx.ReadTimeout("second attempt timed out")),
-        ]
-        assert _is_timeout_error(wrapper) is True
-
-    def test_empty_failed_attempts(self):
-        wrapper = RuntimeError("InstructorRetryException")
-        wrapper.failed_attempts = []
-        assert _is_timeout_error(wrapper) is False
 
 
 # ---------------------------------------------------------------------------
