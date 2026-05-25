@@ -563,8 +563,58 @@ def _set_app_icon() -> None:
             pass
 
 
+def _patch_pywebview_multi_monitor_drag() -> None:
+    """Fix pywebview's multi-monitor frameless-window drag on macOS.
+
+    pywebview's bundled drag JS (``customize.js``) sends absolute screen
+    coordinates over the JS↔Python bridge each mousemove, and the macOS
+    backend's ``BrowserView.move`` then ADDS ``self.screen.origin.x`` to
+    that x value before calling ``setFrameTopLeftPoint:``. On a single-
+    monitor setup the cached ``self.screen`` is the primary (origin.x =
+    0) and the addition is a no-op — so the bug never fires. On a multi-
+    monitor setup where the window's cached screen has a non-zero origin
+    (e.g. a secondary monitor positioned to the LEFT of the primary at
+    screen X = −1920), the addition double-counts and the window jumps
+    off the visible workspace mid-drag — confirmed reproducible vs.
+    single-monitor.
+
+    Patch swaps ``BrowserView.move`` for a version that passes ``x``
+    through unchanged. The Y math is left as-is because typical
+    horizontal multi-monitor layouts have ``screen.origin.y == 0`` and
+    we don't have a confirmed Y-side reproduction.
+
+    Safe to leave installed on single-monitor: ``origin.x`` is 0 there,
+    so the behaviour is identical. Skipped silently on non-Darwin or if
+    pywebview's internal layout changes (no AttributeError).
+
+    Tracked upstream: https://github.com/r0x0r/pywebview/issues/1820 —
+    drop this helper once the fix ships in a pywebview release we
+    depend on.
+    """
+    if sys.platform != "darwin":
+        return
+    try:
+        from webview.platforms.cocoa import BrowserView  # noqa: PLC0415
+        import AppKit  # noqa: PLC0415
+    except ImportError:
+        return
+    if not hasattr(BrowserView, 'move'):
+        return
+
+    def _patched_move(self, x: float, y: float) -> None:
+        flipped_y = self.screen.size.height - y
+        # The original code added ``self.screen.origin.x`` to x here;
+        # see docstring above for why that's wrong on multi-monitor.
+        self.window.setFrameTopLeftPoint_(
+            AppKit.NSPoint(x, self.screen.origin.y + flipped_y)
+        )
+
+    BrowserView.move = _patched_move
+
+
 def main() -> None:
     _set_app_icon()
+    _patch_pywebview_multi_monitor_drag()
     url = sys.argv[1]
     sock_path = Path(sys.argv[2])
     api_pid = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3] else 0
