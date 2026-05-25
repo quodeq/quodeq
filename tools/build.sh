@@ -9,7 +9,7 @@ UI_WEB="${QUODEQ_UI_WEB:-$ROOT/ui/web}"
 STATIC_DEST="${QUODEQ_STATIC_DEST:-$ROOT/src/quodeq/static}"
 
 echo "==> Building frontend..."
-(cd "$UI_WEB" && npm install && npm run build)
+(cd "$UI_WEB" && npm ci && npm run build)
 
 echo "==> Bundling frontend into package..."
 rm -rf "$STATIC_DEST"

@@ -46,11 +46,21 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install UI dependencies
+        working-directory: src/quodeq/ui
+        run: npm ci
+
+      - name: Verify package signatures
+        working-directory: src/quodeq/ui
+        run: npm audit signatures
+
+      - name: Audit for high-severity vulnerabilities
+        working-directory: src/quodeq/ui
+        run: npm audit --audit-level=high
+
       - name: Build web UI
-        run: |
-          cd src/quodeq/ui
-          npm ci
-          npm run build
+        working-directory: src/quodeq/ui
+        run: npm run build
 
       - name: Build package
         run: uv build

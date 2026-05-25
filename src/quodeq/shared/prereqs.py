@@ -92,12 +92,12 @@ def _check_tool_version(cmd: list[str], tool_name: str, min_major: int, install_
         )
 
 
-def check_node(min_major: int = 18) -> None:
+def check_node(min_major: int = 20) -> None:
     """Raise RuntimeError if Node.js is missing or below minimum version."""
     _check_tool_version(["node", "--version"], "Node.js", min_major, _INSTALL_HINT_NODE)
 
 
-def check_npm(min_major: int = 9) -> None:
+def check_npm(min_major: int = 10) -> None:
     """Raise RuntimeError if npm is missing or below minimum version."""
     _check_tool_version(["npm", "--version"], "npm", min_major, _INSTALL_HINT_NODE)
 
@@ -178,10 +178,10 @@ def check_dashboard_prereqs() -> None:
     packages) gets the full story in one message, with one install command.
     """
     issues: list[str] = []
-    node_issue = _collect_tool_issue(["node", "--version"], "Node.js", 18)
+    node_issue = _collect_tool_issue(["node", "--version"], "Node.js", 20)
     if node_issue is not None:
         issues.append(node_issue)
-    npm_issue = _collect_tool_issue(["npm", "--version"], "npm", 9)
+    npm_issue = _collect_tool_issue(["npm", "--version"], "npm", 10)
     if npm_issue is not None:
         issues.append(npm_issue)
     if not issues:
