@@ -5,7 +5,7 @@
 #   ./scripts/build-dist.sh
 #
 # Prerequisites:
-#   - Node.js 18+ and npm 8+
+#   - Node.js 20+ and npm 10+
 #   - uv (https://docs.astral.sh/uv/)
 set -euo pipefail
 
@@ -16,7 +16,7 @@ WEB_DIR="${QUODEQ_WEB_DIR:-$REPO_ROOT/ui/web}"
 
 echo "==> Building web UI..."
 cd "$WEB_DIR"
-npm install
+npm ci
 npm run build
 cd "$REPO_ROOT"
 

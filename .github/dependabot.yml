@@ -1,4 +1,7 @@
 version: 2
+# Cooldown defers PRs until a release has settled, defending against
+# compromised versions that get yanked within hours of publication.
+# See: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file#cooldown
 updates:
   - package-ecosystem: "pip"
     directory: "/"
@@ -6,13 +9,24 @@ updates:
       interval: "weekly"
     target-branch: "develop"
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+      semver-minor-days: 3
+      semver-patch-days: 2
 
   - package-ecosystem: "npm"
-    directory: "/"
+    # package.json lives under src/quodeq/ui, not the repo root.
+    directory: "/src/quodeq/ui"
     schedule:
       interval: "weekly"
     target-branch: "develop"
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+      semver-minor-days: 3
+      semver-patch-days: 2
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -20,3 +34,8 @@ updates:
       interval: "weekly"
     target-branch: "develop"
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+      semver-minor-days: 3
+      semver-patch-days: 2

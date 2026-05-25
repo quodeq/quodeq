@@ -18,7 +18,7 @@ class TestCheckNode:
     def test_old_node_raises(self):
         result = subprocess.CompletedProcess([], 0, stdout="16.20.0\n")
         with patch("subprocess.run", return_value=result):
-            with pytest.raises(RuntimeError, match="18"):
+            with pytest.raises(RuntimeError, match="20"):
                 check_node()
 
     def test_valid_node_passes(self):
@@ -36,7 +36,7 @@ class TestCheckNpm:
     def test_old_npm_raises(self):
         result = subprocess.CompletedProcess([], 0, stdout="8.19.0\n")
         with patch("subprocess.run", return_value=result):
-            with pytest.raises(RuntimeError, match="9"):
+            with pytest.raises(RuntimeError, match="10"):
                 check_npm()
 
     def test_valid_npm_passes(self):
