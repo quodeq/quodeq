@@ -57,7 +57,7 @@ def test_force_action_api_host_port(monkeypatch):
 
     monkeypatch.setattr(runner, "_ensure_action_api_forced", fake_ensure)
     monkeypatch.setattr(runner, "maybe_build_ui", lambda *_args, **_kwargs: Path("ui/web/dist"))
-    monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
+    monkeypatch.setattr(runner, "check_dashboard_dev_prereqs", lambda: None)
     monkeypatch.setattr(runner, "validate_paths", lambda *_args, **_kwargs: None)
 
     config = runner.DashboardConfig(

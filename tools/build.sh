@@ -4,16 +4,12 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-# Standard project layout paths; override via environment if needed.
-UI_WEB="${QUODEQ_UI_WEB:-$ROOT/ui/web}"
-STATIC_DEST="${QUODEQ_STATIC_DEST:-$ROOT/src/quodeq/static}"
+UI_DIR="${QUODEQ_UI_DIR:-$ROOT/src/quodeq/ui}"
 
 echo "==> Building frontend..."
-(cd "$UI_WEB" && npm ci && npm run build)
-
-echo "==> Bundling frontend into package..."
-rm -rf "$STATIC_DEST"
-cp -r "$UI_WEB/dist" "$STATIC_DEST"
+# vite.config.js writes to ../static (i.e. src/quodeq/static) by default,
+# which is exactly where the wheel picks the bundled UI up from.
+(cd "$UI_DIR" && npm ci && npm run build)
 
 echo "==> Syncing engine_version in plugin files..."
 VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('$ROOT/pyproject.toml','rb'))['project']['version'])")

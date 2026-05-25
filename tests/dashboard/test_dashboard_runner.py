@@ -47,7 +47,7 @@ def test_run_dashboard_spawns_action_api_with_static_dist(tmp_path: Path, monkey
     monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *_a, **_k: None)
     monkeypatch.setattr(runner, "_ensure_action_api", fake_ensure)
     monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
-    monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
+    monkeypatch.setattr(runner, "check_dashboard_dev_prereqs", lambda: None)
 
     config = _make_config(tmp_path, static_dist=static_dist)
 
@@ -66,7 +66,7 @@ def test_run_dashboard_creates_default_reports(tmp_path: Path, monkeypatch):
         lambda *_args, **_kwargs: (f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()),
     )
     monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
-    monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
+    monkeypatch.setattr(runner, "check_dashboard_dev_prereqs", lambda: None)
 
     reports_dir = tmp_path / "reports"
     config = _make_config(tmp_path, reports_dir=reports_dir, static_dist=static_dist, reports_defaulted=True)
@@ -94,7 +94,7 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(_networking, "_is_port_open", lambda host, port: port == _TEST_PORT)
     monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
-    monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
+    monkeypatch.setattr(runner, "check_dashboard_dev_prereqs", lambda: None)
 
     config = _make_config(tmp_path, static_dist=static_dist, reports_defaulted=True)
 
@@ -145,7 +145,7 @@ def test_run_dashboard_native_window(tmp_path: Path, monkeypatch):
         lambda *_args, **_kwargs: (f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()),
     )
     monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
-    monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
+    monkeypatch.setattr(runner, "check_dashboard_dev_prereqs", lambda: None)
 
     from quodeq.dashboard import _server
 
@@ -179,7 +179,7 @@ def test_run_dashboard_browser_fallback(tmp_path: Path, monkeypatch):
         lambda *_args, **_kwargs: (f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()),
     )
     monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
-    monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
+    monkeypatch.setattr(runner, "check_dashboard_dev_prereqs", lambda: None)
 
     def fake_serve(url, proc, config):
         browser_calls.append(config.build.use_native)
@@ -208,7 +208,7 @@ def test_run_dashboard_verbose_sets_env(tmp_path: Path, monkeypatch):
         lambda *_args, **_kwargs: (f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()),
     )
     monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
-    monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
+    monkeypatch.setattr(runner, "check_dashboard_dev_prereqs", lambda: None)
 
     test_env: dict[str, str] = {}
     config = _make_config(

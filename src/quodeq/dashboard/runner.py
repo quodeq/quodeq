@@ -23,7 +23,7 @@ from quodeq.dashboard._server import (
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.paths import resolve_path
-from quodeq.shared.prereqs import check_dashboard_prereqs
+from quodeq.shared.prereqs import check_dashboard_dev_prereqs
 
 __all__ = [
     "BuildConfig",
@@ -58,19 +58,15 @@ def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
         log_warning(f"Port {config.server.port} is in use. Using {chosen_port} instead.")
 
     if config.build.dev:
-        check_dashboard_prereqs()
+        check_dashboard_dev_prereqs()
         static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall, dev=True)
     elif not config.static_dist_defaulted:
         user_provided_dist = resolve_path(str(config.static_dist))
         if (user_provided_dist / "index.html").exists():
             static_dist = user_provided_dist
         else:
-            if not config.build.no_build:
-                check_dashboard_prereqs()
             static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall)
     else:
-        if not config.build.no_build:
-            check_dashboard_prereqs()
         static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall)
 
     return DashboardConfig(
