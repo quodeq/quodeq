@@ -170,6 +170,59 @@ def _extract_finding_dicts(node: object, sink: list[dict]) -> None:
             _extract_finding_dicts(item, sink)
 
 
+def _completion_text(completion: object) -> str | None:
+    """Extract ``choices[0].message.content`` from an LLM completion.
+
+    Tolerates both pydantic-model and dict shapes so the helper survives
+    openai/instructor version drift. Returns None when the structure
+    isn't recognisable -- callers must treat that as "no salvage data
+    available here" and continue.
+    """
+    try:
+        choices = getattr(completion, "choices", None)
+        if choices is None and isinstance(completion, dict):
+            choices = completion.get("choices")
+        if not choices:
+            return None
+        first = choices[0]
+        message = getattr(first, "message", None)
+        if message is None and isinstance(first, dict):
+            message = first.get("message")
+        if message is None:
+            return None
+        content = getattr(message, "content", None)
+        if content is None and isinstance(message, dict):
+            content = message.get("content")
+        return content if isinstance(content, str) else None
+    except (AttributeError, IndexError, KeyError, TypeError):
+        return None
+
+
+def _salvage_from_failed_attempts(exc: BaseException) -> list[dict]:
+    """Recover findings from Instructor's per-attempt completion data.
+
+    When Pydantic rejects ``list[_Finding]`` because one element is
+    missing a required field, the ValidationError message only quotes
+    the offending element -- every structurally-valid sibling is lost
+    if we salvage from ``str(exc)`` alone. Instructor stashes the raw
+    LLM completion on each ``FailedAttempt``, which contains everything
+    the model emitted, so walking those gives us a complete view.
+
+    Duck-typed so an Instructor version bump that renames the
+    attribute or moves the class still works.
+    """
+    findings: list[dict] = []
+    attempts = getattr(exc, "failed_attempts", None) or []
+    for attempt in attempts:
+        completion = getattr(attempt, "completion", None)
+        if completion is None:
+            continue
+        text = _completion_text(completion)
+        if text:
+            findings.extend(_salvage_partial_findings(text))
+    return findings
+
+
 def _salvage_partial_findings(raw_json: str) -> list[dict]:
     """Try to extract valid findings from malformed JSON.
 
@@ -304,9 +357,17 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
                     elapsed, config.model,
                 )
                 return [], True
-            # Try to salvage valid findings from the malformed response
-            raw = str(exc)
-            salvaged = _salvage_partial_findings(raw)
+            # Try Instructor's stashed completions first: when the model
+            # emits a valid {"findings":[...]} array but ONE element fails
+            # validation (e.g. missing ``reason``), Pydantic's error message
+            # only quotes the offending element. The good siblings are
+            # invisible in ``str(exc)`` but they are in
+            # ``failed_attempts[*].completion.choices[0].message.content``.
+            salvaged = _salvage_from_failed_attempts(exc)
+            # Fall back to exception-string salvage for older Instructor
+            # versions or non-retry exceptions where completion is absent.
+            if not salvaged:
+                salvaged = _salvage_partial_findings(str(exc))
             if salvaged:
                 _log.warning(
                     "Model %s returned malformed JSON after %.0fs -- salvaged %d findings from the response",
