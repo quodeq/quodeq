@@ -60,6 +60,64 @@ class TestSalvagePartialFindings:
         result = _salvage_partial_findings(raw)
         assert len(result) == 2
 
+    def test_handles_finding_with_nested_req_refs(self):
+        """The shallow-regex predecessor silently dropped any finding with a
+        nested object; this was the exact failure pattern reported in a real
+        run where the model emitted ``req_refs: [{"label": "CWE-..."}]``."""
+        raw = (
+            '{"req":"R-MAT-5","t":"violation","file":"a.py","line":1,'
+            '"severity":"minor","w":"nested","snippet":"x = 1","reason":"r",'
+            '"req_refs":[{"label":"CWE-79","url":"https://example.com"}]}'
+        )
+        result = _salvage_partial_findings(raw)
+        assert len(result) == 1
+        assert result[0]["req"] == "R-MAT-5"
+
+    def test_handles_bare_findings_concatenated(self):
+        """Reproduces the production failure where the model emitted two
+        bare finding objects back-to-back (no array wrapper, no separator).
+        The JSON parser stops at "trailing characters" after the first."""
+        raw = (
+            '{"req":"R-MAT-5","t":"violation","file":"a.py","line":10,'
+            '"severity":"minor","w":"first","snippet":"foo","reason":"one"}\n'
+            '{"req":"R-FT-1","t":"violation","file":"b.py","line":11,'
+            '"severity":"minor","w":"second","snippet":"bar","reason":"two"}'
+        )
+        result = _salvage_partial_findings(raw)
+        assert len(result) == 2
+        assert {r["req"] for r in result} == {"R-MAT-5", "R-FT-1"}
+
+    def test_handles_wrapped_findings_array(self):
+        """If the model returned the canonical {"findings":[...]} but
+        Instructor still rejected it for some non-structural reason, the
+        salvage path should still recover everything."""
+        raw = (
+            '{"findings":['
+            '{"req":"A-1","t":"violation","file":"a.py","line":1,'
+            '"severity":"minor","w":"one","snippet":"x","reason":"r"},'
+            '{"req":"B-2","t":"compliance","file":"b.py","line":2,'
+            '"severity":"minor","w":"two","snippet":"y","reason":"r"}'
+            ']}'
+        )
+        result = _salvage_partial_findings(raw)
+        assert len(result) == 2
+
+    def test_handles_findings_buried_in_error_preamble(self):
+        """Mirrors what Pydantic's ValidationError stringification looks like:
+        a chunk of error message followed by the bad input. The salvage walker
+        must skip the preamble and find the JSON object inside."""
+        raw = (
+            "1 validation error for _Findings\n"
+            "Invalid JSON: trailing characters at line 10 column 4\n"
+            "input_value='"
+            '{"req":"R-MAT-5","t":"violation","file":"a.py","line":3,'
+            '"severity":"minor","w":"ok","snippet":"x","reason":"r"}'
+            "', input_type=str"
+        )
+        result = _salvage_partial_findings(raw)
+        assert len(result) == 1
+        assert result[0]["req"] == "R-MAT-5"
+
 
 # ---------------------------------------------------------------------------
 # _is_timeout_error

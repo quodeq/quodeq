@@ -19,7 +19,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import time
 from dataclasses import dataclass
 from enum import Enum as _Enum
@@ -148,25 +147,73 @@ def _is_timeout_error(exc: BaseException) -> bool:
     return False
 
 
+def _extract_finding_dicts(node: object, sink: list[dict]) -> None:
+    """Walk a decoded JSON value, appending any dict that parses as a `_Finding`.
+
+    Used by ``_salvage_partial_findings`` so we recover findings whether
+    the model emitted them as a bare object, a list, a wrapped
+    ``{"findings": [...]}``, or nested somewhere unexpected. Recursion
+    stops at a successful ``_Finding`` validation (so we don't dive into
+    a finding's own fields looking for sub-findings).
+    """
+    if isinstance(node, dict):
+        try:
+            f = _Finding.model_validate(node)
+            sink.append(f.model_dump())
+            return
+        except (ValueError, KeyError, TypeError):
+            pass
+        for value in node.values():
+            _extract_finding_dicts(value, sink)
+    elif isinstance(node, list):
+        for item in node:
+            _extract_finding_dicts(item, sink)
+
+
 def _salvage_partial_findings(raw_json: str) -> list[dict]:
     """Try to extract valid findings from malformed JSON.
 
-    Local models sometimes drop a brace in long arrays, producing invalid
-    JSON. We try to parse each object individually.
+    Local models produce several distinct failure shapes:
+    - Bare finding objects concatenated without an array wrapper
+      (``{...}{...}``), which trips the JSON parser at "trailing
+      characters" after the first object.
+    - A complete ``{"findings": [...]}`` wrapper that Instructor still
+      rejected for a non-structural reason (extra hedging text, etc).
+    - Findings with nested fields like ``req_refs: [{...}]``.
 
-    Note: the regex ``r'\\{[^{}]*\\}'`` is intentionally shallow — it matches
-    single-level (non-nested) JSON objects only.  This is sufficient for
-    salvaging malformed local-model output where each finding is a flat
-    object, and avoids the complexity of nested-brace matching.
+    Strategy: walk the input with ``json.JSONDecoder().raw_decode()`` to
+    find every complete top-level JSON value (object or array) regardless
+    of nested braces, then recurse into each decoded value harvesting
+    anything that validates as a ``_Finding``. ``raw_decode`` is
+    bracket-aware so nested structures pass through; the previous regex
+    approach (shallow ``{[^{}]*}``) silently dropped any finding with a
+    nested field.
     """
-    objects = re.findall(r'\{[^{}]*\}', raw_json)
-    findings = []
-    for obj_str in objects:
+    decoder = json.JSONDecoder()
+    findings: list[dict] = []
+    i = 0
+    n = len(raw_json)
+    while i < n:
+        # Advance to the next plausible JSON start. Skipping non-`{`/`[`
+        # chars handles the wrapper text Instructor/Pydantic prepends to
+        # the model's raw output ("Invalid JSON: ...", error preambles).
+        brace = raw_json.find("{", i)
+        bracket = raw_json.find("[", i)
+        candidates = [c for c in (brace, bracket) if c >= 0]
+        if not candidates:
+            break
+        start = min(candidates)
         try:
-            f = _Finding.model_validate_json(obj_str)
-            findings.append(f.model_dump())
-        except (ValueError, KeyError, TypeError):
+            node, end = decoder.raw_decode(raw_json, start)
+        except json.JSONDecodeError:
+            # Not a real JSON value at this offset -- advance one char
+            # and keep scanning. The decoder is the source of truth for
+            # "is this position a complete value"; the brace/bracket
+            # scan above is just a cheap pre-filter.
+            i = start + 1
             continue
+        _extract_finding_dicts(node, findings)
+        i = end
     return findings
 
 
