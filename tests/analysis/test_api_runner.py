@@ -81,6 +81,7 @@ class TestRunApiAnalysis:
                 base_url="http://localhost:8000/v1",
                 api_key="test-key",
                 timeout=_LOCAL_TIMEOUT,
+                max_retries=0,
             )
 
     def test_handles_empty_findings(self, tmp_path, api_config):

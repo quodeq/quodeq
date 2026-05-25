@@ -10,6 +10,7 @@ import pytest
 instructor = pytest.importorskip("instructor", reason="requires quodeq[api] extra")
 
 import httpx
+import openai
 
 from quodeq.analysis._api_runner import (
     ApiRunnerConfig,
@@ -242,6 +243,21 @@ class TestIsTimeoutError:
     def test_bare_timeout_exception(self):
         assert _is_timeout_error(httpx.TimeoutException("timeout")) is True
 
+    def test_bare_openai_api_timeout(self):
+        """The OpenAI SDK collapses an httpx.ReadTimeout into its own
+        APITimeoutError after exhausting internal retries; treat that as
+        a timeout so the surfaced WARN stays accurate."""
+        request = httpx.Request("POST", "http://localhost/v1/chat/completions")
+        assert _is_timeout_error(openai.APITimeoutError(request=request)) is True
+
+    def test_wrapped_openai_api_timeout_in_failed_attempts(self):
+        """Instructor may wrap an openai.APITimeoutError directly (when the
+        SDK already collapsed the underlying httpx error)."""
+        request = httpx.Request("POST", "http://localhost/v1/chat/completions")
+        wrapper = RuntimeError("InstructorRetryException")
+        wrapper.failed_attempts = [MagicMock(exception=openai.APITimeoutError(request=request))]
+        assert _is_timeout_error(wrapper) is True
+
     def test_unrelated_exception(self):
         assert _is_timeout_error(ValueError("not a timeout")) is False
 
@@ -365,10 +381,14 @@ class TestCallApi:
             mock_inst.Mode.JSON = "json"
             _call_api("test", config)
 
+        # max_retries=0 disables the OpenAI SDK's internal retry-on-timeout
+        # so a single 500s read timeout fails fast instead of compounding
+        # into the SDK's default 3-attempt 1500s wall time.
         mock_openai.OpenAI.assert_called_once_with(
             base_url="http://localhost:11434/v1",
             api_key="ollama",
             timeout=_LOCAL_TIMEOUT,
+            max_retries=0,
         )
 
     def test_returns_clean_flag_on_success(self):
