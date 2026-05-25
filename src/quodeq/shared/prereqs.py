@@ -169,13 +169,18 @@ def _collect_tool_issue(cmd: list[str], tool_name: str, min_major: int) -> str |
     return None
 
 
-def check_dashboard_prereqs() -> None:
-    """Check all prerequisites for the dashboard command in one pass.
+def check_dashboard_dev_prereqs() -> None:
+    """Check Node.js and npm prerequisites for `quodeq dashboard --dev`.
+
+    Production dashboards ship a pre-built UI inside the wheel and do not
+    require Node or npm at runtime. This check is only relevant when
+    running with `--dev`, which rebuilds the UI from source on the user's
+    machine.
 
     Runs every tool check, collects any issues, and raises a single
-    RuntimeError that lists them all — so a user missing both Node.js and
-    npm (common on fresh Debian/Ubuntu systems where they're separate
-    packages) gets the full story in one message, with one install command.
+    RuntimeError listing them all, so a contributor missing both Node and
+    npm (common on fresh Debian/Ubuntu systems where they ship as separate
+    packages) gets the full story in one message with one install command.
     """
     issues: list[str] = []
     node_issue = _collect_tool_issue(["node", "--version"], "Node.js", 20)

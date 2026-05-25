@@ -2,7 +2,7 @@
 # Build the distribution package (sdist + wheel) with pre-built web UI.
 #
 # Usage:
-#   ./scripts/build-dist.sh
+#   ./tools/build-dist.sh
 #
 # Prerequisites:
 #   - Node.js 20+ and npm 10+
@@ -10,19 +10,15 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-# Standard project layout paths; override via environment if needed.
-STATIC_DIR="${QUODEQ_STATIC_DIR:-$REPO_ROOT/src/quodeq/static}"
-WEB_DIR="${QUODEQ_WEB_DIR:-$REPO_ROOT/ui/web}"
+UI_DIR="${QUODEQ_UI_DIR:-$REPO_ROOT/src/quodeq/ui}"
 
 echo "==> Building web UI..."
-cd "$WEB_DIR"
+cd "$UI_DIR"
 npm ci
+# vite.config.js writes to ../static (i.e. src/quodeq/static) by default,
+# which is exactly where the wheel picks the bundled UI up from.
 npm run build
 cd "$REPO_ROOT"
-
-echo "==> Copying dist to bundled static directory..."
-rm -rf "$STATIC_DIR"
-cp -r "$WEB_DIR/dist" "$STATIC_DIR"
 
 echo "==> Building Python package..."
 uv build

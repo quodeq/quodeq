@@ -158,7 +158,7 @@ class TestStaticDistDefaulted:
 
         config = self._make_config(tmp_path, static_dist_defaulted=True, no_build=False)
         monkeypatch.setattr(runner, "maybe_build_ui", fake_build)
-        monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
+        monkeypatch.setattr(runner, "check_dashboard_dev_prereqs", lambda: None)
         monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *a, **k: None)
         monkeypatch.setattr(
             runner, "_ensure_action_api",
@@ -182,7 +182,7 @@ class TestStaticDistDefaulted:
 
         config = self._make_config(tmp_path, static_dist_defaulted=False)
         monkeypatch.setattr(runner, "maybe_build_ui", fake_build)
-        monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
+        monkeypatch.setattr(runner, "check_dashboard_dev_prereqs", lambda: None)
         monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *a, **k: None)
         monkeypatch.setattr(
             runner, "_ensure_action_api",
