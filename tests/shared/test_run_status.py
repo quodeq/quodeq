@@ -87,9 +87,7 @@ def test_read_unsupported_schema_raises(tmp_path: Path) -> None:
         read_status(tmp_path)
 
 
-def test_write_status_persists_provider_and_model(tmp_path):
-    from quodeq.shared.run_status import write_status, RunState
-    import json
+def test_write_status_persists_provider_and_model(tmp_path: Path) -> None:
     write_status(
         tmp_path,
         state=RunState.RUNNING,
@@ -104,9 +102,7 @@ def test_write_status_persists_provider_and_model(tmp_path):
     assert data["ai_model"] == "qwen3.6-27b"
 
 
-def test_write_status_omits_provider_and_model_when_unset(tmp_path):
-    from quodeq.shared.run_status import write_status, RunState
-    import json
+def test_write_status_omits_provider_and_model_when_unset(tmp_path: Path) -> None:
     write_status(
         tmp_path,
         state=RunState.RUNNING,
