@@ -50,3 +50,33 @@ describe('JobIdLine', () => {
     expect(screen.queryByTestId('job-runtime-chip')).toBeNull();
   });
 });
+
+describe('project label', () => {
+  const selectedInfo = { id: 'uuid-b', name: 'project-b', displayName: 'Project B' };
+  const jobInfo = { id: 'uuid-a', name: 'project-a', displayName: 'Project A' };
+
+  it("shows the running job's own project, not the globally-selected one", () => {
+    renderWithClient(
+      <EvaluationStatus
+        job={{ ...baseJob, status: 'running', outputProject: 'uuid-a' }}
+        project="uuid-b"
+        projectInfo={selectedInfo}
+        jobProjectInfo={jobInfo}
+      />
+    );
+    expect(screen.getByText('Project A')).toBeInTheDocument();
+    expect(screen.queryByText('Project B')).toBeNull();
+  });
+
+  it("falls back to the selected project when the job's project is not resolvable", () => {
+    renderWithClient(
+      <EvaluationStatus
+        job={{ ...baseJob, status: 'running' }}
+        project="uuid-b"
+        projectInfo={selectedInfo}
+        jobProjectInfo={null}
+      />
+    );
+    expect(screen.getByText('Project B')).toBeInTheDocument();
+  });
+});

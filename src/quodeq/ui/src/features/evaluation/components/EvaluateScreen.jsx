@@ -113,7 +113,7 @@ function NoProjectSelected({ onGoToProjects }) {
 
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
-  const { selectedProject, projectInfo } = context;
+  const { selectedProject, projectInfo, jobProjectInfo } = context;
   const { onStart: onStartEvaluation, onDismiss, onCancel, onGoToProjects, onGoToSettings } = actions;
   const [toastKey, setToastKey] = useState(0);
   const [toastVisible, setToastVisible] = useState(false);
@@ -145,6 +145,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
           job={job}
           project={selectedProject}
           projectInfo={projectInfo}
+          jobProjectInfo={jobProjectInfo}
           liveViolations={liveViolations}
           onDismiss={onDismiss}
           onCancel={onCancel}

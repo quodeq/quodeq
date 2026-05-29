@@ -71,12 +71,18 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onG
   const { connected, setConnected } = serverHealth;
   const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
   const projectInfo = projects?.find(p => (p.id || p.name) === selectedProject) || null;
+  // The in-progress card describes the running job's own project, which can
+  // differ from the UI's global selection. Resolve it the same way so the
+  // card label follows the job rather than the selection.
+  const jobProjectInfo = job?.outputProject
+    ? (projects?.find(p => (p.id || p.name) === job.outputProject) || null)
+    : null;
   return (
     <>
       {!connected && <ServerDisconnectedOverlay onReconnect={() => setConnected(true)} />}
       <EvaluateScreen
         evaluation={{ job, jobError, liveViolations }}
-        context={{ selectedProject, projectInfo }}
+        context={{ selectedProject, projectInfo, jobProjectInfo }}
         actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation, onGoToProjects, onGoToSettings }}
       />
     </>
