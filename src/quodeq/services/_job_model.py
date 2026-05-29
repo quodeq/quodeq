@@ -85,6 +85,8 @@ class Job:
             deadline_at=self.deadline_at,
             current_dimension=self.current_dimension,
             dimensions=self.dimensions,
+            ai_provider=self.ai_provider,
+            ai_model=self.ai_model,
         )
 
 

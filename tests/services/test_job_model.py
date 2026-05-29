@@ -244,6 +244,16 @@ class TestSerialization:
         assert restored.ai_provider is None
         assert restored.ai_model is None
 
+    def test_to_dict_carries_provider_and_model(self):
+        job = Job(
+            job_id="job-1", status="running", command=["x"],
+            started_at="2026-01-01T00:00:00Z", ended_at=None, exit_code=None,
+            ai_provider="ollama", ai_model="gemma4:26b-mlx",
+        )
+        snap = job.to_dict()
+        assert snap.ai_provider == "ollama"
+        assert snap.ai_model == "gemma4:26b-mlx"
+
 
 # ---------------------------------------------------------------------------
 # FileJobStore

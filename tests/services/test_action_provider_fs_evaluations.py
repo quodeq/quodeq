@@ -18,7 +18,7 @@ class StubJobs:
     def __init__(self):
         self.captured: dict = {}
 
-    def start_job(self, cmd, cwd, env):
+    def start_job(self, cmd, *, cwd=None, env=None, ai_provider=None, ai_model=None):
         self.captured["cmd"] = cmd
         self.captured["cwd"] = cwd
         self.captured["env"] = env

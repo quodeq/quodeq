@@ -44,6 +44,8 @@ class EvaluationDispatcher(Protocol):
         *,
         cwd: str | None = None,
         env: dict[str, str] | None = None,
+        ai_provider: str | None = None,
+        ai_model: str | None = None,
     ) -> JobSnapshot:
         """Submit an evaluation command and return the initial job state."""
         ...
@@ -61,8 +63,13 @@ class SubprocessDispatcher:
         *,
         cwd: str | None = None,
         env: dict[str, str] | None = None,
+        ai_provider: str | None = None,
+        ai_model: str | None = None,
     ) -> JobSnapshot:
-        return self._jobs.start_job(cmd, cwd=cwd, env=env)
+        return self._jobs.start_job(
+            cmd, cwd=cwd, env=env,
+            ai_provider=ai_provider, ai_model=ai_model,
+        )
 
 
 def _build_evaluate_cmd(
@@ -300,7 +307,11 @@ class FsEvaluationMixin:
                 candidate = candidate.parent
         else:
             cwd = str(resolved)
-        return self.dispatcher.dispatch(cmd, cwd=cwd, env=env)
+        return self.dispatcher.dispatch(
+            cmd, cwd=cwd, env=env,
+            ai_provider=options.ai_cmd,
+            ai_model=options.ai_model,
+        )
 
     def get_evaluation_status(self, job_id: str, reports_dir: str | None = None) -> JobSnapshot | None:
         """Return the current status of an evaluation job.
