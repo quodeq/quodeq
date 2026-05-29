@@ -329,6 +329,6 @@ def test_pipeline_records_provider_and_model_from_env(tmp_path: Path, monkeypatc
 
     run_dir = evaluation_dir.parent
     status = read_status(run_dir)
-    assert status is not None
+    assert status is not None, "status.json must be written"
     assert status["ai_provider"] == "test-provider"
     assert status["ai_model"] == "test-model"
