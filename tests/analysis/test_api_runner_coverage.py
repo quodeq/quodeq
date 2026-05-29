@@ -1,4 +1,4 @@
-"""Extended tests for _api_runner.py: salvage, enrichment, path resolution."""
+"""Extended tests for _api_runner.py: parse_findings, enrichment, path resolution."""
 from __future__ import annotations
 
 import json
@@ -28,7 +28,7 @@ from quodeq.analysis._api_runner import (
 
 
 # ---------------------------------------------------------------------------
-# _salvage_partial_findings
+# _parse_findings
 # ---------------------------------------------------------------------------
 
 class TestSalvagePartialFindings:

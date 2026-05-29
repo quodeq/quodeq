@@ -380,7 +380,7 @@ def run_api_analysis(
     run_config: RunConfig | None = None,
     dim_id: str | None = None,
 ) -> None:
-    """Call an LLM API and persist evidence through ``FindingsRouter``.
+    """Call the LLM and write findings as JSONL evidence through ``FindingsRouter``.
 
     Both the CLI/MCP path and this API path write per-dim evidence through
     a single canonical sink (``FindingsRouter``). The router owns:
@@ -391,13 +391,13 @@ def run_api_analysis(
       V2 cache's ``ok_files`` filter (``analysis/cache/dimension_helpers.py``).
 
     Marker contract:
-        On a clean Instructor return, every file in *source_file_paths* gets
-        an ``ok`` marker -- the API call analysed all of them in one shot.
-        On the salvage path (malformed JSON, partial recovery) we cannot
-        prove which files were actually completed, so no markers are emitted
-        and the cache will dispatch all of them on the next run. Same
-        guarantee as the CLI path: a file is only ever marked ``ok`` when
-        analysis genuinely finished.
+        When the API call completes end-to-end (``was_lossy`` is False), every
+        file in *source_file_paths* gets an ``ok`` marker -- the call analysed
+        them all. Individual malformed findings may have been dropped during
+        per-finding parsing (and were logged with a count), but that does not
+        invalidate the file: it was analysed, so it should not re-dispatch.
+        Only a genuine call failure (network/timeout, ``was_lossy`` True)
+        suppresses the markers, so those files re-dispatch on the next run.
 
     *source_file_paths* should be the full per-dim file list. When omitted,
     no markers are emitted (preserves caller flexibility but the run will
@@ -409,7 +409,7 @@ def run_api_analysis(
     marker writes its per-file cache entry to disk before returning. Legacy
     callers that omit either remain unchanged -- no cache is written.
     """
-    findings, was_salvaged = _call_api(prompt, config)
+    findings, was_lossy = _call_api(prompt, config)
 
     if source_file_paths:
         findings = _resolve_file_paths(findings, source_file_paths)
@@ -423,9 +423,9 @@ def run_api_analysis(
     ctx = _build_router_context(compiled_dir, dimension, work_dir, project_dir)
 
     _log.debug(
-        "API runner: %d findings, salvaged=%s, marking %d files",
-        len(findings), was_salvaged,
-        len(source_file_paths) if source_file_paths and not was_salvaged else 0,
+        "API runner: %d findings, lossy=%s, marking %d files",
+        len(findings), was_lossy,
+        len(source_file_paths) if source_file_paths and not was_lossy else 0,
     )
 
     events_log = jsonl_file.parent.parent / "events.jsonl"
@@ -457,6 +457,6 @@ def run_api_analysis(
         )
         for f in findings:
             router.receive(f)
-        if not was_salvaged and source_file_paths:
+        if not was_lossy and source_file_paths:
             for path in source_file_paths:
                 router.mark_file_done(file=path, status="ok")
