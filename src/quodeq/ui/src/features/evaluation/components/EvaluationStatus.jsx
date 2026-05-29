@@ -46,7 +46,9 @@ function JobIdLine({ jobId, aiProvider, aiModel }) {
       <CopyButton aria-label="Copy job ID" onClick={() => copyToClipboard(jobId)} />
       {aiProvider && aiModel && (
         <span data-testid="job-runtime-chip">
-          {aiProvider} · {aiModel}
+          {aiProvider}
+          <span className="eval-provider-sep" aria-hidden="true"> · </span>
+          {aiModel}
         </span>
       )}
     </div>

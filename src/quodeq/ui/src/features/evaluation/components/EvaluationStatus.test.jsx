@@ -42,4 +42,11 @@ describe('JobIdLine', () => {
     );
     expect(screen.queryByTestId('job-runtime-chip')).toBeNull();
   });
+
+  it('does not render job-runtime-chip when aiProvider is absent', () => {
+    renderWithClient(
+      <EvaluationStatus job={{ ...baseJob, aiModel: 'qwen3.6-27b' }} />
+    );
+    expect(screen.queryByTestId('job-runtime-chip')).toBeNull();
+  });
 });
