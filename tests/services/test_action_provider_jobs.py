@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import threading
+from pathlib import Path
 
 import pytest
 
@@ -117,7 +118,7 @@ def test_job_manager_handles_failure() -> None:
     assert any("boom" in line for line in result.logs)
 
 
-def test_start_evaluation_forwards_provider_and_model(tmp_path: pytest.fixture) -> None:
+def test_start_evaluation_forwards_provider_and_model(tmp_path: Path) -> None:
     """start_evaluation must pass ai_provider/ai_model through the dispatcher."""
     from unittest.mock import patch
     from quodeq.services.base import EvaluationOptions

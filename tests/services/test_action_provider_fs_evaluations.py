@@ -22,6 +22,8 @@ class StubJobs:
         self.captured["cmd"] = cmd
         self.captured["cwd"] = cwd
         self.captured["env"] = env
+        self.captured["ai_provider"] = ai_provider
+        self.captured["ai_model"] = ai_model
         return {"jobId": "test"}
 
 
