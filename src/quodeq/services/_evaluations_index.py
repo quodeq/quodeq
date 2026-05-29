@@ -307,6 +307,8 @@ class EvaluationsIndex:
         logs: list[str] = []
         dimensions: list[str] | None = None
         deadline_at: str | None = None
+        ai_provider: str | None = None
+        ai_model: str | None = None
         if row.run_dir:
             run_dir_path = Path(row.run_dir)
             try:
@@ -321,6 +323,10 @@ class EvaluationsIndex:
                 deadline_at = _read_deadline_from_status(run_dir_path)
             except (OSError, ValueError):
                 deadline_at = None
+            try:
+                ai_provider, ai_model = _read_provider_model_from_status(run_dir_path)
+            except (OSError, ValueError):
+                ai_provider, ai_model = None, None
         return JobSnapshot(
             job_id=row.job_id,
             status=row.state,
@@ -338,6 +344,8 @@ class EvaluationsIndex:
             error=row.exit_reason,
             source="external" if row.job_id.startswith("ext-") else "internal",
             exit_reason=row.exit_reason,
+            ai_provider=ai_provider,
+            ai_model=ai_model,
         )
 
 
@@ -386,3 +394,27 @@ def _read_deadline_from_status(run_dir: Path) -> str | None:
         return None
     val = data.get("deadline_at")
     return val if isinstance(val, str) else None
+
+
+def _read_provider_model_from_status(run_dir: Path) -> tuple[str | None, str | None]:
+    """Read (ai_provider, ai_model) from status.json, or (None, None).
+
+    External (CLI) runs aren't tracked by JobManager, so they don't carry
+    provider/model on an in-memory Job. Reading directly from status.json
+    keeps the dashboard's in-progress card self-describing for ext- runs.
+    """
+    status_path = run_dir / "status.json"
+    if not status_path.is_file():
+        return (None, None)
+    try:
+        data = json.loads(status_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return (None, None)
+    if not isinstance(data, dict):
+        return (None, None)
+    provider = data.get("ai_provider")
+    model = data.get("ai_model")
+    return (
+        provider if isinstance(provider, str) else None,
+        model if isinstance(model, str) else None,
+    )

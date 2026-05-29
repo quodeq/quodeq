@@ -318,6 +318,9 @@ def _check_stale_and_promote(
             # Preserve deadline_at across the stale → cancelled rewrite so
             # downstream readers (filesystem snapshot builder) still see it.
             deadline_at=status.get("deadline_at"),
+            # Preserve provider/model so the dashboard card stays self-describing.
+            ai_provider=status.get("ai_provider"),
+            ai_model=status.get("ai_model"),
         )
         with db:
             _upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
