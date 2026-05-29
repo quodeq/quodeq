@@ -21,7 +21,7 @@ from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, 
 from quodeq.engine.scoring_pipeline import run_full
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.logging import log_error, log_info, log_warning
-from quodeq.shared.utils import get_ai_model, get_ai_provider, is_repo_url, project_name_from_repo, write_text
+from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo, write_text
 from quodeq.shared.repo_handler import cleanup_cloned_repo
 from quodeq.engine._runner_markers import emit_marker
 from quodeq.shared.prereqs import check_evaluate_prereqs
@@ -300,7 +300,7 @@ def _run_pipeline_with_cleanup(
         # Lifecycle context: pending → running on enter, done on clean exit,
         # failed on exception, cancelled on SIGINT/SIGTERM/SIGHUP or atexit.
         try:
-            ai_provider = get_ai_provider()
+            ai_provider = get_ai_cmd()
             ai_model = get_ai_model()
             with RunLifecycleContext(
                 run_dir=run_dir,

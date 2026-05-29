@@ -332,3 +332,38 @@ def test_pipeline_records_provider_and_model_from_env(tmp_path: Path, monkeypatc
     assert status is not None, "status.json must be written"
     assert status["ai_provider"] == "test-provider"
     assert status["ai_model"] == "test-model"
+
+
+def test_pipeline_records_ai_cmd_as_provider(tmp_path: Path, monkeypatch) -> None:
+    """status.json records AI_CMD as ai_provider when AI_CMD is set (not AI_PROVIDER).
+
+    Locks in get_ai_cmd() semantics: the pipeline selects its provider via
+    AI_CMD → AI_PROVIDER → default; the external path must record the same
+    value as the internal path's options.ai_cmd.
+    """
+    import quodeq._cli_evaluation as cli
+
+    monkeypatch.setenv("AI_CMD", "llamacpp")
+    monkeypatch.setenv("AI_MODEL", "qwen3.6-27b")
+    monkeypatch.delenv("AI_PROVIDER", raising=False)
+
+    evidence_dir = tmp_path / "proj" / "run" / "evidence"
+    evaluation_dir = tmp_path / "proj" / "run" / "evaluation"
+    evidence_dir.mkdir(parents=True)
+    evaluation_dir.mkdir(parents=True)
+
+    with patch.object(cli, "_execute_pipeline", return_value=0), \
+         patch.object(cli, "_save_manifest"), \
+         patch.object(cli, "_build_run_config"), \
+         patch.object(cli, "is_repo_url", return_value=False), \
+         patch.object(cli, "emit_marker"):
+        import argparse
+        args = argparse.Namespace(repo="local")
+        inputs = type("I", (), {"src": tmp_path, "language": "python", "manifest": None, "dims_data": None})()
+        cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
+
+    run_dir = evaluation_dir.parent
+    status = read_status(run_dir)
+    assert status is not None, "status.json must be written"
+    assert status["ai_provider"] == "llamacpp"
+    assert status["ai_model"] == "qwen3.6-27b"
