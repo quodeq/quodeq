@@ -1,10 +1,11 @@
-"""Tests for the Instructor-based API runner."""
+"""Tests for the API runner."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 instructor = pytest.importorskip("instructor", reason="requires quodeq[api] extra")
@@ -15,8 +16,24 @@ from quodeq.analysis._api_runner import (
 )
 
 
+def _make_findings_json(*findings_data) -> str:
+    """Build a JSON string of findings from (req, t, file, line, severity, w) tuples."""
+    findings = []
+    for req, t, file, line, severity, w in findings_data:
+        findings.append({
+            "req": req, "t": t, "file": file, "line": line,
+            "severity": severity, "w": w,
+            "snippet": f"line for {req}",
+            "reason": f"Test reason for {req}",
+        })
+    return json.dumps({"findings": findings})
+
+
 def _make_findings(*findings_data):
-    """Build a _Findings model from (req, t, file, line, severity, w) tuples."""
+    """Build a _Findings model from (req, t, file, line, severity, w) tuples.
+
+    Kept for tests that still use the Pydantic model directly (TestApiRunnerConfig, etc.).
+    """
     findings = []
     for req, t, file, line, severity, w in findings_data:
         findings.append(_Finding(
@@ -26,6 +43,16 @@ def _make_findings(*findings_data):
             reason=f"Test reason for {req}",
         ))
     return _Findings(findings=findings)
+
+
+def _mock_raw_client(content: str) -> MagicMock:
+    """Build a mock that mimics the raw OpenAI client context manager returning a response."""
+    msg = MagicMock(content=content)
+    choice = MagicMock(message=msg)
+    response = MagicMock(choices=[choice])
+    client = MagicMock()
+    client.chat.completions.create.return_value = response
+    return client
 
 
 @pytest.fixture()
@@ -38,46 +65,37 @@ def api_config():
 
 
 class TestRunApiAnalysis:
-    """run_api_analysis calls LLM via Instructor and writes JSONL evidence."""
+    """run_api_analysis calls LLM via raw OpenAI client and writes JSONL evidence."""
 
     def test_writes_jsonl_findings(self, tmp_path, api_config):
         jsonl_file = tmp_path / "evidence.jsonl"
-        findings = _make_findings(
+        content = _make_findings_json(
             ("M-MOD-1", "violation", "main.py", 5, "major", "Multiple responsibilities"),
             ("S-CON-3", "compliance", "utils.py", 1, "minor", "No hardcoded secrets"),
         )
+        raw_client = _mock_raw_client(content)
 
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = findings
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(prompt="test prompt", jsonl_file=jsonl_file, config=api_config)
 
         assert jsonl_file.exists()
-        lines = jsonl_file.read_text().strip().split("\n")
-        assert len(lines) == 2
-        assert json.loads(lines[0])["req"] == "M-MOD-1"
-        assert json.loads(lines[0])["t"] == "violation"
-        assert json.loads(lines[1])["req"] == "S-CON-3"
+        lines = [ln for ln in jsonl_file.read_text().strip().split("\n") if ln]
+        finding_lines = [json.loads(ln) for ln in lines if "_marker" not in ln]
+        assert len(finding_lines) == 2
+        assert finding_lines[0]["req"] == "M-MOD-1"
+        assert finding_lines[0]["t"] == "violation"
+        assert finding_lines[1]["req"] == "S-CON-3"
 
     def test_passes_model_and_base_url(self, tmp_path, api_config):
         jsonl_file = tmp_path / "evidence.jsonl"
-        findings = _make_findings(("X-1", "violation", "a.py", 1, "minor", "test"))
+        raw_client = _mock_raw_client('{"findings":[]}')
 
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = findings
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst, \
-             patch("quodeq.analysis._api_runner.openai") as mock_openai:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(prompt="test prompt", jsonl_file=jsonl_file, config=api_config)
 
-            mock_openai.OpenAI.assert_called_once_with(
+            mock_oa.assert_called_once_with(
                 base_url="http://localhost:8000/v1",
                 api_key="test-key",
                 timeout=_LOCAL_TIMEOUT,
@@ -86,30 +104,25 @@ class TestRunApiAnalysis:
 
     def test_handles_empty_findings(self, tmp_path, api_config):
         jsonl_file = tmp_path / "evidence.jsonl"
+        raw_client = _mock_raw_client('{"findings":[]}')
 
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = _Findings(findings=[])
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(prompt="test prompt", jsonl_file=jsonl_file, config=api_config)
 
         assert jsonl_file.exists()
-        assert jsonl_file.read_text().strip() == ""
+        # Only markers (if any), no findings
+        lines = [json.loads(ln) for ln in jsonl_file.read_text().splitlines() if ln.strip()]
+        findings_only = [ln for ln in lines if "_marker" not in ln]
+        assert findings_only == []
 
     def test_resolves_short_filenames(self, tmp_path, api_config):
         jsonl_file = tmp_path / "evidence.jsonl"
-        findings = _make_findings(("X-1", "violation", "app.py", 1, "minor", "test"))
+        content = _make_findings_json(("X-1", "violation", "app.py", 1, "minor", "test"))
+        raw_client = _mock_raw_client(content)
 
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = findings
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 prompt="test", jsonl_file=jsonl_file, config=api_config,
                 source_file_paths=["src/myproject/app.py"],
@@ -120,29 +133,24 @@ class TestRunApiAnalysis:
         assert len(findings) == 1
         assert findings[0]["file"] == "src/myproject/app.py"
 
-    def test_retries_configured(self, tmp_path, api_config):
-        """Verify max_retries is passed to Instructor."""
-        jsonl_file = tmp_path / "evidence.jsonl"
-        findings = _make_findings(("X-1", "violation", "a.py", 1, "minor", "test"))
-
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = findings
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
-            run_api_analysis(prompt="test", jsonl_file=jsonl_file, config=api_config)
-
-            call_kwargs = mock_client.chat.completions.create.call_args.kwargs
-            assert call_kwargs["max_retries"] == 1
+    def test_client_disables_sdk_retries(self, tmp_path, api_config):
+        from unittest.mock import MagicMock, patch
+        from quodeq.analysis._api_runner import _call_api
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            client = MagicMock()
+            client.chat.completions.create.return_value = MagicMock(
+                choices=[MagicMock(message=MagicMock(content='{"findings":[]}'))]
+            )
+            mock_oa.return_value.__enter__.return_value = client
+            _call_api("prompt", api_config)
+        assert mock_oa.call_args.kwargs["max_retries"] == 0
 
 
 class TestMarkerContract:
     """API runner emits file_done markers so the V2 cache can record
     completion. The CLI/MCP path emits these via the agent calling
     `mark_file_done`; the API path is one-shot and emits them itself
-    after a clean Instructor return.
+    after a clean LLM return.
 
     Regression: before this, the API runner wrote findings to JSONL
     directly, bypassing FindingsRouter and the marker contract. Cache
@@ -161,16 +169,11 @@ class TestMarkerContract:
 
     def test_clean_call_emits_ok_marker_per_source_file(self, tmp_path, api_config):
         jsonl_file = tmp_path / "evidence.jsonl"
-        findings = _make_findings(
-            ("M-MOD-1", "violation", "src/a.py", 5, "major", "x"),
-        )
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = findings
+        content = _make_findings_json(("M-MOD-1", "violation", "src/a.py", 5, "major", "x"))
+        raw_client = _mock_raw_client(content)
 
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 prompt="t", jsonl_file=jsonl_file, config=api_config,
                 source_file_paths=["src/a.py", "src/b.py", "src/c.py"],
@@ -185,13 +188,10 @@ class TestMarkerContract:
     def test_clean_call_with_zero_findings_still_marks_files(self, tmp_path, api_config):
         """A clean file (no findings) is still completed analysis -- mark it ok."""
         jsonl_file = tmp_path / "evidence.jsonl"
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = _Findings(findings=[])
+        raw_client = _mock_raw_client('{"findings":[]}')
 
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 prompt="t", jsonl_file=jsonl_file, config=api_config,
                 source_file_paths=["src/clean.py"],
@@ -204,50 +204,36 @@ class TestMarkerContract:
         assert markers[0]["file"] == "src/clean.py"
         assert markers[0]["status"] == "ok"
 
-    def test_salvaged_response_does_not_emit_markers(self, tmp_path, api_config):
-        """When the response was malformed and we salvaged partial findings,
-        we don't know which files were actually analyzed end-to-end. Don't
-        lie about completion -- leave markers off so the next run re-runs."""
+    def test_network_error_does_not_emit_markers(self, tmp_path, api_config):
+        """When the model call fails with a network error (was_lossy=True),
+        we cannot prove which files were analysed. Don't emit markers so the
+        next run re-runs all files."""
         jsonl_file = tmp_path / "evidence.jsonl"
+        raw_client = MagicMock()
+        raw_client.chat.completions.create.side_effect = httpx.ReadTimeout("timeout")
 
-        mock_client = MagicMock()
-        # Force the salvage path: Instructor raises, but the raw exception
-        # message contains a single salvageable finding object.
-        salvage_payload = json.dumps({
-            "req": "X-1", "t": "violation", "file": "src/a.py", "line": 1,
-            "severity": "minor", "w": "x", "snippet": "code", "reason": "r",
-        })
-        mock_client.chat.completions.create.side_effect = RuntimeError(salvage_payload)
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 prompt="t", jsonl_file=jsonl_file, config=api_config,
                 source_file_paths=["src/a.py", "src/b.py"],
             )
 
-        lines = self._read_jsonl(jsonl_file)
-        # Salvaged finding(s) are still written.
-        assert any(ln.get("req") == "X-1" for ln in self._findings_only(lines))
-        # But NO markers -- cancel-then-restart will re-run all files.
-        assert self._markers(lines) == []
+        # File may not exist at all if nothing was written
+        if jsonl_file.exists() and jsonl_file.read_text().strip():
+            lines = self._read_jsonl(jsonl_file)
+            assert self._markers(lines) == []
 
     def test_no_source_files_no_markers(self, tmp_path, api_config):
         """Backward-compat: callers that don't pass source_file_paths get
         finding writes only -- the CLI dim runner is the typical caller and
         that's expected when the whole-dim file list isn't known here."""
         jsonl_file = tmp_path / "evidence.jsonl"
-        findings = _make_findings(("X-1", "violation", "a.py", 1, "minor", "x"))
+        content = _make_findings_json(("X-1", "violation", "a.py", 1, "minor", "x"))
+        raw_client = _mock_raw_client(content)
 
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = findings
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 prompt="t", jsonl_file=jsonl_file, config=api_config,
                 source_file_paths=None,
@@ -299,17 +285,11 @@ class TestSyncCacheWrite:
         )
 
         jsonl_file = tmp_path / "evidence.jsonl"
-        findings = _make_findings(
-            ("M-MOD-1", "violation", "Foo.kt", 1, "minor", "x"),
-        )
+        content = _make_findings_json(("M-MOD-1", "violation", "Foo.kt", 1, "minor", "x"))
+        raw_client = _mock_raw_client(content)
 
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = findings
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 prompt="t",
                 jsonl_file=jsonl_file,

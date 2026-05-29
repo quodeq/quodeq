@@ -47,6 +47,14 @@ _OLLAMA_DEFAULT_BASE = "http://localhost:11434/v1"
 _OLLAMA_DEFAULT_API_KEY = "ollama"
 _OPENAI_API_HOST = "api.openai.com"
 _LOCAL_TIMEOUT = httpx.Timeout(connect=10.0, read=500.0, write=30.0, pool=10.0)
+_SYSTEM_PROMPT = (
+    "You are a code quality evaluator. Quote the offending code into "
+    "`snippet` VERBATIM from the source, one or a few contiguous lines, "
+    "exact characters, no paraphrase. Set `end_line` to match the last "
+    "line of the snippet. In `reason`, state what the code does wrong and "
+    "the concrete impact in 1 to 3 sentences. "
+    'Return JSON as {"findings": [...]}; an empty array is valid.'
+)
 
 
 # ---------------------------------------------------------------------------
@@ -290,19 +298,18 @@ def _salvage_partial_findings(raw_json: str) -> list[dict]:
 
 
 def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
-    """Call LLM via Instructor and return ``(findings, was_salvaged)``.
+    """Call the LLM raw, validate each finding independently, return ``(findings, was_lossy)``.
 
-    A clean Instructor return means we know the LLM analysed every file in
-    the prompt. If we fall through to the salvage path, the response was
-    malformed and we extracted whatever flat finding objects we could --
-    we can no longer trust which files were actually completed end-to-end,
-    so callers must NOT emit per-file ``mark_file_done: ok`` markers in
-    that case. See ``run_api_analysis`` for the marker contract.
+    ``was_lossy`` is True only when we failed to REACH the model (network /
+    timeout). A response where some findings were malformed returns
+    ``(good_findings, False)`` -- the call succeeded end-to-end, so
+    ``run_api_analysis`` may mark files done. Dropped malformed findings are
+    logged (count) but do not set ``was_lossy``. See ``run_api_analysis`` for
+    the marker contract.
 
-    The OpenAI client owns an httpx connection pool whose sockets count
-    against the process FD limit. Without an explicit close, a long scan
-    (one call per file) accumulates pools until macOS's 256-FD soft cap
-    aborts the dimension with EMFILE on the next queue read.
+    The OpenAI client owns an httpx connection pool whose sockets count against
+    the process FD limit; the ``with`` block closes it so a long scan (one call
+    per file) doesn't exhaust the FD soft cap.
     """
     if config.api_base and config.api_base != _OLLAMA_DEFAULT_BASE:
         validate_url_safe(config.api_base, allow_private=True)
@@ -312,11 +319,9 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     if is_openai:
         extra_body["reasoning_effort"] = "none"
     else:
-        # Disable chat-template-driven thinking on reasoning-mode local models
-        # (Gemma 4, Qwen3). Without this, the model spends 1000s of tokens on
-        # reasoning_content before emitting the JSON we asked for, which can
-        # push per-batch latency from seconds into minutes. Unknown to models
-        # that don't support thinking — they simply ignore it.
+        # Disable chat-template thinking on reasoning-mode local models
+        # (Gemma 4, Qwen3); without it they burn 1000s of tokens before the
+        # JSON. Ignored by models that don't support thinking.
         extra_body["chat_template_kwargs"] = {"enable_thinking": False}
     ctx_size = config.context_size
     if ctx_size <= 0:
@@ -328,83 +333,65 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
 
     create_kwargs: dict = dict(
         model=config.model,
-        response_model=_Findings,
         messages=[
-            {"role": "system", "content": "You are a code quality evaluator. Quote the offending code into `snippet` VERBATIM from the source — one or a few contiguous lines, exact characters, no paraphrase. Set `end_line` to match the last line of the snippet. In `reason`, state what the code does wrong and the concrete impact in 1–3 sentences. Empty `findings` is a valid answer."},
+            {"role": "system", "content": _SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ],
         temperature=config.temperature,
-        max_retries=_MAX_RETRIES,
     )
+    if is_openai:
+        # Cloud OpenAI honours JSON-mode; local providers ignore/reject it.
+        create_kwargs["response_format"] = {"type": "json_object"}
     if extra_body:
         create_kwargs["extra_body"] = extra_body
     if config.max_tokens is not None:
         create_kwargs["max_tokens"] = config.max_tokens
 
     timeout = None if is_openai else _LOCAL_TIMEOUT
-    # Local providers (omlx DMG, llamacpp, etc.) don't support structured
-    # output constraints. MD_JSON uses prompt engineering instead of
-    # response_format, so it works on any provider.
-    mode = instructor.Mode.JSON if is_openai else instructor.Mode.MD_JSON
-    _log.debug("Calling %s model=%s via Instructor mode=%s", config.api_base, config.model, mode)
+    _log.debug("Calling %s model=%s (per-finding parse)", config.api_base, config.model)
+    start = time.monotonic()
     with openai.OpenAI(
         base_url=config.api_base,
         api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY,
         timeout=timeout,
-        # OpenAI SDK retries httpx timeouts internally (default max_retries=2,
-        # so 1 initial + 2 retries = 3 attempts). Each attempt waits the full
-        # read timeout, compounding a single 500s timeout into ~1500s of dead
-        # wall time before APITimeoutError finally surfaces. Disable that
-        # layer so a timeout fails fast at the configured read budget;
-        # Instructor still owns logical retries above us.
+        # Disable the SDK's internal timeout retries: each waits the full read
+        # budget, compounding one timeout into minutes of dead wall time.
         max_retries=0,
-    ) as oa_client:
-        client = instructor.from_openai(oa_client, mode=mode)
-        start = time.monotonic()
+    ) as client:
         try:
-            result = client.chat.completions.create(**create_kwargs)
-            _log.debug("Instructor returned %d findings in %.0fs", len(result.findings), time.monotonic() - start)
-            return [f.model_dump() for f in result.findings], False
+            response = client.chat.completions.create(**create_kwargs)
         except Exception as exc:
             elapsed = time.monotonic() - start
-            # Timeouts are unrecoverable -- no JSON to salvage, and the
-            # message wouldn't tell the user what's wrong. Call them out
-            # explicitly so the failure mode is visible in default INFO logs.
-            # Note: when Instructor exhausts retries it wraps the underlying
-            # ReadTimeout in InstructorRetryException; ``_is_timeout_error``
-            # walks ``failed_attempts`` so wrapped timeouts still surface
-            # with the actionable hint rather than as generic failures.
-            if _is_timeout_error(exc):
+            if isinstance(exc, (httpx.ReadTimeout, httpx.TimeoutException,
+                                openai.APITimeoutError, openai.APIConnectionError)):
                 _log.warning(
-                    "Ollama call timed out after %.0fs (model=%s). "
-                    "Likely causes: --n-subagents > 1 with OLLAMA_NUM_PARALLEL=1 "
-                    "(requests queue and second-in-line exceeds the timeout), "
-                    "or context too large (try QUODEQ_CONTEXT_SIZE).",
-                    elapsed, config.model,
+                    "Model %s call timed out after %.0fs. Likely causes: "
+                    "--n-subagents > 1 with OLLAMA_NUM_PARALLEL=1 (requests "
+                    "queue and the second exceeds the timeout), or context "
+                    "too large (try QUODEQ_CONTEXT_SIZE).",
+                    config.model, elapsed,
                 )
-                return [], True
-            # Try Instructor's stashed completions first: when the model
-            # emits a valid {"findings":[...]} array but ONE element fails
-            # validation (e.g. missing ``reason``), Pydantic's error message
-            # only quotes the offending element. The good siblings are
-            # invisible in ``str(exc)`` but they are in
-            # ``failed_attempts[*].completion.choices[0].message.content``.
-            salvaged = _salvage_from_failed_attempts(exc)
-            # Fall back to exception-string salvage for older Instructor
-            # versions or non-retry exceptions where completion is absent.
-            if not salvaged:
-                salvaged = _salvage_partial_findings(str(exc))
-            if salvaged:
+            else:
                 _log.warning(
-                    "Model %s returned malformed JSON after %.0fs -- salvaged %d findings from the response",
-                    config.model, elapsed, len(salvaged),
+                    "Model %s call failed after %.0fs: %s",
+                    config.model, elapsed, str(exc)[:300],
                 )
-                return salvaged, True
-            _log.warning(
-                "Model %s call failed after %.0fs, no findings recovered: %s",
-                config.model, elapsed, str(exc)[:300],
-            )
             return [], True
+
+    text = (response.choices[0].message.content or "") if response.choices else ""
+    findings, dropped = _parse_findings(text)
+    elapsed = time.monotonic() - start
+    if dropped:
+        _log.warning(
+            "Model %s: dropped %d malformed finding(s) of %d parsed in %.0fs "
+            "(kept %d). The call succeeded; malformed findings were discarded.",
+            config.model, dropped, dropped + len(findings), elapsed, len(findings),
+        )
+    _log.debug(
+        "Model %s returned %d valid findings in %.0fs (raw bytes: %d)",
+        config.model, len(findings), elapsed, len(text),
+    )
+    return findings, False
 
 
 # ---------------------------------------------------------------------------
