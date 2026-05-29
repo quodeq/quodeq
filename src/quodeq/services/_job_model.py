@@ -43,6 +43,8 @@ class Job:
     deadline_at: str | None = None
     current_dimension: str | None = None
     dimensions: list[str] | None = None
+    ai_provider: str | None = None
+    ai_model: str | None = None
 
     def complete(self, exit_code: int, ended_at: str) -> None:
         """Transition job to a terminal state based on exit code."""
@@ -173,6 +175,8 @@ def _job_to_json(job: Job) -> dict:
         "deadline_at": job.deadline_at,
         "current_dimension": job.current_dimension,
         "dimensions": job.dimensions,
+        "ai_provider": job.ai_provider,
+        "ai_model": job.ai_model,
     }
 
 
@@ -193,6 +197,8 @@ def _job_from_json(data: dict) -> Job:
         deadline_at=data.get("deadline_at"),
         current_dimension=data.get("current_dimension"),
         dimensions=data.get("dimensions"),
+        ai_provider=data.get("ai_provider"),
+        ai_model=data.get("ai_model"),
     )
 
 

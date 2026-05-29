@@ -206,6 +206,7 @@ class TestSerialization:
             "job_id", "status", "command", "started_at", "ended_at",
             "exit_code", "logs", "output_project", "output_run_id",
             "phase", "deadline_at", "current_dimension", "dimensions",
+            "ai_provider", "ai_model",
         }
         assert set(data.keys()) == expected_keys
 
@@ -377,3 +378,44 @@ class TestReportPathRegex:
 
     def test_no_match_on_garbage(self):
         assert REPORT_PATH_RE.search("no report here") is None
+
+
+# ---------------------------------------------------------------------------
+# ai_provider / ai_model fields
+# ---------------------------------------------------------------------------
+
+
+def test_job_round_trips_provider_and_model():
+    from quodeq.services._job_model import Job, _job_to_json, _job_from_json
+    job = Job(
+        job_id="job-1",
+        status="running",
+        command=["x"],
+        started_at="2026-01-01T00:00:00Z",
+        ended_at=None,
+        exit_code=None,
+        ai_provider="ollama",
+        ai_model="gemma4:26b-mlx",
+    )
+    blob = _job_to_json(job)
+    assert blob["ai_provider"] == "ollama"
+    assert blob["ai_model"] == "gemma4:26b-mlx"
+    restored = _job_from_json(blob)
+    assert restored.ai_provider == "ollama"
+    assert restored.ai_model == "gemma4:26b-mlx"
+
+
+def test_job_defaults_provider_and_model_to_none():
+    from quodeq.services._job_model import Job, _job_to_json, _job_from_json
+    job = Job(
+        job_id="job-1",
+        status="running",
+        command=["x"],
+        started_at="2026-01-01T00:00:00Z",
+        ended_at=None,
+        exit_code=None,
+    )
+    blob = _job_to_json(job)
+    restored = _job_from_json(blob)
+    assert restored.ai_provider is None
+    assert restored.ai_model is None
