@@ -1,15 +1,14 @@
 """API runner for direct LLM evaluation.
 
-Calls LLM APIs directly via Instructor (Pydantic-based structured output)
-and writes findings as JSONL evidence -- the same format the CLI runner
-produces via MCP.
+Calls LLM APIs directly via the raw OpenAI client and writes findings as
+JSONL evidence -- the same format the CLI runner produces via MCP.
 
 ``_Finding`` (below) is a lenient short-key variant of the canonical
 ``Judgment`` (``quodeq.core.events.models``). Local models drop required
 fields and balk at long field names under load -- this type's short keys
-(``req``/``t``/``w``) and Field descriptions are tuned for that constraint,
-so the salvage path stays rare. The downstream wire-dict → Judgment lift
-happens via ``quodeq.core.finding_mappings.wire_dict_to_judgment`` after
+(``req``/``t``/``w``) and Field descriptions are tuned for that constraint.
+The downstream wire-dict → Judgment lift happens via
+``quodeq.core.finding_mappings.wire_dict_to_judgment`` after
 ``FindingEnricher`` maps ``req`` to ``practice_id``.
 
 Requires the ``quodeq[api]`` extra: ``pip install 'quodeq[api]'``
@@ -26,7 +25,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import httpx
-import instructor
 import openai
 from pydantic import BaseModel, Field
 
@@ -42,7 +40,6 @@ from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
 
-_MAX_RETRIES = 1
 _OLLAMA_DEFAULT_BASE = "http://localhost:11434/v1"
 _OLLAMA_DEFAULT_API_KEY = "ollama"
 _OPENAI_API_HOST = "api.openai.com"
@@ -114,10 +111,6 @@ class _Finding(BaseModel):
     )
 
 
-class _Findings(BaseModel):
-    findings: list[_Finding]
-
-
 # ---------------------------------------------------------------------------
 # Config and API call
 # ---------------------------------------------------------------------------
@@ -132,39 +125,6 @@ class ApiRunnerConfig:
     temperature: float = 0.1
     max_tokens: int | None = None
     context_size: int = 0
-
-
-_TIMEOUT_EXCEPTIONS: tuple[type[BaseException], ...] = (
-    httpx.ReadTimeout,
-    httpx.TimeoutException,
-    openai.APITimeoutError,
-)
-
-
-def _is_timeout_error(exc: BaseException) -> bool:
-    """Detect timeouts even when Instructor's retry layer wrapped them.
-
-    Instructor raises ``InstructorRetryException`` when ``max_retries`` is
-    exhausted, stashing each underlying error in a ``failed_attempts`` list.
-    A bare ``isinstance(exc, httpx.ReadTimeout)`` misses these wrapped cases,
-    so timeouts surface as "no findings recovered" instead of the
-    timeout-specific WARN that tells the user how to fix it. We duck-type
-    ``failed_attempts`` so an Instructor version bump that renames or moves
-    the exception class still works.
-
-    ``openai.APITimeoutError`` is included alongside the httpx classes
-    because the OpenAI SDK wraps ``httpx.ReadTimeout`` into its own
-    ``APITimeoutError`` after exhausting its internal retries -- the
-    wrapped form never satisfies an httpx isinstance check.
-    """
-    if isinstance(exc, _TIMEOUT_EXCEPTIONS):
-        return True
-    attempts = getattr(exc, "failed_attempts", None) or []
-    for attempt in attempts:
-        inner = getattr(attempt, "exception", None)
-        if isinstance(inner, _TIMEOUT_EXCEPTIONS):
-            return True
-    return False
 
 
 # A dict that fails `_Finding` validation but carries the required, domain-specific
@@ -202,59 +162,6 @@ def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) 
             _extract_finding_dicts(item, sink, dropped)
 
 
-def _completion_text(completion: object) -> str | None:
-    """Extract ``choices[0].message.content`` from an LLM completion.
-
-    Tolerates both pydantic-model and dict shapes so the helper survives
-    openai/instructor version drift. Returns None when the structure
-    isn't recognisable -- callers must treat that as "no salvage data
-    available here" and continue.
-    """
-    try:
-        choices = getattr(completion, "choices", None)
-        if choices is None and isinstance(completion, dict):
-            choices = completion.get("choices")
-        if not choices:
-            return None
-        first = choices[0]
-        message = getattr(first, "message", None)
-        if message is None and isinstance(first, dict):
-            message = first.get("message")
-        if message is None:
-            return None
-        content = getattr(message, "content", None)
-        if content is None and isinstance(message, dict):
-            content = message.get("content")
-        return content if isinstance(content, str) else None
-    except (AttributeError, IndexError, KeyError, TypeError):
-        return None
-
-
-def _salvage_from_failed_attempts(exc: BaseException) -> list[dict]:
-    """Recover findings from Instructor's per-attempt completion data.
-
-    When Pydantic rejects ``list[_Finding]`` because one element is
-    missing a required field, the ValidationError message only quotes
-    the offending element -- every structurally-valid sibling is lost
-    if we salvage from ``str(exc)`` alone. Instructor stashes the raw
-    LLM completion on each ``FailedAttempt``, which contains everything
-    the model emitted, so walking those gives us a complete view.
-
-    Duck-typed so an Instructor version bump that renames the
-    attribute or moves the class still works.
-    """
-    findings: list[dict] = []
-    attempts = getattr(exc, "failed_attempts", None) or []
-    for attempt in attempts:
-        completion = getattr(attempt, "completion", None)
-        if completion is None:
-            continue
-        text = _completion_text(completion)
-        if text:
-            findings.extend(_salvage_partial_findings(text))
-    return findings
-
-
 def _parse_findings(raw_json: str) -> tuple[list[dict], int]:
     """Parse findings from raw (possibly malformed) model output.
 
@@ -290,11 +197,6 @@ def _parse_findings(raw_json: str) -> tuple[list[dict], int]:
         _extract_finding_dicts(node, findings, dropped)
         i = end
     return findings, len(dropped)
-
-
-def _salvage_partial_findings(raw_json: str) -> list[dict]:
-    """Deprecated alias kept until the old salvage callers are removed (Task 3)."""
-    return _parse_findings(raw_json)[0]
 
 
 def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:

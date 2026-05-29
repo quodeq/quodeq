@@ -8,11 +8,11 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-instructor = pytest.importorskip("instructor", reason="requires quodeq[api] extra")
+pytest.importorskip("openai", reason="requires the openai SDK")
 
 from quodeq.analysis._api_runner import (
     run_api_analysis, ApiRunnerConfig,
-    _call_api, _Finding, _Findings, _FindingType, _Severity, _LOCAL_TIMEOUT,
+    _call_api, _Finding, _FindingType, _Severity, _LOCAL_TIMEOUT,
 )
 
 
@@ -27,22 +27,6 @@ def _make_findings_json(*findings_data) -> str:
             "reason": f"Test reason for {req}",
         })
     return json.dumps({"findings": findings})
-
-
-def _make_findings(*findings_data):
-    """Build a _Findings model from (req, t, file, line, severity, w) tuples.
-
-    Kept for tests that still use the Pydantic model directly (TestApiRunnerConfig, etc.).
-    """
-    findings = []
-    for req, t, file, line, severity, w in findings_data:
-        findings.append(_Finding(
-            req=req, t=_FindingType(t), file=file, line=line,
-            severity=_Severity(severity), w=w,
-            snippet=f"line for {req}",
-            reason=f"Test reason for {req}",
-        ))
-    return _Findings(findings=findings)
 
 
 def _mock_raw_client(content: str) -> MagicMock:
