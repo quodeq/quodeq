@@ -57,6 +57,8 @@ class RunLifecycleContext:
         dimensions: list[str],
         *,
         heartbeat_interval: float = 5.0,
+        ai_provider: str | None = None,
+        ai_model: str | None = None,
     ) -> None:
         self._run_dir = run_dir
         self._job_id = job_id
@@ -66,6 +68,8 @@ class RunLifecycleContext:
         self._phase: str | None = None
         self._current_dimension: str | None = None
         self._deadline_at: str | None = None
+        self._ai_provider = ai_provider
+        self._ai_model = ai_model
         self._heartbeat = HeartbeatThread(run_dir, interval=heartbeat_interval)
         self._resources = ResourceSampler()
         self._previous_handlers: dict[int, Any] = {}
@@ -174,6 +178,8 @@ class RunLifecycleContext:
             current_dimension=self._current_dimension,
             exit_reason=exit_reason,
             deadline_at=self._deadline_at,
+            ai_provider=self._ai_provider,
+            ai_model=self._ai_model,
         )
 
     def _seed_dimension_states(self) -> None:
@@ -222,6 +228,8 @@ class RunLifecycleContext:
                 current_dimension=self._current_dimension,
                 exit_reason=f"signal_{name}",
                 deadline_at=self._deadline_at,
+                ai_provider=self._ai_provider,
+                ai_model=self._ai_model,
             )
             self._current_state = RunState.CANCELLED
             raise SystemExit(128 + signum)
@@ -262,6 +270,8 @@ class RunLifecycleContext:
             current_dimension=self._current_dimension,
             exit_reason="atexit_unfinalized",
             deadline_at=self._deadline_at,
+            ai_provider=self._ai_provider,
+            ai_model=self._ai_model,
         )
 
     def _deregister_atexit(self) -> None:

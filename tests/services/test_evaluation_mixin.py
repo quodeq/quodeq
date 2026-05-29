@@ -192,7 +192,9 @@ class TestSubprocessDispatcher:
         dispatcher = SubprocessDispatcher(mock_mgr)
         result = dispatcher.dispatch(["cmd"], cwd="/tmp", env={"A": "1"})
         assert result == expected
-        mock_mgr.start_job.assert_called_once_with(["cmd"], cwd="/tmp", env={"A": "1"})
+        mock_mgr.start_job.assert_called_once_with(
+            ["cmd"], cwd="/tmp", env={"A": "1"}, ai_provider=None, ai_model=None,
+        )
 
 
 # ---------------------------------------------------------------------------

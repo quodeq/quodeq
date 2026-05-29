@@ -26,4 +26,27 @@ describe('JobIdLine', () => {
     expect(screen.getByText('job-123')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /copy job id/i })).toBeInTheDocument();
   });
+
+  it('renders job-runtime-chip when both aiProvider and aiModel are present', () => {
+    renderWithClient(
+      <EvaluationStatus
+        job={{ ...baseJob, aiProvider: 'llamacpp', aiModel: 'qwen3.6-27b' }}
+      />
+    );
+    expect(screen.getByTestId('job-runtime-chip')).toHaveTextContent('llamacpp · qwen3.6-27b');
+  });
+
+  it('does not render job-runtime-chip when aiModel is absent', () => {
+    renderWithClient(
+      <EvaluationStatus job={{ ...baseJob, aiProvider: 'llamacpp' }} />
+    );
+    expect(screen.queryByTestId('job-runtime-chip')).toBeNull();
+  });
+
+  it('does not render job-runtime-chip when aiProvider is absent', () => {
+    renderWithClient(
+      <EvaluationStatus job={{ ...baseJob, aiModel: 'qwen3.6-27b' }} />
+    );
+    expect(screen.queryByTestId('job-runtime-chip')).toBeNull();
+  });
 });

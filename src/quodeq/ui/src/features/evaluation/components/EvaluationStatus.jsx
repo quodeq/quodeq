@@ -38,12 +38,19 @@ function JobHeader({ job, projectLabel, onDismiss, onCancel }) {
   );
 }
 
-function JobIdLine({ jobId }) {
+function JobIdLine({ jobId, aiProvider, aiModel }) {
   return (
     <div className="evaluate-job-id-line">
       <span className="evaluate-job-id-line__label">job</span>
       <code>{jobId}</code>
       <CopyButton aria-label="Copy job ID" onClick={() => copyToClipboard(jobId)} />
+      {aiProvider && aiModel && (
+        <span data-testid="job-runtime-chip">
+          {aiProvider}
+          <span className="eval-provider-sep" aria-hidden="true"> · </span>
+          {aiModel}
+        </span>
+      )}
     </div>
   );
 }
@@ -56,7 +63,7 @@ export default function EvaluationStatus({ job, project, projectInfo, liveViolat
     <div className="panel evaluate-panel--terminal">
       <JobHeader job={job} projectLabel={projectLabel} onDismiss={onDismiss} onCancel={onCancel} />
       <JobStatStrip job={job} liveViolations={liveViolations} />
-      <JobIdLine jobId={job.jobId} />
+      <JobIdLine jobId={job.jobId} aiProvider={job.aiProvider} aiModel={job.aiModel} />
       <ScanProgress job={job} hasEvaluations={hasEvaluations} />
       <LiveViolationsFeed liveViolations={liveViolations} />
     </div>

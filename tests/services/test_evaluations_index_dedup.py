@@ -82,6 +82,64 @@ def test_list_returns_one_entry_for_dashboard_spawned_run(tmp_path: Path) -> Non
     )
 
 
+def test_external_snapshot_carries_provider_and_model(tmp_path: Path) -> None:
+    """An ext- run's status.json provider/model reach the JobSnapshot."""
+    reports_root = tmp_path / "reports"
+    project = "proj-uuid-pm"
+    run_id = "run-uuid-pm"
+    run_dir = reports_root / project / run_id
+    run_dir.mkdir(parents=True)
+    write_status(
+        run_dir,
+        state=RunState.RUNNING,
+        job_id=f"ext-{run_id}",
+        started_at="2026-05-22T19:00:00+00:00",
+        dimensions=["security"],
+        phase="analyzing",
+        pid=99999,
+        ai_provider="llamacpp",
+        ai_model="qwen3.6-27b",
+    )
+
+    store = InMemoryJobStore()  # no internal job for this run
+    jobs = JobManager(job_store=store, reports_root=reports_root)
+    index = EvaluationsIndex(
+        jobs=jobs,
+        index_db_path=tmp_path / "index.db",
+        reports_root=reports_root,
+    )
+    entries = index.list(reports_dir=reports_root)
+    match = [e for e in entries if e.output_run_id == run_id]
+    assert len(match) == 1, f"expected one external entry, got {match}"
+    snap = match[0]
+    assert snap.source == "external"
+    assert snap.ai_provider == "llamacpp"
+    assert snap.ai_model == "qwen3.6-27b"
+
+
+def test_external_snapshot_provider_model_absent_when_not_in_status(tmp_path: Path) -> None:
+    """When status.json has no provider/model, the snapshot fields are None."""
+    reports_root = tmp_path / "reports"
+    project = "proj-uuid-pm2"
+    run_id = "run-uuid-pm2"
+    _seed_status(reports_root, project, run_id)  # no ai_provider/ai_model
+
+    store = InMemoryJobStore()  # no internal job for this run
+    jobs = JobManager(job_store=store, reports_root=reports_root)
+    index = EvaluationsIndex(
+        jobs=jobs,
+        index_db_path=tmp_path / "index.db",
+        reports_root=reports_root,
+    )
+    entries = index.list(reports_dir=reports_root)
+    match = [e for e in entries if e.output_run_id == run_id]
+    assert len(match) == 1, f"expected one external entry, got {match}"
+    snap = match[0]
+    assert snap.source == "external"
+    assert snap.ai_provider is None
+    assert snap.ai_model is None
+
+
 def test_list_prefers_internal_over_indexed_external(tmp_path: Path) -> None:
     """When both an internal and external entry exist for the same run, keep the internal one.
 

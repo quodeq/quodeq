@@ -21,3 +21,5 @@ class JobSnapshot:
     error: str | None = None
     source: str = "internal"  # "internal" | "external"
     exit_reason: str | None = None
+    ai_provider: str | None = None
+    ai_model: str | None = None

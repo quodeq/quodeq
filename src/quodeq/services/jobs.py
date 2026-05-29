@@ -102,7 +102,7 @@ class JobManager:
         """
         self._reports_root = path
 
-    def start_job(self, cmd: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None) -> JobSnapshot:
+    def start_job(self, cmd: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None, ai_provider: str | None = None, ai_model: str | None = None) -> JobSnapshot:
         """Spawn a subprocess and return its initial job state."""
         job_id = str(uuid.uuid4())
         job = Job(
@@ -112,6 +112,8 @@ class JobManager:
             started_at=datetime.now(timezone.utc).isoformat(),
             ended_at=None,
             exit_code=None,
+            ai_provider=ai_provider,
+            ai_model=ai_model,
         )
 
         try:

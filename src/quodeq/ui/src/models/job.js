@@ -17,6 +17,8 @@
  * @property {number|null}   exitCode
  * @property {string|null}   error
  * @property {'internal'|'external'} source  - 'internal' = launched from dashboard; 'external' = CLI/CI
+ * @property {string|null}   aiProvider     - Provider this job is actually using (e.g. 'ollama', 'llamacpp')
+ * @property {string|null}   aiModel        - Model this job is actually using
  */
 
 /**
@@ -43,5 +45,7 @@ export function createJob(raw) {
     exitCode:         raw.exitCode ?? null,
     error:            raw.error ?? null,
     source:           raw.source ?? 'internal',
+    aiProvider:       raw.aiProvider ?? null,
+    aiModel:          raw.aiModel ?? null,
   };
 }

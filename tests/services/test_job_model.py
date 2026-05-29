@@ -206,8 +206,53 @@ class TestSerialization:
             "job_id", "status", "command", "started_at", "ended_at",
             "exit_code", "logs", "output_project", "output_run_id",
             "phase", "deadline_at", "current_dimension", "dimensions",
+            "ai_provider", "ai_model",
         }
         assert set(data.keys()) == expected_keys
+
+    def test_job_round_trips_provider_and_model(self):
+        job = Job(
+            job_id="job-1",
+            status="running",
+            command=["x"],
+            started_at="2026-01-01T00:00:00Z",
+            ended_at=None,
+            exit_code=None,
+            ai_provider="ollama",
+            ai_model="gemma4:26b-mlx",
+        )
+        blob = _job_to_json(job)
+        assert blob["ai_provider"] == "ollama"
+        assert blob["ai_model"] == "gemma4:26b-mlx"
+        restored = _job_from_json(blob)
+        assert restored.ai_provider == "ollama"
+        assert restored.ai_model == "gemma4:26b-mlx"
+
+    def test_job_defaults_provider_and_model_to_none(self):
+        job = Job(
+            job_id="job-1",
+            status="running",
+            command=["x"],
+            started_at="2026-01-01T00:00:00Z",
+            ended_at=None,
+            exit_code=None,
+        )
+        blob = _job_to_json(job)
+        blob.pop("ai_provider", None)
+        blob.pop("ai_model", None)
+        restored = _job_from_json(blob)
+        assert restored.ai_provider is None
+        assert restored.ai_model is None
+
+    def test_to_dict_carries_provider_and_model(self):
+        job = Job(
+            job_id="job-1", status="running", command=["x"],
+            started_at="2026-01-01T00:00:00Z", ended_at=None, exit_code=None,
+            ai_provider="ollama", ai_model="gemma4:26b-mlx",
+        )
+        snap = job.to_dict()
+        assert snap.ai_provider == "ollama"
+        assert snap.ai_model == "gemma4:26b-mlx"
 
 
 # ---------------------------------------------------------------------------

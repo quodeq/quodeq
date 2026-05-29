@@ -64,7 +64,7 @@ class TestEvaluationMixinSubagentModel:
         from quodeq.services.filesystem import FilesystemActionProvider
 
         class StubJobs:
-            def start_job(self, cmd, cwd, env):
+            def start_job(self, cmd, *, cwd=None, env=None, ai_provider=None, ai_model=None):
                 captured["cmd"] = cmd
                 captured["env"] = env
                 return {"jobId": "test"}
