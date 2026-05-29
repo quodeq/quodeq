@@ -55,9 +55,14 @@ function JobIdLine({ jobId, aiProvider, aiModel }) {
   );
 }
 
-export default function EvaluationStatus({ job, project, projectInfo, liveViolations = {}, onDismiss, onCancel, hasEvaluations }) {
+export default function EvaluationStatus({ job, project, projectInfo, jobProjectInfo, liveViolations = {}, onDismiss, onCancel, hasEvaluations }) {
   if (!job) return null;
-  const projectLabel = projectInfo?.displayName || projectInfo?.name || project || null;
+  // Prefer the running job's own project so the card stays accurate when the
+  // UI's global selection points at a different project than the job is
+  // actually scanning. Fall back to the selected project when the job's
+  // project can't be resolved (e.g. before the report-path marker fires).
+  const jobProjectLabel = jobProjectInfo?.displayName || jobProjectInfo?.name || null;
+  const projectLabel = jobProjectLabel || projectInfo?.displayName || projectInfo?.name || project || null;
 
   return (
     <div className="panel evaluate-panel--terminal">
