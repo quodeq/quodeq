@@ -201,8 +201,6 @@ def test_breaker_exit_writes_failed_with_reason(tmp_path: Path) -> None:
 
 def test_lifecycle_context_threads_provider_to_status(tmp_path: Path) -> None:
     """ai_provider and ai_model passed to RunLifecycleContext must land in status.json."""
-    import json
-
     with RunLifecycleContext(
         run_dir=tmp_path,
         job_id="ext-1",
@@ -211,6 +209,6 @@ def test_lifecycle_context_threads_provider_to_status(tmp_path: Path) -> None:
         ai_model="gemma4:26b-mlx",
     ):
         pass
-    data = json.loads((tmp_path / "status.json").read_text())
-    assert data.get("ai_provider") == "ollama"
-    assert data.get("ai_model") == "gemma4:26b-mlx"
+    data = read_status(tmp_path)
+    assert data["ai_provider"] == "ollama"
+    assert data["ai_model"] == "gemma4:26b-mlx"
