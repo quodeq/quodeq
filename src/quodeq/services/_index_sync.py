@@ -255,6 +255,9 @@ def force_promote_to_cancelled_stale(
                 current_dimension=current_dimension,
                 pid=pid if isinstance(pid, int) else None,
                 exit_reason="stale_detected",
+                deadline_at=existing.get("deadline_at"),
+                ai_provider=existing.get("ai_provider"),
+                ai_model=existing.get("ai_model"),
             )
             _upsert_from_status(
                 db, run_dir, project_uuid=project_uuid, run_id=run_id,
