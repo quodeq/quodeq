@@ -28,6 +28,7 @@ from quodeq.shared.prereqs import check_evaluate_prereqs
 from quodeq.analysis._dimension_aliases import expand_dimension_aliases
 from quodeq.analysis._diff_resolver import DiffResolveError, resolve_diff_files
 from quodeq.shared.run_lifecycle import RunLifecycleContext
+from quodeq.shared._env import get_ai_provider, get_ai_model
 
 # Re-export resolution helpers — keep the public API stable
 from quodeq._cli_resolution import (  # noqa: F401
@@ -300,10 +301,14 @@ def _run_pipeline_with_cleanup(
         # Lifecycle context: pending → running on enter, done on clean exit,
         # failed on exception, cancelled on SIGINT/SIGTERM/SIGHUP or atexit.
         try:
+            ai_provider = get_ai_provider()
+            ai_model = get_ai_model()
             with RunLifecycleContext(
                 run_dir=run_dir,
                 job_id=f"ext-{run_id}",
                 dimensions=dimensions_list,
+                ai_provider=ai_provider,
+                ai_model=ai_model,
             ) as lifecycle:
                 try:
                     # Mark the pipeline as actively analyzing so dashboard
