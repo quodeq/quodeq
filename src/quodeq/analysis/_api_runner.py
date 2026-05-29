@@ -362,8 +362,7 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
             response = client.chat.completions.create(**create_kwargs)
         except Exception as exc:
             elapsed = time.monotonic() - start
-            if isinstance(exc, (httpx.ReadTimeout, httpx.TimeoutException,
-                                openai.APITimeoutError, openai.APIConnectionError)):
+            if isinstance(exc, (httpx.TimeoutException, openai.APITimeoutError)):
                 _log.warning(
                     "Model %s call timed out after %.0fs. Likely causes: "
                     "--n-subagents > 1 with OLLAMA_NUM_PARALLEL=1 (requests "

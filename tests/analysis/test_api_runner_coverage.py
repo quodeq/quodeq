@@ -426,11 +426,10 @@ class TestCallApi:
         assert "response_format" not in kwargs
 
     def test_dropped_findings_logged_with_count(self, caplog):
-        import logging as _logging
         # The quodeq logger has propagate=False, so caplog (which adds a handler
         # to the root logger) won't see its records. Re-enable propagation
         # temporarily so pytest's caplog handler receives the messages.
-        quodeq_logger = _logging.getLogger("quodeq")
+        quodeq_logger = logging.getLogger("quodeq")
         orig_propagate = quodeq_logger.propagate
         quodeq_logger.propagate = True
         try:
@@ -443,6 +442,24 @@ class TestCallApi:
         assert len(findings) == 1
         assert lossy is False
         assert any("dropped 2" in r.message for r in caplog.records)
+
+    def test_connection_error_is_lossy_with_generic_message(self, caplog):
+        import openai as _openai
+        exc = _openai.APIConnectionError(request=httpx.Request("POST", "http://localhost:11434/v1"))
+        with caplog.at_level(logging.WARNING, logger="quodeq.analysis._api_runner"):
+            # quodeq logger has propagate=False; flip it so caplog sees the record.
+            qlog = logging.getLogger("quodeq")
+            orig = qlog.propagate
+            qlog.propagate = True
+            try:
+                findings, lossy, *_ = self._run(side_effect=exc)
+            finally:
+                qlog.propagate = orig
+        assert findings == []
+        assert lossy is True
+        msgs = " ".join(r.message for r in caplog.records)
+        assert "timed out" not in msgs
+        assert "call failed" in msgs
 
 
 # ---------------------------------------------------------------------------

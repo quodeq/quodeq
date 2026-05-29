@@ -12,7 +12,7 @@ instructor = pytest.importorskip("instructor", reason="requires quodeq[api] extr
 
 from quodeq.analysis._api_runner import (
     run_api_analysis, ApiRunnerConfig,
-    _Finding, _Findings, _FindingType, _Severity, _LOCAL_TIMEOUT,
+    _call_api, _Finding, _Findings, _FindingType, _Severity, _LOCAL_TIMEOUT,
 )
 
 
@@ -134,8 +134,6 @@ class TestRunApiAnalysis:
         assert findings[0]["file"] == "src/myproject/app.py"
 
     def test_client_disables_sdk_retries(self, tmp_path, api_config):
-        from unittest.mock import MagicMock, patch
-        from quodeq.analysis._api_runner import _call_api
         with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
             client = MagicMock()
             client.chat.completions.create.return_value = MagicMock(
