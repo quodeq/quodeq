@@ -1,15 +1,14 @@
 """API runner for direct LLM evaluation.
 
-Calls LLM APIs directly via Instructor (Pydantic-based structured output)
-and writes findings as JSONL evidence -- the same format the CLI runner
-produces via MCP.
+Calls LLM APIs directly via the raw OpenAI client and writes findings as
+JSONL evidence -- the same format the CLI runner produces via MCP.
 
 ``_Finding`` (below) is a lenient short-key variant of the canonical
 ``Judgment`` (``quodeq.core.events.models``). Local models drop required
 fields and balk at long field names under load -- this type's short keys
-(``req``/``t``/``w``) and Field descriptions are tuned for that constraint,
-so the salvage path stays rare. The downstream wire-dict → Judgment lift
-happens via ``quodeq.core.finding_mappings.wire_dict_to_judgment`` after
+(``req``/``t``/``w``) and Field descriptions are tuned for that constraint.
+The downstream wire-dict → Judgment lift happens via
+``quodeq.core.finding_mappings.wire_dict_to_judgment`` after
 ``FindingEnricher`` maps ``req`` to ``practice_id``.
 
 Requires the ``quodeq[api]`` extra: ``pip install 'quodeq[api]'``
@@ -26,7 +25,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import httpx
-import instructor
 import openai
 from pydantic import BaseModel, Field
 
@@ -42,11 +40,18 @@ from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
 
-_MAX_RETRIES = 1
 _OLLAMA_DEFAULT_BASE = "http://localhost:11434/v1"
 _OLLAMA_DEFAULT_API_KEY = "ollama"
 _OPENAI_API_HOST = "api.openai.com"
 _LOCAL_TIMEOUT = httpx.Timeout(connect=10.0, read=500.0, write=30.0, pool=10.0)
+_SYSTEM_PROMPT = (
+    "You are a code quality evaluator. Quote the offending code into "
+    "`snippet` VERBATIM from the source, one or a few contiguous lines, "
+    "exact characters, no paraphrase. Set `end_line` to match the last "
+    "line of the snippet. In `reason`, state what the code does wrong and "
+    "the concrete impact in 1 to 3 sentences. "
+    'Return JSON as {"findings": [...]}; an empty array is valid.'
+)
 
 
 # ---------------------------------------------------------------------------
@@ -106,10 +111,6 @@ class _Finding(BaseModel):
     )
 
 
-class _Findings(BaseModel):
-    findings: list[_Finding]
-
-
 # ---------------------------------------------------------------------------
 # Config and API call
 # ---------------------------------------------------------------------------
@@ -126,47 +127,24 @@ class ApiRunnerConfig:
     context_size: int = 0
 
 
-_TIMEOUT_EXCEPTIONS: tuple[type[BaseException], ...] = (
-    httpx.ReadTimeout,
-    httpx.TimeoutException,
-    openai.APITimeoutError,
-)
+# A dict that fails `_Finding` validation but carries the required, domain-specific
+# `req` identifier is a *dropped finding* attempt: counted once for observability,
+# then we stop (its own fields are not separate findings, mirroring the valid path).
+# A dict without `req` is a container/wrapper (e.g. {"findings": [...]}) we recurse
+# into to recover findings nested inside it. `req` alone avoids false positives from
+# generic short keys like "t"/"w".
+_DROPPED_FINDING_KEY = "req"
 
 
-def _is_timeout_error(exc: BaseException) -> bool:
-    """Detect timeouts even when Instructor's retry layer wrapped them.
-
-    Instructor raises ``InstructorRetryException`` when ``max_retries`` is
-    exhausted, stashing each underlying error in a ``failed_attempts`` list.
-    A bare ``isinstance(exc, httpx.ReadTimeout)`` misses these wrapped cases,
-    so timeouts surface as "no findings recovered" instead of the
-    timeout-specific WARN that tells the user how to fix it. We duck-type
-    ``failed_attempts`` so an Instructor version bump that renames or moves
-    the exception class still works.
-
-    ``openai.APITimeoutError`` is included alongside the httpx classes
-    because the OpenAI SDK wraps ``httpx.ReadTimeout`` into its own
-    ``APITimeoutError`` after exhausting its internal retries -- the
-    wrapped form never satisfies an httpx isinstance check.
-    """
-    if isinstance(exc, _TIMEOUT_EXCEPTIONS):
-        return True
-    attempts = getattr(exc, "failed_attempts", None) or []
-    for attempt in attempts:
-        inner = getattr(attempt, "exception", None)
-        if isinstance(inner, _TIMEOUT_EXCEPTIONS):
-            return True
-    return False
-
-
-def _extract_finding_dicts(node: object, sink: list[dict]) -> None:
+def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) -> None:
     """Walk a decoded JSON value, appending any dict that parses as a `_Finding`.
 
-    Used by ``_salvage_partial_findings`` so we recover findings whether
-    the model emitted them as a bare object, a list, a wrapped
-    ``{"findings": [...]}``, or nested somewhere unexpected. Recursion
-    stops at a successful ``_Finding`` validation (so we don't dive into
-    a finding's own fields looking for sub-findings).
+    Recovers findings whether the model emitted them as a bare object, a list,
+    a wrapped ``{"findings": [...]}``, or nested somewhere unexpected. Recursion
+    stops at a successful ``_Finding`` validation. A dict that fails validation
+    but carries the ``req`` key is treated as a dropped finding attempt: counted
+    once for observability, then recursion stops (mirroring the valid path).
+    Pure containers (no ``req`` key) are recursed to recover nested findings.
     """
     if isinstance(node, dict):
         try:
@@ -174,94 +152,37 @@ def _extract_finding_dicts(node: object, sink: list[dict]) -> None:
             sink.append(f.model_dump())
             return
         except (ValueError, KeyError, TypeError):
-            pass
+            if _DROPPED_FINDING_KEY in node:
+                dropped.append(node)
+                return
         for value in node.values():
-            _extract_finding_dicts(value, sink)
+            _extract_finding_dicts(value, sink, dropped)
     elif isinstance(node, list):
         for item in node:
-            _extract_finding_dicts(item, sink)
+            _extract_finding_dicts(item, sink, dropped)
 
 
-def _completion_text(completion: object) -> str | None:
-    """Extract ``choices[0].message.content`` from an LLM completion.
+def _parse_findings(raw_json: str) -> tuple[list[dict], int]:
+    """Parse findings from raw (possibly malformed) model output.
 
-    Tolerates both pydantic-model and dict shapes so the helper survives
-    openai/instructor version drift. Returns None when the structure
-    isn't recognisable -- callers must treat that as "no salvage data
-    available here" and continue.
-    """
-    try:
-        choices = getattr(completion, "choices", None)
-        if choices is None and isinstance(completion, dict):
-            choices = completion.get("choices")
-        if not choices:
-            return None
-        first = choices[0]
-        message = getattr(first, "message", None)
-        if message is None and isinstance(first, dict):
-            message = first.get("message")
-        if message is None:
-            return None
-        content = getattr(message, "content", None)
-        if content is None and isinstance(message, dict):
-            content = message.get("content")
-        return content if isinstance(content, str) else None
-    except (AttributeError, IndexError, KeyError, TypeError):
-        return None
+    This is the primary parser, not a fallback. Local models produce several
+    failure shapes: bare finding objects concatenated without an array wrapper
+    (``{...}{...}``); a complete ``{"findings": [...]}`` wrapper with hedging
+    text around it; findings with nested fields like ``req_refs: [{...}]``.
 
+    Strategy: walk the input with ``json.JSONDecoder().raw_decode()`` to find
+    every complete top-level JSON value (bracket-aware, so nested structures
+    pass through), then harvest anything that validates as a ``_Finding``.
 
-def _salvage_from_failed_attempts(exc: BaseException) -> list[dict]:
-    """Recover findings from Instructor's per-attempt completion data.
-
-    When Pydantic rejects ``list[_Finding]`` because one element is
-    missing a required field, the ValidationError message only quotes
-    the offending element -- every structurally-valid sibling is lost
-    if we salvage from ``str(exc)`` alone. Instructor stashes the raw
-    LLM completion on each ``FailedAttempt``, which contains everything
-    the model emitted, so walking those gives us a complete view.
-
-    Duck-typed so an Instructor version bump that renames the
-    attribute or moves the class still works.
-    """
-    findings: list[dict] = []
-    attempts = getattr(exc, "failed_attempts", None) or []
-    for attempt in attempts:
-        completion = getattr(attempt, "completion", None)
-        if completion is None:
-            continue
-        text = _completion_text(completion)
-        if text:
-            findings.extend(_salvage_partial_findings(text))
-    return findings
-
-
-def _salvage_partial_findings(raw_json: str) -> list[dict]:
-    """Try to extract valid findings from malformed JSON.
-
-    Local models produce several distinct failure shapes:
-    - Bare finding objects concatenated without an array wrapper
-      (``{...}{...}``), which trips the JSON parser at "trailing
-      characters" after the first object.
-    - A complete ``{"findings": [...]}`` wrapper that Instructor still
-      rejected for a non-structural reason (extra hedging text, etc).
-    - Findings with nested fields like ``req_refs: [{...}]``.
-
-    Strategy: walk the input with ``json.JSONDecoder().raw_decode()`` to
-    find every complete top-level JSON value (object or array) regardless
-    of nested braces, then recurse into each decoded value harvesting
-    anything that validates as a ``_Finding``. ``raw_decode`` is
-    bracket-aware so nested structures pass through; the previous regex
-    approach (shallow ``{[^{}]*}``) silently dropped any finding with a
-    nested field.
+    Returns ``(valid_findings, dropped_count)`` where *dropped_count* is the
+    number of finding-shaped dicts that failed validation (for observability).
     """
     decoder = json.JSONDecoder()
     findings: list[dict] = []
+    dropped: list[dict] = []
     i = 0
     n = len(raw_json)
     while i < n:
-        # Advance to the next plausible JSON start. Skipping non-`{`/`[`
-        # chars handles the wrapper text Instructor/Pydantic prepends to
-        # the model's raw output ("Invalid JSON: ...", error preambles).
         brace = raw_json.find("{", i)
         bracket = raw_json.find("[", i)
         candidates = [c for c in (brace, bracket) if c >= 0]
@@ -271,31 +192,26 @@ def _salvage_partial_findings(raw_json: str) -> list[dict]:
         try:
             node, end = decoder.raw_decode(raw_json, start)
         except json.JSONDecodeError:
-            # Not a real JSON value at this offset -- advance one char
-            # and keep scanning. The decoder is the source of truth for
-            # "is this position a complete value"; the brace/bracket
-            # scan above is just a cheap pre-filter.
             i = start + 1
             continue
-        _extract_finding_dicts(node, findings)
+        _extract_finding_dicts(node, findings, dropped)
         i = end
-    return findings
+    return findings, len(dropped)
 
 
 def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
-    """Call LLM via Instructor and return ``(findings, was_salvaged)``.
+    """Call the LLM raw, validate each finding independently, return ``(findings, was_lossy)``.
 
-    A clean Instructor return means we know the LLM analysed every file in
-    the prompt. If we fall through to the salvage path, the response was
-    malformed and we extracted whatever flat finding objects we could --
-    we can no longer trust which files were actually completed end-to-end,
-    so callers must NOT emit per-file ``mark_file_done: ok`` markers in
-    that case. See ``run_api_analysis`` for the marker contract.
+    ``was_lossy`` is True only when we failed to REACH the model (network /
+    timeout). A response where some findings were malformed returns
+    ``(good_findings, False)`` -- the call succeeded end-to-end, so
+    ``run_api_analysis`` may mark files done. Dropped malformed findings are
+    logged (count) but do not set ``was_lossy``. See ``run_api_analysis`` for
+    the marker contract.
 
-    The OpenAI client owns an httpx connection pool whose sockets count
-    against the process FD limit. Without an explicit close, a long scan
-    (one call per file) accumulates pools until macOS's 256-FD soft cap
-    aborts the dimension with EMFILE on the next queue read.
+    The OpenAI client owns an httpx connection pool whose sockets count against
+    the process FD limit; the ``with`` block closes it so a long scan (one call
+    per file) doesn't exhaust the FD soft cap.
     """
     if config.api_base and config.api_base != _OLLAMA_DEFAULT_BASE:
         validate_url_safe(config.api_base, allow_private=True)
@@ -305,11 +221,9 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     if is_openai:
         extra_body["reasoning_effort"] = "none"
     else:
-        # Disable chat-template-driven thinking on reasoning-mode local models
-        # (Gemma 4, Qwen3). Without this, the model spends 1000s of tokens on
-        # reasoning_content before emitting the JSON we asked for, which can
-        # push per-batch latency from seconds into minutes. Unknown to models
-        # that don't support thinking — they simply ignore it.
+        # Disable chat-template thinking on reasoning-mode local models
+        # (Gemma 4, Qwen3); without it they burn 1000s of tokens before the
+        # JSON. Ignored by models that don't support thinking.
         extra_body["chat_template_kwargs"] = {"enable_thinking": False}
     ctx_size = config.context_size
     if ctx_size <= 0:
@@ -321,83 +235,64 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
 
     create_kwargs: dict = dict(
         model=config.model,
-        response_model=_Findings,
         messages=[
-            {"role": "system", "content": "You are a code quality evaluator. Quote the offending code into `snippet` VERBATIM from the source — one or a few contiguous lines, exact characters, no paraphrase. Set `end_line` to match the last line of the snippet. In `reason`, state what the code does wrong and the concrete impact in 1–3 sentences. Empty `findings` is a valid answer."},
+            {"role": "system", "content": _SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ],
         temperature=config.temperature,
-        max_retries=_MAX_RETRIES,
     )
+    if is_openai:
+        # Cloud OpenAI honours JSON-mode; local providers ignore/reject it.
+        create_kwargs["response_format"] = {"type": "json_object"}
     if extra_body:
         create_kwargs["extra_body"] = extra_body
     if config.max_tokens is not None:
         create_kwargs["max_tokens"] = config.max_tokens
 
     timeout = None if is_openai else _LOCAL_TIMEOUT
-    # Local providers (omlx DMG, llamacpp, etc.) don't support structured
-    # output constraints. MD_JSON uses prompt engineering instead of
-    # response_format, so it works on any provider.
-    mode = instructor.Mode.JSON if is_openai else instructor.Mode.MD_JSON
-    _log.debug("Calling %s model=%s via Instructor mode=%s", config.api_base, config.model, mode)
+    _log.debug("Calling %s model=%s (per-finding parse)", config.api_base, config.model)
+    start = time.monotonic()
     with openai.OpenAI(
         base_url=config.api_base,
         api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY,
         timeout=timeout,
-        # OpenAI SDK retries httpx timeouts internally (default max_retries=2,
-        # so 1 initial + 2 retries = 3 attempts). Each attempt waits the full
-        # read timeout, compounding a single 500s timeout into ~1500s of dead
-        # wall time before APITimeoutError finally surfaces. Disable that
-        # layer so a timeout fails fast at the configured read budget;
-        # Instructor still owns logical retries above us.
+        # Disable the SDK's internal timeout retries: each waits the full read
+        # budget, compounding one timeout into minutes of dead wall time.
         max_retries=0,
-    ) as oa_client:
-        client = instructor.from_openai(oa_client, mode=mode)
-        start = time.monotonic()
+    ) as client:
         try:
-            result = client.chat.completions.create(**create_kwargs)
-            _log.debug("Instructor returned %d findings in %.0fs", len(result.findings), time.monotonic() - start)
-            return [f.model_dump() for f in result.findings], False
+            response = client.chat.completions.create(**create_kwargs)
         except Exception as exc:
             elapsed = time.monotonic() - start
-            # Timeouts are unrecoverable -- no JSON to salvage, and the
-            # message wouldn't tell the user what's wrong. Call them out
-            # explicitly so the failure mode is visible in default INFO logs.
-            # Note: when Instructor exhausts retries it wraps the underlying
-            # ReadTimeout in InstructorRetryException; ``_is_timeout_error``
-            # walks ``failed_attempts`` so wrapped timeouts still surface
-            # with the actionable hint rather than as generic failures.
-            if _is_timeout_error(exc):
+            if isinstance(exc, (httpx.TimeoutException, openai.APITimeoutError)):
                 _log.warning(
-                    "Ollama call timed out after %.0fs (model=%s). "
-                    "Likely causes: --n-subagents > 1 with OLLAMA_NUM_PARALLEL=1 "
-                    "(requests queue and second-in-line exceeds the timeout), "
-                    "or context too large (try QUODEQ_CONTEXT_SIZE).",
-                    elapsed, config.model,
+                    "Model %s call timed out after %.0fs. Likely causes: "
+                    "--n-subagents > 1 with OLLAMA_NUM_PARALLEL=1 (requests "
+                    "queue and the second exceeds the timeout), or context "
+                    "too large (try QUODEQ_CONTEXT_SIZE).",
+                    config.model, elapsed,
                 )
-                return [], True
-            # Try Instructor's stashed completions first: when the model
-            # emits a valid {"findings":[...]} array but ONE element fails
-            # validation (e.g. missing ``reason``), Pydantic's error message
-            # only quotes the offending element. The good siblings are
-            # invisible in ``str(exc)`` but they are in
-            # ``failed_attempts[*].completion.choices[0].message.content``.
-            salvaged = _salvage_from_failed_attempts(exc)
-            # Fall back to exception-string salvage for older Instructor
-            # versions or non-retry exceptions where completion is absent.
-            if not salvaged:
-                salvaged = _salvage_partial_findings(str(exc))
-            if salvaged:
+            else:
                 _log.warning(
-                    "Model %s returned malformed JSON after %.0fs -- salvaged %d findings from the response",
-                    config.model, elapsed, len(salvaged),
+                    "Model %s call failed after %.0fs: %s",
+                    config.model, elapsed, str(exc)[:300],
                 )
-                return salvaged, True
-            _log.warning(
-                "Model %s call failed after %.0fs, no findings recovered: %s",
-                config.model, elapsed, str(exc)[:300],
-            )
             return [], True
+
+    text = (response.choices[0].message.content or "") if response.choices else ""
+    findings, dropped = _parse_findings(text)
+    elapsed = time.monotonic() - start
+    if dropped:
+        _log.warning(
+            "Model %s: dropped %d malformed finding(s) of %d parsed in %.0fs "
+            "(kept %d). The call succeeded; malformed findings were discarded.",
+            config.model, dropped, dropped + len(findings), elapsed, len(findings),
+        )
+    _log.debug(
+        "Model %s returned %d valid findings in %.0fs (raw bytes: %d)",
+        config.model, len(findings), elapsed, len(text),
+    )
+    return findings, False
 
 
 # ---------------------------------------------------------------------------
@@ -485,7 +380,7 @@ def run_api_analysis(
     run_config: RunConfig | None = None,
     dim_id: str | None = None,
 ) -> None:
-    """Call an LLM API and persist evidence through ``FindingsRouter``.
+    """Call the LLM and write findings as JSONL evidence through ``FindingsRouter``.
 
     Both the CLI/MCP path and this API path write per-dim evidence through
     a single canonical sink (``FindingsRouter``). The router owns:
@@ -496,13 +391,13 @@ def run_api_analysis(
       V2 cache's ``ok_files`` filter (``analysis/cache/dimension_helpers.py``).
 
     Marker contract:
-        On a clean Instructor return, every file in *source_file_paths* gets
-        an ``ok`` marker -- the API call analysed all of them in one shot.
-        On the salvage path (malformed JSON, partial recovery) we cannot
-        prove which files were actually completed, so no markers are emitted
-        and the cache will dispatch all of them on the next run. Same
-        guarantee as the CLI path: a file is only ever marked ``ok`` when
-        analysis genuinely finished.
+        When the API call completes end-to-end (``was_lossy`` is False), every
+        file in *source_file_paths* gets an ``ok`` marker -- the call analysed
+        them all. Individual malformed findings may have been dropped during
+        per-finding parsing (and were logged with a count), but that does not
+        invalidate the file: it was analysed, so it should not re-dispatch.
+        Only a genuine call failure (network/timeout, ``was_lossy`` True)
+        suppresses the markers, so those files re-dispatch on the next run.
 
     *source_file_paths* should be the full per-dim file list. When omitted,
     no markers are emitted (preserves caller flexibility but the run will
@@ -514,7 +409,7 @@ def run_api_analysis(
     marker writes its per-file cache entry to disk before returning. Legacy
     callers that omit either remain unchanged -- no cache is written.
     """
-    findings, was_salvaged = _call_api(prompt, config)
+    findings, was_lossy = _call_api(prompt, config)
 
     if source_file_paths:
         findings = _resolve_file_paths(findings, source_file_paths)
@@ -528,9 +423,9 @@ def run_api_analysis(
     ctx = _build_router_context(compiled_dir, dimension, work_dir, project_dir)
 
     _log.debug(
-        "API runner: %d findings, salvaged=%s, marking %d files",
-        len(findings), was_salvaged,
-        len(source_file_paths) if source_file_paths and not was_salvaged else 0,
+        "API runner: %d findings, lossy=%s, marking %d files",
+        len(findings), was_lossy,
+        len(source_file_paths) if source_file_paths and not was_lossy else 0,
     )
 
     events_log = jsonl_file.parent.parent / "events.jsonl"
@@ -562,6 +457,6 @@ def run_api_analysis(
         )
         for f in findings:
             router.receive(f)
-        if not was_salvaged and source_file_paths:
+        if not was_lossy and source_file_paths:
             for path in source_file_paths:
                 router.mark_file_done(file=path, status="ok")

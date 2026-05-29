@@ -74,7 +74,7 @@ class FindingsRouter:
     - **CLI/MCP path:** the agent calls ``report_finding`` and ``mark_file_done``
       MCP tools; the dispatcher in ``mcp/handlers.py`` forwards each call to
       this router via ``receive`` / ``mark_file_done``.
-    - **API/Instructor path:** ``analysis/_api_runner.py`` opens the JSONL,
+    - **API path:** ``analysis/_api_runner.py`` opens the JSONL,
       constructs a router pointed at that file handle, and calls ``receive``
       per finding plus ``mark_file_done`` per source file on a clean return.
     - **Future paths:** any new provider integration uses this same surface.
