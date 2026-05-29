@@ -22,6 +22,7 @@ from quodeq.analysis._api_runner import (
     _Findings,
     _FindingType,
     _is_timeout_error,
+    _parse_findings,
     _resolve_file_paths,
     _salvage_from_failed_attempts,
     _salvage_partial_findings,
@@ -120,6 +121,34 @@ class TestSalvagePartialFindings:
         result = _salvage_partial_findings(raw)
         assert len(result) == 1
         assert result[0]["req"] == "R-MAT-5"
+
+    def test_parse_findings_returns_findings_and_drop_count(self):
+        raw = (
+            '{"findings":['
+            '{"req":"A-1","t":"violation","file":"a.py","line":1,'
+            '"severity":"minor","w":"good","snippet":"x","reason":"valid"},'
+            '{"req":"B-2","t":"violation","file":"b.py","line":2,'
+            '"severity":"minor","w":"bad","snippet":"y"}'  # missing reason
+            ']}'
+        )
+        findings, dropped = _parse_findings(raw)
+        assert len(findings) == 1
+        assert findings[0]["req"] == "A-1"
+        assert dropped == 1
+
+    def test_parse_findings_zero_drops_on_clean_input(self):
+        raw = (
+            '{"findings":[{"req":"A-1","t":"violation","file":"a.py","line":1,'
+            '"severity":"minor","w":"w","snippet":"x","reason":"r"}]}'
+        )
+        findings, dropped = _parse_findings(raw)
+        assert len(findings) == 1
+        assert dropped == 0
+
+    def test_parse_findings_container_not_counted_as_drop(self):
+        findings, dropped = _parse_findings('{"findings":[]}')
+        assert findings == []
+        assert dropped == 0
 
 
 # ---------------------------------------------------------------------------

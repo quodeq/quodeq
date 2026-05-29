@@ -159,14 +159,20 @@ def _is_timeout_error(exc: BaseException) -> bool:
     return False
 
 
-def _extract_finding_dicts(node: object, sink: list[dict]) -> None:
+# Keys distinctive of a `_Finding` attempt. A dict that has at least one of
+# these but fails `_Finding` validation is a *dropped finding* (counted for
+# observability); a dict with none of them is a container we recurse into.
+_FINDING_KEYS = frozenset({"req", "t", "file", "w"})
+
+
+def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) -> None:
     """Walk a decoded JSON value, appending any dict that parses as a `_Finding`.
 
-    Used by ``_salvage_partial_findings`` so we recover findings whether
-    the model emitted them as a bare object, a list, a wrapped
-    ``{"findings": [...]}``, or nested somewhere unexpected. Recursion
-    stops at a successful ``_Finding`` validation (so we don't dive into
-    a finding's own fields looking for sub-findings).
+    Recovers findings whether the model emitted them as a bare object, a list,
+    a wrapped ``{"findings": [...]}``, or nested somewhere unexpected. Recursion
+    stops at a successful ``_Finding`` validation. A dict that fails validation
+    but *looks like a finding attempt* (has at least one of ``_FINDING_KEYS``)
+    is appended to *dropped* for observability; pure containers are recursed.
     """
     if isinstance(node, dict):
         try:
@@ -174,12 +180,13 @@ def _extract_finding_dicts(node: object, sink: list[dict]) -> None:
             sink.append(f.model_dump())
             return
         except (ValueError, KeyError, TypeError):
-            pass
+            if _FINDING_KEYS & node.keys():
+                dropped.append(node)
         for value in node.values():
-            _extract_finding_dicts(value, sink)
+            _extract_finding_dicts(value, sink, dropped)
     elif isinstance(node, list):
         for item in node:
-            _extract_finding_dicts(item, sink)
+            _extract_finding_dicts(item, sink, dropped)
 
 
 def _completion_text(completion: object) -> str | None:
@@ -235,33 +242,27 @@ def _salvage_from_failed_attempts(exc: BaseException) -> list[dict]:
     return findings
 
 
-def _salvage_partial_findings(raw_json: str) -> list[dict]:
-    """Try to extract valid findings from malformed JSON.
+def _parse_findings(raw_json: str) -> tuple[list[dict], int]:
+    """Parse findings from raw (possibly malformed) model output.
 
-    Local models produce several distinct failure shapes:
-    - Bare finding objects concatenated without an array wrapper
-      (``{...}{...}``), which trips the JSON parser at "trailing
-      characters" after the first object.
-    - A complete ``{"findings": [...]}`` wrapper that Instructor still
-      rejected for a non-structural reason (extra hedging text, etc).
-    - Findings with nested fields like ``req_refs: [{...}]``.
+    This is the primary parser, not a fallback. Local models produce several
+    failure shapes: bare finding objects concatenated without an array wrapper
+    (``{...}{...}``); a complete ``{"findings": [...]}`` wrapper with hedging
+    text around it; findings with nested fields like ``req_refs: [{...}]``.
 
-    Strategy: walk the input with ``json.JSONDecoder().raw_decode()`` to
-    find every complete top-level JSON value (object or array) regardless
-    of nested braces, then recurse into each decoded value harvesting
-    anything that validates as a ``_Finding``. ``raw_decode`` is
-    bracket-aware so nested structures pass through; the previous regex
-    approach (shallow ``{[^{}]*}``) silently dropped any finding with a
-    nested field.
+    Strategy: walk the input with ``json.JSONDecoder().raw_decode()`` to find
+    every complete top-level JSON value (bracket-aware, so nested structures
+    pass through), then harvest anything that validates as a ``_Finding``.
+
+    Returns ``(valid_findings, dropped_count)`` where *dropped_count* is the
+    number of finding-shaped dicts that failed validation (for observability).
     """
     decoder = json.JSONDecoder()
     findings: list[dict] = []
+    dropped: list[dict] = []
     i = 0
     n = len(raw_json)
     while i < n:
-        # Advance to the next plausible JSON start. Skipping non-`{`/`[`
-        # chars handles the wrapper text Instructor/Pydantic prepends to
-        # the model's raw output ("Invalid JSON: ...", error preambles).
         brace = raw_json.find("{", i)
         bracket = raw_json.find("[", i)
         candidates = [c for c in (brace, bracket) if c >= 0]
@@ -271,15 +272,16 @@ def _salvage_partial_findings(raw_json: str) -> list[dict]:
         try:
             node, end = decoder.raw_decode(raw_json, start)
         except json.JSONDecodeError:
-            # Not a real JSON value at this offset -- advance one char
-            # and keep scanning. The decoder is the source of truth for
-            # "is this position a complete value"; the brace/bracket
-            # scan above is just a cheap pre-filter.
             i = start + 1
             continue
-        _extract_finding_dicts(node, findings)
+        _extract_finding_dicts(node, findings, dropped)
         i = end
-    return findings
+    return findings, len(dropped)
+
+
+def _salvage_partial_findings(raw_json: str) -> list[dict]:
+    """Deprecated alias kept until the old salvage callers are removed (Task 3)."""
+    return _parse_findings(raw_json)[0]
 
 
 def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
