@@ -218,8 +218,8 @@ class TestRunCliAnalysis:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.skipif(
-    not __import__("importlib").util.find_spec("instructor"),
-    reason="requires quodeq[api] extra",
+    not __import__("importlib").util.find_spec("openai"),
+    reason="requires the openai SDK",
 )
 class TestRunApiAnalysisBridge:
     def test_raises_when_no_model(self, tmp_path):
