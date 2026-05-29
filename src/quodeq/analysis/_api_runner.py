@@ -159,10 +159,13 @@ def _is_timeout_error(exc: BaseException) -> bool:
     return False
 
 
-# Keys distinctive of a `_Finding` attempt. A dict that has at least one of
-# these but fails `_Finding` validation is a *dropped finding* (counted for
-# observability); a dict with none of them is a container we recurse into.
-_FINDING_KEYS = frozenset({"req", "t", "file", "w"})
+# A dict that fails `_Finding` validation but carries the required, domain-specific
+# `req` identifier is a *dropped finding* attempt: counted once for observability,
+# then we stop (its own fields are not separate findings, mirroring the valid path).
+# A dict without `req` is a container/wrapper (e.g. {"findings": [...]}) we recurse
+# into to recover findings nested inside it. `req` alone avoids false positives from
+# generic short keys like "t"/"w".
+_DROPPED_FINDING_KEY = "req"
 
 
 def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) -> None:
@@ -171,8 +174,9 @@ def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) 
     Recovers findings whether the model emitted them as a bare object, a list,
     a wrapped ``{"findings": [...]}``, or nested somewhere unexpected. Recursion
     stops at a successful ``_Finding`` validation. A dict that fails validation
-    but *looks like a finding attempt* (has at least one of ``_FINDING_KEYS``)
-    is appended to *dropped* for observability; pure containers are recursed.
+    but carries the ``req`` key is treated as a dropped finding attempt: counted
+    once for observability, then recursion stops (mirroring the valid path).
+    Pure containers (no ``req`` key) are recursed to recover nested findings.
     """
     if isinstance(node, dict):
         try:
@@ -180,8 +184,9 @@ def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) 
             sink.append(f.model_dump())
             return
         except (ValueError, KeyError, TypeError):
-            if _FINDING_KEYS & node.keys():
+            if _DROPPED_FINDING_KEY in node:
                 dropped.append(node)
+                return
         for value in node.values():
             _extract_finding_dicts(value, sink, dropped)
     elif isinstance(node, list):

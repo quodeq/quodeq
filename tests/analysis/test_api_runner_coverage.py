@@ -150,6 +150,26 @@ class TestSalvagePartialFindings:
         assert findings == []
         assert dropped == 0
 
+    def test_parse_findings_invalid_finding_counted_once_not_recursed(self):
+        # A req-bearing dict that fails validation and has a nested req-bearing
+        # object must count as exactly ONE drop (we stop, don't recurse in).
+        raw = '{"req":"A-1","t":"violation","extras":{"req":"B-2","t":"violation"}}'
+        findings, dropped = _parse_findings(raw)
+        assert findings == []
+        assert dropped == 1
+
+    def test_parse_findings_recovers_finding_nested_in_container(self):
+        # A container without `req` is recursed, so a valid finding nested
+        # inside it is still recovered.
+        raw = (
+            '{"wrapper":{"findings":[{"req":"A-1","t":"violation","file":"a.py",'
+            '"line":1,"severity":"minor","w":"w","snippet":"x","reason":"r"}]}}'
+        )
+        findings, dropped = _parse_findings(raw)
+        assert len(findings) == 1
+        assert findings[0]["req"] == "A-1"
+        assert dropped == 0
+
 
 # ---------------------------------------------------------------------------
 # _completion_text + _salvage_from_failed_attempts
