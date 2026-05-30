@@ -82,6 +82,8 @@ def _install_broken_pipe_guard() -> None:
 
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch to the appropriate subcommand handler."""
+    from quodeq.shared._io import configure_stdio_utf8
+    configure_stdio_utf8()
     _install_broken_pipe_guard()
     load_env_file(default_paths())
     parser = build_parser()
