@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any, IO
 
@@ -30,3 +32,24 @@ def read_json(path: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding=TEXT_ENCODING))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Cannot read JSON file {path}: {exc}") from exc
+
+
+def configure_stdio_utf8() -> None:
+    """Ensure this process (and spawned Python children) use UTF-8 for console I/O.
+
+    On Windows the console defaults to the active code page (e.g. cp1252), and a
+    bare ``LANG=C`` locale does the same on POSIX; printing non-ASCII text (file
+    paths, finding messages) then raises ``UnicodeEncodeError``. This reconfigures
+    stdout/stderr to UTF-8 for the current process and defaults ``PYTHONUTF8=1`` so
+    spawned Python children start in UTF-8 mode too. Call once at process entry; it
+    is safe and idempotent, and no-ops on streams that cannot be reconfigured.
+    """
+    os.environ.setdefault("PYTHONUTF8", "1")
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8")
+        except (ValueError, OSError):
+            pass
