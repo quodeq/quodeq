@@ -47,6 +47,6 @@ def needs_rebuild(source_dir: Path, static_dir: Path, reinstall: bool) -> bool:
     hash_file = static_dir / _HASH_FILE
     if not hash_file.exists():
         return True
-    stored_hash = hash_file.read_text().strip()
+    stored_hash = hash_file.read_text(encoding="utf-8").strip()
     current_hash = compute_source_hash(source_dir)
     return stored_hash != current_hash

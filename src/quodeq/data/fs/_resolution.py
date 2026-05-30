@@ -70,7 +70,7 @@ def _find_existing_project(
         if not info_file.exists():
             continue
         try:
-            info = json.loads(info_file.read_text())
+            info = json.loads(info_file.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             continue
         if info.get("name") != identity.project_name:
@@ -119,7 +119,7 @@ def _create_project(
     if parent_uuid:
         info["parent"] = parent_uuid
     try:
-        (project_dir / _REPO_INFO_FILENAME).write_text(json.dumps(info, indent=2))
+        (project_dir / _REPO_INFO_FILENAME).write_text(json.dumps(info, indent=2), encoding="utf-8")
     except OSError as exc:
         logging.getLogger(__name__).warning("Could not write repository_info.json: %s", exc)
     index = load_fn(reports_dir)

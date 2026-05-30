@@ -451,7 +451,7 @@ def run_api_analysis(
             language=run_config.language or "",
         )
 
-    with open(jsonl_file, "a") as fh:
+    with open(jsonl_file, "a", encoding="utf-8") as fh:
         router = FindingsRouter(
             fh, context=ctx, event_log=event_log, on_file_done=cache_writer,
         )

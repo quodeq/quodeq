@@ -50,7 +50,7 @@ def maybe_cleanup_after_job(
     """
     info_path = Path(reports_root) / project_uuid / "repository_info.json"
     try:
-        raw = info_path.read_text()
+        raw = info_path.read_text(encoding="utf-8")
     except (OSError, ValueError):
         return
     try:

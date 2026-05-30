@@ -24,7 +24,7 @@ def load_env_file(paths: ConfigPaths, target: dict[str, str] | None = None) -> N
     if not paths.env_file.exists():
         return
     try:
-        lines = paths.env_file.read_text().splitlines()
+        lines = paths.env_file.read_text(encoding="utf-8").splitlines()
     except OSError as exc:
         _logger.warning("Failed to read env file %s: %s", paths.env_file, exc)
         return

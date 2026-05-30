@@ -80,7 +80,7 @@ def maybe_build_ui(no_build: bool, reinstall: bool, dev: bool = False) -> Path:
         log_info("Building web UI (source changed)...")
         static_dir.mkdir(parents=True, exist_ok=True)
         run_npm_build(source_dir, static_dir)
-        (static_dir / _HASH_FILE).write_text(compute_source_hash(source_dir))
+        (static_dir / _HASH_FILE).write_text(compute_source_hash(source_dir), encoding="utf-8")
         return static_dir
 
     # Production: the wheel ships a pre-built UI. Never invoke npm here.

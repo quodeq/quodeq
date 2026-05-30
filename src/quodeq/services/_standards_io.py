@@ -26,12 +26,12 @@ def _require_id(data: dict, source: str) -> str:
 
 def default_read_json(path: Path) -> dict:
     """Read and parse a JSON file from disk."""
-    return json.loads(path.read_text())
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def default_write_json(path: Path, data: dict) -> None:
     """Serialize *data* as pretty-printed JSON and write it to *path*."""
-    path.write_text(json.dumps(data, indent=2))
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 def count_principles_and_requirements(data: dict) -> tuple[int, int]:

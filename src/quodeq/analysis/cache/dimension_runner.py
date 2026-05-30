@@ -196,7 +196,7 @@ def _write_findings(
 ) -> None:
     jsonl.parent.mkdir(parents=True, exist_ok=True)
     mode = "a" if append else "w"
-    with jsonl.open(mode) as out:
+    with jsonl.open(mode, encoding="utf-8") as out:
         for finding in findings:
             out.write(json.dumps(finding) + "\n")
     if emit_events:

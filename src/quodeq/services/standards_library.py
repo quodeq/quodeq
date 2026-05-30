@@ -65,7 +65,7 @@ class StandardsLibraryClient:
             raise ValueError(f"Invalid standard ID from library: {data['id']}")
         # Check for collision with existing standard
         if dest.is_file():
-            existing = json.loads(dest.read_text())
+            existing = json.loads(dest.read_text(encoding="utf-8"))
             if existing.get("origin") == file_path:
                 # Same origin — update in place
                 pass
@@ -79,5 +79,5 @@ class StandardsLibraryClient:
         data["managed"] = True
         data["origin"] = file_path
         data["origin_hash"] = content_hash
-        dest.write_text(json.dumps(data, indent=2))
+        dest.write_text(json.dumps(data, indent=2), encoding="utf-8")
         return dest

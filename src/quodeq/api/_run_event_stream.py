@@ -106,7 +106,7 @@ def _read_status(run_dir: Path) -> tuple[dict[str, Any], float]:
     except OSError:
         return {"state": "pending"}, _STATUS_MTIME_MISSING
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             return {"state": "pending"}, mtime
         return data, mtime
@@ -137,7 +137,7 @@ def _read_dim_eval(run_dir: Path, dimension: str) -> dict[str, Any] | None:
     """
     path = run_dir / "evaluation" / f"{dimension}{_DIM_FILENAME_SUFFIX}"
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else None
     except (OSError, ValueError) as exc:
         _logger.warning("dimension eval read failed at %s: %s", path, exc)

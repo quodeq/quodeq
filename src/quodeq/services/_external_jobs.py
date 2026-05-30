@@ -46,7 +46,7 @@ def resolve_external_pid(project_uuid: str, run_id: str, reports_root: Path) -> 
     if not pid_file.exists():
         return None
     try:
-        pid = int(pid_file.read_text().strip())
+        pid = int(pid_file.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
         return None
     # Use the shared liveness probe -- os.kill(pid, 0) is unsafe on

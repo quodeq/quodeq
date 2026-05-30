@@ -26,7 +26,7 @@ def _status_json_terminal(run_dir: Path) -> bool:
     if not status_path.exists():
         return False
     try:
-        data = json.loads(status_path.read_text())
+        data = json.loads(status_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return False
     state = data.get("state")

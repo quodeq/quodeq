@@ -93,7 +93,7 @@ def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
         stderr_text = ""
         if stream_err.exists():
             try:
-                stderr_text = _sanitize_stderr(stream_err.read_text().strip())
+                stderr_text = _sanitize_stderr(stream_err.read_text(encoding="utf-8").strip())
             except (OSError, UnicodeDecodeError):
                 stderr_text = "(stderr unreadable)"
         raise AnalysisError(
@@ -107,7 +107,7 @@ def _spawn_and_monitor(
     paths: _SpawnPaths, cfg: AnalysisConfig,
 ) -> tuple[subprocess.Popen, bool]:
     """Spawn the AI CLI process, monitor with heartbeat, return (process, timed_out)."""
-    with open(paths.stream_file, "w") as out, open(paths.stream_err, "w") as err:
+    with open(paths.stream_file, "w", encoding="utf-8") as out, open(paths.stream_err, "w", encoding="utf-8") as err:
         # start_new_session creates a new process group so we can kill the
         # entire tree (including child processes) when the agent is cancelled.
         process = subprocess.Popen(

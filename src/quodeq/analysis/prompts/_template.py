@@ -27,14 +27,14 @@ def load_template(
     """
     if template_path:
         try:
-            return template_path.read_text()
+            return template_path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError) as exc:
             raise FileNotFoundError(f"Cannot read template {template_path}: {exc}") from exc
     if prompts_dir is None:
         prompts_dir = default_paths().prompts_dir
     path = prompts_dir / template_name
     try:
-        return path.read_text()
+        return path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         raise FileNotFoundError(f"Cannot read template {path}: {exc}") from exc
 

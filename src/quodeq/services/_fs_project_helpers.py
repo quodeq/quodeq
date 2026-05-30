@@ -31,14 +31,14 @@ def _backfill_onboarding_field(project_dir: Path) -> dict | None:
     if not info_path.exists():
         return None
     try:
-        data = json.loads(info_path.read_text())
+        data = json.loads(info_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return None
     if "onboardingCompletedAt" in data:
         return data
     data["onboardingCompletedAt"] = data.get("createdAt") or datetime.now(timezone.utc).isoformat()
     try:
-        info_path.write_text(json.dumps(data, indent=2))
+        info_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     except OSError:
         pass
     return data

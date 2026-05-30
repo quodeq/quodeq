@@ -15,7 +15,7 @@ def _read_scan_summary(reports_root: Path, entry_name: str) -> dict[str, Any]:
     if not scan_path.exists():
         return {}
     try:
-        data = json.loads(scan_path.read_text())
+        data = json.loads(scan_path.read_text(encoding="utf-8"))
         return {
             "scanDate": data.get("scanned_at"),
             "totalFiles": data.get("total_files"),
@@ -50,7 +50,7 @@ def _read_repo_info(reports_root: Path, entry_name: str) -> dict[str, Any]:
     if not info_path.exists():
         return {}
     try:
-        return json.loads(info_path.read_text())
+        return json.loads(info_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {}
 
@@ -83,7 +83,7 @@ def _read_language_stats(reports_root: Path, entry_name: str, runs: list[RunInfo
     for run in runs:
         manifest_path = reports_root / entry_name / run.run_id / "evidence" / "manifest.json"
         try:
-            data = json.loads(manifest_path.read_text())
+            data = json.loads(manifest_path.read_text(encoding="utf-8"))
             stats = data.get("language_stats") or {}
             if stats:
                 return {k.lstrip("."): v for k, v in stats.items()}
@@ -95,7 +95,7 @@ def _read_language_stats(reports_root: Path, entry_name: str, runs: list[RunInfo
 def _read_discipline_from_eval(eval_path: Path) -> str | None:
     """Try to read a discipline string from a single evidence JSON file."""
     try:
-        return json.loads(eval_path.read_text()).get("discipline") or None
+        return json.loads(eval_path.read_text(encoding="utf-8")).get("discipline") or None
     except (OSError, json.JSONDecodeError):
         return None
 

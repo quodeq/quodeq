@@ -27,7 +27,7 @@ def _load_index(reports_dir: Path) -> dict[str, str]:
     if cached is not None and cached[0] == mtime:
         return dict(cached[1])  # return a copy so callers can mutate safely
     try:
-        data = json.loads(index_path.read_text())
+        data = json.loads(index_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
     index_cache.set(index_path, (mtime, dict(data)))
