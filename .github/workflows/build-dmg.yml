@@ -96,6 +96,37 @@ jobs:
         shell: pwsh
         run: .\packaging\windows\build-exe.ps1
 
+      - name: Smoke test exe (headless API)
+        shell: pwsh
+        # Boot the built bundle in headless API mode (Quodeq.exe --_api routes to
+        # quodeq.api.app:main via dashboard_entry.py) and assert it serves
+        # /api/health. Proves the PyInstaller bundle + bundled static UI start on
+        # a clean Windows runner. Non-blocking (continue-on-error) until it has
+        # been seen green on a real release, so an unverified assumption can't
+        # break a release; then drop continue-on-error to gate the release,
+        # mirroring how the windows-latest test job was promoted to blocking.
+        continue-on-error: true
+        run: |
+          $exe = "dist\dashboard-build\dist\Quodeq\Quodeq.exe"
+          if (-not (Test-Path $exe)) { throw "Quodeq.exe not found at $exe" }
+          $env:QUODEQ_ACTION_API_HOST = "127.0.0.1"
+          $env:QUODEQ_ACTION_API_PORT = "7863"
+          $p = Start-Process -FilePath $exe -ArgumentList "--_api" -PassThru
+          try {
+            $ok = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              if ($p.HasExited) { throw "exe exited early (code $($p.ExitCode))" }
+              try {
+                $r = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:7863/api/health" -TimeoutSec 2
+                if ($r.StatusCode -eq 200) { $ok = $true; break }
+              } catch { Start-Sleep -Seconds 1 }
+            }
+            if (-not $ok) { throw "exe did not serve /api/health within 30s" }
+            Write-Host "Packaged exe served /api/health OK"
+          } finally {
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          }
+
       - name: Upload zip to release
         env:
           GH_TOKEN: ${{ github.token }}
