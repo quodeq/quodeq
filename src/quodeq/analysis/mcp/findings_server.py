@@ -70,7 +70,7 @@ def main() -> None:
         queue = FileQueue(Path(sa.queue_path))
 
     try:
-        with open(sa.findings_file, "a") as findings_fh:
+        with open(sa.findings_file, "a", encoding="utf-8") as findings_fh:
             router = _build_router(findings_fh, Path(sa.findings_file), ctx, sa)
             while True:
                 msg = read_message()

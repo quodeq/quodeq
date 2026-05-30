@@ -59,7 +59,7 @@ def find_children(reports_root: Path, parent_id: str) -> list[str]:
         if not info_path.exists():
             continue
         try:
-            info = json.loads(info_path.read_text())
+            info = json.loads(info_path.read_text(encoding="utf-8"))
             if info.get("parent") == parent_id:
                 children.append(entry.name)
         except (json.JSONDecodeError, OSError):
@@ -76,7 +76,7 @@ def _build_parent_child_sets(reports_root: Path, dir_names: list[str]) -> tuple[
         if not info_path.exists():
             continue
         try:
-            info = json.loads(info_path.read_text())
+            info = json.loads(info_path.read_text(encoding="utf-8"))
             parent = info.get("parent")
             if parent:
                 parent_ids.add(parent)
@@ -150,10 +150,10 @@ def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
         location = "local"
 
     try:
-        info = json.loads(info_path.read_text())
+        info = json.loads(info_path.read_text(encoding="utf-8"))
         info["path"] = resolved_path
         info["location"] = location
-        info_path.write_text(json.dumps(info, indent=2))
+        info_path.write_text(json.dumps(info, indent=2), encoding="utf-8")
         return True
     except (json.JSONDecodeError, OSError):
         return False
@@ -190,7 +190,7 @@ def get_project_info(reports_dir: str, project: str) -> dict[str, Any] | None:
     if not info_path.exists():
         return None
     try:
-        info = json.loads(info_path.read_text())
+        info = json.loads(info_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return None
 

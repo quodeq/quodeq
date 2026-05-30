@@ -47,7 +47,7 @@ def _build_manifest(project_path: Path) -> dict[str, object]:
     info_path = project_path / "repository_info.json"
     if info_path.exists():
         try:
-            info = json.loads(info_path.read_text())
+            info = json.loads(info_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             info = {}
     return {

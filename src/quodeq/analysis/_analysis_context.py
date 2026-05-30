@@ -23,7 +23,7 @@ def _load_custom_dimensions(evaluators_dir: Path, dims_data: list[str]) -> list[
     seen = set(result)
     for _p in evaluators_dir.glob("*.json"):
         try:
-            _eid = _json.loads(_p.read_text()).get("id")
+            _eid = _json.loads(_p.read_text(encoding="utf-8")).get("id")
             if _eid and _eid not in seen:
                 result.append(_eid)
                 seen.add(_eid)

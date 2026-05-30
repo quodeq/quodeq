@@ -16,7 +16,7 @@ def write_standards_file(work_dir: Path, dimension: str, content: str) -> Path:
     """
     standards_path = work_dir / f"{_STANDARDS_FILE_PREFIX}{dimension}.md"
     try:
-        standards_path.write_text(content)
+        standards_path.write_text(content, encoding="utf-8")
     except OSError as exc:
         raise OSError(f"Failed to write standards file {standards_path}: {exc}") from exc
     return standards_path

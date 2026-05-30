@@ -133,7 +133,7 @@ def load_evaluation_reports(evaluation_dir: Path) -> list[dict]:
     for path in sorted(evaluation_dir.glob("*.json")):
         if path.stem.endswith("_full"):
             continue
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             reports.append(json.load(f))
     return reports
 

@@ -32,7 +32,7 @@ def _read_omlx_api_key() -> str:
     if env_key:
         return env_key
     try:
-        cfg = json.loads((Path.home() / ".omlx" / "settings.json").read_text())
+        cfg = json.loads((Path.home() / ".omlx" / "settings.json").read_text(encoding="utf-8"))
         return cfg.get("auth", {}).get("api_key", "")
     except (OSError, json.JSONDecodeError):
         return ""

@@ -15,7 +15,7 @@ def _persist_json(data: dict, path: Path) -> None:
     """Write a report dict as formatted JSON to *path* (I/O adapter)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        path.write_text(json.dumps(data, indent=2))
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     except OSError as exc:
         raise OSError(f"Failed to write report to {path}: {exc}") from exc
 

@@ -87,7 +87,7 @@ def _load_req_to_principle(dimension: str, evaluators_dir: "Path | None" = None)
     if not path.is_file():
         return {}
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         mapping: dict[str, str] = {}
         for p in data.get("principles", []):
             pname = p.get("name", "")

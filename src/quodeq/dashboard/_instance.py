@@ -114,7 +114,7 @@ class InstanceController:
         """Windows: use TCP localhost with port stored in a file."""
         if self._port_file.exists():
             try:
-                port = int(self._port_file.read_text().strip())
+                port = int(self._port_file.read_text(encoding="utf-8").strip())
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
                     probe.settimeout(_SOCK_TIMEOUT)
                     probe.connect((_TCP_LOCALHOST, port))
@@ -129,7 +129,7 @@ class InstanceController:
         self._tcp_port = self._server_sock.getsockname()[1]
         self._server_sock.listen(_LISTEN_BACKLOG)
         self._server_sock.settimeout(_SOCK_TIMEOUT)
-        self._port_file.write_text(str(self._tcp_port))
+        self._port_file.write_text(str(self._tcp_port), encoding="utf-8")
         return True
 
     def start_listening(self, on_reload: Callable[[str], None]) -> None:

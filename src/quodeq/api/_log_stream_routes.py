@@ -179,7 +179,7 @@ def register_log_stream_routes(app: Flask) -> None:
             if status_path.exists():
                 try:
                     import json
-                    data = json.loads(status_path.read_text())
+                    data = json.loads(status_path.read_text(encoding="utf-8"))
                     state = data.get("state")
                     if isinstance(state, str):
                         return state

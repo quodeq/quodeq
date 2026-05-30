@@ -41,7 +41,7 @@ def get_current_provider(
     if provider is not None:
         return provider
     if paths.env_file.exists():
-        for line in paths.env_file.read_text().splitlines():
+        for line in paths.env_file.read_text(encoding="utf-8").splitlines():
             if line.strip().startswith(_AI_PROVIDER_EXPORT_PREFIX):
                 return line.split("=", 1)[1].strip()
     if default_provider is not None:
@@ -100,10 +100,10 @@ def _write_env(paths: ConfigPaths, provider: str, api_key_var: str, api_key_valu
 def _ensure_gitignore(paths: ConfigPaths) -> None:
     if not paths.gitignore_file.exists():
         return
-    content = paths.gitignore_file.read_text().splitlines()
+    content = paths.gitignore_file.read_text(encoding="utf-8").splitlines()
     if ".quodeq.env" not in content:
         content.append(".quodeq.env")
-        paths.gitignore_file.write_text("\n".join(content) + "\n")
+        paths.gitignore_file.write_text("\n".join(content) + "\n", encoding="utf-8")
         log_info("Added .quodeq.env to .gitignore")
 
 

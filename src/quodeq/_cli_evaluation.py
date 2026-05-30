@@ -277,7 +277,7 @@ def _run_pipeline_with_cleanup(
     # Write a .pid file so the dashboard can detect and cancel this external run
     pid_file = run_dir / ".pid"
     try:
-        pid_file.write_text(str(os.getpid()))
+        pid_file.write_text(str(os.getpid()), encoding="utf-8")
     except OSError:
         pass  # non-fatal; cancel-by-filesystem just won't work for this run
 

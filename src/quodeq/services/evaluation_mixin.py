@@ -107,7 +107,7 @@ def _scan_parent_project(project_dir: Path, reports_path: Path, repo_path: Path)
     """Scan the parent project directory if it lacks a scan.json."""
     info_path = project_dir / "repository_info.json"
     try:
-        parent_uuid = json.loads(info_path.read_text()).get("parent")
+        parent_uuid = json.loads(info_path.read_text(encoding="utf-8")).get("parent")
         if parent_uuid:
             parent_dir = reports_path / parent_uuid
             if not (parent_dir / "scan.json").exists():
@@ -175,11 +175,11 @@ def _register_project(
 
     # Persist the resolved path + ephemeral flag in repository_info.json.
     info_path = project_dir / "repository_info.json"
-    info = json.loads(info_path.read_text()) if info_path.exists() else {}
+    info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.exists() else {}
     info["path"] = str(target_path.resolve())
     info["location"] = _LOCATION_LOCAL
     info["ephemeral"] = bool(ephemeral)
-    info_path.write_text(json.dumps(info, indent=2))
+    info_path.write_text(json.dumps(info, indent=2), encoding="utf-8")
 
     # Scan now that files are guaranteed on disk.
     scan_project(target_path, output_dir=project_dir)
@@ -200,13 +200,13 @@ def _ensure_onboarding_field(project_dir: Path) -> None:
     if not info_path.exists():
         return
     try:
-        data = json.loads(info_path.read_text())
+        data = json.loads(info_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return
     if "onboardingCompletedAt" in data:
         return
     data["onboardingCompletedAt"] = None
-    info_path.write_text(json.dumps(data, indent=2))
+    info_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 class FsEvaluationMixin:

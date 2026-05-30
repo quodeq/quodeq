@@ -36,7 +36,7 @@ Each finding must be a JSON object with these fields:
 def _read_file_safe(path: Path) -> str | None:
     """Read a file, returning None on failure."""
     try:
-        return path.read_text()
+        return path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         _log.warning("Could not read file: %s", path)
         return None

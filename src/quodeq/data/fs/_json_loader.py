@@ -41,7 +41,7 @@ def load_json_file(path: Path, label: str) -> dict:
     if not path.exists():
         raise NotFoundError(f"{label}")
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
         raise NotFoundError(
             f"Invalid JSON in {label} — check the file for syntax errors or validate with a JSON linter"

@@ -40,7 +40,7 @@ def _read_source_file_count(run_dir: Path) -> int:
         if path.suffix != ".json":
             continue
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
         count = data.get("sourceFileCount")

@@ -94,7 +94,7 @@ def locked(lock_path: Path):
 def read_state(path: Path) -> dict:
     """Read and validate the queue JSON file."""
     try:
-        raw = path.read_text()
+        raw = path.read_text(encoding="utf-8")
     except OSError as exc:
         raise FileQueueError(f"Cannot read queue file: {exc}") from exc
     try:

@@ -129,7 +129,7 @@ def _enrich_from_json_eval(run_dir: Path, keys: set[tuple], out: dict[tuple, dic
         if path.suffix != ".json":
             continue
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
         dimension = path.stem

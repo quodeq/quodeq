@@ -97,7 +97,7 @@ def _silence_broken_stdout() -> None:
     does. Swapping the streams to /dev/null lets remaining dimensions run.
     """
     try:
-        devnull = open(os.devnull, "w")  # noqa: SIM115 - long-lived
+        devnull = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115 - long-lived
         sys.stdout = devnull
         sys.stderr = devnull
     except OSError:

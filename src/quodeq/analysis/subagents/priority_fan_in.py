@@ -26,7 +26,7 @@ def compute_fan_in(
         if not path.exists():
             return None
         try:
-            return path.read_text(errors="ignore")
+            return path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             return None
 

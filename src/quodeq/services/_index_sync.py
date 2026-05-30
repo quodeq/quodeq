@@ -161,7 +161,7 @@ def _sync_legacy_run(
         state, exit_reason = "done", None
     elif pid_path.exists():
         try:
-            pid = int(pid_path.read_text().strip())
+            pid = int(pid_path.read_text(encoding="utf-8").strip())
             alive = _is_pid_alive(pid)
         except (OSError, ValueError):
             alive = False

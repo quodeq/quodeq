@@ -59,7 +59,7 @@ def spawn_action_api(
         **_popen_platform_kwargs(),
     )
     try:
-        pid_file_path.write_text(str(proc.pid))
+        pid_file_path.write_text(str(proc.pid), encoding="utf-8")
     except (OSError, AttributeError) as exc:
         log_warning(f"Could not write PID file: {exc}")
     return proc

@@ -47,7 +47,7 @@ def _find_existing_project(reports_root: str, repo: str, scope_path: str | None)
         if not info_file.exists():
             continue
         try:
-            data = json.loads(info_file.read_text())
+            data = json.loads(info_file.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             continue
         if data.get("name") != expected_name:
@@ -185,7 +185,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         scan_path = project_dir / "scan.json"
         if scan_path.exists():
             try:
-                data = json.loads(scan_path.read_text())
+                data = json.loads(scan_path.read_text(encoding="utf-8"))
                 return jsonify(data)
             except (json.JSONDecodeError, OSError):
                 pass
@@ -197,7 +197,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             return jsonify(body), status
 
         try:
-            info = json.loads(info_path.read_text())
+            info = json.loads(info_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             body, status = error_response("Could not read project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL")
             return jsonify(body), status
@@ -341,7 +341,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         # scan.json is now always present after _register_project succeeds.
         scan_path = Path(reports_root) / project_uuid / "scan.json"
         try:
-            scan_data = json.loads(scan_path.read_text())
+            scan_data = json.loads(scan_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError, FileNotFoundError):
             scan_data = {
                 "total_files": 0,

@@ -121,7 +121,7 @@ def _apply_precedent_downweight(
 
 
 def _default_read_file(path: Path) -> str:
-    return path.read_text()
+    return path.read_text(encoding="utf-8")
 
 
 class FindingEnricher:
