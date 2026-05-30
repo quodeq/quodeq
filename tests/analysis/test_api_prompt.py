@@ -66,6 +66,31 @@ class TestAssembleApiPrompt:
         assert '"severity"' in prompt
         assert '"violation"' in prompt
 
+    def test_constant_instructions_precede_variable_file_content(self, src_dir, standards_text):
+        """Constant task instructions and the finding schema must come BEFORE the
+        variable file content.
+
+        The API runner makes one call per file (or small file batch) in a
+        dimension run, and everything except the file block is identical across
+        those calls. Putting the constant instructions/schema first and the
+        per-call file content last maximises the shared prompt prefix so
+        Ollama/llama.cpp prompt-prefix caching can reuse it. The finding schema
+        is the last constant block before the file content, so asserting it
+        precedes the file content transitively guards the rules block too.
+        """
+        prompt = assemble_api_prompt(
+            source_files=[src_dir / "main.py"],
+            standards_text=standards_text,
+            dimension="security",
+            repo_name="test-repo",
+        )
+        task_idx = prompt.index("## Your Task")
+        schema_idx = prompt.index("Each finding must be a JSON object")
+        file_content_idx = prompt.index("def hello():")
+
+        assert task_idx < file_content_idx, "task instructions must precede file content"
+        assert schema_idx < file_content_idx, "finding schema must precede file content"
+
     def test_handles_unreadable_file_gracefully(self, src_dir, standards_text):
         missing = src_dir / "gone.py"
         prompt = assemble_api_prompt(
