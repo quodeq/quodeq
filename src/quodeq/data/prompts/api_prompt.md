@@ -11,16 +11,16 @@ You MUST evaluate EVERY principle group — not just the first ones.
 
 {{PROJECT_SHAPE}}
 
-## Source Files
-
-{{FILES_BLOCK}}
-
 ## Your Task
 
-Evaluate the source files against EACH principle group in the checklist above. Clean code returns `{"findings": []}`.
+Evaluate the source files below against EACH principle group in the checklist above. Clean code returns `{"findings": []}`.
 
 {{EVALUATION_RULES}}
 
 {{FINDING_SCHEMA}}
+
+## Source Files
+
+{{FILES_BLOCK}}
 
 Respond with ONLY this JSON.
