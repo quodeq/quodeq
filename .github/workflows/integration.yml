@@ -1,22 +1,26 @@
-name: Windows integration (non-blocking)
+name: Integration (non-blocking)
 
 # Exercises the @pytest.mark.integration suite (real subprocesses, server boot,
-# signal handling) on Windows. These are timing-sensitive and some paths are
-# POSIX-only, so this lane is intentionally NOT a required PR check: it runs on
-# a schedule (and on demand) to surface Windows-specific regressions for triage.
+# signal handling) on Linux AND Windows. Timing-sensitive and some paths are
+# platform-specific, so this lane is intentionally NOT a required PR check: it
+# runs on a schedule (and on demand) to surface OS-specific regressions for triage.
 
 on:
   schedule:
-    - cron: "0 4 * * *"   # nightly 04:00 UTC
+    - cron: "0 4 * * *"
   workflow_dispatch: {}
 
 permissions:
   contents: read
 
 jobs:
-  windows-integration:
-    runs-on: windows-latest
+  integration:
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v6
 
