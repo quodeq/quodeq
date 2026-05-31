@@ -1,0 +1,68 @@
+name: Linux distro install smoke (non-blocking)
+
+# Verifies the pip-install path on the distros the README claims to support, and
+# surfaces which distro/Python combos actually run quodeq (the 3.12+ floor). A
+# distro shipping Python <3.12 will fail `pip install` (requires-python) — that
+# is the intended signal, not a regression — so this lane is non-blocking.
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build-wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+      - name: Build wheel
+        run: uv build --wheel
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel
+          path: dist/*.whl
+
+  distro-smoke:
+    needs: build-wheel
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["debian:stable", "debian:testing", "fedora:latest", "archlinux:latest"]
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheel
+          path: dist
+
+      - name: Install Python + pip + venv
+        shell: bash
+        run: |
+          set -eux
+          if command -v apt-get >/dev/null; then apt-get update && apt-get install -y python3 python3-pip python3-venv; fi
+          if command -v dnf >/dev/null; then dnf install -y python3 python3-pip; fi
+          if command -v pacman >/dev/null; then pacman -Sy --noconfirm python python-pip; fi
+          python3 --version
+
+      - name: Install quodeq from the wheel and smoke a dry-run eval
+        shell: bash
+        run: |
+          set -eux
+          ver=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+          echo "::notice::${{ matrix.image }} ships Python ${ver}"
+          set -- dist/*.whl
+          whl="$1"
+          python3 -m venv /tmp/v
+          /tmp/v/bin/python -m pip install -U pip
+          /tmp/v/bin/python -m pip install "$whl"
+          /tmp/v/bin/python -c "import quodeq; print('import OK')"
+          mkdir -p /tmp/src
+          printf 'def f():\n    return 1\n' > /tmp/src/a.py
+          QUODEQ_EVALUATIONS_DIR=/tmp/reports /tmp/v/bin/python -m quodeq.cli evaluate /tmp/src --dry-run -d security
