@@ -444,9 +444,9 @@ class TestCircuitBreakerWiring:
                     "_marker": "file_done", "file": "b.py",
                     "status": "error", "reason": "token_limit",
                 }) + "\n")
-            # Give the watcher's poll loop time to read both errors and trip.
-            import time as _time
-            _time.sleep(1.0)
+            # No sleep: the breaker does a final scan on stop (see
+            # FailureStreakWatcher._run), so the trip is detected once dispatch
+            # returns rather than depending on a poll landing mid-dispatch.
             return _make_dummy_evidence(files_read=2)
 
         try:
