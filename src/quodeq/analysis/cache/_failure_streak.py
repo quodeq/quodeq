@@ -86,18 +86,43 @@ class FailureStreakWatcher:
         recent: list[FileError] = []
         while not self._stop.is_set():
             offset, streak, recent = self._scan_once(offset, streak, recent)
-            if streak >= self._threshold and self.trip_event is None:
-                if not cancellation.is_cancelled():
-                    event = TripEvent(streak=streak, recent=list(recent[-self._threshold:]))
-                    self.trip_event = event
-                    _logger.error(
-                        "failure-streak breaker tripped: %d consecutive errors; recent=%s",
-                        streak, [(e.file, e.reason) for e in event.recent],
-                    )
-                    cancellation.request_cancel()
-                self._tripped.set()
+            if self._maybe_trip(streak, recent):
                 return  # one trip, then we're done
             self._stop.wait(timeout=_POLL_INTERVAL_S)
+        # Stop was signaled (dispatch finished or raised). Do one last scan so
+        # a streak written since the previous poll still trips. Without it, a
+        # dispatch that fails fast and returns within a single poll interval
+        # (a dead endpoint erroring every file, or a time-compressed test) can
+        # finish *between* polls -- the loop then exits at the top check having
+        # never scanned the errors, and the breaker misses a trip it should
+        # have caught. This mirrors the periodic-persist watcher's
+        # final-persist-on-stop guarantee and makes the trip independent of
+        # poll timing (the slow-runner flake).
+        offset, streak, recent = self._scan_once(offset, streak, recent)
+        self._maybe_trip(streak, recent)
+
+    def _maybe_trip(self, streak: int, recent: list[FileError]) -> bool:
+        """Record a trip when the consecutive-error streak hits the threshold.
+
+        Idempotent and safe to call after stop: only the first trip sets
+        ``trip_event`` and requests cancellation. Returns True once a trip is
+        registered so the poll loop knows to stop. If the run is already
+        cancelling for another reason, set ``_tripped`` but leave
+        ``trip_event`` None -- the breaker must not claim a cancellation it
+        didn't cause (preserves the prior behavior).
+        """
+        if streak < self._threshold or self.trip_event is not None:
+            return False
+        if not cancellation.is_cancelled():
+            event = TripEvent(streak=streak, recent=list(recent[-self._threshold:]))
+            self.trip_event = event
+            _logger.error(
+                "failure-streak breaker tripped: %d consecutive errors; recent=%s",
+                streak, [(e.file, e.reason) for e in event.recent],
+            )
+            cancellation.request_cancel()
+        self._tripped.set()
+        return True
 
     def _scan_once(
         self, offset: int, streak: int, recent: list[FileError],

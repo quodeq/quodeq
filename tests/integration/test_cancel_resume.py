@@ -145,9 +145,11 @@ class _ScriptedDispatcher:
         with jsonl.open("a") as out:
             for entry in self._script(files):
                 out.write(json.dumps(entry) + "\n")
-        # Give the breaker watcher a moment to read errors that may trip it.
-        import time as _t
-        _t.sleep(0.6)
+        # No sleep: the breaker does a final scan when the runner signals stop
+        # (see FailureStreakWatcher._run), so a trip is detected deterministically
+        # once dispatch returns -- it no longer depends on a poll landing during
+        # dispatch. The old fixed sleep was a slow-runner flake ("DID NOT RAISE
+        # CircuitBreakerError" on macos-latest).
         return _make_dummy_evidence(files_read=len(files))
 
     def _script(self, files: list[str]):
