@@ -24,7 +24,8 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from quodeq.analysis.cache.backend import CacheBackend
-from quodeq.analysis.cache.entry import CacheEntry
+from quodeq.analysis.cache.dimension_helpers import _SCHEMA_VERSION
+from quodeq.analysis.cache.entry import CacheEntry, build_provenance
 from quodeq.analysis.cache.key import CacheKey, compute_key
 
 
@@ -76,18 +77,15 @@ class UnitResult:
 
 
 def _key_for(unit: WorkUnit, schema_version: int) -> str:
+    # Permissive key: only the real per-unit inputs. The unit's volatile
+    # fields (standards/prompts/evaluator/model/sampling) are carried for
+    # provenance, not keying.
     return compute_key(CacheKey(
         schema_version=schema_version,
         file_content_hash=unit.file_content_hash,
         file_path=unit.file_path,
         dimension=unit.dimension,
-        standards_hash=unit.standards_hash,
-        prompts_hash=unit.prompts_hash,
-        evaluator_hash=unit.evaluator_hash,
-        model_id=unit.model_id,
         language=unit.language,
-        temperature=unit.temperature,
-        max_tokens=unit.max_tokens,
     ))
 
 
@@ -96,7 +94,7 @@ def analyze_unit(
     *,
     cache: CacheBackend,
     dispatcher: Dispatcher,
-    schema_version: int = 1,
+    schema_version: int = _SCHEMA_VERSION,
 ) -> UnitResult:
     """Cache-or-dispatch one work unit.
 
@@ -120,6 +118,12 @@ def analyze_unit(
         file_path=unit.file_path,
         dimension=unit.dimension,
         model_id=unit.model_id,
+        file_content_hash=unit.file_content_hash,
+        language=unit.language,
+        provenance=build_provenance(
+            model_id=unit.model_id, prompts_hash=unit.prompts_hash,
+            standards_hash=unit.standards_hash,
+        ),
     )
     cache.put(key, entry)
     return UnitResult(entry=entry, cache_hit=False)

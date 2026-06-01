@@ -1,16 +1,28 @@
 """Cache key — content-addressed identity for a (file, dimension) work unit.
 
-The key is the SHA-256 of a canonical JSON serialization of every input
-that affects the analysis output. Two runs with identical inputs compute
-the same key and share the cached result; any diverging input produces
-a different key and forces a fresh dispatch.
+The key is the SHA-256 of a canonical JSON serialization of the inputs that
+define *"this exact code, evaluated for this dimension."* Two runs with
+identical inputs compute the same key and share the cached result.
 
-What is intentionally NOT in the key:
-- timestamps, run_id, machine, user, git_commit, branch — those are
-  metadata about the run, not inputs to the analysis itself.
+The key is **permissive** (cost-first): it invalidates ONLY on a real
+per-unit change. Evaluations are expensive, the user already owns the
+explicit refresh path (``--clean-scan``), so cached findings stay resilient
+to everything except an actual file change.
 
-What might be added later:
-- evaluator code hash, when evaluators start shaping output deterministically.
+What is intentionally NOT in the key (recorded in ``CacheEntry.provenance``
+instead, so reuse across these boundaries is surfaced rather than silently
+re-evaluated):
+- ``model_id`` — switching models reuses prior work; the user refreshes if
+  they want the new model to re-run.
+- ``prompts_hash`` / ``standards_hash`` — a quodeq update or a standards edit
+  reuses prior work; ``--clean-scan`` refreshes on demand.
+- ``evaluator_hash`` and sampling params (``temperature``, ``max_tokens``).
+- timestamps, run_id, machine, user, git_commit, branch — run metadata, never
+  inputs to the analysis itself.
+
+``language`` stays in the key: it is a stable project property (not a quodeq
+update) and changing it genuinely changes which files exist and how they are
+analyzed.
 """
 from __future__ import annotations
 
@@ -21,21 +33,19 @@ from dataclasses import asdict, dataclass
 
 @dataclass(frozen=True)
 class CacheKey:
-    """Inputs that uniquely determine the analysis output for one work unit."""
+    """The real per-unit inputs that determine the analysis output.
+
+    Only these fields. Volatile inputs (model, prompts, standards, sampling)
+    are deliberately excluded — they live in ``CacheEntry.provenance``. Adding
+    a field here is a cache-wide invalidation, so do it only for a genuine
+    per-unit input.
+    """
 
     schema_version: int
     file_content_hash: str
     file_path: str
     dimension: str
-    standards_hash: str
-    prompts_hash: str
-    evaluator_hash: str
-    model_id: str
     language: str
-    # Sampling params: optional today, but baked into the key so any future
-    # variation invalidates correctly without a schema bump.
-    temperature: float | None = None
-    max_tokens: int | None = None
 
 
 def compute_key(key: CacheKey) -> str:

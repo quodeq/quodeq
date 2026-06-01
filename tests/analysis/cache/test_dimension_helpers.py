@@ -25,6 +25,7 @@ from quodeq.analysis.cache.dimension_helpers import (
     ClassifyResult,
     build_cache_key_for_file,
     classify_files_via_cache,
+    format_provenance_drift,
     persist_dispatch_results,
 )
 
@@ -91,13 +92,15 @@ class TestKeyComposition:
             != build_cache_key_for_file(config, "a.py", "documentation")
         )
 
-    def test_model_change_invalidates(self, tmp_path: Path):
+    def test_model_change_does_not_invalidate(self, tmp_path: Path):
+        # Permissive key: switching model reuses the cache (model lives in
+        # provenance, not the key). This is the cost-first behavior.
         _write_files(tmp_path / "src", {"a.py": "x"})
         c1 = _make_config(tmp_path / "src", model="claude-opus-4-7")
         c2 = _make_config(tmp_path / "src", model="claude-sonnet-4-6")
         assert (
             build_cache_key_for_file(c1, "a.py", "security")
-            != build_cache_key_for_file(c2, "a.py", "security")
+            == build_cache_key_for_file(c2, "a.py", "security")
         )
 
     def test_language_change_invalidates(self, tmp_path: Path):
@@ -109,7 +112,10 @@ class TestKeyComposition:
             != build_cache_key_for_file(c2, "a.py", "security")
         )
 
-    def test_standards_change_invalidates(self, tmp_path: Path):
+    def test_standards_change_does_not_invalidate(self, tmp_path: Path):
+        # Permissive key: editing a standard reuses the cache. Standards drift
+        # is surfaced via provenance, and the user refreshes with --clean-scan
+        # when they want to re-evaluate against new standards.
         _write_files(tmp_path / "src", {"a.py": "x"})
         std_dir = tmp_path / "standards"
         _write_compiled_standards(std_dir, "security", '{"v": 1}')
@@ -117,22 +123,12 @@ class TestKeyComposition:
         k1 = build_cache_key_for_file(c1, "a.py", "security")
 
         _write_compiled_standards(std_dir, "security", '{"v": 2}')
-        # The in-process standards hash is memoized via _hash_file_by_stat,
-        # keyed on (path, size, mtime_ns). Both writes here produce 8-byte
-        # JSON, and on Windows file timestamps are quantized to ~16ms by
-        # the OS — so two rewrites in the same millisecond can share both
-        # size and mtime_ns, falsely hitting the cache. Explicitly bump
-        # mtime past the quantum so the cache invariant we're asserting
-        # ("standards rewrite invalidates the cache key") is testable on
-        # every platform. In real ``quodeq evaluate`` runs the standards
-        # file is not rewritten mid-process; this only matters for tests
-        # that simulate mid-run mutation.
         import os
         compiled = std_dir / "compiled" / "security.json"
         st = compiled.stat()
         os.utime(compiled, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000_000))
         k2 = build_cache_key_for_file(c1, "a.py", "security")
-        assert k1 != k2
+        assert k1 == k2
 
     def test_path_change_invalidates(self, tmp_path: Path):
         _write_files(tmp_path / "src", {"a.py": "x", "sub/a.py": "x"})
@@ -220,6 +216,107 @@ class TestClassify:
 
 
 # ============================================================
+# provenance drift (reuse across model/standards/prompts boundary)
+# ============================================================
+
+class TestProvenanceDrift:
+    def _seed(self, cache, config, files, *, provenance):
+        for f in files:
+            key = build_cache_key_for_file(config, f, "security")
+            cache.put(key, CacheEntry(
+                key=key, schema_version=3, findings=[{"file": f}],
+                files_read=1, file_path=f, dimension="security",
+                model_id=provenance.get("model_id", ""), provenance=provenance,
+            ))
+
+    def test_reports_model_drift_across_hits(self, tmp_path: Path, cache: LocalFileBackend):
+        files = _write_files(tmp_path / "src", {"a.py": "x", "b.py": "y"})
+        config = _make_config(tmp_path / "src", model="new-model")
+        # Seed entries produced under a different model. Other provenance
+        # fields are blank, so only the model field is a known difference.
+        self._seed(cache, config, files, provenance={
+            "model_id": "old-model", "standards_hash": "",
+            "prompts_hash": "", "quodeq_version": "",
+        })
+        result = classify_files_via_cache(config, "security", files, cache)
+        assert result.misses == []
+        drift = result.provenance_drift
+        assert drift["model_id"]["count"] == 2
+        assert drift["model_id"]["from"] == "old-model"
+        assert drift["model_id"]["to"] == "new-model"
+        # Blank (unknown) fields are never reported as drift.
+        assert "standards_hash" not in drift
+        assert "prompts_hash" not in drift
+
+    def test_ignores_unknown_provenance(self, tmp_path: Path, cache: LocalFileBackend):
+        # A legacy / empty-provenance entry must not be claimed as drift —
+        # we can't know what it was produced under.
+        files = _write_files(tmp_path / "src", {"a.py": "x"})
+        config = _make_config(tmp_path / "src", model="new-model")
+        self._seed(cache, config, files, provenance={})
+        result = classify_files_via_cache(config, "security", files, cache)
+        assert result.misses == []
+        assert result.provenance_drift == {}
+
+    def test_no_drift_when_provenance_matches(self, tmp_path: Path, cache: LocalFileBackend):
+        files = _write_files(tmp_path / "src", {"a.py": "x"})
+        config = _make_config(tmp_path / "src", model="same-model")
+        self._seed(cache, config, files, provenance={
+            "model_id": "same-model", "standards_hash": "",
+            "prompts_hash": "", "quodeq_version": "",
+        })
+        result = classify_files_via_cache(config, "security", files, cache)
+        assert result.provenance_drift == {}
+
+
+class TestFormatProvenanceDrift:
+    def test_names_model_and_standards_with_counts(self):
+        drift = {
+            "model_id": {"count": 240, "from": "claude-sonnet-4", "to": "claude-opus-4"},
+            "standards_hash": {"count": 240, "from": "s3", "to": "s4"},
+        }
+        msg = format_provenance_drift(drift, reused=240)
+        assert "240" in msg
+        assert "model" in msg
+        assert "claude-sonnet-4" in msg and "claude-opus-4" in msg
+        assert "standards" in msg
+        # Opaque standards hashes are not dumped into user-facing text.
+        assert "s3" not in msg
+        # No em-dash in user-facing strings (repo convention).
+        assert "—" not in msg
+
+    def test_empty_when_no_drift(self):
+        assert format_provenance_drift({}, reused=100) == ""
+
+    def test_shows_version_transition_suppresses_all_hashes_in_order(self):
+        # Covers the other two field branches: quodeq_version (human-value,
+        # shows from->to) and prompts_hash (opaque, value suppressed). Pins
+        # that NEITHER the 'from' nor 'to' of an opaque hash leaks, and that
+        # fields render in _PROV_FIELDS order.
+        drift = {
+            "model_id": {"count": 3, "from": "sonnet", "to": "opus"},
+            "standards_hash": {"count": 3, "from": "s3", "to": "s4"},
+            "prompts_hash": {"count": 3, "from": "p3", "to": "p4"},
+            "quodeq_version": {"count": 3, "from": "1.0.0", "to": "1.1.2"},
+        }
+        msg = format_provenance_drift(drift, reused=3)
+        # Human-value fields show the transition.
+        assert "1.0.0" in msg and "1.1.2" in msg
+        assert "quodeq version" in msg
+        assert "prompts" in msg
+        # Opaque hashes never leak — neither 'from' nor 'to'.
+        for opaque in ("s3", "s4", "p3", "p4"):
+            assert opaque not in msg
+        # Rendered in _PROV_FIELDS order: model, standards, prompts, version.
+        assert (
+            msg.index("model")
+            < msg.index("standards")
+            < msg.index("prompts")
+            < msg.index("quodeq version")
+        )
+
+
+# ============================================================
 # persist_dispatch_results
 # ============================================================
 
@@ -300,6 +397,33 @@ class TestPersist:
         # Only a.py's key is in the cache; carried.py was never dispatched here.
         assert cache.get(miss_keys["a.py"]) is not None
         # No entry for carried.py — its key isn't even in miss_keys.
+
+    def test_persisted_entry_is_self_describing(self, tmp_path: Path, cache: LocalFileBackend):
+        # persist_dispatch_results writes entries that record the content
+        # hash they were keyed under and the provenance they were produced
+        # under, so reuse across a model/standards boundary is surfaceable.
+        files = _write_files(tmp_path / "src", {"a.py": "hello"})
+        config = _make_config(tmp_path / "src", work_dir=tmp_path / "work", model="model-1")
+        miss_keys = {f: build_cache_key_for_file(config, f, "security") for f in files}
+
+        jsonl = tmp_path / "work" / "security_evidence.jsonl"
+        jsonl.parent.mkdir(parents=True, exist_ok=True)
+        jsonl.write_text(
+            json.dumps({"_marker": "file_done", "file": "a.py", "status": "ok"}) + "\n"
+        )
+
+        persist_dispatch_results(
+            config, "security", miss_files=files,
+            jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
+        )
+
+        entry = cache.get(miss_keys["a.py"])
+        assert entry is not None
+        assert entry.file_content_hash == hashlib.sha256(b"hello").hexdigest()
+        assert entry.provenance["model_id"] == "model-1"
+        assert "prompts_hash" in entry.provenance
+        assert "standards_hash" in entry.provenance
+        assert "quodeq_version" in entry.provenance
 
     def test_handles_missing_jsonl(self, tmp_path: Path, cache: LocalFileBackend):
         files = _write_files(tmp_path / "src", {"a.py": "x"})

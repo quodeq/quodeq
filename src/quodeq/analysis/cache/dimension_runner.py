@@ -48,8 +48,10 @@ from quodeq.analysis.cache.dimension_helpers import (
     _group_findings_by_file,
     build_cache_key_for_file,
     classify_files_via_cache,
+    format_provenance_drift,
     persist_dispatch_results,
 )
+from quodeq.analysis.cache.gc import maybe_collect_legacy_entries
 from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.subagents._source_files import _list_source_files
 from quodeq.analysis.subagents.runner import (
@@ -215,6 +217,10 @@ def process_dimension_with_cache(
     """
     if cache is None:
         cache = LocalFileBackend()
+        # First cache open of a real run (tests inject their own cache and
+        # skip this branch). Reclaim entries orphaned by the schema bump,
+        # once per process. Best-effort: never blocks the run.
+        maybe_collect_legacy_entries(cache.root)
 
     files, _ext = _list_source_files(config, dim_id)
     if not files:
@@ -248,10 +254,15 @@ def process_dimension_with_cache(
         config, dim_id, files, cache, bypass_reads=bypass_reads,
     )
     n_hits = len(files) - len(classify.misses)
+    # Surface provenance drift on the classify log so reuse across a
+    # model/standards/prompts boundary is never silent (run.log -> side-pane
+    # log viewer + CLI). The user decides when to --clean-scan to refresh.
+    drift_note = format_provenance_drift(classify.provenance_drift, reused=n_hits)
     _logger.info(
-        "[%s] cache: %d hits / %d misses (%d total)%s",
+        "[%s] cache: %d hits / %d misses (%d total)%s%s",
         dim_id, n_hits, len(classify.misses), len(files),
         " - clean-scan invalidated" if bypass_reads else "",
+        f" - reused {drift_note}" if drift_note else "",
     )
     # Structured marker for the dashboard / SSE stream - one event per
     # dim summarising hit/miss split. Per-file events would be too noisy

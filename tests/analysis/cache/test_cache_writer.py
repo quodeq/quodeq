@@ -84,6 +84,86 @@ def test_cache_writer_writes_empty_findings_entry(tmp_path):
     assert len(entries) == 1
 
 
+def test_cache_writer_records_provenance_and_content_hash(tmp_path):
+    """The written entry is self-describing: it stores the file_content_hash
+    it was keyed under and a provenance block (model / prompts / standards /
+    quodeq version) recording the volatile context it was produced under."""
+    import quodeq
+    from quodeq.analysis.cache.cache_writer import build_cache_writer
+    from quodeq.analysis.cache.dimension_helpers import (
+        _hash_prompts_combined,
+        build_cache_key_for_file,
+    )
+    from quodeq.analysis.cache.local import LocalFileBackend
+    from quodeq.analysis.fingerprint import _hash_file
+
+    src_root = tmp_path / "src"
+    src_root.mkdir()
+    (src_root / "Foo.kt").write_text("class Foo")
+
+    cache_root = tmp_path / "cache"
+    write = build_cache_writer(
+        cache_root=cache_root,
+        src_root=src_root,
+        standards_dir=None,
+        dimension="flexibility",
+        model_id="sonnet",
+        language="kotlin",
+    )
+    write("Foo.kt", [])
+
+    config = _make_config(src_root, model="sonnet", language="kotlin")
+    key = build_cache_key_for_file(config, "Foo.kt", "flexibility")
+    entry = LocalFileBackend(root=cache_root).get(key)
+    assert entry is not None
+    assert entry.file_content_hash == _hash_file(src_root / "Foo.kt")
+    prov = entry.provenance
+    assert prov["model_id"] == "sonnet"
+    assert prov["standards_hash"] == ""  # standards_dir=None
+    assert prov["prompts_hash"] == _hash_prompts_combined()
+    assert prov["quodeq_version"] == (quodeq.__version__ or "")
+
+
+def test_entry_is_self_describing_for_future_key_migration(tmp_path):
+    """The schema-3 self-describing guarantee: an entry stores EVERY field its
+    key was computed from (content hash, path, dimension, language), so a
+    future key change can be recomputed losslessly from the entry alone — no
+    re-evaluation. This is what makes the 2->3 change the last one that costs
+    a re-eval. Regressing it (e.g. dropping language from the entry) silently
+    breaks future migratability, so pin it."""
+    from quodeq.analysis.cache.cache_writer import build_cache_writer
+    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
+    from quodeq.analysis.cache.key import CacheKey, compute_key
+    from quodeq.analysis.cache.local import LocalFileBackend
+
+    src_root = tmp_path / "src"
+    src_root.mkdir()
+    (src_root / "Foo.kt").write_text("class Foo")
+
+    cache_root = tmp_path / "cache"
+    write = build_cache_writer(
+        cache_root=cache_root, src_root=src_root, standards_dir=None,
+        dimension="flexibility", model_id="sonnet", language="kotlin",
+    )
+    write("Foo.kt", [])
+
+    config = _make_config(src_root, model="sonnet", language="kotlin")
+    key = build_cache_key_for_file(config, "Foo.kt", "flexibility")
+    entry = LocalFileBackend(root=cache_root).get(key)
+    assert entry is not None
+
+    # Recompute the key PURELY from stored entry fields (the migration
+    # primitive — a real migration does this with schema_version + 1).
+    recomputed = compute_key(CacheKey(
+        schema_version=entry.schema_version,
+        file_content_hash=entry.file_content_hash,
+        file_path=entry.file_path,
+        dimension=entry.dimension,
+        language=entry.language,
+    ))
+    assert recomputed == key
+
+
 def test_cache_writer_key_matches_classify_files_via_cache(tmp_path):
     """LOAD-BEARING TEST: the key the closure computes MUST equal
     build_cache_key_for_file(config, file, dim). Otherwise the parent's
