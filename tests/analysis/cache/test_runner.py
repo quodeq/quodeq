@@ -123,27 +123,38 @@ class TestDispatcherFailure:
         assert result.cache_hit is True
 
 
-# ---------- key sensitivity (every CacheKey field invalidates) ----------
+# ---------- key sensitivity (only real per-unit changes invalidate) ----------
 
 class TestInvalidation:
     @pytest.mark.parametrize("override", [
         {"file_content_hash": "00" * 32},
         {"file_path": "src/other.py"},
         {"dimension": "documentation"},
-        {"standards_hash": "11" * 32},
-        {"prompts_hash": "22" * 32},
-        {"evaluator_hash": "33" * 32},
-        {"model_id": "claude-sonnet-4-6"},
         {"language": "typescript"},
-        {"temperature": 0.7},
-        {"max_tokens": 4096},
     ])
-    def test_each_input_change_misses(self, cache: LocalFileBackend, override: dict):
+    def test_each_real_change_misses(self, cache: LocalFileBackend, override: dict):
         dispatcher = _RecordingDispatcher()
         analyze_unit(_unit(), cache=cache, dispatcher=dispatcher)
         result = analyze_unit(_unit(**override), cache=cache, dispatcher=dispatcher)
         assert result.cache_hit is False
         assert len(dispatcher.calls) == 2
+
+    @pytest.mark.parametrize("override", [
+        {"standards_hash": "11" * 32},
+        {"prompts_hash": "22" * 32},
+        {"evaluator_hash": "33" * 32},
+        {"model_id": "claude-sonnet-4-6"},
+        {"temperature": 0.7},
+        {"max_tokens": 4096},
+    ])
+    def test_volatile_change_reuses(self, cache: LocalFileBackend, override: dict):
+        # Permissive key: changing model / prompts / standards / sampling
+        # params reuses the cached result rather than re-dispatching.
+        dispatcher = _RecordingDispatcher()
+        analyze_unit(_unit(), cache=cache, dispatcher=dispatcher)
+        result = analyze_unit(_unit(**override), cache=cache, dispatcher=dispatcher)
+        assert result.cache_hit is True
+        assert len(dispatcher.calls) == 1
 
     def test_schema_version_bump_invalidates_everything(self, cache: LocalFileBackend):
         dispatcher = _RecordingDispatcher()
@@ -174,6 +185,42 @@ class TestRunnerOwnsKey:
         assert result.entry.file_path == "src/special.py"
         assert result.entry.dimension == "performance"
         assert result.entry.model_id == "claude-haiku-4"
+
+
+# ---------- schema default stays aligned with the live cache ----------
+
+class TestSchemaDefault:
+    def test_default_schema_matches_current_version(self, cache: LocalFileBackend):
+        # analyze_unit's default schema_version must equal the live cache
+        # schema, so it can never silently key into a stale namespace (whose
+        # writes the one-time GC would then reclaim). Keeps the runner
+        # byte-identical to the two live key sites by default.
+        from quodeq.analysis.cache.dimension_helpers import _SCHEMA_VERSION
+        result = analyze_unit(_unit(), cache=cache, dispatcher=_RecordingDispatcher())
+        assert result.entry.schema_version == _SCHEMA_VERSION
+
+
+# ---------- self-describing entry (file_content_hash + provenance) ----------
+
+class TestProvenance:
+    def test_entry_records_content_hash_and_provenance(self, cache: LocalFileBackend):
+        # The entry remembers exactly what it was keyed under (content hash)
+        # and the volatile context it was produced under (provenance), so the
+        # cache is self-describing and reuse across a model/standards boundary
+        # is never silent.
+        unit = _unit(
+            file_content_hash="ab" * 32,
+            model_id="model-a",
+            prompts_hash="prompts-1",
+            standards_hash="standards-1",
+        )
+        result = analyze_unit(unit, cache=cache, dispatcher=_RecordingDispatcher())
+        assert result.entry.file_content_hash == "ab" * 32
+        prov = result.entry.provenance
+        assert prov["model_id"] == "model-a"
+        assert prov["prompts_hash"] == "prompts-1"
+        assert prov["standards_hash"] == "standards-1"
+        assert "quodeq_version" in prov
 
 
 # ---------- concurrency (atomic writes from the backend) ----------

@@ -21,6 +21,7 @@ state and the dispatcher call recorder.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
@@ -207,6 +208,160 @@ class TestAllHits:
         jsonl = (tmp_path / "work" / "security_evidence.jsonl").read_text()
         lines = [json.loads(l) for l in jsonl.splitlines() if l.strip()]
         assert {l["w"] for l in lines} == {"a-cached", "b-cached"}
+
+
+class _ListHandler(logging.Handler):
+    """Capture log messages off a specific logger. The ``quodeq`` logger sets
+    propagate=False, so pytest's caplog (root) can't see these records — we
+    attach directly to the module logger instead."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.messages.append(record.getMessage())
+
+
+class TestProvenanceSurfacing:
+    def test_classify_log_names_model_drift_on_all_hits(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        # Reuse across a model change must never be silent: the per-dim
+        # classify log line surfaces that reused findings predate the
+        # current model.
+        config, src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
+        for f in ["a.py", "b.py"]:
+            key = build_cache_key_for_file(config, f, "security")
+            cache.put(key, CacheEntry(
+                key=key, schema_version=3,
+                findings=[{"file": f, "line": 1, "t": "violation", "w": f"{f}-cached"}],
+                files_read=1, file_path=f, dimension="security",
+                model_id="old-model",
+                provenance={
+                    "model_id": "old-model", "standards_hash": "",
+                    "prompts_hash": "", "quodeq_version": "",
+                },
+            ))
+
+        handler = _ListHandler()
+        logger = logging.getLogger("quodeq.analysis.cache.dimension_runner")
+        logger.addHandler(handler)
+        dispatcher = FakeDispatcher(src)
+        try:
+            with patch(
+                "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+                new=dispatcher,
+            ):
+                process_dimension_with_cache(
+                    config, "security", idx=1, ctx=_make_ctx(),
+                    callbacks=_make_callbacks(), cache=cache,
+                )
+        finally:
+            logger.removeHandler(handler)
+
+        assert dispatcher.calls == []
+        text = "\n".join(handler.messages)
+        assert "model" in text.lower()
+        assert "old-model" in text  # the model the reused findings predate
+
+
+class TestModelSwitchReuse:
+    def test_second_run_with_new_model_is_all_hits(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        # The headline cost-first behavior: run a dimension on model A, then
+        # the SAME code on model B. The second run reuses every cached
+        # finding with zero re-dispatch, and the entries still record model A
+        # as their provenance so the drift is surfaceable.
+        config_a, src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
+        # config_a model is "test-model" (the _make_config default).
+
+        d1 = FakeDispatcher(src)
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=d1,
+        ):
+            process_dimension_with_cache(
+                config_a, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+            )
+        assert len(d1.calls) == 1  # cold cache -> dispatched the misses
+
+        # Same project, different model.
+        config_b = replace(
+            config_a,
+            options=replace(config_a.options, subagent_model="other-model"),
+        )
+        d2 = FakeDispatcher(src)
+        handler = _ListHandler()
+        logger = logging.getLogger("quodeq.analysis.cache.dimension_runner")
+        logger.addHandler(handler)
+        try:
+            with patch(
+                "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+                new=d2,
+            ):
+                ev = process_dimension_with_cache(
+                    config_b, "security", idx=1, ctx=_make_ctx(),
+                    callbacks=_make_callbacks(), cache=cache,
+                )
+        finally:
+            logger.removeHandler(handler)
+
+        # All hits despite the model change: no re-dispatch.
+        assert d2.calls == []
+        assert ev is not None
+
+        # The cache key is identical across the model switch, and the entry
+        # still remembers the model that produced it.
+        key = build_cache_key_for_file(config_b, "a.py", "security")
+        assert key == build_cache_key_for_file(config_a, "a.py", "security")
+        entry = cache.get(key)
+        assert entry is not None
+        assert entry.provenance["model_id"] == "test-model"
+
+        # End-to-end: the provenance written by run 1's persist is read back
+        # by run 2's classify and surfaced on the log, naming the model the
+        # reused findings predate. This pins the persist -> classify ->
+        # format_provenance_drift seam that the unit tests stub.
+        text = "\n".join(handler.messages)
+        assert "model" in text.lower()
+        assert "test-model" in text
+
+
+class TestGcWiring:
+    def test_default_backend_open_collects_legacy_entries(
+        self, tmp_path: Path, monkeypatch,
+    ):
+        # When no cache is injected (the production path), opening the default
+        # backend runs the one-time GC, reclaiming schema<3 entries. Sandbox
+        # the cache root via env so we never touch the real ~/.quodeq cache.
+        from quodeq.analysis.cache.local import default_cache_root
+
+        monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "qroot"))
+        results_root = default_cache_root()
+        legacy_dir = results_root / "aa" / ("0" * 62)
+        legacy_dir.mkdir(parents=True, exist_ok=True)
+        (legacy_dir / "entry.json").write_text(json.dumps({
+            "key": "aa" + "0" * 62, "schema_version": 2, "findings": [],
+            "files_read": 1, "file_path": "old.py", "dimension": "security",
+            "model_id": "m",
+        }))
+
+        config, src = _setup(tmp_path, {"a.py": "x"})
+        dispatcher = FakeDispatcher(src)
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=dispatcher,
+        ):
+            # cache=None -> production default-backend path -> GC fires.
+            process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=None,
+            )
+
+        assert not (legacy_dir / "entry.json").exists()
 
 
 class TestAllMisses:

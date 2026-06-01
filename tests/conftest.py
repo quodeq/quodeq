@@ -20,6 +20,13 @@ def _isolate_quodeq_home(tmp_path_factory: pytest.TempPathFactory,
       * ``QUODEQ_INDEX_DB_PATH``    — ``services/filesystem._open_index``
       * ``QUODEQ_EVALUATIONS_DIR``  — ``services/filesystem.list_evaluations`` etc.
       * ``QUODEQ_DIR``              — ``dashboard/_build_npm._quodeq_dir``
+      * ``QUODEQ_CACHE_ROOT``       — ``analysis/cache/local.default_cache_root``
+        (and the online cache). Without this, the content-addressed result
+        cache falls through to the real ``~/.quodeq/cache``; the one-time
+        legacy-entry GC would then walk and delete from the developer's real
+        cache whenever a test reaches the ``cache is None`` production path.
+        Sandbox it so the suite is safe by construction, not by per-test
+        discipline.
     ``QUODEQ_HOME`` is kept for any out-of-tree consumer that may rely on it.
     """
     home = tmp_path_factory.mktemp("quodeq-home")
@@ -27,6 +34,7 @@ def _isolate_quodeq_home(tmp_path_factory: pytest.TempPathFactory,
     monkeypatch.setenv("QUODEQ_DIR", str(home))
     monkeypatch.setenv("QUODEQ_INDEX_DB_PATH", str(home / "index.db"))
     monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(home / "evaluations"))
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(home / "cache"))
 
 
 class DummyProcess:

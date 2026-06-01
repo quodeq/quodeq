@@ -26,7 +26,7 @@ from quodeq.analysis.cache.dimension_helpers import (
     _SCHEMA_VERSION,
     _hash_prompts_combined,
 )
-from quodeq.analysis.cache.entry import CacheEntry
+from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_version
 from quodeq.analysis.cache.key import CacheKey, compute_key
 from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.fingerprint import _hash_file, _hash_standards
@@ -67,10 +67,14 @@ def build_cache_writer(
     write already succeeded, so the run continues.
     """
     cache = LocalFileBackend(root=cache_root)
+    # Provenance context, captured once at construction (run-constant). These
+    # left the cache key in schema 3 but are recorded on each entry so reuse
+    # across a model/prompts/standards boundary is surfaceable, not silent.
     standards_hash = (
         (_hash_standards(standards_dir, dimension) if standards_dir else "") or ""
     )
     prompts_hash = _hash_prompts_combined()
+    version = quodeq_version()
 
     def write(file_path: str, findings: list[dict]) -> None:
         content_hash = _hash_file(src_root / file_path) or ""
@@ -79,10 +83,6 @@ def build_cache_writer(
             file_content_hash=content_hash,
             file_path=file_path,
             dimension=dimension,
-            standards_hash=standards_hash,
-            prompts_hash=prompts_hash,
-            evaluator_hash="",  # not yet versioned; matches build_cache_key_for_file
-            model_id=model_id,
             language=language,
         )
         key = compute_key(key_struct)
@@ -94,6 +94,12 @@ def build_cache_writer(
             file_path=file_path,
             dimension=dimension,
             model_id=model_id,
+            file_content_hash=content_hash,
+            language=language,
+            provenance=build_provenance(
+                model_id=model_id, prompts_hash=prompts_hash,
+                standards_hash=standards_hash, version=version,
+            ),
         )
         cache.put(key, entry)
 
