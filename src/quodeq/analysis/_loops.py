@@ -118,17 +118,25 @@ def check_zero_findings(
     """
     if not result or source_file_count <= 0 or incremental_filter_active:
         return
-    total_findings = sum(
-        sum(len(pe.violations) + len(pe.compliance) for pe in ev.principles.values())
-        for ev in result.values()
-    )
-    if total_findings == 0:
+    if _count_findings(result) == 0:
         skip_msg = f" ({skipped_count} skipped)" if skipped_count else ""
         raise EvaluationError(
             f"Evaluation produced 0 findings across {len(result)} dimensions{skip_msg}. "
             f"This usually means the AI CLI could not read files or report findings "
             "- check tool permissions and MCP configuration."
         )
+
+
+def _count_findings(result: dict[str, Evidence]) -> int:
+    """Total violations + compliance findings across all dimension Evidence.
+
+    Counts findings carried forward from cache as well as freshly produced
+    ones -- both land in ``Evidence.principles`` for the dims in ``result``.
+    """
+    return sum(
+        sum(len(pe.violations) + len(pe.compliance) for pe in ev.principles.values())
+        for ev in result.values()
+    )
 
 
 def _tally_markers(jsonl_path: Path) -> tuple[int, int]:
@@ -140,7 +148,10 @@ def _tally_markers(jsonl_path: Path) -> tuple[int, int]:
     """
     last_status: dict[str, str] = {}
     try:
-        with jsonl_path.open("r", encoding="utf-8") as fh:
+        # errors="replace" so a corrupt (non-UTF8) evidence file degrades to
+        # unparseable lines (dropped by the json.loads guard) instead of
+        # raising UnicodeDecodeError out of an otherwise-successful run.
+        with jsonl_path.open("r", encoding="utf-8", errors="replace") as fh:
             for raw in fh:
                 raw = raw.strip()
                 if not raw:
@@ -162,18 +173,35 @@ def _tally_markers(jsonl_path: Path) -> tuple[int, int]:
     return ok, err
 
 
-def check_model_reachable(run_dir: Path | None) -> None:
-    """Raise EvaluationError if files were dispatched but none were analysed.
+def check_model_reachable(run_dir: Path | None, result: dict) -> None:
+    """Raise EvaluationError if the run attempted analysis but produced nothing.
 
-    Distinguishes a misconfigured/unreachable model (files dispatched, every
-    call failed -> only ``error`` markers, zero ``ok`` markers) from a
-    legitimately empty scan (no applicable files dispatched -> no markers at
-    all). Runs in every mode, including diff (review) and incremental (nightly)
-    where ``check_zero_findings`` is deliberately bypassed -- those are exactly
-    the modes where an unreachable model used to exit 0 (green) while producing
-    nothing.
+    Fires only when ALL of the following hold, so it flags a genuinely worthless
+    run (an unreachable/misconfigured model) without false-positiving on healthy
+    or partial runs:
+
+    - the run produced zero findings (fresh OR carried forward from cache). Any
+      finding means real output exists, so a mostly-cached run is not failed just
+      because the model blipped on the uncached remainder. (A lossy call now
+      writes ``error`` markers, so the dim yields an *empty* Evidence rather than
+      being skipped -- hence we gate on findings, not on ``result`` emptiness.)
+    - zero files were successfully analysed (no ``ok`` file_done markers); and
+    - at least one file was dispatched and failed (an ``error`` marker exists).
+
+    Runs in every mode, including diff (review) and incremental (nightly) where
+    ``check_zero_findings`` is deliberately bypassed -- those are exactly the
+    modes where an unreachable model used to exit 0 (green) while producing
+    nothing. A legitimately empty scan (no applicable files dispatched -> no
+    markers) does not raise.
+
+    Coverage note: the guard keys off file_done ``error`` markers. The Ollama /
+    API provider path writes those on a lossy call (``run_api_analysis``), so the
+    Ollama-backed CI flows are covered. A CLI provider (claude/gemini/codex) that
+    is itself unreachable never connects to the MCP server and writes no markers
+    at all, so this guard cannot see that failure in diff/incremental mode --
+    that remains a known gap, out of scope for the Ollama incident this targets.
     """
-    if run_dir is None:
+    if run_dir is None or _count_findings(result) > 0:
         return
     evidence_dir = run_dir / "evidence"
     if not evidence_dir.is_dir():
@@ -184,12 +212,12 @@ def check_model_reachable(run_dir: Path | None) -> None:
         ok, err = _tally_markers(jsonl)
         ok_total += ok
         err_total += err
-    if err_total > 0 and ok_total == 0:
+    if ok_total == 0 and err_total > 0:
         raise EvaluationError(
             f"Model produced no analysis: all {err_total} dispatched file(s) failed "
-            f"and 0 were analysed. The AI model is unreachable or misconfigured -- "
-            f"check the provider/model name and that the server is running "
-            f"(e.g. `ollama list`)."
+            f"and 0 were analysed. The model is likely unreachable or misconfigured "
+            f"(check the provider/model name and that the server is running, "
+            f"e.g. `ollama list`), or every dispatched file errored during analysis."
         )
 
 
@@ -312,7 +340,7 @@ def run_incremental_loop(
         incremental_filter_active=config.options.incremental_file_filter is not None
             or config.options.skip_scoring,
     )
-    check_model_reachable(_run_dir_for(config))
+    check_model_reachable(_run_dir_for(config), result)
     return result
 
 
@@ -418,5 +446,5 @@ def run_per_dimension_loop(
         incremental_filter_active=config.options.incremental_file_filter is not None
             or config.options.skip_scoring,
     )
-    check_model_reachable(_run_dir_for(config))
+    check_model_reachable(_run_dir_for(config), result)
     return result
