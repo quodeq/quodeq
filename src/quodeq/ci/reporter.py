@@ -172,9 +172,11 @@ def build_review_payload(
 
     if changed_lines is None:
         comments = all_comments
-        out_of_diff_count = 0
     else:
-        comments, out_of_diff_count = filter_comments_to_diff(all_comments, changed_lines)
+        # Out-of-diff comments are dropped: a PR review speaks only to the
+        # touched code. The dropped findings are not surfaced in the summary
+        # either — they remain in the full evaluation artifact.
+        comments, _ = filter_comments_to_diff(all_comments, changed_lines)
 
     summary = build_review_summary(
         reports,
@@ -183,7 +185,6 @@ def build_review_payload(
         duration_seconds=duration_seconds,
         baseline_available=baseline_available,
         artifact_url=artifact_url,
-        out_of_diff_count=out_of_diff_count,
     )
     verdict = determine_verdict(new_violations)
 

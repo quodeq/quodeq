@@ -76,13 +76,13 @@ def build_review_summary(
     duration_seconds: int | None = None,
     baseline_available: bool = True,
     artifact_url: str | None = None,
-    out_of_diff_count: int = 0,
 ) -> str:
     """Build the review body summarizing all dimension results.
 
-    out_of_diff_count: number of violations that were found but fell outside
-    the PR's changed lines. They can't be posted as line-anchored comments
-    (GitHub would 422); this count is surfaced in the body so reviewers know.
+    Violations outside the PR's changed lines are omitted entirely — they are
+    never posted as comments (GitHub would 422) and are not surfaced in the
+    body either. A PR review speaks only to the touched code; out-of-diff
+    findings remain available in the full evaluation artifact.
     """
     # Diff mode is signaled by reports with unscored ("N/A") dimensions —
     # PR diff runs skip scoring, so the per-dimension score table and the
@@ -135,13 +135,6 @@ def build_review_summary(
         minutes = duration_seconds // 60
         seconds = duration_seconds % 60
         lines.append(f"_Evaluation completed in {minutes}m {seconds}s_")
-
-    if out_of_diff_count > 0:
-        lines.append("")
-        lines.append(
-            f"_{out_of_diff_count} additional violation(s) found outside the PR diff — "
-            "see the full evaluation artifact._"
-        )
 
     if artifact_url is not None:
         lines.append("")

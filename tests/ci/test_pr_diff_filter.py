@@ -191,7 +191,13 @@ def test_build_review_payload_filters_when_changed_lines_provided() -> None:
     assert payload["comments"][0]["path"] == "src/a.py"
 
 
-def test_build_review_payload_summary_mentions_out_of_diff_count() -> None:
+def test_build_review_payload_summary_omits_out_of_diff_violations() -> None:
+    """Out-of-diff violations are omitted from the PR review entirely.
+
+    They are never posted as comments (GitHub would 422), and the summary body
+    no longer surfaces a count of them either — a PR review speaks only to the
+    code that was touched. The findings still live in the evaluation artifact.
+    """
     reports = [{
         "dimension": "security",
         "overallScore": "7/10",
@@ -203,8 +209,10 @@ def test_build_review_payload_summary_mentions_out_of_diff_count() -> None:
     }]
     payload = build_review_payload(reports, changed_lines={})  # empty diff → all dropped
     assert payload["comments"] == []
-    # Summary body should mention the dropped count so users aren't misled.
-    assert "outside the pr diff" in payload["body"].lower()
+    # Summary must say nothing about findings outside the touched code.
+    body = payload["body"].lower()
+    assert "outside the pr diff" not in body
+    assert "additional violation" not in body
 
 
 def test_build_review_payload_no_filter_when_changed_lines_is_none() -> None:
