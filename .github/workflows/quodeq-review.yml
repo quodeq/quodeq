@@ -59,7 +59,7 @@ jobs:
           else
             {
               echo "AI_PROVIDER=ollama"
-              echo "AI_MODEL=gemma4-26b-32k:latest"
+              echo "AI_MODEL=gemma4:26b-mlx"
               echo "EVAL_DIR=$HOME/.quodeq/evaluations"
             } >> "$GITHUB_ENV"
           fi
