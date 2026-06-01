@@ -186,10 +186,15 @@ class TestMarkerContract:
         assert markers[0]["file"] == "src/clean.py"
         assert markers[0]["status"] == "ok"
 
-    def test_network_error_does_not_emit_markers(self, tmp_path, api_config):
-        """When the model call fails with a network error (was_lossy=True),
-        we cannot prove which files were analysed. Don't emit markers so the
-        next run re-runs all files."""
+    def test_network_error_emits_error_markers(self, tmp_path, api_config):
+        """When the model call fails (was_lossy=True), emit an 'error' marker
+        for every file in the batch.
+
+        This makes the failure visible to the failure-streak circuit breaker
+        and the post-run model-reachability guard, so an unreachable/broken
+        model fails the run loudly instead of silently producing zero findings.
+        'error' markers are excluded from the cache's ok_files set, so the
+        files still re-dispatch on the next run (retry semantics preserved)."""
         jsonl_file = tmp_path / "evidence.jsonl"
         raw_client = MagicMock()
         raw_client.chat.completions.create.side_effect = httpx.ReadTimeout("timeout")
@@ -201,10 +206,12 @@ class TestMarkerContract:
                 source_file_paths=["src/a.py", "src/b.py"],
             )
 
-        # File may not exist at all if nothing was written
-        if jsonl_file.exists() and jsonl_file.read_text().strip():
-            lines = self._read_jsonl(jsonl_file)
-            assert self._markers(lines) == []
+        lines = self._read_jsonl(jsonl_file)
+        markers = self._markers(lines)
+        assert {m["file"] for m in markers} == {"src/a.py", "src/b.py"}
+        assert all(m["status"] == "error" for m in markers)
+        # A failed call produces no findings.
+        assert self._findings_only(lines) == []
 
     def test_no_source_files_no_markers(self, tmp_path, api_config):
         """Backward-compat: callers that don't pass source_file_paths get

@@ -131,6 +131,68 @@ def check_zero_findings(
         )
 
 
+def _tally_markers(jsonl_path: Path) -> tuple[int, int]:
+    """Return ``(ok_count, error_count)`` from a dim's evidence JSONL.
+
+    Counts each file once by its *latest* ``file_done`` marker status, matching
+    the cache's ok_files semantics (a file that errored then re-succeeded counts
+    as ok). Unreadable/missing files contribute nothing.
+    """
+    last_status: dict[str, str] = {}
+    try:
+        with jsonl_path.open("r", encoding="utf-8") as fh:
+            for raw in fh:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    entry = json.loads(raw)
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+                if entry.get("_marker") != "file_done":
+                    continue
+                file = entry.get("file")
+                status = entry.get("status")
+                if isinstance(file, str) and status in ("ok", "error"):
+                    last_status[file] = status
+    except (FileNotFoundError, OSError):
+        return 0, 0
+    ok = sum(1 for s in last_status.values() if s == "ok")
+    err = sum(1 for s in last_status.values() if s == "error")
+    return ok, err
+
+
+def check_model_reachable(run_dir: Path | None) -> None:
+    """Raise EvaluationError if files were dispatched but none were analysed.
+
+    Distinguishes a misconfigured/unreachable model (files dispatched, every
+    call failed -> only ``error`` markers, zero ``ok`` markers) from a
+    legitimately empty scan (no applicable files dispatched -> no markers at
+    all). Runs in every mode, including diff (review) and incremental (nightly)
+    where ``check_zero_findings`` is deliberately bypassed -- those are exactly
+    the modes where an unreachable model used to exit 0 (green) while producing
+    nothing.
+    """
+    if run_dir is None:
+        return
+    evidence_dir = run_dir / "evidence"
+    if not evidence_dir.is_dir():
+        return
+    ok_total = 0
+    err_total = 0
+    for jsonl in evidence_dir.glob("*_evidence.jsonl"):
+        ok, err = _tally_markers(jsonl)
+        ok_total += ok
+        err_total += err
+    if err_total > 0 and ok_total == 0:
+        raise EvaluationError(
+            f"Model produced no analysis: all {err_total} dispatched file(s) failed "
+            f"and 0 were analysed. The AI model is unreachable or misconfigured -- "
+            f"check the provider/model name and that the server is running "
+            f"(e.g. `ollama list`)."
+        )
+
+
 def run_incremental_loop(
     config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
     *, runner: DimensionRunner,
@@ -250,6 +312,7 @@ def run_incremental_loop(
         incremental_filter_active=config.options.incremental_file_filter is not None
             or config.options.skip_scoring,
     )
+    check_model_reachable(_run_dir_for(config))
     return result
 
 
@@ -355,4 +418,5 @@ def run_per_dimension_loop(
         incremental_filter_active=config.options.incremental_file_filter is not None
             or config.options.skip_scoring,
     )
+    check_model_reachable(_run_dir_for(config))
     return result
