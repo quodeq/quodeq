@@ -163,6 +163,18 @@ class TestParserDropAccounting:
         assert len(findings) == 1
         assert dropped == 0
 
+    def test_recovers_real_findings_nested_in_finding_shaped_wrapper(self):
+        # A wrapper that happens to share >=2 finding field names (severity,
+        # reason) but NESTS a real finding must not have that finding swallowed.
+        # Counting the wrapper as a drop AND stopping recursion would lose it.
+        valid = {"req": "R1", "t": "violation", "file": "a.py", "line": 5,
+                 "severity": "minor", "w": "x", "snippet": "code", "reason": "bad"}
+        raw = json.dumps({"severity": "major", "reason": "run summary", "items": [valid]})
+        findings, dropped = _parse_findings(raw)
+        assert len(findings) == 1
+        assert findings[0]["req"] == "R1"
+        assert dropped == 0
+
 
 class TestTruncationDetection:
     """A length-truncated response is incomplete: mark the call lossy so the
@@ -274,6 +286,28 @@ class TestMarkerContract:
         assert all(m["status"] == "error" for m in markers)
         # A failed call produces no findings.
         assert self._findings_only(lines) == []
+
+    def test_truncated_response_emits_error_markers(self, tmp_path, api_config):
+        """A length-truncated response is lossy: emit 'error' markers so the
+        files re-dispatch and the breaker/reachability guard see the failure,
+        while still surfacing the partial findings recovered before the cut."""
+        jsonl_file = tmp_path / "evidence.jsonl"
+        content = _make_findings_json(("X-1", "violation", "a.py", 1, "minor", "x"))
+        raw_client = _mock_raw_client_finish(content, "length")
+
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
+            run_api_analysis(
+                prompt="t", jsonl_file=jsonl_file, config=api_config,
+                source_file_paths=["src/a.py"],
+            )
+
+        lines = self._read_jsonl(jsonl_file)
+        markers = self._markers(lines)
+        assert {m["file"] for m in markers} == {"src/a.py"}
+        assert all(m["status"] == "error" for m in markers)
+        # Partial findings recovered before the cut are still surfaced.
+        assert len(self._findings_only(lines)) == 1
 
     def test_no_source_files_no_markers(self, tmp_path, api_config):
         """Backward-compat: callers that don't pass source_file_paths get

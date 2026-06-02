@@ -162,7 +162,16 @@ def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) 
             sink.append(f.model_dump())
             return
         except (ValueError, KeyError, TypeError):
-            if _DROPPED_FINDING_KEY in node or _looks_like_finding(node):
+            if _DROPPED_FINDING_KEY in node:
+                dropped.append(node)
+                return
+            # A finding-shaped LEAF (shares finding fields, no nested containers)
+            # that failed validation is a malformed finding attempt -> count it.
+            # A dict that merely shares field names while NESTING dicts/lists is a
+            # wrapper: fall through and recurse so its real findings are recovered
+            # rather than swallowed (counting + stopping here would lose them).
+            has_nested = any(isinstance(v, (dict, list)) for v in node.values())
+            if _looks_like_finding(node) and not has_nested:
                 dropped.append(node)
                 return
         for value in node.values():
