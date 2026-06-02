@@ -154,13 +154,14 @@ def test_upgrade_v3_to_v4_recovers_when_findings_already_renamed():
     assert rows == [("P1", "a.py")]  # data carried in the renamed table survived
 
 
-def test_upgrade_v3_to_v4_recovers_when_stale_old_table_present():
-    """An attempt interrupted before dropping `findings_old_v3` leaves BOTH
-    tables. The rebuild's RENAME would fail with 'table findings_old_v3 already
-    exists'; the upgrade must drop the stale leftover and finish."""
+def test_upgrade_v3_to_v4_recovers_when_partial_new_table_present():
+    """An attempt interrupted after `findings` was recreated but before the
+    copy finished leaves BOTH tables: an empty/partial new `findings` and the
+    original `findings_old_v3`. The ORIGINAL data must win, otherwise dropping
+    findings_old_v3 (and keeping the empty new table) loses every finding."""
     conn = sqlite3.connect(":memory:")
-    _make_findings_table(conn, "findings", dedup="P1|a.py|10|violation")
-    _make_findings_table(conn, "findings_old_v3", dedup="stale")
+    conn.execute(f"CREATE TABLE findings ({_V3_FINDINGS_COLUMNS})")  # empty new table
+    _make_findings_table(conn, "findings_old_v3", dedup="P1|a.py|10|violation")  # original
 
     _upgrade_v3_to_v4(conn)  # must not raise
 
@@ -170,7 +171,7 @@ def test_upgrade_v3_to_v4_recovers_when_stale_old_table_present():
     assert "findings" in tables
     assert "findings_old_v3" not in tables
     rows = conn.execute("SELECT practice_id, file FROM findings").fetchall()
-    assert rows == [("P1", "a.py")]  # authoritative `findings` data kept
+    assert rows == [("P1", "a.py")]  # original rows recovered, not the empty copy
 
 
 def test_apply_evaluation_schema_rejects_unknown_version_with_no_upgrade_path():

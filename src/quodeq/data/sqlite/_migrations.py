@@ -77,14 +77,17 @@ def _upgrade_v3_to_v4(conn: sqlite3.Connection) -> None:
         )
     }
     if "findings_old_v3" in tables:
-        if "findings" not in tables:
-            # Interrupted after the rename, before the rebuild: restore the
-            # original name and continue.
-            conn.execute("ALTER TABLE findings_old_v3 RENAME TO findings")
-        else:
-            # Interrupted after the new table was built, before the old one was
-            # dropped: `findings` is authoritative; discard the stale copy.
-            conn.execute("DROP TABLE findings_old_v3")
+        if "findings" in tables:
+            # Both present: a previous attempt recreated `findings` (possibly
+            # empty or partial, if interrupted before/within the copy) without
+            # dropping the original. findings_old_v3 holds the complete original
+            # rows, so discard the partial copy and restore the original; the
+            # rebuild below redoes the copy cleanly. Dropping the original here
+            # instead would lose every finding when the new table was empty.
+            conn.execute("DROP TABLE findings")
+        # Interrupted after the rename, before the rebuild finished: restore the
+        # original name so the rebuild runs against the complete data.
+        conn.execute("ALTER TABLE findings_old_v3 RENAME TO findings")
 
     conn.executescript("""
         -- Drop triggers and FTS index that reference the old table by name.
