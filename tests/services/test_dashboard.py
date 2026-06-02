@@ -162,7 +162,12 @@ class TestBuildDashboard:
         ):
             result = build_dashboard(str(tmp_path), "proj", "latest")  # must not raise
 
+        # The FS-based grades survive: the SQL override is skipped, not silently
+        # blanked, so the dimension keeps the grade/score from read_run_data.
         assert len(result["dimensions"]) == 1
+        dim = result["dimensions"][0]
+        assert dim["overallGrade"] == "B"
+        assert dim["overallScore"] == "7.0"
 
     def test_latest_skips_cancelled_runs(self, tmp_path):
         # ``"latest"`` defaults to the most recent fully-completed run so the

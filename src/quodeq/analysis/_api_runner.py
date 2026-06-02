@@ -131,9 +131,13 @@ class ApiRunnerConfig:
 # `req` identifier is a *dropped finding* attempt: counted once for observability,
 # then we stop (its own fields are not separate findings, mirroring the valid path).
 # A dict that LOOKS like a finding (shares >=2 fields with the schema) but is missing
-# `req` is also a dropped attempt -- counting it makes that silent loss visible.
-# A pure container/wrapper (e.g. {"findings": [...]}) shares no finding fields, so we
-# recurse into it to recover findings nested inside.
+# `req` is also a dropped attempt -- BUT only when it is a leaf (no nested dict/list
+# values). A dict that shares field names yet nests dicts/lists is treated as a
+# wrapper and recursed into, so real findings inside it (e.g. {"findings": [...]}) are
+# recovered rather than swallowed. The trade-off: a malformed, req-less finding that
+# itself nests a container is recursed instead of counted, so it is not tallied in the
+# (observability-only) dropped count -- acceptable, since a req-bearing attempt is
+# still always counted regardless of nesting.
 _DROPPED_FINDING_KEY = "req"
 _FINDING_FIELDS = frozenset(_Finding.model_fields)
 
