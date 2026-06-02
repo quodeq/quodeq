@@ -1,6 +1,7 @@
 """Dashboard and accumulated-view logic, split from action_provider_fs."""
 from __future__ import annotations
 
+import logging
 import os
 import threading
 from collections import OrderedDict
@@ -21,6 +22,8 @@ from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services.dim_resolution import is_eligible_for_default_view
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -428,6 +431,7 @@ def _apply_sql_grade_override(
     Falls back to the FS-based grades when grade tables are empty or the
     run directory does not exist.
     """
+    from quodeq.data.sqlite._migrations import SchemaVersionError  # noqa: PLC0415
     from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
     from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
 
@@ -435,11 +439,19 @@ def _apply_sql_grade_override(
     if not run_dir.is_dir():
         return payload
 
-    repo = SqliteFindingsRepository(run_dir)
-    repo._ensure_fresh()  # noqa: SLF001
-
     store = SQLiteStateStore(run_dir)
-    dim_rows = store.read_dimension_scores()
+    try:
+        repo = SqliteFindingsRepository(run_dir)
+        repo._ensure_fresh()  # noqa: SLF001
+        dim_rows = store.read_dimension_scores()
+    except SchemaVersionError:
+        # evaluation.db was written by a newer Quodeq than this binary; keep the
+        # FS-based grades already in the payload rather than crashing the build.
+        _logger.warning(
+            "evaluation.db for %s/%s has a newer schema than this binary; "
+            "keeping FS-based grades in the dashboard.", project, run_id,
+        )
+        return payload
     if not dim_rows:
         return payload
 

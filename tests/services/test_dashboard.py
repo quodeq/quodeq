@@ -128,6 +128,42 @@ class TestBuildDashboard:
         assert len(result["dimensions"]) == 1
         assert "trend" in result
 
+    def test_build_dashboard_survives_too_new_db(self, tmp_path):
+        """The SQL grade override reads the per-run evaluation.db. If that DB was
+        written by a newer Quodeq, build_dashboard must keep the FS-based grades
+        instead of crashing on SchemaVersionError."""
+        import sqlite3
+
+        from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+        from quodeq.core.events.writer import EventLogWriter
+        from quodeq.data.projection.projector import Projector
+        from quodeq.data.sqlite._schema import SCHEMA_VERSION
+
+        run_dir = tmp_path / "proj" / "r1"
+        run_dir.mkdir(parents=True)
+        log = run_dir / "events.jsonl"
+        EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+            practice_id="P1", verdict="violation", dimension="security",
+            file="a.py", line=10, reason="r", req="R1",
+        )))
+        Projector().ensure_projected(log, run_dir, project_dir=tmp_path / "proj")
+        conn = sqlite3.connect(run_dir / "evaluation.db")
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION + 5}")
+        conn.commit()
+        conn.close()
+
+        run = _make_run("r1", "2024-01-01")
+        dims = [_dim("security", "B", "7.0")]
+        summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
+        with (
+            patch("quodeq.services.dashboard.list_runs", return_value=[run]),
+            patch("quodeq.services.dashboard.read_run_data", return_value=dims),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), "proj", "latest")  # must not raise
+
+        assert len(result["dimensions"]) == 1
+
     def test_latest_skips_cancelled_runs(self, tmp_path):
         # ``"latest"`` defaults to the most recent fully-completed run so the
         # per-dim cards reflect a coherent run that agrees with the headline.
