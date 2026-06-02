@@ -84,13 +84,28 @@ class SQLiteStateStore:
             conn.commit()
 
     def update_verdict(self, *, req: str, file: str, line: int, verdict: str) -> int:
-        """Update a finding's verdict by (requirement, file, line). Returns row count."""
+        """Update a finding's verdict by (requirement, file, line). Returns row count.
+
+        A finding with no requirement id is stored with ``requirement`` NULL, but
+        the dismiss/restore event carries an empty string. ``requirement = ''``
+        never matches NULL in SQL, so an empty ``req`` is matched on (file, line)
+        against rows whose requirement is NULL or empty, scoped so it cannot
+        sweep a different, req-bearing finding at the same location.
+        """
         with open_evaluation_db(self._run_dir) as conn:
-            cur = conn.execute(
-                "UPDATE findings SET verdict = ? "
-                "WHERE requirement = ? AND file = ? AND line = ?",
-                (verdict, req, file, line),
-            )
+            if req:
+                cur = conn.execute(
+                    "UPDATE findings SET verdict = ? "
+                    "WHERE requirement = ? AND file = ? AND line = ?",
+                    (verdict, req, file, line),
+                )
+            else:
+                cur = conn.execute(
+                    "UPDATE findings SET verdict = ? "
+                    "WHERE (requirement IS NULL OR requirement = '') "
+                    "AND file = ? AND line = ?",
+                    (verdict, file, line),
+                )
             conn.commit()
             return cur.rowcount
 
