@@ -133,6 +133,39 @@ def test_update_verdict_returns_zero_when_no_match(tmp_path: Path) -> None:
     assert rows == 0
 
 
+def test_update_verdict_empty_req_returns_zero_when_no_match(tmp_path: Path) -> None:
+    """The empty-req branch must report no match cleanly when there is no
+    null/empty-requirement finding at that location."""
+    store = SQLiteStateStore(tmp_path)
+    store.record_finding(Judgment(
+        practice_id="P1", verdict="violation", dimension="Security",
+        file="a.py", line=10, reason="r", req="R1",  # has a req, NULL branch won't hit it
+    ))
+
+    rows = store.update_verdict(req="", file="a.py", line=10, verdict="dismissed")
+
+    assert rows == 0
+
+
+def test_update_verdict_empty_req_matches_empty_string_requirement(tmp_path: Path) -> None:
+    """A finding physically stored with requirement='' (not NULL) is also
+    matched by the empty-req branch."""
+    store = SQLiteStateStore(tmp_path)
+    store.record_finding(Judgment(
+        practice_id="P1", verdict="violation", dimension="Security",
+        file="a.py", line=10, reason="r", req="",  # stored as empty string
+    ))
+
+    rows = store.update_verdict(req="", file="a.py", line=10, verdict="dismissed")
+
+    assert rows == 1
+    with open_evaluation_db(tmp_path) as conn:
+        row = conn.execute(
+            "SELECT verdict FROM findings WHERE file=? AND line=?", ("a.py", 10),
+        ).fetchone()
+        assert row[0] == "dismissed"
+
+
 def test_actions_projected_size_round_trips(tmp_path: Path) -> None:
     store = SQLiteStateStore(tmp_path)
     assert store.get_actions_projected_size() is None
