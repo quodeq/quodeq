@@ -396,8 +396,12 @@ def run_api_analysis(
         them all. Individual malformed findings may have been dropped during
         per-finding parsing (and were logged with a count), but that does not
         invalidate the file: it was analysed, so it should not re-dispatch.
-        Only a genuine call failure (network/timeout, ``was_lossy`` True)
-        suppresses the markers, so those files re-dispatch on the next run.
+        On a genuine call failure (network/timeout/unreachable, ``was_lossy``
+        True), every file gets an ``error`` marker instead. ``error`` markers
+        are excluded from the cache's ``ok_files`` set, so those files still
+        re-dispatch on the next run -- but, unlike emitting no marker at all,
+        they let the failure-streak breaker trip and the post-run
+        reachability guard fail the run loudly when the model is unreachable.
 
     *source_file_paths* should be the full per-dim file list. When omitted,
     no markers are emitted (preserves caller flexibility but the run will
@@ -423,9 +427,10 @@ def run_api_analysis(
     ctx = _build_router_context(compiled_dir, dimension, work_dir, project_dir)
 
     _log.debug(
-        "API runner: %d findings, lossy=%s, marking %d files",
+        "API runner: %d findings, lossy=%s, marking %d file(s) as %s",
         len(findings), was_lossy,
-        len(source_file_paths) if source_file_paths and not was_lossy else 0,
+        len(source_file_paths) if source_file_paths else 0,
+        "error" if was_lossy else "ok",
     )
 
     events_log = jsonl_file.parent.parent / "events.jsonl"
@@ -457,6 +462,13 @@ def run_api_analysis(
         )
         for f in findings:
             router.receive(f)
-        if not was_lossy and source_file_paths:
+        if source_file_paths:
+            # Clean end-to-end call -> 'ok'; lossy call (model unreachable /
+            # network / timeout) -> 'error'. The 'error' status is excluded
+            # from the cache's ok_files set (files still re-dispatch next run),
+            # but lets the failure-streak breaker and the post-run
+            # reachability guard see the failure and fail the run loudly.
+            status = "error" if was_lossy else "ok"
+            reason = "model call failed (unreachable or errored)" if was_lossy else None
             for path in source_file_paths:
-                router.mark_file_done(file=path, status="ok")
+                router.mark_file_done(file=path, status=status, reason=reason)

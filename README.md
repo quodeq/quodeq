@@ -86,7 +86,7 @@ Quodeq needs an LLM to do the evaluation. You have two options:
 **Local, free, private** — [Ollama](https://ollama.com/download) with Gemma 4:
 ```bash
 # install ollama from https://ollama.com/download, then:
-ollama pull gemma4:26b-mlx
+ollama pull gemma4:26b
 ollama serve    # runs in the background
 ```
 
