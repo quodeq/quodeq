@@ -1,7 +1,8 @@
 name: Wheel smoke test
 
 # Builds the wheel, asserts it's under the size budget, and verifies the
-# production maybe_build_ui codepath works without npm on PATH. Catches
+# production maybe_build_ui codepath works without npm on PATH. Also builds the
+# sdist and asserts it excludes node_modules and stays small. Catches
 # regressions in the "ship pre-built UI in wheel" architecture before
 # they reach PyPI.
 #
@@ -73,6 +74,31 @@ jobs:
             exit 1
           fi
           echo "OK: index.html present in wheel"
+
+      - name: Build sdist
+        run: uv build --sdist
+
+      # node_modules (~28 MB / 11k files, reproducible from package-lock.json)
+      # must never reach the source tarball. source-exclude in pyproject keeps
+      # it out; this asserts it stays out and the sdist stays small. npm ci ran
+      # above, so node_modules is present and a missing exclude would be caught.
+      - name: Assert sdist excludes node_modules and is under 5 MB
+        run: |
+          sdist=$(ls dist/quodeq-*.tar.gz)
+          echo "sdist: $sdist"
+          if tar tzf "$sdist" | grep -q "node_modules"; then
+            echo "::error::sdist bundles node_modules. Check source-exclude in pyproject.toml."
+            tar tzf "$sdist" | grep "node_modules" | head
+            exit 1
+          fi
+          size=$(stat -c%s "$sdist")
+          max=5242880
+          echo "Size: $size bytes (budget: $max bytes / 5 MB)"
+          if [ "$size" -gt "$max" ]; then
+            echo "::error::sdist exceeds 5 MB budget. Did a large directory get included?"
+            exit 1
+          fi
+          echo "OK: sdist clean and under budget"
 
       - name: Install wheel in clean venv
         run: |
