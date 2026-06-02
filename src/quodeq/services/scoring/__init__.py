@@ -288,11 +288,22 @@ def get_scores_raw(
     # without one, skip straight to the JSON-file fallback so we don't have
     # to wait on a no-op projection that will leave the grade tables empty.
     if (run_dir / "events.jsonl").is_file():
-        repo = SqliteFindingsRepository(run_dir)
-        repo._ensure_fresh()  # noqa: SLF001
-        store = SQLiteStateStore(run_dir)
-        if store.read_dimension_scores():
-            return _build_response_from_grade_tables(run_dir)
+        from quodeq.data.sqlite._migrations import SchemaVersionError  # noqa: PLC0415
+        try:
+            repo = SqliteFindingsRepository(run_dir)
+            repo._ensure_fresh()  # noqa: SLF001
+            store = SQLiteStateStore(run_dir)
+            if store.read_dimension_scores():
+                return _build_response_from_grade_tables(run_dir)
+        except SchemaVersionError:
+            # evaluation.db was written by a newer Quodeq than this binary
+            # understands. Don't crash the score read; fall back to the JSON
+            # eval files (schema-independent) so a downgraded install still works.
+            _logger.warning(
+                "Run %s/%s has an evaluation.db from a newer Quodeq version; "
+                "serving scores from the JSON eval files. Upgrade to read the "
+                "SQL grade tables.", project, run_id,
+            )
 
     return _build_response_from_eval_files(reports_root, project, run_id)
 

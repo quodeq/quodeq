@@ -42,6 +42,18 @@ def test_apply_evaluation_schema_rejects_newer_version():
         apply_evaluation_schema(conn)
 
 
+def test_newer_version_error_is_a_database_error():
+    """SchemaVersionError must be a sqlite3.DatabaseError so the existing
+    `except sqlite3.DatabaseError` guards (e.g. dismissed-list enrichment)
+    degrade gracefully instead of crashing when an older binary opens a
+    newer-schema evaluation.db."""
+    assert issubclass(SchemaVersionError, sqlite3.DatabaseError)
+    conn = sqlite3.connect(":memory:")
+    conn.execute("PRAGMA user_version = 99")
+    with pytest.raises(sqlite3.DatabaseError):
+        apply_evaluation_schema(conn)
+
+
 def _build_v1_db() -> sqlite3.Connection:
     """Recreate the schema as it existed at SCHEMA_VERSION=1, before the
     confidence column was added. Used to verify the v1 → v2 upgrade path."""

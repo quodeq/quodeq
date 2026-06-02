@@ -6,8 +6,14 @@ import sqlite3
 from quodeq.data.sqlite._schema import EVALUATION_DDL, SCHEMA_VERSION
 
 
-class SchemaVersionError(RuntimeError):
-    """Raised when the on-disk DB has a newer schema than this binary supports."""
+class SchemaVersionError(sqlite3.DatabaseError):
+    """Raised when the on-disk DB has a newer schema than this binary supports.
+
+    Subclasses ``sqlite3.DatabaseError`` (not bare ``RuntimeError``) so the
+    existing ``except sqlite3.DatabaseError`` guards around evaluation.db reads
+    degrade gracefully when an older binary opens a newer-schema DB, instead of
+    letting the error escape and crash the read.
+    """
 
 
 def _current_version(conn: sqlite3.Connection) -> int:
