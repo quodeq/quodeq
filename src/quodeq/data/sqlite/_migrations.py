@@ -61,7 +61,31 @@ def _upgrade_v3_to_v4(conn: sqlite3.Connection) -> None:
 
     Note: ``user_version`` is bumped by ``apply_evaluation_schema`` after
     this function returns.
+
+    Recovery: this rebuild renames ``findings`` -> ``findings_old_v3`` before
+    recreating it. If a previous attempt was interrupted partway, the DB is
+    left in a half-migrated state that would brick every subsequent open:
+    either ``findings`` is already gone (the rename below would raise "no such
+    table: findings") or a stale ``findings_old_v3`` lingers (the rename would
+    raise "table findings_old_v3 already exists"). Normalise both states first
+    so the migration is idempotent across interruptions and self-heals on the
+    next open instead of failing permanently.
     """
+    tables = {
+        r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )
+    }
+    if "findings_old_v3" in tables:
+        if "findings" not in tables:
+            # Interrupted after the rename, before the rebuild: restore the
+            # original name and continue.
+            conn.execute("ALTER TABLE findings_old_v3 RENAME TO findings")
+        else:
+            # Interrupted after the new table was built, before the old one was
+            # dropped: `findings` is authoritative; discard the stale copy.
+            conn.execute("DROP TABLE findings_old_v3")
+
     conn.executescript("""
         -- Drop triggers and FTS index that reference the old table by name.
         DROP TRIGGER IF EXISTS findings_ai;
