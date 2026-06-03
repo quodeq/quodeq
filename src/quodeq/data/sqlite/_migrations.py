@@ -23,14 +23,31 @@ def _current_version(conn: sqlite3.Connection) -> int:
 # Incremental upgrades from version N to N+1. Each function takes a connection
 # already at version N; the caller bumps PRAGMA user_version to N+1 afterwards.
 def _upgrade_v1_to_v2(conn: sqlite3.Connection) -> None:
-    """Add per-finding confidence column (default 100 = full confidence)."""
-    conn.execute("ALTER TABLE findings ADD COLUMN confidence INTEGER NOT NULL DEFAULT 100")
+    """Add per-finding confidence column (default 100 = full confidence).
+
+    Idempotency: the ALTER and the PRAGMA user_version bump commit separately,
+    so a crash between them leaves the column added but the version still 1.
+    Skip if it already exists, otherwise the re-run raises "duplicate column
+    name: confidence" and bricks the run (see _upgrade_v4_to_v5 for the same
+    guard on exit_reason).
+    """
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
+    if "confidence" not in columns:
+        conn.execute("ALTER TABLE findings ADD COLUMN confidence INTEGER NOT NULL DEFAULT 100")
 
 
 def _upgrade_v2_to_v3(conn: sqlite3.Connection) -> None:
-    """Add principle_grades table for per-principle scoring."""
+    """Add principle_grades table for per-principle scoring.
+
+    Idempotency: executescript commits the DDL immediately, independent of the
+    later PRAGMA user_version bump in apply_evaluation_schema. A crash between
+    them leaves the table created but the version still 2, so re-running a bare
+    CREATE would raise "table principle_grades already exists" -- a plain
+    OperationalError the scoring/dashboard read seams don't catch, permanently
+    bricking the run. IF NOT EXISTS makes the re-run a no-op and self-heal.
+    """
     conn.executescript("""
-        CREATE TABLE principle_grades (
+        CREATE TABLE IF NOT EXISTS principle_grades (
             dimension        TEXT NOT NULL,
             principle_id     TEXT NOT NULL,
             score            REAL,
@@ -41,7 +58,7 @@ def _upgrade_v2_to_v3(conn: sqlite3.Connection) -> None:
             PRIMARY KEY (dimension, principle_id)
         );
 
-        CREATE INDEX idx_principle_grades_dimension ON principle_grades(dimension);
+        CREATE INDEX IF NOT EXISTS idx_principle_grades_dimension ON principle_grades(dimension);
     """)
 
 
@@ -209,7 +226,15 @@ def _upgrade_v4_to_v5(conn: sqlite3.Connection) -> None:
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='dimension_scores'"
     ).fetchone() is not None
     if has_dim_scores:
-        conn.execute("ALTER TABLE dimension_scores ADD COLUMN exit_reason TEXT")
+        # Idempotency: the ALTER and the PRAGMA user_version bump in
+        # apply_evaluation_schema commit separately (autocommit), so a crash
+        # in between leaves the column added but the version still 4. Re-running
+        # the bare ALTER would then raise "duplicate column name: exit_reason"
+        # -- a plain OperationalError the scoring/dashboard read seams don't
+        # catch, permanently bricking the run. Skip if the column already exists.
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(dimension_scores)")}
+        if "exit_reason" not in columns:
+            conn.execute("ALTER TABLE dimension_scores ADD COLUMN exit_reason TEXT")
 
 
 _UPGRADES = {
