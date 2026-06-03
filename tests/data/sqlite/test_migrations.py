@@ -3,8 +3,44 @@ import pytest
 from quodeq.data.sqlite._migrations import (
     apply_evaluation_schema,
     SchemaVersionError,
+    _upgrade_v3_to_v4,
 )
 from quodeq.data.sqlite._schema import SCHEMA_VERSION
+
+
+# Column list shared by the v3 `findings` table and its renamed `findings_old_v3`.
+_V3_FINDINGS_COLUMNS = """
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    schema_version INTEGER NOT NULL DEFAULT 1,
+    practice_id TEXT NOT NULL,
+    dimension TEXT NOT NULL DEFAULT '',
+    requirement TEXT,
+    verdict TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    file TEXT NOT NULL DEFAULT '',
+    line INTEGER NOT NULL DEFAULT 0,
+    end_line INTEGER NOT NULL DEFAULT 0,
+    title TEXT NOT NULL DEFAULT '',
+    reason TEXT NOT NULL DEFAULT '',
+    snippet TEXT NOT NULL DEFAULT '',
+    violation_type TEXT NOT NULL DEFAULT '',
+    context TEXT NOT NULL DEFAULT '',
+    scope TEXT NOT NULL DEFAULT '',
+    req_refs_json TEXT,
+    dedup_key TEXT NOT NULL UNIQUE,
+    confidence INTEGER NOT NULL DEFAULT 100,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+"""
+
+
+def _make_findings_table(conn: sqlite3.Connection, name: str, *, dedup: str) -> None:
+    conn.execute(f"CREATE TABLE {name} ({_V3_FINDINGS_COLUMNS})")
+    conn.execute(
+        f"INSERT INTO {name} (practice_id, verdict, severity, file, line, dedup_key) "
+        "VALUES ('P1', 'violation', 'critical', 'a.py', 10, ?)",
+        (dedup,),
+    )
+    conn.commit()
 
 
 def test_apply_evaluation_schema_on_fresh_db_sets_version():
@@ -39,6 +75,18 @@ def test_apply_evaluation_schema_rejects_newer_version():
     conn = sqlite3.connect(":memory:")
     conn.execute("PRAGMA user_version = 99")
     with pytest.raises(SchemaVersionError):
+        apply_evaluation_schema(conn)
+
+
+def test_newer_version_error_is_a_database_error():
+    """SchemaVersionError must be a sqlite3.DatabaseError so the existing
+    `except sqlite3.DatabaseError` guards (e.g. dismissed-list enrichment)
+    degrade gracefully instead of crashing when an older binary opens a
+    newer-schema evaluation.db."""
+    assert issubclass(SchemaVersionError, sqlite3.DatabaseError)
+    conn = sqlite3.connect(":memory:")
+    conn.execute("PRAGMA user_version = 99")
+    with pytest.raises(sqlite3.DatabaseError):
         apply_evaluation_schema(conn)
 
 
@@ -85,6 +133,45 @@ def test_apply_evaluation_schema_upgrades_v1_to_current():
     assert cur.fetchone()[0] == SCHEMA_VERSION
     cur = conn.execute("SELECT confidence FROM findings WHERE practice_id='P-1'")
     assert cur.fetchone()[0] == 100
+
+
+def test_upgrade_v3_to_v4_recovers_when_findings_already_renamed():
+    """An interrupted v3->v4 migration leaves `findings` renamed to
+    `findings_old_v3` with no `findings` table. Re-running the upgrade must
+    recover and finish, not raise 'no such table: findings' forever (which
+    permanently bricked the run's DB)."""
+    conn = sqlite3.connect(":memory:")
+    _make_findings_table(conn, "findings_old_v3", dedup="P1|a.py|10|violation")
+
+    _upgrade_v3_to_v4(conn)  # must not raise
+
+    tables = {r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    )}
+    assert "findings" in tables
+    assert "findings_old_v3" not in tables
+    rows = conn.execute("SELECT practice_id, file FROM findings").fetchall()
+    assert rows == [("P1", "a.py")]  # data carried in the renamed table survived
+
+
+def test_upgrade_v3_to_v4_recovers_when_partial_new_table_present():
+    """An attempt interrupted after `findings` was recreated but before the
+    copy finished leaves BOTH tables: an empty/partial new `findings` and the
+    original `findings_old_v3`. The ORIGINAL data must win, otherwise dropping
+    findings_old_v3 (and keeping the empty new table) loses every finding."""
+    conn = sqlite3.connect(":memory:")
+    conn.execute(f"CREATE TABLE findings ({_V3_FINDINGS_COLUMNS})")  # empty new table
+    _make_findings_table(conn, "findings_old_v3", dedup="P1|a.py|10|violation")  # original
+
+    _upgrade_v3_to_v4(conn)  # must not raise
+
+    tables = {r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    )}
+    assert "findings" in tables
+    assert "findings_old_v3" not in tables
+    rows = conn.execute("SELECT practice_id, file FROM findings").fetchall()
+    assert rows == [("P1", "a.py")]  # original rows recovered, not the empty copy
 
 
 def test_apply_evaluation_schema_rejects_unknown_version_with_no_upgrade_path():

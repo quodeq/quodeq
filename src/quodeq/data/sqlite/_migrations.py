@@ -6,8 +6,14 @@ import sqlite3
 from quodeq.data.sqlite._schema import EVALUATION_DDL, SCHEMA_VERSION
 
 
-class SchemaVersionError(RuntimeError):
-    """Raised when the on-disk DB has a newer schema than this binary supports."""
+class SchemaVersionError(sqlite3.DatabaseError):
+    """Raised when the on-disk DB has a newer schema than this binary supports.
+
+    Subclasses ``sqlite3.DatabaseError`` (not bare ``RuntimeError``) so the
+    existing ``except sqlite3.DatabaseError`` guards around evaluation.db reads
+    degrade gracefully when an older binary opens a newer-schema DB, instead of
+    letting the error escape and crash the read.
+    """
 
 
 def _current_version(conn: sqlite3.Connection) -> int:
@@ -55,7 +61,34 @@ def _upgrade_v3_to_v4(conn: sqlite3.Connection) -> None:
 
     Note: ``user_version`` is bumped by ``apply_evaluation_schema`` after
     this function returns.
+
+    Recovery: this rebuild renames ``findings`` -> ``findings_old_v3`` before
+    recreating it. If a previous attempt was interrupted partway, the DB is
+    left in a half-migrated state that would brick every subsequent open:
+    either ``findings`` is already gone (the rename below would raise "no such
+    table: findings") or a stale ``findings_old_v3`` lingers (the rename would
+    raise "table findings_old_v3 already exists"). Normalise both states first
+    so the migration is idempotent across interruptions and self-heals on the
+    next open instead of failing permanently.
     """
+    tables = {
+        r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )
+    }
+    if "findings_old_v3" in tables:
+        if "findings" in tables:
+            # Both present: a previous attempt recreated `findings` (possibly
+            # empty or partial, if interrupted before/within the copy) without
+            # dropping the original. findings_old_v3 holds the complete original
+            # rows, so discard the partial copy and restore the original; the
+            # rebuild below redoes the copy cleanly. Dropping the original here
+            # instead would lose every finding when the new table was empty.
+            conn.execute("DROP TABLE findings")
+        # Interrupted after the rename, before the rebuild finished: restore the
+        # original name so the rebuild runs against the complete data.
+        conn.execute("ALTER TABLE findings_old_v3 RENAME TO findings")
+
     conn.executescript("""
         -- Drop triggers and FTS index that reference the old table by name.
         DROP TRIGGER IF EXISTS findings_ai;

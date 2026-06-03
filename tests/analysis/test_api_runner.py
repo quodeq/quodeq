@@ -12,8 +12,18 @@ pytest.importorskip("openai", reason="requires the openai SDK")
 
 from quodeq.analysis._api_runner import (
     run_api_analysis, ApiRunnerConfig,
-    _call_api, _Finding, _FindingType, _Severity, _LOCAL_TIMEOUT,
+    _call_api, _parse_findings, _Finding, _FindingType, _Severity, _LOCAL_TIMEOUT,
 )
+
+
+def _mock_raw_client_finish(content: str, finish_reason: str) -> MagicMock:
+    """Mock client whose single choice carries an explicit finish_reason."""
+    msg = MagicMock(content=content)
+    choice = MagicMock(message=msg, finish_reason=finish_reason)
+    response = MagicMock(choices=[choice])
+    client = MagicMock()
+    client.chat.completions.create.return_value = response
+    return client
 
 
 def _make_findings_json(*findings_data) -> str:
@@ -128,6 +138,70 @@ class TestRunApiAnalysis:
         assert mock_oa.call_args.kwargs["max_retries"] == 0
 
 
+class TestParserDropAccounting:
+    """Every finding-shaped object the model emits but we can't keep must be
+    counted, so a systemic loss is visible in the logs instead of silent."""
+
+    def test_counts_finding_missing_req_as_dropped(self):
+        # A finding-shaped object missing the required `req`. Today it is
+        # silently recursed away and NOT counted; it must count as dropped.
+        raw = json.dumps({"findings": [
+            {"t": "violation", "file": "a.py", "line": 5, "w": "x",
+             "snippet": "code", "reason": "bad"},  # no req
+        ]})
+        findings, dropped = _parse_findings(raw)
+        assert findings == []
+        assert dropped == 1
+
+    def test_does_not_count_non_finding_noise(self):
+        # A stray container/noise object that does not look like a finding
+        # must NOT inflate the dropped count.
+        valid = {"req": "R1", "t": "violation", "file": "a.py", "line": 5,
+                 "severity": "minor", "w": "x", "snippet": "code", "reason": "bad"}
+        raw = '{"note": "analysis complete"}' + json.dumps({"findings": [valid]})
+        findings, dropped = _parse_findings(raw)
+        assert len(findings) == 1
+        assert dropped == 0
+
+    def test_recovers_real_findings_nested_in_finding_shaped_wrapper(self):
+        # A wrapper that happens to share >=2 finding field names (severity,
+        # reason) but NESTS a real finding must not have that finding swallowed.
+        # Counting the wrapper as a drop AND stopping recursion would lose it.
+        valid = {"req": "R1", "t": "violation", "file": "a.py", "line": 5,
+                 "severity": "minor", "w": "x", "snippet": "code", "reason": "bad"}
+        raw = json.dumps({"severity": "major", "reason": "run summary", "items": [valid]})
+        findings, dropped = _parse_findings(raw)
+        assert len(findings) == 1
+        assert findings[0]["req"] == "R1"
+        assert dropped == 0
+
+
+class TestTruncationDetection:
+    """A length-truncated response is incomplete: mark the call lossy so the
+    file re-dispatches instead of being cached as a clean analysis."""
+
+    def test_truncated_response_is_lossy(self, api_config):
+        content = _make_findings_json(
+            ("R1", "violation", "a.py", 5, "minor", "x"),
+        )
+        client = _mock_raw_client_finish(content, "length")
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = client
+            _findings, was_lossy = _call_api("prompt", api_config)
+        assert was_lossy is True
+
+    def test_complete_response_is_not_lossy(self, api_config):
+        content = _make_findings_json(
+            ("R1", "violation", "a.py", 5, "minor", "x"),
+        )
+        client = _mock_raw_client_finish(content, "stop")
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = client
+            findings, was_lossy = _call_api("prompt", api_config)
+        assert was_lossy is False
+        assert len(findings) == 1
+
+
 class TestMarkerContract:
     """API runner emits file_done markers so the V2 cache can record
     completion. The CLI/MCP path emits these via the agent calling
@@ -212,6 +286,28 @@ class TestMarkerContract:
         assert all(m["status"] == "error" for m in markers)
         # A failed call produces no findings.
         assert self._findings_only(lines) == []
+
+    def test_truncated_response_emits_error_markers(self, tmp_path, api_config):
+        """A length-truncated response is lossy: emit 'error' markers so the
+        files re-dispatch and the breaker/reachability guard see the failure,
+        while still surfacing the partial findings recovered before the cut."""
+        jsonl_file = tmp_path / "evidence.jsonl"
+        content = _make_findings_json(("X-1", "violation", "a.py", 1, "minor", "x"))
+        raw_client = _mock_raw_client_finish(content, "length")
+
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
+            run_api_analysis(
+                prompt="t", jsonl_file=jsonl_file, config=api_config,
+                source_file_paths=["src/a.py"],
+            )
+
+        lines = self._read_jsonl(jsonl_file)
+        markers = self._markers(lines)
+        assert {m["file"] for m in markers} == {"src/a.py"}
+        assert all(m["status"] == "error" for m in markers)
+        # Partial findings recovered before the cut are still surfaced.
+        assert len(self._findings_only(lines)) == 1
 
     def test_no_source_files_no_markers(self, tmp_path, api_config):
         """Backward-compat: callers that don't pass source_file_paths get

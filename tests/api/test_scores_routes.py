@@ -85,6 +85,27 @@ def test_get_scores_raw_reads_from_sql_after_projection(tmp_path: Path) -> None:
     assert security_dim["overallScore"] is not None
 
 
+def test_get_scores_raw_falls_back_when_db_schema_too_new(tmp_path: Path) -> None:
+    """A run whose evaluation.db was written by a NEWER Quodeq (higher schema
+    version) must not crash the score read on an older binary; get_scores_raw
+    degrades to the JSON-eval-file path instead of raising SchemaVersionError."""
+    import sqlite3  # noqa: PLC0415
+
+    from quodeq.data.sqlite._schema import SCHEMA_VERSION  # noqa: PLC0415
+
+    _seed_run(tmp_path, "myproject", "r1", violations=_scorable_violations())
+    db = tmp_path / "myproject" / "r1" / "evaluation.db"
+    conn = sqlite3.connect(db)
+    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION + 5}")
+    conn.commit()
+    conn.close()
+
+    result = get_scores_raw(tmp_path, "myproject", "r1")  # must not raise
+
+    assert "dimensions" in result
+    assert "summary" in result
+
+
 def test_get_scores_raw_uses_sql_when_grades_present(tmp_path: Path, monkeypatch) -> None:
     """When grade tables have rows, get_scores_raw reads them, not the legacy rescore."""
     _seed_run(tmp_path, "myproject", "r1", violations=[_DEFAULT_VIOLATION])

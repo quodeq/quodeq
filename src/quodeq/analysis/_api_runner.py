@@ -130,10 +130,24 @@ class ApiRunnerConfig:
 # A dict that fails `_Finding` validation but carries the required, domain-specific
 # `req` identifier is a *dropped finding* attempt: counted once for observability,
 # then we stop (its own fields are not separate findings, mirroring the valid path).
-# A dict without `req` is a container/wrapper (e.g. {"findings": [...]}) we recurse
-# into to recover findings nested inside it. `req` alone avoids false positives from
-# generic short keys like "t"/"w".
+# A dict that LOOKS like a finding (shares >=2 fields with the schema) but is missing
+# `req` is also a dropped attempt -- BUT only when it is a leaf (no nested dict/list
+# values). A dict that shares field names yet nests dicts/lists is treated as a
+# wrapper and recursed into, so real findings inside it (e.g. {"findings": [...]}) are
+# recovered rather than swallowed. The trade-off: a malformed, req-less finding that
+# itself nests a container is recursed instead of counted, so it is not tallied in the
+# (observability-only) dropped count -- acceptable, since a req-bearing attempt is
+# still always counted regardless of nesting.
 _DROPPED_FINDING_KEY = "req"
+_FINDING_FIELDS = frozenset(_Finding.model_fields)
+
+
+def _looks_like_finding(node: dict) -> bool:
+    """True if *node* shares enough keys with the finding schema to be a finding
+    attempt rather than a generic container. Two-field floor avoids false
+    positives from generic short keys like ``t``/``w`` appearing alone.
+    """
+    return len(_FINDING_FIELDS.intersection(node)) >= 2
 
 
 def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) -> None:
@@ -142,9 +156,9 @@ def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) 
     Recovers findings whether the model emitted them as a bare object, a list,
     a wrapped ``{"findings": [...]}``, or nested somewhere unexpected. Recursion
     stops at a successful ``_Finding`` validation. A dict that fails validation
-    but carries the ``req`` key is treated as a dropped finding attempt: counted
-    once for observability, then recursion stops (mirroring the valid path).
-    Pure containers (no ``req`` key) are recursed to recover nested findings.
+    but is a finding attempt (carries ``req`` or otherwise looks like a finding)
+    is counted as dropped, then recursion stops (mirroring the valid path). Pure
+    containers (no finding-like keys) are recursed to recover nested findings.
     """
     if isinstance(node, dict):
         try:
@@ -153,6 +167,15 @@ def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) 
             return
         except (ValueError, KeyError, TypeError):
             if _DROPPED_FINDING_KEY in node:
+                dropped.append(node)
+                return
+            # A finding-shaped LEAF (shares finding fields, no nested containers)
+            # that failed validation is a malformed finding attempt -> count it.
+            # A dict that merely shares field names while NESTING dicts/lists is a
+            # wrapper: fall through and recurse so its real findings are recovered
+            # rather than swallowed (counting + stopping here would lose them).
+            has_nested = any(isinstance(v, (dict, list)) for v in node.values())
+            if _looks_like_finding(node) and not has_nested:
                 dropped.append(node)
                 return
         for value in node.values():
@@ -202,8 +225,10 @@ def _parse_findings(raw_json: str) -> tuple[list[dict], int]:
 def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     """Call the LLM raw, validate each finding independently, return ``(findings, was_lossy)``.
 
-    ``was_lossy`` is True only when we failed to REACH the model (network /
-    timeout). A response where some findings were malformed returns
+    ``was_lossy`` is True when the analysis is unreliable: we failed to REACH
+    the model (network / timeout), OR the response was truncated by the output
+    budget (``finish_reason == "length"``) so findings past the cut are lost. A
+    response where only some individual findings were malformed returns
     ``(good_findings, False)`` -- the call succeeded end-to-end, so
     ``run_api_analysis`` may mark files done. Dropped malformed findings are
     logged (count) but do not set ``was_lossy``. See ``run_api_analysis`` for
@@ -279,9 +304,24 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
                 )
             return [], True
 
-    text = (response.choices[0].message.content or "") if response.choices else ""
+    choice = response.choices[0] if response.choices else None
+    finish_reason = getattr(choice, "finish_reason", None)
+    text = (choice.message.content or "") if choice else ""
     findings, dropped = _parse_findings(text)
     elapsed = time.monotonic() - start
+
+    # A length-truncated response is an incomplete analysis: the model ran out of
+    # output budget mid-stream, so findings after the cut are simply gone. Treat
+    # it as lossy so run_api_analysis writes an 'error' marker and the file(s)
+    # re-dispatch next run, rather than caching a partial result as 'ok'.
+    truncated = finish_reason == "length"
+    if truncated:
+        _log.warning(
+            "Model %s response was truncated (finish_reason=length) after %.0fs; "
+            "kept %d finding(s) but the analysis is incomplete and will re-dispatch. "
+            "Reduce input size or raise the model context window.",
+            config.model, elapsed, len(findings),
+        )
     if dropped:
         _log.warning(
             "Model %s: dropped %d malformed finding(s) of %d parsed in %.0fs "
@@ -292,7 +332,7 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
         "Model %s returned %d valid findings in %.0fs (raw bytes: %d)",
         config.model, len(findings), elapsed, len(text),
     )
-    return findings, False
+    return findings, truncated
 
 
 # ---------------------------------------------------------------------------
@@ -396,8 +436,9 @@ def run_api_analysis(
         them all. Individual malformed findings may have been dropped during
         per-finding parsing (and were logged with a count), but that does not
         invalidate the file: it was analysed, so it should not re-dispatch.
-        On a genuine call failure (network/timeout/unreachable, ``was_lossy``
-        True), every file gets an ``error`` marker instead. ``error`` markers
+        On a lossy call (network/timeout/unreachable, or a length-truncated
+        response, ``was_lossy`` True), every file gets an ``error`` marker
+        instead. ``error`` markers
         are excluded from the cache's ``ok_files`` set, so those files still
         re-dispatch on the next run -- but, unlike emitting no marker at all,
         they let the failure-streak breaker trip and the post-run
