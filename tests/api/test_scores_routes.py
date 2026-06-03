@@ -106,6 +106,22 @@ def test_get_scores_raw_falls_back_when_db_schema_too_new(tmp_path: Path) -> Non
     assert "summary" in result
 
 
+def test_get_scores_raw_falls_back_when_db_is_corrupt(tmp_path: Path) -> None:
+    """A corrupt or half-written evaluation.db raises a generic
+    sqlite3.DatabaseError (e.g. 'file is not a database'), not the narrower
+    SchemaVersionError. The score read must still degrade to the JSON-eval-file
+    path instead of crashing. SchemaVersionError already subclasses
+    DatabaseError, so widening the seam to DatabaseError covers both."""
+    _seed_run(tmp_path, "myproject", "r1", violations=_scorable_violations())
+    db = tmp_path / "myproject" / "r1" / "evaluation.db"
+    db.write_bytes(b"this is not a sqlite database at all")
+
+    result = get_scores_raw(tmp_path, "myproject", "r1")  # must not raise
+
+    assert "dimensions" in result
+    assert "summary" in result
+
+
 def test_get_scores_raw_uses_sql_when_grades_present(tmp_path: Path, monkeypatch) -> None:
     """When grade tables have rows, get_scores_raw reads them, not the legacy rescore."""
     _seed_run(tmp_path, "myproject", "r1", violations=[_DEFAULT_VIOLATION])

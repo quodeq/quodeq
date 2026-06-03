@@ -169,6 +169,41 @@ class TestBuildDashboard:
         assert dim["overallGrade"] == "B"
         assert dim["overallScore"] == "7.0"
 
+    def test_build_dashboard_survives_corrupt_db(self, tmp_path):
+        """If the per-run evaluation.db is corrupt or half-written it raises a
+        generic sqlite3.DatabaseError, not SchemaVersionError. The SQL grade
+        override must keep the FS-based grades instead of crashing the dashboard
+        build. Widening the seam to DatabaseError (which SchemaVersionError
+        subclasses) covers both the too-new and the corrupt case."""
+        from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+        from quodeq.core.events.writer import EventLogWriter
+
+        run_dir = tmp_path / "proj" / "r1"
+        run_dir.mkdir(parents=True)
+        log = run_dir / "events.jsonl"
+        EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+            practice_id="P1", verdict="violation", dimension="security",
+            file="a.py", line=10, reason="r", req="R1",
+        )))
+        # A truncated / non-SQLite evaluation.db: opening it raises
+        # "file is not a database" when the override path tries to project.
+        (run_dir / "evaluation.db").write_bytes(b"this is not a sqlite database")
+
+        run = _make_run("r1", "2024-01-01")
+        dims = [_dim("security", "B", "7.0")]
+        summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
+        with (
+            patch("quodeq.services.dashboard.list_runs", return_value=[run]),
+            patch("quodeq.services.dashboard.read_run_data", return_value=dims),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), "proj", "latest")  # must not raise
+
+        assert len(result["dimensions"]) == 1
+        dim = result["dimensions"][0]
+        assert dim["overallGrade"] == "B"
+        assert dim["overallScore"] == "7.0"
+
     def test_latest_skips_cancelled_runs(self, tmp_path):
         # ``"latest"`` defaults to the most recent fully-completed run so the
         # per-dim cards reflect a coherent run that agrees with the headline.
