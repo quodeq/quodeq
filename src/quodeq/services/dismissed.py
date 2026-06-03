@@ -20,11 +20,16 @@ from quodeq.core.events.models import (
 )
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
 from quodeq.data.actions_log import ActionLogWriter, read_action_events
+from quodeq.data.migrations.dismissed_json_to_actions_log import migrate_if_needed
 from quodeq.data.sqlite.connection import open_evaluation_db
 
 
 def dismiss_finding(project_dir: Path, finding: dict) -> None:
     """Append a FindingDismissed event to project_dir/actions.jsonl."""
+    # Fold any legacy dismissed.json in FIRST, so the new event lands after the
+    # migrated history rather than the migration appending stale dismissals on
+    # top of this action later (see migrate_if_needed).
+    migrate_if_needed(project_dir)
     payload = FindingDismissed(
         req=str(finding.get("req", "")),
         file=str(finding.get("file", "")),
@@ -36,6 +41,9 @@ def dismiss_finding(project_dir: Path, finding: dict) -> None:
 
 def restore_finding(project_dir: Path, finding: dict) -> None:
     """Append a FindingUndismissed event to project_dir/actions.jsonl."""
+    # Fold legacy dismissals in before recording the restore, otherwise the
+    # migration would re-dismiss this finding after the fact (ordering bug).
+    migrate_if_needed(project_dir)
     payload = FindingUndismissed(
         req=str(finding.get("req", "")),
         file=str(finding.get("file", "")),
@@ -61,6 +69,12 @@ def dismissed_keys(project_dir: Path) -> set[tuple]:
     """
     if not project_dir.is_dir():
         return set()
+
+    # Pure-legacy projects (dismissed.json, no actions.jsonl, no events.jsonl)
+    # have nothing in the action log until this fold runs. Trigger it at the
+    # read seam so the very first score/list after upgrade reflects the user's
+    # existing dismissals instead of an empty set.
+    migrate_if_needed(project_dir)
 
     keys: set[tuple] = set()
     for event in read_action_events(project_dir):
