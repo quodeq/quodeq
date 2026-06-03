@@ -431,7 +431,8 @@ def _apply_sql_grade_override(
     Falls back to the FS-based grades when grade tables are empty or the
     run directory does not exist.
     """
-    from quodeq.data.sqlite._migrations import SchemaVersionError  # noqa: PLC0415
+    import sqlite3  # noqa: PLC0415
+
     from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
     from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
 
@@ -444,12 +445,14 @@ def _apply_sql_grade_override(
         repo = SqliteFindingsRepository(run_dir)
         repo._ensure_fresh()  # noqa: SLF001
         dim_rows = store.read_dimension_scores()
-    except SchemaVersionError:
-        # evaluation.db was written by a newer Quodeq than this binary; keep the
-        # FS-based grades already in the payload rather than crashing the build.
+    except sqlite3.DatabaseError:
+        # evaluation.db is unreadable by this binary: written by a newer Quodeq
+        # (SchemaVersionError, a DatabaseError subclass) or otherwise corrupt /
+        # half-written. Keep the FS-based grades already in the payload rather
+        # than crashing the build.
         _logger.warning(
-            "evaluation.db for %s/%s has a newer schema than this binary; "
-            "keeping FS-based grades in the dashboard.", project, run_id,
+            "evaluation.db for %s/%s is unreadable; keeping FS-based grades "
+            "in the dashboard.", project, run_id,
         )
         return payload
     if not dim_rows:
