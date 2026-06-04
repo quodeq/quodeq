@@ -37,7 +37,7 @@ jobs:
         image: ["debian:stable", "debian:testing", "fedora:latest", "archlinux:latest"]
     container: ${{ matrix.image }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: wheel
           path: dist
