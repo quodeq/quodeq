@@ -16,8 +16,13 @@ updates:
       semver-patch-days: 2
 
   - package-ecosystem: "npm"
-    # package.json lives under src/quodeq/ui, not the repo root.
-    directory: "/src/quodeq/ui"
+    # package.json lives under src/quodeq/ui, not the repo root. Use the
+    # `directories` (list) form: an earlier `directory:` value change (2026-05-25)
+    # did not dislodge Dependabot's stale root-scoped npm version-update job,
+    # which keeps failing weekly with "/package.json not found". Changing the
+    # config shape forces Dependabot to re-register the ecosystem at the new path.
+    directories:
+      - "/src/quodeq/ui"
     schedule:
       interval: "weekly"
     target-branch: "develop"
