@@ -1,5 +1,46 @@
 # Changelog
 
+## [1.2.0] - 2026-06-04
+
+### Features
+- **Event-sourced findings pipeline**: each run now appends judgments to an `events.jsonl` log as the durable truth, and SQLite is rebuilt from it as a derived projection (kept in sync during active runs via incremental ticks). User actions (dismiss, restore, delete) are recorded in an append-only `actions.jsonl`, so dismissals are replayable and never silently lost.
+- **omlx local provider**: select omlx in the provider tabs alongside Ollama and llama.cpp on macOS Apple Silicon. Lists models from your local omlx server, with API key and server-address settings in an Advanced block, and falls back to a text input when the model list is empty.
+- **Permissive content-addressed cache**: the result cache now invalidates only on a real per-file change (content, path, dimension, language). Switching model, updating Quodeq, or running a single dimension reuses cached findings with no re-dispatch. Force a fresh scan on demand with `--clean-scan`.
+- **No Node.js or npm needed for installs**: the wheel now ships the pre-built dashboard under `quodeq/static/` and serves it directly. Production installs no longer pull or run npm. The `--dev` path still rebuilds from source for contributors.
+- **Synchronous per-file cache writes**: findings are written to cache the moment a file finishes cleanly, on both the CLI and API paths, so a hard crash mid-run keeps every completed file instead of losing in-flight work.
+- **Per-dimension exit reason**: each dimension records why it stopped (complete, deadline, failure streak, cancelled). The report and dashboard surface it per dimension, falling back to the run-level reason, and a partial dimension shows an amber coverage percentage on both the report card and the in-progress page.
+- **Provider and model on the in-progress card**: the running-evaluation card shows the job's own provider and model in a chip, and external and CLI-started runs persist `ai_provider`/`ai_model` in `status.json` so the dashboard reflects what actually ran.
+- **Mutation returns the new score**: dismissing, restoring, or deleting a finding returns the rescored run in the same response, so the displayed score updates in about a second with no refetch. Works on old runs that pre-date the event log via a JSON-file rescore fallback.
+
+### Improvements
+- **Windows is now a blocking test tier**: UTF-8 is forced on stdout, stderr, and every text I/O path at the CLI and API entry points, with a regression guard against non-UTF-8 file opens. Windows joins the integration lane with a packaged-exe boot smoke against `/api/health`.
+- **Linux install coverage**: cross-distro install smoke on Debian, Fedora, and Arch, plus a GTK fallback path and an xvfb desktop smoke.
+- **Resilient API-runner parsing**: the API runner parses each finding independently against the raw OpenAI client, so one malformed finding drops itself and the call still succeeds, with dropped findings counted and logged. Connection errors get a generic message rather than a misleading timeout hint, and OpenAI SDK retry compounding is capped.
+- **Cross-platform cancel escalation**: cancelling an external run escalates from SIGTERM to SIGKILL across the process group, so runs no longer orphan, and the evaluations list dedupes by project and run id rather than job id.
+- **Unified coverage line on dimension cards**: the separate partial badge and stale label are replaced with a single muted coverage line.
+- **Faster dismiss on large projects**: dismiss responses carry a slim scores payload (hundreds of bytes instead of hundreds of KB) and the accumulated dashboard rollup is marked stale rather than refetched immediately, cutting click-to-rescore from seconds to under a second on large projects.
+- **Overview stays visible during evaluations** instead of being replaced while a run is in progress.
+- **Narrow-viewport layout**: the overview score-history and dimensions panels stack on narrow viewports instead of overflowing.
+- **API prompt prefix ordering**: the constant prefix leads and the variable file block trails, improving cache locality on the API path.
+- **Faster manifest scanning**: it prunes skip directories and memoizes file hashes, and dimension estimates reuse a single classification pass.
+- **Sharper CI PR reviews**: the run fails loudly when the model is unreachable instead of passing green while every call 404s, and reviews post inline comments only on the changed lines, listing any findings outside those lines in the summary so nothing is silently dropped.
+
+### Fixes
+- **Legacy dismissed findings survive the upgrade to 1.2.0**: `dismissed.json` is now folded into `actions.jsonl` keyed off a sentinel marker, even after `actions.jsonl` already exists. Previously, upgrading projects lost their Dismissed tab and saw hidden findings reappear in scores.
+- **'major' severity no longer silently dropped**: the schema now accepts `major`, which a CHECK constraint had been rejecting on every major finding.
+- **Findings nested in finding-shaped wrappers are counted**, not swallowed, and truncated parses are treated as lossy so they are not cached as complete.
+- **Scoring handles findings with no requirement id** when dismissing and restoring, rather than skipping them.
+- **Dashboard serves CLI scores from the evaluation JSON**, removing an overlay that could diverge from the canonical scores, and the projector and rescore paths share the CLI engine's confidence-level rule.
+- **Failure-streak breaker trips deterministically**: a final scan runs on stop so the circuit breaker no longer flakes on the last dimension.
+- **Source tarball excludes `node_modules`**, with a CI guard so it cannot creep back in.
+- **QuodeqBar packaging** points the PyInstaller add-data at the correct icon path.
+- **pywebview multi-monitor drag** no longer jumps the window off-screen.
+- **Side-pane window registration** no longer loops on `setState` when re-registering the same spec.
+- **Principle names restored on the violations page** after the internal `principle` to `practice_id` rename.
+
+### Migration safety
+- **Schema upgrades self-heal instead of bricking a run**: every per-run `evaluation.db` migration step recovers if an upgrade from 1.1.2 is interrupted (not only the v3 to v4 step), a both-present migration keeps the original rows, and a database written by a newer binary or otherwise unreadable falls back to the JSON eval files instead of crashing the scores or the dashboard.
+
 ## [1.1.2] - 2026-05-10
 
 ### Fixes
