@@ -40,7 +40,6 @@ updates:
     target-branch: "develop"
     open-pull-requests-limit: 5
     cooldown:
+      # github-actions does not version with semver, so Dependabot rejects the
+      # semver-*-days keys for this ecosystem. Only default-days is supported.
       default-days: 3
-      semver-major-days: 7
-      semver-minor-days: 3
-      semver-patch-days: 2
