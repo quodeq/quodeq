@@ -191,28 +191,30 @@ def test_build_review_payload_filters_when_changed_lines_provided() -> None:
     assert payload["comments"][0]["path"] == "src/a.py"
 
 
-def test_build_review_payload_summary_omits_out_of_diff_violations() -> None:
-    """Out-of-diff violations are omitted from the PR review entirely.
+def test_build_review_payload_summary_surfaces_out_of_diff_violations() -> None:
+    """Out-of-diff findings cannot be inline comments (GitHub rejects anchors
+    outside the diff hunks with HTTP 422), but they ARE surfaced in the summary
+    body with file:line + description so they aren't silently lost.
 
-    They are never posted as comments (GitHub would 422), and the summary body
-    no longer surfaces a count of them either — a PR review speaks only to the
-    code that was touched. The findings still live in the evaluation artifact.
+    This reverses the earlier "omit entirely" behavior: a finding that the eval
+    flags on an unchanged line of a changed file (e.g. a pre-existing helper)
+    was previously counted but never shown, leaving "N found" with zero visible
+    findings. Now it is listed in an "outside the changed lines" section.
     """
     reports = [{
         "dimension": "security",
         "overallScore": "7/10",
         "overallGrade": "B",
         "violations": [
-            {"file": "src/z.py", "line": 99, "title": "out of diff", "reason": "", "severity": "major"},
+            {"file": "src/z.py", "line": 99, "title": "unsafe eval", "reason": "", "severity": "major"},
         ],
         "totals": {"violationCount": 1, "severity": {"major": 1}},
     }]
-    payload = build_review_payload(reports, changed_lines={})  # empty diff → all dropped
-    assert payload["comments"] == []
-    # Summary must say nothing about findings outside the touched code.
-    body = payload["body"].lower()
-    assert "outside the pr diff" not in body
-    assert "additional violation" not in body
+    payload = build_review_payload(reports, changed_lines={})  # empty diff → no inline anchors
+    assert payload["comments"] == []                # still not posted as an inline comment
+    body = payload["body"]
+    assert "src/z.py:99" in body                    # surfaced with file:line
+    assert "unsafe eval" in body                    # and its description
 
 
 def test_build_review_payload_no_filter_when_changed_lines_is_none() -> None:

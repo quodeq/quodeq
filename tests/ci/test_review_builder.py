@@ -239,6 +239,44 @@ def test_diff_mode_uses_diff_phrasing_for_violation_count():
     assert "introduced by this PR" not in summary
 
 
+def test_summary_lists_outside_diff_findings_and_counts_only_in_diff():
+    """Out-of-diff NEW findings are listed in their own section with file:line,
+    and the headline count + severity breakdown reflect only the in-diff
+    (inline-anchorable) violations, so the number shown matches the inline
+    comments posted."""
+    from quodeq.ci.review_builder import build_review_summary
+
+    reports = [{"dimension": "pr-diff", "violations": [],
+                "overallScore": "N/A", "overallGrade": "N/A"}]
+    in_diff = {"file": "src/a.py", "line": 10, "severity": "high", "title": "in-diff issue"}
+    outside = {"file": "tests/t.py", "line": 37, "severity": "minor", "title": "f-string DDL"}
+    summary = build_review_summary(
+        reports, [in_diff, outside], [], baseline_available=False,
+        outside_diff_violations=[outside],
+    )
+    # Headline + severity reflect the in-diff finding only.
+    assert "1 violation(s) found in PR diff" in summary
+    assert "1 high" in summary
+    assert "1 minor" not in summary  # the outside minor is not in the by-severity line
+    # The outside finding is surfaced with file:line, severity, and title.
+    assert "outside the changed lines" in summary
+    assert "tests/t.py:37" in summary
+    assert "f-string DDL" in summary
+
+
+def test_summary_no_outside_section_when_all_in_diff():
+    """Backward compat: with no out-of-diff findings, no extra section appears
+    and the count is unchanged."""
+    from quodeq.ci.review_builder import build_review_summary
+
+    reports = [{"dimension": "pr-diff", "violations": [],
+                "overallScore": "N/A", "overallGrade": "N/A"}]
+    new = [{"file": "src/a.py", "line": 10, "severity": "high", "title": "x"}]
+    summary = build_review_summary(reports, new, [], baseline_available=False)
+    assert "1 violation(s) found in PR diff" in summary
+    assert "outside the changed lines" not in summary
+
+
 def test_scored_mode_preserves_existing_summary_shape():
     """Regression guard: scored reports still get the old framing."""
     from quodeq.ci.review_builder import build_review_summary
