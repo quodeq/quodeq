@@ -55,7 +55,7 @@ class _ProviderConfigCache:
             with self._lock:
                 if self._configs is None:
                     try:
-                        self._configs = json.loads(_AI_PROVIDERS_PATH.read_text())
+                        self._configs = json.loads(_AI_PROVIDERS_PATH.read_text(encoding="utf-8"))
                     except (OSError, json.JSONDecodeError):
                         self._configs = _PROVIDER_CONFIGS_FALLBACK
         return self._configs

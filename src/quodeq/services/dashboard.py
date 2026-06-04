@@ -1,6 +1,7 @@
 """Dashboard and accumulated-view logic, split from action_provider_fs."""
 from __future__ import annotations
 
+import logging
 import os
 import threading
 from collections import OrderedDict
@@ -21,6 +22,8 @@ from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services.dim_resolution import is_eligible_for_default_view
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -230,13 +233,64 @@ class _DashboardPayload:
     stale_dimensions: list[DimensionResult]
 
 
+def _read_run_exit_reason(reports_root: Path, project: str, run_id: str) -> str | None:
+    """Return the run's ``status.json`` ``exit_reason``, or ``None`` if absent.
+
+    Used by the dashboard to surface deadline-truncated runs to the UI:
+    the "Partial" badge on each DimensionGaugeCard fires when the run
+    didn't complete naturally (e.g. ``exit_reason="deadline"`` from a
+    timeout, or ``"failure_streak"`` from repeated failures).
+    """
+    import json as _json  # noqa: PLC0415
+    status_path = reports_root / project / run_id / "status.json"
+    if not status_path.is_file():
+        return None
+    try:
+        with status_path.open("r", encoding="utf-8") as fp:
+            data = _json.load(fp)
+    except (OSError, ValueError):
+        return None
+    reason = data.get("exit_reason")
+    return reason if isinstance(reason, str) else None
+
+
+def _attach_exit_reason_to_dim(
+    dim_dict: dict[str, Any], run_exit_reason: str | None,
+) -> dict[str, Any]:
+    """Add ``exitReason`` to a serialized dimension dict.
+
+    Preference order: per-dim exit_reason (if present on the dim) wins over
+    the run-level value. Either way, the chosen reason is exposed to the UI
+    as ``exitReason``. Falls back to no key when both are absent (legacy).
+    """
+    per_dim = dim_dict.get("exit_reason") or dim_dict.get("exitReason")
+    chosen = per_dim or run_exit_reason
+    if chosen is None:
+        # Drop the snake_case key if present, to keep the response clean.
+        if "exit_reason" in dim_dict:
+            out = dict(dim_dict)
+            out.pop("exit_reason", None)
+            return out
+        return dim_dict
+    out = dict(dim_dict)
+    out.pop("exit_reason", None)
+    out["exitReason"] = chosen
+    return out
+
+
 def _build_dashboard_result(
     project: str,
     runs: list[RunInfo],
     selected_run: RunInfo,
     payload: _DashboardPayload,
+    *,
+    exit_reason: str | None = None,
 ) -> dict[str, Any]:
     """Assemble the final dashboard response dict from pre-computed parts."""
+    dim_dicts = [
+        _attach_exit_reason_to_dim(to_camel_dict(d), exit_reason)
+        for d in payload.dimensions_with_trend
+    ]
     return {
         "project": project,
         "availableRuns": [
@@ -247,6 +301,7 @@ def _build_dashboard_result(
             "runId": selected_run.run_id,
             "dateISO": selected_run.date_iso,
             "dateLabel": selected_run.date_label,
+            "exitReason": exit_reason,
         },
         "summary": {
             **to_camel_dict(payload.selected_summary),
@@ -254,7 +309,7 @@ def _build_dashboard_result(
             "dateLabel": selected_run.date_label,
         },
         "trend": payload.trend,
-        "dimensions": [to_camel_dict(d) for d in payload.dimensions_with_trend],
+        "dimensions": dim_dicts,
         "previousByDimension": {k: to_camel_dict(v) for k, v in payload.previous_by_dimension.items()},
         "stalePreviousByDimension": {k: to_camel_dict(v) for k, v in payload.stale_previous_by_dimension.items()},
         "staleDimensions": [to_camel_dict(d) for d in payload.stale_dimensions],
@@ -357,6 +412,82 @@ def _compute_dashboard_payload(
     )
 
 
+def _apply_sql_grade_override(
+    reports_root: Path,
+    project: str,
+    run_id: str,
+    payload: _DashboardPayload,
+) -> _DashboardPayload:
+    """Override per-dimension grade fields from SQL grade tables when available.
+
+    Keeps the dashboard rollup in lockstep with dim-detail dismisses: a
+    dismiss updates SQL via the projection layer, the next dashboard read
+    reflects the new scores. Safe to overlay because the SQL projector
+    now applies the same confidence-level Insufficient rule the CLI
+    engine uses (see ``services.scoring.projector_scoring`` +
+    ``core.evidence.model.classify_confidence_level``) — SQL grades and
+    JSON grades agree on the same input.
+
+    Falls back to the FS-based grades when grade tables are empty or the
+    run directory does not exist.
+    """
+    import sqlite3  # noqa: PLC0415
+
+    from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
+    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
+
+    run_dir = reports_root / project / run_id
+    if not run_dir.is_dir():
+        return payload
+
+    store = SQLiteStateStore(run_dir)
+    try:
+        repo = SqliteFindingsRepository(run_dir)
+        repo._ensure_fresh()  # noqa: SLF001
+        dim_rows = store.read_dimension_scores()
+    except sqlite3.DatabaseError:
+        # evaluation.db is unreadable by this binary: written by a newer Quodeq
+        # (SchemaVersionError, a DatabaseError subclass) or otherwise corrupt /
+        # half-written. Keep the FS-based grades already in the payload rather
+        # than crashing the build.
+        _logger.warning(
+            "evaluation.db for %s/%s is unreadable; keeping FS-based grades "
+            "in the dashboard.", project, run_id,
+        )
+        return payload
+    if not dim_rows:
+        return payload
+
+    sql_grades: dict[str, dict] = {r["dimension"]: r for r in dim_rows}
+
+    def _override_dim(d: DimensionResult) -> DimensionResult:
+        row = sql_grades.get(d.dimension)
+        if row is None:
+            return d
+        score_val: float | None = row.get("score")
+        sql_score = f"{score_val}/10" if score_val is not None else d.overall_score
+        sql_grade = row.get("grade") or d.overall_grade
+        return replace(d, overall_score=sql_score, overall_grade=sql_grade)
+
+    overridden_dims = [_override_dim(d) for d in payload.dimensions_with_trend]
+
+    run_score = store.read_run_score_from_dim_scores()
+    if run_score.get("grade") is not None:
+        sql_numeric_avg: float | None = run_score.get("score")
+        sql_run_grade: str | None = run_score.get("grade")
+        overridden_summary = replace(
+            payload.selected_summary,
+            overall_grade=sql_run_grade,
+            numeric_average=sql_numeric_avg,
+        )
+    else:
+        overridden_summary = payload.selected_summary
+
+    payload.dimensions_with_trend = overridden_dims
+    payload.selected_summary = overridden_summary
+    return payload
+
+
 def build_dashboard(
     reports_dir: str,
     project: str,
@@ -389,4 +520,8 @@ def build_dashboard(
         summary=summarize_dimensions(selected_dims),
     )
     payload = _compute_dashboard_payload(reports_root, project, runs, ctx, cc)
-    return _build_dashboard_result(project, runs, selected_run, payload)
+    payload = _apply_sql_grade_override(reports_root, project, selected_run.run_id, payload)
+    exit_reason = _read_run_exit_reason(reports_root, project, selected_run.run_id)
+    return _build_dashboard_result(
+        project, runs, selected_run, payload, exit_reason=exit_reason,
+    )

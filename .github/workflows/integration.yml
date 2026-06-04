@@ -1,0 +1,37 @@
+name: Integration (non-blocking)
+
+# Exercises the @pytest.mark.integration suite (real subprocesses, server boot,
+# signal handling) on Linux AND Windows. Timing-sensitive and some paths are
+# platform-specific, so this lane is intentionally NOT a required PR check: it
+# runs on a schedule (and on demand) to surface OS-specific regressions for triage.
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python 3.13
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run integration tests
+        run: uv run pytest tests/ -v -ra --tb=short -m integration

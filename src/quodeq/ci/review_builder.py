@@ -76,14 +76,22 @@ def build_review_summary(
     duration_seconds: int | None = None,
     baseline_available: bool = True,
     artifact_url: str | None = None,
-    out_of_diff_count: int = 0,
+    outside_diff_violations: list[dict] | None = None,
 ) -> str:
     """Build the review body summarizing all dimension results.
 
-    out_of_diff_count: number of violations that were found but fell outside
-    the PR's changed lines. They can't be posted as line-anchored comments
-    (GitHub would 422); this count is surfaced in the body so reviewers know.
+    outside_diff_violations: NEW violations whose file:line falls outside the
+    PR's changed hunks. GitHub can't anchor an inline comment there, so they're
+    listed in a dedicated section with file:line + description instead of being
+    silently dropped. The headline count and severity breakdown then reflect
+    only the in-diff (inline-anchorable) violations, so the number shown agrees
+    with the inline comments actually posted.
     """
+    outside = outside_diff_violations or []
+    _outside_ids = {id(v) for v in outside}
+    # Count and break down only the violations shown as inline comments; the
+    # out-of-diff ones get their own listed section below.
+    new_violations = [v for v in new_violations if id(v) not in _outside_ids]
     # Diff mode is signaled by reports with unscored ("N/A") dimensions —
     # PR diff runs skip scoring, so the per-dimension score table and the
     # "no baseline" note (which frames absence-of-baseline as a scoring
@@ -131,17 +139,28 @@ def build_review_summary(
             lines.append(f"New violations by severity: {', '.join(parts)}")
         lines.append("")
 
+    if outside:
+        n = len(outside)
+        noun = "finding" if n == 1 else "findings"
+        lines.append(
+            f"**{n} {noun} outside the changed lines** "
+            "(GitHub can't anchor an inline comment to unchanged lines, so "
+            "they're listed here):"
+        )
+        lines.append("")
+        for v in outside:
+            file = v.get("file", "?")
+            line = v.get("line")
+            loc = f"{file}:{line}" if line is not None else file
+            severity = str(v.get("severity", "minor")).upper()
+            title = v.get("title") or "Violation"
+            lines.append(f"- `{loc}` — **{severity}** {title}")
+        lines.append("")
+
     if duration_seconds is not None:
         minutes = duration_seconds // 60
         seconds = duration_seconds % 60
         lines.append(f"_Evaluation completed in {minutes}m {seconds}s_")
-
-    if out_of_diff_count > 0:
-        lines.append("")
-        lines.append(
-            f"_{out_of_diff_count} additional violation(s) found outside the PR diff — "
-            "see the full evaluation artifact._"
-        )
 
     if artifact_url is not None:
         lines.append("")

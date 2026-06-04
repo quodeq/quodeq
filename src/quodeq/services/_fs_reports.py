@@ -21,7 +21,7 @@ def _enrich_with_coverage(reports_dir: str, project: str, payload: dict[str, Any
     if not scan_path.exists():
         return payload
     try:
-        scan = json.loads(scan_path.read_text())
+        scan = json.loads(scan_path.read_text(encoding="utf-8"))
         total = scan.get("total_files", 0)
         payload["totalFiles"] = total
         # Compute analyzed_files from the files_count already tracked in run data.

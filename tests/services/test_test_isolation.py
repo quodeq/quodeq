@@ -35,16 +35,14 @@ def test_default_evaluations_dir_resolves_inside_tmp() -> None:
 
 def test_default_provider_open_index_writes_to_tmp() -> None:
     """The exact failure mode that polluted ~/.quodeq/index.db: provider
-    constructed with no kwargs and ``_open_index`` lazily resolves the path."""
+    constructed with no kwargs lazily resolves the path on first use."""
     provider = FilesystemActionProvider()
-    db = provider._open_index()
-    try:
-        # The lazy resolver in _open_index sets _index_db_path to the resolved
-        # value; assert it is not the real home DB.
-        real_home_db = Path.home() / ".quodeq" / "index.db"
-        assert provider._index_db_path != real_home_db, (
-            f"FilesystemActionProvider() opened the production DB at "
-            f"{provider._index_db_path}; isolation fixture is broken"
-        )
-    finally:
-        db.close()
+    # Trigger the lazy resolver inside EvaluationsIndex._open_index by doing
+    # any read that opens the DB. rebuild_index is the public entry point.
+    provider.rebuild_index()
+    real_home_db = Path.home() / ".quodeq" / "index.db"
+    resolved = provider._evaluations.index_db_path
+    assert resolved != real_home_db, (
+        f"FilesystemActionProvider() opened the production DB at "
+        f"{resolved}; isolation fixture is broken"
+    )

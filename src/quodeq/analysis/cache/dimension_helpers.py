@@ -32,7 +32,7 @@ from pathlib import Path
 
 from quodeq.analysis._types import RunConfig
 from quodeq.analysis.cache.backend import CacheBackend
-from quodeq.analysis.cache.entry import CacheEntry
+from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_version
 from quodeq.analysis.cache.key import CacheKey, compute_key
 from quodeq.analysis.fingerprint import _hash_file, _hash_prompts_map, _hash_standards
 
@@ -42,7 +42,14 @@ _logger = logging.getLogger(__name__)
 # v1 -> v2: file_done marker contract; entries written without marker
 # filtering are no longer trusted, so old entries naturally invalidate
 # on the next input change.
-_SCHEMA_VERSION = 2
+# v2 -> v3: permissive key — model/prompts/standards/sampling left the key
+# (now provenance on the entry). The formula change re-keys every entry, so
+# schema-2 entries land in a different namespace that schema-3 lookups never
+# reach; the one-time GC (cache/gc.py) then reclaims them. This is the LAST
+# key change that costs a re-eval: entries are now self-describing
+# (file_content_hash stored), so any future key change is losslessly
+# migratable.
+_SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True)
@@ -54,6 +61,73 @@ class ClassifyResult:
     # Per-file cache key for the missed files, so the caller can write
     # entries after dispatch without recomputing the key.
     miss_keys: dict[str, str] = field(default_factory=dict)
+    # Per-field drift among cache hits: field -> {"count", "from", "to"}.
+    # Only fields that actually drifted appear. Lets the caller surface how
+    # many reused findings predate the current model / standards / prompts,
+    # so reuse across those boundaries is never silent.
+    provenance_drift: dict = field(default_factory=dict)
+
+
+# Provenance fields compared at classify time, in display order.
+_PROV_FIELDS = ("model_id", "standards_hash", "prompts_hash", "quodeq_version")
+# Fields whose values are human-readable enough to show in a summary; hashes
+# are not (an opaque SHA helps no one).
+_PROV_HUMAN_VALUE = frozenset({"model_id", "quodeq_version"})
+_PROV_LABELS = {
+    "model_id": "model",
+    "standards_hash": "standards",
+    "prompts_hash": "prompts",
+    "quodeq_version": "quodeq version",
+}
+
+
+def _current_provenance(config: RunConfig, dimension: str) -> dict:
+    """The provenance the current run would stamp on a fresh entry."""
+    standards_hash = (
+        _hash_standards(config.standards_dir, dimension)
+        if config.standards_dir else ""
+    ) or ""
+    return {
+        "model_id": _model_id_from(config),
+        "standards_hash": standards_hash,
+        "prompts_hash": _hash_prompts_combined(),
+        "quodeq_version": quodeq_version(),
+    }
+
+
+def _accumulate_drift(drift: dict, entry_provenance: dict, current: dict) -> None:
+    """Count, per provenance field, hits whose recorded value differs from the
+    current run. Unknown (blank/missing) entry values are skipped — we only
+    claim drift we can prove, so legacy/empty-provenance entries are quiet."""
+    for fname in _PROV_FIELDS:
+        old = entry_provenance.get(fname)
+        if not old:
+            continue
+        new = current.get(fname, "")
+        if old != new:
+            record = drift.setdefault(fname, {"count": 0, "from": old, "to": new})
+            record["count"] += 1
+
+
+def format_provenance_drift(drift: dict, *, reused: int) -> str:
+    """One-line summary of how many reused findings predate the current
+    model / standards / prompts. Empty string when nothing drifted."""
+    if not drift or reused <= 0:
+        return ""
+    parts: list[str] = []
+    for fname in _PROV_FIELDS:
+        record = drift.get(fname)
+        if not record:
+            continue
+        label = _PROV_LABELS[fname]
+        if fname in _PROV_HUMAN_VALUE:
+            parts.append(
+                f"{record['count']} across {label} change "
+                f"({record['from']} -> {record['to']})"
+            )
+        else:
+            parts.append(f"{record['count']} across {label} change")
+    return ", ".join(parts)
 
 
 def _hash_prompts_combined() -> str:
@@ -82,22 +156,22 @@ def _model_id_from(config: RunConfig) -> str:
 def build_cache_key_for_file(config: RunConfig, file_path: str, dimension: str) -> str:
     """Compute the cache key for a (file, dimension) pair under ``config``.
 
-    Returns a 64-char hex SHA-256. Same inputs always produce the same key.
+    Returns a 64-char hex SHA-256. The key is permissive: it depends only on
+    the real per-unit inputs (file content, path, dimension, language), so a
+    model switch or a quodeq/standards update reuses the cached result. The
+    volatile context is recorded on the entry's provenance at write time.
+
+    MUST stay byte-for-byte identical to the key built in
+    ``cache_writer.build_cache_writer`` and ``cache.runner._key_for`` —
+    ``CacheKey`` is the single source of truth and all three populate exactly
+    its fields.
     """
     content_hash = _hash_file(config.src / file_path) or ""
-    standards_hash = (
-        _hash_standards(config.standards_dir, dimension)
-        if config.standards_dir else ""
-    ) or ""
     key = CacheKey(
         schema_version=_SCHEMA_VERSION,
         file_content_hash=content_hash,
         file_path=file_path,
         dimension=dimension,
-        standards_hash=standards_hash,
-        prompts_hash=_hash_prompts_combined(),
-        evaluator_hash="",  # not yet versioned; revisit when evaluators are.
-        model_id=_model_id_from(config),
         language=config.language or "",
     )
     return compute_key(key)
@@ -114,10 +188,27 @@ def classify_files_via_cache(
     file is forced into the misses bucket regardless of cache state. The
     miss_keys map is still populated so callers can write fresh entries
     after dispatch — clean-scan refreshes the cache rather than ignoring it.
+
+    The pipeline classifies twice per dim (estimates + dim runner). When
+    ``config._classify_cache`` is set to a dict, this function stashes
+    its result there on the first call for a given ``(dimension, files)``
+    pair and short-circuits the second call. The stash MUST NOT short-
+    circuit when ``bypass_reads`` is True — clean-scan deletes entries
+    immediately before this call, so an upfront classify's hits are
+    stale by the time the dim runner asks again.
     """
+    files_tuple = tuple(files)
+    run_cache = config._classify_cache
+    if not bypass_reads and run_cache is not None:
+        stashed = run_cache.get(dimension)
+        if stashed is not None and stashed[0] == files_tuple:
+            return stashed[1]
+
     cached_findings: list[dict] = []
     misses: list[str] = []
     miss_keys: dict[str, str] = {}
+    provenance_drift: dict = {}
+    current_prov: dict | None = None  # computed lazily, only if there are hits
     for f in files:
         key = build_cache_key_for_file(config, f, dimension)
         hit = None if bypass_reads else cache.get(key)
@@ -126,11 +217,18 @@ def classify_files_via_cache(
             miss_keys[f] = key
         else:
             cached_findings.extend(hit.findings)
-    return ClassifyResult(
+            if current_prov is None:
+                current_prov = _current_provenance(config, dimension)
+            _accumulate_drift(provenance_drift, hit.provenance or {}, current_prov)
+    result = ClassifyResult(
         cached_findings=cached_findings,
         misses=misses,
         miss_keys=miss_keys,
+        provenance_drift=provenance_drift,
     )
+    if not bypass_reads and run_cache is not None:
+        run_cache[dimension] = (files_tuple, result)
+    return result
 
 
 def _group_findings_by_file(jsonl_path: Path) -> tuple[dict[str, list[dict]], set[str]]:
@@ -184,6 +282,14 @@ def persist_dispatch_results(
         return
     grouped, ok_files = _group_findings_by_file(jsonl_path)
     model_id = _model_id_from(config)
+    # Provenance context — run-constant, computed once. These left the cache
+    # key in schema 3; recording them keeps each entry self-describing.
+    standards_hash = (
+        _hash_standards(config.standards_dir, dimension)
+        if config.standards_dir else ""
+    ) or ""
+    prompts_hash = _hash_prompts_combined()
+    version = quodeq_version()
     for f in miss_files:
         if f not in ok_files:
             continue
@@ -199,5 +305,11 @@ def persist_dispatch_results(
             file_path=f,
             dimension=dimension,
             model_id=model_id,
+            file_content_hash=_hash_file(config.src / f) or "",
+            language=config.language or "",
+            provenance=build_provenance(
+                model_id=model_id, prompts_hash=prompts_hash,
+                standards_hash=standards_hash, version=version,
+            ),
         )
         cache.put(key, entry)

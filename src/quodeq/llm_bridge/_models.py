@@ -26,7 +26,7 @@ def get_known_models(*, _cache: dict | None = None) -> dict[str, list[dict]]:
     if _KNOWN_MODELS is not None:
         return _KNOWN_MODELS
     try:
-        _KNOWN_MODELS = json.loads(_models_path().read_text())
+        _KNOWN_MODELS = json.loads(_models_path().read_text(encoding="utf-8"))
         return _KNOWN_MODELS
     except (OSError, json.JSONDecodeError) as exc:
         _log.warning("Could not load known_models.json: %s", exc)

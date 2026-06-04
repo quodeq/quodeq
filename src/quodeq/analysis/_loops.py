@@ -10,8 +10,8 @@ from dataclasses import replace
 from collections.abc import Callable
 from pathlib import Path
 
-from quodeq.analysis._dimension_ops import _run_dimension_incremental as run_dimension_incremental
 from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.analysis.errors import EvaluationError
 from quodeq.core.evidence.model import Evidence
 from quodeq.engine._runner_markers import emit_marker
@@ -22,7 +22,8 @@ from quodeq.shared.dimensions_state import DimState, write_dim_state, IllegalDim
 
 
 def _safe_write_dim_state(
-    run_dir: Path | None, dim: str, state: DimState, *, reason: str | None = None,
+    run_dir: Path | None, dim: str, state: DimState, *,
+    reason: str | None = None, exit_reason: str | None = None,
 ) -> None:
     """Best-effort dim-state write. Never raises into the loop.
 
@@ -39,7 +40,7 @@ def _safe_write_dim_state(
     except (TypeError, ValueError):
         return
     try:
-        write_dim_state(run_dir, dim, state, reason=reason)
+        write_dim_state(run_dir, dim, state, reason=reason, exit_reason=exit_reason)
     except IllegalDimTransitionError as exc:
         log_warning(f"[loop] dim-state transition rejected: {exc}")
     except (OSError, AttributeError, TypeError) as exc:
@@ -96,7 +97,7 @@ def _silence_broken_stdout() -> None:
     does. Swapping the streams to /dev/null lets remaining dimensions run.
     """
     try:
-        devnull = open(os.devnull, "w")  # noqa: SIM115 - long-lived
+        devnull = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115 - long-lived
         sys.stdout = devnull
         sys.stderr = devnull
     except OSError:
@@ -117,11 +118,7 @@ def check_zero_findings(
     """
     if not result or source_file_count <= 0 or incremental_filter_active:
         return
-    total_findings = sum(
-        sum(len(pe.violations) + len(pe.compliance) for pe in ev.principles.values())
-        for ev in result.values()
-    )
-    if total_findings == 0:
+    if _count_findings(result) == 0:
         skip_msg = f" ({skipped_count} skipped)" if skipped_count else ""
         raise EvaluationError(
             f"Evaluation produced 0 findings across {len(result)} dimensions{skip_msg}. "
@@ -130,10 +127,103 @@ def check_zero_findings(
         )
 
 
+def _count_findings(result: dict[str, Evidence]) -> int:
+    """Total violations + compliance findings across all dimension Evidence.
+
+    Counts findings carried forward from cache as well as freshly produced
+    ones -- both land in ``Evidence.principles`` for the dims in ``result``.
+    """
+    return sum(
+        sum(len(pe.violations) + len(pe.compliance) for pe in ev.principles.values())
+        for ev in result.values()
+    )
+
+
+def _tally_markers(jsonl_path: Path) -> tuple[int, int]:
+    """Return ``(ok_count, error_count)`` from a dim's evidence JSONL.
+
+    Counts each file once by its *latest* ``file_done`` marker status, matching
+    the cache's ok_files semantics (a file that errored then re-succeeded counts
+    as ok). Unreadable/missing files contribute nothing.
+    """
+    last_status: dict[str, str] = {}
+    try:
+        # errors="replace" so a corrupt (non-UTF8) evidence file degrades to
+        # unparseable lines (dropped by the json.loads guard) instead of
+        # raising UnicodeDecodeError out of an otherwise-successful run.
+        with jsonl_path.open("r", encoding="utf-8", errors="replace") as fh:
+            for raw in fh:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    entry = json.loads(raw)
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+                if entry.get("_marker") != "file_done":
+                    continue
+                file = entry.get("file")
+                status = entry.get("status")
+                if isinstance(file, str) and status in ("ok", "error"):
+                    last_status[file] = status
+    except (FileNotFoundError, OSError):
+        return 0, 0
+    ok = sum(1 for s in last_status.values() if s == "ok")
+    err = sum(1 for s in last_status.values() if s == "error")
+    return ok, err
+
+
+def check_model_reachable(run_dir: Path | None, result: dict) -> None:
+    """Raise EvaluationError if the run attempted analysis but produced nothing.
+
+    Fires only when ALL of the following hold, so it flags a genuinely worthless
+    run (an unreachable/misconfigured model) without false-positiving on healthy
+    or partial runs:
+
+    - the run produced zero findings (fresh OR carried forward from cache). Any
+      finding means real output exists, so a mostly-cached run is not failed just
+      because the model blipped on the uncached remainder. (A lossy call now
+      writes ``error`` markers, so the dim yields an *empty* Evidence rather than
+      being skipped -- hence we gate on findings, not on ``result`` emptiness.)
+    - zero files were successfully analysed (no ``ok`` file_done markers); and
+    - at least one file was dispatched and failed (an ``error`` marker exists).
+
+    Runs in every mode, including diff (review) and incremental (nightly) where
+    ``check_zero_findings`` is deliberately bypassed -- those are exactly the
+    modes where an unreachable model used to exit 0 (green) while producing
+    nothing. A legitimately empty scan (no applicable files dispatched -> no
+    markers) does not raise.
+
+    Coverage note: the guard keys off file_done ``error`` markers. The Ollama /
+    API provider path writes those on a lossy call (``run_api_analysis``), so the
+    Ollama-backed CI flows are covered. A CLI provider (claude/gemini/codex) that
+    is itself unreachable never connects to the MCP server and writes no markers
+    at all, so this guard cannot see that failure in diff/incremental mode --
+    that remains a known gap, out of scope for the Ollama incident this targets.
+    """
+    if run_dir is None or _count_findings(result) > 0:
+        return
+    evidence_dir = run_dir / "evidence"
+    if not evidence_dir.is_dir():
+        return
+    ok_total = 0
+    err_total = 0
+    for jsonl in evidence_dir.glob("*_evidence.jsonl"):
+        ok, err = _tally_markers(jsonl)
+        ok_total += ok
+        err_total += err
+    if ok_total == 0 and err_total > 0:
+        raise EvaluationError(
+            f"Model produced no analysis: all {err_total} dispatched file(s) failed "
+            f"and 0 were analysed. The model is likely unreachable or misconfigured "
+            f"(check the provider/model name and that the server is running, "
+            f"e.g. `ollama list`), or every dispatched file errored during analysis."
+        )
+
+
 def run_incremental_loop(
     config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
-    *, process_fn: Callable[..., Evidence | None],
-    log_result_fn: Callable[..., None],
+    *, runner: DimensionRunner,
     on_dimension_done: Callable[[str, Evidence], None] | None = None,
 ) -> dict[str, Evidence]:
     """Run incremental per-dimension analysis.
@@ -142,9 +232,12 @@ def run_incremental_loop(
         config: Run configuration for this evaluation.
         dimensions: Dimension identifiers to analyze.
         ctx: Shared analysis context (total count, etc.).
-        process_fn: Callback to process a single dimension (signature:
-            ``(config, dimension, idx, ctx) -> Evidence | None``).
-        log_result_fn: Callback to log a completed dimension result.
+        runner: DimensionRunner used to analyze each dimension. The loop calls
+            ``runner.run(config, dim, idx, ctx, emit_log=False)`` for the
+            incremental path (the loop emits its own ``analyzing`` marker
+            with "(incremental)" suffix), then calls ``_log_dimension_result``
+            after a successful dim. The full-scan fallback uses
+            ``emit_log=True`` so the runner emits its own analyzing marker.
     """
     result: dict[str, Evidence] = {}
     log_info(f"[loop] incremental: {len(dimensions)} dim(s) to process: {', '.join(dimensions)}")
@@ -161,7 +254,7 @@ def run_incremental_loop(
         ev: Evidence | None = None
         last_exc: BaseException | None = None
         try:
-            ev = run_dimension_incremental(config, dimension, idx, ctx)
+            ev = runner.run(config, dimension, idx, ctx, emit_log=False)
         except BrokenPipeError as exc:
             _silence_broken_stdout()
             last_exc = exc
@@ -173,7 +266,7 @@ def run_incremental_loop(
             fallback_options.incremental_file_filter = None
             fallback_config = replace(config, options=fallback_options)
             try:
-                ev = process_fn(fallback_config, dimension, idx, ctx)
+                ev = runner.run(fallback_config, dimension, idx, ctx, emit_log=True)
             except BrokenPipeError as inner_exc:
                 _silence_broken_stdout()
                 last_exc = inner_exc
@@ -193,13 +286,16 @@ def run_incremental_loop(
             )
             last_exc = exc
             ev = None
-        # log_result_fn / on_dimension_done are caller-provided (e.g., the
-        # dashboard's scoring callback). Wrap them too - an exception in a
-        # callback shouldn't drop the next iteration on the floor.
+        # on_dimension_done is caller-provided (e.g., the dashboard's
+        # scoring callback). Wrap it too - an exception in a callback
+        # shouldn't drop the next iteration on the floor.
         if ev:
-            _safe_write_dim_state(run_dir, dimension, DimState.DONE)
+            _safe_write_dim_state(
+                run_dir, dimension, DimState.DONE,
+                exit_reason=ev.exit_reason,
+            )
             try:
-                log_result_fn(ev, dimension, idx, ctx.total)
+                _log_dimension_result(ev, dimension, idx, ctx.total)
                 result[dimension] = ev
                 if on_dimension_done:
                     on_dimension_done(dimension, ev)
@@ -244,12 +340,13 @@ def run_incremental_loop(
         incremental_filter_active=config.options.incremental_file_filter is not None
             or config.options.skip_scoring,
     )
+    check_model_reachable(_run_dir_for(config), result)
     return result
 
 
 def run_per_dimension_loop(
     config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
-    *, process_fn: Callable[..., Evidence | None],
+    *, runner: DimensionRunner,
     on_dimension_done: Callable[[str, Evidence], None] | None = None,
 ) -> dict[str, Evidence]:
     """Per-dimension loop (fallback or single-dimension).
@@ -258,8 +355,9 @@ def run_per_dimension_loop(
         config: Run configuration for this evaluation.
         dimensions: Dimension identifiers to analyze.
         ctx: Shared analysis context (total count, etc.).
-        process_fn: Callback to process a single dimension (signature:
-            ``(config, dimension, idx, ctx) -> Evidence | None``).
+        runner: DimensionRunner used to analyze each dimension. The loop calls
+            ``runner.run(config, dim, idx, ctx, emit_log=True)`` so the runner
+            emits its own analyzing/scoring markers and success log.
     """
     result: dict[str, Evidence] = {}
     skipped_count = 0
@@ -275,7 +373,7 @@ def run_per_dimension_loop(
         _safe_write_dim_state(run_dir, dimension, DimState.RUNNING)
         ev: Evidence | None = None
         try:
-            ev = process_fn(config, dimension, idx, ctx)
+            ev = runner.run(config, dimension, idx, ctx, emit_log=True)
         except BrokenPipeError as exc:
             _silence_broken_stdout()
             skipped_count += 1
@@ -305,7 +403,10 @@ def run_per_dimension_loop(
             log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: ev=None)")
             continue
         # ev is set - dim succeeded analytically.
-        _safe_write_dim_state(run_dir, dimension, DimState.DONE)
+        _safe_write_dim_state(
+            run_dir, dimension, DimState.DONE,
+            exit_reason=ev.exit_reason,
+        )
         try:
             result[dimension] = ev
             if on_dimension_done:
@@ -345,4 +446,5 @@ def run_per_dimension_loop(
         incremental_filter_active=config.options.incremental_file_filter is not None
             or config.options.skip_scoring,
     )
+    check_model_reachable(_run_dir_for(config), result)
     return result

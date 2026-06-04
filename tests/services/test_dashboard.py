@@ -1,4 +1,4 @@
-"""Tests for quodeq.provider.dashboard — dashboard construction logic."""
+"""Tests for quodeq.services.dashboard — dashboard construction logic."""
 from __future__ import annotations
 
 from typing import Any
@@ -127,6 +127,82 @@ class TestBuildDashboard:
         assert result["selectedRun"]["runId"] == "r1"
         assert len(result["dimensions"]) == 1
         assert "trend" in result
+
+    def test_build_dashboard_survives_too_new_db(self, tmp_path):
+        """The SQL grade override reads the per-run evaluation.db. If that DB was
+        written by a newer Quodeq, build_dashboard must keep the FS-based grades
+        instead of crashing on SchemaVersionError."""
+        import sqlite3
+
+        from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+        from quodeq.core.events.writer import EventLogWriter
+        from quodeq.data.projection.projector import Projector
+        from quodeq.data.sqlite._schema import SCHEMA_VERSION
+
+        run_dir = tmp_path / "proj" / "r1"
+        run_dir.mkdir(parents=True)
+        log = run_dir / "events.jsonl"
+        EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+            practice_id="P1", verdict="violation", dimension="security",
+            file="a.py", line=10, reason="r", req="R1",
+        )))
+        Projector().ensure_projected(log, run_dir, project_dir=tmp_path / "proj")
+        conn = sqlite3.connect(run_dir / "evaluation.db")
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION + 5}")
+        conn.commit()
+        conn.close()
+
+        run = _make_run("r1", "2024-01-01")
+        dims = [_dim("security", "B", "7.0")]
+        summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
+        with (
+            patch("quodeq.services.dashboard.list_runs", return_value=[run]),
+            patch("quodeq.services.dashboard.read_run_data", return_value=dims),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), "proj", "latest")  # must not raise
+
+        # The FS-based grades survive: the SQL override is skipped, not silently
+        # blanked, so the dimension keeps the grade/score from read_run_data.
+        assert len(result["dimensions"]) == 1
+        dim = result["dimensions"][0]
+        assert dim["overallGrade"] == "B"
+        assert dim["overallScore"] == "7.0"
+
+    def test_build_dashboard_survives_corrupt_db(self, tmp_path):
+        """If the per-run evaluation.db is corrupt or half-written it raises a
+        generic sqlite3.DatabaseError, not SchemaVersionError. The SQL grade
+        override must keep the FS-based grades instead of crashing the dashboard
+        build. Widening the seam to DatabaseError (which SchemaVersionError
+        subclasses) covers both the too-new and the corrupt case."""
+        from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+        from quodeq.core.events.writer import EventLogWriter
+
+        run_dir = tmp_path / "proj" / "r1"
+        run_dir.mkdir(parents=True)
+        log = run_dir / "events.jsonl"
+        EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+            practice_id="P1", verdict="violation", dimension="security",
+            file="a.py", line=10, reason="r", req="R1",
+        )))
+        # A truncated / non-SQLite evaluation.db: opening it raises
+        # "file is not a database" when the override path tries to project.
+        (run_dir / "evaluation.db").write_bytes(b"this is not a sqlite database")
+
+        run = _make_run("r1", "2024-01-01")
+        dims = [_dim("security", "B", "7.0")]
+        summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
+        with (
+            patch("quodeq.services.dashboard.list_runs", return_value=[run]),
+            patch("quodeq.services.dashboard.read_run_data", return_value=dims),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), "proj", "latest")  # must not raise
+
+        assert len(result["dimensions"]) == 1
+        dim = result["dimensions"][0]
+        assert dim["overallGrade"] == "B"
+        assert dim["overallScore"] == "7.0"
 
     def test_latest_skips_cancelled_runs(self, tmp_path):
         # ``"latest"`` defaults to the most recent fully-completed run so the
@@ -482,3 +558,100 @@ class TestStaleCacheSelfHeal:
         assert read_calls == [], (
             f"expected no disk reads (cache hit), got {read_calls}"
         )
+
+
+
+
+# ============================================================
+# Dashboard scores come from CLI evaluation JSON, no SQL overlay
+# ============================================================
+
+
+class TestDashboardSqlOverlayAfterConfidenceFix:
+    """The SQL grade overlay is back, but only after the SQL projector and
+    the CLI engine were unified on the same confidence-level rule (see
+    ``core.evidence.model.classify_confidence_level``).  These tests pin
+    the new contract: when SQL grade tables are populated, the dashboard
+    surfaces them — which is now safe because they're computed with the
+    same formula the CLI used to write the evaluation JSON.
+
+    Previous incarnation of these tests (``TestDashboardSqlGradeOverride``)
+    pinned the same overlay against the buggy projector formula; that
+    behaviour caused the 7.7-vs-9.0 dashboard-vs-CLI split the user
+    reported.  Now that both engines agree, the overlay is a feature
+    (live updates on dismiss) rather than a divergence.
+    """
+
+    def test_dashboard_overlays_sql_grades_when_populated(self, tmp_path: Path) -> None:
+        """Post-dismissal SQL grade overrides the FS-derived grade."""
+        from quodeq.data.sqlite.state_store import SQLiteStateStore
+        from quodeq.data.fs.report_parser import RunInfo as _RI
+
+        project = "myproject"
+        run_id = "r1"
+        run_dir = tmp_path / project / run_id
+        run_dir.mkdir(parents=True)
+
+        # Seed SQL grade tables with the post-dismissal grade — what
+        # would be computed if the user had dismissed one of the
+        # critical findings, lifting the score.
+        store = SQLiteStateStore(run_dir)
+        store.record_dimension_score(dimension="Security", score=7.5, grade="Good")
+
+        # FS-derived grade is the original pre-dismissal value.
+        fs_dim = DimensionResult(
+            dimension="Security", overall_grade="Critical", overall_score="2.0",
+        )
+        summary = DimensionSummary(
+            dimensions_count=1, overall_grade="Critical", numeric_average=2.0,
+        )
+
+        with (
+            patch(
+                "quodeq.services.dashboard.list_runs",
+                return_value=[_RI(run_id=run_id, date_iso="2024-01-01", date_label="2024-01-01")],
+            ),
+            patch("quodeq.services.dashboard.read_run_data", return_value=[fs_dim]),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), project, run_id)
+
+        sec = result["dimensions"][0]
+        assert sec["overallGrade"] == "Good", (
+            f"Expected SQL post-dismissal grade 'Good', got {sec['overallGrade']!r}"
+        )
+        assert sec["overallScore"] == "7.5/10"
+
+    def test_dashboard_falls_back_to_fs_when_sql_tables_empty(
+        self, tmp_path: Path,
+    ) -> None:
+        """No SQL rows → use FS grade unchanged (this is the steady state
+        for runs that haven't been projected, e.g. legacy runs without
+        events.jsonl)."""
+        from quodeq.data.fs.report_parser import RunInfo as _RI
+
+        project = "myproject"
+        run_id = "r1"
+        run_dir = tmp_path / project / run_id
+        run_dir.mkdir(parents=True)
+
+        fs_dim = DimensionResult(
+            dimension="Security", overall_grade="Good", overall_score="7.7/10",
+        )
+        summary = DimensionSummary(
+            dimensions_count=1, overall_grade="Good", numeric_average=7.7,
+        )
+
+        with (
+            patch(
+                "quodeq.services.dashboard.list_runs",
+                return_value=[_RI(run_id=run_id, date_iso="2024-01-01", date_label="2024-01-01")],
+            ),
+            patch("quodeq.services.dashboard.read_run_data", return_value=[fs_dim]),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), project, run_id)
+
+        sec = result["dimensions"][0]
+        assert sec["overallScore"] == "7.7/10"
+        assert sec["overallGrade"] == "Good"

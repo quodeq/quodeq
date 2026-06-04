@@ -1,6 +1,6 @@
 [project]
 name = "quodeq"
-version = "1.1.2"
+version = "1.2.0"
 description = "Source code quality evaluation platform powered by AI"
 readme = "README.md"
 license = "MIT"
@@ -24,7 +24,8 @@ dependencies = [
     "jsonschema==4.26.0",
     "flask==3.1.3",
     "pywebview>=6.2",
-    "instructor>=1.15.0",
+    "openai>=1.0",
+    "httpx>=0.27",
 ]
 
 [project.urls]
@@ -73,4 +74,14 @@ requires = ["uv_build>=0.10.6,<0.12.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-wheel-exclude = ["src/quodeq/static", "src/quodeq/ui/node_modules"]
+# Note: src/quodeq/static is intentionally INCLUDED so the wheel ships a
+# pre-built UI. End users no longer need Node/npm at runtime. Build it
+# with `tools/build-dist.sh` (runs npm ci + vite build before uv build).
+wheel-exclude = ["src/quodeq/ui/node_modules"]
+# Keep the installed JS dependency tree (~28MB / 11k files, reproducible from
+# package-lock.json) and local build cruft out of the published source tarball.
+source-exclude = [
+    "src/quodeq/ui/node_modules",
+    "src/quodeq/ui/.mypy_cache",
+    "**/.DS_Store",
+]

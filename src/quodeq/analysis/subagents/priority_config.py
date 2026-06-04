@@ -26,7 +26,7 @@ def load_priority_config() -> dict:
     """Load file priority config. Cached after first call."""
     config_path = default_paths().root / "config" / "file_priority.json"
     try:
-        return json.loads(config_path.read_text())
+        return json.loads(config_path.read_text(encoding="utf-8"))
     except (FileNotFoundError, PermissionError, json.JSONDecodeError):
         return {}
 

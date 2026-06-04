@@ -18,6 +18,7 @@ from quodeq.services._index_sync import (
     _sync_legacy_run,
     _upsert_from_status,
     _check_stale_and_promote,
+    force_promote_to_cancelled_stale,
 )
 
 
@@ -319,5 +320,38 @@ def test_stale_promotion_terminal_state_untouched(tmp_path: Path) -> None:
         assert promoted is False
         row = db.execute("SELECT state FROM runs WHERE job_id = ?", ("ext-r9",)).fetchone()
         assert row[0] == "done"
+    finally:
+        db.close()
+
+
+def test_force_promote_preserves_provider_model_deadline(tmp_path: Path) -> None:
+    """force_promote_to_cancelled_stale must carry ai_provider/ai_model/deadline_at
+    into the rewritten status.json, consistent with _check_stale_and_promote."""
+    db = open_index(tmp_path / "idx.db")
+    try:
+        run = _make_run_dir(tmp_path, "p", "r11")
+        write_status(
+            run,
+            state=RunState.RUNNING,
+            job_id="ext-r11",
+            started_at="2026-04-20T00:00:00+00:00",
+            dimensions=[],
+            pid=999999999,
+            ai_provider="llamacpp",
+            ai_model="qwen3.6-27b",
+            deadline_at="2026-01-01T00:00:00+00:00",
+        )
+        _upsert_from_status(db, run, project_uuid="p", run_id="r11")
+
+        promoted = force_promote_to_cancelled_stale(db, "ext-r11", run_dir=run)
+        assert promoted is True
+
+        from quodeq.shared.run_status import read_status
+        disk = read_status(run)
+        assert disk is not None
+        assert disk["state"] == "cancelled"
+        assert disk["ai_provider"] == "llamacpp"
+        assert disk["ai_model"] == "qwen3.6-27b"
+        assert disk["deadline_at"] == "2026-01-01T00:00:00+00:00"
     finally:
         db.close()

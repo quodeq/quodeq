@@ -191,20 +191,30 @@ def test_build_review_payload_filters_when_changed_lines_provided() -> None:
     assert payload["comments"][0]["path"] == "src/a.py"
 
 
-def test_build_review_payload_summary_mentions_out_of_diff_count() -> None:
+def test_build_review_payload_summary_surfaces_out_of_diff_violations() -> None:
+    """Out-of-diff findings cannot be inline comments (GitHub rejects anchors
+    outside the diff hunks with HTTP 422), but they ARE surfaced in the summary
+    body with file:line + description so they aren't silently lost.
+
+    This reverses the earlier "omit entirely" behavior: a finding that the eval
+    flags on an unchanged line of a changed file (e.g. a pre-existing helper)
+    was previously counted but never shown, leaving "N found" with zero visible
+    findings. Now it is listed in an "outside the changed lines" section.
+    """
     reports = [{
         "dimension": "security",
         "overallScore": "7/10",
         "overallGrade": "B",
         "violations": [
-            {"file": "src/z.py", "line": 99, "title": "out of diff", "reason": "", "severity": "major"},
+            {"file": "src/z.py", "line": 99, "title": "unsafe eval", "reason": "", "severity": "major"},
         ],
         "totals": {"violationCount": 1, "severity": {"major": 1}},
     }]
-    payload = build_review_payload(reports, changed_lines={})  # empty diff → all dropped
-    assert payload["comments"] == []
-    # Summary body should mention the dropped count so users aren't misled.
-    assert "outside the pr diff" in payload["body"].lower()
+    payload = build_review_payload(reports, changed_lines={})  # empty diff → no inline anchors
+    assert payload["comments"] == []                # still not posted as an inline comment
+    body = payload["body"]
+    assert "src/z.py:99" in body                    # surfaced with file:line
+    assert "unsafe eval" in body                    # and its description
 
 
 def test_build_review_payload_no_filter_when_changed_lines_is_none() -> None:

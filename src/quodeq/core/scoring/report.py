@@ -1,2 +1,1 @@
-"""Backward-compat re-export — moved to quodeq.engine.scoring_pipeline."""
-from quodeq.engine.scoring_pipeline import run_full  # noqa: F401
+"""DEPRECATED: This module is a legacy re-export and should be removed in future versions."""

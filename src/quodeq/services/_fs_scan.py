@@ -123,4 +123,4 @@ def _write_scan_json(scan: ScanData, output_dir: Path) -> None:
     """Persist scan data as JSON."""
     output_dir.mkdir(parents=True, exist_ok=True)
     payload = dataclasses.asdict(scan)
-    (output_dir / "scan.json").write_text(json.dumps(payload, indent=2))
+    (output_dir / "scan.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")

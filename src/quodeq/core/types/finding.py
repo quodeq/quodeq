@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from quodeq.core.types.req_ref import ReqRef as ReqRef
+
 
 @dataclass(frozen=True, slots=True)
 class SeverityTally:
@@ -19,14 +21,9 @@ class Totals:
 
 
 @dataclass(frozen=True, slots=True)
-class ReqRef:
-    label: str
-    url: str
-
-
-@dataclass(frozen=True, slots=True)
 class Finding:
-    principle: str | None = None
+    practice_id: str | None = None
+    verdict: str | None = None  # "violation" | "compliance" | "dismissed"
     file: str | None = None
     line: int | str | None = None
     end_line: int | str | None = None

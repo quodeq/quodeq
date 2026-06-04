@@ -16,19 +16,14 @@ from pathlib import Path
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import read_message, dispatch as _dispatch
-from quodeq.engine._ref_utils import load_compiled_refs as _load_compiled_refs
+from quodeq.core.standards.refs import load_compiled_refs as _load_compiled_refs
 from quodeq.context.precedent import load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
 from quodeq.core.standards.refs import load_compiled_requirements as _load_compiled_requirements
-from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
 # Re-export public API so existing imports keep working.
-from quodeq.analysis.mcp.router import (  # noqa: F401
-    CompiledContext,
-    DeduplicationStore,
-    FileReader,
-    FindingsRouter,
-)
+from quodeq.analysis.mcp.enricher import CompiledContext, FileReader  # noqa: F401
+from quodeq.analysis.mcp.router import DeduplicationStore, FindingsRouter  # noqa: F401
 
 
 def _build_compiled_context(sa: ServerArgs) -> CompiledContext:
@@ -75,8 +70,8 @@ def main() -> None:
         queue = FileQueue(Path(sa.queue_path))
 
     try:
-        with open(sa.findings_file, "a") as findings_fh:
-            router = _build_router(findings_fh, Path(sa.findings_file), ctx)
+        with open(sa.findings_file, "a", encoding="utf-8") as findings_fh:
+            router = _build_router(findings_fh, Path(sa.findings_file), ctx, sa)
             while True:
                 msg = read_message()
                 if msg is None:
@@ -93,21 +88,54 @@ def main() -> None:
         sys.exit(1)
 
 
-def _build_router(findings_fh, findings_path: Path, ctx: CompiledContext) -> FindingsRouter:
-    """Construct a FindingsRouter wired to dual-write into the run's evaluation.db.
+def _build_router(
+    findings_fh, findings_path: Path, ctx: CompiledContext,
+    server_args: ServerArgs,
+) -> FindingsRouter:
+    """Construct a FindingsRouter wired to the event log and (when configured)
+    the per-file synchronous cache writer.
 
     The findings_path is `<run_dir>/evidence/<dim>_evidence.jsonl`, so the run
-    directory is its grandparent and the project directory its great-
-    grandparent. SqliteFindingsRepository creates / opens
-    `<run_dir>/evaluation.db` lazily on first insert. We also load the
-    project's prior dismissals from `<project_dir>/dismissed.json` so the
-    router can downweight findings the user has already judged.
+    directory is its grandparent and the project directory its great-grandparent.
+    The event log lives at `<run_dir>/events.jsonl`.
+
+    When ``server_args.dimension`` is set, the cache writer becomes mandatory:
+    a findings_server scoped to a dimension MUST have ``--cache-root`` and
+    ``--model-id`` so each ok marker writes the cache entry synchronously.
+    Silent degradation to watcher-only is the failure mode the Phase 1 audit
+    warned against -- argparse-level enforcement comes in Task 7; this check
+    is defense-in-depth.
     """
     run_dir = Path(findings_path).parent.parent
     project_dir = run_dir.parent
-    repo = SqliteFindingsRepository(run_dir)
     ctx.precedent_fingerprints = load_precedent_fingerprints(project_dir)
-    return FindingsRouter(findings_fh, context=ctx, findings_repo=repo)
+    from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
+    event_log = EventLogWriter(run_dir / "events.jsonl")
+
+    cache_writer = None
+    if server_args.dimension:
+        if not server_args.cache_root or not server_args.model_id:
+            raise RuntimeError(
+                "findings_server requires --cache-root and --model-id when "
+                "--dimension is set; got cache_root=%r, model_id=%r"
+                % (server_args.cache_root, server_args.model_id),
+            )
+        from quodeq.analysis.cache.cache_writer import build_cache_writer  # noqa: PLC0415
+        src_root = Path(server_args.work_dir) if server_args.work_dir else Path.cwd()
+        standards_dir = Path(server_args.compiled_dir) if server_args.compiled_dir else None
+        cache_writer = build_cache_writer(
+            cache_root=Path(server_args.cache_root),
+            src_root=src_root,
+            standards_dir=standards_dir,
+            dimension=server_args.dimension,
+            model_id=server_args.model_id,
+            language=server_args.language or "",
+        )
+
+    return FindingsRouter(
+        findings_fh, context=ctx, event_log=event_log,
+        on_file_done=cache_writer,
+    )
 
 
 if __name__ == "__main__":

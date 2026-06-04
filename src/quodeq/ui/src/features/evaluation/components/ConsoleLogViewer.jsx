@@ -20,8 +20,10 @@ import usePretextHeight from '../../../hooks/usePretextHeight.js';
 
 const SCROLL_BOTTOM_TOLERANCE = 8;
 // Real ANSI: \x1b[ ... <letter>. Bare CSI fallback: [0;34m, [0m, etc.
+// Digits are required — [m (no digits) would also match SGR reset but would
+// incorrectly strip the leading [m from dimension names like [maintainability].
 const ANSI_ESC_RE = /\x1b\[[\d;?]*[A-Za-z]/g;
-const ANSI_BARE_RE = /\[(?:\d+(?:;\d+)*)?m/g;
+const ANSI_BARE_RE = /\[\d+(?:;\d+)*m/g;
 
 // Match http(s) URLs in log lines. Trailing punctuation is excluded so a
 // URL at the end of a sentence ("see https://x.com.") doesn't pull the

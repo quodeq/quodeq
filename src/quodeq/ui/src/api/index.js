@@ -71,7 +71,11 @@ export function relocateProject(projectId, newPath) {
 /** @returns {Promise<{accumulated: Object, trend: Array, availableRuns: Array}>} */
 export async function getProjectScores(projectId, asOfRun = null) {
   const q = asOfRun ? `?asOf=${encodeURIComponent(asOfRun)}` : '';
-  return request(`/projects/${encodeURIComponent(projectId)}/scores${q}`);
+  const data = await request(`/projects/${encodeURIComponent(projectId)}/scores${q}`);
+  if (data?.accumulated && Array.isArray(data.accumulated.dimensions)) {
+    data.accumulated.dimensions = data.accumulated.dimensions.map(createDimension);
+  }
+  return data;
 }
 
 /** @returns {Promise<{dimensions: Array, summary: Object}>} */
@@ -251,6 +255,30 @@ export function testLlamacppConcurrency(model) {
   return request('/llamacpp/test-concurrency', {
     method: 'POST',
     body: JSON.stringify({ model: model || '' }),
+  });
+}
+
+/** @returns {Promise<Object>} omlx connection status */
+export function getOmlxStatus(baseUrl) {
+  const params = baseUrl ? `?base_url=${encodeURIComponent(baseUrl)}` : '';
+  return request(`/omlx/status${params}`);
+}
+
+/** @returns {Promise<Object[]>} Available omlx models */
+export async function getOmlxModels(baseUrl, apiKey) {
+  const params = new URLSearchParams();
+  if (baseUrl) params.set('base_url', baseUrl);
+  if (apiKey) params.set('api_key', apiKey);
+  const qs = params.toString() ? `?${params}` : '';
+  const data = await request(`/omlx/models${qs}`);
+  return data?.models ?? [];
+}
+
+/** @returns {Promise<Object>} Concurrency test results for the given model */
+export function testOmlxConcurrency(model, baseUrl, apiKey) {
+  return request('/omlx/test-concurrency', {
+    method: 'POST',
+    body: JSON.stringify({ model, base_url: baseUrl || undefined, api_key: apiKey || undefined }),
   });
 }
 

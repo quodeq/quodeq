@@ -6,7 +6,7 @@
 </p>
 
 <h2 align="center">AI-powered code quality and security scanner</h2>
-<p align="center"><strong>v1.1.2</strong></p>
+<p align="center"><strong>v1.2.0</strong></p>
 <p align="center">
   <a href="https://github.com/quodeq/quodeq/actions/workflows/test.yml"><img src="https://github.com/quodeq/quodeq/actions/workflows/test.yml/badge.svg" alt="Tests" /></a>
   <a href="https://github.com/quodeq/quodeq/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
@@ -60,17 +60,17 @@ Each finding includes a reason, the offending code, and a fix plan. Results are 
 
 | OS | Command |
 |---|---|
-| **macOS** | `brew install python node pipx` |
-| **Windows** _(experimental)_ | `winget install Python.Python.3.13 OpenJS.NodeJS` then `python -m pip install --user pipx && python -m pipx ensurepath` |
-| **Debian / Ubuntu** | `sudo apt install -y python3.12 python3-pip pipx nodejs npm` |
-| **Fedora / RHEL** | `sudo dnf install -y python3.12 python3-pip pipx nodejs npm` |
-| **Arch** | `sudo pacman -S python python-pipx nodejs npm` |
+| **macOS** | `brew install python pipx` |
+| **Windows** | `winget install Python.Python.3.13` then `python -m pip install --user pipx && python -m pipx ensurepath` |
+| **Debian / Ubuntu** | `sudo apt install -y python3.12 python3-pip pipx` |
+| **Fedora / RHEL** | `sudo dnf install -y python3.12 python3-pip pipx` |
+| **Arch** | `sudo pacman -S python python-pipx` |
 
-> **Debian/Ubuntu heads-up:** `nodejs` and `npm` are separate packages. `apt install nodejs` alone is not enough. If you also use the native desktop window (not `--browser`), you'll need `sudo apt install -y python3-gi gir1.2-webkit2-4.1` too — otherwise quodeq will auto-fall-back to opening the dashboard in your default browser.
+> **Debian/Ubuntu heads-up:** If you use the native desktop window (not `--browser`), you'll need `sudo apt install -y python3-gi gir1.2-webkit2-4.1` too. Otherwise quodeq will auto-fall-back to opening the dashboard in your default browser.
 
-> **Windows heads-up:** Windows is supported on a best-effort basis. The full test suite runs green on `windows-latest` in CI, but we don't have a Windows machine to smoke-test the dashboard or end-to-end runs against — so please [open an issue](https://github.com/quodeq/quodeq/issues) if anything misbehaves.
+> **Windows note:** The test suite runs on `windows-latest` as a **blocking** CI gate, so a Windows regression blocks the PR. The desktop window (WebView2) is smoke-tested manually per release (see `docs/windows-manual-smoke-checklist.md`). If anything misbehaves, please [open an issue](https://github.com/quodeq/quodeq/issues).
 
-Minimum versions: Python 3.12+, Node.js 18+, npm 9+.
+Minimum versions: Python 3.12+. (The dashboard UI ships pre-built inside the wheel, so end users no longer need Node.js or npm. Contributors who want to iterate on the UI source need Node 20+ and npm 10+, see [CONTRIBUTING.md](CONTRIBUTING.md).)
 
 ### 2. Install quodeq
 
@@ -86,7 +86,7 @@ Quodeq needs an LLM to do the evaluation. You have two options:
 **Local, free, private** — [Ollama](https://ollama.com/download) with Gemma 4:
 ```bash
 # install ollama from https://ollama.com/download, then:
-ollama pull gemma4-26b-32k
+ollama pull gemma4:26b
 ollama serve    # runs in the background
 ```
 
@@ -208,7 +208,7 @@ uv run quodeq             # launch the dashboard
 uv run pytest             # run the test suite
 ```
 
-Same OS prerequisites apply as for the pipx install — Node.js 18+ + npm for the dashboard UI, and a configured LLM provider (Ollama or Claude Code / Codex CLI / Gemini CLI) before you can actually scan anything.
+Same OS prerequisites as the pipx install (Python 3.12+), plus Node 20+ and npm 10+ because a source checkout builds the dashboard UI from the working copy. You also need a configured LLM provider (Ollama or Claude Code / Codex CLI / Gemini CLI) before you can actually scan anything.
 
 If the dashboard window doesn't appear on Linux, run `uv run quodeq --browser` (the native window needs `python3-gi` + `gir1.2-webkit2-4.1`, which aren't pulled in by the pip wheel).
 

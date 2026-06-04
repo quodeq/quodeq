@@ -82,6 +82,8 @@ def write_status(
     exit_reason: str | None = None,
     finalized_at: str | None = None,
     deadline_at: str | None = None,
+    ai_provider: str | None = None,
+    ai_model: str | None = None,
 ) -> None:
     """Atomically write status.json with *state* and metadata.
 
@@ -107,6 +109,10 @@ def write_status(
         "exit_reason": exit_reason,
         "deadline_at": deadline_at,
     }
+    if ai_provider is not None:
+        payload["ai_provider"] = ai_provider
+    if ai_model is not None:
+        payload["ai_model"] = ai_model
     body = json.dumps(payload, indent=2)
     tmp_path = run_dir / (STATUS_FILENAME + ".tmp")
     final_path = run_dir / STATUS_FILENAME

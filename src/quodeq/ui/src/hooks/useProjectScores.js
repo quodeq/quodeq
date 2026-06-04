@@ -23,16 +23,6 @@ import { projectKeys } from "../api/queryKeys.js";
  */
 export function useProjectScores({ selectedProject, selectedRun, keepPlaceholder = true }) {
   const queryClient = useQueryClient();
-  const asOf = selectedRun && selectedRun !== "latest" ? selectedRun : null;
-
-  const scoresQuery = useQuery({
-    queryKey: projectKeys.scores(selectedProject || "_none_", asOf),
-    queryFn: () => getProjectScores(selectedProject, asOf),
-    enabled: !!selectedProject,
-    staleTime: 60_000,
-    // Keep prior scores visible while switching runs — see useDashboard for rationale.
-    placeholderData: keepPlaceholder ? (prev) => prev : undefined,
-  });
 
   const latestQuery = useQuery({
     queryKey: projectKeys.scores(selectedProject || "_none_", null),
@@ -42,6 +32,34 @@ export function useProjectScores({ selectedProject, selectedRun, keepPlaceholder
     // Latest scores are project-wide (no per-run swap), so prev-data
     // flashing isn't a concern — keep placeholder unconditionally.
     placeholderData: (prev) => prev,
+  });
+
+  // Overview is anchored on completed runs. If selectedRun points at an
+  // in-progress run (or one that hasn't shown up in availableRuns yet),
+  // fall back to 'latest' so the cards keep showing the last finished
+  // evaluation instead of going blank mid-flight. Resolution waits for
+  // latestQuery so we never fire the scoped query with a stale asOf.
+  const isLatestSelection = !selectedRun || selectedRun === "latest";
+  const asOf = useMemo(() => {
+    if (isLatestSelection) return null;
+    const runs = latestQuery.data?.availableRuns;
+    if (!runs) return null;
+    const match = runs.find((r) => r.runId === selectedRun);
+    if (!match) return null;
+    if (match.status === "in_progress") return null;
+    return selectedRun;
+  }, [isLatestSelection, selectedRun, latestQuery.data]);
+
+  const scoresQuery = useQuery({
+    queryKey: projectKeys.scores(selectedProject || "_none_", asOf),
+    queryFn: () => getProjectScores(selectedProject, asOf),
+    // Wait for the latest run-status list before issuing a scoped fetch —
+    // otherwise we'd briefly call with the raw selectedRun and only later
+    // correct it, leaking a stale-asOf request.
+    enabled: !!selectedProject && (isLatestSelection || latestQuery.isSuccess),
+    staleTime: 60_000,
+    // Keep prior scores visible while switching runs — see useDashboard for rationale.
+    placeholderData: keepPlaceholder ? (prev) => prev : undefined,
   });
 
   const availableRuns = useMemo(() => {

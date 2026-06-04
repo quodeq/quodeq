@@ -1,6 +1,7 @@
 """Consecutive-failure circuit breaker for the dim runner."""
 from __future__ import annotations
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -86,6 +87,34 @@ class TestFailureStreakBreaker:
         watcher.stop_and_join(timeout=5.0)
         # The watcher sees cancellation already set and does not record a trip event.
         assert watcher.trip_event is None
+
+    def test_trips_on_final_scan_when_dispatch_ends_between_polls(self, tmp_path: Path):
+        """Regression (slow-runner flake): a streak written while the watcher
+        is parked in its poll wait, with stop signaled before the next poll,
+        must still trip via the final scan on stop.
+
+        On a fast machine a poll usually lands in time; on a slow/loaded
+        runner the dispatch can finish *between* polls, and without a
+        final-scan-on-stop guarantee the breaker exits its loop having never
+        scanned the errors -- the "DID NOT RAISE CircuitBreakerError" flake.
+        """
+        jsonl = tmp_path / "evidence.jsonl"
+        jsonl.write_text("")  # empty: first scan sees nothing, watcher parks
+        watcher = FailureStreakWatcher(jsonl, threshold=2)
+        watcher.start()
+        # Let the watcher do its first (empty) scan and park in _stop.wait().
+        # This reproduces the exact slow-runner state: parked mid-interval.
+        time.sleep(0.05)
+        # Dispatch writes a 2-error streak, then finishes immediately -- stop
+        # is signaled well within one poll interval, before the next scan.
+        _append(jsonl, {"_marker": "file_done", "file": "a.py",
+                        "status": "error", "reason": "token_limit"})
+        _append(jsonl, {"_marker": "file_done", "file": "b.py",
+                        "status": "error", "reason": "token_limit"})
+        watcher.stop_and_join(timeout=5.0)
+        assert isinstance(watcher.trip_event, TripEvent)
+        assert watcher.trip_event.streak == 2
+        assert cancellation.is_cancelled()
 
 
 class TestCircuitBreakerError:

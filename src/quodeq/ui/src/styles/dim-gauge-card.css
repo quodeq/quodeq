@@ -113,11 +113,20 @@
 .dim-gauge-card--stale:focus-visible {
   opacity: 0.85;
 }
-.dim-gauge-card__stale-label {
+/* Coverage line: `<date> · <pct>%` rendered under every dimension card.
+   When the card is for a non-active dimension, `.dim-gauge-card--stale`
+   applies opacity 0.6 to the whole card — that's the "older run" cue.
+   When the run is partial, the line carries a tooltip with full detail. */
+.dim-gauge-card__coverage-line {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
-  font-style: italic;
   text-align: center;
+}
+.dim-gauge-card__coverage-pct {
+  color: inherit;
+}
+.dim-gauge-card__coverage-pct--partial {
+  color: #f0b95f;
 }
 
 .dim-gauge-card__gauge--insuf .dim-gauge-card__score {
@@ -131,3 +140,4 @@
   margin-top: var(--space-2);
   letter-spacing: 0.04em;
 }
+

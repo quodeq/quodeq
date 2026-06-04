@@ -28,6 +28,11 @@
  * @property {string|null}   fromRunId
  * @property {string|null}   fromDateLabel
  * @property {string|null}   fromDateISO
+ * @property {number|null}   [filesRead]         - files analyzed in this dim (Phase 1+)
+ * @property {number|null}   [sourceFileCount]   - total project source-file count (Phase 1+)
+ * @property {string|null}   [exitReason]        - per-dim or run-level exit signal.
+ *   Values: "done" (success), "time_limit", "failure_streak", "cancelled",
+ *   "error", or null/missing (legacy, treated as "done" by the UI).
  *
  * @typedef {Object} DimensionEval
  * @property {string}           dimension

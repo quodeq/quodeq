@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
@@ -20,7 +21,7 @@ from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, 
 from quodeq.engine.scoring_pipeline import run_full
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.logging import log_error, log_info, log_warning
-from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_repo, write_text
+from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo, write_text
 from quodeq.shared.repo_handler import cleanup_cloned_repo
 from quodeq.engine._runner_markers import emit_marker
 from quodeq.shared.prereqs import check_evaluate_prereqs
@@ -244,6 +245,23 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
     )
 
 
+def _record_deadline_if_hit(lifecycle: "RunLifecycleContext", config: "RunConfig") -> None:
+    """Tag the lifecycle with exit_reason='deadline' if the run's
+    --max-duration was reached before natural completion.
+
+    The loops at ``analysis/_loops.py:156, 273`` break out of dim iteration
+    silently when ``time.monotonic() >= deadline_at`` — they don't raise.
+    Without this hook, a deadline-truncated run finalizes with
+    ``exit_reason=null``, indistinguishable from a clean completion. The
+    dashboard then can't render the "Partial" badge.
+    """
+    deadline_at = getattr(getattr(config, "options", None), "deadline_at", None)
+    if not isinstance(deadline_at, (int, float)):
+        return
+    if time.monotonic() >= deadline_at:
+        lifecycle.set_exit_reason("deadline")
+
+
 def _run_pipeline_with_cleanup(
     args: argparse.Namespace, inputs: ResolvedInputs, paths: tuple[Path, Path, Path],
 ) -> int:
@@ -259,7 +277,7 @@ def _run_pipeline_with_cleanup(
     # Write a .pid file so the dashboard can detect and cancel this external run
     pid_file = run_dir / ".pid"
     try:
-        pid_file.write_text(str(os.getpid()))
+        pid_file.write_text(str(os.getpid()), encoding="utf-8")
     except OSError:
         pass  # non-fatal; cancel-by-filesystem just won't work for this run
 
@@ -282,10 +300,14 @@ def _run_pipeline_with_cleanup(
         # Lifecycle context: pending → running on enter, done on clean exit,
         # failed on exception, cancelled on SIGINT/SIGTERM/SIGHUP or atexit.
         try:
+            ai_provider = get_ai_cmd()
+            ai_model = get_ai_model()
             with RunLifecycleContext(
                 run_dir=run_dir,
                 job_id=f"ext-{run_id}",
                 dimensions=dimensions_list,
+                ai_provider=ai_provider,
+                ai_model=ai_model,
             ) as lifecycle:
                 try:
                     # Mark the pipeline as actively analyzing so dashboard
@@ -305,6 +327,11 @@ def _run_pipeline_with_cleanup(
                         ).isoformat()
                         lifecycle.set_deadline(deadline_iso)
                     result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+                    # If the loops broke out on --max-duration, the pipeline
+                    # returns cleanly with no exception. Tag the lifecycle so
+                    # the dashboard can distinguish a deadline-truncated run
+                    # from a clean completion (exit_reason=null vs "deadline").
+                    _record_deadline_if_hit(lifecycle, config)
                     # run_full writes per-dimension reports as each dimension
                     # completes, so by the time it returns scoring is already
                     # done. Record the last pre-finalize phase as "scoring"

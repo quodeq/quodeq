@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.shared.prereqs import (
-    check_node, check_npm, check_dashboard_prereqs, check_evaluate_prereqs,
+    check_node, check_npm, check_dashboard_dev_prereqs, check_evaluate_prereqs,
     _check_cli_provider, _check_api_provider, _is_provider_explicitly_configured,
 )
 
@@ -18,7 +18,7 @@ class TestCheckNode:
     def test_old_node_raises(self):
         result = subprocess.CompletedProcess([], 0, stdout="16.20.0\n")
         with patch("subprocess.run", return_value=result):
-            with pytest.raises(RuntimeError, match="18"):
+            with pytest.raises(RuntimeError, match="20"):
                 check_node()
 
     def test_valid_node_passes(self):
@@ -36,7 +36,7 @@ class TestCheckNpm:
     def test_old_npm_raises(self):
         result = subprocess.CompletedProcess([], 0, stdout="8.19.0\n")
         with patch("subprocess.run", return_value=result):
-            with pytest.raises(RuntimeError, match="9"):
+            with pytest.raises(RuntimeError, match="10"):
                 check_npm()
 
     def test_valid_npm_passes(self):
@@ -97,13 +97,13 @@ class TestCompositeChecks:
         node_result = subprocess.CompletedProcess([], 0, stdout="v20.11.0\n")
         npm_result = subprocess.CompletedProcess([], 0, stdout="10.2.0\n")
         with patch("subprocess.run", side_effect=[node_result, npm_result]):
-            check_dashboard_prereqs()
+            check_dashboard_dev_prereqs()
 
     def test_dashboard_prereqs_reports_both_missing_in_one_error(self):
         """Both node and npm missing — user should see both in a single message."""
         with patch("subprocess.run", side_effect=FileNotFoundError):
             with pytest.raises(RuntimeError) as excinfo:
-                check_dashboard_prereqs()
+                check_dashboard_dev_prereqs()
         msg = str(excinfo.value)
         assert "Node.js" in msg
         assert "npm" in msg
@@ -115,7 +115,7 @@ class TestCompositeChecks:
         node_result = subprocess.CompletedProcess([], 0, stdout="v20.11.0\n")
         with patch("subprocess.run", side_effect=[node_result, FileNotFoundError()]):
             with pytest.raises(RuntimeError) as excinfo:
-                check_dashboard_prereqs()
+                check_dashboard_dev_prereqs()
         msg = str(excinfo.value)
         assert "npm" in msg
         assert "Node.js 18+ not found" not in msg  # don't falsely claim node is missing

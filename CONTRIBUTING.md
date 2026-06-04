@@ -10,6 +10,15 @@ uv sync
 uv run pytest
 ```
 
+## Building the Web Dashboard
+
+The web dashboard is a Vite + React app at `src/quodeq/ui/`. End users get a pre-built copy inside the wheel and do not need Node.js or npm. Contributors need them in two situations:
+
+1. **Local wheel builds.** `uv build` on its own produces a wheel without the UI. Use `tools/build-dist.sh` instead. It runs `npm ci && npm run build` and then `uv build`, so the wheel ships with `src/quodeq/static/` populated.
+2. **Iterating on the UI source.** `quodeq dashboard --dev` rebuilds the UI from `src/quodeq/ui/` on the fly. This is the only runtime codepath that still invokes npm.
+
+Minimum dev versions: Python 3.12+, Node.js 20+, npm 10+.
+
 ## How to Contribute
 
 ### Reporting Bugs

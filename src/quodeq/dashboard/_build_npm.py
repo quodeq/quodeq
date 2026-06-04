@@ -68,7 +68,11 @@ def run_npm_build(workdir: Path, static_dir: Path) -> None:
         )
 
     log_info("Installing npm dependencies...")
-    subprocess.run([npm, "install"], cwd=str(workdir), check=True, timeout=_NPM_INSTALL_TIMEOUT_S)
+    # Use `npm ci` to enforce lockfile-pinned installs (refuses to mutate
+    # package-lock.json, errors if it's out of sync). `_SYNC_ITEMS` in
+    # `_build_hash.py` copies package-lock.json into the workdir before this
+    # runs, so a lockfile is always present.
+    subprocess.run([npm, "ci"], cwd=str(workdir), check=True, timeout=_NPM_INSTALL_TIMEOUT_S)
 
     log_info("Building web UI...")
     env = {**os.environ, "QUODEQ_BUILD_OUTDIR": str(static_dir)}

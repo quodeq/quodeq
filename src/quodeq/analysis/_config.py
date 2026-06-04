@@ -4,9 +4,12 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from quodeq.shared.constants import _DEFAULT_TIME_LIMIT
+
+if TYPE_CHECKING:
+    from quodeq.analysis._types import RunConfig
 
 HeartbeatCallback = Callable[[int, dict], None]
 
@@ -39,6 +42,12 @@ class AnalysisConfig:
     max_files_per_agent: int = _DEFAULT_MAX_FILES_PER_AGENT
     work_dir: Path | None = None
     context_size: int = 0
+    # Optional ``RunConfig`` carrier so the API path can build a per-file
+    # cache writer (Task 3.5). Typed loosely to avoid a circular import:
+    # ``_types`` imports from ``subprocess`` which re-exports ``HeartbeatCallback``
+    # from this module. Stored as ``Any`` and read back as a ``RunConfig`` by
+    # the API runner. ``None`` keeps legacy callers (no cache writes) working.
+    run_config: Any = None
 
 
 @dataclass(frozen=True)
@@ -47,6 +56,12 @@ class _AgentParams:
     queue_path: Path | None = None
     agent_id: str = ""
     work_dir: Path | None = None
+    # Phase 1.5 (Task 3.5): cache fingerprint inputs propagated to
+    # ``findings_server.py`` so the subprocess writes cache entries with the
+    # same keys as ``classify_files_via_cache``. ``None`` resolves to
+    # ``"unknown"`` / ``""`` at emit time.
+    model_id: str | None = None
+    language: str | None = None
 
 
 @dataclass(frozen=True)

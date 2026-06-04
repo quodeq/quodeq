@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { providerKey } from '../../../constants.js';
 
-const SETTINGS = ['model', 'model-analysis', 'model-fast', 'model-balanced', 'model-thorough', 'subagents', 'time-limit', 'per-dimension', 'verify'];
+const SETTINGS = ['model', 'model-analysis', 'model-fast', 'model-balanced', 'model-thorough', 'subagents', 'time-limit', 'per-dimension', 'verify', 'api-key', 'api-base'];
 const DEFAULTS = {
   'model': '',
   'model-analysis': '',
@@ -12,6 +12,8 @@ const DEFAULTS = {
   'time-limit': '0',
   'per-dimension': 'true',
   'verify': 'true',
+  'api-key': '',
+  'api-base': '',
 };
 
 // Legacy storage key fallback, only consulted when the new key has no value.

@@ -71,8 +71,19 @@ def _write_wrapper(tmp_path: Path, pause: float = 1.0) -> Path:
 
 
 @pytest.mark.integration
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Windows TerminateProcess (what send_signal(SIGTERM) maps to) is not "
+    "catchable, so the SIGTERM handler that writes the cancelled status never "
+    "runs. Windows cancellation uses CTRL_BREAK_EVENT, which the CLI lifecycle "
+    "does not yet handle; a Windows-specific cancellation test is a separate "
+    "follow-up.",
+)
 def test_sigterm_writes_cancelled_status(tmp_path: Path) -> None:
-    """Spawn CLI subprocess, send SIGTERM mid-run, assert status.json=cancelled."""
+    """Spawn CLI subprocess, send SIGTERM mid-run, assert status.json=cancelled.
+
+    POSIX-only: see the skipif above for why this cannot run on Windows.
+    """
     src = tmp_path / "src"
     src.mkdir()
     (src / "hello.py").write_text("def f(): return 1\n")

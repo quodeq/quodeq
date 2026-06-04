@@ -220,6 +220,66 @@ class TestBuildMcpServerArgs:
         args = _build_mcp_server_args(config, work_dir=tmp_path)
         assert "--work-dir" in args
 
+    def test_includes_cache_root_model_id_language(self, tmp_path):
+        """Task 3.5 #6: the args list passed to findings_server.py MUST include
+        --cache-root, --model-id, and --language so the subprocess can build a
+        cache writer with the same fingerprint inputs as the parent's
+        classify_files_via_cache. Without these flags, CLI-path and API-path
+        cache keys diverge for the same project state.
+        """
+        from types import SimpleNamespace
+
+        jsonl = tmp_path / "findings.jsonl"
+        # Synthesise a minimal RunConfig-shaped carrier the helper can read.
+        run_config = SimpleNamespace(
+            language="kotlin",
+            options=SimpleNamespace(subagent_model="sonnet", ai_model="opus"),
+        )
+        config = AnalysisConfig(jsonl_file=jsonl, run_config=run_config)
+        args = _build_mcp_server_args(config)
+
+        assert "--cache-root" in args
+        assert "--model-id" in args
+        assert "--language" in args
+        # Values
+        model_idx = args.index("--model-id")
+        assert args[model_idx + 1] == "sonnet"
+        lang_idx = args.index("--language")
+        assert args[lang_idx + 1] == "kotlin"
+        # Cache root defaults to ~/.quodeq/cache/results. Compare via
+        # Path so the assertion is platform-agnostic — on Windows the
+        # produced path uses backslashes, so a literal forward-slash
+        # tail check would fail there.
+        cr_idx = args.index("--cache-root")
+        expected_tail = str(Path(".quodeq") / "cache" / "results")
+        assert args[cr_idx + 1].endswith(expected_tail)
+
+    def test_cache_flags_fall_back_when_no_run_config(self, tmp_path):
+        """Without a RunConfig carrier, --cache-root is still emitted, model_id
+        comes from AnalysisConfig.ai_model, and language is empty — matching
+        Task 5's contract that language="" means "unset" rather than missing.
+        """
+        jsonl = tmp_path / "findings.jsonl"
+        config = AnalysisConfig(jsonl_file=jsonl, ai_model="haiku")
+        args = _build_mcp_server_args(config)
+
+        assert "--cache-root" in args
+        model_idx = args.index("--model-id")
+        assert args[model_idx + 1] == "haiku"
+        lang_idx = args.index("--language")
+        assert args[lang_idx + 1] == ""
+
+    def test_model_id_falls_back_to_unknown(self, tmp_path):
+        """No ai_model and no run_config => model_id is 'unknown' (reference
+        from cache.dimension_helpers._model_id_from).
+        """
+        jsonl = tmp_path / "findings.jsonl"
+        config = AnalysisConfig(jsonl_file=jsonl)
+        args = _build_mcp_server_args(config)
+
+        model_idx = args.index("--model-id")
+        assert args[model_idx + 1] == "unknown"
+
 
 # ---------------------------------------------------------------------------
 # _mcp_server_name

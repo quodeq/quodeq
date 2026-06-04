@@ -16,6 +16,10 @@ import { projectKeys } from "../../../api/queryKeys.js";
  * navigation where consecutive runs are similar. Set false in contexts
  * where stale data is misleading (e.g. History run details, where users
  * compare specific runs and the flash of previous data confuses them).
+ *
+ * Live grade updates after a dismiss arrive via the dismiss HTTP response,
+ * not via SSE. ``refreshDashboard`` is what the dismiss handlers call to
+ * trigger a refetch of the accumulated (cross-run) dashboard payload.
  */
 export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = true }) {
   const { getDashboard } = useApi();
@@ -49,7 +53,20 @@ export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = t
 
   const refreshDashboard = useCallback(() => {
     if (!selectedProject) return;
-    queryClient.invalidateQueries({ queryKey: projectKeys.project(selectedProject) });
+    // Mark project queries stale but DON'T trigger an immediate refetch.
+    // The dashboard payload is 10-20 MB on large projects (one run's full
+    // violation + compliance arrays × multiple dimensions); refetching on
+    // every dismiss froze the UI for 1-3 s while the browser parsed the
+    // JSON and React re-rendered. The dismiss POST already returned the
+    // rescored run for the active page (PrincipleDetail / FileDetail /
+    // FindingDetail) to apply locally — the dashboard rollup just needs
+    // to be eventually-correct, which React Query handles automatically:
+    // ``refetchType: 'none'`` marks the cache stale, the next mount
+    // refetches naturally on navigation.
+    queryClient.invalidateQueries({
+      queryKey: projectKeys.project(selectedProject),
+      refetchType: 'none',
+    });
   }, [queryClient, selectedProject]);
 
   return {

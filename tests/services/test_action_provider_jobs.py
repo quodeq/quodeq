@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import threading
+from pathlib import Path
 
 import pytest
 
@@ -115,3 +116,29 @@ def test_job_manager_handles_failure() -> None:
     assert result.status == "failed"
     assert result.exit_code == 2
     assert any("boom" in line for line in result.logs)
+
+
+def test_start_evaluation_forwards_provider_and_model(tmp_path: Path) -> None:
+    """start_evaluation must pass ai_provider/ai_model through the dispatcher."""
+    from unittest.mock import patch
+    from quodeq.services.base import EvaluationOptions
+    from quodeq.services.evaluation_mixin import FsEvaluationMixin
+
+    captured: dict = {}
+
+    class _SpyDispatcher:
+        def dispatch(self, cmd, *, cwd=None, env=None, ai_provider=None, ai_model=None):
+            captured["ai_provider"] = ai_provider
+            captured["ai_model"] = ai_model
+            return JobSnapshot(job_id="job-1", status="running")
+
+    mixin = FsEvaluationMixin()
+    mixin._jobs = None  # not used — spy bypasses JobManager entirely
+    mixin._dispatcher = _SpyDispatcher()
+
+    opts = EvaluationOptions(ai_cmd="ollama", ai_model="gemma4:26b-mlx")
+    with patch("quodeq.services.evaluation_mixin._register_project"):
+        mixin.start_evaluation(str(tmp_path), str(tmp_path / "reports"), opts)
+
+    assert captured["ai_provider"] == "ollama"
+    assert captured["ai_model"] == "gemma4:26b-mlx"

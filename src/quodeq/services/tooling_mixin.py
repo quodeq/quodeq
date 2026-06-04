@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import platform as _platform_module
 import shutil
 import subprocess
+import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -71,6 +73,13 @@ def get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:
         if cfg.get("type") == "api"
     )
     return _DEFAULT_CLIENT_IDS | api_ids
+
+
+def _platform_matches(requires: str) -> bool:
+    """Return True if the current platform satisfies the requires_platform constraint."""
+    if requires == "darwin-arm64":
+        return sys.platform == "darwin" and _platform_module.machine() == "arm64"
+    return True
 
 
 class FsToolingMixin:
@@ -212,6 +221,9 @@ class FsToolingMixin:
         api_label_overrides = {"llamacpp": "llama.cpp"}
         for provider_id, cfg in provider_configs.items():
             if cfg.get("type") == "api" and provider_id != "custom":
+                requires = cfg.get("requires_platform", "")
+                if requires and not _platform_matches(requires):
+                    continue
                 if not any(c["id"] == provider_id for c in clients):
                     clients.append({
                         "id": provider_id,

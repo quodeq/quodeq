@@ -30,14 +30,28 @@ def _mk_config(work_dir: Path):
     return config
 
 
+def _runner_returning(ev):
+    """A DimensionRunner-shaped mock whose .run() returns *ev*."""
+    runner = MagicMock()
+    runner.run.return_value = ev
+    return runner
+
+
+def _runner_raising(exc):
+    """A DimensionRunner-shaped mock whose .run() raises *exc*."""
+    runner = MagicMock()
+    runner.run.side_effect = exc
+    return runner
+
+
 class TestPerDimensionLoopTransitions:
     def test_successful_dim_marked_done(self, tmp_path: Path):
         config = _mk_config(tmp_path)
         ctx = MagicMock(total=1)
         ev = MagicMock()
-        process_fn = MagicMock(return_value=ev)
+        ev.exit_reason = None  # DONE-write path forwards this into dimensions.json
 
-        run_per_dimension_loop(config, ["security"], ctx, process_fn=process_fn)
+        run_per_dimension_loop(config, ["security"], ctx, runner=_runner_returning(ev))
 
         states = read_dimensions(tmp_path)["dimensions"]
         assert states["security"]["state"] == "done"
@@ -45,9 +59,11 @@ class TestPerDimensionLoopTransitions:
     def test_exception_marks_incomplete_failed(self, tmp_path: Path):
         config = _mk_config(tmp_path)
         ctx = MagicMock(total=1)
-        process_fn = MagicMock(side_effect=RuntimeError("boom"))
 
-        run_per_dimension_loop(config, ["security"], ctx, process_fn=process_fn)
+        run_per_dimension_loop(
+            config, ["security"], ctx,
+            runner=_runner_raising(RuntimeError("boom")),
+        )
 
         entry = read_dimensions(tmp_path)["dimensions"]["security"]
         assert entry["state"] == "incomplete"
@@ -61,10 +77,9 @@ class TestPerDimensionLoopTransitions:
             cancellation.request_cancel()
             raise RuntimeError("cancelled mid-flight")
 
-        run_per_dimension_loop(
-            config, ["security"], ctx,
-            process_fn=MagicMock(side_effect=cancel_then_raise),
-        )
+        runner = MagicMock()
+        runner.run.side_effect = cancel_then_raise
+        run_per_dimension_loop(config, ["security"], ctx, runner=runner)
 
         entry = read_dimensions(tmp_path)["dimensions"]["security"]
         assert entry["state"] == "incomplete"
@@ -73,9 +88,8 @@ class TestPerDimensionLoopTransitions:
     def test_ev_none_marks_incomplete(self, tmp_path: Path):
         config = _mk_config(tmp_path)
         ctx = MagicMock(total=1)
-        process_fn = MagicMock(return_value=None)
 
-        run_per_dimension_loop(config, ["security"], ctx, process_fn=process_fn)
+        run_per_dimension_loop(config, ["security"], ctx, runner=_runner_returning(None))
 
         entry = read_dimensions(tmp_path)["dimensions"]["security"]
         assert entry["state"] == "incomplete"
@@ -84,15 +98,17 @@ class TestPerDimensionLoopTransitions:
         config = _mk_config(tmp_path)
         ctx = MagicMock(total=2)
         ev = MagicMock()
+        ev.exit_reason = None
 
-        def proc(_cfg, dim, _idx, _ctx):
+        def proc(_cfg, dim, _idx, _ctx, *, emit_log=True):
             if dim == "security":
                 return ev
             raise RuntimeError("boom")
 
+        runner = MagicMock()
+        runner.run.side_effect = proc
         run_per_dimension_loop(
-            config, ["security", "reliability"], ctx,
-            process_fn=MagicMock(side_effect=proc),
+            config, ["security", "reliability"], ctx, runner=runner,
         )
 
         states = read_dimensions(tmp_path)["dimensions"]
@@ -105,17 +121,14 @@ class TestIncrementalLoopTransitions:
         config = _mk_config(tmp_path)
         ctx = MagicMock(total=1)
         ev = MagicMock()
-        # Patch the incremental dispatcher so we don't go down the fallback path.
-        monkeypatch.setattr(
-            "quodeq.analysis._loops.run_dimension_incremental",
-            lambda *a, **k: ev,
-        )
-        process_fn = MagicMock()
-        log_result_fn = MagicMock()
+        ev.exit_reason = None
+        # Patch the success-log call so the test doesn't depend on its side
+        # effects (markers, log_success). The loop calls _log_dimension_result
+        # directly after a successful incremental dim.
+        monkeypatch.setattr("quodeq.analysis._loops._log_dimension_result", MagicMock())
 
         run_incremental_loop(
-            config, ["security"], ctx,
-            process_fn=process_fn, log_result_fn=log_result_fn,
+            config, ["security"], ctx, runner=_runner_returning(ev),
         )
 
         assert read_dimensions(tmp_path)["dimensions"]["security"]["state"] == "done"
@@ -134,18 +147,14 @@ class TestIncrementalLoopTransitions:
         config = RunConfig(src=tmp_path, language="python", work_dir=tmp_path, options=options)
         ctx = MagicMock(total=1)
         ev = MagicMock()
-        # Incremental fails, fallback succeeds.
-        monkeypatch.setattr(
-            "quodeq.analysis._loops.run_dimension_incremental",
-            MagicMock(side_effect=RuntimeError("inc failed")),
-        )
-        process_fn = MagicMock(return_value=ev)
-        log_result_fn = MagicMock()
+        ev.exit_reason = None
+        monkeypatch.setattr("quodeq.analysis._loops._log_dimension_result", MagicMock())
+        # First call (incremental) fails with RuntimeError → loop triggers
+        # the fallback call, which succeeds and returns ev.
+        runner = MagicMock()
+        runner.run.side_effect = [RuntimeError("inc failed"), ev]
 
-        run_incremental_loop(
-            config, ["security"], ctx,
-            process_fn=process_fn, log_result_fn=log_result_fn,
-        )
+        run_incremental_loop(config, ["security"], ctx, runner=runner)
 
         assert read_dimensions(tmp_path)["dimensions"]["security"]["state"] == "done"
 
@@ -154,26 +163,12 @@ class TestIncrementalLoopTransitions:
     ):
         config = _mk_config(tmp_path)
         ctx = MagicMock(total=1)
-        # Raise something that's NOT in the (OSError, KeyError, ValueError, RuntimeError) tuple.
-        monkeypatch.setattr(
-            "quodeq.analysis._loops.run_dimension_incremental",
-            MagicMock(side_effect=KeyboardInterrupt("user ctrl-c")),
-        )
-        process_fn = MagicMock()
-        log_result_fn = MagicMock()
+        monkeypatch.setattr("quodeq.analysis._loops._log_dimension_result", MagicMock())
+        # Raise something that's NOT in the (OSError, KeyError, ValueError,
+        # RuntimeError) tuple, so the bare ``except Exception`` branch runs.
+        runner = _runner_raising(TypeError("unexpected"))
 
-        # KeyboardInterrupt would actually propagate -- but the bare Exception
-        # handler catches `except Exception`, which doesn't include KeyboardInterrupt.
-        # Use TypeError instead to test the bare handler.
-        monkeypatch.setattr(
-            "quodeq.analysis._loops.run_dimension_incremental",
-            MagicMock(side_effect=TypeError("unexpected")),
-        )
-
-        run_incremental_loop(
-            config, ["security"], ctx,
-            process_fn=process_fn, log_result_fn=log_result_fn,
-        )
+        run_incremental_loop(config, ["security"], ctx, runner=runner)
 
         entry = read_dimensions(tmp_path)["dimensions"]["security"]
         assert entry["state"] == "incomplete"
@@ -255,10 +250,11 @@ class TestRunDirResolution:
 
             # Now drive the loop -- transition to DONE.
             ev = MagicMock()
+            ev.exit_reason = None
             ctx = MagicMock(total=1)
             run_per_dimension_loop(
                 config, ["security"], ctx,
-                process_fn=MagicMock(return_value=ev),
+                runner=_runner_returning(ev),
             )
 
         # The loop's DONE write hit the SAME file the lifecycle seeded.

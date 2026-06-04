@@ -107,7 +107,7 @@ def _load_skip_dirs() -> frozenset[str]:
     """Load skip_dirs from detection.json (shared with manifest builder)."""
     try:
         det_path = Path(__file__).resolve().parent.parent / "data" / "config" / "detection.json"
-        data = _json.loads(det_path.read_text())
+        data = _json.loads(det_path.read_text(encoding="utf-8"))
         return frozenset(data.get("skip_dirs", []))
     except (OSError, _json.JSONDecodeError):
         return frozenset({"node_modules", ".git", "__pycache__", "venv", ".venv", "dist", "build"})
@@ -184,7 +184,7 @@ def _load_standards_text(compiled_dir: Path | None, dimension: str | None) -> st
     json_path = compiled_dir / f"{dimension}.json"
     if json_path.exists():
         try:
-            data = _json.loads(json_path.read_text())
+            data = _json.loads(json_path.read_text(encoding="utf-8"))
             text = _render_standards_grouped(data)
             if text:
                 if len(text) > _MAX_STANDARDS_CHARS:
@@ -197,7 +197,7 @@ def _load_standards_text(compiled_dir: Path | None, dimension: str | None) -> st
     md_path = compiled_dir / f"{dimension}.md"
     if md_path.exists():
         try:
-            text = md_path.read_text()
+            text = md_path.read_text(encoding="utf-8")
             if len(text) > _MAX_STANDARDS_CHARS:
                 text = text[:_MAX_STANDARDS_CHARS] + "\n\n[... standards truncated for context limits ...]"
             return text
@@ -240,6 +240,9 @@ def _resolve_provider_config(cfg: AnalysisConfig) -> tuple[str, str, str]:
     api_base = provider_cfg.get("api_base", "")
     api_key_env = provider_cfg.get("api_key_env", "")
     api_key = os.environ.get(api_key_env, "") if api_key_env else ""
+    if not api_key and ai_cmd == "omlx":
+        from quodeq.llm_bridge._omlx import _read_omlx_api_key
+        api_key = _read_omlx_api_key()
 
     if not model:
         raise AnalysisError(
@@ -273,7 +276,7 @@ def _gather_api_source_files(
             # Don't touch jsonl_file — it's the SHARED `{dim}_evidence.jsonl`
             # that every agent in the pool appends to via MCP. Truncating it
             # here wipes findings from every other agent in the pool.
-            stream_file.write_text('{"type":"api_runner","status":"complete"}\n')
+            stream_file.write_text('{"type":"api_runner","status":"complete"}\n', encoding="utf-8")
             return None
         return source_files
     return _gather_source_files(work_dir)
@@ -326,9 +329,14 @@ def _run_api_analysis_bridge(
         dimension=cfg.dimension,
         work_dir=work_dir,
         source_file_paths=rel_paths,
+        # Wire the synchronous cache-write closure when the pool layer
+        # supplied a RunConfig carrier. Legacy callers pass nothing and
+        # the API runner simply skips the cache write.
+        run_config=cfg.run_config,
+        dim_id=cfg.dimension,
     )
 
-    stream_file.write_text('{"type":"api_runner","status":"complete"}\n')
+    stream_file.write_text('{"type":"api_runner","status":"complete"}\n', encoding="utf-8")
     _log.debug("API analysis complete, evidence written to %s", jsonl_file)
 
 

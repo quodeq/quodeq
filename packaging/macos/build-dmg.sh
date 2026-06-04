@@ -45,7 +45,7 @@ uv run --with pyinstaller --with rumps pyinstaller \
     --specpath "$BUILD_DIR" \
     --hidden-import rumps \
     --collect-all rumps \
-    --add-data "$SCRIPT_DIR/icon.icns:." \
+    --add-data "$REPO_ROOT/src/quodeq/data/icons/icon.icns:." \
     --add-data "$SCRIPT_DIR/menubar_iconTemplate.png:." \
     --add-data "$SCRIPT_DIR/menubar_iconTemplate@2x.png:." \
     --add-data "$SCRIPT_DIR/menubar_icon_running.png:." \

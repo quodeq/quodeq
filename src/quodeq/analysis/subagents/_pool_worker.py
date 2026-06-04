@@ -53,6 +53,9 @@ def build_agent_config(
         compiled_dir=bc.compiled_dir, dimension=wctx.dimension,
         queue_path=wctx.queue_path, agent_id=agent_id,
         max_files_per_agent=bc.max_files_per_agent,
+        # Propagate the RunConfig carrier so the API runner can wire a
+        # synchronous cache writer into FindingsRouter (Task 3.5).
+        run_config=bc.run_config,
     )
     return ac, jsonl_file, stream_file
 

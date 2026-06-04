@@ -45,10 +45,13 @@ from quodeq.analysis.cache._failure_streak import (
 )
 from quodeq.analysis.cache.dimension_helpers import (
     ClassifyResult,
+    _group_findings_by_file,
     build_cache_key_for_file,
     classify_files_via_cache,
+    format_provenance_drift,
     persist_dispatch_results,
 )
+from quodeq.analysis.cache.gc import maybe_collect_legacy_entries
 from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.subagents._source_files import _list_source_files
 from quodeq.analysis.subagents.runner import (
@@ -112,12 +115,94 @@ def _jsonl_path(config: RunConfig, dim_id: str) -> Path:
     return _evidence_dir(config) / f"{dim_id}_evidence.jsonl"
 
 
-def _write_findings(jsonl: Path, findings: list[dict], *, append: bool) -> None:
+def _compute_files_read(
+    classify: ClassifyResult, jsonl_path: Path, all_files: list[str],
+) -> int:
+    """Return the count of source files reproducible from the cache after
+    this run ends.
+
+    A source file is "reproducible" if either:
+      - it was a cache hit (``classify.cached_findings`` already carried it
+        forward — its cache entry already exists), or
+      - it was dispatched and the worker emitted ``file_done="ok"``
+        (which triggers a synchronous cache write via
+        ``build_cache_writer``, or the watcher's next persist tick).
+
+    Files with ``file_done="error"`` or no marker at all are NOT counted:
+    their analysis was incomplete and the cache contains no entry for
+    them, so the next run must re-dispatch.
+
+    Pre-fix, ``files_read`` was set to ``len(input_files)`` at every
+    callsite, making coverage % (computed downstream as
+    ``files_read / source_file_count``) meaningless: it always read 100%
+    even on deadline-truncated runs. The user reported a flexibility
+    score of "6.6/Adequate" on a run that actually analyzed ~850/3037
+    files — the dashboard couldn't tell it was partial.
+    """
+    n_hits = len(all_files) - len(classify.misses)
+    if not jsonl_path.is_file():
+        return n_hits
+    _grouped, ok_files = _group_findings_by_file(jsonl_path)
+    miss_set = set(classify.misses)
+    n_dispatch_ok = len(ok_files & miss_set)
+    return n_hits + n_dispatch_ok
+
+
+def _events_log_path(jsonl: Path) -> Path:
+    """Return the run's events.jsonl path given a per-dim evidence JSONL.
+
+    Evidence files live at ``<run_dir>/evidence/<dim>_evidence.jsonl``; the
+    event log lives at ``<run_dir>/events.jsonl``. Centralising the join so
+    the two callers below can't drift apart.
+    """
+    return jsonl.parent.parent / "events.jsonl"
+
+
+def _emit_cached_findings(events_log: Path, findings: list[dict]) -> None:
+    """Emit cached findings as JUDGMENT_CREATED events to the run's event log.
+
+    Cached findings replayed by the V2 cache in incremental runs were
+    landing only in the per-dim JSONL and never reaching ``events.jsonl``.
+    The SQL projection runs off ``events.jsonl``, so the dashboard's grade
+    tables saw only the freshly-dispatched findings and produced scores
+    that disagreed with the CLI's JSON file (e.g. flexibility scoring 9.0
+    in the UI vs 7.7 from the CLI on the same run). Mirroring each cached
+    finding into the event log closes that gap.
+
+    Exceptions are caught per finding and logged — the JSONL write
+    already succeeded above, so an event-emit failure should not propagate
+    and roll back the cache restore.
+    """
+    if not findings:
+        return
+    from quodeq.core.events.models import JudgmentCreatedEvent  # noqa: PLC0415
+    from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
+    from quodeq.core.finding_mappings import wire_dict_to_judgment  # noqa: PLC0415
+
+    writer = EventLogWriter(events_log)
+    for finding in findings:
+        try:
+            payload = wire_dict_to_judgment(finding)
+            writer.emit(JudgmentCreatedEvent(payload=payload))
+        except Exception:  # noqa: BLE001 — event-log emit must never break a cache replay
+            _logger.warning(
+                "cache replay: event emit failed for finding p=%r file=%r line=%r",
+                finding.get("p"), finding.get("file"), finding.get("line"),
+                exc_info=True,
+            )
+
+
+def _write_findings(
+    jsonl: Path, findings: list[dict], *, append: bool,
+    emit_events: bool = True,
+) -> None:
     jsonl.parent.mkdir(parents=True, exist_ok=True)
     mode = "a" if append else "w"
-    with jsonl.open(mode) as out:
+    with jsonl.open(mode, encoding="utf-8") as out:
         for finding in findings:
             out.write(json.dumps(finding) + "\n")
+    if emit_events:
+        _emit_cached_findings(_events_log_path(jsonl), findings)
 
 
 def process_dimension_with_cache(
@@ -132,6 +217,10 @@ def process_dimension_with_cache(
     """
     if cache is None:
         cache = LocalFileBackend()
+        # First cache open of a real run (tests inject their own cache and
+        # skip this branch). Reclaim entries orphaned by the schema bump,
+        # once per process. Best-effort: never blocks the run.
+        maybe_collect_legacy_entries(cache.root)
 
     files, _ext = _list_source_files(config, dim_id)
     if not files:
@@ -165,10 +254,15 @@ def process_dimension_with_cache(
         config, dim_id, files, cache, bypass_reads=bypass_reads,
     )
     n_hits = len(files) - len(classify.misses)
+    # Surface provenance drift on the classify log so reuse across a
+    # model/standards/prompts boundary is never silent (run.log -> side-pane
+    # log viewer + CLI). The user decides when to --clean-scan to refresh.
+    drift_note = format_provenance_drift(classify.provenance_drift, reused=n_hits)
     _logger.info(
-        "[%s] cache: %d hits / %d misses (%d total)%s",
+        "[%s] cache: %d hits / %d misses (%d total)%s%s",
         dim_id, n_hits, len(classify.misses), len(files),
         " - clean-scan invalidated" if bypass_reads else "",
+        f" - reused {drift_note}" if drift_note else "",
     )
     # Structured marker for the dashboard / SSE stream - one event per
     # dim summarising hit/miss split. Per-file events would be too noisy
@@ -195,7 +289,8 @@ def process_dimension_with_cache(
         if jsonl.exists():
             deduplicate_jsonl(jsonl)
         return parse_evidence_from_jsonl(
-            config, dim_id, ctx, jsonl, files_read=len(files),
+            config, dim_id, ctx, jsonl,
+            files_read=_compute_files_read(classify, jsonl, files),
         )
 
     # Dispatch misses via the existing path, with file filter restricted
@@ -224,10 +319,15 @@ def process_dimension_with_cache(
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(json.dumps(classify.miss_keys, indent=2), encoding="utf-8")
 
-    # Periodic persist watcher: persists what's in JSONL every
-    # _PERSIST_INTERVAL_S seconds. If the dispatch is cancelled (SIGTERM,
-    # exception, etc.) the cache retains the work that completed before
-    # the cancel - instead of losing the entire dim's progress.
+    # Periodic persist watcher (safety net only — NOT authoritative).
+    # After Phase 1.5 Task 3.5, FindingsRouter.on_file_done writes cache
+    # entries synchronously the instant a worker emits mark_file_done(ok)
+    # (both API path and CLI/subprocess path). The watcher remains as a
+    # belt-and-suspenders guard for any future code path that constructs
+    # a router WITHOUT on_file_done (or for paths that bypass the router
+    # entirely). On a cancel/SIGTERM the synchronous writes are already on
+    # disk; the final watcher tick re-scans the JSONL and is a no-op for
+    # files that the sync path already persisted.
     def _persist_now() -> None:
         persist_dispatch_results(
             config, dim_id, miss_files=classify.misses,
@@ -256,8 +356,20 @@ def process_dimension_with_cache(
         # Signal the watcher to do a final persist and exit. Whatever
         # completed before this point gets cached, whether the dispatch
         # returned cleanly or raised.
+        #
+        # No join timeout: the prior 5s cap was the c88be50e regression
+        # that dropped the final persist tick when it ran longer than 5s.
+        # On a 790-file flexibility run the user lost ~16% of the cache
+        # entries (790 file_done="ok" markers in the JSONL, only 662
+        # entries persisted) because the final tick was scanning the whole
+        # JSONL and rewriting per-file entries — each persist_dispatch_results
+        # call does O(n_files) work and an interrupted final tick silently
+        # abandoned every entry it hadn't yet written.
+        #
+        # The breaker join keeps its 5s cap: it's a separate thread with
+        # independent lifecycle whose final tick is bounded I/O.
         stop_event.set()
-        watcher.join(timeout=5.0)
+        watcher.join()
         breaker.stop_and_join(timeout=5.0)
 
     if breaker.trip_event is not None:
@@ -273,7 +385,8 @@ def process_dimension_with_cache(
         # them so the run still has SOMETHING to score; otherwise None.
         if classify.cached_findings and jsonl.exists():
             return parse_evidence_from_jsonl(
-                config, dim_id, ctx, jsonl, files_read=len(files),
+                config, dim_id, ctx, jsonl,
+                files_read=_compute_files_read(classify, jsonl, files),
             )
         return None
 
@@ -281,5 +394,6 @@ def process_dimension_with_cache(
     # not just len(misses) which is what the dispatcher's Evidence carries.
     # The dispatcher already deduped on its way out, so no extra dedup here.
     return parse_evidence_from_jsonl(
-        config, dim_id, ctx, jsonl, files_read=len(files),
+        config, dim_id, ctx, jsonl,
+        files_read=_compute_files_read(classify, jsonl, files),
     )

@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.core.evidence.model import Judgment
+from quodeq.core.events.models import Judgment
 
 _SEV_RANKS = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 
@@ -34,7 +34,7 @@ def _build_req_to_principle_map(dimension: str, evaluators_dir: Path | None = No
     if not path.is_file():
         return {}
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         mapping: dict[str, str] = {}
         for principle in data.get("principles", []):
             pname = principle.get("name", "")

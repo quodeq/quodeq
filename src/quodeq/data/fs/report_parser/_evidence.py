@@ -43,7 +43,18 @@ def load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
     """
     run_dir = evidence_dir.parent
     if not sqlite_disabled() and has_evaluation_db(run_dir):
-        return load_evidence_map_from_db(run_dir)
+        import sqlite3  # noqa: PLC0415
+        try:
+            return load_evidence_map_from_db(run_dir)
+        except sqlite3.DatabaseError:
+            # evaluation.db is unreadable by this binary: written by a newer
+            # Quodeq (SchemaVersionError, a DatabaseError subclass) or otherwise
+            # corrupt/half-written. Don't crash the run read; fall back to the
+            # per-dimension _evidence.json files below.
+            _logger.warning(
+                "evaluation.db at %s is unreadable; falling back to "
+                "_evidence.json files", run_dir,
+            )
 
     evidence_map = _load_evidence_from_dir(evidence_dir)
     for entry in safe_read_dir(evidence_dir):

@@ -8,6 +8,65 @@ import { SevBadge } from '../../../components/terminal/index.js';
 import { splitScore, scoreGradeColorVar, complianceRatio, formatRunId } from '../../../utils/formatters.js';
 import { dimensionGradeLabel } from './dimensionGradeLabel.js';
 
+/**
+ * Build a coverage record for the gauge card's footer line.
+ *
+ * Every card with a date gets a footer line; `coveragePct` and `isPartial`
+ * are derived from the same signals as the old partial badge:
+ *   - "partial" when filesRead < sourceFileCount, OR
+ *   - "partial" when exitReason is set to anything other than 'done'.
+ * Legacy runs with neither signal end up complete-by-default.
+ *
+ * `coveragePct` is null when there are no file counts (legacy runs);
+ * in that case the footer renders the date only.
+ */
+function computeCoverageInfo(filesRead, sourceFileCount, exitReason) {
+  const hasCounts =
+    typeof filesRead === 'number' &&
+    typeof sourceFileCount === 'number' &&
+    sourceFileCount > 0;
+  const coveragePct = hasCounts
+    ? Math.round((filesRead / sourceFileCount) * 100)
+    : null;
+  const coverageIncomplete = hasCounts && filesRead < sourceFileCount;
+  const exitIncomplete = typeof exitReason === 'string' && exitReason !== 'done';
+  const isPartial = coverageIncomplete || exitIncomplete;
+  return { filesRead, sourceFileCount, coveragePct, exitReason, isPartial };
+}
+
+function buildPartialTooltip({ filesRead, sourceFileCount, exitReason }) {
+  const hasCounts =
+    typeof filesRead === 'number' &&
+    typeof sourceFileCount === 'number' &&
+    sourceFileCount > 0;
+  const parts = ['Partial run'];
+  if (hasCounts) {
+    parts.push(`${filesRead.toLocaleString()} of ${sourceFileCount.toLocaleString()} files`);
+  }
+  if (typeof exitReason === 'string') {
+    parts.push(`stopped: ${exitReason}`);
+  }
+  return parts.join(' · ');
+}
+
+function CoverageLine({ dateText, coveragePct, isPartial, tooltip }) {
+  if (!dateText) return null;
+  if (coveragePct === null) {
+    return (
+      <div className="dim-gauge-card__coverage-line" title={isPartial ? tooltip : undefined}>
+        {dateText}
+      </div>
+    );
+  }
+  return (
+    <div className="dim-gauge-card__coverage-line" title={isPartial ? tooltip : undefined}>
+      {dateText} · <span
+        className={`dim-gauge-card__coverage-pct${isPartial ? ' dim-gauge-card__coverage-pct--partial' : ''}`}
+      >{coveragePct}%</span>
+    </div>
+  );
+}
+
 // SVG geometry — tuned to look right inside the card without scaling JS.
 const RING_SIZE = 100;
 const RING_STROKE = 8;
@@ -57,6 +116,8 @@ export default function DimensionGaugeCard({
   const activate = () => onDimensionClick?.(item, selectedRunId);
   const staleClass = evaluatedToday ? '' : 'dim-gauge-card--stale';
   const dateText = item.fromDateLabel || dateLabel || formatRunId(item.fromRunId || selectedRunId);
+  const coverage = computeCoverageInfo(item.filesRead, item.sourceFileCount, item.exitReason);
+  const partialTooltip = coverage.isPartial ? buildPartialTooltip(coverage) : undefined;
 
   return (
     <article
@@ -129,9 +190,12 @@ export default function DimensionGaugeCard({
         </>
       )}
 
-      {!evaluatedToday && dateText && (
-        <div className="dim-gauge-card__stale-label">Older run · {dateText}</div>
-      )}
+      <CoverageLine
+        dateText={dateText}
+        coveragePct={coverage.coveragePct}
+        isPartial={coverage.isPartial}
+        tooltip={partialTooltip}
+      />
     </article>
   );
 }

@@ -36,6 +36,8 @@ class DimensionResult:
     compliance: list[Finding] = field(default_factory=list)
     totals: Totals | None = None
     source_file_count: int | None = None
+    files_read: int | None = None
+    exit_reason: str | None = None
     evidence_date: str | None = None
     discipline: str | None = None
     trend: str | None = None

@@ -71,12 +71,18 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onG
   const { connected, setConnected } = serverHealth;
   const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
   const projectInfo = projects?.find(p => (p.id || p.name) === selectedProject) || null;
+  // The in-progress card describes the running job's own project, which can
+  // differ from the UI's global selection. Resolve it the same way so the
+  // card label follows the job rather than the selection.
+  const jobProjectInfo = job?.outputProject
+    ? (projects?.find(p => (p.id || p.name) === job.outputProject) || null)
+    : null;
   return (
     <>
       {!connected && <ServerDisconnectedOverlay onReconnect={() => setConnected(true)} />}
       <EvaluateScreen
         evaluation={{ job, jobError, liveViolations }}
-        context={{ selectedProject, projectInfo }}
+        context={{ selectedProject, projectInfo, jobProjectInfo }}
         actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation, onGoToProjects, onGoToSettings }}
       />
     </>
@@ -132,16 +138,26 @@ function renderEvalPrincipleDetail(params, props) {
     <PrincipleDetailPage
       evalPrincipal={evalPrincipal}
       severityFilter={params.severity || null}
-      onDismiss={(v) => {
-        props.dismissFinding(selectedProject, buildDismissPayload(v, evalPrincipal.dimension))
-          .then(() => props.refreshDashboard?.())
-          .catch((e) => console.error('[Dismiss] failed:', e));
+      onDismiss={async (v) => {
+        // POST returns { scores: { dimensions, summary } } — the rescored
+        // payload for this run. PrincipleDetailPage applies it to its
+        // local liveScore/liveGrade. The dashboard refetch covers the
+        // accumulated (cross-run) rollup separately.
+        const payload = { ...buildDismissPayload(v, evalPrincipal.dimension), run_id: evalPrincipal.runId };
+        const result = await props.dismissFinding(selectedProject, payload);
+        props.refreshDashboard?.();
+        props.bumpDismissRefresh?.();
+        return result;
       }}
     />
   );
 }
 
-function buildEvalPrincipal(principleObj, principleGrade) {
+// Exported so unit tests can pin the runId-threading contract without having
+// to mount the whole App. Callers from the Violations page must pass the
+// dimension's ``fromRunId`` — see ``ViolationsRoute.navigateToPrinciple`` for
+// the regression history.
+export function buildEvalPrincipal(principleObj, principleGrade, runId) {
   const violations = principleObj.violations || [];
   const compliance = principleObj.compliance || [];
   return {
@@ -149,6 +165,7 @@ function buildEvalPrincipal(principleObj, principleGrade) {
     score: principleGrade?.score || null,
     grade: principleGrade?.grade || null,
     dimension: principleObj.dimension || '',
+    runId: runId || '',
     principleData: {
       name: principleObj.principle,
       grade: principleGrade?.grade || null,
@@ -172,7 +189,16 @@ function ViolationsRoute({ params, props }) {
   function navigateToPrinciple(principleObj, severity) {
     const dim = dimMap.get(principleObj.dimension);
     const pg = principleMap.get(`${principleObj.dimension}\0${principleObj.principle}`);
-    nav('evalprinciple', { evalPrincipal: buildEvalPrincipal(principleObj, pg), severity, sourceTab: 'violations' });
+    // dim.fromRunId is the run whose data populated this accumulated entry;
+    // threading it through lets the dismiss POST carry a real run id so the
+    // backend can rescore and project the action into SQL — without this the
+    // PrincipleDetail score never moves on dismiss and the entry never lands
+    // on the Dismissed tab.
+    nav('evalprinciple', {
+      evalPrincipal: buildEvalPrincipal(principleObj, pg, dim?.fromRunId),
+      severity,
+      sourceTab: 'violations',
+    });
   }
 
   function navigateToDimension(row, severity) {
@@ -204,6 +230,7 @@ function ViolationsRoute({ params, props }) {
         projectName: props.dashboardData.selectedDisplayName,
         loading: props.dashboardData.loading,
         isFetching: props.dashboardData.isFetching,
+        dismissRefreshKey: props.dismissRefreshKey,
       }}
       callbacks={{
         onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
@@ -299,10 +326,12 @@ const ROUTE_RENDERERS = {
       runId={params.runId}
       dateLabel={params.dateLabel}
       severityFilter={params.severityFilter || params.severity || null}
-      onDismiss={(v) => {
-        props.dismissFinding(props.navigation.selectedProject, buildDismissPayload(v))
-          .then(() => props.refreshDashboard?.())
-          .catch((e) => console.error('[Dismiss] failed:', e));
+      onDismiss={async (v) => {
+        const payload = { ...buildDismissPayload(v), run_id: params.runId };
+        const result = await props.dismissFinding(props.navigation.selectedProject, payload);
+        props.refreshDashboard?.();
+        props.bumpDismissRefresh?.();
+        return result;
       }}
     />
   ),
@@ -313,10 +342,12 @@ const ROUTE_RENDERERS = {
       finding={params.finding}
       principle={params.principle}
       dimension={params.dimension}
-      onDismiss={(v) => {
-        props.dismissFinding(props.navigation.selectedProject, buildDismissPayload(v, params.dimension))
-          .then(() => props.refreshDashboard?.())
-          .catch((e) => console.error('[Dismiss] failed:', e));
+      onDismiss={async (v) => {
+        const payload = { ...buildDismissPayload(v, params.dimension), run_id: params.runId };
+        const result = await props.dismissFinding(props.navigation.selectedProject, payload);
+        props.refreshDashboard?.();
+        props.bumpDismissRefresh?.();
+        return result;
       }}
     />
   ),
@@ -378,6 +409,13 @@ export default function App() {
   const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [wizardEntry, setWizardEntry] = useState(null);
+  // Incremented after every successful dismiss POST so the violations
+  // page's dismissed sub-tab knows to refetch its list. Without this, a
+  // dismiss made on the principle / file detail page never appeared in the
+  // dismissed list until the user switched projects — the list was only
+  // fetched once on mount.
+  const [dismissRefreshKey, setDismissRefreshKey] = useState(0);
+  const bumpDismissRefresh = () => setDismissRefreshKey((k) => k + 1);
   // Auto-open is a once-per-session decision. Without this guard, closing the
   // wizard sets wizardEntry → null, which re-fires this effect and re-opens
   // the wizard immediately because projects.length is still 0. The user's
@@ -523,6 +561,8 @@ export default function App() {
     settings: state.settings,
     refreshDashboard: state.refreshDashboard,
     dismissFinding,
+    bumpDismissRefresh,
+    dismissRefreshKey,
   };
 
   // Resolve the project's friendly name. Until the /api/projects response

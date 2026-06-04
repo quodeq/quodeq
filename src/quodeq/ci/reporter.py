@@ -103,6 +103,20 @@ def fetch_pr_changed_lines(
     return result
 
 
+def _violation_anchorable(violation: dict, changed_lines: dict[str, set[int]]) -> bool:
+    """True when a violation's file+line falls on a PR changed line.
+
+    Mirrors ``filter_comments_to_diff``'s keep condition (a comment's path is
+    its violation's ``file`` and its line is the violation's ``line``), so a
+    violation is anchorable exactly when its inline comment would survive the
+    filter. Used to identify the NEW violations GitHub cannot anchor, which are
+    then listed in the summary instead of silently dropped.
+    """
+    path = violation.get("file")
+    line = violation.get("line")
+    return bool(path) and line is not None and line in changed_lines.get(path, set())
+
+
 def filter_comments_to_diff(
     comments: list[dict],
     changed_lines: dict[str, set[int]],
@@ -133,7 +147,7 @@ def load_evaluation_reports(evaluation_dir: Path) -> list[dict]:
     for path in sorted(evaluation_dir.glob("*.json")):
         if path.stem.endswith("_full"):
             continue
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             reports.append(json.load(f))
     return reports
 
@@ -157,7 +171,9 @@ def build_review_payload(
     changed_lines: when provided, review comments are filtered to only those
     whose path+line fall within the PR's changed hunks. GitHub rejects
     comments outside the diff with HTTP 422, so the CLI must fetch the PR's
-    files and pass this mapping. Dropped comments are counted in the summary.
+    files and pass this mapping. NEW violations that fall outside the changed
+    lines can't be inline-anchored, so they're surfaced in the summary body
+    (file:line + description) instead of silently dropped.
     """
     all_violations: list[dict] = []
     for report in reports:
@@ -172,9 +188,16 @@ def build_review_payload(
 
     if changed_lines is None:
         comments = all_comments
-        out_of_diff_count = 0
+        outside_diff_new: list[dict] = []
     else:
-        comments, out_of_diff_count = filter_comments_to_diff(all_comments, changed_lines)
+        # Out-of-diff comments can't be posted inline (GitHub 422), so they're
+        # dropped from `comments`. But rather than silently lose them, the NEW
+        # violations among them are surfaced in the summary body with file:line
+        # so the headline count and the visible findings agree.
+        comments, _ = filter_comments_to_diff(all_comments, changed_lines)
+        outside_diff_new = [
+            v for v in new_violations if not _violation_anchorable(v, changed_lines)
+        ]
 
     summary = build_review_summary(
         reports,
@@ -183,7 +206,7 @@ def build_review_payload(
         duration_seconds=duration_seconds,
         baseline_available=baseline_available,
         artifact_url=artifact_url,
-        out_of_diff_count=out_of_diff_count,
+        outside_diff_violations=outside_diff_new,
     )
     verdict = determine_verdict(new_violations)
 

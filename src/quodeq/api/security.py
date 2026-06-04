@@ -15,6 +15,16 @@ _logger = logging.getLogger(__name__)
 
 _HEALTH_PATH = "/api/health"
 _RATE_LIMITED_GET_PATHS = frozenset({"/api/browse"})
+# Per-finding user actions are idempotent and don't trigger expensive work
+# server-side. Burst-dismissing is a normal user flow on large projects; a
+# rate limit there just rolls back the optimistic UI update, which the user
+# experiences as "violations come back". The global limit still applies to
+# everything else (e.g. /api/evaluations/start).
+_RATE_LIMIT_EXEMPT_PATHS = frozenset({
+    "/api/findings/dismiss",
+    "/api/findings/restore",
+    "/api/findings/delete",
+})
 _LOCALHOST_ADDRS = {"127.0.0.1", "::1"}
 
 
@@ -59,6 +69,8 @@ def _check_csrf() -> Response | tuple[Response, int] | None:
 def _check_rate_limit(store: RateLimitStore) -> Response | tuple[Response, int] | None:
     """Enforce rate limiting on state-changing requests and sensitive GET endpoints."""
     if request.method in ("GET", "HEAD", "OPTIONS") and request.path not in _RATE_LIMITED_GET_PATHS:
+        return None
+    if request.path in _RATE_LIMIT_EXEMPT_PATHS:
         return None
     ip = request.remote_addr or "unknown"
     now = time.monotonic()

@@ -9,21 +9,46 @@ from quodeq.analysis._dim_estimates import compute_dim_estimates, write_dim_esti
 from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
 from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
 from quodeq.analysis._types import RunConfig, _AnalysisContext
-from quodeq.analysis._dimension_ops import (
-    _build_dimension_prompt,
-    _log_dimension_result,
-    _parse_dimension_evidence,
-    _process_single_dimension,
-    _run_dimension_analysis,
-)
+from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
 from quodeq.analysis.subagents.runner import process_consolidated_dimensions
+from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.analysis.subprocess import _get_provider_type
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.engine._runner_markers import emit_marker
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.utils import get_ai_cmd
+
+_LOCAL_API_HOSTS = ("localhost", "127.0.0.1", "::1")
+
+
+def _warn_if_local_api_oversubscribed(config: RunConfig) -> None:
+    """Warn when subagents will queue behind one local-API inference slot.
+
+    Local model servers (Ollama, llama.cpp, omlx) default to serving one
+    request per loaded model. With ``--n-subagents > 1`` the second agent
+    queues behind the first and typically exceeds the read timeout, surfacing
+    as silent timeouts. The fix is either ``--n-subagents 1`` or raising the
+    server's parallelism (e.g. ``OLLAMA_NUM_PARALLEL``). Cloud API providers
+    don't have this constraint, so we narrow the warning to loopback bases.
+    """
+    if config.options.max_subagents <= 1:
+        return
+    ai_cmd = get_ai_cmd()
+    if _get_provider_type(ai_cmd) != "api":
+        return
+    api_base = get_provider_configs().get(ai_cmd, {}).get("api_base", "")
+    if not any(host in api_base for host in _LOCAL_API_HOSTS):
+        return
+    log_warning(
+        f"--n-subagents={config.options.max_subagents} with local provider "
+        f"'{ai_cmd}' will likely time out: local model servers serve one "
+        f"request per model by default, so subagents queue and the second "
+        f"exceeds the read timeout. Use --n-subagents 1 or raise the "
+        f"server's parallelism (e.g. OLLAMA_NUM_PARALLEL="
+        f"{config.options.max_subagents})."
+    )
 
 
 def load_analysis_context(config: RunConfig) -> tuple[list[str], _AnalysisContext]:
@@ -87,8 +112,24 @@ def _run_dimensions(
     if config.options.dry_run:
         return _run_dry_run(config, on_dimension_done=on_dimension_done)
 
+    _warn_if_local_api_oversubscribed(config)
+
     dimensions, ctx = load_analysis_context(config)
+    # Activate the per-run classify stash so ``_persist_dim_estimates``
+    # below and the dim runner inside ``cache/dimension_runner.py`` share
+    # a single walk of the source files per dim. Without this, the same
+    # ``classify_files_via_cache`` call happens twice per dim (once for
+    # the dashboard's upfront totals, once for the actual hit/miss
+    # dispatch), each repeating thousands of source-file hashes and
+    # cache.get() lookups. Tests and dry-run paths leave it as None.
+    if config._classify_cache is None:
+        config._classify_cache = {}
     _persist_dim_estimates(config, dimensions)
+
+    # One runner per run. Per-run construction (vs. a module-level
+    # singleton) makes test substitution and concurrency-safety obvious:
+    # each evaluation owns its own DimensionCallbacks instance.
+    runner = DimensionRunner()
 
     # Set the run-level deadline once, just before the dim loop starts.
     # Skipped for dry runs (already returned above), unlimited budget, or
@@ -109,7 +150,7 @@ def _run_dimensions(
         emit_marker("setup", dimensions=dimensions)
         return run_per_dimension_loop(
             config, dimensions, ctx,
-            process_fn=_process_single_dimension,
+            runner=runner,
             on_dimension_done=on_dimension_done,
         )
 
@@ -121,8 +162,7 @@ def _run_dimensions(
         emit_marker("setup", dimensions=dimensions)
         return run_incremental_loop(
             config, dimensions, ctx,
-            process_fn=_process_single_dimension,
-            log_result_fn=_log_dimension_result,
+            runner=runner,
             on_dimension_done=on_dimension_done,
         )
 
@@ -153,7 +193,7 @@ def _run_dimensions(
 
     return run_per_dimension_loop(
         config, dimensions, ctx,
-        process_fn=_process_single_dimension,
+        runner=runner,
         on_dimension_done=on_dimension_done,
     )
 

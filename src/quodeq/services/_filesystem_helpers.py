@@ -18,7 +18,7 @@ def _read_dimensions_from_file(dims_file: str) -> tuple[str, ...]:
     try:
         p = Path(dims_file)
         if p.exists():
-            data = json.loads(p.read_text())
+            data = json.loads(p.read_text(encoding="utf-8"))
             return tuple(d["id"] for d in data.get("applies", []))
         return ()
     except (OSError, json.JSONDecodeError, KeyError, TypeError):

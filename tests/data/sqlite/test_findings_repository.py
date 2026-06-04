@@ -1,5 +1,14 @@
 from pathlib import Path
 
+from quodeq.core.events.models import (
+    FindingDismissed,
+    FindingDismissedEvent,
+    JudgmentCreatedEvent,
+    JudgmentPayload,
+)
+from quodeq.core.events.writer import EventLogWriter
+from quodeq.data.actions_log import ActionLogWriter
+from quodeq.data.projection.projector import ProjectionResult, Projector
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
@@ -78,3 +87,79 @@ def test_search_respects_limit(tmp_path: Path):
         repo.insert_finding(_finding(p=f"P{i}", line=i, reason="duplicate text"))
     hits = repo.search("duplicate", limit=3)
     assert len(hits) == 3
+
+
+class _SpyProjector(Projector):
+    """Projector that records ensure_projected invocations."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.ensure_calls = 0
+
+    def ensure_projected(self, events_path, run_dir, *, project_dir=None):  # type: ignore[override]
+        self.ensure_calls += 1
+        return ProjectionResult(events_projected=0, rebuilt=False)
+
+
+def _write_event(log: Path, practice_id: str = "P1") -> None:
+    writer = EventLogWriter(log)
+    writer.emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+        practice_id=practice_id, verdict="violation", dimension="dim",
+        file="x.py", line=1, reason="r",
+    )))
+
+
+def test_read_triggers_ensure(tmp_path: Path):
+    _write_event(tmp_path / "events.jsonl")
+    spy = _SpyProjector()
+    repo = SqliteFindingsRepository(tmp_path, projector=spy)
+
+    repo.list_by_dimension("dim")
+    repo.count_by_dimension()
+    repo.search("r")
+
+    assert spy.ensure_calls == 3
+
+
+def test_write_does_not_trigger_ensure(tmp_path: Path):
+    _write_event(tmp_path / "events.jsonl")
+    spy = _SpyProjector()
+    repo = SqliteFindingsRepository(tmp_path, projector=spy)
+
+    repo.insert_finding(_finding(p="P1"))
+    repo.set_verdict(practice_id="P1", file="x.py", line=1, verdict="dismissed")
+
+    assert spy.ensure_calls == 0
+
+
+def test_read_skips_ensure_when_no_event_log(tmp_path: Path):
+    spy = _SpyProjector()
+    repo = SqliteFindingsRepository(tmp_path, projector=spy)
+
+    repo.count_by_dimension()
+
+    assert spy.ensure_calls == 0
+
+
+def test_repo_reads_reflect_dismissal_via_actions_log(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    run_dir = project_dir / "r1"
+    run_dir.mkdir(parents=True)
+    events_log = run_dir / "events.jsonl"
+
+    EventLogWriter(events_log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+        practice_id="P1", verdict="violation", dimension="Security",
+        file="a.py", line=10, reason="r", req="R1",
+    )))
+    ActionLogWriter(project_dir).emit(
+        FindingDismissedEvent(payload=FindingDismissed(req="R1", file="a.py", line=10))
+    )
+
+    repo = SqliteFindingsRepository(run_dir)
+    findings = repo.list_by_dimension("Security")
+
+    # The dismissed finding should still surface in list_by_dimension (the verdict
+    # column tells the caller it's dismissed); the assertion is that ensure_fresh
+    # applied the dismissal.
+    assert len(findings) == 1
+    assert findings[0].verdict == "dismissed"

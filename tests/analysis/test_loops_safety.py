@@ -59,10 +59,28 @@ class _FakeEvidence:
     # check_zero_findings (called after the loop) iterates principles —
     # an empty dict satisfies it without any findings logic.
     principles: dict = None  # type: ignore[assignment]
+    # The DONE write site forwards Evidence.exit_reason into dimensions.json;
+    # default None matches the real Evidence model so safe-write skips the field.
+    exit_reason: str | None = None
 
     def __post_init__(self) -> None:
         if self.principles is None:
             object.__setattr__(self, "principles", {})
+
+
+def _runner_from(fn):
+    """Wrap a process-fn callable (`(cfg, dim, idx, ctx) -> Evidence`) into a
+    DimensionRunner-shaped mock so it can be passed as ``runner=``.
+
+    The new signature includes a keyword-only ``emit_log`` that the loops
+    pass; tests don't care about it, so we accept and ignore it.
+    """
+    def _adapter(cfg, dim, idx, ctx, *, emit_log=True):
+        return fn(cfg, dim, idx, ctx)
+
+    runner = MagicMock()
+    runner.run.side_effect = _adapter
+    return runner
 
 
 # ---------------------------------------------------------------------------
@@ -95,7 +113,7 @@ class TestPerDimLoopSafety:
 
         result = run_per_dimension_loop(
             cfg, ["security", "usability", "flexibility"], _ctx(3),
-            process_fn=process_fn, on_dimension_done=on_done,
+            runner=_runner_from(process_fn), on_dimension_done=on_done,
         )
         # All three dims iterated despite usability's callback raising.
         assert seen_dims == ["security", "usability", "flexibility"]
@@ -118,7 +136,7 @@ class TestPerDimLoopSafety:
 
         result = run_per_dimension_loop(
             cfg, ["security", "reliability", "performance"], _ctx(3),
-            process_fn=process_fn, on_dimension_done=on_done,
+            runner=_runner_from(process_fn), on_dimension_done=on_done,
         )
         assert seen == ["security", "reliability", "performance"]
         assert set(result) == {"security", "reliability", "performance"}
@@ -135,7 +153,7 @@ class TestPerDimLoopSafety:
 
         result = run_per_dimension_loop(
             cfg, ["security", "reliability"], _ctx(2),
-            process_fn=process_fn,
+            runner=_runner_from(process_fn),
         )
         # Both iterations attempted; security skipped, reliability succeeds.
         assert seen == ["security", "reliability"]
@@ -147,7 +165,7 @@ class TestPerDimLoopSafety:
         with patch("quodeq.analysis._loops.log_info") as mock_log:
             run_per_dimension_loop(
                 cfg, ["a", "b"], _ctx(2),
-                process_fn=lambda *a, **k: _FakeEvidence(),
+                runner=_runner_from(lambda *a: _FakeEvidence()),
             )
         messages = [c.args[0] for c in mock_log.call_args_list]
         # Loop start banner
@@ -185,11 +203,10 @@ class TestIncrementalLoopSafety:
         def on_done(dim, _ev):
             callback_calls.append(dim)
 
-        with patch("quodeq.analysis._loops.run_dimension_incremental", side_effect=fake_runner):
+        with patch("quodeq.analysis._loops._log_dimension_result", side_effect=log_result):
             result = run_incremental_loop(
                 cfg, ["security", "usability", "flexibility"], _ctx(3),
-                process_fn=MagicMock(),  # only used as fallback if the inner runner raises
-                log_result_fn=log_result,
+                runner=_runner_from(fake_runner),
                 on_dimension_done=on_done,
             )
 
@@ -212,23 +229,21 @@ class TestIncrementalLoopSafety:
                 raise AttributeError("not in catch list")
             return _FakeEvidence()
 
-        with patch("quodeq.analysis._loops.run_dimension_incremental", side_effect=fake_runner):
+        with patch("quodeq.analysis._loops._log_dimension_result"):
             result = run_incremental_loop(
                 cfg, ["security", "reliability", "maintainability"], _ctx(3),
-                process_fn=MagicMock(),
-                log_result_fn=lambda *a: None,
+                runner=_runner_from(fake_runner),
             )
         assert seen == ["security", "reliability", "maintainability"]
         assert set(result) == {"security", "maintainability"}
 
     def test_diagnostic_log_lines_are_emitted(self):
         cfg = _config()
-        with patch("quodeq.analysis._loops.run_dimension_incremental", return_value=_FakeEvidence()), \
+        with patch("quodeq.analysis._loops._log_dimension_result"), \
              patch("quodeq.analysis._loops.log_info") as mock_log:
             run_incremental_loop(
                 cfg, ["security", "flexibility"], _ctx(2),
-                process_fn=MagicMock(),
-                log_result_fn=lambda *a: None,
+                runner=_runner_from(lambda *a: _FakeEvidence()),
             )
         messages = [c.args[0] for c in mock_log.call_args_list]
         assert any("incremental: 2 dim(s) to process: security, flexibility" in m for m in messages)
@@ -270,7 +285,7 @@ class TestCallbackRetryPersistsSideEffects:
 
         run_per_dimension_loop(
             cfg, ["security", "reliability"], _ctx(2),
-            process_fn=lambda *a, **k: _FakeEvidence(),
+            runner=_runner_from(lambda *a: _FakeEvidence()),
             on_dimension_done=scoring_callback,
         )
         # security was retried once; reliability ran straight through.
@@ -287,7 +302,7 @@ class TestCallbackRetryPersistsSideEffects:
         with patch("quodeq.analysis._loops.log_warning") as mock_warn:
             run_per_dimension_loop(
                 cfg, ["security"], _ctx(1),
-                process_fn=lambda *a, **k: _FakeEvidence(),
+                runner=_runner_from(lambda *a: _FakeEvidence()),
                 on_dimension_done=always_raises,
             )
         warn_messages = [c.args[0] for c in mock_warn.call_args_list]
@@ -302,9 +317,9 @@ class TestCallbackRetryPersistsSideEffects:
         def fake_runner(_c, dim, _i, _ctx):
             return _FakeEvidence()
 
-        # log_result_fn raises BrokenPipeError before on_dimension_done is
-        # reached on the original try; the retry path then invokes
-        # on_dimension_done with stdout silenced.
+        # _log_dimension_result raises BrokenPipeError before
+        # on_dimension_done is reached on the original try; the retry path
+        # then invokes on_dimension_done with stdout silenced.
         def log_result(_ev, dim, _i, _t):
             if dim == "security":
                 raise BrokenPipeError("dashboard pipe closed")
@@ -313,11 +328,10 @@ class TestCallbackRetryPersistsSideEffects:
             attempts[dim] = attempts.get(dim, 0) + 1
             written.append(dim)
 
-        with patch("quodeq.analysis._loops.run_dimension_incremental", side_effect=fake_runner):
+        with patch("quodeq.analysis._loops._log_dimension_result", side_effect=log_result):
             run_incremental_loop(
                 cfg, ["security", "reliability"], _ctx(2),
-                process_fn=MagicMock(),
-                log_result_fn=log_result,
+                runner=_runner_from(fake_runner),
                 on_dimension_done=scoring_callback,
             )
 
@@ -357,13 +371,12 @@ class TestProductionBugRegression:
                 usability_first_call["done"] = True
                 raise BrokenPipeError("Broken pipe")
 
-        with patch("quodeq.analysis._loops.run_dimension_incremental", side_effect=fake_runner):
+        with patch("quodeq.analysis._loops._log_dimension_result"):
             result = run_incremental_loop(
                 cfg,
                 ["security", "reliability", "maintainability", "performance", "usability", "flexibility"],
                 _ctx(6),
-                process_fn=MagicMock(),
-                log_result_fn=lambda *a: None,
+                runner=_runner_from(fake_runner),
                 on_dimension_done=scoring_callback,
             )
 

@@ -21,6 +21,7 @@ state and the dispatcher call recorder.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
@@ -209,6 +210,160 @@ class TestAllHits:
         assert {l["w"] for l in lines} == {"a-cached", "b-cached"}
 
 
+class _ListHandler(logging.Handler):
+    """Capture log messages off a specific logger. The ``quodeq`` logger sets
+    propagate=False, so pytest's caplog (root) can't see these records — we
+    attach directly to the module logger instead."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.messages.append(record.getMessage())
+
+
+class TestProvenanceSurfacing:
+    def test_classify_log_names_model_drift_on_all_hits(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        # Reuse across a model change must never be silent: the per-dim
+        # classify log line surfaces that reused findings predate the
+        # current model.
+        config, src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
+        for f in ["a.py", "b.py"]:
+            key = build_cache_key_for_file(config, f, "security")
+            cache.put(key, CacheEntry(
+                key=key, schema_version=3,
+                findings=[{"file": f, "line": 1, "t": "violation", "w": f"{f}-cached"}],
+                files_read=1, file_path=f, dimension="security",
+                model_id="old-model",
+                provenance={
+                    "model_id": "old-model", "standards_hash": "",
+                    "prompts_hash": "", "quodeq_version": "",
+                },
+            ))
+
+        handler = _ListHandler()
+        logger = logging.getLogger("quodeq.analysis.cache.dimension_runner")
+        logger.addHandler(handler)
+        dispatcher = FakeDispatcher(src)
+        try:
+            with patch(
+                "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+                new=dispatcher,
+            ):
+                process_dimension_with_cache(
+                    config, "security", idx=1, ctx=_make_ctx(),
+                    callbacks=_make_callbacks(), cache=cache,
+                )
+        finally:
+            logger.removeHandler(handler)
+
+        assert dispatcher.calls == []
+        text = "\n".join(handler.messages)
+        assert "model" in text.lower()
+        assert "old-model" in text  # the model the reused findings predate
+
+
+class TestModelSwitchReuse:
+    def test_second_run_with_new_model_is_all_hits(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        # The headline cost-first behavior: run a dimension on model A, then
+        # the SAME code on model B. The second run reuses every cached
+        # finding with zero re-dispatch, and the entries still record model A
+        # as their provenance so the drift is surfaceable.
+        config_a, src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
+        # config_a model is "test-model" (the _make_config default).
+
+        d1 = FakeDispatcher(src)
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=d1,
+        ):
+            process_dimension_with_cache(
+                config_a, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+            )
+        assert len(d1.calls) == 1  # cold cache -> dispatched the misses
+
+        # Same project, different model.
+        config_b = replace(
+            config_a,
+            options=replace(config_a.options, subagent_model="other-model"),
+        )
+        d2 = FakeDispatcher(src)
+        handler = _ListHandler()
+        logger = logging.getLogger("quodeq.analysis.cache.dimension_runner")
+        logger.addHandler(handler)
+        try:
+            with patch(
+                "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+                new=d2,
+            ):
+                ev = process_dimension_with_cache(
+                    config_b, "security", idx=1, ctx=_make_ctx(),
+                    callbacks=_make_callbacks(), cache=cache,
+                )
+        finally:
+            logger.removeHandler(handler)
+
+        # All hits despite the model change: no re-dispatch.
+        assert d2.calls == []
+        assert ev is not None
+
+        # The cache key is identical across the model switch, and the entry
+        # still remembers the model that produced it.
+        key = build_cache_key_for_file(config_b, "a.py", "security")
+        assert key == build_cache_key_for_file(config_a, "a.py", "security")
+        entry = cache.get(key)
+        assert entry is not None
+        assert entry.provenance["model_id"] == "test-model"
+
+        # End-to-end: the provenance written by run 1's persist is read back
+        # by run 2's classify and surfaced on the log, naming the model the
+        # reused findings predate. This pins the persist -> classify ->
+        # format_provenance_drift seam that the unit tests stub.
+        text = "\n".join(handler.messages)
+        assert "model" in text.lower()
+        assert "test-model" in text
+
+
+class TestGcWiring:
+    def test_default_backend_open_collects_legacy_entries(
+        self, tmp_path: Path, monkeypatch,
+    ):
+        # When no cache is injected (the production path), opening the default
+        # backend runs the one-time GC, reclaiming schema<3 entries. Sandbox
+        # the cache root via env so we never touch the real ~/.quodeq cache.
+        from quodeq.analysis.cache.local import default_cache_root
+
+        monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "qroot"))
+        results_root = default_cache_root()
+        legacy_dir = results_root / "aa" / ("0" * 62)
+        legacy_dir.mkdir(parents=True, exist_ok=True)
+        (legacy_dir / "entry.json").write_text(json.dumps({
+            "key": "aa" + "0" * 62, "schema_version": 2, "findings": [],
+            "files_read": 1, "file_path": "old.py", "dimension": "security",
+            "model_id": "m",
+        }))
+
+        config, src = _setup(tmp_path, {"a.py": "x"})
+        dispatcher = FakeDispatcher(src)
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=dispatcher,
+        ):
+            # cache=None -> production default-backend path -> GC fires.
+            process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=None,
+            )
+
+        assert not (legacy_dir / "entry.json").exists()
+
+
 class TestAllMisses:
     def test_cold_cache_dispatches_all_files(self, tmp_path: Path, cache: LocalFileBackend):
         config, src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
@@ -339,12 +494,12 @@ class TestNoSourceFiles:
 
 
 class TestWiring:
-    def test_process_single_dimension_routes_to_cache_runner(
+    def test_dimension_runner_routes_to_cache_runner(
         self, tmp_path: Path,
     ):
-        """V2 is the canonical path: _process_single_dimension always
-        routes through process_dimension_with_cache."""
-        from quodeq.analysis._dimension_ops import _process_single_dimension
+        """V2 is the canonical path: DimensionRunner.run always routes
+        through process_dimension_with_cache."""
+        from quodeq.analysis.dimension_runner import DimensionRunner
 
         config, src = _setup(tmp_path, {"a.py": "x"})
 
@@ -354,10 +509,10 @@ class TestWiring:
             return _make_dummy_evidence(files_read=1)
 
         with patch(
-            "quodeq.analysis._dimension_ops.process_dimension_with_cache",
+            "quodeq.analysis.dimension_runner.process_dimension_with_cache",
             new=fake_cache,
         ):
-            _process_single_dimension(config, "security", 1, _make_ctx(), emit_log=False)
+            DimensionRunner().run(config, "security", 1, _make_ctx(), emit_log=False)
 
         assert called["hit"] is True
 
@@ -444,9 +599,9 @@ class TestCircuitBreakerWiring:
                     "_marker": "file_done", "file": "b.py",
                     "status": "error", "reason": "token_limit",
                 }) + "\n")
-            # Give the watcher's poll loop time to read both errors and trip.
-            import time as _time
-            _time.sleep(1.0)
+            # No sleep: the breaker does a final scan on stop (see
+            # FailureStreakWatcher._run), so the trip is detected once dispatch
+            # returns rather than depending on a poll landing mid-dispatch.
             return _make_dummy_evidence(files_read=2)
 
         try:
@@ -583,4 +738,334 @@ class TestCarryOrder:
         fresh_idx = next(i for i, f in enumerate(findings) if f.get("w") == "fresh-b")
         assert carry_idx < fresh_idx, (
             f"carry (index {carry_idx}) should appear before fresh (index {fresh_idx})"
+        )
+
+
+class TestWatcherJoinHasNoTimeoutCeiling:
+    """Regression for the c88be50e "16% loss" bug.
+
+    The watcher's final persist tick can take longer than 5s when the
+    JSONL has a few hundred file_done="ok" markers (each tick re-scans
+    the full file and writes per-file cache entries). A 5s join ceiling
+    silently abandoned the final tick mid-flight, so every `ok` marker
+    that hadn't been persisted by the previous tick was lost.
+
+    The user reported a flexibility run where 790 file_done="ok" markers
+    landed in the JSONL but only 662 cache entries persisted (~16% loss).
+
+    Pin via source inspection so a future refactor can't re-introduce the
+    timeout. The watcher.join() call MUST stay un-timeout-bounded; the
+    breaker is a separate thread and keeps its own timeout.
+    """
+
+    def test_final_cache_flush_has_no_join_timeout_ceiling(self):
+        import inspect
+
+        from quodeq.analysis.cache import dimension_runner
+
+        src = inspect.getsource(dimension_runner.process_dimension_with_cache)
+        assert "watcher.join(timeout=5.0)" not in src, (
+            "watcher.join must not have a timeout ceiling — the 5s cap "
+            "was the c88be50e regression that dropped the final persist tick"
+        )
+        assert "watcher.join()" in src, (
+            "watcher.join() (no timeout) must still run in the finally "
+            "block so the final persist tick completes"
+        )
+
+    def test_breaker_join_keeps_its_timeout(self):
+        """The breaker is a separate thread with its own lifecycle —
+        its 5s join cap is unrelated to the cache-loss bug and should
+        remain intact."""
+        import inspect
+
+        from quodeq.analysis.cache import dimension_runner
+
+        src = inspect.getsource(dimension_runner.process_dimension_with_cache)
+        assert "breaker.stop_and_join(timeout=5.0)" in src, (
+            "breaker.stop_and_join's 5s timeout is independent of the "
+            "watcher fix and must stay in place"
+        )
+
+
+class TestCachedFindingsReachEventLog:
+    """Pin that cache-replayed findings land in ``events.jsonl`` as
+    ``JUDGMENT_CREATED`` events, not only in the per-dim JSONL.
+
+    Without this, an incremental run's SQL projection (which reads
+    ``events.jsonl``) sees only the freshly-dispatched findings — the
+    dashboard grade tables disagree with the CLI's JSON output because
+    they're scoring different sets of findings. The user reported this as
+    "flexibility shows 7.7 in the CLI but 9.0 in the UI" on a real
+    incremental run; the gap was exactly the cache-restored findings.
+    """
+
+    def _read_events(self, events_log: Path) -> list[dict]:
+        if not events_log.exists():
+            return []
+        out = []
+        for line in events_log.read_text().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            out.append(json.loads(line))
+        return out
+
+    def test_all_hits_run_emits_judgment_events_for_cache_replay(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        config, src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
+
+        # Pre-populate cache for both files so the run short-circuits dispatch.
+        for f in ["a.py", "b.py"]:
+            key = build_cache_key_for_file(config, f, "security")
+            cache.put(key, CacheEntry(
+                key=key, schema_version=1,
+                findings=[{
+                    "file": f, "line": 7, "t": "violation",
+                    "w": f"cached-{f}", "p": "Confidentiality", "d": "security",
+                    "req": f"S-CON-{f}", "severity": "minor",
+                    "snippet": "s", "reason": "r",
+                }],
+                files_read=1, file_path=f, dimension="security",
+                model_id="test-model",
+            ))
+
+        dispatcher = FakeDispatcher(src)
+        # events.jsonl lives at <evidence_dir>/.. which is <work_dir>/..
+        # The runner derives this from the per-dim JSONL path internally.
+        events_log = (config.work_dir or config.src).parent / "events.jsonl"
+
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=dispatcher,
+        ):
+            process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+            )
+
+        assert dispatcher.calls == [], "all-hits path must not dispatch"
+
+        events = self._read_events(events_log)
+        # Every cached finding must produce a JUDGMENT_CREATED event so the
+        # SQL projection sees it. Without the fix this list would be empty.
+        judgments = [e for e in events if e.get("event_type") == "JUDGMENT_CREATED"]
+        files_in_events = {e["payload"]["file"] for e in judgments}
+        assert files_in_events == {"a.py", "b.py"}, (
+            f"events.jsonl must contain a JUDGMENT_CREATED per cached finding; "
+            f"got {files_in_events}"
+        )
+
+    def test_partial_run_emits_judgment_events_for_carried_findings(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        """Mixed run: one cached hit (a.py) + one dispatched miss (b.py).
+
+        The cached carry was the silently-dropped path — pin that it shows
+        up in events.jsonl alongside the dispatcher's own emit.
+        """
+        config, src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
+
+        key = build_cache_key_for_file(config, "a.py", "security")
+        cache.put(key, CacheEntry(
+            key=key, schema_version=1,
+            findings=[{
+                "file": "a.py", "line": 1, "t": "violation",
+                "w": "carry-a", "p": "Confidentiality", "d": "security",
+                "req": "S-CON-A", "severity": "minor",
+                "snippet": "x", "reason": "r",
+            }],
+            files_read=1, file_path="a.py", dimension="security",
+            model_id="test-model",
+        ))
+
+        events_log = (config.work_dir or config.src).parent / "events.jsonl"
+
+        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+            # The dispatcher in production routes through FindingsRouter,
+            # which emits events. This fake only writes JSONL — we're
+            # specifically testing the cache-replay side.
+            jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
+            jsonl.parent.mkdir(parents=True, exist_ok=True)
+            with jsonl.open("a") as out:
+                out.write(json.dumps({
+                    "file": "b.py", "line": 1, "t": "violation",
+                    "w": "fresh-b", "p": "Confidentiality", "d": "security",
+                    "req": "S-CON-B", "severity": "minor",
+                    "snippet": "y", "reason": "r",
+                }) + "\n")
+            return _make_dummy_evidence(files_read=1)
+
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=fake_dispatch,
+        ):
+            process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+            )
+
+        events = self._read_events(events_log)
+        carry_files = {
+            e["payload"]["file"] for e in events
+            if e.get("event_type") == "JUDGMENT_CREATED"
+        }
+        assert "a.py" in carry_files, (
+            f"cached carry for a.py must emit a JUDGMENT_CREATED event; "
+            f"got {carry_files}"
+        )
+
+
+# ============================================================
+# files_read reflects analyzed count, not input list size
+# ============================================================
+#
+# Pre-fix, every callsite of parse_evidence_from_jsonl in
+# process_dimension_with_cache passed ``files_read=len(files)``. That
+# made coverage % (computed downstream as files_read / source_file_count)
+# always 100% even when the run only finished a fraction of its files —
+# e.g. a deadline-truncated flexibility run that analyzed 850/3037 files
+# scored "6.6/Adequate" on a dashboard that couldn't tell it was partial.
+#
+# The honest signal: files_read = cache hits + dispatch files whose
+# most recent file_done marker is "ok". Files with file_done="error"
+# (worker crashed, token-out) or no marker at all are NOT counted —
+# their analysis was incomplete, the cache has no entry for them, and
+# the next run will re-dispatch.
+
+
+class TestFilesReadReflectsAnalyzedCount:
+    """files_read on the returned Evidence must equal the number of source
+    files reproducible from cache at run end — NOT len(input_files)."""
+
+    def test_files_read_equals_total_when_all_cache_hits(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        """All-hits short-circuit: every input file is a cache hit.
+        files_read must equal len(files)."""
+        config, src = _setup(tmp_path, {"a.py": "x", "b.py": "y", "c.py": "z"})
+
+        # Pre-populate cache for every input file.
+        for f in ["a.py", "b.py", "c.py"]:
+            key = build_cache_key_for_file(config, f, "security")
+            cache.put(key, CacheEntry(
+                key=key, schema_version=1,
+                findings=[{"file": f, "line": 1, "t": "violation", "w": f"v-{f}"}],
+                files_read=1, file_path=f, dimension="security",
+                model_id="test-model",
+            ))
+
+        dispatcher = FakeDispatcher(src)
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=dispatcher,
+        ):
+            ev = process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+            )
+
+        assert dispatcher.calls == [], "all-hits path must not dispatch"
+        assert ev is not None
+        assert ev.files_read == 3, (
+            f"all-hits run must report files_read=3, got {ev.files_read}"
+        )
+
+    def test_files_read_equals_hits_plus_ok_dispatches(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        """3 source files: 1 cache hit, 1 dispatches with file_done='ok',
+        1 dispatches with file_done='error'. Expect files_read=2 (hit + ok).
+        """
+        config, src = _setup(
+            tmp_path, {"a.py": "x", "b.py": "y", "c.py": "z"},
+        )
+
+        # Pre-seed cache for a.py only — b.py and c.py are misses.
+        key_a = build_cache_key_for_file(config, "a.py", "security")
+        cache.put(key_a, CacheEntry(
+            key=key_a, schema_version=1,
+            findings=[{"file": "a.py", "line": 1, "t": "violation", "w": "cached-a"}],
+            files_read=1, file_path="a.py", dimension="security",
+            model_id="test-model",
+        ))
+
+        def mixed_dispatcher(cfg, dim_id, idx, ctx, callbacks):
+            # Misses are restricted by the file filter to {b.py, c.py}.
+            jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
+            jsonl.parent.mkdir(parents=True, exist_ok=True)
+            with jsonl.open("a") as out:
+                # b.py completes with ok marker — counts toward files_read.
+                out.write(json.dumps({
+                    "file": "b.py", "line": 1, "t": "violation", "w": "fresh-b",
+                }) + "\n")
+                out.write(json.dumps({
+                    "_marker": "file_done", "file": "b.py", "status": "ok",
+                }) + "\n")
+                # c.py errors out — must NOT count toward files_read.
+                out.write(json.dumps({
+                    "_marker": "file_done", "file": "c.py",
+                    "status": "error", "reason": "token_limit",
+                }) + "\n")
+            return _make_dummy_evidence(files_read=2)
+
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=mixed_dispatcher,
+        ):
+            ev = process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+            )
+
+        assert ev is not None
+        # a.py = cache hit (1). b.py = ok dispatch (1). c.py = errored (0).
+        assert ev.files_read == 2, (
+            f"expected files_read=2 (hit + ok), got {ev.files_read}; "
+            f"source_file_count={ev.source_file_count}"
+        )
+        assert ev.source_file_count == 3, (
+            f"source_file_count must equal len(input files) = 3, "
+            f"got {ev.source_file_count}"
+        )
+
+    def test_files_read_when_dispatch_returns_none_with_carries(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        """Dispatch returns None but cached findings exist — the
+        ``classify.cached_findings and jsonl.exists()`` branch must also
+        use the computed files_read (= just the cache hits, since no
+        dispatched files have ok markers)."""
+        config, src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
+
+        # Pre-populate a.py only.
+        key_a = build_cache_key_for_file(config, "a.py", "security")
+        cache.put(key_a, CacheEntry(
+            key=key_a, schema_version=1,
+            findings=[{"file": "a.py", "line": 1, "t": "violation", "w": "cached-a"}],
+            files_read=1, file_path="a.py", dimension="security",
+            model_id="test-model",
+        ))
+
+        # Dispatch returns None (no fresh findings, no markers written).
+        def failing_dispatcher(*args, **kwargs):
+            return None
+
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=failing_dispatcher,
+        ):
+            ev = process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+            )
+
+        assert ev is not None, (
+            "dispatch returned None but cached findings should still produce "
+            "Evidence via the pre-written JSONL"
+        )
+        # Only a.py is reproducible — b.py's dispatch produced no ok marker.
+        assert ev.files_read == 1, (
+            f"expected files_read=1 (just the cache hit), got {ev.files_read}"
         )

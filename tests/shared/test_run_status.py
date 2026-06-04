@@ -87,6 +87,34 @@ def test_read_unsupported_schema_raises(tmp_path: Path) -> None:
         read_status(tmp_path)
 
 
+def test_write_status_persists_provider_and_model(tmp_path: Path) -> None:
+    write_status(
+        tmp_path,
+        state=RunState.RUNNING,
+        job_id="ext-abc",
+        started_at="2026-01-01T00:00:00Z",
+        dimensions=["maintainability"],
+        ai_provider="llamacpp",
+        ai_model="qwen3.6-27b",
+    )
+    data = json.loads((tmp_path / "status.json").read_text())
+    assert data["ai_provider"] == "llamacpp"
+    assert data["ai_model"] == "qwen3.6-27b"
+
+
+def test_write_status_omits_provider_and_model_when_unset(tmp_path: Path) -> None:
+    write_status(
+        tmp_path,
+        state=RunState.RUNNING,
+        job_id="ext-abc",
+        started_at="2026-01-01T00:00:00Z",
+        dimensions=[],
+    )
+    data = json.loads((tmp_path / "status.json").read_text())
+    assert "ai_provider" not in data
+    assert "ai_model" not in data
+
+
 def test_concurrent_writes_no_partial_file(tmp_path: Path) -> None:
     """Two threads writing concurrently: each read sees a valid JSON document."""
     barrier = threading.Barrier(2)

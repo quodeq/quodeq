@@ -8,7 +8,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Callable, Protocol
 
 from quodeq.core.types import JobSnapshot
 from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_TIME_LIMIT
@@ -44,6 +44,8 @@ class EvaluationDispatcher(Protocol):
         *,
         cwd: str | None = None,
         env: dict[str, str] | None = None,
+        ai_provider: str | None = None,
+        ai_model: str | None = None,
     ) -> JobSnapshot:
         """Submit an evaluation command and return the initial job state."""
         ...
@@ -61,8 +63,13 @@ class SubprocessDispatcher:
         *,
         cwd: str | None = None,
         env: dict[str, str] | None = None,
+        ai_provider: str | None = None,
+        ai_model: str | None = None,
     ) -> JobSnapshot:
-        return self._jobs.start_job(cmd, cwd=cwd, env=env)
+        return self._jobs.start_job(
+            cmd, cwd=cwd, env=env,
+            ai_provider=ai_provider, ai_model=ai_model,
+        )
 
 
 def _build_evaluate_cmd(
@@ -100,7 +107,7 @@ def _scan_parent_project(project_dir: Path, reports_path: Path, repo_path: Path)
     """Scan the parent project directory if it lacks a scan.json."""
     info_path = project_dir / "repository_info.json"
     try:
-        parent_uuid = json.loads(info_path.read_text()).get("parent")
+        parent_uuid = json.loads(info_path.read_text(encoding="utf-8")).get("parent")
         if parent_uuid:
             parent_dir = reports_path / parent_uuid
             if not (parent_dir / "scan.json").exists():
@@ -168,11 +175,11 @@ def _register_project(
 
     # Persist the resolved path + ephemeral flag in repository_info.json.
     info_path = project_dir / "repository_info.json"
-    info = json.loads(info_path.read_text()) if info_path.exists() else {}
+    info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.exists() else {}
     info["path"] = str(target_path.resolve())
     info["location"] = _LOCATION_LOCAL
     info["ephemeral"] = bool(ephemeral)
-    info_path.write_text(json.dumps(info, indent=2))
+    info_path.write_text(json.dumps(info, indent=2), encoding="utf-8")
 
     # Scan now that files are guaranteed on disk.
     scan_project(target_path, output_dir=project_dir)
@@ -193,26 +200,37 @@ def _ensure_onboarding_field(project_dir: Path) -> None:
     if not info_path.exists():
         return
     try:
-        data = json.loads(info_path.read_text())
+        data = json.loads(info_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return
     if "onboardingCompletedAt" in data:
         return
     data["onboardingCompletedAt"] = None
-    info_path.write_text(json.dumps(data, indent=2))
+    info_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 class FsEvaluationMixin:
-    """Mixin for evaluation start/status/cancel methods.
+    """Evaluation lifecycle collaborator: start, status, cancel, score.
 
-    Requires the host class to provide a ``_jobs`` attribute (a ``JobManager``)
-    and optionally a ``_dispatcher`` attribute (an ``EvaluationDispatcher``).
-    When no dispatcher is set, a ``SubprocessDispatcher`` wrapping ``_jobs``
-    is used automatically.
+    Can be used as a standalone object (pass ``jobs`` to ``__init__``) or as a
+    mixin (set ``self._jobs`` on the host before calling any method).  The
+    ``get_status_fn`` hook lets a composing host override the status lookup so
+    that external-job IDs (``ext-`` prefix, resolved via SQLite) work correctly
+    inside ``cancel_evaluation`` without re-introducing MRO coupling.
     """
 
     _jobs: JobManager
     _dispatcher: EvaluationDispatcher | None
+
+    def __init__(
+        self,
+        jobs: JobManager | None = None,
+        get_status_fn: Callable | None = None,
+    ) -> None:
+        if jobs is not None:
+            self._jobs = jobs
+        self._dispatcher = None
+        self._get_status_fn = get_status_fn
 
     @property
     def dispatcher(self) -> EvaluationDispatcher:
@@ -249,6 +267,11 @@ class FsEvaluationMixin:
             built_env["QUODEQ_NO_CONSOLIDATE"] = "1"
         if options.context_size > 0:
             built_env["QUODEQ_CONTEXT_SIZE"] = str(options.context_size)
+        if options.ai_cmd == "omlx":
+            if options.provider_api_key:
+                built_env["OMLX_API_KEY"] = options.provider_api_key
+            if options.provider_api_base:
+                built_env["OMLX_BASE_URL"] = options.provider_api_base
         return built_env
 
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:
@@ -284,14 +307,24 @@ class FsEvaluationMixin:
                 candidate = candidate.parent
         else:
             cwd = str(resolved)
-        return self.dispatcher.dispatch(cmd, cwd=cwd, env=env)
+        return self.dispatcher.dispatch(
+            cmd, cwd=cwd, env=env,
+            ai_provider=options.ai_cmd,
+            ai_model=options.ai_model,
+        )
 
     def get_evaluation_status(self, job_id: str, reports_dir: str | None = None) -> JobSnapshot | None:
         """Return the current status of an evaluation job.
 
-        Passes *reports_dir* to ``JobManager.get_job`` so that external jobs
-        (``ext-`` prefix) can be looked up from the filesystem.
+        When a ``get_status_fn`` was injected at construction time, delegates
+        to that function (allows a composing host to supply a richer lookup,
+        e.g. via ``EvaluationsIndex``, without MRO coupling).  Otherwise falls
+        back to ``JobManager.get_job`` which handles the ``ext-`` prefix via
+        the filesystem.
         """
+        fn = getattr(self, "_get_status_fn", None)
+        if fn is not None:
+            return fn(job_id, reports_dir=reports_dir)
         reports_root = Path(reports_dir) if reports_dir else None
         return self._jobs.get_job(job_id, reports_root=reports_root)
 

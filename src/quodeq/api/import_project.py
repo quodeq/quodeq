@@ -250,7 +250,7 @@ def _find_identity_collision(reports_root: Path, identity: ProjectIdentity, *, i
         if not info_file.exists():
             continue
         try:
-            data = json.loads(info_file.read_text())
+            data = json.loads(info_file.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
         if data.get("name") != identity.project_name:
@@ -279,12 +279,12 @@ def _rewrite_repository_info(project_dir: Path, new_uuid: str) -> None:
     """Update the imported project's repository_info.json with its new UUID."""
     info_path = project_dir / _REPO_INFO_FILENAME
     try:
-        data = json.loads(info_path.read_text())
+        data = json.loads(info_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return
     data["uuid"] = new_uuid
     try:
-        info_path.write_text(json.dumps(data, indent=2))
+        info_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     except OSError as exc:
         _logger.warning("import: could not rewrite repository_info.json: %s", exc)
 

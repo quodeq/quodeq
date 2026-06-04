@@ -69,7 +69,7 @@ def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, l
         all_req_refs = req_refs_lookup.get(req) if req and req_refs_lookup else None
         req_refs = resolve_llm_refs(obj.get("refs"), all_req_refs)
     entry = build_finding_base(FindingSpec(
-        principle=obj["p"],
+        practice_id=obj["p"],
         file=obj.get("file"),
         line=obj.get("line"),
         end_line=obj.get("end_line"),
@@ -105,7 +105,7 @@ def _coerce_confidence(value: object, default: int = 100) -> int:
 def _build_violation_from_principle(violation: dict, label: str) -> Finding:
     """Build a normalized violation from a principle's violation entry."""
     return build_finding_base(FindingSpec(
-        principle=label,
+        practice_id=label,
         file=format_file_line(violation.get("file"), violation.get("line")),
         line=violation.get("line"),
         title=violation.get("title"),

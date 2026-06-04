@@ -14,17 +14,17 @@ from quodeq.core.types import Finding, ReqRef
 
 class TestBuildFindingBase:
     def test_minimal_spec(self):
-        spec = FindingSpec(principle="P1")
+        spec = FindingSpec(practice_id="P1")
         finding = build_finding_base(spec)
         assert isinstance(finding, Finding)
-        assert finding.principle == "P1"
+        assert finding.practice_id == "P1"
         assert finding.severity == "minor"
         assert finding.file is None
         assert finding.req_refs == []
 
     def test_full_spec(self):
         spec = FindingSpec(
-            principle="Auth",
+            practice_id="Auth",
             file="app.py",
             line=42,
             end_line=50,
@@ -39,7 +39,7 @@ class TestBuildFindingBase:
             scope="src/",
         )
         finding = build_finding_base(spec)
-        assert finding.principle == "Auth"
+        assert finding.practice_id == "Auth"
         assert finding.file == "app.py"
         assert finding.line == 42
         assert finding.end_line == 50
@@ -52,38 +52,38 @@ class TestBuildFindingBase:
         assert finding.scope == "src/"
 
     def test_severity_defaults_minor_when_none(self):
-        spec = FindingSpec(principle="P1", severity=None)
+        spec = FindingSpec(practice_id="P1", severity=None)
         finding = build_finding_base(spec)
         assert finding.severity == "minor"
 
     def test_severity_not_included(self):
-        spec = FindingSpec(principle="P1", severity="critical", include_severity=False)
+        spec = FindingSpec(practice_id="P1", severity="critical", include_severity=False)
         finding = build_finding_base(spec)
         assert finding.severity == "minor"  # include_severity=False forces "minor"
 
     def test_empty_cwe_becomes_none(self):
-        spec = FindingSpec(principle="P1", cwe=0)
+        spec = FindingSpec(practice_id="P1", cwe=0)
         finding = build_finding_base(spec)
         assert finding.cwe is None
 
     def test_empty_req_becomes_none(self):
-        spec = FindingSpec(principle="P1", req="")
+        spec = FindingSpec(practice_id="P1", req="")
         finding = build_finding_base(spec)
         assert finding.req is None
 
     def test_empty_context_becomes_none(self):
-        spec = FindingSpec(principle="P1", context="")
+        spec = FindingSpec(practice_id="P1", context="")
         finding = build_finding_base(spec)
         assert finding.context is None
 
     def test_empty_scope_becomes_none(self):
-        spec = FindingSpec(principle="P1", scope="")
+        spec = FindingSpec(practice_id="P1", scope="")
         finding = build_finding_base(spec)
         assert finding.scope is None
 
     def test_multiple_req_refs(self):
         spec = FindingSpec(
-            principle="P1",
+            practice_id="P1",
             req_refs=[
                 {"label": "A", "url": "https://a.com"},
                 {"label": "B", "url": "https://b.com"},
@@ -94,7 +94,7 @@ class TestBuildFindingBase:
         assert finding.req_refs[1].url == "https://b.com"
 
     def test_req_refs_missing_keys(self):
-        spec = FindingSpec(principle="P1", req_refs=[{}])
+        spec = FindingSpec(practice_id="P1", req_refs=[{}])
         finding = build_finding_base(spec)
         assert finding.req_refs[0].label == ""
         assert finding.req_refs[0].url == ""

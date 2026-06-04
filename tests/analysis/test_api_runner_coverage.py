@@ -1,41 +1,45 @@
-"""Extended tests for _api_runner.py — salvage, enrichment, path resolution."""
+"""Extended tests for _api_runner.py: parse_findings, enrichment, path resolution."""
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-instructor = pytest.importorskip("instructor", reason="requires quodeq[api] extra")
+pytest.importorskip("openai", reason="requires the openai SDK")
+
+import httpx
+import openai
 
 from quodeq.analysis._api_runner import (
     ApiRunnerConfig,
+    _LOCAL_TIMEOUT,
     _build_router_context,
     _call_api,
     _Finding,
-    _Findings,
     _FindingType,
+    _parse_findings,
     _resolve_file_paths,
-    _salvage_partial_findings,
     _Severity,
     run_api_analysis,
 )
 
 
 # ---------------------------------------------------------------------------
-# _salvage_partial_findings
+# _parse_findings
 # ---------------------------------------------------------------------------
 
 class TestSalvagePartialFindings:
     def test_extracts_valid_findings_from_malformed_json(self):
         raw = '{"findings": [{"req":"S-1","t":"violation","file":"a.py","line":1,"severity":"minor","w":"test","snippet":"x = 1","reason":"bad"}, BROKEN'
-        result = _salvage_partial_findings(raw)
+        result, _ = _parse_findings(raw)
         assert len(result) >= 1
         assert result[0]["req"] == "S-1"
 
     def test_returns_empty_for_completely_invalid(self):
-        result = _salvage_partial_findings("totally invalid no json here")
+        result, _ = _parse_findings("totally invalid no json here")
         assert result == []
 
     def test_skips_invalid_objects(self):
@@ -44,7 +48,7 @@ class TestSalvagePartialFindings:
             '{"req":"X-1","t":"violation","file":"a.py","line":1,"severity":"minor","w":"ok","snippet":"x = 1","reason":"r"} '
             '{"not_a_finding": true}'
         )
-        result = _salvage_partial_findings(raw)
+        result, _ = _parse_findings(raw)
         assert len(result) == 1
         assert result[0]["req"] == "X-1"
 
@@ -53,153 +57,230 @@ class TestSalvagePartialFindings:
             '{"req":"A-1","t":"violation","file":"a.py","line":1,"severity":"minor","w":"one","snippet":"x = 1","reason":"r"} '
             '{"req":"B-2","t":"compliance","file":"b.py","line":2,"severity":"major","w":"two","snippet":"y = 2","reason":"r"}'
         )
-        result = _salvage_partial_findings(raw)
+        result, _ = _parse_findings(raw)
         assert len(result) == 2
+
+    def test_handles_finding_with_nested_req_refs(self):
+        """The shallow-regex predecessor silently dropped any finding with a
+        nested object; this was the exact failure pattern reported in a real
+        run where the model emitted ``req_refs: [{"label": "CWE-..."}]``."""
+        raw = (
+            '{"req":"R-MAT-5","t":"violation","file":"a.py","line":1,'
+            '"severity":"minor","w":"nested","snippet":"x = 1","reason":"r",'
+            '"req_refs":[{"label":"CWE-79","url":"https://example.com"}]}'
+        )
+        result, _ = _parse_findings(raw)
+        assert len(result) == 1
+        assert result[0]["req"] == "R-MAT-5"
+
+    def test_handles_bare_findings_concatenated(self):
+        """Reproduces the production failure where the model emitted two
+        bare finding objects back-to-back (no array wrapper, no separator).
+        The JSON parser stops at "trailing characters" after the first."""
+        raw = (
+            '{"req":"R-MAT-5","t":"violation","file":"a.py","line":10,'
+            '"severity":"minor","w":"first","snippet":"foo","reason":"one"}\n'
+            '{"req":"R-FT-1","t":"violation","file":"b.py","line":11,'
+            '"severity":"minor","w":"second","snippet":"bar","reason":"two"}'
+        )
+        result, _ = _parse_findings(raw)
+        assert len(result) == 2
+        assert {r["req"] for r in result} == {"R-MAT-5", "R-FT-1"}
+
+    def test_handles_wrapped_findings_array(self):
+        """If the model returned the canonical {"findings":[...]} but
+        parsing still needed to walk the structure, the parser should
+        recover everything."""
+        raw = (
+            '{"findings":['
+            '{"req":"A-1","t":"violation","file":"a.py","line":1,'
+            '"severity":"minor","w":"one","snippet":"x","reason":"r"},'
+            '{"req":"B-2","t":"compliance","file":"b.py","line":2,'
+            '"severity":"minor","w":"two","snippet":"y","reason":"r"}'
+            ']}'
+        )
+        result, _ = _parse_findings(raw)
+        assert len(result) == 2
+
+    def test_handles_findings_buried_in_error_preamble(self):
+        """The parser must skip non-JSON preamble text and find the JSON
+        object that follows."""
+        raw = (
+            "1 validation error for _Findings\n"
+            "Invalid JSON: trailing characters at line 10 column 4\n"
+            "input_value='"
+            '{"req":"R-MAT-5","t":"violation","file":"a.py","line":3,'
+            '"severity":"minor","w":"ok","snippet":"x","reason":"r"}'
+            "', input_type=str"
+        )
+        result, _ = _parse_findings(raw)
+        assert len(result) == 1
+        assert result[0]["req"] == "R-MAT-5"
+
+    def test_parse_findings_returns_findings_and_drop_count(self):
+        raw = (
+            '{"findings":['
+            '{"req":"A-1","t":"violation","file":"a.py","line":1,'
+            '"severity":"minor","w":"good","snippet":"x","reason":"valid"},'
+            '{"req":"B-2","t":"violation","file":"b.py","line":2,'
+            '"severity":"minor","w":"bad","snippet":"y"}'  # missing reason
+            ']}'
+        )
+        findings, dropped = _parse_findings(raw)
+        assert len(findings) == 1
+        assert findings[0]["req"] == "A-1"
+        assert dropped == 1
+
+    def test_parse_findings_zero_drops_on_clean_input(self):
+        raw = (
+            '{"findings":[{"req":"A-1","t":"violation","file":"a.py","line":1,'
+            '"severity":"minor","w":"w","snippet":"x","reason":"r"}]}'
+        )
+        findings, dropped = _parse_findings(raw)
+        assert len(findings) == 1
+        assert dropped == 0
+
+    def test_parse_findings_container_not_counted_as_drop(self):
+        findings, dropped = _parse_findings('{"findings":[]}')
+        assert findings == []
+        assert dropped == 0
+
+    def test_parse_findings_invalid_finding_counted_once_not_recursed(self):
+        # A req-bearing dict that fails validation and has a nested req-bearing
+        # object must count as exactly ONE drop (we stop, don't recurse in).
+        raw = '{"req":"A-1","t":"violation","extras":{"req":"B-2","t":"violation"}}'
+        findings, dropped = _parse_findings(raw)
+        assert findings == []
+        assert dropped == 1
+
+    def test_parse_findings_recovers_finding_nested_in_container(self):
+        # A container without `req` is recursed, so a valid finding nested
+        # inside it is still recovered.
+        raw = (
+            '{"wrapper":{"findings":[{"req":"A-1","t":"violation","file":"a.py",'
+            '"line":1,"severity":"minor","w":"w","snippet":"x","reason":"r"}]}}'
+        )
+        findings, dropped = _parse_findings(raw)
+        assert len(findings) == 1
+        assert findings[0]["req"] == "A-1"
+        assert dropped == 0
 
 
 # ---------------------------------------------------------------------------
 # _call_api
 # ---------------------------------------------------------------------------
 
+def _mock_response(content: str) -> MagicMock:
+    msg = MagicMock(content=content)
+    choice = MagicMock(message=msg)
+    return MagicMock(choices=[choice])
+
+
+def _local_config() -> ApiRunnerConfig:
+    return ApiRunnerConfig(model="test-model", api_base="http://localhost:11434/v1", api_key="ollama")
+
+
+def _cloud_config() -> ApiRunnerConfig:
+    return ApiRunnerConfig(model="gpt-x", api_base="https://api.openai.com/v1", api_key="sk-x")
+
+
+_GOOD = (
+    '{"req":"A-1","t":"violation","file":"a.py","line":1,'
+    '"severity":"minor","w":"one","snippet":"x = 1","reason":"r"}'
+)
+_GOOD2 = (
+    '{"req":"B-2","t":"compliance","file":"b.py","line":2,'
+    '"severity":"minor","w":"two","snippet":"y = 2","reason":"r"}'
+)
+_BAD_MISSING_REASON = (
+    '{"req":"C-3","t":"violation","file":"c.py","line":3,'
+    '"severity":"minor","w":"bad","snippet":"z"}'
+)
+
+
 class TestCallApi:
-    def test_passes_context_size_as_num_ctx(self):
-        config = ApiRunnerConfig(
-            model="llama3.1", api_base="http://localhost:11434/v1",
-            context_size=8192,
-        )
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = _Findings(findings=[])
+    def _run(self, content=None, side_effect=None, config=None):
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            client = MagicMock()
+            if side_effect is not None:
+                client.chat.completions.create.side_effect = side_effect
+            else:
+                client.chat.completions.create.return_value = _mock_response(content)
+            mock_oa.return_value.__enter__.return_value = client
+            findings, lossy = _call_api("prompt", config or _local_config())
+            return findings, lossy, mock_oa, client
 
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst, \
-             patch("quodeq.analysis._api_runner.openai"):
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-            _call_api("test", config)
+    def test_clean_wrapped_array(self):
+        findings, lossy, *_ = self._run(f'{{"findings":[{_GOOD},{_GOOD2}]}}')
+        assert len(findings) == 2
+        assert lossy is False
 
-        kwargs = mock_client.chat.completions.create.call_args.kwargs
-        assert kwargs["extra_body"]["num_ctx"] == 8192
-
-    def test_no_num_ctx_when_zero(self):
-        config = ApiRunnerConfig(
-            model="llama3.1", api_base="http://localhost:11434/v1",
-            context_size=0,
-        )
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = _Findings(findings=[])
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst, \
-             patch("quodeq.analysis._api_runner.openai"):
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-            _call_api("test", config)
-
-        kwargs = mock_client.chat.completions.create.call_args.kwargs
-        assert "num_ctx" not in kwargs["extra_body"]
-
-    def test_includes_max_tokens_when_set(self):
-        config = ApiRunnerConfig(
-            model="llama3.1", api_base="http://localhost:11434/v1",
-            max_tokens=4096,
-        )
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = _Findings(findings=[])
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst, \
-             patch("quodeq.analysis._api_runner.openai"):
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-            _call_api("test", config)
-
-        kwargs = mock_client.chat.completions.create.call_args.kwargs
-        assert kwargs["max_tokens"] == 4096
-
-    def test_no_max_tokens_when_none(self):
-        config = ApiRunnerConfig(
-            model="llama3.1", api_base="http://localhost:11434/v1",
-        )
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = _Findings(findings=[])
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst, \
-             patch("quodeq.analysis._api_runner.openai"):
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-            _call_api("test", config)
-
-        kwargs = mock_client.chat.completions.create.call_args.kwargs
-        assert "max_tokens" not in kwargs
-
-    def test_uses_ollama_as_default_key(self):
-        config = ApiRunnerConfig(
-            model="llama3.1", api_base="http://localhost:11434/v1",
-            api_key="",
-        )
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = _Findings(findings=[])
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst, \
-             patch("quodeq.analysis._api_runner.openai") as mock_openai:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-            _call_api("test", config)
-
-        mock_openai.OpenAI.assert_called_once_with(
-            base_url="http://localhost:11434/v1",
-            api_key="ollama",
-        )
-
-    def test_returns_clean_flag_on_success(self):
-        config = ApiRunnerConfig(
-            model="llama3.1", api_base="http://localhost:11434/v1",
-        )
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = _Findings(findings=[
-            _Finding(req="X-1", t=_FindingType.violation, file="a.py", line=1,
-                     severity=_Severity.minor, w="x", snippet="code", reason="r"),
-        ])
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst, \
-             patch("quodeq.analysis._api_runner.openai"):
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-            findings, salvaged = _call_api("test", config)
-
+    def test_one_bad_finding_drops_only_itself(self):
+        findings, lossy, *_ = self._run(f'{{"findings":[{_GOOD},{_BAD_MISSING_REASON}]}}')
         assert len(findings) == 1
-        assert salvaged is False
+        assert findings[0]["req"] == "A-1"
+        assert lossy is False
 
-    def test_salvages_on_exception(self):
-        config = ApiRunnerConfig(
-            model="llama3.1", api_base="http://localhost:11434/v1",
-        )
-        mock_client = MagicMock()
-        # Simulate instructor validation failure with valid JSON in the error message
-        error_msg = 'Validation failed: {"req":"X-1","t":"violation","file":"a.py","line":1,"severity":"minor","w":"test","snippet":"x = 1","reason":"bad"}'
-        mock_client.chat.completions.create.side_effect = Exception(error_msg)
+    def test_bare_concatenated_findings(self):
+        findings, lossy, *_ = self._run(f'{_GOOD}\n{_GOOD2}')
+        assert {f["req"] for f in findings} == {"A-1", "B-2"}
+        assert lossy is False
 
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst, \
-             patch("quodeq.analysis._api_runner.openai"):
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-            findings, salvaged = _call_api("test", config)
-
-        assert len(findings) >= 1
-        assert salvaged is True
-
-    def test_returns_empty_on_unsalvageable_error(self):
-        config = ApiRunnerConfig(
-            model="llama3.1", api_base="http://localhost:11434/v1",
-        )
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.side_effect = Exception("Connection refused")
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst, \
-             patch("quodeq.analysis._api_runner.openai"):
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-            findings, salvaged = _call_api("test", config)
-
+    def test_garbled_response_not_lossy(self):
+        findings, lossy, *_ = self._run("I cannot evaluate this code.")
         assert findings == []
-        assert salvaged is True
+        assert lossy is False
+
+    def test_network_error_is_lossy(self):
+        findings, lossy, *_ = self._run(side_effect=httpx.ReadTimeout("upstream"))
+        assert findings == []
+        assert lossy is True
+
+    def test_cloud_sets_json_object_response_format(self):
+        _, _, _, client = self._run(f'{{"findings":[{_GOOD}]}}', config=_cloud_config())
+        kwargs = client.chat.completions.create.call_args.kwargs
+        assert kwargs["response_format"] == {"type": "json_object"}
+
+    def test_local_omits_json_object_response_format(self):
+        _, _, _, client = self._run(f'{{"findings":[{_GOOD}]}}', config=_local_config())
+        kwargs = client.chat.completions.create.call_args.kwargs
+        assert "response_format" not in kwargs
+
+    def test_dropped_findings_logged_with_count(self, caplog):
+        # The quodeq logger has propagate=False, so caplog (which adds a handler
+        # to the root logger) won't see its records. Re-enable propagation
+        # temporarily so pytest's caplog handler receives the messages.
+        quodeq_logger = logging.getLogger("quodeq")
+        orig_propagate = quodeq_logger.propagate
+        quodeq_logger.propagate = True
+        try:
+            with caplog.at_level(logging.WARNING, logger="quodeq.analysis._api_runner"):
+                findings, lossy, *_ = self._run(
+                    f'{{"findings":[{_GOOD},{_BAD_MISSING_REASON},{_BAD_MISSING_REASON}]}}'
+                )
+        finally:
+            quodeq_logger.propagate = orig_propagate
+        assert len(findings) == 1
+        assert lossy is False
+        assert any("dropped 2" in r.message for r in caplog.records)
+
+    def test_connection_error_is_lossy_with_generic_message(self, caplog):
+        import openai as _openai
+        exc = _openai.APIConnectionError(request=httpx.Request("POST", "http://localhost:11434/v1"))
+        with caplog.at_level(logging.WARNING, logger="quodeq.analysis._api_runner"):
+            # quodeq logger has propagate=False; flip it so caplog sees the record.
+            qlog = logging.getLogger("quodeq")
+            orig = qlog.propagate
+            qlog.propagate = True
+            try:
+                findings, lossy, *_ = self._run(side_effect=exc)
+            finally:
+                qlog.propagate = orig
+        assert findings == []
+        assert lossy is True
+        msgs = " ".join(r.message for r in caplog.records)
+        assert "timed out" not in msgs
+        assert "call failed" in msgs
 
 
 # ---------------------------------------------------------------------------
@@ -266,23 +347,23 @@ class TestRunApiAnalysisAppend:
         jsonl.write_text('{"req":"existing","t":"violation"}\n')
 
         config = ApiRunnerConfig(model="m", api_base="http://localhost/v1")
-        findings = _Findings(findings=[
-            _Finding(req="NEW-1", t=_FindingType.violation, file="a.py", line=1, w="new", snippet="x = 1", reason="placeholder"),
-        ])
+        content = json.dumps({"findings": [
+            {"req": "NEW-1", "t": "violation", "file": "a.py", "line": 1,
+             "w": "new", "snippet": "x = 1", "reason": "placeholder", "severity": "minor"},
+        ]})
+        raw_client = MagicMock()
+        msg = MagicMock(content=content)
+        raw_client.chat.completions.create.return_value = MagicMock(choices=[MagicMock(message=msg)])
 
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = findings
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst, \
-             patch("quodeq.analysis._api_runner.openai"):
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(prompt="test", jsonl_file=jsonl, config=config)
 
-        lines = jsonl.read_text().strip().split("\n")
-        assert len(lines) == 2
-        assert json.loads(lines[0])["req"] == "existing"
-        assert json.loads(lines[1])["req"] == "NEW-1"
+        lines = [ln for ln in jsonl.read_text().strip().split("\n") if ln]
+        finding_lines = [json.loads(ln) for ln in lines if "_marker" not in ln]
+        assert len(finding_lines) == 2
+        assert finding_lines[0]["req"] == "existing"
+        assert finding_lines[1]["req"] == "NEW-1"
 
     def test_router_context_built_when_compiled_dir_provided(self, tmp_path):
         """When a compiled dir is passed, the API runner builds a router
@@ -290,19 +371,18 @@ class TestRunApiAnalysisAppend:
         default context (no enrichment) but still writes findings + markers."""
         jsonl = tmp_path / "evidence.jsonl"
         config = ApiRunnerConfig(model="m", api_base="http://localhost/v1")
-        findings = _Findings(findings=[
-            _Finding(req="X-1", t=_FindingType.violation, file="a.py", line=1, w="test", snippet="x = 1", reason="placeholder"),
-        ])
+        content = json.dumps({"findings": [
+            {"req": "X-1", "t": "violation", "file": "a.py", "line": 1,
+             "w": "test", "snippet": "x = 1", "reason": "placeholder", "severity": "minor"},
+        ]})
+        raw_client = MagicMock()
+        msg = MagicMock(content=content)
+        raw_client.chat.completions.create.return_value = MagicMock(choices=[MagicMock(message=msg)])
 
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = findings
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst, \
-             patch("quodeq.analysis._api_runner.openai"), \
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa, \
              patch("quodeq.analysis._api_runner._build_router_context",
                    return_value=None) as mock_ctx:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 prompt="test", jsonl_file=jsonl, config=config,
                 compiled_dir=tmp_path, dimension="security",

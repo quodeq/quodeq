@@ -25,7 +25,7 @@ def empty_severity_buckets() -> dict[str, list]:
 def build_finding(item: dict, *, include_severity: bool) -> Finding:
     """Build a normalized finding from a violation or compliance item."""
     return build_finding_base(FindingSpec(
-        principle=item.get("principle"),
+        practice_id=item.get("principle"),
         file=item.get("file"),
         line=item.get("line"),
         end_line=item.get("end_line"),
@@ -61,6 +61,13 @@ def parse_report_json(json_path: Path) -> dict[str, Any] | None:
         "dimension": data.get("dimension"),
         "overallScore": data.get("overallScore"),
         "overallGrade": data.get("overallGrade"),
+        # filesRead / sourceFileCount: surface evidence coverage so the
+        # dashboard can render a "Partial" badge when a run was deadline-
+        # truncated. Pre-Phase-1 reports lack filesRead; the UI treats
+        # missing values as "no coverage signal" and skips the badge.
+        "filesRead": data.get("filesRead"),
+        "sourceFileCount": data.get("sourceFileCount"),
+        "exitReason": data.get("exitReason"),
         "principles": [
             {"name": p.get("name"), "score": p.get("score"), "grade": p.get("grade")}
             for p in data.get("principles", [])

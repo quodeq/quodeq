@@ -1,0 +1,128 @@
+name: Wheel smoke test
+
+# Builds the wheel, asserts it's under the size budget, and verifies the
+# production maybe_build_ui codepath works without npm on PATH. Also builds the
+# sdist and asserts it excludes node_modules and stays small. Catches
+# regressions in the "ship pre-built UI in wheel" architecture before
+# they reach PyPI.
+#
+# Scoped via paths to PRs that actually touch the wheel-relevant surface.
+# Always runs on push to develop/main as a final gate.
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'src/quodeq/ui/**'
+      - 'src/quodeq/dashboard/_build*.py'
+      - 'src/quodeq/shared/prereqs.py'
+      - 'pyproject.toml'
+      - 'tools/build-dist.sh'
+      - 'tools/build.sh'
+      - '.github/workflows/wheel-smoke.yml'
+  push:
+    branches: [develop, main]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Build UI
+        working-directory: src/quodeq/ui
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build wheel
+        run: uv build --wheel
+
+      # 5 MB ceiling: current wheel is ~2 MB. This catches catastrophic
+      # regressions (e.g., accidentally bundling node_modules, which would
+      # be ~250 MB) without false-alarming on natural UI growth.
+      - name: Assert wheel size under 5 MB
+        run: |
+          wheel=$(ls dist/quodeq-*.whl)
+          size=$(stat -c%s "$wheel")
+          max=5242880
+          echo "Wheel: $wheel"
+          echo "Size:  $size bytes (budget: $max bytes / 5 MB)"
+          if [ "$size" -gt "$max" ]; then
+            echo "::error::Wheel exceeds 5 MB budget. Did node_modules get bundled?"
+            exit 1
+          fi
+
+      - name: Confirm wheel contains pre-built UI static
+        run: |
+          wheel=$(ls dist/quodeq-*.whl)
+          if ! unzip -l "$wheel" | grep -q "quodeq/static/index.html"; then
+            echo "::error::Wheel is missing quodeq/static/index.html"
+            unzip -l "$wheel" | head -40
+            exit 1
+          fi
+          echo "OK: index.html present in wheel"
+
+      - name: Build sdist
+        run: uv build --sdist
+
+      # node_modules (~28 MB / 11k files, reproducible from package-lock.json)
+      # must never reach the source tarball. source-exclude in pyproject keeps
+      # it out; this asserts it stays out and the sdist stays small. npm ci ran
+      # above, so node_modules is present and a missing exclude would be caught.
+      - name: Assert sdist excludes node_modules and is under 5 MB
+        run: |
+          sdist=$(ls dist/quodeq-*.tar.gz)
+          echo "sdist: $sdist"
+          if tar tzf "$sdist" | grep -q "node_modules"; then
+            echo "::error::sdist bundles node_modules. Check source-exclude in pyproject.toml."
+            tar tzf "$sdist" | grep "node_modules" | head
+            exit 1
+          fi
+          size=$(stat -c%s "$sdist")
+          max=5242880
+          echo "Size: $size bytes (budget: $max bytes / 5 MB)"
+          if [ "$size" -gt "$max" ]; then
+            echo "::error::sdist exceeds 5 MB budget. Did a large directory get included?"
+            exit 1
+          fi
+          echo "OK: sdist clean and under budget"
+
+      - name: Install wheel in clean venv
+        run: |
+          python3 -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --quiet dist/quodeq-*.whl
+
+      # The real regression test: in a PATH that does NOT contain npm,
+      # call maybe_build_ui in production mode and verify it returns the
+      # bundled static dir. run_npm_build is replaced with a trap that
+      # raises — if production ever falls back to npm, this fails loud.
+      - name: Production maybe_build_ui works without npm
+        run: |
+          env -i HOME="$HOME" PATH="/tmp/smoke/bin:/usr/bin:/bin" /tmp/smoke/bin/python <<'PY'
+          from pathlib import Path
+          import quodeq.dashboard._build as build_mod
+          from quodeq.dashboard._build import maybe_build_ui
+
+          def trap(*args, **kwargs):
+              raise RuntimeError("REGRESSION: production codepath invoked npm")
+
+          build_mod.run_npm_build = trap
+
+          result = maybe_build_ui(no_build=False, reinstall=False)
+          assert isinstance(result, Path), f"Expected Path, got {type(result)}"
+          assert (result / "index.html").exists(), f"No index.html in {result}"
+          print(f"OK: maybe_build_ui returned {result} without invoking npm")
+          PY

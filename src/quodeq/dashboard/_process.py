@@ -41,7 +41,7 @@ def _kill_stale_action_api(host: str, port: int) -> None:
     pid_file = _get_pid_file()
     if pid_file.exists():
         try:
-            pid = int(pid_file.read_text().strip())
+            pid = int(pid_file.read_text(encoding="utf-8").strip())
             _terminate_pid(pid)
         except (ValueError, OSError) as exc:
             log_debug(f"Could not kill stale action API (pid file): {exc}")

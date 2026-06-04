@@ -9,7 +9,8 @@ import pytest
 from flask import Flask
 
 from quodeq.api._run_events_routes import register_run_events_routes
-from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
+from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+from quodeq.core.events.writer import EventLogWriter
 
 
 @pytest.fixture
@@ -20,9 +21,17 @@ def app(tmp_path: Path) -> Flask:
     run_dir.mkdir()
     provider.get_log_run_dir = lambda job_id: run_dir if job_id == "job-1" else None
     app.config["_provider"] = provider
-    app.config["_run_dir"] = run_dir  # for tests to use
+    app.config["_run_dir"] = run_dir
     register_run_events_routes(app)
     return app
+
+
+def _write_finding(event_log: EventLogWriter, p: str, line: int = 1) -> None:
+    payload = JudgmentPayload(
+        practice_id=p, verdict="violation", dimension="dim",
+        file="x.py", line=line, reason="r", severity="medium", snippet="s", title="t",
+    )
+    event_log.emit(JudgmentCreatedEvent(payload=payload))
 
 
 def test_route_returns_404_for_unknown_job(app: Flask):
@@ -43,7 +52,7 @@ def test_route_returns_text_event_stream(app: Flask):
 
 def test_route_emits_status_event_for_running_run(app: Flask):
     import os
-    os.environ["QUODEQ_SSE_TICK_MS"] = "0"  # drain immediately
+    os.environ["QUODEQ_SSE_TICK_MS"] = "0"
     run_dir: Path = app.config["_run_dir"]
     (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
     client = app.test_client()
@@ -58,16 +67,26 @@ def test_route_honors_last_event_id_header(app: Flask):
     os.environ["QUODEQ_SSE_TICK_MS"] = "0"
     run_dir: Path = app.config["_run_dir"]
     (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
-    repo = SqliteFindingsRepository(run_dir)
-    repo.insert_finding({"p": "P1", "file": "x.py", "line": 1, "t": "violation",
-                         "severity": "medium", "d": "dim", "reason": "r",
-                         "snippet": "s", "w": "t"})
-    repo.insert_finding({"p": "P2", "file": "x.py", "line": 2, "t": "violation",
-                         "severity": "medium", "d": "dim", "reason": "r",
-                         "snippet": "s", "w": "t"})
+
+    event_log = EventLogWriter(run_dir / "events.jsonl")
+    _write_finding(event_log, "P1", line=1)
+    _write_finding(event_log, "P2", line=2)
+
+    # First request: get all findings and capture the timestamp of finding #1
     client = app.test_client()
-    resp = client.get("/api/evaluations/job-1/events", headers={"Last-Event-ID": "1"})
+    resp0 = client.get("/api/evaluations/job-1/events")
+    body0 = resp0.get_data(as_text=True)
+    finding_blocks = [b for b in body0.split("\n\n") if "event: finding" in b]
+    assert len(finding_blocks) == 2
+    # Extract the SSE id: line (ISO timestamp) from finding #1's block
+    ts_of_first = next(
+        line[len("id: "):] for line in finding_blocks[0].splitlines() if line.startswith("id: ")
+    )
+
+    # Reconnect after finding #1's timestamp → should get only finding #2
+    resp = client.get("/api/evaluations/job-1/events", headers={"Last-Event-ID": ts_of_first})
     body = resp.get_data(as_text=True)
-    finding_lines = [line for line in body.split("\n\n") if "event: finding" in line]
+    finding_lines = [b for b in body.split("\n\n") if "event: finding" in b]
     assert len(finding_lines) == 1
-    assert "id: 2" in finding_lines[0]
+    data = json.loads(next(l for l in finding_lines[0].splitlines() if l.startswith("data: "))[6:])
+    assert data["practice_id"] == "P2"

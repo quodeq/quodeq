@@ -1,11 +1,11 @@
 """SSE watcher and event serializers for /api/evaluations/<jobId>/events.
 
 Producers (lifecycle context, scoring engine, FindingsRouter) write durable
-artifacts (status.json, evaluation/<dim>.json, evaluation.db). This module
+artifacts (status.json, evaluation/<dim>.json, events.jsonl). This module
 observes those artifacts on a 250 ms tick and emits SSE events to subscribers.
 
-No producer changes. No in-memory event log. No cross-stream state.
-Reconnect via Last-Event-ID is supported by SQLite's autoincrement findings.id.
+Reconnect via Last-Event-ID is supported by ISO 8601 timestamps stored in
+events.jsonl (the run event log written by EventLogWriter / FindingsRouter).
 """
 from __future__ import annotations
 
@@ -13,17 +13,16 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from quodeq.data.sqlite.connection import EVALUATION_DB_FILENAME
-
 _DEFAULT_FINDINGS_BATCH = 500
-"""Per-tick cap on findings pulled from SQLite for the SSE stream.
+"""Per-tick cap on findings pulled from the event log for the SSE stream.
 
-Bounds the initial-snapshot burst (and any post-disconnect catch-up) so a run
-with tens of thousands of findings cannot OOM the API process. Subsequent
-ticks resume from the highest id returned via the SSE Last-Event-ID mechanism.
+Bounds the initial-snapshot burst so a run with tens of thousands of findings
+cannot OOM the API process. Subsequent ticks resume from the last event
+timestamp via the SSE Last-Event-ID mechanism.
 """
 
 
@@ -67,10 +66,17 @@ def serialize_finding_event(judgment_dict: dict[str, Any]) -> str:
 class WatcherState:
     """Mutable per-stream state. Tracks what has been emitted to one client.
 
-    last_event_id advances only on `event: finding` (matches SSE Last-Event-ID
-    semantics — status and dimension events are idempotent on reconnect).
+    last_event_ts is the ISO 8601 timestamp cursor for resuming from events.jsonl
+    on reconnect (via Last-Event-ID). last_event_counter is a sequential integer
+    used as finding `id` in the payload for client backward-compatibility.
+
+    Grade updates intentionally do NOT live on the SSE stream — mutations
+    (dismiss / restore / delete) return the rescored payload synchronously
+    from their HTTP response. SSE is reserved for in-progress eval tracking:
+    new findings, dimension completions, status transitions, terminal done.
     """
-    last_event_id: int = 0
+    last_event_ts: datetime | None = None
+    last_event_counter: int = 0
     last_status_mtime: float | None = None
     emitted_dimensions: frozenset[str] = field(default_factory=frozenset)
 
@@ -79,8 +85,8 @@ _logger = logging.getLogger(__name__)
 
 _DIM_FILENAME_SUFFIX = ".json"
 
-EventTuple = tuple[str, str, int | None]
-"""(event_type, payload, optional_event_id) — event_id is None for non-finding events."""
+EventTuple = tuple[str, str, str | None]
+"""(event_type, payload, optional_event_id) — event_id is ISO timestamp for findings, None for others."""
 
 
 _STATUS_MTIME_MISSING: float = 0.0
@@ -100,7 +106,7 @@ def _read_status(run_dir: Path) -> tuple[dict[str, Any], float]:
     except OSError:
         return {"state": "pending"}, _STATUS_MTIME_MISSING
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             return {"state": "pending"}, mtime
         return data, mtime
@@ -131,64 +137,62 @@ def _read_dim_eval(run_dir: Path, dimension: str) -> dict[str, Any] | None:
     """
     path = run_dir / "evaluation" / f"{dimension}{_DIM_FILENAME_SUFFIX}"
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else None
     except (OSError, ValueError) as exc:
         _logger.warning("dimension eval read failed at %s: %s", path, exc)
         return None
 
 
-def _judgment_as_dict(judgment: Any, finding_id: int) -> dict[str, Any]:
-    """Project a Judgment dataclass into a JSON-friendly dict for SSE."""
+def _payload_as_sse_finding(payload: Any, finding_id: int) -> dict[str, Any]:
+    """Project a Judgment into the finding dict the SSE client expects."""
     return {
         "id": finding_id,
-        "practice_id": judgment.practice_id,
-        "dimension": judgment.dimension,
-        "requirement": judgment.req,
-        "verdict": judgment.verdict,
-        "severity": judgment.severity,
-        "file": judgment.file,
-        "line": judgment.line,
-        "end_line": judgment.end_line,
-        "title": judgment.title,
-        "reason": judgment.reason,
-        "snippet": judgment.snippet,
-        "confidence": getattr(judgment, "confidence", 100),
+        "practice_id": payload.practice_id,
+        "dimension": payload.dimension,
+        "requirement": getattr(payload, "req", None),
+        "verdict": payload.verdict,
+        "severity": payload.severity,
+        "file": payload.file,
+        "line": payload.line,
+        "end_line": payload.end_line,
+        "title": payload.title,
+        "reason": payload.reason,
+        "snippet": payload.snippet,
+        "confidence": payload.confidence,
     }
 
 
-def _read_new_findings(
-    run_dir: Path, last_event_id: int,
-) -> list[tuple[int, dict[str, Any]]]:
-    """Return (id, judgment_dict) pairs for findings whose id > last_event_id.
+def _read_new_findings_from_events(
+    run_dir: Path,
+    last_event_ts: datetime | None,
+    counter_start: int,
+) -> list[tuple[datetime, int, dict[str, Any]]]:
+    """Return (event_ts, counter, finding_dict) triples for new JUDGMENT_CREATED events.
 
-    Caps the result at ``_findings_batch_size()`` rows per call. Subsequent
-    ticks pick up the remainder via the highest id returned.
+    Reads from run_dir/events.jsonl via EventLogReader.stream(since_timestamp).
+    Caps at _findings_batch_size() results per call so a large initial snapshot
+    cannot OOM the API process. Subsequent ticks resume via last_event_ts.
     """
-    db_path = run_dir / EVALUATION_DB_FILENAME
-    if not db_path.is_file():
+    events_log = run_dir / "events.jsonl"
+    if not events_log.is_file():
         return []
     try:
-        from quodeq.data.sqlite.connection import open_evaluation_db  # noqa: PLC0415
-        from quodeq.data.sqlite._row_mappers import row_to_judgment  # noqa: PLC0415
-        results: list[tuple[int, dict[str, Any]]] = []
-        with open_evaluation_db(run_dir) as conn:
-            cur = conn.execute(
-                "SELECT id, practice_id, dimension, requirement, verdict, severity, "
-                "file, line, end_line, title, reason, snippet, "
-                "violation_type, context, scope, req_refs_json, confidence "
-                "FROM findings WHERE id > ? ORDER BY id LIMIT ?",
-                (last_event_id, _findings_batch_size()),
-            )
-            cols = [c[0] for c in cur.description]
-            for row in cur.fetchall():
-                row_dict = dict(zip(cols, row))
-                finding_id = row_dict["id"]
-                judgment = row_to_judgment(row_dict)
-                results.append((finding_id, _judgment_as_dict(judgment, finding_id)))
+        from quodeq.core.events.reader import EventLogReader  # noqa: PLC0415
+        from quodeq.core.events.models import EventType  # noqa: PLC0415
+        results: list[tuple[datetime, int, dict[str, Any]]] = []
+        counter = counter_start
+        batch_limit = _findings_batch_size()
+        for event in EventLogReader(events_log).stream(since_timestamp=last_event_ts):
+            if event.event_type != EventType.JUDGMENT_CREATED:
+                continue
+            counter += 1
+            results.append((event.timestamp, counter, _payload_as_sse_finding(event.payload, counter)))
+            if len(results) >= batch_limit:
+                break
         return results
     except Exception as exc:  # noqa: BLE001 — never crash the stream on read errors
-        _logger.warning("findings query failed for %s: %s", run_dir, exc)
+        _logger.warning("events.jsonl read failed for %s: %s", run_dir, exc)
         return []
 
 
@@ -217,14 +221,26 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
         ), None))
 
     # --- Findings ---
-    new_findings = _read_new_findings(run_dir, state.last_event_id)
-    new_last_id = state.last_event_id
-    for finding_id, judgment_dict in new_findings:
-        events.append(("finding", serialize_finding_event(judgment_dict), finding_id))
-        new_last_id = max(new_last_id, finding_id)
+    new_findings = _read_new_findings_from_events(
+        run_dir, state.last_event_ts, state.last_event_counter,
+    )
+    new_last_ts = state.last_event_ts
+    new_counter = state.last_event_counter
+    for event_ts, counter, judgment_dict in new_findings:
+        events.append(("finding", serialize_finding_event(judgment_dict), event_ts.isoformat()))
+        new_last_ts = event_ts
+        new_counter = counter
 
+    # NOTE: scores.updated used to be emitted here on every tick by reading
+    # dimension_scores / principle_grades and fingerprinting them. That whole
+    # design ate four PRs (#525-#528) of bugs — fingerprint blind spots,
+    # 1-second SQLite timestamps, terminal-status closure, principle-id
+    # mismatches. The pipeline is now mutation-driven: ``POST /api/findings/*``
+    # returns the rescored payload synchronously. SSE only carries lifecycle
+    # events for in-progress evals (status, finding, dimension-completed, done).
     new_state = WatcherState(
-        last_event_id=new_last_id,
+        last_event_ts=new_last_ts,
+        last_event_counter=new_counter,
         last_status_mtime=status_mtime,
         emitted_dimensions=frozenset(state.emitted_dimensions | set(new_dims)),
     )
@@ -237,8 +253,17 @@ from typing import Iterator
 
 from quodeq.api._sse_log_helpers import sse_line
 
-_TICK_MS = int(os.environ.get("QUODEQ_SSE_TICK_MS", "250"))
 _HEARTBEAT_S = float(os.environ.get("QUODEQ_SSE_HEARTBEAT_S", "15"))
+
+
+def _tick_ms() -> int:
+    """Read tick interval at call time so tests can set QUODEQ_SSE_TICK_MS=0
+    to force a single-tick drain. Reading at module import time made the env
+    var a no-op for tests that set it inside the test body."""
+    try:
+        return int(os.environ.get("QUODEQ_SSE_TICK_MS", "250"))
+    except ValueError:
+        return 250
 _TERMINAL_STATES = frozenset({"done", "failed", "cancelled"})
 
 
@@ -257,7 +282,7 @@ def _is_terminal(status_payload: str) -> tuple[bool, str]:
 def run_events_generator(
     run_dir: Path,
     *,
-    last_event_id: int = 0,
+    last_event_ts: datetime | None = None,
     tick_seconds: float | None = None,
     heartbeat_seconds: float | None = None,
 ) -> Iterator[str]:
@@ -268,13 +293,13 @@ def run_events_generator(
     heartbeat_seconds overrides the 15s :keepalive interval for tests.
 
     The try/finally is defensive: today no per-stream resources persist
-    between ticks (every helper opens and closes its own DB / file handle),
+    between ticks (every helper opens and closes its own file handle),
     so cleanup is a no-op. The block exists so a future change that adds
     a longer-lived resource has a place to release it.
     """
-    sleep_s = tick_seconds if tick_seconds is not None else (_TICK_MS / 1000.0)
+    sleep_s = tick_seconds if tick_seconds is not None else (_tick_ms() / 1000.0)
     heartbeat_s = heartbeat_seconds if heartbeat_seconds is not None else _HEARTBEAT_S
-    state = WatcherState(last_event_id=last_event_id)
+    state = WatcherState(last_event_ts=last_event_ts)
     last_emit_at = time.monotonic()
     yield ":keepalive\n\n"
 
@@ -290,6 +315,9 @@ def run_events_generator(
                     if done:
                         terminal_state = terminal
 
+            # Terminal status closes the stream. Score updates no longer flow
+            # through SSE — they ride on dismiss/restore HTTP responses — so
+            # there is nothing left to deliver after the eval finishes.
             if terminal_state:
                 yield sse_line(
                     json.dumps({"state": terminal_state}, separators=(",", ":")),

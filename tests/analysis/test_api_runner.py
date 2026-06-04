@@ -1,31 +1,52 @@
-"""Tests for the Instructor-based API runner."""
+"""Tests for the API runner."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
-instructor = pytest.importorskip("instructor", reason="requires quodeq[api] extra")
+pytest.importorskip("openai", reason="requires the openai SDK")
 
 from quodeq.analysis._api_runner import (
     run_api_analysis, ApiRunnerConfig,
-    _Finding, _Findings, _FindingType, _Severity,
+    _call_api, _parse_findings, _Finding, _FindingType, _Severity, _LOCAL_TIMEOUT,
 )
 
 
-def _make_findings(*findings_data):
-    """Build a _Findings model from (req, t, file, line, severity, w) tuples."""
+def _mock_raw_client_finish(content: str, finish_reason: str) -> MagicMock:
+    """Mock client whose single choice carries an explicit finish_reason."""
+    msg = MagicMock(content=content)
+    choice = MagicMock(message=msg, finish_reason=finish_reason)
+    response = MagicMock(choices=[choice])
+    client = MagicMock()
+    client.chat.completions.create.return_value = response
+    return client
+
+
+def _make_findings_json(*findings_data) -> str:
+    """Build a JSON string of findings from (req, t, file, line, severity, w) tuples."""
     findings = []
     for req, t, file, line, severity, w in findings_data:
-        findings.append(_Finding(
-            req=req, t=_FindingType(t), file=file, line=line,
-            severity=_Severity(severity), w=w,
-            snippet=f"line for {req}",
-            reason=f"Test reason for {req}",
-        ))
-    return _Findings(findings=findings)
+        findings.append({
+            "req": req, "t": t, "file": file, "line": line,
+            "severity": severity, "w": w,
+            "snippet": f"line for {req}",
+            "reason": f"Test reason for {req}",
+        })
+    return json.dumps({"findings": findings})
+
+
+def _mock_raw_client(content: str) -> MagicMock:
+    """Build a mock that mimics the raw OpenAI client context manager returning a response."""
+    msg = MagicMock(content=content)
+    choice = MagicMock(message=msg)
+    response = MagicMock(choices=[choice])
+    client = MagicMock()
+    client.chat.completions.create.return_value = response
+    return client
 
 
 @pytest.fixture()
@@ -38,76 +59,64 @@ def api_config():
 
 
 class TestRunApiAnalysis:
-    """run_api_analysis calls LLM via Instructor and writes JSONL evidence."""
+    """run_api_analysis calls LLM via raw OpenAI client and writes JSONL evidence."""
 
     def test_writes_jsonl_findings(self, tmp_path, api_config):
         jsonl_file = tmp_path / "evidence.jsonl"
-        findings = _make_findings(
+        content = _make_findings_json(
             ("M-MOD-1", "violation", "main.py", 5, "major", "Multiple responsibilities"),
             ("S-CON-3", "compliance", "utils.py", 1, "minor", "No hardcoded secrets"),
         )
+        raw_client = _mock_raw_client(content)
 
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = findings
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(prompt="test prompt", jsonl_file=jsonl_file, config=api_config)
 
         assert jsonl_file.exists()
-        lines = jsonl_file.read_text().strip().split("\n")
-        assert len(lines) == 2
-        assert json.loads(lines[0])["req"] == "M-MOD-1"
-        assert json.loads(lines[0])["t"] == "violation"
-        assert json.loads(lines[1])["req"] == "S-CON-3"
+        lines = [ln for ln in jsonl_file.read_text().strip().split("\n") if ln]
+        finding_lines = [json.loads(ln) for ln in lines if "_marker" not in ln]
+        assert len(finding_lines) == 2
+        assert finding_lines[0]["req"] == "M-MOD-1"
+        assert finding_lines[0]["t"] == "violation"
+        assert finding_lines[1]["req"] == "S-CON-3"
 
     def test_passes_model_and_base_url(self, tmp_path, api_config):
         jsonl_file = tmp_path / "evidence.jsonl"
-        findings = _make_findings(("X-1", "violation", "a.py", 1, "minor", "test"))
+        raw_client = _mock_raw_client('{"findings":[]}')
 
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = findings
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst, \
-             patch("quodeq.analysis._api_runner.openai") as mock_openai:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(prompt="test prompt", jsonl_file=jsonl_file, config=api_config)
 
-            mock_openai.OpenAI.assert_called_once_with(
+            mock_oa.assert_called_once_with(
                 base_url="http://localhost:8000/v1",
                 api_key="test-key",
+                timeout=_LOCAL_TIMEOUT,
+                max_retries=0,
             )
 
     def test_handles_empty_findings(self, tmp_path, api_config):
         jsonl_file = tmp_path / "evidence.jsonl"
+        raw_client = _mock_raw_client('{"findings":[]}')
 
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = _Findings(findings=[])
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(prompt="test prompt", jsonl_file=jsonl_file, config=api_config)
 
         assert jsonl_file.exists()
-        assert jsonl_file.read_text().strip() == ""
+        # Only markers (if any), no findings
+        lines = [json.loads(ln) for ln in jsonl_file.read_text().splitlines() if ln.strip()]
+        findings_only = [ln for ln in lines if "_marker" not in ln]
+        assert findings_only == []
 
     def test_resolves_short_filenames(self, tmp_path, api_config):
         jsonl_file = tmp_path / "evidence.jsonl"
-        findings = _make_findings(("X-1", "violation", "app.py", 1, "minor", "test"))
+        content = _make_findings_json(("X-1", "violation", "app.py", 1, "minor", "test"))
+        raw_client = _mock_raw_client(content)
 
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = findings
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 prompt="test", jsonl_file=jsonl_file, config=api_config,
                 source_file_paths=["src/myproject/app.py"],
@@ -118,29 +127,86 @@ class TestRunApiAnalysis:
         assert len(findings) == 1
         assert findings[0]["file"] == "src/myproject/app.py"
 
-    def test_retries_configured(self, tmp_path, api_config):
-        """Verify max_retries is passed to Instructor."""
-        jsonl_file = tmp_path / "evidence.jsonl"
-        findings = _make_findings(("X-1", "violation", "a.py", 1, "minor", "test"))
+    def test_client_disables_sdk_retries(self, tmp_path, api_config):
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            client = MagicMock()
+            client.chat.completions.create.return_value = MagicMock(
+                choices=[MagicMock(message=MagicMock(content='{"findings":[]}'))]
+            )
+            mock_oa.return_value.__enter__.return_value = client
+            _call_api("prompt", api_config)
+        assert mock_oa.call_args.kwargs["max_retries"] == 0
 
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = findings
 
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
+class TestParserDropAccounting:
+    """Every finding-shaped object the model emits but we can't keep must be
+    counted, so a systemic loss is visible in the logs instead of silent."""
 
-            run_api_analysis(prompt="test", jsonl_file=jsonl_file, config=api_config)
+    def test_counts_finding_missing_req_as_dropped(self):
+        # A finding-shaped object missing the required `req`. Today it is
+        # silently recursed away and NOT counted; it must count as dropped.
+        raw = json.dumps({"findings": [
+            {"t": "violation", "file": "a.py", "line": 5, "w": "x",
+             "snippet": "code", "reason": "bad"},  # no req
+        ]})
+        findings, dropped = _parse_findings(raw)
+        assert findings == []
+        assert dropped == 1
 
-            call_kwargs = mock_client.chat.completions.create.call_args.kwargs
-            assert call_kwargs["max_retries"] == 1
+    def test_does_not_count_non_finding_noise(self):
+        # A stray container/noise object that does not look like a finding
+        # must NOT inflate the dropped count.
+        valid = {"req": "R1", "t": "violation", "file": "a.py", "line": 5,
+                 "severity": "minor", "w": "x", "snippet": "code", "reason": "bad"}
+        raw = '{"note": "analysis complete"}' + json.dumps({"findings": [valid]})
+        findings, dropped = _parse_findings(raw)
+        assert len(findings) == 1
+        assert dropped == 0
+
+    def test_recovers_real_findings_nested_in_finding_shaped_wrapper(self):
+        # A wrapper that happens to share >=2 finding field names (severity,
+        # reason) but NESTS a real finding must not have that finding swallowed.
+        # Counting the wrapper as a drop AND stopping recursion would lose it.
+        valid = {"req": "R1", "t": "violation", "file": "a.py", "line": 5,
+                 "severity": "minor", "w": "x", "snippet": "code", "reason": "bad"}
+        raw = json.dumps({"severity": "major", "reason": "run summary", "items": [valid]})
+        findings, dropped = _parse_findings(raw)
+        assert len(findings) == 1
+        assert findings[0]["req"] == "R1"
+        assert dropped == 0
+
+
+class TestTruncationDetection:
+    """A length-truncated response is incomplete: mark the call lossy so the
+    file re-dispatches instead of being cached as a clean analysis."""
+
+    def test_truncated_response_is_lossy(self, api_config):
+        content = _make_findings_json(
+            ("R1", "violation", "a.py", 5, "minor", "x"),
+        )
+        client = _mock_raw_client_finish(content, "length")
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = client
+            _findings, was_lossy = _call_api("prompt", api_config)
+        assert was_lossy is True
+
+    def test_complete_response_is_not_lossy(self, api_config):
+        content = _make_findings_json(
+            ("R1", "violation", "a.py", 5, "minor", "x"),
+        )
+        client = _mock_raw_client_finish(content, "stop")
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = client
+            findings, was_lossy = _call_api("prompt", api_config)
+        assert was_lossy is False
+        assert len(findings) == 1
 
 
 class TestMarkerContract:
     """API runner emits file_done markers so the V2 cache can record
     completion. The CLI/MCP path emits these via the agent calling
     `mark_file_done`; the API path is one-shot and emits them itself
-    after a clean Instructor return.
+    after a clean LLM return.
 
     Regression: before this, the API runner wrote findings to JSONL
     directly, bypassing FindingsRouter and the marker contract. Cache
@@ -159,16 +225,11 @@ class TestMarkerContract:
 
     def test_clean_call_emits_ok_marker_per_source_file(self, tmp_path, api_config):
         jsonl_file = tmp_path / "evidence.jsonl"
-        findings = _make_findings(
-            ("M-MOD-1", "violation", "src/a.py", 5, "major", "x"),
-        )
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = findings
+        content = _make_findings_json(("M-MOD-1", "violation", "src/a.py", 5, "major", "x"))
+        raw_client = _mock_raw_client(content)
 
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 prompt="t", jsonl_file=jsonl_file, config=api_config,
                 source_file_paths=["src/a.py", "src/b.py", "src/c.py"],
@@ -183,13 +244,10 @@ class TestMarkerContract:
     def test_clean_call_with_zero_findings_still_marks_files(self, tmp_path, api_config):
         """A clean file (no findings) is still completed analysis -- mark it ok."""
         jsonl_file = tmp_path / "evidence.jsonl"
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = _Findings(findings=[])
+        raw_client = _mock_raw_client('{"findings":[]}')
 
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 prompt="t", jsonl_file=jsonl_file, config=api_config,
                 source_file_paths=["src/clean.py"],
@@ -202,50 +260,65 @@ class TestMarkerContract:
         assert markers[0]["file"] == "src/clean.py"
         assert markers[0]["status"] == "ok"
 
-    def test_salvaged_response_does_not_emit_markers(self, tmp_path, api_config):
-        """When the response was malformed and we salvaged partial findings,
-        we don't know which files were actually analyzed end-to-end. Don't
-        lie about completion -- leave markers off so the next run re-runs."""
+    def test_network_error_emits_error_markers(self, tmp_path, api_config):
+        """When the model call fails (was_lossy=True), emit an 'error' marker
+        for every file in the batch.
+
+        This makes the failure visible to the failure-streak circuit breaker
+        and the post-run model-reachability guard, so an unreachable/broken
+        model fails the run loudly instead of silently producing zero findings.
+        'error' markers are excluded from the cache's ok_files set, so the
+        files still re-dispatch on the next run (retry semantics preserved)."""
         jsonl_file = tmp_path / "evidence.jsonl"
+        raw_client = MagicMock()
+        raw_client.chat.completions.create.side_effect = httpx.ReadTimeout("timeout")
 
-        mock_client = MagicMock()
-        # Force the salvage path: Instructor raises, but the raw exception
-        # message contains a single salvageable finding object.
-        salvage_payload = json.dumps({
-            "req": "X-1", "t": "violation", "file": "src/a.py", "line": 1,
-            "severity": "minor", "w": "x", "snippet": "code", "reason": "r",
-        })
-        mock_client.chat.completions.create.side_effect = RuntimeError(salvage_payload)
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 prompt="t", jsonl_file=jsonl_file, config=api_config,
                 source_file_paths=["src/a.py", "src/b.py"],
             )
 
         lines = self._read_jsonl(jsonl_file)
-        # Salvaged finding(s) are still written.
-        assert any(ln.get("req") == "X-1" for ln in self._findings_only(lines))
-        # But NO markers -- cancel-then-restart will re-run all files.
-        assert self._markers(lines) == []
+        markers = self._markers(lines)
+        assert {m["file"] for m in markers} == {"src/a.py", "src/b.py"}
+        assert all(m["status"] == "error" for m in markers)
+        # A failed call produces no findings.
+        assert self._findings_only(lines) == []
+
+    def test_truncated_response_emits_error_markers(self, tmp_path, api_config):
+        """A length-truncated response is lossy: emit 'error' markers so the
+        files re-dispatch and the breaker/reachability guard see the failure,
+        while still surfacing the partial findings recovered before the cut."""
+        jsonl_file = tmp_path / "evidence.jsonl"
+        content = _make_findings_json(("X-1", "violation", "a.py", 1, "minor", "x"))
+        raw_client = _mock_raw_client_finish(content, "length")
+
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
+            run_api_analysis(
+                prompt="t", jsonl_file=jsonl_file, config=api_config,
+                source_file_paths=["src/a.py"],
+            )
+
+        lines = self._read_jsonl(jsonl_file)
+        markers = self._markers(lines)
+        assert {m["file"] for m in markers} == {"src/a.py"}
+        assert all(m["status"] == "error" for m in markers)
+        # Partial findings recovered before the cut are still surfaced.
+        assert len(self._findings_only(lines)) == 1
 
     def test_no_source_files_no_markers(self, tmp_path, api_config):
         """Backward-compat: callers that don't pass source_file_paths get
         finding writes only -- the CLI dim runner is the typical caller and
         that's expected when the whole-dim file list isn't known here."""
         jsonl_file = tmp_path / "evidence.jsonl"
-        findings = _make_findings(("X-1", "violation", "a.py", 1, "minor", "x"))
+        content = _make_findings_json(("X-1", "violation", "a.py", 1, "minor", "x"))
+        raw_client = _mock_raw_client(content)
 
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = findings
-
-        with patch("quodeq.analysis._api_runner.instructor") as mock_inst:
-            mock_inst.from_openai.return_value = mock_client
-            mock_inst.Mode.JSON = "json"
-
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 prompt="t", jsonl_file=jsonl_file, config=api_config,
                 source_file_paths=None,
@@ -254,6 +327,68 @@ class TestMarkerContract:
         lines = self._read_jsonl(jsonl_file)
         assert self._markers(lines) == []
         assert len(self._findings_only(lines)) == 1
+
+
+class TestSyncCacheWrite:
+    """API path wires build_cache_writer into FindingsRouter so each
+    ``mark_file_done(status='ok')`` triggers a synchronous cache.put.
+
+    Closes the 30s polling window between watcher ticks: after this, the
+    API runner's in-process router writes its per-file cache entry on disk
+    BEFORE returning from ``mark_file_done``. SIGKILL between the JSONL
+    marker and the cache put cannot lose the work.
+    """
+
+    def test_api_path_writes_cache_synchronously_when_file_done_ok(
+        self, tmp_path, api_config, monkeypatch,
+    ):
+        """After router processes findings + mark_file_done(file=F, status='ok')
+        in the API path, a cache entry for F exists on disk under cache_root.
+        """
+        from quodeq.analysis._types import AnalysisOptions, RunConfig
+
+        src_root = tmp_path / "src"
+        src_root.mkdir()
+        (src_root / "Foo.kt").write_text("class Foo")
+
+        # build_cache_writer hardcodes Path.home() / ".quodeq/cache/results",
+        # so redirect the user-home lookup to keep this test self-contained.
+        # POSIX's expanduser reads HOME; Windows' reads USERPROFILE first and
+        # ignores HOME when USERPROFILE is set (which it always is on CI).
+        # Setting both keeps the test cross-platform.
+        fake_home = tmp_path / "home"
+        monkeypatch.setenv("HOME", str(fake_home))
+        monkeypatch.setenv("USERPROFILE", str(fake_home))
+        cache_root = fake_home / ".quodeq" / "cache" / "results"
+
+        run_config = RunConfig(
+            src=src_root,
+            language="kotlin",
+            standards_dir=None,
+            work_dir=src_root,
+            options=AnalysisOptions(subagent_model="sonnet"),
+        )
+
+        jsonl_file = tmp_path / "evidence.jsonl"
+        content = _make_findings_json(("M-MOD-1", "violation", "Foo.kt", 1, "minor", "x"))
+        raw_client = _mock_raw_client(content)
+
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
+            run_api_analysis(
+                prompt="t",
+                jsonl_file=jsonl_file,
+                config=api_config,
+                source_file_paths=["Foo.kt"],
+                run_config=run_config,
+                dim_id="flexibility",
+            )
+
+        entries = list(cache_root.rglob("entry.json"))
+        assert len(entries) == 1, (
+            f"Expected synchronous cache write on file_done='ok'. "
+            f"Found {len(entries)} entries under {cache_root}."
+        )
 
 
 class TestApiRunnerConfig:

@@ -11,6 +11,10 @@ const fakeApi = {
     run: run || "latest",
     trend: [],
     summary: { score: 75 },
+    dimensions: [
+      { dimension: "Security", overallScore: "7.0/10", overallGrade: "B", violations: [], compliance: [], principles: [] },
+    ],
+    selectedRun: { runId: "r1", dateLabel: "2026-05-01" },
   })),
 };
 
@@ -60,4 +64,19 @@ describe("useDashboard", () => {
       expect(Array.isArray(result.current.dashboard?.trend)).toBe(true);
     });
   });
+
+  it("exposes refreshDashboard for invalidating the cache after a dismiss", async () => {
+    const { result } = renderHook(
+      () => useDashboard({ selectedProject: "p1", selectedRun: null }),
+      { wrapper: ({ children }) => wrap(children) },
+    );
+    await waitFor(() => expect(result.current.dashboard).not.toBeNull());
+    expect(typeof result.current.refreshDashboard).toBe("function");
+  });
 });
+
+// Note: live grade SSE merging used to live here. It was deleted in the
+// move to mutation-returns-result — the dismiss HTTP response now carries
+// the rescored payload synchronously, and the dashboard refetches the
+// accumulated rollup via refreshDashboard. See tests/api/test_routes_findings.py
+// for the backend half of that contract.
