@@ -14,7 +14,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: develop
+          # Check out the exact commit the release was published from -- the tag
+          # commit that triggered "Publish to PyPI" -- NOT `develop`. publish.yml
+          # only runs on `release: published`, so workflow_run.head_sha is always
+          # the release commit. develop is stale at release time (the sync PR
+          # main->develop has not merged yet), which previously pinned the tap to
+          # the OLD version. Reading head_sha ties the formula to the published
+          # release and makes re-runs version-correct regardless of develop.
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Extract version from pyproject.toml
         id: version
