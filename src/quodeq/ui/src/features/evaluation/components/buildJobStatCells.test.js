@@ -100,9 +100,9 @@ test('buildJobStatCells: failed/cancelled show PROGRESS + FOUND-so-far + ELAPSED
 // ---------------------------------------------------------------------------
 
 test('computeRate: files/sec from oldest→newest over the window', () => {
-  // 30 files over 30s = 1.0 files/s
-  const s = [{ t: 1_000_000, taken: 10 }, { t: 1_030_000, taken: 40 }];
-  assert.equal(computeRate(s), 1);
+  // 30 files over 60s = 0.5 files/s (returned in files/sec; displayed per-min)
+  const s = [{ t: 1_000_000, taken: 10 }, { t: 1_060_000, taken: 40 }];
+  assert.equal(computeRate(s), 0.5);
 });
 
 test('computeRate: null when fewer than 2 samples', () => {
@@ -111,7 +111,7 @@ test('computeRate: null when fewer than 2 samples', () => {
   assert.equal(computeRate(null), null);
 });
 
-test('computeRate: null when window span is below the minimum (~15s)', () => {
+test('computeRate: null when window span is below the minimum (~30s)', () => {
   // 10s span -> not enough to be honest yet
   const s = [{ t: 1_000_000, taken: 10 }, { t: 1_010_000, taken: 30 }];
   assert.equal(computeRate(s), null);
@@ -131,10 +131,11 @@ test('RATE_WINDOW_MS is exported for the buffer to window against', () => {
 // formatRate / formatEta
 // ---------------------------------------------------------------------------
 
-test('formatRate: one decimal below 10/s, integer at/above 10/s', () => {
-  assert.equal(formatRate(1.234), '~1.2 files/s');
-  assert.equal(formatRate(9.96), '~10.0 files/s'); // toFixed rounds; still < 10 path
-  assert.equal(formatRate(12.7), '~13 files/s');
+test('formatRate: per-minute display (integer at/above 1/min, 1 decimal below)', () => {
+  assert.equal(formatRate(0.05), '~3 files/min');      // 0.05/s = 3/min
+  assert.equal(formatRate(0.1), '~6 files/min');       // 6/min
+  assert.equal(formatRate(0.25), '~15 files/min');     // 15/min
+  assert.equal(formatRate(1 / 600), '~0.1 files/min'); // 0.1/min keeps a decimal
 });
 
 test('formatRate: null for non-positive / non-finite / null', () => {
@@ -178,18 +179,18 @@ test('buildEtaHint: "estimating…" when rate is unusable but total is known', (
   assert.equal(buildEtaHint({ rate: null, takenFiles: 5, totalFiles: 100 }), 'estimating…');
 });
 
-test('buildEtaHint: "~rate files/s · ~eta" when estimate is available', () => {
-  // 90 files left at 1 file/s = 90s -> "~2 min left"
+test('buildEtaHint: "~rate files/min · ~eta" when estimate is available', () => {
+  // 90 files left at 0.1 file/s (6/min) = 900s -> "~15 min left"
   assert.equal(
-    buildEtaHint({ rate: 1, takenFiles: 10, totalFiles: 100 }),
-    '~1.0 files/s · ~2 min left',
+    buildEtaHint({ rate: 0.1, takenFiles: 10, totalFiles: 100 }),
+    '~6 files/min · ~15 min left',
   );
 });
 
 test('buildJobStatCells: running ELAPSED cell carries the etaHint as its subtext', () => {
-  const cells = buildJobStatCells('running', { ...baseInputs, etaHint: '~1.2 files/s · ~5h left' });
+  const cells = buildJobStatCells('running', { ...baseInputs, etaHint: '~6 files/min · ~5h left' });
   assert.equal(cells[3].label, 'ELAPSED');
-  assert.equal(cells[3].hint, '~1.2 files/s · ~5h left');
+  assert.equal(cells[3].hint, '~6 files/min · ~5h left');
 });
 
 test('buildJobStatCells: done DURATION cell ignores etaHint', () => {

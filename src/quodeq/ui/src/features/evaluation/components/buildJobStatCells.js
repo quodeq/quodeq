@@ -3,11 +3,14 @@
  * No React, no network, no DOM — drop-in testable.
  */
 
-// Throughput estimate tuning. The rate is measured over a sliding window so it
-// reflects *current* speed (cache-hit bursts vs slow LLM misses, and the
-// per-dimension speed shifts) rather than a startup-biased lifetime average.
-export const RATE_WINDOW_MS = 60000;   // sliding window the buffer is trimmed to
-const RATE_MIN_SPAN_MS = 15000;        // refuse to estimate from < this much data
+// Throughput estimate tuning. The eval completes only a few files per MINUTE
+// (one slow LLM call per file), so the rate is shown per minute and measured
+// over a wide window: at ~3-10 files/min a short window sees too few files to
+// be stable and would flicker to "estimating…". The window also reflects
+// *current* speed (cache-hit bursts vs slow misses, per-dimension shifts)
+// rather than a startup-biased lifetime average.
+export const RATE_WINDOW_MS = 120000;  // 2-min sliding window the buffer is trimmed to
+const RATE_MIN_SPAN_MS = 30000;        // refuse to estimate from < this much data
 
 /**
  * Files/sec from a buffer of {t, taken} samples (t = epoch ms, ascending).
@@ -28,11 +31,16 @@ export function computeRate(samples) {
   return dFiles / (spanMs / 1000);
 }
 
-/** "~1.2 files/s" (1 decimal below 10/s, integer above). null when unusable. */
+/**
+ * "~5 files/min" from a files/SECOND rate. The eval runs only a few files per
+ * minute, so per-second would read ~0.08; per-minute is legible. Integer
+ * at/above 1/min, one decimal below. null when unusable.
+ */
 export function formatRate(rate) {
   if (rate == null || !Number.isFinite(rate) || rate <= 0) return null;
-  const shown = rate < 10 ? rate.toFixed(1) : String(Math.round(rate));
-  return `~${shown} files/s`;
+  const perMin = rate * 60;
+  const shown = perMin >= 1 ? String(Math.round(perMin)) : perMin.toFixed(1);
+  return `~${shown} files/min`;
 }
 
 /**
@@ -58,7 +66,7 @@ export function formatEta(remainingFiles, rate) {
 }
 
 /**
- * ELAPSED subtext for a running job: "~1.2 files/s · ~5h left".
+ * ELAPSED subtext for a running job: "~5 files/min · ~5h left".
  *  - null  when totalFiles is unknown (the PROGRESS card shows "preparing…").
  *  - "estimating…" when total is known but the rate isn't trustworthy yet.
  * @param {{rate:number|null, takenFiles:number, totalFiles:number}} args

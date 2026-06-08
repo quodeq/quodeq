@@ -16,7 +16,7 @@ the operator has no sense of remaining time or current throughput.
 
 1. ELAPSED advances smoothly, **once per second**.
 2. A subtext under ELAPSED shows the **current reading speed and a rough,
-   human-readable time remaining**, e.g. `~1.2 files/s · ~5h left`.
+   human-readable time remaining**, e.g. `~5 files/min · ~5h left`.
 3. The estimate is **honest**: it shows the *current* throughput (not a
    lifetime average), and it refuses to print a number when it does not yet
    have enough data (shows `estimating…`).
@@ -41,7 +41,7 @@ active only while the job is non-terminal. Each tick re-renders the strip.
 the *live* display; the backend value is no longer needed for ticking (the
 wall-clock delta is accurate to within the poll skew and updates every second).
 
-### Part 2 — `~1.2 files/s · ~5h left` subtext
+### Part 2 — `~5 files/min · ~5h left` subtext
 
 **Rate: sliding window.** `JobStatStrip` keeps a `useRef` buffer of samples
 `{ t, taken }`. A sample is pushed **once per completed poll** — the push effect
@@ -49,7 +49,10 @@ is keyed on the query's `dataUpdatedAt` (which advances every poll even when the
 data is identical), NOT on the 1s tick and NOT on `takenFiles` changing. Pushing
 on every poll regardless of change is deliberate: a stall then shows up as a run
 of flat samples (`Δfiles == 0` across the window), which the guard below detects.
-Samples older than `WINDOW_MS` (~60s) are dropped. The rate is:
+Samples older than `RATE_WINDOW_MS` (~120s / 2 min) are dropped. The eval runs
+only a few files per minute, so a wide window is required: at ~3-10 files/min a
+short (60s) window sees too few file completions to give a steady number. The
+rate is:
 
 ```
 rate = (newest.taken - oldest.taken) / ((newest.t - oldest.t) / 1000)   // files/sec
@@ -61,7 +64,9 @@ This reflects current throughput and sheds the slow agent/model warmup at t=0.
 
 **Formatting (pure helpers in `buildJobStatCells.js`):**
 
-- `formatRate(rate)` → `~1.2 files/s` (1 decimal below 10/s, integer above).
+- `formatRate(rate)` converts the files/sec rate to **files/min** for display →
+  `~5 files/min` (integer at/above 1/min, one decimal below). Per-second would
+  read ~0.08 for this workload, which is illegible.
 - `formatEta(remainingFiles, rate)` → coarse human bucket:
   - `remainingFiles <= 0` or `etaSec <= 45` → `finishing`
   - `etaSec < 3600` → `~M min left`, where M = round(etaSec/60), rounded to the
@@ -74,7 +79,7 @@ This reflects current throughput and sheds the slow agent/model warmup at t=0.
 `computeRate(samples)` returns `null` (→ subtext = `estimating…`) when any of:
 
 - fewer than 2 samples, or
-- window span `< MIN_WINDOW_S` (~15s) — too little data to be honest, or
+- window span `< RATE_MIN_SPAN_MS` (~30s) — too little data to be honest, or
 - `Δfiles <= 0` across the window — files have stalled, so a 0/near-0 rate
   would yield a meaningless or infinite ETA.
 
@@ -111,7 +116,7 @@ omitted entirely (`hint = null`), consistent with the PROGRESS card showing
   - `formatEta`: `finishing` (≤45s and remaining≤0), minute buckets (rounding
     below 10 vs nearest-5), hour buckets (with/without minutes, carry at 60).
 - Component (`JobStatStrip.test.jsx` style): elapsed advances on a faked 1s
-  interval; subtext renders `~rate files/s · …`; `estimating…` before enough
+  interval; subtext renders `~rate files/min · …`; `estimating…` before enough
   data; no subtext on terminal/`preparing…`.
 
 ## Out of scope / future
