@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildJobStatCells, formatClock } from './buildJobStatCells.js';
+import { buildJobStatCells, formatClock, computeRate, RATE_WINDOW_MS } from './buildJobStatCells.js';
 
 const baseInputs = {
   overallPct: 62,
@@ -93,4 +93,36 @@ test('buildJobStatCells: failed/cancelled show PROGRESS + FOUND-so-far + ELAPSED
   assert.equal(failed[1].label, 'PROGRESS');
   assert.equal(failed[2].label, 'FOUND');
   assert.equal(failed[3].label, 'ELAPSED');
+});
+
+// ---------------------------------------------------------------------------
+// computeRate (sliding-window throughput)
+// ---------------------------------------------------------------------------
+
+test('computeRate: files/sec from oldest→newest over the window', () => {
+  // 30 files over 30s = 1.0 files/s
+  const s = [{ t: 1_000_000, taken: 10 }, { t: 1_030_000, taken: 40 }];
+  assert.equal(computeRate(s), 1);
+});
+
+test('computeRate: null when fewer than 2 samples', () => {
+  assert.equal(computeRate([]), null);
+  assert.equal(computeRate([{ t: 1, taken: 5 }]), null);
+  assert.equal(computeRate(null), null);
+});
+
+test('computeRate: null when window span is below the minimum (~15s)', () => {
+  // 10s span -> not enough to be honest yet
+  const s = [{ t: 1_000_000, taken: 10 }, { t: 1_010_000, taken: 30 }];
+  assert.equal(computeRate(s), null);
+});
+
+test('computeRate: null when files have not advanced (stalled)', () => {
+  const s = [{ t: 1_000_000, taken: 50 }, { t: 1_040_000, taken: 50 }];
+  assert.equal(computeRate(s), null);
+});
+
+test('RATE_WINDOW_MS is exported for the buffer to window against', () => {
+  assert.equal(typeof RATE_WINDOW_MS, 'number');
+  assert.ok(RATE_WINDOW_MS > 0);
 });

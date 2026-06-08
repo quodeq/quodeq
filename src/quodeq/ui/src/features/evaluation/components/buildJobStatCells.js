@@ -3,6 +3,31 @@
  * No React, no network, no DOM — drop-in testable.
  */
 
+// Throughput estimate tuning. The rate is measured over a sliding window so it
+// reflects *current* speed (cache-hit bursts vs slow LLM misses, and the
+// per-dimension speed shifts) rather than a startup-biased lifetime average.
+export const RATE_WINDOW_MS = 60000;   // sliding window the buffer is trimmed to
+const RATE_MIN_SPAN_MS = 15000;        // refuse to estimate from < this much data
+
+/**
+ * Files/sec from a buffer of {t, taken} samples (t = epoch ms, ascending).
+ * Returns null — meaning "no honest estimate yet" — when there are fewer than
+ * two samples, the window spans less than RATE_MIN_SPAN_MS, or files have not
+ * advanced across the window (a stall).
+ * @param {Array<{t:number, taken:number}>} samples
+ * @returns {number|null}
+ */
+export function computeRate(samples) {
+  if (!Array.isArray(samples) || samples.length < 2) return null;
+  const oldest = samples[0];
+  const newest = samples[samples.length - 1];
+  const spanMs = newest.t - oldest.t;
+  if (spanMs < RATE_MIN_SPAN_MS) return null;
+  const dFiles = newest.taken - oldest.taken;
+  if (dFiles <= 0) return null;
+  return dFiles / (spanMs / 1000);
+}
+
 export function formatClock(s) {
   if (s == null || !Number.isFinite(s)) return '—';
   const total = Math.max(0, Math.floor(s));
