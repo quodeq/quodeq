@@ -27,7 +27,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
-    "@tanstack/react-query-devtools": "^5.100.9",
+    "@tanstack/react-query-devtools": "^5.101.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
