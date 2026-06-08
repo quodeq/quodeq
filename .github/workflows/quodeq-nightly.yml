@@ -22,9 +22,9 @@ on:
       dimensions:
         description: "Dimensions (empty = all)"
         default: ""
-      pool_budget:
-        description: "Pool budget in seconds"
-        default: "600"
+      time_limit:
+        description: "Run time limit in seconds (0 = unlimited). Default 11h truncates gracefully before the 12h job timeout."
+        default: "39600"
 
 jobs:
   nightly:
@@ -100,12 +100,18 @@ jobs:
           # Precedence: workflow_dispatch input > NIGHTLY_DIMENSIONS from quodeq.env > all
           DIMS="${{ github.event.inputs.dimensions }}"
           DIMS="${DIMS:-$NIGHTLY_DIMENSIONS}"
-          BUDGET="${{ github.event.inputs.pool_budget }}"
-          BUDGET="${BUDGET:-600}"
+          # Run-level time limit (seconds). 0 = unlimited. The default 39600 (11h)
+          # gives the whole 6-dimension loop room to run: each dimension's pool is
+          # still auto-capped at 2h, so all dims get a fair slice instead of the
+          # first one (security) consuming the entire budget. An 11h ceiling also
+          # truncates gracefully (scoring completed dims) about 1h before GitHub's
+          # 12h job timeout would hard-kill the process tree.
+          LIMIT="${{ github.event.inputs.time_limit }}"
+          LIMIT="${LIMIT:-39600}"
           # Use an array so flag values are passed as proper argv entries
           # (avoids SC2086 word-splitting issues with unquoted $ARGS).
           ARGS=(evaluate .
-                --pool-budget "$BUDGET"
+                --time-limit "$LIMIT"
                 --max-duration 300
                 --n-subagents "${N_SUBAGENTS:-3}"
                 --output "$EVAL_DIR")
