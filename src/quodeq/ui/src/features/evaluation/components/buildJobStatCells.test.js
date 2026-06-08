@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildJobStatCells, formatClock, computeRate, RATE_WINDOW_MS } from './buildJobStatCells.js';
+import { buildJobStatCells, formatClock, computeRate, RATE_WINDOW_MS, formatRate, formatEta } from './buildJobStatCells.js';
 
 const baseInputs = {
   overallPct: 62,
@@ -125,4 +125,43 @@ test('computeRate: null when files have not advanced (stalled)', () => {
 test('RATE_WINDOW_MS is exported for the buffer to window against', () => {
   assert.equal(typeof RATE_WINDOW_MS, 'number');
   assert.ok(RATE_WINDOW_MS > 0);
+});
+
+// ---------------------------------------------------------------------------
+// formatRate / formatEta
+// ---------------------------------------------------------------------------
+
+test('formatRate: one decimal below 10/s, integer at/above 10/s', () => {
+  assert.equal(formatRate(1.234), '~1.2 files/s');
+  assert.equal(formatRate(9.96), '~10.0 files/s'); // toFixed rounds; still < 10 path
+  assert.equal(formatRate(12.7), '~13 files/s');
+});
+
+test('formatRate: null for non-positive / non-finite / null', () => {
+  assert.equal(formatRate(0), null);
+  assert.equal(formatRate(-1), null);
+  assert.equal(formatRate(Infinity), null);
+  assert.equal(formatRate(null), null);
+});
+
+test('formatEta: "finishing" when essentially done', () => {
+  assert.equal(formatEta(0, 1), 'finishing');     // nothing left
+  assert.equal(formatEta(40, 1), 'finishing');    // 40s <= 45s
+});
+
+test('formatEta: minute buckets (nearest 1 under 10m, nearest 5 over)', () => {
+  assert.equal(formatEta(120, 1), '~2 min left');   // 120s
+  assert.equal(formatEta(1000, 1), '~15 min left'); // 1000s ≈ 16.7m -> nearest 5 = 15
+  assert.equal(formatEta(50, 1), '~1 min left');    // 50s -> 1m (just over the 45s floor)
+});
+
+test('formatEta: hour buckets, minutes to nearest 5, carry at 60', () => {
+  assert.equal(formatEta(18000, 1), '~5h left');        // 5h exactly
+  assert.equal(formatEta(19800, 1), '~5h 30m left');    // 5h30m
+  assert.equal(formatEta(7080, 1), '~2h left');         // 1h58m -> minutes round to 60 -> carry
+});
+
+test('formatEta: estimating when rate is unusable', () => {
+  assert.equal(formatEta(100, 0), 'estimating…');
+  assert.equal(formatEta(100, null), 'estimating…');
 });

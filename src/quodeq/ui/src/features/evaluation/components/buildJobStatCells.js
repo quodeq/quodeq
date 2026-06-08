@@ -28,6 +28,35 @@ export function computeRate(samples) {
   return dFiles / (spanMs / 1000);
 }
 
+/** "~1.2 files/s" (1 decimal below 10/s, integer above). null when unusable. */
+export function formatRate(rate) {
+  if (rate == null || !Number.isFinite(rate) || rate <= 0) return null;
+  const shown = rate < 10 ? rate.toFixed(1) : String(Math.round(rate));
+  return `~${shown} files/s`;
+}
+
+/**
+ * Coarse, human-readable time remaining from files-left + files/sec rate.
+ * "finishing" near the end; "~N min left"; "~Hh left" / "~Hh Mm left".
+ * Returns "estimating…" if rate is unusable (caller normally gates first).
+ */
+export function formatEta(remainingFiles, rate) {
+  if (!(rate > 0) || !Number.isFinite(rate)) return 'estimating…';
+  if (remainingFiles <= 0) return 'finishing';
+  const etaSec = remainingFiles / rate;
+  if (etaSec <= 45) return 'finishing';
+  if (etaSec < 3600) {
+    const rawMin = etaSec / 60;
+    let min = rawMin < 10 ? Math.max(1, Math.round(rawMin)) : Math.round(rawMin / 5) * 5;
+    if (min >= 60) return '~1h left';
+    return `~${min} min left`;
+  }
+  let hours = Math.floor(etaSec / 3600);
+  let min = Math.round(((etaSec % 3600) / 60) / 5) * 5;
+  if (min === 60) { hours += 1; min = 0; }
+  return min === 0 ? `~${hours}h left` : `~${hours}h ${min}m left`;
+}
+
 export function formatClock(s) {
   if (s == null || !Number.isFinite(s)) return '—';
   const total = Math.max(0, Math.floor(s));
