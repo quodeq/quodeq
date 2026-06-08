@@ -32,6 +32,18 @@ updates:
       semver-major-days: 7
       semver-minor-days: 3
       semver-patch-days: 2
+    # react-dom's peer dependency pins an exactly-matching react version
+    # (react-dom@19.2.7 needs react@^19.2.7). Bumping one without the other in
+    # separate PRs breaks `npm ci` with ERESOLVE (happened in #596/#599). Group
+    # the react packages so they are always bumped together in a single PR.
+    groups:
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "@testing-library/react"
 
   - package-ecosystem: "github-actions"
     directory: "/"
