@@ -57,6 +57,19 @@ export function formatEta(remainingFiles, rate) {
   return min === 0 ? `~${hours}h left` : `~${hours}h ${min}m left`;
 }
 
+/**
+ * ELAPSED subtext for a running job: "~1.2 files/s · ~5h left".
+ *  - null  when totalFiles is unknown (the PROGRESS card shows "preparing…").
+ *  - "estimating…" when total is known but the rate isn't trustworthy yet.
+ * @param {{rate:number|null, takenFiles:number, totalFiles:number}} args
+ */
+export function buildEtaHint({ rate, takenFiles, totalFiles }) {
+  if (!(totalFiles > 0)) return null;
+  const rateStr = formatRate(rate);
+  if (rateStr == null) return 'estimating…';
+  return `${rateStr} · ${formatEta(totalFiles - takenFiles, rate)}`;
+}
+
 export function formatClock(s) {
   if (s == null || !Number.isFinite(s)) return '—';
   const total = Math.max(0, Math.floor(s));
@@ -131,7 +144,7 @@ export function buildJobStatCells(status, inputs) {
     statusCell,
     progressCell(inputs),
     foundCell(inputs.liveCount),
-    elapsedCell(inputs.elapsedS),
+    elapsedCell(inputs.elapsedS, 'ELAPSED', inputs.etaHint ?? null),
   ];
 }
 

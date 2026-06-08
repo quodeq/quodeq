@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildJobStatCells, formatClock, computeRate, RATE_WINDOW_MS, formatRate, formatEta } from './buildJobStatCells.js';
+import { buildJobStatCells, formatClock, computeRate, RATE_WINDOW_MS, formatRate, formatEta, buildEtaHint } from './buildJobStatCells.js';
 
 const baseInputs = {
   overallPct: 62,
@@ -164,4 +164,36 @@ test('formatEta: hour buckets, minutes to nearest 5, carry at 60', () => {
 test('formatEta: estimating when rate is unusable', () => {
   assert.equal(formatEta(100, 0), 'estimating…');
   assert.equal(formatEta(100, null), 'estimating…');
+});
+
+// ---------------------------------------------------------------------------
+// buildEtaHint + ELAPSED cell wiring
+// ---------------------------------------------------------------------------
+
+test('buildEtaHint: null when total is unknown (preparing…)', () => {
+  assert.equal(buildEtaHint({ rate: 1, takenFiles: 0, totalFiles: 0 }), null);
+});
+
+test('buildEtaHint: "estimating…" when rate is unusable but total is known', () => {
+  assert.equal(buildEtaHint({ rate: null, takenFiles: 5, totalFiles: 100 }), 'estimating…');
+});
+
+test('buildEtaHint: "~rate files/s · ~eta" when estimate is available', () => {
+  // 90 files left at 1 file/s = 90s -> "~2 min left"
+  assert.equal(
+    buildEtaHint({ rate: 1, takenFiles: 10, totalFiles: 100 }),
+    '~1.0 files/s · ~2 min left',
+  );
+});
+
+test('buildJobStatCells: running ELAPSED cell carries the etaHint as its subtext', () => {
+  const cells = buildJobStatCells('running', { ...baseInputs, etaHint: '~1.2 files/s · ~5h left' });
+  assert.equal(cells[3].label, 'ELAPSED');
+  assert.equal(cells[3].hint, '~1.2 files/s · ~5h left');
+});
+
+test('buildJobStatCells: done DURATION cell ignores etaHint', () => {
+  const cells = buildJobStatCells('done', { ...baseInputs, takenFiles: 220, etaHint: 'should-not-appear' });
+  assert.equal(cells[3].label, 'DURATION');
+  assert.equal(cells[3].hint, 'total');
 });
