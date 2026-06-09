@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getEvaluationProgress } from '../../../api/index.js';
 import { evaluationKeys } from '../../../api/queryKeys.js';
 import { StatStrip, Stat } from '../../../components/terminal/index.js';
 import { computeOverallProgress } from './scanProgressTotals.js';
-import { buildJobStatCells, computeRate, buildEtaHint, RATE_WINDOW_MS } from './buildJobStatCells.js';
+import { buildJobStatCells, computeRate, buildEtaHint, msUntilNextSecond } from './buildJobStatCells.js';
+import { recordRateSample, getRateSamples } from './rateSampleStore.js';
 
 const POLL_INTERVAL_MS = 2000;
-const TICK_INTERVAL_MS = 1000;
 const TERMINAL_STATES = new Set(['done', 'completed', 'failed', 'cancelled', 'lost']);
 
 function sumLiveViolations(liveViolations) {
@@ -43,39 +43,50 @@ export default function JobStatStrip({ job, liveViolations }) {
     retry: false,
   });
 
-  // Per-second re-render so wall-clock elapsed advances between the 2s polls.
+  // Re-render aligned to each whole-second boundary of wall-clock elapsed, so
+  // ELAPSED ticks *evenly*. A fixed setInterval(1000) has its phase fixed at
+  // mount and beats against the second boundary as timer jitter drifts it,
+  // producing visible double/skip ticks. A self-correcting timeout recomputes
+  // the delay from absolute `now` each tick — it re-aligns to the boundary and
+  // never accumulates drift. Inactive on terminal states / without a startedAt
+  // (the elapsed value is then poll-derived and can't tick per-second anyway).
   const [tick, setTick] = useState(0);
+  const startMs = job?.startedAt ? Date.parse(job.startedAt) : NaN;
   useEffect(() => {
-    if (isTerminal || !jobId) return undefined;
-    const id = setInterval(() => setTick((t) => t + 1), TICK_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [isTerminal, jobId]);
+    if (isTerminal || !jobId || Number.isNaN(startMs)) return undefined;
+    let id;
+    const schedule = () => {
+      id = setTimeout(() => { setTick((t) => t + 1); schedule(); }, msUntilNextSecond(Date.now() - startMs));
+    };
+    schedule();
+    return () => clearTimeout(id);
+  }, [isTerminal, jobId, startMs]);
 
-  // Throughput samples: one per completed poll (keyed on dataUpdatedAt, which
-  // advances every poll even when the data is identical — so a stall registers
-  // as flat samples). Trimmed to RATE_WINDOW_MS. Kept in a ref so pushes don't
-  // trigger renders; the 1s tick picks the new sample up within a second.
-  const samplesRef = useRef([]);
-  useEffect(() => { samplesRef.current = []; }, [jobId]);
+  // Throughput samples live in a module-level store (rateSampleStore.js) keyed
+  // by jobId, so the sliding-window rate SURVIVES navigating out of and back
+  // into a running job — re-entry shows the current rate immediately instead of
+  // re-measuring from "estimating…". One sample per completed poll (keyed on
+  // dataUpdatedAt, which advances every poll even when the data is identical, so
+  // a stall registers as flat samples and reads as "estimating…").
   useEffect(() => {
     if (!progress || isTerminal) return;
     const { takenFiles, totalFiles } = computeOverallProgress(progress);
     if (!(totalFiles > 0)) return;
-    const now = Date.now();
-    const buf = samplesRef.current;
-    buf.push({ t: now, taken: takenFiles });
-    while (buf.length > 1 && now - buf[0].t > RATE_WINDOW_MS) buf.shift();
-  }, [dataUpdatedAt, isTerminal, progress]);
+    recordRateSample(jobId, Date.now(), takenFiles);
+  }, [dataUpdatedAt, isTerminal, progress, jobId]);
 
   const cells = useMemo(() => {
     if (!jobId) return [];
     const { takenFiles, totalFiles, overallPct } = computeOverallProgress(progress);
     const elapsedS = deriveElapsedS(job?.startedAt, job?.endedAt, isTerminal, progress?.totalElapsedS);
     const liveCount = sumLiveViolations(liveViolations);
-    const rate = isTerminal ? null : computeRate(samplesRef.current);
+    // Current throughput from the persisted sliding window (null → "estimating…"
+    // until ~30s of samples accumulate). No whole-run average: it over-reads
+    // because the parallel start burst-completes cached files cheaply.
+    const rate = isTerminal ? null : computeRate(getRateSamples(jobId));
     const etaHint = isTerminal ? null : buildEtaHint({ rate, takenFiles, totalFiles });
     return buildJobStatCells(job.status, { overallPct, takenFiles, totalFiles, elapsedS, liveCount, etaHint });
-    // `tick` drives the per-second recompute; samplesRef is read (not a dep).
+    // `tick` drives the per-second recompute; the sample store is read (not a dep).
   }, [jobId, job?.status, job?.startedAt, job?.endedAt, isTerminal, progress, liveViolations, tick]);
 
   if (!jobId) return null;

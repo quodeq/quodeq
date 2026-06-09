@@ -78,6 +78,20 @@ export function buildEtaHint({ rate, takenFiles, totalFiles }) {
   return `${rateStr} · ${formatEta(totalFiles - takenFiles, rate)}`;
 }
 
+/**
+ * Milliseconds from an elapsed-ms value to the next whole-second boundary.
+ * The ELAPSED display shows `floor(elapsedMs / 1000)`, so it flips exactly on
+ * these boundaries; scheduling the next re-render for this delay (instead of a
+ * fixed 1s interval whose phase is fixed at mount and drifts against the
+ * boundary) keeps the clock ticking evenly and never accumulates drift. Always
+ * in (0, 1000]; defaults to 1000 for a non-finite input.
+ */
+export function msUntilNextSecond(elapsedMs) {
+  if (!Number.isFinite(elapsedMs)) return 1000;
+  const rem = ((elapsedMs % 1000) + 1000) % 1000;  // normalize negatives
+  return 1000 - rem;
+}
+
 export function formatClock(s) {
   if (s == null || !Number.isFinite(s)) return '—';
   const total = Math.max(0, Math.floor(s));
