@@ -1,6 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildJobStatCells, formatClock, computeRate, RATE_WINDOW_MS, formatRate, formatEta, buildEtaHint } from './buildJobStatCells.js';
+import {
+  buildJobStatCells,
+  formatClock,
+  computeRate,
+  RATE_WINDOW_MS,
+  formatRate,
+  formatEta,
+  buildEtaHint,
+  msUntilNextSecond,
+} from './buildJobStatCells.js';
 
 const baseInputs = {
   overallPct: 62,
@@ -197,4 +206,22 @@ test('buildJobStatCells: done DURATION cell ignores etaHint', () => {
   const cells = buildJobStatCells('done', { ...baseInputs, takenFiles: 220, etaHint: 'should-not-appear' });
   assert.equal(cells[3].label, 'DURATION');
   assert.equal(cells[3].hint, 'total');
+});
+
+// ---------------------------------------------------------------------------
+// msUntilNextSecond (boundary-aligned re-render delay for the ELAPSED ticker)
+// ---------------------------------------------------------------------------
+
+test('msUntilNextSecond: delay to the next whole-second boundary, in (0, 1000]', () => {
+  assert.equal(msUntilNextSecond(0), 1000);      // on a boundary → a full second to the next
+  assert.equal(msUntilNextSecond(5000), 1000);   // whole second elapsed
+  assert.equal(msUntilNextSecond(5300), 700);    // 300ms into the second
+  assert.equal(msUntilNextSecond(999), 1);       // just before the boundary
+  assert.equal(msUntilNextSecond(1500), 500);
+});
+
+test('msUntilNextSecond: normalizes negatives and defaults non-finite to 1000', () => {
+  assert.equal(msUntilNextSecond(-300), 300);
+  assert.equal(msUntilNextSecond(NaN), 1000);
+  assert.equal(msUntilNextSecond(Infinity), 1000);
 });

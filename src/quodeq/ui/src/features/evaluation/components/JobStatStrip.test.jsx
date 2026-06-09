@@ -7,6 +7,7 @@ vi.mock('../../../api/index.js', () => ({
   getEvaluationProgress: vi.fn(),
 }));
 import { getEvaluationProgress } from '../../../api/index.js';
+import { recordRateSample, _resetRateSamples } from './rateSampleStore.js';
 
 function renderWithClient(ui) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -17,7 +18,7 @@ const runningJob = { jobId: 'job-1', status: 'running' };
 const doneJob    = { jobId: 'job-2', status: 'done' };
 
 describe('JobStatStrip', () => {
-  beforeEach(() => { getEvaluationProgress.mockReset(); });
+  beforeEach(() => { getEvaluationProgress.mockReset(); _resetRateSamples(); });
 
   it('renders 4 stat cells for a running job', async () => {
     getEvaluationProgress.mockResolvedValue({
@@ -69,6 +70,39 @@ describe('JobStatStrip', () => {
     const job = { jobId: 'job-3', status: 'running', startedAt: new Date(Date.now() - 5000).toISOString() };
     renderWithClient(<JobStatStrip job={job} liveViolations={{}} />);
     expect(await screen.findByText('estimating…')).toBeInTheDocument();
+  });
+
+  it('cold entry into a deep-in-progress run stays "estimating…" (no biased whole-run average)', async () => {
+    // Even at 500/3000 files and 20 min in, with no persisted samples we have
+    // not measured *current* throughput yet — show "estimating…", not a number
+    // skewed high by the cache-hit burst at the start of the run.
+    const now = new Date('2026-06-08T10:20:00Z').getTime();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    getEvaluationProgress.mockResolvedValue({
+      dimensions: [{ state: 'running', files: { taken: 500, total: 3000 } }],
+    });
+    const job = { jobId: 'job-6', status: 'running', startedAt: new Date(now - 20 * 60 * 1000).toISOString() };
+    renderWithClient(<JobStatStrip job={job} liveViolations={{}} />);
+    expect(await screen.findByText('estimating…')).toBeInTheDocument();
+    expect(screen.queryByText(/files\/min/)).not.toBeInTheDocument();
+    nowSpy.mockRestore();
+  });
+
+  it('re-entry uses throughput samples persisted from a previous mount (no re-measuring)', async () => {
+    // Simulate the window built up before navigating away: 30 files over 60s =
+    // 0.5 files/s = 30 files/min. On re-entry the rate is shown immediately.
+    const now = new Date('2026-06-08T10:20:00Z').getTime();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    recordRateSample('job-7', now - 60_000, 470);
+    recordRateSample('job-7', now, 500);
+    getEvaluationProgress.mockResolvedValue({
+      dimensions: [{ state: 'running', files: { taken: 500, total: 3000 } }],
+    });
+    const job = { jobId: 'job-7', status: 'running', startedAt: new Date(now - 20 * 60 * 1000).toISOString() };
+    renderWithClient(<JobStatStrip job={job} liveViolations={{}} />);
+    expect(await screen.findByText(/^~30 files\/min/)).toBeInTheDocument();
+    expect(screen.queryByText('estimating…')).not.toBeInTheDocument();
+    nowSpy.mockRestore();
   });
 
   it('ELAPSED reflects wall-clock from startedAt (not backend elapsed)', async () => {
