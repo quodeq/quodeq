@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getEvaluationProgress } from '../../../api/index.js';
-import { evaluationKeys } from '../../../api/queryKeys.js';
 import { useEvalLog } from '../eval-log/EvalLogContext.js';
 import { pct, computeOverallProgress } from './scanProgressTotals.js';
 import ConsoleButton from '../../../components/ConsoleButton.jsx';
 import { SectionLabel } from '../../../components/terminal/index.js';
+import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 
-const POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATES = new Set(['done', 'failed', 'cancelled']);
 const STATUS_MARKERS = { arrow: '\u2192', check: '\u2713', error: 'Error:', failed: 'failed' };
 
@@ -150,14 +147,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   const consoleOpen = evalLog.activeJobId === jobId;
   const isTerminal = TERMINAL_STATES.has(status);
 
-  const progressQuery = useQuery({
-    queryKey: jobId ? [...evaluationKeys.evaluation(jobId), 'progress'] : ['evaluation', '_none_', 'progress'],
-    queryFn: () => getEvaluationProgress(jobId),
-    enabled: !!jobId,
-    refetchInterval: isTerminal ? false : POLL_INTERVAL_MS,
-    staleTime: 0,
-    retry: false,
-  });
+  const progressQuery = useEvaluationProgress(jobId, isTerminal);
   // Best-effort: surface the last successful payload, ignore errors silently
   // (progress is purely informational and should never block the UI).
   const progress = progressQuery.data ?? null;

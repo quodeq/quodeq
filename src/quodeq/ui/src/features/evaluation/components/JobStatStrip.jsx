@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getEvaluationProgress } from '../../../api/index.js';
-import { evaluationKeys } from '../../../api/queryKeys.js';
 import { StatStrip, Stat } from '../../../components/terminal/index.js';
 import { computeOverallProgress } from './scanProgressTotals.js';
 import { buildJobStatCells, computeRate, buildEtaHint, msUntilNextSecond } from './buildJobStatCells.js';
 import { recordRateSample, getRateSamples } from './rateSampleStore.js';
+import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 
-const POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATES = new Set(['done', 'completed', 'failed', 'cancelled', 'lost']);
 
 function sumLiveViolations(liveViolations) {
@@ -34,14 +31,7 @@ export default function JobStatStrip({ job, liveViolations }) {
   const jobId = job?.jobId;
   const isTerminal = TERMINAL_STATES.has(job?.status);
 
-  const { data: progress, dataUpdatedAt } = useQuery({
-    queryKey: jobId ? [...evaluationKeys.evaluation(jobId), 'progress'] : ['evaluation', '_none_', 'progress'],
-    queryFn: () => getEvaluationProgress(jobId),
-    enabled: !!jobId,
-    refetchInterval: isTerminal ? false : POLL_INTERVAL_MS,
-    staleTime: 0,
-    retry: false,
-  });
+  const { data: progress, dataUpdatedAt } = useEvaluationProgress(jobId, isTerminal);
 
   // Re-render aligned to each whole-second boundary of wall-clock elapsed, so
   // ELAPSED ticks *evenly*. A fixed setInterval(1000) has its phase fixed at
