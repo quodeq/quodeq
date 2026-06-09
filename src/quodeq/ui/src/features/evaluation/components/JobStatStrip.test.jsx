@@ -88,6 +88,24 @@ describe('JobStatStrip', () => {
     nowSpy.mockRestore();
   });
 
+  it('refetches progress on the terminal transition so a fast run reaches 100% (no 97% freeze)', async () => {
+    // Reproduces the incremental/cached freeze: the last running poll catches
+    // 34/35 (97%); the final files complete as the job goes terminal, but the
+    // poll has stopped — so without a terminal refetch the bar stays at 97%.
+    getEvaluationProgress
+      .mockResolvedValueOnce({ dimensions: [{ state: 'running', files: { taken: 34, total: 35 } }] })
+      .mockResolvedValue({ dimensions: [{ state: 'running', files: { taken: 35, total: 35 } }] });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const startedAt = new Date(Date.now() - 5000).toISOString();
+    const wrap = (j) => <QueryClientProvider client={client}><JobStatStrip job={j} liveViolations={{}} /></QueryClientProvider>;
+    const { rerender } = render(wrap({ jobId: 'jt', status: 'running', startedAt }));
+    expect(await screen.findByText('97%')).toBeInTheDocument();
+    const before = getEvaluationProgress.mock.calls.length;
+    rerender(wrap({ jobId: 'jt', status: 'cancelled', startedAt }));   // running -> terminal
+    expect(await screen.findByText('100%')).toBeInTheDocument();
+    expect(getEvaluationProgress.mock.calls.length).toBeGreaterThan(before);
+  });
+
   it('re-entry uses throughput samples persisted from a previous mount (no re-measuring)', async () => {
     // Simulate the window built up before navigating away: 30 files over 60s =
     // 0.5 files/s = 30 files/min. On re-entry the rate is shown immediately.
