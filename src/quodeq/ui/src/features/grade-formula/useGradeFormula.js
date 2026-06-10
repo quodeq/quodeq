@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   getGradeFormula, saveGradeFormula, resetGradeFormula, previewGradeFormula,
 } from '../../api/index.js';
+import { projectKeys } from '../../api/queryKeys.js';
 import { setGradeThresholds } from '../../utils/gradeThresholds.js';
 
 const PREVIEW_DEBOUNCE_MS = 250;
@@ -20,6 +22,15 @@ export default function useGradeFormula(projectId) {
   const [error, setError] = useState(null);
   const debounceRef = useRef(null);
   const loadedRef = useRef(false); // true once the initial GET has populated draft
+  const queryClient = useQueryClient();
+
+  // Applying or resetting the formula rewrites the SQL grade tables for every
+  // run across every project (server-side apply_to_all_runs), so the cached
+  // dashboard / accumulated-scores / project-card queries are now stale. Drop
+  // the whole `project` subtree (scores + dashboard + runs) so they refetch.
+  const invalidateScoreQueries = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: projectKeys.all() });
+  }, [queryClient]);
 
   useEffect(() => {
     getGradeFormula()
@@ -68,6 +79,7 @@ export default function useGradeFormula(projectId) {
       const d = await saveGradeFormula(draft);
       setSaved(d.current); setDraft(d.current); setIsCustom(d.isCustom);
       setGradeThresholds(d.current.gradeThresholds);
+      invalidateScoreQueries();
       requestPreview(d.current);
       return d.applied;
     } catch {
@@ -76,7 +88,7 @@ export default function useGradeFormula(projectId) {
     } finally {
       setBusy(false);
     }
-  }, [draft, requestPreview]);
+  }, [draft, requestPreview, invalidateScoreQueries]);
 
   const resetToDefaults = useCallback(async () => {
     setBusy(true); setError(null);
@@ -84,13 +96,14 @@ export default function useGradeFormula(projectId) {
       const d = await resetGradeFormula();
       setSaved(d.current); setDraft(d.current); setIsCustom(d.isCustom);
       setGradeThresholds(d.current.gradeThresholds);
+      invalidateScoreQueries();
       requestPreview(d.current);
     } catch {
       setError('Reset failed');
     } finally {
       setBusy(false);
     }
-  }, [requestPreview]);
+  }, [requestPreview, invalidateScoreQueries]);
 
   return { draft, defaults, isCustom, isDirty, preview, busy, error, update, apply, resetToDefaults };
 }
