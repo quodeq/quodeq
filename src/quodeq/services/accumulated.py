@@ -250,9 +250,15 @@ def _compute_parent_accumulated(
 def compute_accumulated(
     reports_dir: str, project: str, as_of: str | None,
     *, cache_config: AccumulatedCacheConfig | None = None,
-    params: ScoringParams = DEFAULT_PARAMS,
+    params: ScoringParams | None = None,
 ) -> dict[str, Any] | None:
-    """Compute the accumulated (cross-run) view for *project*."""
+    """Compute the accumulated (cross-run) view for *project*.
+
+    When *params* is None, the saved grade-formula params are loaded.
+    """
+    if params is None:
+        from quodeq.services import grade_formula  # noqa: PLC0415
+        params = grade_formula.load_params()
     reports_root = Path(reports_dir)
     if not (reports_root / project).exists():
         return None

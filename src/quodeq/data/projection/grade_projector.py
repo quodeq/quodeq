@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types.finding import Finding
 from quodeq.data.sqlite._row_mappers import row_to_finding
 from quodeq.data.sqlite.connection import open_evaluation_db
@@ -66,8 +67,14 @@ def _dict_row(cursor, row):
     return {col[0]: row[i] for i, col in enumerate(cursor.description)}
 
 
-def recompute_grades(run_dir: Path) -> None:
-    """Full recompute of dimension_scores + principle_grades from findings."""
+def recompute_grades(run_dir: Path, params: ScoringParams | None = None) -> None:
+    """Full recompute of dimension_scores + principle_grades from findings.
+
+    When *params* is None, the saved grade-formula params are loaded.
+    """
+    if params is None:
+        from quodeq.services import grade_formula  # noqa: PLC0415
+        params = grade_formula.load_params()
     store = SQLiteStateStore(run_dir)
     source_file_count = _read_source_file_count(run_dir)
 
@@ -103,6 +110,7 @@ def recompute_grades(run_dir: Path) -> None:
             compliance=p_compliance,
             dismissed_count=dismissed,
             source_file_count=source_file_count,
+            params=params,
         )
         principle_grades_by_dim.setdefault(dim, []).append(grade)
         principle_rows_to_write.append((dim, grade))
@@ -120,7 +128,7 @@ def recompute_grades(run_dir: Path) -> None:
         )
 
     for dim, p_grades in principle_grades_by_dim.items():
-        d_score = compute_dimension_score(dimension=dim, principle_grades=p_grades)
+        d_score = compute_dimension_score(dimension=dim, principle_grades=p_grades, params=params)
         store.record_dimension_score(
             dimension=dim,
             score=d_score["score"],

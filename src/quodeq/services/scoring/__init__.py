@@ -37,6 +37,7 @@ from quodeq.services.dashboard import (
     DashboardCacheConfig,
     _make_run_dimension_fetcher,
 )
+from quodeq.services.grade_formula import load_params
 from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
@@ -177,7 +178,9 @@ def _build_summary_from_dim_dicts(
     return to_camel_dict(summary)
 
 
-def _build_response_from_grade_tables(run_dir: Path) -> dict:
+def _build_response_from_grade_tables(
+    run_dir: Path, params: ScoringParams = DEFAULT_PARAMS,
+) -> dict:
     """Build the full scores response from SQL grade tables + findings.
 
     Reads dimension_scores and principle_grades from the state store, reads
@@ -232,12 +235,13 @@ def _build_response_from_grade_tables(run_dir: Path) -> dict:
             compliance_by_dim.get(dim_name, []),
         ))
 
-    summary = _build_summary_from_dim_dicts(dim_dicts)
+    summary = _build_summary_from_dim_dicts(dim_dicts, params=params)
     return {"dimensions": dim_dicts, "summary": summary}
 
 
 def _build_response_from_eval_files(
     reports_root: Path, project: str, run_id: str,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict:
     """Read eval JSON files for a run and apply rescore (legacy path).
 
@@ -257,7 +261,7 @@ def _build_response_from_eval_files(
     deleted = deleted_keys(project_dir)
 
     dims = base_fetcher(run_id)
-    rescored = rescore_dimensions(dims, dismissed, deleted)
+    rescored = rescore_dimensions(dims, dismissed, deleted, params=params)
     return {
         "dimensions": rescored.get("dimensions", []),
         "summary": rescored.get("summary", {}),
@@ -281,6 +285,8 @@ def get_scores_raw(
     if not run_dir.is_dir():
         raise FileNotFoundError(f"Run directory not found: {run_dir}")
 
+    params = load_params()
+
     from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
     from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
 
@@ -294,7 +300,7 @@ def get_scores_raw(
             repo._ensure_fresh()  # noqa: SLF001
             store = SQLiteStateStore(run_dir)
             if store.read_dimension_scores():
-                return _build_response_from_grade_tables(run_dir)
+                return _build_response_from_grade_tables(run_dir, params=params)
         except sqlite3.DatabaseError:
             # evaluation.db is unreadable by this binary: it was written by a
             # newer Quodeq (SchemaVersionError, a DatabaseError subclass) or is
@@ -307,11 +313,12 @@ def get_scores_raw(
                 project, run_id,
             )
 
-    return _build_response_from_eval_files(reports_root, project, run_id)
+    return _build_response_from_eval_files(reports_root, project, run_id, params=params)
 
 
 def _make_rescoring_fetcher(
     reports_root: Path, project: str,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a dimension fetcher that applies rescore (dismissals) to results.
 
@@ -327,7 +334,7 @@ def _make_rescoring_fetcher(
 
     def rescoring_fetcher(run_id: str) -> list[DimensionResult]:
         dims = base_fetcher(run_id)
-        return [_rescore_dimension(d, dismissed, deleted) for d in dims]
+        return [_rescore_dimension(d, dismissed, deleted, params=params) for d in dims]
 
     return rescoring_fetcher
 
@@ -335,6 +342,7 @@ def _make_rescoring_fetcher(
 def _rescore_runs_by_dimension(
     dims: list[dict], reports_root: Path, project: str,
     dismissed: set[tuple], deleted: set[tuple] | None = None,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, dict]:
     """Rescore each unique run and return a map of dim_key -> rescored dict."""
     dim_to_run: dict[str, str] = {}
@@ -350,7 +358,7 @@ def _rescore_runs_by_dimension(
     for dim_key, run_id in dim_to_run.items():
         if run_id not in seen_runs:
             run_dims = fetcher(run_id)
-            result = rescore_dimensions(run_dims, dismissed, deleted)
+            result = rescore_dimensions(run_dims, dismissed, deleted, params=params)
             seen_runs[run_id] = {
                 (rd.get("dimension") or "").lower(): rd
                 for rd in result.get("dimensions", [])
@@ -386,6 +394,7 @@ def _rescore_accumulated_response(
     accumulated: dict[str, Any],
     reports_root: Path,
     project: str,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, Any]:
     """Apply rescore to an accumulated response dict (in-place compatible shape).
 
@@ -402,7 +411,9 @@ def _rescore_accumulated_response(
     if not dims:
         return accumulated
 
-    rescored_by_dim = _rescore_runs_by_dimension(dims, reports_root, project, dismissed, deleted)
+    rescored_by_dim = _rescore_runs_by_dimension(
+        dims, reports_root, project, dismissed, deleted, params=params,
+    )
     new_dims = _merge_rescored_dims(dims, rescored_by_dim)
 
     new_summary = recompute_summary(new_dims, accumulated.get("summary", {}))
@@ -424,6 +435,8 @@ def get_project_scores(
     if not (reports_root / project).exists():
         return None
 
+    params = load_params()
+
     all_runs = list_runs(reports_root, project)
     if not all_runs:
         return {
@@ -434,13 +447,13 @@ def get_project_scores(
 
     # Build accumulated using the existing service (returns full data with violations)
     accumulated = compute_accumulated(
-        str(reports_root), project, as_of,
+        str(reports_root), project, as_of, params=params,
     )
     if accumulated is None:
         accumulated = {"dimensions": [], "summary": {}}
 
     # Apply rescore to accumulated dimensions
-    accumulated = _rescore_accumulated_response(accumulated, reports_root, project)
+    accumulated = _rescore_accumulated_response(accumulated, reports_root, project, params=params)
 
     # Build trend using a rescoring fetcher (applies dismissals to each run).
     # Exclude cancelled/failed runs — their partial scores are misleading on
@@ -448,7 +461,7 @@ def get_project_scores(
     # when the user asks for them explicitly.
     scoreable_runs = [r for r in all_runs if r.status not in ("cancelled", "failed")]
     history_runs = scoreable_runs[:_max_history_runs()]
-    rescoring_fetcher = _make_rescoring_fetcher(reports_root, project)
+    rescoring_fetcher = _make_rescoring_fetcher(reports_root, project, params=params)
     trend = build_accumulated_trend(history_runs, rescoring_fetcher)
 
     # Build available runs list

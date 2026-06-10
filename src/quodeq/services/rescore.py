@@ -168,12 +168,16 @@ def rescore_dimensions(
     dimensions: list[DimensionResult],
     dismissed_keys: set[tuple],
     deleted_keys: set[tuple] | None = None,
-    params: ScoringParams = DEFAULT_PARAMS,
+    params: ScoringParams | None = None,
 ) -> dict[str, Any]:
     """Rescore all dimensions after filtering dismissed and deleted findings.
 
     Returns a dict with 'dimensions' (list of camelCase dicts) and 'summary' (camelCase dict).
+    When *params* is None, the saved grade-formula params are loaded.
     """
+    if params is None:
+        from quodeq.services import grade_formula  # noqa: PLC0415
+        params = grade_formula.load_params()
     rescored = [
         _rescore_dimension(dim, dismissed_keys, deleted_keys, params=params)
         for dim in dimensions
