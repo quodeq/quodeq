@@ -24,8 +24,7 @@ export default function CurvePlot({ baseK, ceilScale, thresholds }) {
   const ceiling = (wv) => (wv === 0 ? 10 : 10 - Math.log2(1 + wv) * ceilScale);
   const basePath = pathFor(base);
   const ceilPath = pathFor(ceiling);
-  const zone = `${ceilPath} L ${x(MAX_WV)},${y(Math.max(0, base(MAX_WV)))} ${
-    basePath.slice(2).split(' L ').reverse().join(' L ')} Z`;
+  const zone = `${ceilPath} L ${basePath.slice(2).split(' L ').reverse().join(' L ')} Z`;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width={W} role="img" aria-label="Score curves">
       {thresholds.map(([t]) => (

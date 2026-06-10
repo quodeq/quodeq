@@ -134,4 +134,20 @@ describe('GradeBoundaryBar', () => {
     // ascending [4.5, 5, 7, 9] -> descending [9, 7, 5, 4.5]
     expect(next.map(([t]) => t)).toEqual([9, 7, 5, 4.5]);
   });
+
+  it('removes all window listeners after pointercancel so subsequent moves are silent', () => {
+    const onChange = vi.fn();
+    render(<GradeBoundaryBar thresholds={THRESHOLDS} onChange={onChange} />);
+    const divider = screen.getByLabelText('Boundary 2');
+    fireEvent.pointerDown(divider, { clientX: 50 });
+    // One move during the drag — onChange fires.
+    fireEvent.pointerMove(window, { clientX: 55 });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    // Browser cancels the gesture (e.g. touch pan taken over by scroll).
+    fireEvent.pointerCancel(window);
+    // Further moves after cancel must NOT fire onChange.
+    fireEvent.pointerMove(window, { clientX: 60 });
+    fireEvent.pointerMove(window, { clientX: 70 });
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
 });
