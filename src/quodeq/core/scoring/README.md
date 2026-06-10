@@ -109,6 +109,22 @@ The overall dimension score is a weighted average across all principle scores, e
 
 If more than 50% of principles are Insufficient, the overall score is flagged with low confidence.
 
+## Tunable parameters
+
+All Q² constants are wrapped by `ScoringParams` (`core/scoring/params.py`).
+`DEFAULT_PARAMS` mirrors the constants in `_constants.py`; user overrides
+persist at `~/.quodeq/grade_formula.json` (see `services/grade_formula.py`)
+and are editable from Settings > Grade formula. Every scoring function takes
+an explicit `params` argument; there is no global mutable configuration.
+The confidence/insufficient-evidence gate is intentionally NOT part of
+`ScoringParams`.
+
+**Params-convention split:** public entry points take
+`params: ScoringParams | None = None` and lazily load the saved file on first
+call; internal helpers take `params: ScoringParams = DEFAULT_PARAMS` and must
+be reached through a loading entry point so defaults and overrides stay
+consistent.
+
 ## Design Rationale
 
 The model was designed to address specific fairness issues observed in real evaluations:

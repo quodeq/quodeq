@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (documents existing behavior). Bootstraps `docs/adr/`.
+Partially superseded, see status update below. Originally: Accepted (documents existing behavior). Bootstraps `docs/adr/`.
 
 ## Context
 
@@ -140,3 +140,15 @@ A future "apply dimension weights" PR would need to touch:
 * `src/quodeq/data/fs/report_parser/_summary.py`
 * `src/quodeq/core/types/standard.py`
 * `src/quodeq/ui/src/features/help/components/HelpSections.jsx`
+
+## Status update (2026-06-10)
+
+Superseded in part by the Grade Formula Editor
+(`docs/superpowers/specs/2026-06-10-grade-formula-editor-design.md`).
+Dimension weights are now applied at runtime when the user enables the
+"apply dimension weights" switch in Settings > Grade formula
+(`ScoringParams.dimension_weights_enabled`). The default remains OFF, so
+out-of-the-box behavior is unchanged (plain unweighted mean). Both
+aggregation paths (`summarize_dimensions`, `compute_run_score` and the
+accumulated view) share `dimension_weighted_average()` from
+`core/scoring/params.py`, so they cannot drift apart.
