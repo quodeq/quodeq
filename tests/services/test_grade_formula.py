@@ -243,3 +243,45 @@ def test_event_log_runs_orders_by_started_at_not_mtime(tmp_path):
     assert ordered[0] == run_new, (
         f"Expected run_new (newer started_at) first, got {ordered[0].name}"
     )
+
+
+# --- Regression: UnsupportedSchemaError must not crash run ordering ----------
+
+def test_event_log_runs_tolerates_future_schema_version(tmp_path):
+    """A run whose status.json has a schema_version newer than supported must
+    not raise; it falls back to mtime ordering and the other runs are unaffected.
+    """
+    from quodeq.shared.run_status import SCHEMA_VERSION
+    from quodeq.services.grade_formula import _event_log_runs  # noqa: PLC0415
+
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+
+    # A normal run with a known-good status.json.
+    run_good = project_dir / "run_good"
+    run_good.mkdir()
+    (run_good / "events.jsonl").write_text("")
+    _write_status_json(run_good, "2024-06-01T10:00:00+00:00")
+
+    # A run with a status.json whose schema_version is far above supported.
+    run_future = project_dir / "run_future"
+    run_future.mkdir()
+    (run_future / "events.jsonl").write_text("")
+    future_payload = {
+        "schema_version": SCHEMA_VERSION + 99,
+        "job_id": "run_future",
+        "state": "done",
+        "started_at": "2024-03-01T10:00:00+00:00",
+    }
+    (run_future / "status.json").write_text(json.dumps(future_payload), encoding="utf-8")
+
+    # Must not raise — and both runs must be present in the result.
+    ordered = _event_log_runs(project_dir)
+    names = [r.name for r in ordered]
+    assert "run_good" in names, "run_good must be included"
+    assert "run_future" in names, "run_future must be included (mtime fallback)"
+    # run_good has a proper started_at key (priority 1); run_future uses mtime
+    # fallback (priority 0) so run_good always sorts first regardless of mtime.
+    assert ordered[0].name == "run_good", (
+        f"run_good (proper started_at) should sort first, got {ordered[0].name}"
+    )

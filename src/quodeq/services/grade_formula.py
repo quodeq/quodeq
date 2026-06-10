@@ -17,7 +17,7 @@ from quodeq.core.scoring.params import (
     params_to_dict,
     validate_params,
 )
-from quodeq.shared.run_status import read_status
+from quodeq.shared.run_status import UnsupportedSchemaError, read_status
 
 _logger = logging.getLogger(__name__)
 
@@ -71,7 +71,10 @@ def _run_recency_key(run_dir: Path) -> tuple[int, str | float]:
     status.json is missing/corrupt.  ISO timestamps sort lexically ==
     chronologically, so (1, iso_str) > (0, any_mtime) naturally.
     """
-    status = read_status(run_dir) or {}
+    try:
+        status = read_status(run_dir) or {}
+    except UnsupportedSchemaError:
+        return (0, run_dir.stat().st_mtime)
     started_at = status.get("started_at")
     if started_at:
         return (1, started_at)
