@@ -125,3 +125,18 @@ def test_dimension_weighted_average_unknown_dimension_defaults_to_1():
 
 def test_dimension_weighted_average_empty_returns_none():
     assert dimension_weighted_average([], DEFAULT_PARAMS) is None
+
+
+def test_mappings_are_read_only():
+    import pytest as _pytest
+    with _pytest.raises(TypeError):
+        DEFAULT_PARAMS.dimension_weights["security"] = 9.9  # type: ignore[index]
+    with _pytest.raises(TypeError):
+        DEFAULT_PARAMS.severity_weight["critical"] = 9.9  # type: ignore[index]
+
+
+def test_replace_does_not_alias_default_mappings():
+    import dataclasses
+    copy = dataclasses.replace(DEFAULT_PARAMS, base_k=0.3)
+    assert copy.dimension_weights is not DEFAULT_PARAMS.dimension_weights
+    assert copy.severity_weight is not DEFAULT_PARAMS.severity_weight

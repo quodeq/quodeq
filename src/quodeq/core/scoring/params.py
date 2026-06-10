@@ -48,7 +48,11 @@ _DIMENSION_WEIGHT_RANGE = (0.1, 3.0)
 
 @dataclass(frozen=True, slots=True)
 class ScoringParams:
-    """One full set of Q² formula parameters."""
+    """One full set of Q² formula parameters.
+
+    Mappings are defensively copied and read-only; instances are not hashable.
+    """
+
     severity_weight: Mapping[str, float]
     base_k: float
     lift_compress: float
@@ -61,14 +65,16 @@ class ScoringParams:
         default_factory=lambda: dict(_DEFAULT_DIMENSION_WEIGHTS),
     )
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, ScoringParams):
-            return NotImplemented
-        return params_to_dict(self) == params_to_dict(other)
+    def __post_init__(self) -> None:
+        # Defensive copy + read-only wrap: dataclasses.replace() must never
+        # alias a mutable mapping with another instance (DEFAULT_PARAMS is a
+        # process-wide singleton).
+        object.__setattr__(self, "severity_weight", MappingProxyType(dict(self.severity_weight)))
+        object.__setattr__(self, "dimension_weights", MappingProxyType(dict(self.dimension_weights)))
 
 
 DEFAULT_PARAMS = ScoringParams(
-    severity_weight=MappingProxyType(dict(_SEVERITY_WEIGHT)),
+    severity_weight=dict(_SEVERITY_WEIGHT),
     base_k=_BASE_K,
     lift_compress=_LIFT_COMPRESS,
     ceil_scale=_CEIL_SCALE,
