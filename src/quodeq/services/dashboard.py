@@ -93,6 +93,12 @@ def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]],
     return OrderedDict(), threading.Lock()
 
 
+def clear_shared_dimension_cache() -> None:
+    """Drop all cached run-dimension data (e.g. after a formula change)."""
+    with _SHARED_RUN_DIM_LOCK:
+        _SHARED_RUN_DIM_CACHE.clear()
+
+
 def _collect_previous_scores(
     runs: list[RunInfo], selected_index: int, selected_dim_names: set[str],
     get_run_dimensions: Callable[[str], list[DimensionResult]],

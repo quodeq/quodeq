@@ -61,3 +61,90 @@ def reset_params() -> None:
 def is_custom() -> bool:
     """True when a custom-params file is in effect."""
     return grade_formula_path().is_file()
+
+
+def _event_log_runs(project_dir: Path) -> list[Path]:
+    """Run dirs under *project_dir* that have an events.jsonl, newest-first.
+
+    Run ids are random UUIDs (see ``_cli_evaluation.run_id = uuid4()``), so a
+    name sort would not surface the most recent run. Order by directory mtime
+    instead, which tracks when the run was written.
+    """
+    return sorted(
+        (r for r in project_dir.iterdir()
+         if r.is_dir() and (r / "events.jsonl").is_file()),
+        key=lambda p: p.stat().st_mtime, reverse=True,
+    )
+
+
+def apply_to_all_runs(reports_root: Path) -> int:
+    """Rescore every run that has an events.jsonl with the currently saved params.
+
+    Legacy runs without an event log cannot be rescored and are skipped.
+    Always clears the dashboard cache (even when nothing was rescored, e.g.
+    when *reports_root* does not exist). Returns the number of runs rescored.
+    """
+    from quodeq.data.projection.grade_projector import recompute_grades  # noqa: PLC0415
+    from quodeq.services.dashboard import clear_shared_dimension_cache  # noqa: PLC0415
+
+    params = load_params()
+    count = 0
+    if reports_root.is_dir():
+        for project_dir in sorted(p for p in reports_root.iterdir() if p.is_dir()):
+            for run_dir in sorted(r for r in project_dir.iterdir() if r.is_dir()):
+                if not (run_dir / "events.jsonl").is_file():
+                    continue
+                try:
+                    recompute_grades(run_dir, params=params)
+                    count += 1
+                except Exception:  # noqa: BLE001 — one bad run must not block the rest
+                    _logger.warning("Rescore failed for %s; skipping.", run_dir, exc_info=True)
+    clear_shared_dimension_cache()
+    return count
+
+
+def preview_scores(
+    reports_root: Path, project: str, params: ScoringParams,
+) -> dict | None:
+    """Recompute the project's latest event-log run in memory with *params*.
+
+    Read-only: never writes evaluation.db. Returns None when the project has
+    no run with an events.jsonl. The ``before`` numbers use the currently
+    SAVED params (what the dashboard shows today); the ``after`` numbers use
+    the candidate *params* being previewed.
+    """
+    from quodeq.data.projection.grade_projector import compute_run_grades  # noqa: PLC0415
+    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
+    from quodeq.services.scoring.projector_scoring import compute_run_score  # noqa: PLC0415
+
+    project_dir = reports_root / project
+    if not project_dir.is_dir():
+        return None
+    run_dirs = _event_log_runs(project_dir)
+    if not run_dirs:
+        return None
+    run_dir = run_dirs[0]
+
+    saved = load_params()
+    store = SQLiteStateStore(run_dir)
+    before_dims = store.read_dimension_scores()
+    before_overall = compute_run_score(before_dims, params=saved)
+
+    _, after_dims = compute_run_grades(run_dir, params)
+    after_overall = compute_run_score(after_dims, params=params)
+
+    def _payload(dims: list[dict], overall: dict) -> dict:
+        return {
+            "overall": overall,
+            "dimensions": [
+                {"dimension": d["dimension"], "score": d["score"], "grade": d["grade"]}
+                for d in sorted(dims, key=lambda x: x["dimension"] or "")
+            ],
+        }
+
+    return {
+        "project": project,
+        "runId": run_dir.name,
+        "before": _payload(before_dims, before_overall),
+        "after": _payload(after_dims, after_overall),
+    }
