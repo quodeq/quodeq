@@ -136,22 +136,38 @@
 .term-stat--warning .term-stat__value { color: var(--color-warning); }
 .term-stat--critical .term-stat__value { color: var(--color-sev-critical-text); }
 
-/* Clickable variant — used when a Stat doubles as a navigation affordance. */
-button.term-stat--clickable {
+/* Clickable variant — a Stat doubles as a navigation affordance. The card stays
+   a <div>; an inner `.term-stat__hitbox` button is the actual click target so
+   the hint (which may hold its own interactive badges) is a sibling of the
+   button, never nested inside it. Nesting <button> in <button> is invalid HTML. */
+.term-stat--clickable {
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.term-stat__hitbox {
   appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: none;
   font: inherit;
   color: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: var(--term-space-1);
+  width: 100%;
 }
-button.term-stat--clickable:hover {
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
-}
-button.term-stat--clickable:focus-visible {
+.term-stat__hitbox:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+  border-radius: var(--term-radius);
+}
+/* Whole-card hover highlight, driven by the inner hitbox — not the sibling
+   severity badges, which are their own independent click targets. */
+.term-stat--clickable:has(.term-stat__hitbox:hover) {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
 }
 
 /* ------------------------------------------------------------
