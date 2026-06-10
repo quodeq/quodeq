@@ -185,3 +185,61 @@ def test_preview_scores_none_when_no_runs(tmp_path, formula_path):
     (tmp_path / "empty-proj").mkdir()
     assert grade_formula.preview_scores(tmp_path, "empty-proj", DEFAULT_PARAMS) is None
     assert grade_formula.preview_scores(tmp_path, "missing", DEFAULT_PARAMS) is None
+
+
+# --- Regression: run ordering must use started_at, not dir mtime -------------
+
+import json  # noqa: E402
+import os  # noqa: E402
+import time  # noqa: E402
+
+
+def _write_status_json(run_dir: Path, started_at: str) -> None:
+    """Write a minimal valid status.json fixture into *run_dir*."""
+    payload = {
+        "schema_version": 2,
+        "job_id": run_dir.name,
+        "state": "done",
+        "started_at": started_at,
+        "updated_at": started_at,
+        "finalized_at": started_at,
+        "phase": None,
+        "current_dimension": None,
+        "dimensions": [],
+        "pid": 1,
+        "exit_reason": None,
+        "deadline_at": None,
+    }
+    (run_dir / "status.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_event_log_runs_orders_by_started_at_not_mtime(tmp_path):
+    """Older started_at run must not win just because its dir mtime is bumped.
+
+    Scenario: run_old was created earlier (lower started_at) but we
+    artificially advance its directory mtime so it looks newer to a naive
+    mtime sort.  _event_log_runs must still return run_new first.
+    """
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+
+    run_old = project_dir / "run_old"
+    run_old.mkdir()
+    (run_old / "events.jsonl").write_text("")
+    _write_status_json(run_old, "2024-01-01T10:00:00+00:00")
+
+    run_new = project_dir / "run_new"
+    run_new.mkdir()
+    (run_new / "events.jsonl").write_text("")
+    _write_status_json(run_new, "2024-06-01T10:00:00+00:00")
+
+    # Bump run_old's mtime to "now + 1 hour" so a naive mtime sort would pick it.
+    future_ts = time.time() + 3600
+    os.utime(run_old, (future_ts, future_ts))
+
+    from quodeq.services.grade_formula import _event_log_runs  # noqa: PLC0415
+
+    ordered = _event_log_runs(project_dir)
+    assert ordered[0] == run_new, (
+        f"Expected run_new (newer started_at) first, got {ordered[0].name}"
+    )
