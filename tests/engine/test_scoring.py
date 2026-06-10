@@ -217,3 +217,12 @@ def test_run_scoring_with_strict_params_lowers_scores():
     )
     strict_result = run_scoring(evidence, "numerical", params=strict)
     assert strict_result.overall.weighted_score < default_result.overall.weighted_score
+
+    # Custom thresholds must move the grade LABEL through the same pipeline.
+    relabeled = dataclasses.replace(
+        DEFAULT_PARAMS,
+        grade_thresholds=((9.9, "Exemplary"), (9.8, "Good"), (9.7, "Adequate"), (0.1, "Poor")),
+    )
+    relabeled_result = run_scoring(evidence, "numerical", params=relabeled)
+    assert relabeled_result.overall.grade == "Poor"
+    assert relabeled_result.principles["p1"].grade == "Poor"
