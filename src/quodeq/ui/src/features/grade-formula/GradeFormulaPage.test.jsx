@@ -133,4 +133,45 @@ describe('GradeFormulaPage', () => {
       screen.getByText('No evaluation with an event log yet. Run an evaluation to see a live preview.'),
     ).toBeInTheDocument();
   });
+
+  describe('boundary-divider drag guard when busy', () => {
+    let rectSpy;
+
+    beforeEach(() => {
+      rectSpy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+        left: 0, top: 0, right: 100, bottom: 28, width: 100, height: 28, x: 0, y: 0,
+        toJSON: () => {},
+      });
+    });
+
+    afterEach(() => {
+      rectSpy.mockRestore();
+    });
+
+    it('blocks boundary-bar drags while busy:true — update is NOT called', () => {
+      const state = mockHook({ busy: true });
+      render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
+      fireEvent.click(screen.getByRole('button', { name: 'BOUNDARIES' }));
+
+      const divider = screen.getByLabelText('Boundary 1');
+      fireEvent.pointerDown(divider, { clientX: 30 });
+      fireEvent.pointerMove(window, { clientX: 70 });
+      fireEvent.pointerUp(window);
+
+      expect(state.update).not.toHaveBeenCalled();
+    });
+
+    it('allows boundary-bar drags while busy:false — update IS called', () => {
+      const state = mockHook({ busy: false });
+      render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
+      fireEvent.click(screen.getByRole('button', { name: 'BOUNDARIES' }));
+
+      const divider = screen.getByLabelText('Boundary 1');
+      fireEvent.pointerDown(divider, { clientX: 30 });
+      fireEvent.pointerMove(window, { clientX: 50 });
+      fireEvent.pointerUp(window);
+
+      expect(state.update).toHaveBeenCalled();
+    });
+  });
 });

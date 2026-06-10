@@ -26,6 +26,7 @@ export default function GradeBoundaryBar({ thresholds, onChange }) {
   ascRef.current = asc;
 
   const startDrag = (dividerIdx) => (downEvent) => {
+    if (downEvent.currentTarget.closest('fieldset[disabled]')) return;
     downEvent.preventDefault();
     const rect = barRef.current.getBoundingClientRect();
     const move = (e) => {
