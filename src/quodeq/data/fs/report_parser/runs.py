@@ -57,7 +57,15 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[Dimensi
         dimensions.append(parse_dimension_result(merged))
 
     dimensions.sort(key=lambda item: item.dimension)
-    return dimensions
+    # For event-log runs, the SQL grade tables (rewritten on dismiss and on a
+    # grade-formula Apply) are the source of truth; overlay them so every
+    # read-side consumer — run detail, accumulated overview, trend, project
+    # cards — agrees with the run-detail SQL grades. Legacy runs (no
+    # events.jsonl) keep their frozen eval-time grades.
+    from quodeq.data.fs.report_parser._sql_grade_overlay import (  # noqa: PLC0415
+        overlay_sql_grades,
+    )
+    return overlay_sql_grades(run_dir, dimensions)
 
 
 def _read_run_status(run_dir: Path) -> str | None:

@@ -3,7 +3,10 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from quodeq.core.scoring.params import ScoringParams
 
 from quodeq.core.events.models import Judgment
 from quodeq.data.sqlite.connection import open_evaluation_db
@@ -190,12 +193,9 @@ class SQLiteStateStore:
             for r in rows
         ]
 
-    def read_run_score_from_dim_scores(self) -> dict:
-        """Compute run-level score as the mean of non-null dimension scores."""
-        from quodeq.core.scoring.internals import score_to_grade_label  # noqa: PLC0415
+    def read_run_score_from_dim_scores(self, params: "ScoringParams | None" = None) -> dict:
+        """Compute the run-level score from non-null dimension scores (weighted when params enable dimension weights)."""
+        from quodeq.services.scoring.projector_scoring import compute_run_score  # noqa: PLC0415
+        from quodeq.core.scoring.params import DEFAULT_PARAMS  # noqa: PLC0415
         rows = self.read_dimension_scores()
-        scores = [r["score"] for r in rows if r["score"] is not None]
-        if not scores:
-            return {"score": None, "grade": None}
-        avg = round(sum(scores) / len(scores), 1)
-        return {"score": avg, "grade": score_to_grade_label(avg)}
+        return compute_run_score(rows, params=params if params is not None else DEFAULT_PARAMS)

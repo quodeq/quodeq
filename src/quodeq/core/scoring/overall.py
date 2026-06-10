@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from quodeq.core.types import OverallScore, PrincipleScore
+from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.scoring.internals import (
     GRADE_LADDER,
     score_to_grade_label,
@@ -41,13 +42,16 @@ def accumulate_weights(
     return total_weight, total_value, total_count, insufficient_count
 
 
-def build_overall_result(mode: str, total_weight: int, total_value: float) -> OverallScore:
+def build_overall_result(
+    mode: str, total_weight: int, total_value: float,
+    params: ScoringParams = DEFAULT_PARAMS,
+) -> OverallScore:
     """Build the overall result from aggregated weights."""
     if mode == MODE_NUMERICAL:
         mean_score = round(total_value / total_weight, 1)
         return OverallScore(
             weighted_score=mean_score,
-            grade=score_to_grade_label(mean_score),
+            grade=score_to_grade_label(mean_score, params=params),
             total_weight=total_weight,
         )
     mean_index = total_value / total_weight
@@ -55,7 +59,10 @@ def build_overall_result(mode: str, total_weight: int, total_value: float) -> Ov
     return OverallScore(weighted_grade=GRADE_LADDER[ladder_pos], total_weight=total_weight)
 
 
-def weighted_overall(principles_scores: dict[str, PrincipleScore], mode: str) -> OverallScore:
+def weighted_overall(
+    principles_scores: dict[str, PrincipleScore], mode: str,
+    params: ScoringParams = DEFAULT_PARAMS,
+) -> OverallScore:
     """Compute a weighted overall score or grade from per-principle results."""
     tw, tv, total, insuff = accumulate_weights(principles_scores, mode)
 
@@ -64,7 +71,7 @@ def weighted_overall(principles_scores: dict[str, PrincipleScore], mode: str) ->
             return OverallScore(weighted_score=0.0, grade="Insufficient")
         return OverallScore(weighted_grade="Insufficient")
 
-    result = build_overall_result(mode, tw, tv)
+    result = build_overall_result(mode, tw, tv, params)
 
     if total > 0 and insuff > total * _INSUFFICIENT_MAJORITY_RATIO:
         scored = total - insuff

@@ -9,6 +9,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
 
+from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types import DimensionResult, DimensionSummary, to_camel_dict
 
 from quodeq.services.ports import (
@@ -90,6 +91,12 @@ def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]],
     and standard ``__getitem__``/``__setitem__``/``__contains__``.
     """
     return OrderedDict(), threading.Lock()
+
+
+def clear_shared_dimension_cache() -> None:
+    """Drop all cached run-dimension data (e.g. after a formula change)."""
+    with _SHARED_RUN_DIM_LOCK:
+        _SHARED_RUN_DIM_CACHE.clear()
 
 
 def _collect_previous_scores(
@@ -364,6 +371,7 @@ class _SelectedRunContext:
 def _compute_dashboard_payload(
     reports_root: Path, project: str, runs: list[RunInfo],
     ctx: _SelectedRunContext, cc: DashboardCacheConfig,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> _DashboardPayload:
     """Compute history-dependent parts of the dashboard response."""
     selected_dim_names = {d.dimension for d in ctx.dimensions}
@@ -404,88 +412,12 @@ def _compute_dashboard_payload(
     )
     return _DashboardPayload(
         selected_summary=ctx.summary,
-        trend=build_accumulated_trend(history_runs, get_run_dimensions),
+        trend=build_accumulated_trend(history_runs, get_run_dimensions, params=params),
         dimensions_with_trend=_enrich_dimensions_with_trend(ctx.dimensions, previous_by_dimension),
         previous_by_dimension=previous_by_dimension,
         stale_previous_by_dimension=stale_previous_by_dimension,
         stale_dimensions=stale_dimensions,
     )
-
-
-def _apply_sql_grade_override(
-    reports_root: Path,
-    project: str,
-    run_id: str,
-    payload: _DashboardPayload,
-) -> _DashboardPayload:
-    """Override per-dimension grade fields from SQL grade tables when available.
-
-    Keeps the dashboard rollup in lockstep with dim-detail dismisses: a
-    dismiss updates SQL via the projection layer, the next dashboard read
-    reflects the new scores. Safe to overlay because the SQL projector
-    now applies the same confidence-level Insufficient rule the CLI
-    engine uses (see ``services.scoring.projector_scoring`` +
-    ``core.evidence.model.classify_confidence_level``) — SQL grades and
-    JSON grades agree on the same input.
-
-    Falls back to the FS-based grades when grade tables are empty or the
-    run directory does not exist.
-    """
-    import sqlite3  # noqa: PLC0415
-
-    from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
-    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
-
-    run_dir = reports_root / project / run_id
-    if not run_dir.is_dir():
-        return payload
-
-    store = SQLiteStateStore(run_dir)
-    try:
-        repo = SqliteFindingsRepository(run_dir)
-        repo._ensure_fresh()  # noqa: SLF001
-        dim_rows = store.read_dimension_scores()
-    except sqlite3.DatabaseError:
-        # evaluation.db is unreadable by this binary: written by a newer Quodeq
-        # (SchemaVersionError, a DatabaseError subclass) or otherwise corrupt /
-        # half-written. Keep the FS-based grades already in the payload rather
-        # than crashing the build.
-        _logger.warning(
-            "evaluation.db for %s/%s is unreadable; keeping FS-based grades "
-            "in the dashboard.", project, run_id,
-        )
-        return payload
-    if not dim_rows:
-        return payload
-
-    sql_grades: dict[str, dict] = {r["dimension"]: r for r in dim_rows}
-
-    def _override_dim(d: DimensionResult) -> DimensionResult:
-        row = sql_grades.get(d.dimension)
-        if row is None:
-            return d
-        score_val: float | None = row.get("score")
-        sql_score = f"{score_val}/10" if score_val is not None else d.overall_score
-        sql_grade = row.get("grade") or d.overall_grade
-        return replace(d, overall_score=sql_score, overall_grade=sql_grade)
-
-    overridden_dims = [_override_dim(d) for d in payload.dimensions_with_trend]
-
-    run_score = store.read_run_score_from_dim_scores()
-    if run_score.get("grade") is not None:
-        sql_numeric_avg: float | None = run_score.get("score")
-        sql_run_grade: str | None = run_score.get("grade")
-        overridden_summary = replace(
-            payload.selected_summary,
-            overall_grade=sql_run_grade,
-            numeric_average=sql_numeric_avg,
-        )
-    else:
-        overridden_summary = payload.selected_summary
-
-    payload.dimensions_with_trend = overridden_dims
-    payload.selected_summary = overridden_summary
-    return payload
 
 
 def build_dashboard(
@@ -494,11 +426,19 @@ def build_dashboard(
     run: str,
     *,
     cache_config: DashboardCacheConfig | None = None,
+    params: ScoringParams | None = None,
 ) -> dict[str, Any]:
     """Build a full dashboard response for *project* at *run*.
 
     Pass *cache_config* to override the module-level LRU cache.
+
+    When *params* is None, the saved grade-formula params are loaded once
+    here and threaded through the run-level summary, SQL grade override, and
+    trend so the dashboard rollup honours the user's custom formula.
     """
+    if params is None:
+        from quodeq.services import grade_formula  # noqa: PLC0415
+        params = grade_formula.load_params()
     cc = cache_config or DashboardCacheConfig()
     reports_root = Path(reports_dir)
     runs = list_runs(reports_root, project)
@@ -512,15 +452,18 @@ def build_dashboard(
         }
 
     selected_run, selected_index = _resolve_selected_run(runs, run)
+    # read_run_data overlays the SQL grade tables for event-log runs, so the
+    # selected run's dims (and the summary derived from them) already reflect
+    # dismisses and any applied grade formula. Passing *params* keeps the
+    # aggregate threshold labels and dimension weights in sync.
     selected_dims = read_run_data(reports_root, project, selected_run.run_id)
     ctx = _SelectedRunContext(
         run=selected_run,
         index=selected_index,
         dimensions=selected_dims,
-        summary=summarize_dimensions(selected_dims),
+        summary=summarize_dimensions(selected_dims, params),
     )
-    payload = _compute_dashboard_payload(reports_root, project, runs, ctx, cc)
-    payload = _apply_sql_grade_override(reports_root, project, selected_run.run_id, payload)
+    payload = _compute_dashboard_payload(reports_root, project, runs, ctx, cc, params)
     exit_reason = _read_run_exit_reason(reports_root, project, selected_run.run_id)
     return _build_dashboard_result(
         project, runs, selected_run, payload, exit_reason=exit_reason,

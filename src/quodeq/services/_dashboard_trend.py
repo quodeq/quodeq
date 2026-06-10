@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from quodeq.core.scoring.internals import score_to_grade_label
+from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import DimensionResult
 from quodeq.services.ports import RunInfo, most_frequent_grade, parse_numeric_score
 from quodeq.services.accumulated import numeric_average
@@ -34,8 +35,16 @@ def _build_dimension_details(
 def build_accumulated_trend(
     runs: list[RunInfo],
     get_run_dimensions: Callable[[str], list[DimensionResult]],
+    params: ScoringParams | None = None,
 ) -> list[dict[str, Any]]:
-    """Build trend using accumulated scores across all runs (oldest to newest)."""
+    """Build trend using accumulated scores across all runs (oldest to newest).
+
+    When *params* is None, the saved grade-formula params are loaded so the
+    per-run and accumulated grade labels honour the user's custom formula.
+    """
+    if params is None:
+        from quodeq.services import grade_formula  # noqa: PLC0415
+        params = grade_formula.load_params()
     trend: list[dict[str, Any]] = []
     acc_by_dim: dict[str, DimensionResult] = {}
     prev_by_dim: dict[str, DimensionResult] = {}
@@ -48,8 +57,8 @@ def build_accumulated_trend(
             continue
         acc_dims = list(acc_by_dim.values())
         acc_grades = [d.overall_grade for d in acc_dims if d.overall_grade]
-        acc_avg = numeric_average(acc_dims)
-        run_avg = numeric_average(run_dims)
+        acc_avg = numeric_average(acc_dims, params)
+        run_avg = numeric_average(run_dims, params)
         run_grades = [d.overall_grade for d in run_dims if d.overall_grade]
         run_dim_names = sorted(d.dimension for d in run_dims if d.dimension)
         dim_details = _build_dimension_details(run_dims, prev_by_dim)
@@ -72,12 +81,12 @@ def build_accumulated_trend(
                 "accumulatedDimensionsCount": len(acc_by_dim),
                 "runNumericAverage": run_avg,
                 "runOverallGrade": (
-                    score_to_grade_label(run_avg) if run_avg is not None
+                    score_to_grade_label(run_avg, params=params) if run_avg is not None
                     else (most_frequent_grade(run_grades) if run_grades else None)
                 ),
                 "numericAverage": acc_avg,
                 "overallGrade": (
-                    score_to_grade_label(acc_avg) if acc_avg is not None
+                    score_to_grade_label(acc_avg, params=params) if acc_avg is not None
                     else (most_frequent_grade(acc_grades) if acc_grades else None)
                 ),
             }

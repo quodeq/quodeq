@@ -1,3 +1,5 @@
+import { getGradeThresholds } from './gradeThresholds.js';
+
 /**
  * Grade-to-CSS-class mapping.
  * Full word keys take priority; single-letter keys serve as fallback.
@@ -35,21 +37,23 @@ export function splitScore(score) {
 /**
  * Map a numeric score (0–10) to a CSS grade class.
  *
+ * Boundaries come from the served grade thresholds (gradeThresholds.js) so the
+ * class buckets stay in lock-step with the active grade formula. The class
+ * names are positional: index 0 (highest band) → grade-top, then high/mid/low.
+ *
  * @param {number|string|null|undefined} score
  * @returns {string}
  */
-const SCORE_EXEMPLARY = 9;
-const SCORE_GOOD = 7;
-const SCORE_ADEQUATE = 5;
-const SCORE_POOR = 3;
+const GRADE_CLASSES = ['grade-top', 'grade-high', 'grade-mid', 'grade-low'];
+const TIER_LETTERS = ['A', 'B', 'C', 'D'];
 
 export function scoreColorClass(score) {
-  const n = parseFloat(score);
-  if (isNaN(n)) return 'grade-none';
-  if (n >= SCORE_EXEMPLARY) return 'grade-top';
-  if (n >= SCORE_GOOD) return 'grade-high';
-  if (n >= SCORE_ADEQUATE) return 'grade-mid';
-  if (n >= SCORE_POOR) return 'grade-low';
+  const n = typeof score === 'number' ? score : parseFloat(score);
+  if (Number.isNaN(n)) return 'grade-none';
+  const thresholds = getGradeThresholds();
+  for (let i = 0; i < thresholds.length; i += 1) {
+    if (n >= thresholds[i][0]) return GRADE_CLASSES[i] ?? 'grade-low';
+  }
   return 'grade-bottom';
 }
 
@@ -202,12 +206,12 @@ export function angleFromDelta(d) {
  * @returns {string} Single letter grade ('A', 'B', 'C', 'D', 'F') or empty string
  */
 export function scoreTierLabel(score) {
-  const n = parseFloat(score);
-  if (isNaN(n)) return '';
-  if (n >= SCORE_EXEMPLARY) return 'A';
-  if (n >= SCORE_GOOD) return 'B';
-  if (n >= SCORE_ADEQUATE) return 'C';
-  if (n >= SCORE_POOR) return 'D';
+  const n = typeof score === 'number' ? score : parseFloat(score);
+  if (Number.isNaN(n)) return '';
+  const thresholds = getGradeThresholds();
+  for (let i = 0; i < thresholds.length; i += 1) {
+    if (n >= thresholds[i][0]) return TIER_LETTERS[i] ?? 'D';
+  }
   return 'F';
 }
 

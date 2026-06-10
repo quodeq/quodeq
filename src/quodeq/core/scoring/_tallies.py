@@ -1,6 +1,8 @@
 """Violation and compliance type-counting helpers."""
 from __future__ import annotations
 
+from typing import Mapping
+
 from quodeq.core.scoring._constants import _SEVERITY_WEIGHT
 
 
@@ -49,9 +51,14 @@ def tally_compliance_types_by_reason(compliance: list[dict]) -> dict[str, int]:
     return _tally_types(compliance, "reason")
 
 
-def _weighted_sum(type_counts: dict[str, int]) -> float:
+def _weighted_sum(
+    type_counts: dict[str, int],
+    severity_weight: Mapping[str, float] | None = None,
+) -> float:
     """Sum type counts weighted by severity."""
+    weights = severity_weight if severity_weight is not None else _SEVERITY_WEIGHT
+    fallback = weights.get("minor", 0.25)
     return sum(
-        count * _SEVERITY_WEIGHT.get(sev, 0.25)
+        count * weights.get(sev, fallback)
         for sev, count in type_counts.items()
     )

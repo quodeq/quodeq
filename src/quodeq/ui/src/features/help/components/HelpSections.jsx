@@ -249,7 +249,7 @@ export function Dimensions() {
       <p>The {ICON_EYE_ON} <strong>visibility toggle</strong> on each standard card controls whether a dimension is part of evaluations and the Overview. Hide a dimension to ignore it without deleting any standards. Re-enable it any time, the next run will include it.</p>
 
       <h3>Scoring summary</h3>
-      <p>Each dimension is scored 0 to 10 with a letter grade. The project grade is a weighted average across enabled dimensions. See <em>Philosophy</em> for the full Q² formula.</p>
+      <p>Each dimension is scored 0 to 10 with a letter grade. The project grade averages enabled dimensions. Dimension weights apply only when enabled in Settings, Grade formula. See <em>Philosophy</em> for the full Q² formula.</p>
     </section>
   );
 }

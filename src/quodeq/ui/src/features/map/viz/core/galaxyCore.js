@@ -9,6 +9,8 @@
  * allow injection for testing.
  */
 
+import { getGradeThresholds } from '../../../../utils/gradeThresholds.js';
+
 export const TAU = Math.PI * 2;
 
 /* ── Theme color helpers ── */
@@ -78,12 +80,14 @@ export function getThemeColors(sourceEl, { cache } = {}) {
 export function invalidateThemeColors() { _themeColors = null; }
 
 // score is 0-10 scale (matching the app's grading system)
+const GRADE_COLOR_KEYS = ['gradeTop', 'gradeHigh', 'gradeMid', 'gradeLow'];
+
 export function scoreRGB(score) {
   const tc = getThemeColors();
-  if (score >= 9) return tc.gradeTop;
-  if (score >= 7) return tc.gradeHigh;
-  if (score >= 5) return tc.gradeMid;
-  if (score >= 3) return tc.gradeLow;
+  const thresholds = getGradeThresholds();
+  for (let i = 0; i < thresholds.length; i += 1) {
+    if (score >= thresholds[i][0]) return tc[GRADE_COLOR_KEYS[i]] ?? tc.gradeLow;
+  }
   return tc.gradeBottom;
 }
 
