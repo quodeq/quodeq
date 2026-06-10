@@ -9,6 +9,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
 
+from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types import DimensionResult, DimensionSummary, to_camel_dict
 
 from quodeq.services.ports import (
@@ -364,6 +365,7 @@ class _SelectedRunContext:
 def _compute_dashboard_payload(
     reports_root: Path, project: str, runs: list[RunInfo],
     ctx: _SelectedRunContext, cc: DashboardCacheConfig,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> _DashboardPayload:
     """Compute history-dependent parts of the dashboard response."""
     selected_dim_names = {d.dimension for d in ctx.dimensions}
@@ -404,7 +406,7 @@ def _compute_dashboard_payload(
     )
     return _DashboardPayload(
         selected_summary=ctx.summary,
-        trend=build_accumulated_trend(history_runs, get_run_dimensions),
+        trend=build_accumulated_trend(history_runs, get_run_dimensions, params=params),
         dimensions_with_trend=_enrich_dimensions_with_trend(ctx.dimensions, previous_by_dimension),
         previous_by_dimension=previous_by_dimension,
         stale_previous_by_dimension=stale_previous_by_dimension,
@@ -417,6 +419,7 @@ def _apply_sql_grade_override(
     project: str,
     run_id: str,
     payload: _DashboardPayload,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> _DashboardPayload:
     """Override per-dimension grade fields from SQL grade tables when available.
 
@@ -471,7 +474,7 @@ def _apply_sql_grade_override(
 
     overridden_dims = [_override_dim(d) for d in payload.dimensions_with_trend]
 
-    run_score = store.read_run_score_from_dim_scores()
+    run_score = store.read_run_score_from_dim_scores(params)
     if run_score.get("grade") is not None:
         sql_numeric_avg: float | None = run_score.get("score")
         sql_run_grade: str | None = run_score.get("grade")
@@ -494,11 +497,19 @@ def build_dashboard(
     run: str,
     *,
     cache_config: DashboardCacheConfig | None = None,
+    params: ScoringParams | None = None,
 ) -> dict[str, Any]:
     """Build a full dashboard response for *project* at *run*.
 
     Pass *cache_config* to override the module-level LRU cache.
+
+    When *params* is None, the saved grade-formula params are loaded once
+    here and threaded through the run-level summary, SQL grade override, and
+    trend so the dashboard rollup honours the user's custom formula.
     """
+    if params is None:
+        from quodeq.services import grade_formula  # noqa: PLC0415
+        params = grade_formula.load_params()
     cc = cache_config or DashboardCacheConfig()
     reports_root = Path(reports_dir)
     runs = list_runs(reports_root, project)
@@ -519,8 +530,8 @@ def build_dashboard(
         dimensions=selected_dims,
         summary=summarize_dimensions(selected_dims),
     )
-    payload = _compute_dashboard_payload(reports_root, project, runs, ctx, cc)
-    payload = _apply_sql_grade_override(reports_root, project, selected_run.run_id, payload)
+    payload = _compute_dashboard_payload(reports_root, project, runs, ctx, cc, params)
+    payload = _apply_sql_grade_override(reports_root, project, selected_run.run_id, payload, params)
     exit_reason = _read_run_exit_reason(reports_root, project, selected_run.run_id)
     return _build_dashboard_result(
         project, runs, selected_run, payload, exit_reason=exit_reason,

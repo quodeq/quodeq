@@ -4,15 +4,21 @@ from __future__ import annotations
 from typing import Any
 
 from quodeq.core.scoring.internals import score_to_grade_label
+from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.services.ports import most_frequent_grade, parse_numeric_score
 
 
 def recompute_summary(
     dimensions: list[dict[str, Any]],
     old_summary: dict[str, Any],
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, Any]:
-    """Recompute the accumulated summary from rescored camelCase dimension dicts."""
-    scores: list[float] = []
+    """Recompute the accumulated summary from rescored camelCase dimension dicts.
+
+    Honours *params*: the average is dimension-weighted when the formula
+    enables it, and the overall grade label uses the custom thresholds.
+    """
+    score_pairs: list[tuple[str | None, float]] = []
     grades: list[str] = []
     total_violations = 0
     total_compliance = 0
@@ -23,7 +29,7 @@ def recompute_summary(
         if score_str:
             val = parse_numeric_score(score_str)
             if val is not None:
-                scores.append(val)
+                score_pairs.append((d.get("dimension"), val))
         grade = d.get("overallGrade")
         if grade:
             grades.append(grade)
@@ -35,9 +41,9 @@ def recompute_summary(
         major += severity.get("major", 0)
         minor += severity.get("minor", 0)
 
-    avg = round(sum(scores) / len(scores), 1) if scores else None
+    avg = dimension_weighted_average(score_pairs, params)
     overall_grade = (
-        score_to_grade_label(avg) if avg is not None
+        score_to_grade_label(avg, params=params) if avg is not None
         else (most_frequent_grade(grades) if grades else None)
     )
 

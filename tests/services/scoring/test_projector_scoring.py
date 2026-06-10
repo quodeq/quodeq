@@ -282,3 +282,82 @@ def test_summary_builders_agree_under_dimension_weights():
     assert legacy.numeric_average == 7.2
     assert sql["numericAverage"] == 7.2
     assert sql["overallGrade"] == legacy.overall_grade
+
+
+# --- read-time aggregation honours saved params (dashboard summary, trend) ----
+#
+# Regression guards for the three read-time aggregation points that used to
+# fall back to DEFAULT_PARAMS while the rest of the stack threaded the saved
+# grade-formula params: recompute_summary (accumulated summary rescore) and
+# build_accumulated_trend (history chart labels).
+
+_CUSTOM_THRESHOLDS = (
+    (9.9, "Exemplary"), (9.8, "Good"), (9.7, "Adequate"), (0.1, "Poor"),
+)
+
+
+def test_recompute_summary_uses_custom_thresholds_for_overall_grade():
+    """A ~7.0 average lands in the custom 'Poor' band, not the default
+    'Good'/'Adequate'. Without threading params, recompute_summary labelled
+    it under DEFAULT_PARAMS thresholds (the accumulated-grade mislabel bug)."""
+    from quodeq.services.scoring._summary import recompute_summary
+
+    params = dataclasses.replace(DEFAULT_PARAMS, grade_thresholds=_CUSTOM_THRESHOLDS)
+    dims = [
+        {"dimension": "security", "overallScore": "8.0/10", "overallGrade": "Good"},
+        {"dimension": "performance", "overallScore": "6.0/10", "overallGrade": "Adequate"},
+    ]
+
+    # Sanity: under the default formula this avg (7.0) is NOT "Poor".
+    default_summary = recompute_summary(dims, {})
+    assert default_summary["overallGrade"] != "Poor"
+
+    summary = recompute_summary(dims, {}, params=params)
+    assert summary["numericAverage"] == 7.0
+    assert summary["overallGrade"] == "Poor"
+
+
+def test_recompute_summary_applies_dimension_weights_when_enabled():
+    """With dimension weights on, the average is weighted (security 1.2,
+    performance 0.8) → 7.2, not the plain mean 7.0."""
+    from quodeq.services.scoring._summary import recompute_summary
+
+    params = dataclasses.replace(DEFAULT_PARAMS, dimension_weights_enabled=True)
+    dims = [
+        {"dimension": "security", "overallScore": "8.0/10", "overallGrade": "Good"},
+        {"dimension": "performance", "overallScore": "6.0/10", "overallGrade": "Adequate"},
+    ]
+
+    summary = recompute_summary(dims, {}, params=params)
+    # (8.0*1.2 + 6.0*0.8) / (1.2 + 0.8) = 7.2
+    assert summary["numericAverage"] == 7.2
+
+
+def test_build_accumulated_trend_uses_custom_thresholds_for_run_grade():
+    """The trend builder's run/accumulated grade labels must reflect the
+    custom thresholds. Build the full public input (a RunInfo list + a
+    dict-backed fetcher) since constructing those is cheap, rather than
+    testing an internal helper."""
+    from quodeq.core.types.dimension import DimensionResult
+    from quodeq.data.fs.report_parser._run_info import RunInfo
+    from quodeq.services._dashboard_trend import build_accumulated_trend
+
+    params = dataclasses.replace(DEFAULT_PARAMS, grade_thresholds=_CUSTOM_THRESHOLDS)
+
+    run = RunInfo(run_id="r1", date_iso="2026-06-10", date_label="Jun 10")
+    dims = [
+        DimensionResult(dimension="security", overall_grade="Good", overall_score="8.0/10"),
+        DimensionResult(dimension="performance", overall_grade="Adequate", overall_score="6.0/10"),
+    ]
+
+    def fetcher(run_id: str) -> list[DimensionResult]:
+        return dims if run_id == "r1" else []
+
+    # Default formula: ~7.0 avg is not "Poor".
+    default_trend = build_accumulated_trend([run], fetcher)
+    assert default_trend[0]["runOverallGrade"] != "Poor"
+
+    trend = build_accumulated_trend([run], fetcher, params=params)
+    assert trend[0]["runNumericAverage"] == 7.0
+    assert trend[0]["runOverallGrade"] == "Poor"
+    assert trend[0]["overallGrade"] == "Poor"

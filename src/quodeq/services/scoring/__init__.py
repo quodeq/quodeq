@@ -416,7 +416,7 @@ def _rescore_accumulated_response(
     )
     new_dims = _merge_rescored_dims(dims, rescored_by_dim)
 
-    new_summary = recompute_summary(new_dims, accumulated.get("summary", {}))
+    new_summary = recompute_summary(new_dims, accumulated.get("summary", {}), params=params)
     return {**accumulated, "dimensions": new_dims, "summary": new_summary}
 
 
@@ -462,7 +462,7 @@ def get_project_scores(
     scoreable_runs = [r for r in all_runs if r.status not in ("cancelled", "failed")]
     history_runs = scoreable_runs[:_max_history_runs()]
     rescoring_fetcher = _make_rescoring_fetcher(reports_root, project, params=params)
-    trend = build_accumulated_trend(history_runs, rescoring_fetcher)
+    trend = build_accumulated_trend(history_runs, rescoring_fetcher, params=params)
 
     # Build available runs list
     available_runs = [
