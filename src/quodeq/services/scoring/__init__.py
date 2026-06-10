@@ -29,6 +29,7 @@ _logger = logging.getLogger(__name__)
 from quodeq.core.types import to_camel_dict
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
 from quodeq.core.scoring.internals import score_to_grade_label
+from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.types.dimension import DimensionResult, DimensionSummary, GradeBreakdown
 from quodeq.services.accumulated import compute_accumulated
@@ -132,7 +133,9 @@ def _build_dimension_dict(
     return to_camel_dict(dim)
 
 
-def _build_summary_from_dim_dicts(dim_dicts: list[dict]) -> dict:
+def _build_summary_from_dim_dicts(
+    dim_dicts: list[dict], params: ScoringParams = DEFAULT_PARAMS,
+) -> dict:
     """Build a camelCase summary dict from a list of dimension camelCase dicts.
 
     Mirrors ``summarize_dimensions`` logic but works directly on the already-
@@ -154,7 +157,7 @@ def _build_summary_from_dim_dicts(dim_dicts: list[dict]) -> dict:
         numeric_average = round(sum(numeric_scores) / len(numeric_scores), _SCORE_DECIMAL_PLACES)
 
     if numeric_average is not None:
-        overall_grade = score_to_grade_label(numeric_average)
+        overall_grade = score_to_grade_label(numeric_average, params=params)
     elif overall_grades:
         from collections import Counter  # noqa: PLC0415
         overall_grade = Counter(overall_grades).most_common(1)[0][0]

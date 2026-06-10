@@ -217,3 +217,42 @@ def test_parity_low_confidence_returns_insufficient_in_both() -> None:
     assert p_grade["grade"] == "Insufficient"
     new_dim = compute_dimension_score(dimension="Security", principle_grades=[p_grade])
     assert new_dim["grade"] == "Insufficient"
+
+
+# --- params threading ---------------------------------------------------------
+import dataclasses
+
+from quodeq.core.scoring.params import DEFAULT_PARAMS
+
+
+def test_compute_dimension_score_with_custom_thresholds_changes_grade():
+    params = dataclasses.replace(DEFAULT_PARAMS, grade_thresholds=(
+        (9.9, "Exemplary"), (9.0, "Good"), (8.0, "Adequate"), (7.0, "Poor"),
+    ))
+    from quodeq.services.scoring.projector_scoring import compute_dimension_score
+    grades = [{"score": 8.5, "grade": "Good"}]
+    result = compute_dimension_score(
+        dimension="security", principle_grades=grades, params=params,
+    )
+    assert result["grade"] == "Adequate"
+
+
+def test_compute_run_score_applies_dimension_weights_when_enabled():
+    params = dataclasses.replace(DEFAULT_PARAMS, dimension_weights_enabled=True)
+    from quodeq.services.scoring.projector_scoring import compute_run_score
+    dims = [
+        {"dimension": "security", "score": 8.0},
+        {"dimension": "performance", "score": 6.0},
+    ]
+    result = compute_run_score(dims, params=params)
+    # security 1.2, performance 0.8 → (8*1.2 + 6*0.8) / 2.0 = 7.2
+    assert result["score"] == 7.2
+
+
+def test_compute_run_score_plain_mean_when_disabled():
+    from quodeq.services.scoring.projector_scoring import compute_run_score
+    dims = [
+        {"dimension": "security", "score": 8.0},
+        {"dimension": "performance", "score": 6.0},
+    ]
+    assert compute_run_score(dims)["score"] == 7.0

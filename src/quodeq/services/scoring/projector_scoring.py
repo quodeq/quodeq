@@ -19,6 +19,11 @@ from quodeq.core.scoring.internals import (
     violation_base,
     violation_ceiling,
 )
+from quodeq.core.scoring.params import (
+    DEFAULT_PARAMS,
+    ScoringParams,
+    dimension_weighted_average,
+)
 from quodeq.core.types.finding import Finding
 
 
@@ -46,6 +51,7 @@ def compute_principle_grade(
     dismissed_count: int = 0,
     source_file_count: int = 0,
     scale_multiplier: int = 1,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, Any]:
     """Score a single principle. ``findings`` excludes dismissed.
 
@@ -94,15 +100,15 @@ def compute_principle_grade(
             "dismissed_count": dismissed_count,
         }
 
-    base = violation_base(vt_counts)
-    lift = compliance_lift(ct_counts, vt_counts)
-    ceil = violation_ceiling(vt_counts)
-    floor = severity_grade_floor(vt_counts)
+    base = violation_base(vt_counts, params=params)
+    lift = compliance_lift(ct_counts, vt_counts, params=params)
+    ceil = violation_ceiling(vt_counts, params=params)
+    floor = severity_grade_floor(vt_counts, params=params)
 
     raw = base + (10.0 - base) * lift
     final = max(floor, min(ceil, raw))
     final = round(final, 1)
-    grade = score_to_grade_label(final)
+    grade = score_to_grade_label(final, params=params)
 
     return {
         "principle_id": principle_id,
@@ -117,19 +123,33 @@ def compute_dimension_score(
     *,
     dimension: str,
     principle_grades: list[dict[str, Any]],
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, Any]:
-    """Average non-Insufficient principle scores into a dimension-level score."""
+    """Average non-Insufficient principle scores into a dimension-level score.
+
+    Averaging across PRINCIPLES is always a plain mean; per-dimension weights
+    apply across DIMENSIONS (see ``compute_run_score``), not principles.
+    """
     scored = [p for p in principle_grades if p.get("score") is not None]
     if not scored:
         return {"dimension": dimension, "score": None, "grade": "Insufficient"}
     avg = round(sum(p["score"] for p in scored) / len(scored), 1)
-    return {"dimension": dimension, "score": avg, "grade": score_to_grade_label(avg)}
+    return {"dimension": dimension, "score": avg, "grade": score_to_grade_label(avg, params=params)}
 
 
-def compute_run_score(dimension_scores: list[dict[str, Any]]) -> dict[str, Any]:
-    """Average non-null dimension scores into a run-level score."""
-    scored = [d["score"] for d in dimension_scores if d.get("score") is not None]
-    if not scored:
+def compute_run_score(
+    dimension_scores: list[dict[str, Any]],
+    params: ScoringParams = DEFAULT_PARAMS,
+) -> dict[str, Any]:
+    """Average non-null dimension scores into a run-level score.
+
+    Applies per-dimension weights when params enable them.
+    """
+    pairs = [
+        (d.get("dimension"), d["score"])
+        for d in dimension_scores if d.get("score") is not None
+    ]
+    avg = dimension_weighted_average(pairs, params)
+    if avg is None:
         return {"score": None, "grade": None}
-    avg = round(sum(scored) / len(scored), 1)
-    return {"score": avg, "grade": score_to_grade_label(avg)}
+    return {"score": avg, "grade": score_to_grade_label(avg, params=params)}
