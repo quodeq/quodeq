@@ -10,6 +10,7 @@ const ProjectsPage = lazy(() => import('./features/dashboard/components/Projects
 const HistoryPage = lazy(() => import('./features/history/components/HistoryPage.jsx'));
 const EvaluateScreen = lazy(() => import('./features/evaluation/components/EvaluateScreen.jsx'));
 const SettingsPage = lazy(() => import('./features/settings/components/SettingsPage.jsx'));
+const GradeFormulaPage = lazy(() => import('./features/grade-formula/GradeFormulaPage.jsx'));
 const StandardsPage = lazy(() => import('./features/standards/StandardsPage.jsx'));
 const ViolationsPage = lazy(() => import('./features/violations/components/ViolationsPage.jsx'));
 const MapPage = lazy(() => import('./features/map/components/MapPage.jsx'));
@@ -18,6 +19,8 @@ const OnboardingWizard = lazy(() => import('./features/onboarding/components/Onb
 import EmptyStateWithTour from './features/onboarding/components/EmptyStateWithTour.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
 import { useApi } from './api/ApiContext.jsx';
+import { getGradeFormula } from './api/index.js';
+import { setGradeThresholds } from './utils/gradeThresholds.js';
 import LoadingScreen from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import TopBar from './components/TopBar.jsx';
@@ -37,7 +40,7 @@ import { LlamaCppLogProvider } from './features/settings/llamacpp-log/LlamaCppLo
 // Tabs that are reachable with zero projects. `projects` is in here so a
 // fresh-install user can land on Projects and add their first one without
 // hitting the "no analyzed projects yet" wall.
-const NO_PROJECT_TABS = ['projects', 'evaluate', 'standards', 'settings', 'help'];
+const NO_PROJECT_TABS = ['projects', 'evaluate', 'standards', 'settings', 'help', 'grade-formula'];
 const SELF_HANDLED_EMPTY = new Set(['overview', 'map', 'violations', 'history']);
 
 /**
@@ -93,10 +96,11 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onG
  * @param {{ settings: Object }} props
  * @returns {JSX.Element}
  */
-function SettingsCase({ settings }) {
+function SettingsCase({ settings, onOpenGradeFormula }) {
   return (
     <SettingsPage
       theme={{ mode: settings.themeMode, family: settings.themeFamily, onApplyMode: settings.applyMode, onApplyFamily: settings.applyFamily }}
+      onOpenGradeFormula={onOpenGradeFormula}
     />
   );
 }
@@ -351,7 +355,8 @@ const ROUTE_RENDERERS = {
       }}
     />
   ),
-  settings: (params, props) => <SettingsCase settings={props.settings} />,
+  settings: (params, props) => <SettingsCase settings={props.settings} onOpenGradeFormula={() => props.navigation.handleNavigate('grade-formula')} />,
+  'grade-formula': (params, props) => <GradeFormulaPage navigation={props.navigation} />,
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup }} />,
   standards: () => <StandardsPage />,
   help: () => <HelpPage />,
@@ -424,6 +429,16 @@ export default function App() {
   const autoOpenedRef = useRef(false);
 
   const { showToast } = useSidePane();
+
+  // Sync the client-side grade-label thresholds with the server formula at
+  // boot so every gauge/badge agrees with the applied Q² parameters. The
+  // gradeThresholds store seeds with the Q² defaults, so a failed/absent
+  // fetch leaves a sane fallback in place.
+  useEffect(() => {
+    getGradeFormula()
+      .then((d) => setGradeThresholds(d?.current?.gradeThresholds))
+      .catch(() => {});
+  }, []);
 
   // While an evaluation is running we block any path that would open the
   // onboarding wizard or start a second evaluation — only one job may be in
