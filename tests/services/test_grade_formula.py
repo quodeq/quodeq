@@ -46,3 +46,14 @@ def test_save_rejects_invalid_params(formula_path):
     with pytest.raises(ValueError):
         grade_formula.save_params(bad)
     assert not formula_path.exists()
+
+
+@pytest.mark.parametrize("payload", [
+    "[1, 2, 3]",
+    "null",
+    '{"severityWeight": "oops"}',
+    '{"severityWeight": [1, 2]}',
+])
+def test_load_falls_back_on_wrong_shape_json(formula_path, payload):
+    formula_path.write_text(payload)
+    assert grade_formula.load_params() == DEFAULT_PARAMS

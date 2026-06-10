@@ -34,7 +34,7 @@ def load_params() -> ScoringParams:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         params = params_from_dict(data)
-    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+    except (OSError, json.JSONDecodeError, AttributeError, KeyError, TypeError, ValueError) as exc:
         _logger.warning("Unreadable %s (%s); using Q2 default formula.", path, exc)
         return DEFAULT_PARAMS
     if validate_params(params):
