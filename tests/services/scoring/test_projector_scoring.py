@@ -256,3 +256,29 @@ def test_compute_run_score_plain_mean_when_disabled():
         {"dimension": "performance", "score": 6.0},
     ]
     assert compute_run_score(dims)["score"] == 7.0
+
+
+def test_summary_builders_agree_under_dimension_weights():
+    """SQL-path and eval-files-path summaries must produce the same weighted average."""
+    from quodeq.core.types.dimension import DimensionResult
+    from quodeq.data.fs.report_parser._summary import summarize_dimensions
+    from quodeq.services.scoring import _build_summary_from_dim_dicts
+
+    params = dataclasses.replace(DEFAULT_PARAMS, dimension_weights_enabled=True)
+
+    dims = [
+        DimensionResult(dimension="security", overall_grade="Good", overall_score="8.0/10"),
+        DimensionResult(dimension="performance", overall_grade="Adequate", overall_score="6.0/10"),
+    ]
+    legacy = summarize_dimensions(dims, params=params)
+
+    dim_dicts = [
+        {"dimension": "security", "overallScore": "8.0/10", "overallGrade": "Good"},
+        {"dimension": "performance", "overallScore": "6.0/10", "overallGrade": "Adequate"},
+    ]
+    sql = _build_summary_from_dim_dicts(dim_dicts, params=params)
+
+    # security 1.2, performance 0.8 → (8.0*1.2 + 6.0*0.8) / (1.2 + 0.8) = 7.2 weighted (vs 7.0 plain)
+    assert legacy.numeric_average == 7.2
+    assert sql["numericAverage"] == 7.2
+    assert sql["overallGrade"] == legacy.overall_grade

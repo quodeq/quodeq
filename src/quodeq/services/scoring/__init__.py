@@ -29,7 +29,7 @@ _logger = logging.getLogger(__name__)
 from quodeq.core.types import to_camel_dict
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
 from quodeq.core.scoring.internals import score_to_grade_label
-from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
+from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.types.dimension import DimensionResult, DimensionSummary, GradeBreakdown
 from quodeq.services.accumulated import compute_accumulated
@@ -141,20 +141,17 @@ def _build_summary_from_dim_dicts(
     Mirrors ``summarize_dimensions`` logic but works directly on the already-
     serialised dicts produced by ``_build_dimension_dict``.
     """
-    _SCORE_DECIMAL_PLACES = 1
     overall_grades = [d["overallGrade"] for d in dim_dicts if d.get("overallGrade")]
-    numeric_scores: list[float] = []
+    score_pairs: list[tuple[str | None, float]] = []
     for d in dim_dicts:
         s = d.get("overallScore")
         if s and isinstance(s, str) and "/" in s:
             try:
-                numeric_scores.append(float(s.split("/")[0]))
+                score_pairs.append((d.get("dimension"), float(s.split("/")[0])))
             except ValueError:
                 pass
 
-    numeric_average = None
-    if numeric_scores:
-        numeric_average = round(sum(numeric_scores) / len(numeric_scores), _SCORE_DECIMAL_PLACES)
+    numeric_average = dimension_weighted_average(score_pairs, params)
 
     if numeric_average is not None:
         overall_grade = score_to_grade_label(numeric_average, params=params)
