@@ -420,83 +420,6 @@ def _compute_dashboard_payload(
     )
 
 
-def _apply_sql_grade_override(
-    reports_root: Path,
-    project: str,
-    run_id: str,
-    payload: _DashboardPayload,
-    params: ScoringParams = DEFAULT_PARAMS,
-) -> _DashboardPayload:
-    """Override per-dimension grade fields from SQL grade tables when available.
-
-    Keeps the dashboard rollup in lockstep with dim-detail dismisses: a
-    dismiss updates SQL via the projection layer, the next dashboard read
-    reflects the new scores. Safe to overlay because the SQL projector
-    now applies the same confidence-level Insufficient rule the CLI
-    engine uses (see ``services.scoring.projector_scoring`` +
-    ``core.evidence.model.classify_confidence_level``) — SQL grades and
-    JSON grades agree on the same input.
-
-    Falls back to the FS-based grades when grade tables are empty or the
-    run directory does not exist.
-    """
-    import sqlite3  # noqa: PLC0415
-
-    from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
-    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
-
-    run_dir = reports_root / project / run_id
-    if not run_dir.is_dir():
-        return payload
-
-    store = SQLiteStateStore(run_dir)
-    try:
-        repo = SqliteFindingsRepository(run_dir)
-        repo._ensure_fresh()  # noqa: SLF001
-        dim_rows = store.read_dimension_scores()
-    except sqlite3.DatabaseError:
-        # evaluation.db is unreadable by this binary: written by a newer Quodeq
-        # (SchemaVersionError, a DatabaseError subclass) or otherwise corrupt /
-        # half-written. Keep the FS-based grades already in the payload rather
-        # than crashing the build.
-        _logger.warning(
-            "evaluation.db for %s/%s is unreadable; keeping FS-based grades "
-            "in the dashboard.", project, run_id,
-        )
-        return payload
-    if not dim_rows:
-        return payload
-
-    sql_grades: dict[str, dict] = {r["dimension"]: r for r in dim_rows}
-
-    def _override_dim(d: DimensionResult) -> DimensionResult:
-        row = sql_grades.get(d.dimension)
-        if row is None:
-            return d
-        score_val: float | None = row.get("score")
-        sql_score = f"{score_val}/10" if score_val is not None else d.overall_score
-        sql_grade = row.get("grade") or d.overall_grade
-        return replace(d, overall_score=sql_score, overall_grade=sql_grade)
-
-    overridden_dims = [_override_dim(d) for d in payload.dimensions_with_trend]
-
-    run_score = store.read_run_score_from_dim_scores(params)
-    if run_score.get("grade") is not None:
-        sql_numeric_avg: float | None = run_score.get("score")
-        sql_run_grade: str | None = run_score.get("grade")
-        overridden_summary = replace(
-            payload.selected_summary,
-            overall_grade=sql_run_grade,
-            numeric_average=sql_numeric_avg,
-        )
-    else:
-        overridden_summary = payload.selected_summary
-
-    payload.dimensions_with_trend = overridden_dims
-    payload.selected_summary = overridden_summary
-    return payload
-
-
 def build_dashboard(
     reports_dir: str,
     project: str,
@@ -529,15 +452,18 @@ def build_dashboard(
         }
 
     selected_run, selected_index = _resolve_selected_run(runs, run)
+    # read_run_data overlays the SQL grade tables for event-log runs, so the
+    # selected run's dims (and the summary derived from them) already reflect
+    # dismisses and any applied grade formula. Passing *params* keeps the
+    # aggregate threshold labels and dimension weights in sync.
     selected_dims = read_run_data(reports_root, project, selected_run.run_id)
     ctx = _SelectedRunContext(
         run=selected_run,
         index=selected_index,
         dimensions=selected_dims,
-        summary=summarize_dimensions(selected_dims),
+        summary=summarize_dimensions(selected_dims, params),
     )
     payload = _compute_dashboard_payload(reports_root, project, runs, ctx, cc, params)
-    payload = _apply_sql_grade_override(reports_root, project, selected_run.run_id, payload, params)
     exit_reason = _read_run_exit_reason(reports_root, project, selected_run.run_id)
     return _build_dashboard_result(
         project, runs, selected_run, payload, exit_reason=exit_reason,

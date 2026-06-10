@@ -148,7 +148,15 @@ Superseded in part by the Grade Formula Editor
 Dimension weights are now applied at runtime when the user enables the
 "apply dimension weights" switch in Settings > Grade formula
 (`ScoringParams.dimension_weights_enabled`). The default remains OFF, so
-out-of-the-box behavior is unchanged (plain unweighted mean). Both
-aggregation paths (`summarize_dimensions`, `compute_run_score` and the
-accumulated view) share `dimension_weighted_average()` from
-`core/scoring/params.py`, so they cannot drift apart.
+out-of-the-box behavior is unchanged (plain unweighted mean). The
+aggregation paths (`summarize_dimensions`, `compute_run_score`, and the
+accumulated view) all share `dimension_weighted_average()` from
+`core/scoring/params.py`. Per-dimension grades, in turn, are unified at
+the read layer: for event-log runs `read_run_data` overlays the SQL grade
+tables (rewritten on dismiss and on a grade-formula Apply via
+`data/projection/grade_projector.recompute_grades`) onto the eval-time
+`DimensionResult`s, so the run-detail, accumulated, trend, and project-card
+surfaces read the same numbers by construction. They can still drift if a
+new aggregate is computed off the eval-time JSON without threading the saved
+params or bypassing `read_run_data` — the shared average and the SQL grade
+overlay are what keep them aligned, not an inherent guarantee.

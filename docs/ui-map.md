@@ -278,7 +278,7 @@ flowchart TB
 | ServerSection | [`ServerSection.jsx`](../src/quodeq/ui/src/features/settings/components/ServerSection.jsx) | health, version, download `evaluation.db`, server log stream |
 | AppearanceSection | [`AppearanceSection.jsx`](../src/quodeq/ui/src/features/settings/components/AppearanceSection.jsx) | theme mode (dark/light/system), theme family (daruma/custom) |
 | AboutSection | [`AboutSection.jsx`](../src/quodeq/ui/src/features/settings/components/AboutSection.jsx) | version, random tagline, doc/repo links |
-| Grade formula | [`GradeFormulaEditor.jsx`](../src/quodeq/ui/src/features/grade-formula/GradeFormulaEditor.jsx) | Q² tuning sliders (SEVERITY / CURVE / BOUNDARIES / DIMENSIONS tabs), before/after preview gauges, APPLY (rescores all runs), RESET to Q2 defaults |
+| Grade formula | [`GradeFormulaPage.jsx`](../src/quodeq/ui/src/features/grade-formula/GradeFormulaPage.jsx) | Q² tuning sliders (SEVERITY / CURVE / BOUNDARIES / DIMENSIONS tabs), before/after preview gauges, APPLY (rescores all runs), RESET to Q2 defaults |
 
 **Cross-link from Evaluate:** `ActiveProviderBadge` on `EvaluateScreen` → opens `settings`.
 
