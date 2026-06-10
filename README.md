@@ -68,7 +68,7 @@ Each finding includes a reason, the offending code, and a fix plan. Results are 
 
 > **Debian/Ubuntu heads-up:** If you use the native desktop window (not `--browser`), you'll need `sudo apt install -y python3-gi gir1.2-webkit2-4.1` too. Otherwise quodeq will auto-fall-back to opening the dashboard in your default browser.
 
-> **Windows note:** The test suite runs on `windows-latest` as a **blocking** CI gate, so a Windows regression blocks the PR. The desktop window (WebView2) is smoke-tested manually per release (see `docs/windows-manual-smoke-checklist.md`). If anything misbehaves, please [open an issue](https://github.com/quodeq/quodeq/issues).
+> **Windows note:** The test suite runs on `windows-latest` as a **blocking** CI gate, so a Windows regression blocks the PR. The desktop window (WebView2) is smoke-tested manually per release. If anything misbehaves, please [open an issue](https://github.com/quodeq/quodeq/issues).
 
 Minimum versions: Python 3.12+. (The dashboard UI ships pre-built inside the wheel, so end users no longer need Node.js or npm. Contributors who want to iterate on the UI source need Node 20+ and npm 10+, see [CONTRIBUTING.md](CONTRIBUTING.md).)
 
