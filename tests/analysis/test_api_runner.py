@@ -391,6 +391,46 @@ class TestSyncCacheWrite:
         )
 
 
+class TestDropStatsRecording:
+    """_call_api feeds the per-run drop-ratio accumulator (issue #606).
+
+    The per-call WARNING already counts dropped findings; recording the same
+    (dropped, kept) pair into ``_drop_stats`` lets the run loop surface ONE
+    aggregate signal instead of N scattered lines.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _reset_accumulator(self):
+        from quodeq.analysis import _drop_stats
+        _drop_stats.consume()
+        yield
+        _drop_stats.consume()
+
+    def test_call_with_malformed_finding_records_drop_and_kept(self, api_config):
+        from quodeq.analysis import _drop_stats
+        valid = {"req": "R1", "t": "violation", "file": "a.py", "line": 5,
+                 "severity": "minor", "w": "x", "snippet": "code", "reason": "bad"}
+        malformed = {"t": "violation", "file": "b.py", "line": 1, "w": "y",
+                     "snippet": "code", "reason": "bad"}  # no req -> dropped
+        content = json.dumps({"findings": [valid, malformed]})
+        client = _mock_raw_client(content)
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = client
+            _call_api("prompt", api_config)
+        stats = _drop_stats.consume()
+        assert stats.dropped == 1
+        assert stats.kept == 1
+
+    def test_failed_call_records_nothing(self, api_config):
+        from quodeq.analysis import _drop_stats
+        client = MagicMock()
+        client.chat.completions.create.side_effect = httpx.ReadTimeout("timeout")
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = client
+            _call_api("prompt", api_config)
+        assert _drop_stats.consume().parsed == 0
+
+
 class TestApiRunnerConfig:
     """ApiRunnerConfig dataclass."""
 
