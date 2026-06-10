@@ -33,59 +33,70 @@ from quodeq.core.scoring.numerical import (  # noqa: F401 — re-export
     build_deductions,
     count_grade_drops,
 )
+from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 
 
 # ---------------------------------------------------------------------------
 # 4-stage scoring formula
 # ---------------------------------------------------------------------------
 
-def violation_base(violation_type_counts: dict[str, int]) -> float:
+def violation_base(
+    violation_type_counts: dict[str, int],
+    *, params: ScoringParams = DEFAULT_PARAMS,
+) -> float:
     """Compute the base score from violations alone (ignoring compliance).
 
     Uses a hyperbolic curve: ``base = 10 / (1 + K * weighted_violations)``
     Returns a value in [0, 10].
     """
-    wv = _weighted_sum(violation_type_counts)
+    wv = _weighted_sum(violation_type_counts, params.severity_weight)
     if wv == 0:
         return 10.0
-    return 10.0 / (1.0 + _BASE_K * wv)
+    return 10.0 / (1.0 + params.base_k * wv)
 
 
 def compliance_lift(
     compliance_type_counts: dict[str, int],
     violation_type_counts: dict[str, int],
+    *, params: ScoringParams = DEFAULT_PARAMS,
 ) -> float:
     """Compute the lift factor from compliance evidence.
 
     Returns a value in [0, 1] representing the fraction of the gap filled.
     """
-    wv = _weighted_sum(violation_type_counts)
+    wv = _weighted_sum(violation_type_counts, params.severity_weight)
     cc = sum(compliance_type_counts.get(sev, 0) for sev in compliance_type_counts)
     if cc == 0 or wv == 0:
         return 0.0
     raw_lift = cc / (cc + wv)
-    return raw_lift ** _LIFT_COMPRESS
+    return raw_lift ** params.lift_compress
 
 
-def violation_ceiling(violation_type_counts: dict[str, int]) -> float:
+def violation_ceiling(
+    violation_type_counts: dict[str, int],
+    *, params: ScoringParams = DEFAULT_PARAMS,
+) -> float:
     """Compute the maximum achievable score given the violation weight.
 
     ``ceiling = 10 - log2(1 + wv) * CEIL_SCALE``
     """
-    wv = _weighted_sum(violation_type_counts)
+    wv = _weighted_sum(violation_type_counts, params.severity_weight)
     if wv == 0:
         return 10.0
-    return 10.0 - math.log2(1.0 + wv) * _CEIL_SCALE
+    return 10.0 - math.log2(1.0 + wv) * params.ceil_scale
 
 
-def severity_grade_floor(violation_type_counts: dict[str, int]) -> float:
+def severity_grade_floor(
+    violation_type_counts: dict[str, int],
+    *, params: ScoringParams = DEFAULT_PARAMS,
+) -> float:
     """Return the minimum score based on the worst violation severity present."""
     if violation_type_counts.get("critical", 0) > 0:
-        return _SEVERITY_GRADE_FLOOR["critical"]
+        return 0.0
     if violation_type_counts.get("major", 0) > 0:
-        return _SEVERITY_GRADE_FLOOR["major"]
+        return params.floor_major
     if violation_type_counts.get("minor", 0) > 0:
-        return _SEVERITY_GRADE_FLOOR["minor"]
+        return params.floor_minor
     return 10.0
 
 
@@ -93,9 +104,11 @@ def severity_grade_floor(violation_type_counts: dict[str, int]) -> float:
 # Grade and legacy helpers
 # ---------------------------------------------------------------------------
 
-def score_to_grade_label(score: float) -> str:
+def score_to_grade_label(
+    score: float, *, params: ScoringParams = DEFAULT_PARAMS,
+) -> str:
     """Convert a 0-10 numerical score to a descriptive grade label."""
-    for threshold, label in _GRADE_THRESHOLDS:
+    for threshold, label in params.grade_thresholds:
         if score >= threshold:
             return label
     return "Critical"

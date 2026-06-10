@@ -166,3 +166,58 @@ class TestWeightAsMultiplier:
 
     def test_no_weight(self):
         assert weight_as_multiplier("") == 1
+
+
+# --- ScoringParams threading -------------------------------------------------
+import dataclasses
+
+from quodeq.core.scoring.params import DEFAULT_PARAMS
+from quodeq.core.scoring.internals import (
+    violation_base as _vb,
+    compliance_lift as _cl,
+    violation_ceiling as _vc,
+    severity_grade_floor as _sgf,
+    score_to_grade_label as _stgl,
+)
+
+
+def test_violation_base_with_custom_k():
+    params = dataclasses.replace(DEFAULT_PARAMS, base_k=0.5)
+    # wv for 1 critical = 4.0 → base = 10/(1+0.5*4) = 3.333...
+    assert abs(_vb({"critical": 1}, params=params) - 10.0 / 3.0) < 0.01
+
+
+def test_violation_base_with_custom_severity_weight():
+    params = dataclasses.replace(
+        DEFAULT_PARAMS, severity_weight={"critical": 8.0, "major": 1.5, "minor": 0.25},
+    )
+    # wv = 8.0 → base = 10/(1+0.12*8) = 5.102
+    assert abs(_vb({"critical": 1}, params=params) - 5.102) < 0.01
+
+
+def test_compliance_lift_with_custom_compress():
+    params = dataclasses.replace(DEFAULT_PARAMS, lift_compress=1.0)
+    # cc=4, wv=4 → raw 0.5, compress 1.0 → 0.5
+    assert _cl({"minor": 4}, {"critical": 1}, params=params) == pytest.approx(0.5)
+
+
+def test_violation_ceiling_with_custom_scale():
+    params = dataclasses.replace(DEFAULT_PARAMS, ceil_scale=1.0)
+    # wv=4 → ceiling = 10 - log2(5)*1.0 = 7.678
+    assert abs(_vc({"critical": 1}, params=params) - 7.678) < 0.01
+
+
+def test_severity_grade_floor_with_custom_floors():
+    params = dataclasses.replace(DEFAULT_PARAMS, floor_minor=6.0, floor_major=4.0)
+    assert _sgf({"minor": 3}, params=params) == 6.0
+    assert _sgf({"major": 1}, params=params) == 4.0
+    assert _sgf({"critical": 1}, params=params) == 0.0
+
+
+def test_score_to_grade_label_with_custom_thresholds():
+    params = dataclasses.replace(DEFAULT_PARAMS, grade_thresholds=(
+        (9.5, "Exemplary"), (8.0, "Good"), (6.0, "Adequate"), (4.0, "Poor"),
+    ))
+    assert _stgl(9.4, params=params) == "Good"
+    assert _stgl(5.0, params=params) == "Poor"
+    assert _stgl(3.9, params=params) == "Critical"
