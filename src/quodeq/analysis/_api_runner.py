@@ -28,6 +28,7 @@ import httpx
 import openai
 from pydantic import BaseModel, Field
 
+from quodeq.analysis._drop_stats import record as _record_drop_stats
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
 
 if TYPE_CHECKING:
@@ -309,6 +310,10 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     text = (choice.message.content or "") if choice else ""
     findings, dropped = _parse_findings(text)
     elapsed = time.monotonic() - start
+
+    # Feed the per-run aggregate so the dimension loops can report ONE
+    # drop-ratio signal at end of run instead of N scattered per-call lines.
+    _record_drop_stats(dropped=dropped, kept=len(findings))
 
     # A length-truncated response is an incomplete analysis: the model ran out of
     # output budget mid-stream, so findings after the cut are simply gone. Treat
