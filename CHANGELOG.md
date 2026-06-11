@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.3.0] - 2026-06-11
+
+### Features
+- **Grade Formula Editor**: new Settings screen to tune how grades are computed. Adjust severity weights and grade boundaries on a live curve, preview the effect against recent runs, then apply to all runs with one click. Run detail, accumulated overview, trend and project cards all reflect the applied formula consistently (PRs #611, #614).
+- **Evaluation progress**: the progress strip now ticks elapsed time every second and shows live throughput (files/min) with an estimated time remaining (PR #607).
+- **API runner observability**: each run logs an aggregate parse summary (kept vs dropped findings) and raises a single warning when more than 5% of parsed findings were dropped, so a systemic model output problem is one signal instead of thousands of scattered log lines (PR #615).
+
+### Improvements
+- **Dashboard dependencies**: React 19.2.7 lockstep restored, TanStack Query/Virtual refreshed, Vite/Vitest toolchain updated.
+
+### Fixes
+- **Evaluation progress**: no longer sticks at 97% when an evaluation finishes between polls (PR #609); elapsed ticking stays even and the throughput window survives screen re-entry (PR #608).
+- **Dashboard**: clickable stat cards no longer render invalid nested buttons (PR #610).
+- **Homebrew**: the tap formula now pins the published release commit instead of the develop branch head, so brew installs are reproducible.
+
 ## [1.2.0] - 2026-06-04
 
 ### Features
