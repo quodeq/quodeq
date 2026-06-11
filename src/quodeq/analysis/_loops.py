@@ -10,6 +10,7 @@ from dataclasses import replace
 from collections.abc import Callable
 from pathlib import Path
 
+from quodeq.analysis._drop_stats import report_run_drop_stats
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.analysis.errors import EvaluationError
@@ -335,6 +336,9 @@ def run_incremental_loop(
         f"[loop] incremental finished: processed {len(result)} of {len(dimensions)} dim(s) "
         f"({', '.join(result) if result else 'none'})",
     )
+    # Before the guards: the drop-ratio summary must land even when a
+    # guard raises (a high drop ratio and a worthless run often co-occur).
+    report_run_drop_stats()
     check_zero_findings(
         result, config.source_file_count,
         incremental_filter_active=config.options.incremental_file_filter is not None
@@ -441,6 +445,9 @@ def run_per_dimension_loop(
         f"[loop] per-dimension finished: processed {len(result)} of {len(dimensions)} dim(s) "
         f"({', '.join(result) if result else 'none'}, {skipped_count} skipped)",
     )
+    # Before the guards: the drop-ratio summary must land even when a
+    # guard raises (a high drop ratio and a worthless run often co-occur).
+    report_run_drop_stats()
     check_zero_findings(
         result, config.source_file_count, skipped_count,
         incremental_filter_active=config.options.incremental_file_filter is not None

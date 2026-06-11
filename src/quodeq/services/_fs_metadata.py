@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from quodeq.services.ports import RunInfo, read_run_data, safe_read_dir, summarize_dimensions
+
+if TYPE_CHECKING:
+    from quodeq.core.scoring.params import ScoringParams
 
 
 def _read_scan_summary(reports_root: Path, entry_name: str) -> dict[str, Any]:
@@ -57,8 +60,18 @@ def _read_repo_info(reports_root: Path, entry_name: str) -> dict[str, Any]:
 
 def _read_accumulated_summary(
     reports_root: Path, entry_name: str, runs: list[RunInfo],
+    params: "ScoringParams | None" = None,
 ) -> tuple[str | None, float | None, int | None]:
-    """Compute accumulated grade and score across all runs. Returns (grade, score, files)."""
+    """Compute accumulated grade and score across all runs. Returns (grade, score, files).
+
+    ``read_run_data`` overlays the SQL grade tables for event-log runs, so the
+    project-card summary reflects dismisses and any applied grade formula.
+    *params* (loaded from the saved formula when None) keeps the aggregate
+    threshold labels and dimension weights consistent with the dashboard.
+    """
+    if params is None:
+        from quodeq.services import grade_formula  # noqa: PLC0415
+        params = grade_formula.load_params()
     try:
         latest_by_dim: dict[str, object] = {}
         files_count: int | None = None
@@ -72,7 +85,7 @@ def _read_accumulated_summary(
         acc_dims = list(latest_by_dim.values())
         if not acc_dims:
             return None, None, files_count
-        summary = summarize_dimensions(acc_dims)
+        summary = summarize_dimensions(acc_dims, params)
         return summary.overall_grade, summary.numeric_average, files_count
     except (OSError, json.JSONDecodeError, KeyError):
         return None, None, None

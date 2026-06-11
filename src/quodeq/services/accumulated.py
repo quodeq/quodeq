@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.scoring.internals import score_to_grade_label
+from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.core.types import DimensionResult, to_camel_dict
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services.deleted import filter_deleted_from_dimensions
@@ -23,11 +24,17 @@ from quodeq.services._accumulated_data import _read_all_run_data  # noqa: F401
 _DEFAULT_ACC_CACHE_MAX = 256
 
 
-def numeric_average(dimensions: list[DimensionResult]) -> float | None:
+def numeric_average(
+    dimensions: list[DimensionResult],
+    params: ScoringParams = DEFAULT_PARAMS,
+) -> float | None:
     """Compute the average numeric score from a list of DimensionResult objects."""
-    raw = [d.overall_score for d in dimensions if d.overall_score]
-    numeric = [s for s in (parse_numeric_score(v) for v in raw) if s is not None]
-    return round(sum(numeric) / len(numeric), 1) if numeric else None
+    pairs = [
+        (d.dimension, score)
+        for d, score in ((d, parse_numeric_score(d.overall_score)) for d in dimensions if d.overall_score)
+        if score is not None
+    ]
+    return dimension_weighted_average(pairs, params)
 
 
 def _compute_accumulated_trends(
@@ -70,8 +77,12 @@ def _aggregate_severity_counts(all_dimensions: list[DimensionResult]) -> dict[st
 
 def _compute_accumulated_scores(
     all_dimensions: list[DimensionResult], prev_run_latest: list[DimensionResult],
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> tuple[float | None, float | None]:
-    return numeric_average(all_dimensions), (numeric_average(prev_run_latest) if prev_run_latest else None)
+    return (
+        numeric_average(all_dimensions, params),
+        (numeric_average(prev_run_latest, params) if prev_run_latest else None),
+    )
 
 
 @dataclass(frozen=True)
@@ -83,13 +94,16 @@ class _AccumulatedResult:
     prev_avg_score: float | None
 
 
-def _build_accumulated_response(project: str, result: _AccumulatedResult) -> dict[str, Any]:
+def _build_accumulated_response(
+    project: str, result: _AccumulatedResult,
+    params: ScoringParams = DEFAULT_PARAMS,
+) -> dict[str, Any]:
     return {
         "project": project,
         "dimensions": [to_camel_dict(d) for d in result.dimensions_with_trend],
         "summary": {
             "overallGrade": (
-                score_to_grade_label(result.avg_score) if result.avg_score is not None
+                score_to_grade_label(result.avg_score, params=params) if result.avg_score is not None
                 else most_frequent_grade([d.overall_grade for d in result.all_dimensions if d.overall_grade])
             ),
             "numericAverage": result.avg_score,
@@ -142,6 +156,7 @@ def _resolve_cache(
 def _compute_result(
     reports_root: Path, project: str, all_run_infos: list[RunInfo],
     cache_config: AccumulatedCacheConfig | None,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> _AccumulatedResult:
     """Load run data and compute trends, severity, and scores.
 
@@ -170,12 +185,13 @@ def _compute_result(
         # excluding in_progress. ``_read_all_run_data``'s per-eval-file
         # trustworthiness check filters out stub evals from these.
         eligible_run_infos = [r for r in all_run_infos if r.status != "in_progress"]
-    return _build_accumulated_for_runs(reports_root, project, eligible_run_infos, cache_config)
+    return _build_accumulated_for_runs(reports_root, project, eligible_run_infos, cache_config, params)
 
 
 def _build_accumulated_for_runs(
     reports_root: Path, project: str, run_infos: list[RunInfo],
     cache_config: AccumulatedCacheConfig | None,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> _AccumulatedResult:
     """Read run data and assemble the accumulated result for *run_infos*."""
     runs = [r.run_id for r in run_infos]
@@ -189,7 +205,7 @@ def _build_accumulated_for_runs(
     all_dims = filter_deleted_from_dimensions(all_dims, project_dir)
     dims_with_trend = _compute_accumulated_trends(all_dims, prev_occurrence)
     severity = _aggregate_severity_counts(all_dims)
-    avg, prev_avg = _compute_accumulated_scores(all_dims, prev_run_latest)
+    avg, prev_avg = _compute_accumulated_scores(all_dims, prev_run_latest, params)
     return _AccumulatedResult(all_dims, dims_with_trend, severity, avg, prev_avg)
 
 
@@ -199,6 +215,7 @@ def _compute_parent_accumulated(
     parent_id: str,
     cache_config: AccumulatedCacheConfig | None,
     extra_dims: list[DimensionResult] | None = None,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, Any] | None:
     """Merge latest findings from all children (and optional own dims) and score.
 
@@ -212,16 +229,16 @@ def _compute_parent_accumulated(
         child_runs = list_runs(reports_root, child, limit=50)
         if not child_runs:
             continue
-        result = _compute_result(reports_root, child, child_runs, cache_config)
+        result = _compute_result(reports_root, child, child_runs, cache_config, params)
         for d in result.all_dimensions:
             dim_source[d.dimension] = child
         all_dims.extend(result.all_dimensions)
     if not all_dims:
         return None
     severity = _aggregate_severity_counts(all_dims)
-    avg, _ = _compute_accumulated_scores(all_dims, {})
+    avg, _ = _compute_accumulated_scores(all_dims, [], params)
     merged_result = _AccumulatedResult(all_dims, all_dims, severity, avg, None)
-    response = _build_accumulated_response(parent_id, merged_result)
+    response = _build_accumulated_response(parent_id, merged_result, params)
     # Tag each dimension with its source child project for navigation
     for dim_dict in response.get("dimensions", []):
         dim_name = dim_dict.get("dimension", "")
@@ -233,8 +250,15 @@ def _compute_parent_accumulated(
 def compute_accumulated(
     reports_dir: str, project: str, as_of: str | None,
     *, cache_config: AccumulatedCacheConfig | None = None,
+    params: ScoringParams | None = None,
 ) -> dict[str, Any] | None:
-    """Compute the accumulated (cross-run) view for *project*."""
+    """Compute the accumulated (cross-run) view for *project*.
+
+    When *params* is None, the saved grade-formula params are loaded.
+    """
+    if params is None:
+        from quodeq.services import grade_formula  # noqa: PLC0415
+        params = grade_formula.load_params()
     reports_root = Path(reports_dir)
     if not (reports_root / project).exists():
         return None
@@ -250,15 +274,16 @@ def compute_accumulated(
 
     # Pure parent (no own runs) — aggregate children only
     if not all_run_infos and children:
-        return _compute_parent_accumulated(reports_root, children, project, cache_config)
+        return _compute_parent_accumulated(reports_root, children, project, cache_config, params=params)
 
     # Has own runs — check if also has children to merge
-    own_result = _compute_result(reports_root, project, all_run_infos, cache_config)
+    own_result = _compute_result(reports_root, project, all_run_infos, cache_config, params)
     if not children:
-        return _build_accumulated_response(project, own_result)
+        return _build_accumulated_response(project, own_result, params)
 
     # Has both own runs AND children — merge everything
     return _compute_parent_accumulated(
         reports_root, children, project, cache_config,
         extra_dims=own_result.all_dimensions,
+        params=params,
     )

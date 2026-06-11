@@ -15,6 +15,7 @@ from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEF
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.core.evidence.parser import parse_jsonl_to_evidence, EvidenceContext
 from quodeq.core.scoring.engine import score_evidence
+from quodeq.services.grade_formula import load_params
 from quodeq.analysis.report import write_dimension_report
 from quodeq.services._fs_clone import run_git_clone
 from quodeq.services._fs_scan import scan_project
@@ -580,6 +581,7 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
 
     evaluation_dir.mkdir(parents=True, exist_ok=True)
     source_file_count = _read_project_source_file_count(reports_dir, project)
+    params = load_params()
 
     from quodeq.shared.dimensions_state import read_dimensions
     dim_states = read_dimensions(Path(reports_dir) / project / run_id).get("dimensions", {})
@@ -607,7 +609,7 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
             ))
             if evidence is None:
                 continue
-            scores = score_evidence(evidence, mode="numerical")
+            scores = score_evidence(evidence, mode="numerical", params=params)
             write_dimension_report(evidence, scores, dim_id, evaluation_dir)
             _log.info(
                 "Scored cancelled dimension '%s' for run %s (files_read=%d)",

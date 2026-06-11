@@ -16,6 +16,7 @@ from quodeq.core.scoring.internals import (
     score_to_grade_label,
 )
 from quodeq.core.scoring.overall import weighted_overall, MODE_NUMERICAL
+from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.scoring import PrincipleScore
 from quodeq.data.fs.report_parser.grades import summarize_dimensions
 from quodeq.services.dismissed import recount_totals
@@ -40,6 +41,7 @@ def _finding_to_dict(f: Finding) -> dict[str, Any]:
 def _score_principle(
     violations: list[Finding], compliance: list[Finding],
     *, source_file_count: int = 0, scale_multiplier: int = 1,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> tuple[float | None, str]:
     """Score a single principle from its filtered violations and compliance lists.
 
@@ -67,15 +69,15 @@ def _score_principle(
     if confidence == "low":
         return None, "Insufficient"
 
-    base = violation_base(vt_counts)
-    lift = compliance_lift(ct_counts, vt_counts)
-    ceil = violation_ceiling(vt_counts)
-    floor = severity_grade_floor(vt_counts)
+    base = violation_base(vt_counts, params=params)
+    lift = compliance_lift(ct_counts, vt_counts, params=params)
+    ceil = violation_ceiling(vt_counts, params=params)
+    floor = severity_grade_floor(vt_counts, params=params)
 
     raw = base + (10.0 - base) * lift
     final = max(floor, min(ceil, raw))
     final = round(final, 1)
-    grade = score_to_grade_label(final)
+    grade = score_to_grade_label(final, params=params)
     return final, grade
 
 
@@ -95,6 +97,7 @@ def _score_all_principles(
     *,
     source_file_count: int = 0,
     scale_multiplier: int = 1,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> tuple[dict[str, PrincipleScore], list[PrincipleGrade]]:
     """Score each principle and return (scores_dict, grades_list)."""
     all_principle_names = set(principles_violations) | set(principles_compliance)
@@ -108,6 +111,7 @@ def _score_all_principles(
             p_violations, p_compliance,
             source_file_count=source_file_count,
             scale_multiplier=scale_multiplier,
+            params=params,
         )
         score_str = f"{final_score}/10" if final_score is not None else None
 
@@ -122,6 +126,7 @@ def _rescore_dimension(
     dim: DimensionResult,
     dismissed: set[tuple],
     deleted: set[tuple] | None = None,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> DimensionResult:
     """Rescore a single dimension after filtering dismissed and deleted findings."""
     deleted = deleted or set()
@@ -139,9 +144,10 @@ def _rescore_dimension(
     principle_scores, principle_grades = _score_all_principles(
         principles_violations, principles_compliance,
         source_file_count=dim.source_file_count or 0,
+        params=params,
     )
 
-    overall = weighted_overall(principle_scores, MODE_NUMERICAL)
+    overall = weighted_overall(principle_scores, MODE_NUMERICAL, params)
     overall_score_str = f"{overall.weighted_score}/10" if overall.weighted_score is not None else None
     overall_grade = overall.grade or overall.weighted_grade
 
@@ -162,13 +168,21 @@ def rescore_dimensions(
     dimensions: list[DimensionResult],
     dismissed_keys: set[tuple],
     deleted_keys: set[tuple] | None = None,
+    params: ScoringParams | None = None,
 ) -> dict[str, Any]:
     """Rescore all dimensions after filtering dismissed and deleted findings.
 
     Returns a dict with 'dimensions' (list of camelCase dicts) and 'summary' (camelCase dict).
+    When *params* is None, the saved grade-formula params are loaded.
     """
-    rescored = [_rescore_dimension(dim, dismissed_keys, deleted_keys) for dim in dimensions]
-    summary = summarize_dimensions(rescored)
+    if params is None:
+        from quodeq.services import grade_formula  # noqa: PLC0415
+        params = grade_formula.load_params()
+    rescored = [
+        _rescore_dimension(dim, dismissed_keys, deleted_keys, params=params)
+        for dim in dimensions
+    ]
+    summary = summarize_dimensions(rescored, params=params)
     return {
         "dimensions": [to_camel_dict(d) for d in rescored],
         "summary": to_camel_dict(summary),

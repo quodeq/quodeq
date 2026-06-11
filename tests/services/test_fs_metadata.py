@@ -169,6 +169,81 @@ class TestReadAccumulatedSummary:
         assert score is None
         assert files is None
 
+    def test_project_card_reflects_overlaid_sql_grades_and_loaded_params(
+        self, tmp_path, monkeypatch,
+    ):
+        """The project-card summary must reflect the applied grade formula.
+
+        Builds a real event-log run, bakes default grades, applies a custom
+        formula, then asserts _read_accumulated_summary (which feeds the
+        project card via _build_project_entry) surfaces the CUSTOM grade —
+        proving both the read-layer overlay and the loaded-params threading.
+        """
+        import dataclasses
+
+        from quodeq.core.events.models import Judgment
+        from quodeq.core.scoring.params import DEFAULT_PARAMS
+        from quodeq.data.projection.grade_projector import recompute_grades
+        from quodeq.data.sqlite.state_store import SQLiteStateStore
+        from quodeq.services import grade_formula
+        from quodeq.services.dashboard import clear_shared_dimension_cache
+        from quodeq.services.ports import RunInfo
+
+        monkeypatch.setattr(
+            grade_formula, "grade_formula_path", lambda: tmp_path / "grade_formula.json",
+        )
+        clear_shared_dimension_cache()
+
+        reports_root = tmp_path / "reports"
+        project = "proj-uuid"
+        run_dir = reports_root / project / "run1"
+        run_dir.mkdir(parents=True)
+        (run_dir / "events.jsonl").write_text("")
+
+        store = SQLiteStateStore(run_dir)
+        for i in range(6):
+            store.record_finding(Judgment(
+                practice_id="p1", dimension="security", req=f"req{i}",
+                verdict="violation", severity="major", file=f"f{i}.py", line=1,
+                title=f"t{i}", reason=f"r{i}",
+            ))
+        for i in range(8):
+            store.record_finding(Judgment(
+                practice_id="p1", dimension="security", req=f"c{i}",
+                verdict="compliance", severity="minor", file=f"g{i}.py", line=1,
+                title=f"ct{i}", reason=f"cr{i}",
+            ))
+        store.save_projected_size((run_dir / "events.jsonl").stat().st_size)
+        recompute_grades(run_dir, params=DEFAULT_PARAMS)
+
+        baked = {r["dimension"]: r for r in store.read_dimension_scores()}["security"]
+        eval_dir = run_dir / "evaluation"
+        eval_dir.mkdir(parents=True, exist_ok=True)
+        (eval_dir / "security.json").write_text(json.dumps({
+            "schema_version": 1, "dimension": "security", "project": project,
+            "discipline": "Python", "date": "2026-05-23", "sourceFileCount": 100,
+            "overallScore": f"{baked['score']}/10", "overallGrade": baked["grade"],
+            "principles": [], "violations": [], "compliance": [],
+            "totals": {"violationCount": 0, "complianceCount": 0, "severity": {}},
+        }), encoding="utf-8")
+
+        strict = dataclasses.replace(
+            DEFAULT_PARAMS, severity_weight={"critical": 4.0, "major": 6.0, "minor": 0.25},
+        )
+        grade_formula.save_params(strict)
+        grade_formula.apply_to_all_runs(reports_root)
+        custom = {r["dimension"]: r for r in store.read_dimension_scores()}["security"]
+        assert (custom["score"], custom["grade"]) != (baked["score"], baked["grade"])
+
+        clear_shared_dimension_cache()
+        runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
+        grade, score, files = _read_accumulated_summary(reports_root, project, runs)
+        clear_shared_dimension_cache()
+
+        # Single dimension → the summary grade/score equals the overlaid custom value.
+        assert score == custom["score"]
+        assert grade == custom["grade"]
+
 
 # ---------------------------------------------------------------------------
 # _read_language_stats

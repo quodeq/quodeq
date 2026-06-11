@@ -7,6 +7,7 @@ from quodeq.core.scoring.engine import score_evidence
 from quodeq.analysis.report import write_dimension_report
 from quodeq.analysis.runner import RunConfig, run_per_dimension
 from quodeq.engine._runner_markers import cleanup_stream
+from quodeq.services.grade_formula import load_params
 
 _NUMERICAL_MODE = "numerical"
 _NA_LABEL = "N/A"
@@ -23,9 +24,10 @@ def run_full(config: RunConfig, output_dir: Path, mode: str = _NUMERICAL_MODE) -
     """
     work_dir = config.work_dir or config.src
     results: dict[str, str] = {}
+    params = load_params()
 
     def _score_dimension(dimension: str, evidence: "Evidence") -> None:
-        scores = score_evidence(evidence, mode=mode)
+        scores = score_evidence(evidence, mode=mode, params=params)
         write_dimension_report(evidence, scores, dimension, output_dir)
         cleanup_stream(work_dir / f"{dimension}_live.stream")
         overall = scores.overall

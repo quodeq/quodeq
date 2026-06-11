@@ -6,7 +6,7 @@
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { SevBadge } from '../../../components/terminal/index.js';
 import { splitScore, scoreGradeColorVar, complianceRatio, formatRunId } from '../../../utils/formatters.js';
-import { dimensionGradeLabel } from './dimensionGradeLabel.js';
+import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 
 /**
  * Build a coverage record for the gauge card's footer line.
@@ -104,7 +104,8 @@ export default function DimensionGaugeCard({
   const scoreNum = parseFloat(item.overallScore);
   const hasScore = !Number.isNaN(scoreNum);
   const pct = hasScore ? Math.max(0, Math.min(scoreNum / 10, 1)) : 0;
-  const gradeWord = hasScore ? dimensionGradeLabel(scoreNum) : null;
+  const label = hasScore ? scoreToGradeLabel(scoreNum) : null;
+  const gradeWord = label ? label.toUpperCase() : null;
   const ringColor = hasScore ? scoreGradeColorVar(scoreNum) : 'var(--color-text-muted)';
   const dashOffset = RING_CIRC * (1 - pct);
 

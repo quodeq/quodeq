@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from quodeq.core.types import PrincipleScore
 from quodeq.core.evidence.model import DEFAULT_WEIGHT
 from quodeq.core.scoring.overall import MODE_NUMERICAL
+from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.scoring.internals import (
     build_deductions,
     compliance_dampening,
@@ -65,7 +66,9 @@ def _base_kwargs(ctx: _PrincipleContext) -> dict:
     }
 
 
-def _score_numerical(ctx: _PrincipleContext) -> PrincipleScore:
+def _score_numerical(
+    ctx: _PrincipleContext, params: ScoringParams = DEFAULT_PARAMS,
+) -> PrincipleScore:
     """Score a single principle in numerical mode."""
     kwargs = _base_kwargs(ctx)
     if ctx.conf_level == "low":
@@ -74,21 +77,27 @@ def _score_numerical(ctx: _PrincipleContext) -> PrincipleScore:
             deductions=build_deductions({}, scale_multiplier=ctx.scale_mult),
             final_score=0.0, grade="Insufficient",
         )
-    base = violation_base(ctx.vt_counts)
-    lift = compliance_lift(ctx.ct_counts, ctx.vt_counts)
+    base = violation_base(ctx.vt_counts, params=params)
+    lift = compliance_lift(ctx.ct_counts, ctx.vt_counts, params=params)
     raw = base + (_BASE_SCORE - base) * lift
-    final_pts = round(max(severity_grade_floor(ctx.vt_counts),
-                          min(violation_ceiling(ctx.vt_counts), raw)), 1)
+    final_pts = round(max(severity_grade_floor(ctx.vt_counts, params=params),
+                          min(violation_ceiling(ctx.vt_counts, params=params), raw)), 1)
     return PrincipleScore(
         **kwargs, base_score=round(base, 1),
         deductions=build_deductions(ctx.vt_counts, scale_multiplier=ctx.scale_mult),
         dampening_multiplier=lift, final_score=final_pts,
-        grade=score_to_grade_label(final_pts),
+        grade=score_to_grade_label(final_pts, params=params),
     )
 
 
-def _score_graded(ctx: _PrincipleContext) -> PrincipleScore:
-    """Score a single principle in non-numerical (graded) mode."""
+def _score_graded(
+    ctx: _PrincipleContext, params: ScoringParams = DEFAULT_PARAMS,  # noqa: ARG001
+) -> PrincipleScore:
+    """Score a single principle in non-numerical (graded) mode.
+
+    Accepts params only for scorer-signature symmetry with
+    ``_score_numerical``; the legacy graded ladder is not user-tunable.
+    """
     kwargs = _base_kwargs(ctx)
     if ctx.conf_level == "low":
         return PrincipleScore(
@@ -129,10 +138,11 @@ def _build_context(
 
 def _score_all_principles(
     raw_principles: dict, mode: str, scale_mult: int, files_read: int,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, PrincipleScore]:
     """Score every principle and return the per-principle dict."""
     scorer = _score_numerical if mode == MODE_NUMERICAL else _score_graded
     return {
-        key: scorer(_build_context(key, pdata, scale_mult, files_read))
+        key: scorer(_build_context(key, pdata, scale_mult, files_read), params)
         for key, pdata in raw_principles.items()
     }

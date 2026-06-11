@@ -1984,3 +1984,40 @@ textarea:focus {
   max-height: 240px;
 }
 
+/* ── Grade formula editor ── */
+.gf-slider-row { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; }
+.gf-slider-label { display: flex; justify-content: space-between; align-items: baseline; }
+.gf-slider-value { font-family: var(--font-mono, monospace); color: var(--color-accent); }
+.gf-slider { width: 100%; accent-color: var(--color-accent); }
+.gf-tabs { display: flex; gap: 0; margin-top: 12px; }
+.gf-tab { padding: 4px 12px; border: 1px solid var(--color-border); border-bottom: none;
+  border-radius: 4px 4px 0 0; background: none; color: var(--color-text-muted); cursor: pointer; }
+.gf-tab--active { color: var(--color-accent); background: var(--color-surface-alt); }
+.gf-tab-body { border: 1px solid var(--color-border); border-radius: 0 4px 4px 4px; padding: 14px; }
+.gf-preview { border: 1px solid var(--color-border); border-radius: 4px; padding: 8px; margin-top: 12px; }
+.gf-gauges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-start; }
+.gf-gauge { border: 1px dashed var(--color-border); border-radius: 4px; padding: 6px 10px; text-align: center; }
+.gf-gauge-was { color: var(--color-text-muted); text-decoration: line-through; font-size: 11px; margin-right: 4px; }
+.gf-gauge-now { font-size: 16px; }
+/* The bare grade-* tier classes are otherwise only styled inside .chip; scope
+   the color here so a gauge score painted with scoreColorClass() picks up the
+   right tier color. */
+.gf-gauge-now.grade-top    { color: var(--color-grade-top-text); }
+.gf-gauge-now.grade-high   { color: var(--color-grade-high-text); }
+.gf-gauge-now.grade-mid    { color: var(--color-grade-mid-text); }
+.gf-gauge-now.grade-low    { color: var(--color-grade-low-text); }
+.gf-gauge-now.grade-bottom { color: var(--color-grade-bottom-text); }
+.gf-gauge-now.grade-none   { color: var(--color-text-muted); }
+.gf-gauge-label { display: block; font-size: 9px; letter-spacing: 0.5px; color: var(--color-text-muted); }
+.gf-actions { border-top: 1px solid var(--color-border); margin-top: 8px; padding-top: 10px;
+  display: flex; align-items: center; gap: 10px; }
+.gf-dirty-hint { color: var(--color-text-muted); font-size: 12px; }
+.gf-boundary-bar { display: flex; height: 28px; border-radius: 4px; overflow: hidden;
+  border: 1px solid var(--color-border); user-select: none; }
+.gf-boundary-seg { display: flex; align-items: center; justify-content: center;
+  font-size: 9px; letter-spacing: 0.5px; font-weight: 700; color: var(--color-bg, #000); min-width: 0; }
+.gf-boundary-divider { width: 5px; cursor: col-resize; background: var(--color-text); opacity: 0.85; touch-action: none; }
+/* fieldset[disabled] does not reach non-form elements; block divider drags too */
+fieldset.gf-tab-body:disabled .gf-boundary-divider { pointer-events: none; cursor: default; }
+.gf-boundary-ticks { display: flex; color: var(--color-text-muted); font-size: 10px; margin-top: 3px; }
+

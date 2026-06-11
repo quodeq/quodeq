@@ -179,3 +179,50 @@ def test_all_insufficient_overall():
     scores = score_evidence(ev, mode="numerical")
     assert scores.overall.grade == "Insufficient"
     assert scores.overall.weighted_score == 0.0
+
+
+# --- params threading through run_scoring ------------------------------------
+import dataclasses
+
+from quodeq.core.scoring.params import DEFAULT_PARAMS
+
+
+def test_run_scoring_with_strict_params_lowers_scores():
+    """The same evidence scores lower when severity weights are raised."""
+    from quodeq.core.scoring.engine import run_scoring
+
+    evidence = {
+        "repository": "r", "discipline": "d", "date": "2026-06-10",
+        "source_file_count": 100, "files_read": 100,
+        "principles": {
+            "p1": {
+                "display_name": "P1", "weight": "1",
+                "metrics": {
+                    "compliance_percentage": 50.0, "confidence_level": "high",
+                    "is_balanced": True, "total_instances": 20,
+                },
+                "violations": [
+                    {"severity": "major", "reason": f"r{i}"} for i in range(5)
+                ],
+                "compliance": [
+                    {"severity": "minor", "reason": f"c{i}"} for i in range(10)
+                ],
+            },
+        },
+    }
+    default_result = run_scoring(evidence, "numerical")
+    strict = dataclasses.replace(
+        DEFAULT_PARAMS,
+        severity_weight={"critical": 4.0, "major": 5.0, "minor": 0.25},
+    )
+    strict_result = run_scoring(evidence, "numerical", params=strict)
+    assert strict_result.overall.weighted_score < default_result.overall.weighted_score
+
+    # Custom thresholds must move the grade LABEL through the same pipeline.
+    relabeled = dataclasses.replace(
+        DEFAULT_PARAMS,
+        grade_thresholds=((9.9, "Exemplary"), (9.8, "Good"), (9.7, "Adequate"), (0.1, "Poor")),
+    )
+    relabeled_result = run_scoring(evidence, "numerical", params=relabeled)
+    assert relabeled_result.overall.grade == "Poor"
+    assert relabeled_result.principles["p1"].grade == "Poor"
