@@ -39,6 +39,8 @@ Open an issue using the **Feature Request** template. Describe the problem you a
 1. Fork the repo and create a branch from `develop`
 2. Make your changes
 3. Run the tests: `uv run pytest`
+   CI enforces a coverage floor (80%, see `fail_under` in `pyproject.toml`); reproduce locally with
+   `uv run pytest tests/ -q -m "not integration" --cov=quodeq`.
 4. Open a pull request targeting `develop`
 
 Keep pull requests focused on a single change. If you are fixing a bug and also want to refactor something, open two PRs.
