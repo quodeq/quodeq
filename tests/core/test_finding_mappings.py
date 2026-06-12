@@ -60,6 +60,23 @@ class TestWireDictToJudgment:
         )
         assert j.confidence == 50
 
+    def test_violation_type_read_from_short_vt_key(self):
+        """Regression: the JSONL wire format carries the taxonomy as 'vt'
+        (see core/evidence/_jsonl.py); this reader must not silently drop it
+        on the event-log/SQLite path when only the short key is present."""
+        j = wire_dict_to_judgment(
+            {"p": "P1", "t": "violation", "d": "D", "file": "f", "line": 1,
+             "reason": "r", "vt": "code-injection"}
+        )
+        assert j.violation_type == "code-injection"
+
+    def test_violation_type_read_from_long_key(self):
+        j = wire_dict_to_judgment(
+            {"p": "P1", "t": "violation", "d": "D", "file": "f", "line": 1,
+             "reason": "r", "violation_type": "code-injection"}
+        )
+        assert j.violation_type == "code-injection"
+
     def test_round_trip_via_judgment_dump(self):
         """wire_dict → Judgment → dump preserves the long-name fields."""
         d = {"p": "P1", "t": "violation", "d": "D", "file": "f", "line": 1,

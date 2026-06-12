@@ -46,6 +46,22 @@ def test_finding_dict_to_row_handles_missing_optionals():
     assert row["dedup_key"] == "P1||0|compliance"
 
 
+def test_finding_dict_to_row_reads_violation_type_from_short_vt_key():
+    """Regression: the JSONL wire format carries the taxonomy as 'vt'
+    (see core/evidence/_jsonl.py); the row mapper must accept both keys."""
+    finding = {"p": "P1", "t": "violation", "severity": "medium",
+               "vt": "missed_deadline"}
+    row = finding_dict_to_row(finding)
+    assert row["violation_type"] == "missed_deadline"
+
+
+def test_finding_dict_to_row_reads_violation_type_from_long_key():
+    finding = {"p": "P1", "t": "violation", "severity": "medium",
+               "violation_type": "missed_deadline"}
+    row = finding_dict_to_row(finding)
+    assert row["violation_type"] == "missed_deadline"
+
+
 def test_row_to_finding_roundtrip():
     finding = {
         "p": "P1", "d": "dim", "req": "R1", "t": "violation", "severity": "medium",
