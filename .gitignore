@@ -9,6 +9,8 @@ dist/
 __pycache__/
 *.pyc
 .venv/
+.coverage*
+htmlcov/
 evaluations/
 
 docs/
