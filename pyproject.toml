@@ -65,8 +65,11 @@ timeout_method = "thread"
 
 [tool.coverage.run]
 source = ["quodeq"]
+branch = true
 
 [tool.coverage.report]
+# Enforced gate (activated by --cov in CI). Ratchet this up as coverage
+# improves; never lower it without justification.
 fail_under = 80
 
 [build-system]

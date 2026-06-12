@@ -28,6 +28,11 @@ shared/        -> stdlib only
 config/        -> stdlib, shared/
 ```
 
+These rules are enforced in CI by `tools/check_imports.py` via `tests/tools/test_import_layers.py`.
+Pre-existing violations are grandfathered in `tools/import_baseline.txt` (a burn-down list: fix
+imports rather than add entries). Regenerate the baseline only with justification:
+`python tools/check_imports.py --update-baseline`.
+
 ## File Size Guidelines (soft limits)
 
 | Metric | Limit | Rationale |
