@@ -66,8 +66,14 @@ def parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
 def judgment_to_dict(j: Judgment) -> dict:
     """Convert a Judgment to the dict format used in PrincipleEvidence lists."""
     d: dict = {"file": j.file}
+    # Emit BOTH the long key (UI/report read 'violation_type', see
+    # ui/src/models/violation.js and core/finding_mappings.py) AND the short
+    # key the scoring tally groups by ('vt', see core/scoring/_tallies.py).
+    # They carry the same value; keeping both fixes taxonomy scoring without
+    # breaking any consumer.
     _optional = {"line": j.line, "end_line": j.end_line, "snippet": j.snippet,
                  "severity": j.severity, "violation_type": j.violation_type,
+                 "vt": j.violation_type,
                  "context": j.context, "scope": j.scope}
     d.update({k: v for k, v in _optional.items() if v})
     if j.req:
