@@ -53,7 +53,9 @@ def finding_dict_to_row(finding: dict[str, Any]) -> dict[str, Any]:
         "title": finding.get("w", "") or "",
         "reason": finding.get("reason", "") or "",
         "snippet": finding.get("snippet", "") or "",
-        "violation_type": finding.get("violation_type", "") or "",
+        # The taxonomy travels as 'vt' on the JSONL wire (see evidence/_jsonl.py);
+        # accept the long key too so both spellings survive this seam.
+        "violation_type": finding.get("vt") or finding.get("violation_type") or "",
         "context": finding.get("context", "") or "",
         "scope": finding.get("scope", "") or "",
         "req_refs_json": json.dumps(refs) if refs is not None else None,

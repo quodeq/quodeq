@@ -42,7 +42,9 @@ def wire_dict_to_judgment(d: dict[str, Any]) -> Judgment:
         end_line=d.get("end_line"),
         snippet=d.get("snippet"),
         severity=d.get("severity") or "medium",
-        violation_type=d.get("violation_type"),
+        # The taxonomy travels as 'vt' on the JSONL wire (see evidence/_jsonl.py);
+        # accept the long key too so both spellings survive this seam.
+        violation_type=d.get("vt") or d.get("violation_type"),
         reason=d.get("reason") or "",
         title=d.get("w"),
         context=d.get("context"),
