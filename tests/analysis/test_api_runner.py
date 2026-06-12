@@ -176,6 +176,26 @@ class TestParserDropAccounting:
         assert dropped == 0
 
 
+class TestFindingVtTaxonomy:
+    """The optional 'vt' taxonomy code must survive _Finding validation, or
+    every fresh API run scores with taxonomy_used=False (free-text reason
+    grouping counts near-duplicates as distinct types and depresses scores)."""
+
+    _BASE = {
+        "req": "S-CON-3", "t": "violation", "file": "src/a.py", "line": 3,
+        "severity": "critical", "w": "eval usage",
+        "snippet": "eval(x)", "reason": "Direct code injection via eval.",
+    }
+
+    def test_vt_survives_validate_and_dump(self):
+        dumped = _Finding.model_validate({**self._BASE, "vt": "code-injection"}).model_dump()
+        assert dumped["vt"] == "code-injection"
+
+    def test_vt_defaults_to_none_when_absent(self):
+        dumped = _Finding.model_validate(self._BASE).model_dump()
+        assert dumped["vt"] is None
+
+
 class TestTruncationDetection:
     """A length-truncated response is incomplete: mark the call lossy so the
     file re-dispatches instead of being cached as a clean analysis."""

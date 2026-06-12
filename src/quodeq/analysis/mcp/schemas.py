@@ -20,6 +20,7 @@ REPORT_FINDING_SCHEMA = {
         "end_line": {"type": "integer", "description": "Last line of the violation pattern (omit if single line)"},
         "scope": {"type": "string", "enum": ["file", "class", "module"], "description": "Set when the finding affects an entire file/class/module rather than specific lines"},
         "severity": {"type": "string", "enum": ["critical", "major", "minor"], "description": "Severity level"},
+        "vt": {"type": "string", "description": "Violation type taxonomy code: a short, stable, kebab-case class of the violation (e.g. 'code-injection', 'hardcoded-secret', 'missing-error-handling'). Reuse the exact same code for every finding of the same kind."},
         "w": {"type": "string", "description": "Short description of the finding"},
         "reason": {"type": "string", "description": "Why this is a violation or compliance"},
         "p": {"type": "string", "description": "Sub-characteristic name — auto-filled from req if omitted"},
