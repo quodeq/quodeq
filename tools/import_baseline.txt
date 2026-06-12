@@ -1,0 +1,35 @@
+# Grandfathered layer-import violations. Do NOT add entries without
+# justification -- the goal is to burn this list down, not grow it.
+# Regenerate intentionally: python tools/check_imports.py --update-baseline
+src/quodeq/analysis/_api_runner.py:36:context
+src/quodeq/analysis/_api_runner.py:37:context
+src/quodeq/analysis/api_prompt_assembly.py:14:context
+src/quodeq/analysis/api_prompt_assembly.py:15:context
+src/quodeq/analysis/mcp/enricher.py:15:context
+src/quodeq/analysis/mcp/enricher.py:16:context
+src/quodeq/analysis/mcp/enricher.py:17:context
+src/quodeq/analysis/mcp/findings_server.py:20:context
+src/quodeq/analysis/mcp/findings_server.py:21:context
+src/quodeq/analysis/subprocess.py:244:llm_bridge
+src/quodeq/api/_evaluation_routes.py:19:analysis
+src/quodeq/api/import_project.py:30:data
+src/quodeq/api/import_project.py:31:data
+src/quodeq/api/import_project.py:32:data
+src/quodeq/api/llm_bridge_routes.py:8:llm_bridge
+src/quodeq/api/routes_findings.py:85:data
+src/quodeq/data/fs/project_resolver.py:17:services
+src/quodeq/data/fs/repo_clone.py:19:context
+src/quodeq/data/fs/report_parser/runs.py:109:services
+src/quodeq/data/projection/grade_projector.py:130:services
+src/quodeq/data/projection/grade_projector.py:20:services
+src/quodeq/data/sqlite/state_store.py:198:services
+src/quodeq/engine/scoring_pipeline.py:10:services
+src/quodeq/services/_external_jobs.py:22:analysis
+src/quodeq/services/_violations_jsonl.py:11:analysis
+src/quodeq/services/_violations_stream.py:10:analysis
+src/quodeq/services/_violations_stream.py:11:analysis
+src/quodeq/services/evaluation_mixin.py:19:analysis
+src/quodeq/services/evaluation_mixin.py:445:analysis
+src/quodeq/services/jobs.py:20:analysis
+src/quodeq/services/scan_progress.py:23:analysis
+src/quodeq/services/tooling_mixin.py:17:analysis
