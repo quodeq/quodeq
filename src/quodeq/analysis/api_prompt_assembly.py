@@ -30,6 +30,7 @@ Each finding must be a JSON object with these fields:
   Optional:
     "end_line": integer - last line if multi-line
     "scope": string - "file", "class", or "module"
+    "vt": string - violation type taxonomy code: a short, stable, kebab-case class of the violation (e.g. "code-injection", "hardcoded-secret", "missing-error-handling"); reuse the exact same code for every finding of the same kind
 """
 
 

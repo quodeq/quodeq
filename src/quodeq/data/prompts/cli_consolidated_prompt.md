@@ -26,7 +26,7 @@ You are a code quality analyst evaluating **{{REPO_NAME}}** across these dimensi
 
 **Required:** `req` (the **exact requirement ID from the checklist below**, e.g. `M-MOD-1`, `S-CON-3` — you MUST use the IDs exactly as listed, do NOT invent new ones), `t` (`violation` or `compliance`), `file`, `line`, `severity` (`critical`/`major`/`minor`), `w` (short description), `reason` (why this is a violation or compliance)
 
-**Optional:** `end_line` (last line of the violation pattern, omit if single line), `scope` (set to `file`/`class`/`module` when finding affects entire scope)
+**Optional:** `end_line` (last line of the violation pattern, omit if single line), `scope` (set to `file`/`class`/`module` when finding affects entire scope), `vt` (violation type taxonomy code: a short, stable, kebab-case class of the violation, e.g. `code-injection`, `hardcoded-secret`, `missing-error-handling`; reuse the exact same code for every finding of the same kind so near-duplicates group together)
 
 ## Rules
 

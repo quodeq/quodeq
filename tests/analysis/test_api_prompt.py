@@ -66,6 +66,16 @@ class TestAssembleApiPrompt:
         assert '"severity"' in prompt
         assert '"violation"' in prompt
 
+    def test_schema_offers_vt_taxonomy_field(self, src_dir, standards_text):
+        prompt = assemble_api_prompt(
+            source_files=[src_dir / "main.py"],
+            standards_text=standards_text,
+            dimension="security",
+            repo_name="test-repo",
+        )
+        assert '"vt"' in prompt
+        assert "code-injection" in prompt  # concrete example anchors the format
+
     def test_constant_instructions_precede_variable_file_content(self, src_dir, standards_text):
         """Constant task instructions and the finding schema must come BEFORE the
         variable file content.

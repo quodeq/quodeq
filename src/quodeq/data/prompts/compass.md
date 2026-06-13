@@ -26,6 +26,7 @@ For EVERY finding (violation or compliance), call `report_finding` with:
 - `severity` — `critical`, `major`, or `minor`
 - `w` — short description
 - `reason` — why this is a violation or compliance
+- `vt` — OPTIONAL violation type taxonomy code: a short, stable, kebab-case class of the violation, e.g. `code-injection`, `hardcoded-secret`, `missing-error-handling`. Reuse the exact same code for every finding of the same kind so near-duplicates group together.
 
 ## Search Strategy
 

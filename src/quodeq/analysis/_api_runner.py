@@ -88,6 +88,15 @@ class _Finding(BaseModel):
         ),
     )
     severity: _Severity = Field(default=_Severity.minor)
+    vt: str | None = Field(
+        default=None,
+        description=(
+            "Violation type taxonomy code: a short, stable, kebab-case class "
+            "of the violation (e.g. 'code-injection', 'hardcoded-secret', "
+            "'missing-error-handling'). Reuse the exact same code for every "
+            "finding of the same kind so near-duplicates group together."
+        ),
+    )
     w: str = Field(description="Short title of the finding")
     snippet: str = Field(
         description=(
