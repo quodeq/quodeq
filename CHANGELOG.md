@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixes
+- **Index downgrade no longer crashes the dashboard**: when `~/.quodeq/index.db` was migrated forward by a newer quodeq and you then run an older one, the cross-run index is discarded and rebuilt from the run files on disk instead of raising an unhandled schema error on first access. The index is a derived projection, so nothing is lost (#621).
+
 ## [1.3.0] - 2026-06-11
 
 ### Features
