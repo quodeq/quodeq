@@ -65,15 +65,36 @@ jobs:
             exit 1
           fi
 
-      - name: Confirm wheel contains pre-built UI static
+      # The size assert above only catches the wheel getting too BIG. This
+      # catches it getting too SMALL: if the uv_build include rules regress,
+      # the wheel can ship without its runtime payload and every PyPI install
+      # is broken at runtime while CI stays green. Assert the payload is there:
+      #   quodeq/data/**          - evaluators, standards, prompts, config
+      #   quodeq/static/index.html + quodeq/static/assets/** - pre-built dashboard
+      # (index.html alone is not enough; a broken UI build leaves assets/ empty.)
+      - name: Confirm wheel bundles the runtime payload
         run: |
           wheel=$(ls dist/quodeq-*.whl)
-          if ! unzip -l "$wheel" | grep -q "quodeq/static/index.html"; then
-            echo "::error::Wheel is missing quodeq/static/index.html"
-            unzip -l "$wheel" | head -40
+          echo "Wheel: $wheel"
+          fail=0
+          require() {  # require <grep -E pattern> <human description>
+            n=$(unzip -l "$wheel" | grep -cE "$1" || true)
+            if [ "$n" -eq 0 ]; then
+              echo "::error::Wheel is missing $2"
+              fail=1
+            else
+              echo "OK: $2 ($n entries)"
+            fi
+          }
+          require 'quodeq/data/.+[^/]$'          'runtime data under quodeq/data/'
+          require 'quodeq/static/index\.html$'   'quodeq/static/index.html'
+          require 'quodeq/static/assets/.+[^/]$' 'dashboard assets under quodeq/static/assets/'
+          if [ "$fail" -ne 0 ]; then
+            echo "---- wheel contents (first 60) ----"
+            unzip -l "$wheel" | head -60
             exit 1
           fi
-          echo "OK: index.html present in wheel"
+          echo "OK: wheel bundles the full runtime payload"
 
       - name: Build sdist
         run: uv build --sdist
