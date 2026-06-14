@@ -3,12 +3,9 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-import pytest
-
 from quodeq.services.run_index import (
     RunRow,
     SCHEMA_VERSION,
-    UnsupportedIndexSchemaError,
     open_index,
 )
 
@@ -44,15 +41,56 @@ def test_open_is_idempotent_on_existing_v1(tmp_path: Path) -> None:
         db.close()
 
 
-def test_open_raises_on_newer_schema(tmp_path: Path) -> None:
+def test_open_preserves_rows_on_current_schema(tmp_path: Path) -> None:
+    """Reopening a current-schema index must NOT wipe it.
+
+    Guards the load-bearing counterpart to the downgrade recovery: open_index
+    discards-and-rebuilds ONLY when version > SCHEMA_VERSION. If that condition
+    ever loosened to fire on the equal-version path, every reopen would destroy
+    the user's index — this row survives reopen, so that regression fails loudly.
+    """
+    db_path = tmp_path / "index.db"
+    db = open_index(db_path)
+    db.execute(
+        "INSERT INTO runs (job_id, project_uuid, run_id, run_dir, state, "
+        "started_at, updated_at, status_mtime) "
+        "VALUES ('ext-keep', 'p', 'keep', '/p/keep', 'done', '0', '0', 0)"
+    )
+    db.commit()
+    db.close()
+
+    db = open_index(db_path)
+    try:
+        kept = db.execute("SELECT state FROM runs WHERE job_id = 'ext-keep'").fetchone()
+        assert kept is not None and kept[0] == "done"
+    finally:
+        db.close()
+
+
+def test_open_recovers_from_newer_schema(tmp_path: Path) -> None:
+    """A downgraded index.db (schema newer than this binary) is rebuilt, not fatal.
+
+    Scenario from issue #621: a newer quodeq migrated index.db forward, then the
+    user installed an older one. The index is derived state, so open_index
+    discards the unusable DB and recreates an empty current-schema one (the next
+    sync repopulates it) instead of crashing with a raw schema error.
+    """
     db_path = tmp_path / "index.db"
     raw = sqlite3.connect(db_path)
     raw.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)")
     raw.execute("INSERT INTO schema_version VALUES (99)")
     raw.commit()
     raw.close()
-    with pytest.raises(UnsupportedIndexSchemaError):
-        open_index(db_path)
+
+    db = open_index(db_path)
+    try:
+        v = db.execute("SELECT version FROM schema_version").fetchone()[0]
+        assert v == SCHEMA_VERSION == 1
+        # Full current schema recreated, not just the version table.
+        cols = {row[1] for row in db.execute("PRAGMA table_info(runs)").fetchall()}
+        assert "job_id" in cols
+    finally:
+        db.close()
 
 
 def test_open_recovers_from_corrupt_file(tmp_path: Path) -> None:
