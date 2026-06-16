@@ -133,3 +133,96 @@ class TestPendingDimTotals:
         assert progress is not None
         # Corrupt estimates → empty dict → pending dim reports 0 (preparing…).
         assert progress.dimensions[0].files["total"] == 0
+
+
+def _write_dimensions_json(run_dir: Path, states: dict[str, str]) -> None:
+    payload = {
+        "schema_version": 1,
+        "dimensions": {d: {"state": s} for d, s in states.items()},
+    }
+    (run_dir / "dimensions.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+class TestEmptyStatusDimensionsRecovery:
+    """Runs launched with *all* dimensions (no --dimensions filter) record an
+    empty ``dimensions: []`` in status.json: the raw, unresolved filter is None
+    and gets coerced to [] before the lifecycle writes it. The reader must
+    recover the dim list from the per-dim sidecars (dimensions.json,
+    dim_estimates.json), otherwise the progress header total — and the ETA the
+    UI derives from it — collapse to zero for the entire run (PROGRESS stuck on
+    "preparing…", no ETA ever shown).
+    """
+
+    def test_recovers_dims_from_sidecars_when_status_empty(self, tmp_path: Path) -> None:
+        run_dir = _make_run(tmp_path)
+        _write_status(run_dir, dimensions=[])  # the bug condition
+        _write_dimensions_json(run_dir, {"security": "pending", "reliability": "pending"})
+        (run_dir / "dim_estimates.json").write_text(
+            json.dumps({
+                "security": {"count": 5, "reason": "first-run"},
+                "reliability": {"count": 7, "reason": "first-run"},
+            }),
+            encoding="utf-8",
+        )
+
+        progress = build_scan_progress("j1", run_dir)
+        assert progress is not None
+        totals = {d.id: d.files["total"] for d in progress.dimensions}
+        # Non-zero header total → the ETA can compute instead of preparing…
+        assert totals == {"security": 5, "reliability": 7}
+
+    def test_recovers_from_estimates_alone(self, tmp_path: Path) -> None:
+        run_dir = _make_run(tmp_path)
+        _write_status(run_dir, dimensions=[])
+        (run_dir / "dim_estimates.json").write_text(
+            json.dumps({"security": {"count": 5, "reason": "first-run"}}),
+            encoding="utf-8",
+        )
+
+        progress = build_scan_progress("j1", run_dir)
+        assert progress is not None
+        assert [d.id for d in progress.dimensions] == ["security"]
+        assert progress.dimensions[0].files["total"] == 5
+
+    def test_recovers_running_dim_from_dimensions_json_alone(self, tmp_path: Path) -> None:
+        run_dir = _make_run(tmp_path)
+        _write_status(run_dir, dimensions=[])
+        _write_dimensions_json(run_dir, {"security": "running"})
+        (run_dir / "evidence" / "security_queue.json").write_text(
+            json.dumps({
+                "taken": [{"files": ["a.py", "b.py"], "agent": "a1", "ts": 1}],
+                "pending": ["c.py"],
+            }),
+            encoding="utf-8",
+        )
+
+        progress = build_scan_progress("j1", run_dir)
+        assert progress is not None
+        assert [d.id for d in progress.dimensions] == ["security"]
+        assert progress.dimensions[0].files == {"taken": 2, "total": 3}
+
+    def test_explicit_status_dims_take_precedence_over_fallback(self, tmp_path: Path) -> None:
+        # When status.json *does* carry a list, the fallback must not fire or
+        # add dims from the sidecars — the explicit (possibly filtered) list wins.
+        run_dir = _make_run(tmp_path)
+        _write_status(run_dir, dimensions=["reliability"])
+        (run_dir / "dim_estimates.json").write_text(
+            json.dumps({
+                "security": {"count": 5, "reason": "first-run"},
+                "reliability": {"count": 7, "reason": "first-run"},
+            }),
+            encoding="utf-8",
+        )
+
+        progress = build_scan_progress("j1", run_dir)
+        assert progress is not None
+        assert [d.id for d in progress.dimensions] == ["reliability"]
+
+    def test_empty_status_and_no_sidecars_stays_empty(self, tmp_path: Path) -> None:
+        # Nothing to recover from → empty list, no crash.
+        run_dir = _make_run(tmp_path)
+        _write_status(run_dir, dimensions=[])
+
+        progress = build_scan_progress("j1", run_dir)
+        assert progress is not None
+        assert progress.dimensions == []

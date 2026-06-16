@@ -217,6 +217,19 @@ def build_scan_progress(
     dim_estimates = _read_dim_estimates(run_dir)
     dim_records = read_dimensions(run_dir).get("dimensions") or {}
     dim_ids = list(status.get("dimensions") or [])
+    if not dim_ids:
+        # "All dimensions" runs (no --dimensions filter) record an empty list in
+        # status.json: the raw, unresolved filter is None and gets coerced to []
+        # before the lifecycle writes it. Reading the dim list from status alone
+        # would then zero out the whole progress header — and the ETA the UI
+        # derives from it — for the entire run. The per-dim sidecars still hold
+        # the resolved dims, so recover the list from them (order-preserving,
+        # deduped) when status carries none.
+        recovered: dict[str, None] = {}
+        record_keys = dim_records.keys() if isinstance(dim_records, dict) else ()
+        for key in (*record_keys, *dim_estimates.keys()):
+            recovered.setdefault(key, None)
+        dim_ids = list(recovered)
     evidence_dir = run_dir / "evidence"
 
     dim_results: list[_DimProgress] = []
