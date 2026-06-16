@@ -6,49 +6,37 @@ from typing import Mapping
 from quodeq.core.scoring._constants import _SEVERITY_WEIGHT
 
 
-def _tally_types(
-    items: list[dict], key_field: str, skip_empty: bool = False,
-) -> dict[str, int]:
-    """Count distinct types per severity bucket.
-
-    *key_field* selects which dict key to group by (e.g. ``"vt"`` or ``"reason"``).
-    When *skip_empty* is ``True``, items whose *key_field* is falsy are ignored.
-    """
-    buckets: dict[str, set] = {"critical": set(), "major": set(), "minor": set()}
-    for item in items:
-        value = item.get(key_field)
-        if skip_empty and not value:
-            continue
-        if value is None:
-            value = "unknown"
-        sev = item.get("severity", "minor")
-        buckets.setdefault(sev, set()).add(value)
-    return {sev: len(seen) for sev, seen in buckets.items()}
-
-
 def evidence_has_taxonomy(violations: list[dict]) -> bool:
     """Return True if at least one violation carries a 'vt' field."""
     return any(item.get("vt") for item in violations)
 
 
-def tally_types_by_taxonomy(violations: list[dict]) -> dict[str, int]:
-    """Count distinct violation types per severity using the 'vt' taxonomy field."""
-    return _tally_types(violations, "vt", skip_empty=True)
+def _tally_types_fallback(items: list[dict], key_fields: tuple[str, ...]) -> dict[str, int]:
+    """Count distinct types per severity, grouping each item by the first
+    present key in *key_fields*.
+
+    Unlike taxonomy-only tallying, an item is never dropped: when its preferred
+    key (``vt``) is absent it falls back to the next key (``reason``). A single
+    tagged finding can therefore no longer flip a principle into a mode that
+    discards its untagged findings.
+    """
+    buckets: dict[str, set] = {"critical": set(), "major": set(), "minor": set()}
+    for item in items:
+        value = next((item[k] for k in key_fields if item.get(k)), "unknown")
+        sev = item.get("severity", "minor")
+        buckets.setdefault(sev, set()).add(value)
+    return {sev: len(seen) for sev, seen in buckets.items()}
 
 
-def tally_types_by_reason(violations: list[dict]) -> dict[str, int]:
-    """Count distinct violation types per severity using (severity, reason) pairs."""
-    return _tally_types(violations, "reason")
+def tally_types(items: list[dict]) -> dict[str, int]:
+    """Count distinct violation/compliance types per severity.
 
-
-def tally_compliance_types_by_taxonomy(compliance: list[dict]) -> dict[str, int]:
-    """Count distinct compliance types per severity using the 'vt' field."""
-    return _tally_types(compliance, "vt", skip_empty=True)
-
-
-def tally_compliance_types_by_reason(compliance: list[dict]) -> dict[str, int]:
-    """Count distinct compliance types per severity using (severity, reason) pairs."""
-    return _tally_types(compliance, "reason")
+    Prefers the stable ``vt`` taxonomy code and falls back to the free-text
+    ``reason`` when a finding carries no ``vt``. Because nothing is dropped, the
+    result is continuous in taxonomy coverage: 0 tags and 1 tag tally the same,
+    and full coverage only sharpens the grouping.
+    """
+    return _tally_types_fallback(items, ("vt", "reason"))
 
 
 def _weighted_sum(
