@@ -6,6 +6,7 @@ import pytest
 from quodeq.shared.prereqs import (
     check_node, check_npm, check_dashboard_dev_prereqs, check_evaluate_prereqs,
     _check_cli_provider, _check_api_provider, _is_provider_explicitly_configured,
+    _run_version_cmd,
 )
 
 
@@ -134,3 +135,20 @@ class TestCompositeChecks:
                     return_value={"claude": {"type": "cli", "cmd": "claude"}},
                 ):
                     check_evaluate_prereqs()
+
+
+class TestProviderInjection:
+    def test_run_version_cmd_rejects_shell_metacharacters(self):
+        with pytest.raises(ValueError, match="unsafe command token"):
+            _run_version_cmd(["x & echo PWNED", "--version"])
+
+    def test_check_cli_provider_rejects_injection(self):
+        with patch("subprocess.run") as mock_run:
+            with pytest.raises(RuntimeError):
+                _check_cli_provider("x & echo PWNED")
+            mock_run.assert_not_called()
+
+    def test_check_cli_provider_accepts_valid_name(self):
+        result = subprocess.CompletedProcess([], 0, stdout="1.0.0\n")
+        with patch("subprocess.run", return_value=result):
+            _check_cli_provider("claude")  # must not raise
