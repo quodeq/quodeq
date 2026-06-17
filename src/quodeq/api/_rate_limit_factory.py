@@ -3,25 +3,22 @@ from __future__ import annotations
 
 import logging
 import os
-import tempfile
 from pathlib import Path
 
+from quodeq.api._rate_limit_config import default_rate_limit_path
 from quodeq.api._rate_limit_store import InMemoryRateLimitStore, RateLimitStore
 
 _logger = logging.getLogger(__name__)
 
 _KNOWN_BACKENDS = {"memory", "file"}
-# Use the platform's temp dir (e.g. C:\Users\<user>\AppData\Local\Temp on
-# Windows) instead of a hardcoded /tmp path that doesn't exist there.
-_DEFAULT_RATE_LIMIT_FILE = str(Path(tempfile.gettempdir()) / "quodeq_rate_limits.json")
+_DEFAULT_RATE_LIMIT_FILE = str(default_rate_limit_path())
 
 
 def _validated_rate_limit_path(raw: str) -> str:
     """Reject obviously-unsafe rate-limit file paths from the env.
 
-    Falls back to the default if *raw* is empty, relative, or resolves to a
-    location with parent-traversal components. Symlink resolution is
-    deliberately not strict (the file may not exist yet on first run).
+    Falls back to the default if *raw* is empty, relative, resolves to a
+    location with parent-traversal components, or is a symlink.
     """
     if not raw:
         return _DEFAULT_RATE_LIMIT_FILE
@@ -32,6 +29,11 @@ def _validated_rate_limit_path(raw: str) -> str:
         resolved = candidate.resolve(strict=False)
         if ".." in resolved.parts:
             raise ValueError("path contains parent-directory traversal")
+        # Defense in depth: FileRateLimitStore._save writes via os.replace,
+        # which already defeats a symlink planted later. This rejects an
+        # obviously-symlinked configured path early.
+        if candidate.is_symlink():
+            raise ValueError("path is a symlink")
     except (OSError, ValueError) as exc:
         _logger.warning(
             "Ignoring unsafe QUODEQ_RATE_LIMIT_FILE=%r (%s); using default %s",
@@ -48,7 +50,7 @@ def create_rate_limit_store(env: dict[str, str] | None = None) -> RateLimitStore
 
     - ``memory`` (default): process-local, no external dependencies.
     - ``file``: JSON file in ``QUODEQ_RATE_LIMIT_FILE`` (default:
-      ``quodeq_rate_limits.json`` in the platform temp dir).  Suitable for
+      ``~/.quodeq/quodeq_rate_limits.json``).  Suitable for
       single-machine multi-worker setups but not recommended for
       high-throughput.
 

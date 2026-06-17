@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 _DEFAULT_RATE_LIMIT_WINDOW = 60
 # 60/min was too tight for the dashboard's bulk-dismiss UX — burst-dismissing
@@ -29,3 +30,12 @@ def _rate_limit_max(env: dict[str, str] | None = None) -> int:
         return int((env or os.environ).get("QUODEQ_RATE_LIMIT_MAX", str(_DEFAULT_RATE_LIMIT_MAX)))
     except (ValueError, TypeError):
         return _DEFAULT_RATE_LIMIT_MAX
+
+
+def default_rate_limit_path() -> Path:
+    """Default rate-limit file under the per-user ~/.quodeq directory.
+
+    A per-user, non-world-writable location removes the shared-temp-dir
+    symlink-attack precondition that a bare tempfile.gettempdir() path had.
+    """
+    return Path.home() / ".quodeq" / "quodeq_rate_limits.json"

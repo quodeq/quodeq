@@ -55,6 +55,11 @@ class TestSharding:
         with pytest.raises(ValueError):
             backend.has("ab")
 
+    def test_traversal_key_rejected(self, backend: LocalFileBackend):
+        for bad in ["../../etc/passwd", "ab/cd", "abc.def", "/abcdef"]:
+            with pytest.raises(ValueError):
+                backend.has(bad)
+
 
 class TestAtomicity:
     def test_put_overwrites_atomically(self, backend: LocalFileBackend):

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import urllib.error
 import urllib.request
@@ -43,23 +44,28 @@ _SETTINGS_HINT = (
 _VERSION_CMD_TIMEOUT_S = 30
 _API_CHECK_TIMEOUT_S = 5
 
+# Provider/command tokens are restricted to a charset with no shell
+# metacharacters, so even on the Windows shell=True path (needed for npm
+# .cmd shim resolution) a value like "x & calc.exe" can never reach cmd.exe.
+_SAFE_CMD_TOKEN_RE = re.compile(r"[A-Za-z0-9._-]+")
+
 
 def _run_version_cmd(cmd: list[str]) -> str:
-    """Run a command and return its stdout, or raise FileNotFoundError.
+    """Run a version command and return its stdout, or raise.
 
-    ``shell=True`` is required on Windows so that ``where`` and other
-    shell built-ins resolve correctly and executables installed via npm
-    (which are .cmd shims) can be found on PATH.  The *cmd* parameter
-    is always a ``list[str]`` hard-coded by callers in this module
-    (never user-influenced), so the shell injection risk does not apply.
-
-    SECURITY: Do not pass user-controlled strings into *cmd*.
-    All callers in this module construct *cmd* from string literals
-    (e.g. ``["node", "--version"]``).  If this function is ever
-    exposed to external input, ``shell=True`` MUST be removed.
+    On Windows ``shell=True`` is required so npm-installed ``.cmd`` shims
+    resolve on PATH. To keep that shell safe, every token in *cmd* is
+    validated against a strict ``[A-Za-z0-9._-]`` charset, so no shell
+    metacharacter (space, ``&``, ``|``, ``>`` ...) can reach ``cmd.exe``.
+    Callers that accept external input (e.g. a provider name from the
+    ``AI_CMD`` env var) must still validate at their own layer; this is
+    defense in depth.
     """
     if not isinstance(cmd, list):
         raise TypeError("cmd must be a list of strings, not a raw string")
+    for token in cmd:
+        if not isinstance(token, str) or not _SAFE_CMD_TOKEN_RE.fullmatch(token):
+            raise ValueError(f"unsafe command token: {token!r}")
     result = subprocess.run(
         cmd, capture_output=True, text=True, check=True, shell=_IS_WIN32,
         timeout=_VERSION_CMD_TIMEOUT_S,
@@ -109,6 +115,13 @@ def _is_provider_explicitly_configured() -> bool:
 
 def _check_cli_provider(provider: str) -> None:
     """Check that a CLI provider binary is available on PATH."""
+    if not _SAFE_CMD_TOKEN_RE.fullmatch(provider):
+        raise RuntimeError(
+            f"'{provider}' is not a valid AI provider name.\n\n"
+            f"Provider names may only contain letters, digits, '.', '_', and '-'.\n\n"
+            f"Choose a provider in the dashboard Settings:\n"
+            f"  quodeq"
+        )
     try:
         _run_version_cmd([provider, "--version"])
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
