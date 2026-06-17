@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -30,6 +31,10 @@ _ROOT_ENV = "QUODEQ_CACHE_ROOT"
 _RESULTS_SUBDIR = "results"
 _ENTRY_FILENAME = "entry.json"
 _TMP_PREFIX = ".tmp."
+# Content-addressed keys are SHA-256 hex in production; restrict to a
+# path-safe charset so a key can never contain '/', '\\', or '..' and
+# escape the cache root in _dir_for.
+_SAFE_KEY_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 
 def default_cache_root() -> Path:
@@ -56,6 +61,8 @@ class LocalFileBackend:
     def _dir_for(self, key: str) -> Path:
         if len(key) < 3:
             raise ValueError(f"cache key too short: {key!r}")
+        if not _SAFE_KEY_RE.fullmatch(key):
+            raise ValueError(f"invalid cache key: {key!r}")
         return self._root / key[:2] / key[2:]
 
     def _entry_path(self, key: str) -> Path:
