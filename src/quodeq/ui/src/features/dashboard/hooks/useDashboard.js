@@ -21,7 +21,7 @@ import { projectKeys } from "../../../api/queryKeys.js";
  * not via SSE. ``refreshDashboard`` is what the dismiss handlers call to
  * trigger a refetch of the accumulated (cross-run) dashboard payload.
  */
-export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = true }) {
+export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = true } = {}) {
   const { getDashboard } = useApi();
   const queryClient = useQueryClient();
 

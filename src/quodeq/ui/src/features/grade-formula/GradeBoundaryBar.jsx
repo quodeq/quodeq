@@ -13,7 +13,7 @@ const MIN_GAP = 0.5;
  * (descending). Dragging divider i moves the ascending boundary i.
  * onChange receives a full new thresholds array (descending, labels preserved).
  */
-export default function GradeBoundaryBar({ thresholds, onChange }) {
+export default function GradeBoundaryBar({ thresholds = [], onChange }) {
   const barRef = useRef(null);
   // ascending boundary values, e.g. [3,5,7,9]
   const asc = [...thresholds].map(([t]) => t).reverse();

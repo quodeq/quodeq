@@ -21,7 +21,7 @@ import { projectKeys } from "../api/queryKeys.js";
  *
  * keepPlaceholder (default true): see useDashboard for rationale.
  */
-export function useProjectScores({ selectedProject, selectedRun, keepPlaceholder = true }) {
+export function useProjectScores({ selectedProject, selectedRun, keepPlaceholder = true } = {}) {
   const queryClient = useQueryClient();
 
   const latestQuery = useQuery({

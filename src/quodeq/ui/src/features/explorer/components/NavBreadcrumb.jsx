@@ -42,7 +42,7 @@ export function labelFor(entry) {
  * segments are clickable to pop the nav stack; the current segment is
  * accent-colored and non-interactive.
  */
-export default function NavBreadcrumb({ stack, onGoTo, projectName }) {
+export default function NavBreadcrumb({ stack = [], onGoTo, projectName }) {
   const crumbs = [];
   if (projectName) crumbs.push({ label: projectName, index: -1 });
   stack.forEach((entry, i) => crumbs.push({ label: labelFor(entry), index: i }));
