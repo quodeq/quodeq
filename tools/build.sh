@@ -18,8 +18,13 @@ ENGINE_VERSION_PATTERN='"engine_version": "==[^"]*"'
 # Replacement string pinning engine_version to the current pyproject.toml version
 ENGINE_VERSION_REPLACE="\"engine_version\": \"==$VERSION\""
 # Updates the engine_version constraint in every plugin.json to match the current pyproject.toml version
-find "$ROOT/evaluators" "$ROOT/tests" -name "plugin.json" -exec \
-  sed -i '' "s/$ENGINE_VERSION_PATTERN/$ENGINE_VERSION_REPLACE/" {} +
+if [ "$(uname -s)" = "Darwin" ]; then
+  find "$ROOT/evaluators" "$ROOT/tests" -name "plugin.json" -exec \
+    sed -i '' "s/$ENGINE_VERSION_PATTERN/$ENGINE_VERSION_REPLACE/" {} +
+else
+  find "$ROOT/evaluators" "$ROOT/tests" -name "plugin.json" -exec \
+    sed -i "s/$ENGINE_VERSION_PATTERN/$ENGINE_VERSION_REPLACE/" {} +
+fi
 echo "    engine_version set to ==$VERSION"
 
 echo "==> Building Python package..."

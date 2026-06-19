@@ -10,6 +10,16 @@ from pathlib import Path
 from quodeq.analysis._config import _AgentParams
 
 
+def _default_cache_root():
+    """Return the result cache root, honouring QUODEQ_CACHE_ROOT.
+
+    Deferred import breaks the circular dependency:
+    _mcp_config -> cache/__init__ -> dimension_helpers -> _types -> subprocess -> _command -> _mcp_config.
+    """
+    from quodeq.analysis.cache.local import default_cache_root  # noqa: PLC0415
+    return default_cache_root()
+
+
 def _create_mcp_config(
     jsonl_file: Path,
     compiled_dir: Path | None = None,
@@ -34,7 +44,7 @@ def _create_mcp_config(
     # cache.dimension_helpers._model_id_from ('unknown') and Task 5's
     # language-unset contract ('').
     mcp_args.extend([
-        "--cache-root", str(Path.home() / ".quodeq" / "cache" / "results"),
+        "--cache-root", str(_default_cache_root()),
         "--model-id", ap.model_id or "unknown",
         "--language", ap.language or "",
     ])

@@ -185,7 +185,7 @@ export default function GalaxyFolderView({ node, currentPath = '', onPathChange,
       }
       if (!flyRef.current) {
         advanceCamera(cam, refs, {
-          TRANS, scene, computeFocusCamera, saveNav, setNavVersion, getFitZoom,
+          TRANS, scene, computeFocusCamera, saveNav, setNavVersion, getFitZoom, W, H,
         });
       }
 

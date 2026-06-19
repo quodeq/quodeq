@@ -12,6 +12,7 @@ from __future__ import annotations
 import json as _json
 import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 from quodeq.analysis._command import (
@@ -227,6 +228,19 @@ def _render_standards_grouped(data: dict) -> str:
     return _json.dumps(checklist, separators=(",", ":"))
 
 
+def _read_omlx_key() -> str | None:
+    from quodeq.llm_bridge._omlx import _read_omlx_api_key  # noqa: PLC0415
+    return _read_omlx_api_key()
+
+
+# Registry of provider-specific credential loaders. Each callable returns the
+# API key string (or None/empty string) for that provider. New providers can
+# be added here without touching _resolve_provider_config.
+_CREDENTIAL_LOADERS: dict[str, Callable[[], str | None]] = {
+    "omlx": _read_omlx_key,
+}
+
+
 def _resolve_provider_config(cfg: AnalysisConfig) -> tuple[str, str, str]:
     """Look up model, api_base, and api_key from provider config.
 
@@ -240,9 +254,10 @@ def _resolve_provider_config(cfg: AnalysisConfig) -> tuple[str, str, str]:
     api_base = provider_cfg.get("api_base", "")
     api_key_env = provider_cfg.get("api_key_env", "")
     api_key = os.environ.get(api_key_env, "") if api_key_env else ""
-    if not api_key and ai_cmd == "omlx":
-        from quodeq.llm_bridge._omlx import _read_omlx_api_key
-        api_key = _read_omlx_api_key()
+    if not api_key:
+        loader = _CREDENTIAL_LOADERS.get(ai_cmd)
+        if loader is not None:
+            api_key = loader() or ""
 
     if not model:
         raise AnalysisError(

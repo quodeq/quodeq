@@ -502,8 +502,9 @@ def run_api_analysis(
             or run_config.options.ai_model
             or "unknown"
         )
+        from quodeq.analysis.cache.local import default_cache_root as _dcr  # noqa: PLC0415
         cache_writer = build_cache_writer(
-            cache_root=Path.home() / ".quodeq" / "cache" / "results",
+            cache_root=_dcr(),
             src_root=run_config.src,
             standards_dir=run_config.standards_dir,
             dimension=dim_id,

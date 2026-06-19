@@ -131,7 +131,7 @@ export function createEventHandlers(refs, params) {
       const cam = refs.camRef.current;
       const parentPath = nav.path.slice(0, -1);
       const parentNode = parentPath[parentPath.length - 1];
-      refs.nextSceneRef.current = buildFolderScene(parentNode, 800, 600);
+      refs.nextSceneRef.current = buildFolderScene(parentNode, size.w, size.h);
       refs.flyRef.current = {
         t: 0, reverse: true,
         sx: cam.x, sy: cam.y, sz: cam.z,
@@ -147,7 +147,7 @@ export function createEventHandlers(refs, params) {
     const newPath = refs.navRef.current.path.slice(0, idx + 1);
     const targetNode = newPath[newPath.length - 1];
     const cam = refs.camRef.current;
-    refs.nextSceneRef.current = buildFolderScene(targetNode, 800, 600);
+    refs.nextSceneRef.current = buildFolderScene(targetNode, size.w, size.h);
     refs.flyRef.current = {
       t: 0, reverse: true,
       sx: cam.x, sy: cam.y, sz: cam.z,

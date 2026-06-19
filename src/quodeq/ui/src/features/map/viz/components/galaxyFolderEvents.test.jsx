@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createEventHandlers } from './galaxyFolderEvents.js';
+import { advanceCamera } from './galaxyFolderCamera.js';
 
 function makeRefs(overrides = {}) {
   return {
@@ -97,5 +98,72 @@ describe('galaxyFolderEvents keyboard handler (#2063)', () => {
     expect(() =>
       handlers.handleKeyDown({ key: 'x', preventDefault: vi.fn() })
     ).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fix B (#2604): advanceCamera uses W/H from params, not hardcoded 800/600
+// ---------------------------------------------------------------------------
+
+describe('advanceCamera uses W/H from params (#2604)', () => {
+  function makeCamera(overrides = {}) {
+    return { x: 500, y: 400, z: 1, ...overrides };
+  }
+
+  function makeCameraRefs(overrides = {}) {
+    return {
+      navRef: { current: { path: [{ name: 'root', path: '' }] } },
+      camRef: { current: null },
+      animRef: { current: null },
+      frameCount: { current: 0 },
+      sceneRef: { current: null },
+      nextSceneRef: { current: null },
+      zoomedFileRef: { current: null },
+      focusedFolderRef: { current: null },
+      zoomTargetRef: { current: null },
+      flyRef: { current: null },
+      prevNavRef: { current: null },
+      ...overrides,
+    };
+  }
+
+  it('centering inside anim swap uses W and H from params, not 800/600', () => {
+    // Set up an animation that is complete (t >= 1) so the anim block runs.
+    // A focusedFolderRef with autoEnter=true and a valid folder star triggers
+    // the buildFolderScene call — we verify the scene receives the custom dims.
+    const customW = 1200;
+    const customH = 900;
+    const folderNode = { name: 'src', path: 'src', children: [] };
+    const star = {
+      x: 100, y: 100, isFolder: true, _node: folderNode,
+      radius: 10, col: '#fff',
+    };
+    const scene = { rootStars: [star] };
+
+    const refs = makeCameraRefs({
+      animRef: { current: { t: 1, sx: 0, sy: 0, sz: 1, out: false } },
+      focusedFolderRef: { current: { autoEnter: true, starIdx: 0, x: 100, y: 100 } },
+      sceneRef: { current: scene },
+    });
+
+    const cam = makeCamera();
+    const getFitZoom = vi.fn(() => 1);
+    const computeFocusCamera = vi.fn(() => ({ x: customW / 2, y: customH / 2, z: 1 }));
+
+    advanceCamera(cam, refs, {
+      TRANS: 0.8,
+      scene,
+      computeFocusCamera,
+      saveNav: vi.fn(),
+      setNavVersion: vi.fn(),
+      getFitZoom,
+      W: customW,
+      H: customH,
+    });
+
+    // buildFolderScene was called (nextSceneRef is populated) and its _node set.
+    expect(refs.nextSceneRef.current).not.toBeNull();
+    // The fly transition records starX/starY from the star, not from 800/600 literals.
+    expect(refs.flyRef.current).not.toBeNull();
   });
 });

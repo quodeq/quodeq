@@ -20,6 +20,17 @@ from quodeq.shared.utils import get_ai_cmd, get_ai_model
 
 _log = logging.getLogger(__name__)
 
+
+def _default_cache_root():
+    """Return the result cache root, honouring QUODEQ_CACHE_ROOT.
+
+    Deferred import breaks the circular dependency:
+    _command -> cache/__init__ -> dimension_helpers -> _types -> subprocess -> _command.
+    """
+    from quodeq.analysis.cache.local import default_cache_root  # noqa: PLC0415
+    return default_cache_root()
+
+
 _DEFAULT_AI_TOOLS = "Glob,Grep,Read"
 _DEFAULT_BASE_AI_ARGS = "--print --output-format stream-json --verbose"
 
@@ -189,7 +200,7 @@ def _build_mcp_server_args(
     # agree for the same project state. See cache_writer.build_cache_writer
     # and cache.dimension_helpers._model_id_from for the reference.
     mcp_args.extend([
-        "--cache-root", str(Path.home() / ".quodeq" / "cache" / "results"),
+        "--cache-root", str(_default_cache_root()),
         "--model-id", _resolve_model_id(config),
         "--language", _resolve_language(config),
     ])

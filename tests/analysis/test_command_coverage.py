@@ -246,12 +246,10 @@ class TestBuildMcpServerArgs:
         assert args[model_idx + 1] == "sonnet"
         lang_idx = args.index("--language")
         assert args[lang_idx + 1] == "kotlin"
-        # Cache root defaults to ~/.quodeq/cache/results. Compare via
-        # Path so the assertion is platform-agnostic — on Windows the
-        # produced path uses backslashes, so a literal forward-slash
-        # tail check would fail there.
+        # Cache root ends with /cache/results regardless of whether the
+        # default (~/.quodeq/cache) or QUODEQ_CACHE_ROOT override is used.
         cr_idx = args.index("--cache-root")
-        expected_tail = str(Path(".quodeq") / "cache" / "results")
+        expected_tail = str(Path("cache") / "results")
         assert args[cr_idx + 1].endswith(expected_tail)
 
     def test_cache_flags_fall_back_when_no_run_config(self, tmp_path):
@@ -290,5 +288,24 @@ class TestMcpServerName:
         config = AnalysisConfig()
         name = _mcp_server_name(config)
         assert name == "quodeq-findings"
+
+
+# ---------------------------------------------------------------------------
+# Fix A (#2419): cache root honours QUODEQ_CACHE_ROOT via default_cache_root()
+# ---------------------------------------------------------------------------
+
+class TestBuildMcpServerArgsCacheRootEnv:
+    def test_cache_root_honours_quodeq_cache_root_env(self, tmp_path, monkeypatch):
+        """QUODEQ_CACHE_ROOT is forwarded through _build_mcp_server_args so
+        the subprocess cache writer resolves under the same sandbox root as
+        classify_files_via_cache."""
+        monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path))
+        jsonl = tmp_path / "findings.jsonl"
+        config = AnalysisConfig(jsonl_file=jsonl, ai_model="test-model")
+        args = _build_mcp_server_args(config)
+
+        cr_idx = args.index("--cache-root")
+        resolved = Path(args[cr_idx + 1])
+        assert resolved == tmp_path / "results"
 
 
