@@ -34,6 +34,9 @@ def _build_cwe_name_lookup(compiled_dir: Path) -> dict[int, str]:
         except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
             print(f"  SKIP  cannot read {f}: {exc}")
             continue
+        if not isinstance(data, dict):
+            print(f"  SKIP  unexpected payload type in {f}: {type(data).__name__}")
+            continue
         for principle in data.get("principles", []):
             for cwe in principle.get("cwes", []):
                 cid = cwe.get("id")
@@ -72,6 +75,9 @@ def migrate_file(path: Path, cwe_names: dict[int, str], apply: bool) -> tuple[in
         data = json.loads(path.read_text(encoding=_TEXT_ENCODING))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         print(f"  SKIP  cannot read {path}: {exc}")
+        return 0, 0
+    if not isinstance(data, dict):
+        print(f"  SKIP  unexpected payload type in {path}: {type(data).__name__}")
         return 0, 0
     v_count = _patch_entries(data.get("violations", []), cwe_names)
     c_count = _patch_entries(data.get("compliance", []), cwe_names)

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 import tempfile as _tempfile
@@ -58,10 +59,8 @@ def _create_worktree(repo_dir: Path, branch: str) -> Path | None:
         return worktree_dir
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
         print(f"Failed to create worktree for branch '{branch}': {exc}", file=sys.stderr)
-        try:
-            worktree_dir.rmdir()
-        except OSError:
-            pass
+        _cleanup_worktree(repo_dir, worktree_dir)
+        shutil.rmtree(worktree_dir, ignore_errors=True)
         return None
 
 

@@ -166,6 +166,47 @@ class SQLiteStateStore:
             )
             conn.commit()
 
+    def batch_rewrite_grades(
+        self,
+        principle_rows: "list[tuple[str, dict]]",
+        dimension_rows: "list[dict]",
+    ) -> None:
+        """Clear all grade tables and insert new rows in a single transaction.
+
+        The clear + all inserts are committed atomically: a mid-batch failure
+        rolls back the entire operation, leaving any pre-existing rows intact.
+
+        Args:
+            principle_rows: Sequence of ``(dimension, principle_grade_dict)``
+                as returned by ``compute_run_grades``.
+            dimension_rows: Sequence of dimension score dicts
+                (``{"dimension": ..., "score": ..., "grade": ...}``).
+        """
+        with open_evaluation_db(self._run_dir) as conn:
+            conn.execute("DELETE FROM dimension_scores")
+            conn.execute("DELETE FROM principle_grades")
+            for dim, p_grade in principle_rows:
+                conn.execute(
+                    "INSERT INTO principle_grades "
+                    "(dimension, principle_id, score, grade, finding_count, dismissed_count, completed_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+                    (
+                        dim,
+                        p_grade["principle_id"],
+                        p_grade["score"],
+                        p_grade["grade"],
+                        p_grade["finding_count"],
+                        p_grade["dismissed_count"],
+                    ),
+                )
+            for d_score in dimension_rows:
+                conn.execute(
+                    "INSERT INTO dimension_scores (dimension, score, grade, completed_at) "
+                    "VALUES (?, ?, ?, datetime('now'))",
+                    (d_score["dimension"], d_score["score"], d_score["grade"]),
+                )
+            conn.commit()
+
     def clear_grades(self) -> None:
         with open_evaluation_db(self._run_dir) as conn:
             conn.execute("DELETE FROM dimension_scores")

@@ -387,3 +387,8 @@ class TestLoadFallbackClaudeModels:
     @patch("quodeq.services.tooling_mixin.read_json", side_effect=OSError)
     def test_returns_empty_on_error(self, mock_read):
         assert _load_fallback_claude_models() == []
+
+    # #139 — ValueError (e.g. corrupt JSON int parse) must also be caught
+    @patch("quodeq.services.tooling_mixin.read_json", side_effect=ValueError("bad int"))
+    def test_returns_empty_on_value_error(self, mock_read):
+        assert _load_fallback_claude_models() == []

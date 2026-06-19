@@ -37,7 +37,7 @@ describe('ServerSection', () => {
       expect(screen.getByText('7863')).toBeTruthy();
       expect(screen.getByText('1234')).toBeTruthy();
     });
-    expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/health'));
+    expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/health'), expect.any(Object));
   });
 
   it('renders offline when /api/health is unreachable', async () => {

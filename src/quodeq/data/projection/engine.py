@@ -47,8 +47,16 @@ class ProjectionEngine:
 
         applied = 0
         for event in read_action_events(actions_log.parent):
-            handle(event, store)
-            applied += 1
+            try:
+                handle(event, store)
+                applied += 1
+            except Exception:
+                _logger.error(
+                    "Handler failed for action event %s (type=%s) - skipping",
+                    getattr(event, "event_id", "?"),
+                    getattr(event, "event_type", "?"),
+                    exc_info=True,
+                )
         store.save_actions_projected_size(current_size)
         return applied
 
@@ -67,9 +75,9 @@ class ProjectionEngine:
                 handle(event, store)
                 last_ts = event.timestamp
                 count += 1
-            except Exception:
+            except (ValueError, KeyError, TypeError):
                 _logger.error(
-                    "Handler failed for event %s (type=%s) — skipping",
+                    "Handler failed for event %s (type=%s) - skipping",
                     event.event_id,
                     event.event_type,
                     exc_info=True,

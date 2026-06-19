@@ -3,6 +3,7 @@ import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import ConsoleLogViewer from '../../evaluation/components/ConsoleLogViewer.jsx';
 import { LlamaCppLogContext } from './LlamaCppLogContext.js';
 import { useLlamaCppLogStream } from './useLlamaCppLogStream.js';
+import { request } from '../../../api/request.js';
 
 const WINDOW_ID = 'llamacpp-log';
 
@@ -33,8 +34,7 @@ export function LlamaCppLogProvider({ children }) {
   // session since the env var is set at server-launch time.
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/llamacpp/logs/available')
-      .then((r) => (r.ok ? r.json() : { available: false }))
+    request('/llamacpp/logs/available')
       .then((data) => {
         if (!cancelled) setAvailable(Boolean(data?.available));
       })

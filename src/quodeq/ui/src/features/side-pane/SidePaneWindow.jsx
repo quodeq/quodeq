@@ -33,7 +33,7 @@ function triggerDownload({ filename, body }) {
 class RenderBoundary extends React.Component {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch() { /* swallow — header still works */ }
+  componentDidCatch(error, info) { console.error('[SidePaneWindow] render error:', error, info); }
   componentDidUpdate(prev) {
     if (prev.contentKey !== this.props.contentKey && this.state.failed) {
       this.setState({ failed: false });

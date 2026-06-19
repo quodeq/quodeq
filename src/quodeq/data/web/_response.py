@@ -24,8 +24,8 @@ def check_response_status(response: HttpResponse) -> None:
     error details that should remain internal.
     """
     if response.status in {HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN}:
-        raise AuthError("Authentication error — verify your API key is valid and not expired")
+        raise AuthError("Authentication error. Verify your API key is valid and not expired")
     if response.status == HTTPStatus.NOT_FOUND:
-        raise NotFoundError("Resource not found — verify the URL and that the resource exists")
+        raise NotFoundError("Resource not found. Verify the URL and that the resource exists")
     if response.status >= HTTPStatus.INTERNAL_SERVER_ERROR:
-        raise ServerError("Server error")
+        raise ServerError(f"Server error (HTTP {response.status})")

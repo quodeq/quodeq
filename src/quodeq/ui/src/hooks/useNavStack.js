@@ -30,11 +30,9 @@ function handlePopState(e, setNavStack) {
 
 function createNavActions(setNavStack, navStackRef, history) {
   function navPush(entry) {
-    setNavStack((prev) => {
-      const next = [...prev, entry];
-      history.pushState({ navIndex: next.length - 1, entry }, '');
-      return next;
-    });
+    const next = [...navStackRef.current, entry];
+    setNavStack(next);
+    history.pushState({ navIndex: next.length - 1, entry }, '');
   }
 
   function navPop() {
@@ -47,20 +45,18 @@ function createNavActions(setNavStack, navStackRef, history) {
   }
 
   function navReset() {
-    setNavStack((prev) => {
-      const stepsBack = prev.length - 1;
-      if (stepsBack > 0) history.go(-stepsBack);
-      return [{ page: DEFAULT_PAGE }];
-    });
+    const stepsBack = navStackRef.current.length - 1;
+    setNavStack([{ page: DEFAULT_PAGE }]);
+    if (stepsBack > 0) history.go(-stepsBack);
   }
 
   function navTab(page) {
-    setNavStack((prev) => {
-      const stepsBack = prev.length - 1;
-      if (stepsBack > 0) history.go(-stepsBack);
-      const prevKey = prev.length === 1 && prev[0].page === page ? (prev[0]._tabKey || 0) : 0;
-      return [{ page, _tabKey: prevKey + 1 }];
-    });
+    const prev = navStackRef.current;
+    const stepsBack = prev.length - 1;
+    const prevKey = prev.length === 1 && prev[0].page === page ? (prev[0]._tabKey || 0) : 0;
+    const next = [{ page, _tabKey: prevKey + 1 }];
+    setNavStack(next);
+    if (stepsBack > 0) history.go(-stepsBack);
   }
 
   return { navPush, navPop, navGoTo, navReset, navTab };

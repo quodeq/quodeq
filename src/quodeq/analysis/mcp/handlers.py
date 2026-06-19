@@ -83,7 +83,7 @@ def handle_tools_call(
 ) -> dict:
     """Handle the 'tools/call' JSON-RPC method."""
     name = params.get("name")
-    args = params.get("arguments", {})
+    args = params.get("arguments") or {}
 
     if name == REPORT_FINDING_NAME:
         message, _is_dup = router.receive(args)

@@ -1,6 +1,7 @@
 """Quodeq menu bar app for macOS."""
 from __future__ import annotations
 
+import logging as _logging
 import os
 import signal
 import subprocess
@@ -33,17 +34,37 @@ from _dashboard import (
 )
 
 _DEFAULT_APP_PORT = 7863
-_POLL_INTERVAL = int(os.environ.get("QUODEQ_POLL_INTERVAL", "5"))
+try:
+    _POLL_INTERVAL = int(os.environ.get("QUODEQ_POLL_INTERVAL", "5"))
+except ValueError:
+    _logging.getLogger(__name__).warning("Invalid QUODEQ_POLL_INTERVAL; using default 5")
+    _POLL_INTERVAL = 5
 _PROCESS_PATTERNS = ("quodeq.api.app", "quodeq.action_api", "quodeq dashboard")
-_AUTO_START_DELAY_S = float(os.environ.get("QUODEQ_AUTO_START_DELAY_S", "1.5"))
+try:
+    _AUTO_START_DELAY_S = float(os.environ.get("QUODEQ_AUTO_START_DELAY_S", "1.5"))
+except ValueError:
+    _logging.getLogger(__name__).warning("Invalid QUODEQ_AUTO_START_DELAY_S; using default 1.5")
+    _AUTO_START_DELAY_S = 1.5
 _DEFAULT_PORTS = "7863,7864,7865,7866,7867,7868,7869"
 
 
 def _load_config(env=None):
     """Read port configuration from the environment (or an injected mapping)."""
+    _cfg_log = _logging.getLogger(__name__)
     env = env or os.environ
-    app_port = int(env.get("QUODEQ_PORT", str(_DEFAULT_APP_PORT)))
-    ports = tuple(int(p) for p in env.get("QUODEQ_PORTS", _DEFAULT_PORTS).split(","))
+    try:
+        app_port = int(env.get("QUODEQ_PORT", str(_DEFAULT_APP_PORT)))
+    except ValueError:
+        _cfg_log.warning("Invalid QUODEQ_PORT; using default %d", _DEFAULT_APP_PORT)
+        app_port = _DEFAULT_APP_PORT
+    raw_ports = env.get("QUODEQ_PORTS", _DEFAULT_PORTS)
+    ports_list = []
+    for p in raw_ports.split(","):
+        try:
+            ports_list.append(int(p))
+        except ValueError:
+            _cfg_log.warning("Invalid port value %r in QUODEQ_PORTS; skipping", p)
+    ports = tuple(ports_list) if ports_list else tuple(int(p) for p in _DEFAULT_PORTS.split(","))
     return app_port, ports
 
 

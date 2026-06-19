@@ -139,6 +139,7 @@ function isDeletableStandard(type) {
 function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onToggleVisibility }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [downloadError, setDownloadError] = useState(null);
   const principleCount = standard.principleCount ?? standard.principles?.length ?? 0;
   const requirementCount = standard.requirementCount ?? (standard.principles || []).reduce((sum, p) => sum + (p.requirements?.length ?? 0), 0);
   const isDeletable = isDeletableStandard(standard.type);
@@ -173,11 +174,21 @@ function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onTog
             isEditable={isDeletable}
             onOpen={() => onEdit(standard.id)}
             onDuplicate={() => setShowDuplicateModal(true)}
-            onDownload={() => downloadStandard(standard.id)}
+            onDownload={() => {
+              setDownloadError(null);
+              downloadStandard(standard.id).catch((err) => {
+                setDownloadError(err?.message || 'Download failed');
+              });
+            }}
             onDelete={() => setShowDeleteModal(true)}
           />
         </div>
       </div>
+      {downloadError && (
+        <div role="alert" className="standards-row-error">
+          Could not download standard: {downloadError}
+        </div>
+      )}
       {showDeleteModal && (
         <ConfirmDeleteModal
           standardName={standard.name}
