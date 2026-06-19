@@ -76,6 +76,20 @@ class SqliteFindingsRepository:
             ).fetchall()
         return [row_to_finding(r) for r in rows]
 
+    def list_all(self) -> list[Finding]:
+        """Return every finding in the DB in a single query (all dimensions).
+
+        Callers that need findings grouped by dimension should use this method
+        and group in Python rather than issuing N ``list_by_dimension`` calls.
+        """
+        self._ensure_fresh()
+        with open_evaluation_db(self._run_dir) as conn:
+            conn.row_factory = _dict_row
+            rows = conn.execute(
+                f"SELECT {_SELECT_COLUMNS} FROM findings ORDER BY id",
+            ).fetchall()
+        return [row_to_finding(r) for r in rows]
+
     def count_by_dimension(self) -> dict[str, int]:
         self._ensure_fresh()
         with open_evaluation_db(self._run_dir) as conn:

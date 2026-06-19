@@ -11,6 +11,7 @@ sessions that ended in PRs #525-#528.)
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,20 @@ from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 _MAX_DISMISSED_LIMIT = 5000
+
+# Per-project locks for background projection.  A module-level guard lock
+# protects creation of per-project entries; after creation each project's Lock
+# is accessed without the guard.
+_projection_locks: dict[str, threading.Lock] = {}
+_projection_locks_guard = threading.Lock()
+
+
+def _get_projection_lock(project: str) -> threading.Lock:
+    """Return (and lazily create) the Lock for *project*."""
+    with _projection_locks_guard:
+        if project not in _projection_locks:
+            _projection_locks[project] = threading.Lock()
+        return _projection_locks[project]
 
 
 def _project_dir(evaluations_dir: str, project: str) -> Path:
@@ -147,13 +162,30 @@ def register_findings_routes(app: Flask) -> None:
         When the caller can't supply a usable ``run_id`` (Violations / Map
         nav paths don't carry one today), ``_rescore_run`` returns ``None`` —
         but the action *must* still propagate to SQL or the dismissed-tab
-        list won't see it. Project every run as the fallback so the entry
-        becomes visible without forcing the UI to retry.
+        list won't see it. Project every run in the background as the
+        fallback so the entry becomes visible without blocking the response.
+
+        A per-project non-blocking lock prevents duplicate concurrent
+        projections for the same project: if one projection is already
+        running, the second caller skips rather than queueing behind it
+        (the in-flight run will already cover the latest actions).
         """
         evaluations_dir = _eval_dir()
         scores = _rescore_run(evaluations_dir, project, run_id)
         if scores is None:
-            _project_all_runs(_project_dir(evaluations_dir, project))
+            proj_dir = _project_dir(evaluations_dir, project)
+            lock = _get_projection_lock(project)
+
+            def _bg_project() -> None:
+                if not lock.acquire(blocking=False):
+                    # Another projection for this project is already running.
+                    return
+                try:
+                    _project_all_runs(proj_dir)
+                finally:
+                    lock.release()
+
+            threading.Thread(target=_bg_project, daemon=True).start()
         return scores
 
     @app.get("/api/findings/dismissed")

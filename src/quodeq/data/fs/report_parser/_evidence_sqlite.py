@@ -69,29 +69,34 @@ def _load_run_metadata(run_dir: Path) -> dict[str, Any]:
 
 def load_evidence_map_from_db(run_dir: Path) -> dict[str, dict[str, Any]]:
     repo = SqliteFindingsRepository(run_dir)
-    counts = repo.count_by_dimension()
+    # Fetch all findings in one query, then group by dimension in Python.
+    # Previously this called count_by_dimension() + list_by_dimension(dim)
+    # for each dimension, which was an N+1 query pattern.
+    all_judgments = repo.list_all()
     run_metadata = _load_run_metadata(run_dir)
     result: dict[str, dict[str, Any]] = {}
-    for dimension in counts:
-        judgments = repo.list_by_dimension(dimension)
-        violations = [finding_to_response_dict(j) for j in judgments if j.verdict == "violation"]
-        compliance = [finding_to_response_dict(j) for j in judgments if j.verdict == "compliance"]
-        principles: dict[str, dict[str, Any]] = {}
-        for j in judgments:
-            entry = principles.setdefault(j.practice_id, {
-                "display_name": j.practice_id,
-                "violations": [],
-                "compliance": [],
-            })
-            target = entry["violations"] if j.verdict == "violation" else entry["compliance"]
-            target.append(finding_to_response_dict(j))
-        result[dimension] = {
-            "dimension": dimension,
-            "principles": principles,
-            "violation_count": len(violations),
-            "compliance_count": len(compliance),
-            "sourceFileCount": run_metadata["sourceFileCount"],
-            "date": run_metadata["date"],
-            "discipline": run_metadata["discipline"],
-        }
+    for j in all_judgments:
+        dimension = j.dimension
+        if dimension not in result:
+            result[dimension] = {
+                "dimension": dimension,
+                "principles": {},
+                "violation_count": 0,
+                "compliance_count": 0,
+                "sourceFileCount": run_metadata["sourceFileCount"],
+                "date": run_metadata["date"],
+                "discipline": run_metadata["discipline"],
+            }
+        entry = result[dimension]["principles"].setdefault(j.practice_id, {
+            "display_name": j.practice_id,
+            "violations": [],
+            "compliance": [],
+        })
+        finding_dict = finding_to_response_dict(j)
+        if j.verdict == "violation":
+            entry["violations"].append(finding_dict)
+            result[dimension]["violation_count"] += 1
+        else:
+            entry["compliance"].append(finding_dict)
+            result[dimension]["compliance_count"] += 1
     return result
