@@ -28,6 +28,13 @@ _MAX_DISMISSED_LIMIT = 5000
 # Per-project locks for background projection.  A module-level guard lock
 # protects creation of per-project entries; after creation each project's Lock
 # is accessed without the guard.
+#
+# Intentionally unbounded: one tiny Lock object per distinct project name that
+# has ever triggered a background projection on this host.  In practice this
+# mirrors the number of projects on disk, which is small and naturally bounded
+# by real usage.  Contrast with _scored_jobs (bounded LRU) — scored jobs can
+# accumulate many run-ids per project, so a size cap there is meaningful;
+# here there is one entry per project, not per run.
 _projection_locks: dict[str, threading.Lock] = {}
 _projection_locks_guard = threading.Lock()
 

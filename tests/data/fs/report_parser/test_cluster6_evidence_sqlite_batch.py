@@ -96,6 +96,30 @@ def test_load_evidence_map_empty_db_returns_empty(tmp_path: Path):
     assert result == {}
 
 
+def test_dismissed_verdict_excluded_from_counts(tmp_path: Path):
+    """#1487 faithfulness: dismissed findings must not inflate compliance_count.
+
+    The old code derived counts via ``len([j for j in judgments if j.verdict == "compliance"])``
+    so dismissed findings were never counted.  The batched grouping loop must
+    match that behaviour exactly.
+    """
+    repo = SqliteFindingsRepository(tmp_path)
+    _insert(repo, "P1", "security", "violation", line=1)
+    _insert(repo, "P1", "security", "compliance", line=2)
+    _insert(repo, "P1", "security", "dismissed", line=3)
+
+    result = load_evidence_map_from_db(tmp_path)
+
+    sec = result["security"]
+    assert sec["violation_count"] == 1, (
+        "violation_count should count only verdict='violation' findings"
+    )
+    assert sec["compliance_count"] == 1, (
+        "compliance_count must NOT include dismissed findings — got "
+        f"{sec['compliance_count']}, expected 1"
+    )
+
+
 def test_list_all_method_exists_on_repository(tmp_path: Path):
     """SqliteFindingsRepository exposes list_all()."""
     repo = SqliteFindingsRepository(tmp_path)

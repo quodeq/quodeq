@@ -96,7 +96,13 @@ def load_evidence_map_from_db(run_dir: Path) -> dict[str, dict[str, Any]]:
         if j.verdict == "violation":
             entry["violations"].append(finding_dict)
             result[dimension]["violation_count"] += 1
-        else:
+        elif j.verdict == "compliance":
             entry["compliance"].append(finding_dict)
             result[dimension]["compliance_count"] += 1
+        else:
+            # "dismissed" (and any future verdict) goes into compliance list for
+            # display purposes (matching the old per-dimension behaviour) but
+            # must NOT increment compliance_count — the old code derived counts
+            # via len([j for j in judgments if j.verdict == "compliance"]).
+            entry["compliance"].append(finding_dict)
     return result
