@@ -10,9 +10,9 @@ const MODEL_LEVEL_THOROUGH = 3;
 
 export { AI_MODEL_STORAGE_KEY, AI_CMD_STORAGE_KEY };
 
-function ClientSelector({ aiCmd, availableClients }) {
+function ClientSelector({ aiCmd = {}, availableClients }) {
   const { value, onApply } = aiCmd;
-  if (availableClients === null) {
+  if (availableClients == null) {
     return (
       <div className="settings-row settings-row--last">
         <div className="settings-row-label">
@@ -100,7 +100,7 @@ function ModelOverrideInput({ label, value, setter, level, placeholder }) {
   );
 }
 
-function ModelSettings({ aiCmd, models }) {
+function ModelSettings({ aiCmd = {}, models }) {
   const { value: aiCmdValue } = aiCmd;
   const { aiModel, onAiModelChange, fast, onFastChange, balanced, onBalancedChange, thorough, onThoroughChange } = models;
   if (!aiCmdValue) return null;
