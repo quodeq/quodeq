@@ -30,6 +30,22 @@ def _resolves_to_private(hostname: str) -> bool:
     return is_private_address(hostname)
 
 
+def _remote_host(repo_input: str) -> str:
+    """Return the host of a format-validated repo URL.
+
+    Handles both supported forms so the private-host check covers them equally:
+    ``https://host/path`` and the scp-like ``git@host:path`` (SSH) form. The
+    SSH form skips ``_PRIVATE_HOST_RE`` (anchored to ``^https?://``), so without
+    this it would reach git clone unguarded.
+    """
+    if repo_input.startswith("http"):
+        import urllib.parse
+        return urllib.parse.urlparse(repo_input).hostname or ""
+    if repo_input.startswith("git@"):
+        return repo_input[len("git@"):].split(":", 1)[0].strip("[]")
+    return ""
+
+
 def is_valid_repo_url(url: str) -> bool:
     """Return True if *url* matches the expected git repository URL format."""
     return _REPO_URL_RE.match(url) is not None
@@ -48,8 +64,6 @@ def validate_remote_url(repo_input: str) -> None:
         raise ValueError(f"Invalid repository URL format: {repo_input}. Expected: https://github.com/user/repo or git@github.com:user/repo.git")
     if _PRIVATE_HOST_RE.match(repo_input):
         raise ValueError("Repository URLs pointing to private/internal addresses are not allowed")
-    if repo_input.startswith("http"):
-        import urllib.parse
-        hostname = urllib.parse.urlparse(repo_input).hostname or ""
-        if hostname and _resolves_to_private(hostname):
-            raise ValueError("Repository URL resolves to a private/internal address")
+    hostname = _remote_host(repo_input)
+    if hostname and _resolves_to_private(hostname):
+        raise ValueError("Repository URL resolves to a private/internal address")
