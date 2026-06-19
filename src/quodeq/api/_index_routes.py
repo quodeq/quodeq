@@ -18,7 +18,7 @@ def register_index_routes(app: Flask) -> None:
     def rebuild_index_endpoint() -> Response | tuple[Response, int]:
         provider = current_app.config.get("_provider")
         if provider is None or not hasattr(provider, "rebuild_index"):
-            return jsonify({"error": "provider not available"}), HTTPStatus.SERVICE_UNAVAILABLE
+            return jsonify({"error": "provider not available", "code": "PROVIDER_UNAVAILABLE"}), HTTPStatus.SERVICE_UNAVAILABLE
         try:
             count, elapsed_ms = provider.rebuild_index()
         except Exception:

@@ -90,7 +90,7 @@ def overlay_sql_grades(
         # Project any pending events first so a freshly-completed run has its
         # grade tables baked before we read them (matches the explorer detail
         # path). ensure_projected is a fast no-op once the log size is stable.
-        SqliteFindingsRepository(run_dir)._ensure_fresh()  # noqa: SLF001
+        SqliteFindingsRepository(run_dir).ensure_projected()
         dim_rows = store.read_dimension_scores()
         principle_rows = store.read_principle_grades()
     except sqlite3.DatabaseError:

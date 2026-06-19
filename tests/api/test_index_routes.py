@@ -26,6 +26,23 @@ def test_rebuild_endpoint_registered(monkeypatch, tmp_path) -> None:
     assert "/api/index/rebuild" in rules
 
 
+def test_rebuild_no_provider_returns_503_with_code(monkeypatch, tmp_path) -> None:
+    """When no provider is configured the endpoint returns 503 PROVIDER_UNAVAILABLE."""
+    from quodeq.api._index_routes import register_index_routes
+    from flask import Flask
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    # Deliberately do NOT set _provider — simulates missing provider.
+    register_index_routes(app)
+    client = app.test_client()
+    resp = client.post("/api/index/rebuild", headers={"Origin": "http://localhost"})
+    assert resp.status_code == HTTPStatus.SERVICE_UNAVAILABLE
+    data = resp.get_json()
+    assert data["code"] == "PROVIDER_UNAVAILABLE"
+    assert "error" in data
+
+
 def test_rebuild_returns_count_and_elapsed(monkeypatch, tmp_path) -> None:
     from quodeq.api.app import create_app
     reports = tmp_path / "reports"

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+import threading
+from collections import OrderedDict
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
@@ -24,6 +26,38 @@ from quodeq.services.scan_progress import build_scan_progress, progress_to_dict
 from quodeq.shared.dimensions_state import read_dimensions
 
 _logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Atomic, bounded "already-scored" registry
+# ---------------------------------------------------------------------------
+# Keeps track of job_ids whose background scoring has already been claimed so
+# that repeated GETs for the same job never spawn more than one scoring thread.
+#
+# Uses an OrderedDict as a bounded LRU so the registry cannot grow without
+# limit on a long-running server.  Access is serialised by a Lock so the
+# check-then-add is atomic (closing the TOCTOU race that a plain ``set``
+# would have).
+_scored_jobs: "OrderedDict[str, None]" = OrderedDict()
+_scored_jobs_lock = threading.Lock()
+_SCORED_JOBS_MAX = 1000
+
+
+def _claim_scoring(job_id: str) -> bool:
+    """Atomically claim *job_id* for one-time background scoring.
+
+    Returns ``True`` if this caller should start the scoring thread;
+    ``False`` if another caller already claimed it.
+
+    The registry is bounded to ``_SCORED_JOBS_MAX`` entries (LRU eviction)
+    so memory usage stays constant regardless of server uptime.
+    """
+    with _scored_jobs_lock:
+        if job_id in _scored_jobs:
+            return False
+        _scored_jobs[job_id] = None
+        while len(_scored_jobs) > _SCORED_JOBS_MAX:
+            _scored_jobs.popitem(last=False)  # evict oldest entry
+        return True
 
 
 def _read_dim_states(job: Any) -> dict[str, dict[str, Any]]:
@@ -103,11 +137,10 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
 def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> None:
     """Register single-evaluation status and cancel routes."""
 
-    _scored_jobs: set[str] = set()
-
     def reset_scored_jobs() -> None:
-        """Clear the scored-jobs set. Useful for test isolation."""
-        _scored_jobs.clear()
+        """Clear the scored-jobs registry. Useful for test isolation."""
+        with _scored_jobs_lock:
+            _scored_jobs.clear()
 
     app.extensions["reset_scored_jobs"] = reset_scored_jobs
 
@@ -117,17 +150,32 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
         if not job:
             body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
-        # Score any completed dimensions from failed/cancelled jobs (once)
+        # Score any completed dimensions from failed/cancelled jobs (once).
+        # Offloaded to a background thread so the GET returns immediately;
+        # scoring may involve heavy I/O (reading evidence, writing score files).
+        # _claim_scoring() is atomic: exactly one concurrent GET wins the claim.
         job_status = getattr(job, "status", None)
-        if job_status in ("failed", "cancelled") and job_id not in _scored_jobs:
-            _scored_jobs.add(job_id)
-            try:
-                _score_completed_evidence(_reports_dir(), {
-                    "outputProject": job.output_project,
-                    "outputRunId": job.output_run_id,
-                })
-            except Exception as exc:
-                _logger.debug("Could not score cancelled dimension for %s: %s", job_id, exc)
+        if job_status in ("failed", "cancelled") and _claim_scoring(job_id):
+            _reports = _reports_dir()
+            _score_args = {
+                "outputProject": job.output_project,
+                "outputRunId": job.output_run_id,
+            }
+
+            def _score_in_bg(reports_dir: str, score_args: dict) -> None:
+                try:
+                    _score_completed_evidence(reports_dir, score_args)
+                except Exception as exc:
+                    _logger.debug(
+                        "Could not score cancelled dimension for %s: %s",
+                        score_args.get("outputRunId"), exc,
+                    )
+
+            threading.Thread(
+                target=_score_in_bg,
+                args=(_reports, _score_args),
+                daemon=True,
+            ).start()
         payload = to_camel_dict(job)
         payload["dimStates"] = _read_dim_states(job)
         return jsonify(payload)

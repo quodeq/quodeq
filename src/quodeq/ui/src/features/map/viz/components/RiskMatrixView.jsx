@@ -76,10 +76,14 @@ function BubbleGroup({ points, px, py, br, entered, showLabels, tip, setTip, onD
                 stroke={border} strokeWidth={1}
                 filter={tip?.name === child.name ? 'url(#glow)' : undefined}
                 style={{ cursor: 'pointer', transition: 'fill-opacity 0.2s ease' }}
+                tabIndex={0}
+                role="button"
+                aria-label={child.name || child.path}
                 onMouseEnter={(e) => setTip({ x: e.clientX, y: e.clientY, child })}
                 onMouseMove={(e) => setTip((t) => t ? { ...t, x: e.clientX, y: e.clientY } : null)}
                 onMouseLeave={() => setTip(null)}
-                onClick={() => onDrillDown?.(child.path)} />
+                onClick={() => onDrillDown?.(child.path)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDrillDown?.(child.path); } }} />
             ) : (
               <FileShape cx={cx} cy={cy} r={r} color={color} borderColor={border}
                 glow={tip?.name === child.name}

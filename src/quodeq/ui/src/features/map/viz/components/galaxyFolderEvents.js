@@ -59,38 +59,32 @@ export function createEventHandlers(refs, params) {
     if (refs.tooltipRef.current) refs.tooltipRef.current.style.display = 'none';
   }
 
-  function handleClick() {
-    if (refs.animRef.current || refs.flyRef.current) return;
-    const nav = refs.navRef.current;
-    const h = refs.hoveredRef.current;
-
-    if (h) {
-      if (h.type === 'folder') {
-        const s = h.data;
-        const ff = refs.focusedFolderRef.current;
-        if (ff && ff.starIdx === h.starIdx) {
-          return;
-        } else {
-          refs.zoomedFileRef.current = null;
-          refs.zoomTargetRef.current = null;
-          refs.focusedFolderRef.current = { x: s.x, y: s.y, starIdx: h.starIdx, data: s, autoEnter: true };
-          startTransition(false);
-          saveNav();
-        }
+  function handleNodeClick(h) {
+    if (h.type === 'folder') {
+      const s = h.data;
+      const ff = refs.focusedFolderRef.current;
+      if (ff && ff.starIdx === h.starIdx) {
         return;
-      }
-      if (h.type === 'file') {
-        const s = h.data;
-        refs.focusedFolderRef.current = null;
+      } else {
+        refs.zoomedFileRef.current = null;
         refs.zoomTargetRef.current = null;
-        refs.zoomedFileRef.current = { x: s.x, y: s.y, starIdx: h.starIdx, data: s };
+        refs.focusedFolderRef.current = { x: s.x, y: s.y, starIdx: h.starIdx, data: s, autoEnter: true };
         startTransition(false);
         saveNav();
-        return;
       }
+      return;
     }
+    if (h.type === 'file') {
+      const s = h.data;
+      refs.focusedFolderRef.current = null;
+      refs.zoomTargetRef.current = null;
+      refs.zoomedFileRef.current = { x: s.x, y: s.y, starIdx: h.starIdx, data: s };
+      startTransition(false);
+      saveNav();
+    }
+  }
 
-    // Click empty space
+  function handleEmptySpaceClick(nav) {
     if (refs.zoomedFileRef.current) {
       refs.zoomedFileRef.current = null;
       refs.zoomTargetRef.current = null;
@@ -131,7 +125,7 @@ export function createEventHandlers(refs, params) {
       const cam = refs.camRef.current;
       const parentPath = nav.path.slice(0, -1);
       const parentNode = parentPath[parentPath.length - 1];
-      refs.nextSceneRef.current = buildFolderScene(parentNode, 800, 600);
+      refs.nextSceneRef.current = buildFolderScene(parentNode, size.w, size.h);
       refs.flyRef.current = {
         t: 0, reverse: true,
         sx: cam.x, sy: cam.y, sz: cam.z,
@@ -142,12 +136,25 @@ export function createEventHandlers(refs, params) {
     }
   }
 
+  function handleClick() {
+    if (refs.animRef.current || refs.flyRef.current) return;
+    const nav = refs.navRef.current;
+    const h = refs.hoveredRef.current;
+
+    if (h) {
+      handleNodeClick(h);
+      return;
+    }
+
+    handleEmptySpaceClick(nav);
+  }
+
   function goToPathIndex(idx) {
     if (idx >= refs.navRef.current.path.length - 1 || refs.flyRef.current) return;
     const newPath = refs.navRef.current.path.slice(0, idx + 1);
     const targetNode = newPath[newPath.length - 1];
     const cam = refs.camRef.current;
-    refs.nextSceneRef.current = buildFolderScene(targetNode, 800, 600);
+    refs.nextSceneRef.current = buildFolderScene(targetNode, size.w, size.h);
     refs.flyRef.current = {
       t: 0, reverse: true,
       sx: cam.x, sy: cam.y, sz: cam.z,
@@ -157,5 +164,39 @@ export function createEventHandlers(refs, params) {
     };
   }
 
-  return { handleMouseMove, handleMouseLeave, handleClick, goToPathIndex, updateTooltip };
+  const PAN_STEP = 40;
+
+  function handleKeyDown(e) {
+    const cam = refs.camRef.current;
+    if (!cam) return;
+    const z = cam.z || 1;
+    const step = PAN_STEP / z;
+    switch (e.key) {
+      case 'ArrowLeft':
+        e.preventDefault();
+        cam.x -= step;
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        cam.x += step;
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        cam.y -= step;
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        cam.y += step;
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        handleClick();
+        break;
+      default:
+        break;
+    }
+  }
+
+  return { handleMouseMove, handleMouseLeave, handleClick, goToPathIndex, updateTooltip, handleKeyDown };
 }

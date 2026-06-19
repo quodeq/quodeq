@@ -72,7 +72,11 @@ class FileRateLimitStore:
             data = self._load()
             timestamps = data.get(ip, [])
             timestamps.append(now)
-            data[ip] = [t for t in timestamps if now - t < self._window]
+            pruned = [t for t in timestamps if now - t < self._window]
+            if pruned:
+                data[ip] = pruned
+            else:
+                data.pop(ip, None)
             self._save(data)
 
     def check(self, ip: str, now: float) -> bool:

@@ -18,10 +18,6 @@ _logger = logging.getLogger(__name__)
 class FetchClient:
     """Thread-safe HTTP fetcher with circuit breaker (trips after repeated failures)."""
 
-    _CIRCUIT_THRESHOLD = int(os.environ.get("QUODEQ_CIRCUIT_THRESHOLD", "5"))
-    _MAX_RETRIES = int(os.environ.get("QUODEQ_MAX_RETRIES", "2"))
-    _RETRY_BACKOFF_S = float(os.environ.get("QUODEQ_RETRY_BACKOFF_S", "0.5"))
-
     def _record_success(self) -> None:
         """Reset the failure counter on a successful fetch."""
         with self._lock:
@@ -47,10 +43,14 @@ class FetchClient:
         self._failures = 0
         self._timeout = timeout_s
         self._env = env
+        _e = self._env if self._env is not None else os.environ
+        self._CIRCUIT_THRESHOLD = int(_e.get("QUODEQ_CIRCUIT_THRESHOLD", "5"))
+        self._MAX_RETRIES = int(_e.get("QUODEQ_MAX_RETRIES", "2"))
+        self._RETRY_BACKOFF_S = float(_e.get("QUODEQ_RETRY_BACKOFF_S", "0.5"))
         if allow_private is not None:
             self._allow_private: bool = allow_private
         else:
-            self._allow_private = (self._env or os.environ).get("QUODEQ_ALLOW_PRIVATE_URLS") == "1"
+            self._allow_private = _e.get("QUODEQ_ALLOW_PRIVATE_URLS") == "1"
 
     def fetch(self, url: str, headers: dict | None = None) -> str | None:
         """Fetch *url* and return body text, or None on failure.

@@ -569,6 +569,13 @@ textarea:focus {
 }
 
 .job-error-toast {
+  /* button resets — keeps appearance identical to the previous div */
+  border: none;
+  font: inherit;
+  color: inherit;
+  width: auto;
+  display: block;
+  /* original styles */
   position: fixed;
   bottom: var(--space-6, 24px);
   left: 50%;

@@ -125,12 +125,27 @@ class TestCreateMcpConfig:
             assert args[model_idx + 1] == "sonnet"
             lang_idx = args.index("--language")
             assert args[lang_idx + 1] == "kotlin"
-            # Cache root path uses platform-native separators (backslash
-            # on Windows); compare via Path so the tail check holds on
-            # every OS.
+            # Cache root ends with /cache/results regardless of whether the
+            # default (~/.quodeq/cache) or QUODEQ_CACHE_ROOT override is used.
+            # Compare via Path so the tail check holds on every OS.
             cr_idx = args.index("--cache-root")
-            expected_tail = str(Path(".quodeq") / "cache" / "results")
+            expected_tail = str(Path("cache") / "results")
             assert args[cr_idx + 1].endswith(expected_tail)
+        finally:
+            config_path.unlink(missing_ok=True)
+
+    def test_cache_root_honours_quodeq_cache_root_env(self, tmp_path, monkeypatch):
+        """Fix A (#2419): QUODEQ_CACHE_ROOT overrides the default cache root in
+        the generated MCP config so the subprocess uses the same sandbox path."""
+        monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path))
+        jsonl = tmp_path / "findings.jsonl"
+        jsonl.touch()
+        config_path = _create_mcp_config(jsonl)
+        try:
+            data = json.loads(config_path.read_text())
+            args = data["mcpServers"]["findings"]["args"]
+            cr_idx = args.index("--cache-root")
+            assert Path(args[cr_idx + 1]) == tmp_path / "results"
         finally:
             config_path.unlink(missing_ok=True)
 

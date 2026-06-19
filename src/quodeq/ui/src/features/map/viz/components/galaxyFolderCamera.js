@@ -83,7 +83,7 @@ export function advanceFlyTransition(fly, cam, refs, params) {
  * Advance camera state (non-fly mode). Returns nothing, mutates cam in place.
  */
 export function advanceCamera(cam, refs, params) {
-  const { TRANS, scene, computeFocusCamera, saveNav, setNavVersion, getFitZoom } = params;
+  const { TRANS, scene, computeFocusCamera, saveNav, setNavVersion, getFitZoom, W, H } = params;
   const tg = computeFocusCamera();
   const anim = refs.animRef.current;
   refs.frameCount.current++;
@@ -113,7 +113,7 @@ export function advanceCamera(cam, refs, params) {
         const curScene = refs.sceneRef.current || scene;
         const star = curScene.rootStars[ff3.starIdx];
         if (star && star.isFolder) {
-          refs.nextSceneRef.current = buildFolderScene(star._node, 800, 600);
+          refs.nextSceneRef.current = buildFolderScene(star._node, W, H);
           refs.nextSceneRef.current._node = star._node;
           refs.flyRef.current = {
             t: 0,

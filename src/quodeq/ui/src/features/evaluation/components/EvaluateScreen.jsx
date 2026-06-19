@@ -83,9 +83,9 @@ function ErrorToast({ message, onDismiss }) {
   }, [message, onDismiss]);
 
   return (
-    <div className="job-error-toast" onClick={onDismiss}>
+    <button type="button" className="job-error-toast" onClick={onDismiss}>
       {sanitizeErrorMessage(message)}
-    </div>
+    </button>
   );
 }
 

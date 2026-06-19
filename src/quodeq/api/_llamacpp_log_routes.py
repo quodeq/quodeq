@@ -68,9 +68,9 @@ def _default_log_paths() -> list[Path]:
     return candidates
 
 
-def _llamacpp_log_path() -> Path | None:
+def _llamacpp_log_path(_env_override: str | None = None) -> Path | None:
     """Resolve a usable log path, or None if no candidate file exists."""
-    override = os.environ.get("LLAMACPP_LOG_FILE")
+    override = _env_override if _env_override is not None else os.environ.get("LLAMACPP_LOG_FILE")
     if override:
         # Honor an explicit override even if the file doesn't exist yet —
         # llama-server might create it on next launch and the UI's

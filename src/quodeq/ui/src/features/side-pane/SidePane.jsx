@@ -175,7 +175,18 @@ export function SidePane() {
         role="separator"
         aria-orientation="vertical"
         aria-label="Resize side pane"
+        tabIndex={0}
         onPointerDown={onOuterDividerPointerDown}
+        onKeyDown={(e) => {
+          const STEP = 16;
+          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            const delta = e.key === 'ArrowLeft' ? -STEP : STEP;
+            const newWidth = clampSidePaneWidth(paneWidth + delta, window.innerWidth);
+            document.documentElement.style.setProperty('--side-pane-width', `${newWidth}px`);
+            setPaneWidth(newWidth);
+          }
+        }}
       />
       {windows.map((spec, i) => (
         <React.Fragment key={spec.id}>
@@ -188,7 +199,23 @@ export function SidePane() {
               role="separator"
               aria-orientation="horizontal"
               aria-label={`Resize between window ${i + 1} and ${i + 2}`}
+              aria-valuenow={Math.round((ratios[i] ?? 0.5) * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              tabIndex={0}
               onPointerDown={onInnerDividerPointerDown(i)}
+              onKeyDown={(e) => {
+                const STEP = 0.05;
+                if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  const delta = e.key === 'ArrowUp' ? -STEP : STEP;
+                  setRatios((prev) => {
+                    const out = [...prev];
+                    out[i] = Math.min(1 - MIN_WINDOW_RATIO, Math.max(MIN_WINDOW_RATIO, (out[i] ?? 0.5) + delta));
+                    return out;
+                  });
+                }
+              }}
             />
           )}
         </React.Fragment>

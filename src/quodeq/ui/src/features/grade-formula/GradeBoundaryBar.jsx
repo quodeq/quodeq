@@ -51,6 +51,18 @@ export default function GradeBoundaryBar({ thresholds = [], onChange }) {
     window.addEventListener('pointercancel', stop);
   };
 
+  const stepKey = (dividerIdx, delta) => {
+    const live = ascRef.current;
+    const lo = (dividerIdx === 0 ? 0 : live[dividerIdx - 1]) + MIN_GAP;
+    const hi = (dividerIdx === live.length - 1 ? 10 : live[dividerIdx + 1]) - MIN_GAP;
+    const next = Math.round(Math.min(hi, Math.max(lo, live[dividerIdx] + delta)) * 10) / 10;
+    if (next === live[dividerIdx]) return;
+    const nextAsc = [...live];
+    nextAsc[dividerIdx] = next;
+    const desc = [...nextAsc].reverse();
+    onChange(thresholds.map(([, label], i) => [desc[i], label]));
+  };
+
   return (
     <div>
       <div className="gf-boundary-bar" ref={barRef}>
@@ -60,7 +72,9 @@ export default function GradeBoundaryBar({ thresholds = [], onChange }) {
             i={i}
             width={edges[i + 1] - edge}
             hasDivider={i < asc.length}
+            dividerValue={asc[i]}
             onDrag={startDrag}
+            onStepKey={stepKey}
           />
         ))}
       </div>
@@ -74,7 +88,7 @@ export default function GradeBoundaryBar({ thresholds = [], onChange }) {
   );
 }
 
-function Segment({ i, width, hasDivider, onDrag }) {
+function Segment({ i, width, hasDivider, dividerValue, onDrag, onStepKey }) {
   return (
     <>
       <div
@@ -88,7 +102,15 @@ function Segment({ i, width, hasDivider, onDrag }) {
           className="gf-boundary-divider"
           role="slider"
           aria-label={`Boundary ${i + 1}`}
+          aria-valuemin={0}
+          aria-valuemax={10}
+          aria-valuenow={dividerValue}
+          tabIndex={0}
           onPointerDown={onDrag(i)}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); onStepKey(i, MIN_GAP); }
+            else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); onStepKey(i, -MIN_GAP); }
+          }}
         />
       ) : null}
     </>

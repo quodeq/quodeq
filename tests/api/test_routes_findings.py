@@ -60,6 +60,13 @@ class TestDismissEndpoint:
         resp = client.post("/api/findings/dismiss", json={"project": "x"})
         assert resp.status_code == 400
 
+    def test_dismiss_missing_fields_returns_missing_param_code(self, client):
+        resp = client.post("/api/findings/dismiss", json={"project": "x"})
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data["code"] == "MISSING_PARAM"
+        assert "error" in data
+
     def test_dismiss_with_run_id_returns_rescored_payload(self, client, tmp_path):
         """When the client supplies ``run_id``, the dismiss response carries
         the rescored ``/scores`` payload for that run. The UI applies it
@@ -99,6 +106,14 @@ class TestDismissEndpoint:
 
 
 class TestRestoreEndpoint:
+    def test_restore_missing_fields_returns_missing_param_code(self, client):
+        resp = client.post("/api/findings/restore", json={"project": "x"})
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data["code"] == "MISSING_PARAM"
+        assert "error" in data
+
+
     def test_restore_returns_200_with_scores_envelope(self, client, tmp_path):
         project_dir = tmp_path / "my-project"
         project_dir.mkdir()
