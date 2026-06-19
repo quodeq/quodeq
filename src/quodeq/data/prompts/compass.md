@@ -51,6 +51,8 @@ Report ALL violations AND ALL compliance you observe — do not bias toward eith
 
 Skip generated, vendored, compiled, and dependency directories. Use the project type to decide what matters: a backend API has different concerns than a mobile app or CLI tool.
 
+{{EVALUATION_RULES}}
+
 ## Standards Checklist
 
 Use the **exact requirement ID** (e.g. `M-MOD-1`) as `req`. Do NOT create your own IDs.
