@@ -11,6 +11,7 @@ import threading
 import urllib.parse
 import urllib.request
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path
 
 import webview
