@@ -48,3 +48,23 @@ def test_validated_path_rejects_symlink(tmp_path: Path):
     link = tmp_path / "link.json"
     os.symlink(real, link)
     assert _validated_rate_limit_path(str(link)) == _DEFAULT_RATE_LIMIT_FILE
+
+
+# ---------------------------------------------------------------------------
+# #81 -- dead path-traversal validation: ".." check ran on resolved path
+# ---------------------------------------------------------------------------
+
+def test_validated_path_rejects_dotdot_in_raw_path(tmp_path: Path):
+    """A path containing '..' must fall back to default even if it resolves cleanly.
+
+    Before the fix, ``".." in resolved.parts`` ran on the already-resolved path
+    (where ``..`` has already been collapsed by ``Path.resolve()``), so inputs
+    like ``/tmp/foo/../bar`` were incorrectly accepted.
+    """
+    # Build a path that contains ".." lexically but resolves to a real location.
+    # /tmp/foo/../bar resolves to /tmp/bar, so resolved.parts has no "..".
+    # The pre-fix code accepts this; the fixed code must reject it.
+    raw = str(tmp_path / "subdir" / ".." / "rate_limits.json")
+    assert ".." in Path(raw).parts, "precondition: '..' must be in raw parts"
+    assert ".." not in Path(raw).resolve().parts, "precondition: resolve() removes '..'"
+    assert _validated_rate_limit_path(raw) == _DEFAULT_RATE_LIMIT_FILE

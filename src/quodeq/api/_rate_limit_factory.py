@@ -26,9 +26,9 @@ def _validated_rate_limit_path(raw: str) -> str:
         candidate = Path(raw)
         if not candidate.is_absolute():
             raise ValueError("path must be absolute")
-        resolved = candidate.resolve(strict=False)
-        if ".." in resolved.parts:
+        if ".." in candidate.parts:
             raise ValueError("path contains parent-directory traversal")
+        resolved = candidate.resolve(strict=False)
         # Defense in depth: FileRateLimitStore._save writes via os.replace,
         # which already defeats a symlink planted later. This rejects an
         # obviously-symlinked configured path early.

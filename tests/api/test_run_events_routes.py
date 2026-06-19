@@ -11,6 +11,8 @@ from flask import Flask
 from quodeq.api._run_events_routes import register_run_events_routes
 from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
 from quodeq.core.events.writer import EventLogWriter
+from quodeq.services._evaluations_index import EvaluationsIndex
+from quodeq.services.jobs import JobManager
 
 
 @pytest.fixture
@@ -90,3 +92,36 @@ def test_route_honors_last_event_id_header(app: Flask):
     assert len(finding_lines) == 1
     data = json.loads(next(l for l in finding_lines[0].splitlines() if l.startswith("data: "))[6:])
     assert data["practice_id"] == "P2"
+
+
+# ---------------------------------------------------------------------------
+# #14 -- path traversal via job_id in get_log_run_dir filesystem scan
+# ---------------------------------------------------------------------------
+
+def test_get_log_run_dir_rejects_traversal_in_run_id(tmp_path: Path):
+    """A job_id containing '..' must not resolve to a directory outside reports_root."""
+    reports_root = tmp_path / "reports"
+    reports_root.mkdir()
+    project_dir = reports_root / "my-project"
+    project_dir.mkdir()
+
+    # Create a directory *outside* reports_root that the traversal would escape to
+    outside_dir = tmp_path / "outside"
+    outside_dir.mkdir()
+
+    # Craft a run_id that, when appended to project_dir, traverses outside reports_root:
+    # project_dir / "../../outside" resolves to tmp_path / "outside"
+    traversal_job_id = "../../outside"
+
+    index = EvaluationsIndex(
+        jobs=JobManager(),
+        reports_root=reports_root,
+    )
+    result = index.get_log_run_dir(traversal_job_id)
+    # The result must not be outside reports_root (use resolve() for canonical comparison)
+    outside_resolved = outside_dir.resolve()
+    reports_resolved = reports_root.resolve()
+    assert result is None or (
+        result.resolve() != outside_resolved
+        and result.resolve().is_relative_to(reports_resolved)
+    )
