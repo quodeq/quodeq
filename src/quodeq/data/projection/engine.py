@@ -47,8 +47,16 @@ class ProjectionEngine:
 
         applied = 0
         for event in read_action_events(actions_log.parent):
-            handle(event, store)
-            applied += 1
+            try:
+                handle(event, store)
+                applied += 1
+            except Exception:
+                _logger.error(
+                    "Handler failed for action event %s (type=%s) - skipping",
+                    getattr(event, "event_id", "?"),
+                    getattr(event, "event_type", "?"),
+                    exc_info=True,
+                )
         store.save_actions_projected_size(current_size)
         return applied
 
