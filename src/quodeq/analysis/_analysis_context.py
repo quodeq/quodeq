@@ -23,7 +23,11 @@ def _load_custom_dimensions(evaluators_dir: Path, dims_data: list[str]) -> list[
     seen = set(result)
     for _p in evaluators_dir.glob("*.json"):
         try:
-            _eid = _json.loads(_p.read_text(encoding="utf-8")).get("id")
+            _parsed = _json.loads(_p.read_text(encoding="utf-8"))
+            if not isinstance(_parsed, dict):
+                log_warning(f"Skipping custom evaluator {_p.name}: not a JSON object")
+                continue
+            _eid = _parsed.get("id")
             if _eid and _eid not in seen:
                 result.append(_eid)
                 seen.add(_eid)

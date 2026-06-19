@@ -64,3 +64,21 @@ class TestLoadCustomDimensions:
         assert result == []
         assert "Skipping custom evaluator" in caplog.text
         assert "malformed.json" in caplog.text
+
+    def test_non_dict_json_logs_warning_and_skips(self, tmp_path: Path, caplog):
+        """A top-level JSON array (or any non-dict) must not crash on .get("id")."""
+        ev = tmp_path / "evaluators"
+        ev.mkdir()
+        (ev / "array.json").write_text(json.dumps(["not", "a", "dict"]), encoding="utf-8")
+
+        quodeq_logger, orig = _enable_propagation()
+        try:
+            with caplog.at_level(logging.WARNING, logger="quodeq.analysis._analysis_context"):
+                result = _load_custom_dimensions(ev, ["existing"])
+        finally:
+            quodeq_logger.propagate = orig
+
+        # Pre-existing dimensions are preserved; the bad file is skipped, not fatal.
+        assert result == ["existing"]
+        assert "Skipping custom evaluator" in caplog.text
+        assert "array.json" in caplog.text
