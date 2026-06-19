@@ -24,6 +24,22 @@ DROP speculative concerns: "could", "might", "should consider".
 
 Compliance uses the same scale to mark importance of what's done right.
 
+## Reachable input (provenance)
+
+A missing null/undefined guard (R-FT-2) or a path/key built from a value (S-AUT-3) is `critical` only when a bad value can actually reach the flagged line. Name the source that delivers it. (The target language is named at the top of this prompt; read the patterns below in that language's idiom.)
+
+External source → stays `critical`. The value crosses a trust boundary: an HTTP request, query/route param, header, cookie, or body; a CLI argument; an environment variable; file, network, or message-queue payload; or any argument an untrusted caller controls.
+
+Internal source → NOT `critical`, a hardening gap (`major` if 1–4 hold and the guard is worth adding, else drop). The value cannot be attacker-controlled: a content hash or digest (e.g. a SHA-256 hex string); a literal, constant, or enum; a parameter with a default that every visible call site relies on or passes a literal; or a value already validated (charset-restricted, length-checked, allow-listed) before this line.
+
+If you cannot name an external source, treat the value as internal; do not assume one off-screen.
+
+Worked example (any language). A line opens or dereferences `x` with no check:
+- `x` comes from a request field or CLI arg, e.g. `open(request["file"])` → external → `critical`.
+- `x` is a digest, e.g. `open(cacheDir + "/" + sha256(content))` → internal, a hex digest no caller can choose → `major` or drop.
+
+Same code, opposite verdict: the source decides the severity.
+
 ## Test files
 
 Test file → max severity `minor`. Never `critical`/`major` on tests, fixtures, mocks, or specs.
@@ -41,7 +57,8 @@ For `critical`/`major` also:
 
 5. **Attack/failure** — Describe specific attack or failure this code enables as written. Hedge words → `minor` only if 1–4 hold; else drop.
 6. **Reachable** — Production code path. Tests, examples, dev scaffolding are not `critical`.
+7. **Provenance** (unguarded access & path-from-string only) — Name the caller or external source that delivers a bad or attacker-controlled value to this line. Can't, because the value is a content hash, a constant, a defaulted parameter, or always a literal at the call sites you see? Not `critical` → `major` if 1–4 hold, else drop.
 
-**Decision**: 1–4 fail → DROP entirely. 5–6 fail → `minor` only if 1–4 hold, else drop. `minor` is not a fallback bucket.
+**Decision**: 1–4 fail → DROP entirely. 5–6 fail → `minor` only if 1–4 hold, else drop. 7 fail → `major` (or drop) per the item. `minor` is not a fallback bucket.
 
 Fewer sharper findings beats long reports padded with speculation.
