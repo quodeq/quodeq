@@ -155,13 +155,24 @@ export default function DimensionScoreHistoryPanel({ trend = [], dimension, sele
       {data.length === 0 ? (
         <div className="qd-history-empty">no history yet for this dimension</div>
       ) : (
-        <DimensionHistoryChart
-          data={data}
-          selectedRunId={selectedRunId}
-          hoveredIndex={hoveredIndex}
-          setHoveredIndex={setHoveredIndex}
-          onBarClick={onBarClick}
-        />
+        <div
+          tabIndex={onBarClick ? 0 : undefined}
+          onKeyDown={onBarClick ? (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              const last = data[data.length - 1];
+              if (last) onBarClick(last);
+            }
+          } : undefined}
+        >
+          <DimensionHistoryChart
+            data={data}
+            selectedRunId={selectedRunId}
+            hoveredIndex={hoveredIndex}
+            setHoveredIndex={setHoveredIndex}
+            onBarClick={onBarClick}
+          />
+        </div>
       )}
     </section>
   );

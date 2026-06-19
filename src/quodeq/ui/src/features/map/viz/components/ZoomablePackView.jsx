@@ -196,7 +196,9 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
       <svg
         viewBox={`${-PAD} ${-PAD} ${BASE_SIZE + PAD * 2} ${BASE_SIZE + PAD * 2}`}
         style={{ width: '100%', height: '100%', overflow: 'hidden' }}
+        tabIndex={0}
         onClick={handleBgClick}
+        onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); handleBgClick(); } }}
         aria-label="Zoomable pack visualization of project compliance by folder and file"
       >
         <defs>

@@ -240,7 +240,7 @@ export default function GalaxyFolderView({ node, currentPath = '', onPathChange,
   }, [scene, size, showLabels, w2s, computeFocusCamera, getFitZoom, refs, saveNav]);
 
   // Event handlers
-  const { handleMouseMove, handleMouseLeave, handleClick, goToPathIndex } = useMemo(
+  const { handleMouseMove, handleMouseLeave, handleClick, goToPathIndex, handleKeyDown } = useMemo(
     () => createEventHandlers(refs, { startTransition, saveNav, getFitZoom, scene, size }),
     [refs, startTransition, saveNav, getFitZoom, scene, size]
   );
@@ -273,11 +273,13 @@ export default function GalaxyFolderView({ node, currentPath = '', onPathChange,
         width={size.w}
         height={size.h}
         style={{ width: '100%', height: '100%', display: 'block' }}
+        tabIndex={0}
+        role="application"
+        aria-label="Galaxy folder visualization of project structure"
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
-        role="img"
-        aria-label="Galaxy folder visualization of project structure"
+        onKeyDown={handleKeyDown}
       />
       <VizBreadcrumb items={breadcrumb.map((bc, i) => ({
         label: bc.label,

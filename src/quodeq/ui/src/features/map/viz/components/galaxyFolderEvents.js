@@ -157,5 +157,39 @@ export function createEventHandlers(refs, params) {
     };
   }
 
-  return { handleMouseMove, handleMouseLeave, handleClick, goToPathIndex, updateTooltip };
+  const PAN_STEP = 40;
+
+  function handleKeyDown(e) {
+    const cam = refs.camRef.current;
+    if (!cam) return;
+    const z = cam.z || 1;
+    const step = PAN_STEP / z;
+    switch (e.key) {
+      case 'ArrowLeft':
+        e.preventDefault();
+        cam.x -= step;
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        cam.x += step;
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        cam.y -= step;
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        cam.y += step;
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        handleClick();
+        break;
+      default:
+        break;
+    }
+  }
+
+  return { handleMouseMove, handleMouseLeave, handleClick, goToPathIndex, updateTooltip, handleKeyDown };
 }

@@ -20,7 +20,11 @@ export default function PackCircles({ circles, folderIndices, fileIndices, hover
             strokeWidth={FOLDER_STROKE_WIDTH} vectorEffect="non-scaling-stroke"
             fillOpacity={isRoot ? 1 : isHovered ? FOLDER_FILL_OPACITY_HOVER : FOLDER_FILL_OPACITY_DEFAULT}
             style={{ cursor: 'pointer', transition: 'fill-opacity 0.15s' }}
+            tabIndex={0}
+            role="button"
+            aria-label={d.name || d.path}
             onClick={(e) => handleClick(e, c)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(e, c); } }}
             onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}
           />
         );
