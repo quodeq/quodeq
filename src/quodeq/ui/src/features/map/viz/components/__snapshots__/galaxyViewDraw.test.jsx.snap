@@ -1,0 +1,69 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`drawFrame characterization (#950) > galaxy level (cam.z=1) — records ctx-call sequence > galaxy-level-ctx-calls 1`] = `
+[
+  "createRadialGradient",
+  "fillRect",
+  "beginPath",
+  "arc",
+  "fill",
+  "beginPath",
+  "arc",
+  "setLineDash",
+  "stroke",
+  "setLineDash",
+  "beginPath",
+  "moveTo",
+  "lineTo",
+  "setLineDash",
+  "stroke",
+  "setLineDash",
+  "fillText",
+  "beginPath",
+  "arc",
+  "fill",
+  "beginPath",
+  "arc",
+  "fill",
+  "fillText",
+  "fillText",
+]
+`;
+
+exports[`drawFrame characterization (#950) > zoomed into dimension (cam.z=5, rDim=0) — records ctx-call sequence > zoomed-dim-ctx-calls 1`] = `
+[
+  "createRadialGradient",
+  "fillRect",
+  "beginPath",
+  "arc",
+  "fill",
+  "beginPath",
+  "arc",
+  "stroke",
+  "beginPath",
+  "moveTo",
+  "lineTo",
+  "stroke",
+  "fillText",
+  "fillText",
+]
+`;
+
+exports[`drawFrame characterization (#950) > zoomed into principle (cam.z=15, rDim=0, rPrin=0) — records ctx-call sequence > zoomed-principle-ctx-calls 1`] = `
+[
+  "createRadialGradient",
+  "fillRect",
+  "beginPath",
+  "arc",
+  "fill",
+  "beginPath",
+  "arc",
+  "stroke",
+  "beginPath",
+  "moveTo",
+  "lineTo",
+  "stroke",
+  "fillText",
+  "fillText",
+]
+`;

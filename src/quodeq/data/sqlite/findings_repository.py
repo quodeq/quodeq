@@ -59,6 +59,16 @@ class SqliteFindingsRepository:
                 project_dir=project_dir,
             )
 
+    def ensure_projected(self) -> None:
+        """Ensure the run's grade tables are up to date with the event log.
+
+        Public entry point for callers that need to project before reading
+        grade data directly (e.g. the SQL grade overlay).  Delegates to the
+        internal :meth:`_ensure_fresh` which is a fast no-op once the event
+        log size is stable.
+        """
+        self._ensure_fresh()
+
     def insert_finding(self, finding: dict[str, Any]) -> bool:
         row = finding_dict_to_row(finding)
         with open_evaluation_db(self._run_dir) as conn:

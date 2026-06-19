@@ -65,6 +65,27 @@ class TestAvailability:
         assert resp.get_json() == {"available": True}
 
 
+class TestLlamacppLogPathEnvOverride:
+    def test_env_override_is_honoured_over_os_environ(self, tmp_path, monkeypatch):
+        """_env_override takes precedence over os.environ LLAMACPP_LOG_FILE."""
+        from quodeq.api._llamacpp_log_routes import _llamacpp_log_path
+
+        # Point os.environ at a non-existent path to confirm it is NOT used.
+        monkeypatch.setenv("LLAMACPP_LOG_FILE", str(tmp_path / "env-file.log"))
+        injected = str(tmp_path / "injected.log")
+        result = _llamacpp_log_path(_env_override=injected)
+        assert result == tmp_path / "injected.log"
+
+    def test_default_falls_back_to_os_environ_when_no_override(self, monkeypatch, tmp_path):
+        """Without _env_override, os.environ is consulted as before."""
+        from quodeq.api._llamacpp_log_routes import _llamacpp_log_path
+
+        log = tmp_path / "via-env.log"
+        monkeypatch.setenv("LLAMACPP_LOG_FILE", str(log))
+        result = _llamacpp_log_path()
+        assert result == log
+
+
 class TestStream:
     def test_unconfigured_returns_404(self, client, isolated_defaults):
         resp = client.get("/api/llamacpp/logs/stream")

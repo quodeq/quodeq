@@ -102,6 +102,115 @@ describe('galaxyFolderEvents keyboard handler (#2063)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// #999: handleClick branch coverage (pre-refactor characterization)
+// ---------------------------------------------------------------------------
+
+describe('handleClick — empty-space branches (#999)', () => {
+  it('does nothing if anim is in progress', () => {
+    const params = makeParams();
+    const refs = makeRefs({ animRef: { current: true } });
+    createEventHandlers(refs, params).handleClick();
+    expect(params.startTransition).not.toHaveBeenCalled();
+    expect(params.saveNav).not.toHaveBeenCalled();
+  });
+
+  it('does nothing if fly is in progress', () => {
+    const params = makeParams();
+    const refs = makeRefs({ flyRef: { current: {} } });
+    createEventHandlers(refs, params).handleClick();
+    expect(params.startTransition).not.toHaveBeenCalled();
+  });
+
+  it('clears zoomedFileRef and zooms out when a file is zoomed', () => {
+    const params = makeParams();
+    const refs = makeRefs({
+      zoomedFileRef: { current: { x: 10, y: 10 } },
+      zoomTargetRef: { current: null },
+    });
+    createEventHandlers(refs, params).handleClick();
+    expect(refs.zoomedFileRef.current).toBeNull();
+    expect(refs.zoomTargetRef.current).toBeNull();
+    expect(params.startTransition).toHaveBeenCalledWith(true);
+    expect(params.saveNav).toHaveBeenCalled();
+  });
+
+  it('clears zoomTargetRef when a zoom target is active', () => {
+    const params = makeParams();
+    const refs = makeRefs({
+      zoomedFileRef: { current: null },
+      zoomTargetRef: { current: { x: 5, y: 5, z: 2 } },
+    });
+    createEventHandlers(refs, params).handleClick();
+    expect(refs.zoomTargetRef.current).toBeNull();
+    expect(params.startTransition).toHaveBeenCalledWith(true);
+    expect(params.saveNav).toHaveBeenCalled();
+  });
+
+  it('clears focusedFolderRef when a folder is focused', () => {
+    const params = makeParams();
+    const refs = makeRefs({
+      focusedFolderRef: { current: { x: 10, y: 10, starIdx: 0 } },
+    });
+    createEventHandlers(refs, params).handleClick();
+    expect(refs.focusedFolderRef.current).toBeNull();
+    expect(params.startTransition).toHaveBeenCalledWith(true);
+    expect(params.saveNav).toHaveBeenCalled();
+  });
+
+  it('zooms toward cursor when path has one entry and mouse is valid', () => {
+    const params = makeParams();
+    const refs = makeRefs({
+      mouseRef: { current: { x: 400, y: 300 } },
+      navRef: { current: { path: [{ name: 'root', path: '' }] } },
+    });
+    createEventHandlers(refs, params).handleClick();
+    expect(refs.zoomTargetRef.current).not.toBeNull();
+    expect(refs.zoomTargetRef.current.z).toBeGreaterThan(1);
+    expect(params.startTransition).toHaveBeenCalledWith(false);
+    expect(params.saveNav).toHaveBeenCalled();
+  });
+});
+
+describe('handleClick — node branches (#999)', () => {
+  it('focusing a new folder sets focusedFolderRef and starts transition', () => {
+    const params = makeParams();
+    const folderData = { x: 200, y: 200, name: 'src' };
+    const refs = makeRefs({
+      hoveredRef: { current: { type: 'folder', starIdx: 1, data: folderData } },
+    });
+    createEventHandlers(refs, params).handleClick();
+    expect(refs.focusedFolderRef.current).toMatchObject({ starIdx: 1, data: folderData, autoEnter: true });
+    expect(refs.zoomedFileRef.current).toBeNull();
+    expect(params.startTransition).toHaveBeenCalledWith(false);
+    expect(params.saveNav).toHaveBeenCalled();
+  });
+
+  it('clicking an already-focused folder does nothing', () => {
+    const params = makeParams();
+    const refs = makeRefs({
+      hoveredRef: { current: { type: 'folder', starIdx: 2, data: { x: 0, y: 0 } } },
+      focusedFolderRef: { current: { starIdx: 2 } },
+    });
+    createEventHandlers(refs, params).handleClick();
+    expect(params.startTransition).not.toHaveBeenCalled();
+    expect(params.saveNav).not.toHaveBeenCalled();
+  });
+
+  it('clicking a file sets zoomedFileRef and starts transition', () => {
+    const params = makeParams();
+    const fileData = { x: 300, y: 300, name: 'index.js' };
+    const refs = makeRefs({
+      hoveredRef: { current: { type: 'file', starIdx: 5, data: fileData } },
+    });
+    createEventHandlers(refs, params).handleClick();
+    expect(refs.zoomedFileRef.current).toMatchObject({ starIdx: 5, data: fileData });
+    expect(refs.focusedFolderRef.current).toBeNull();
+    expect(params.startTransition).toHaveBeenCalledWith(false);
+    expect(params.saveNav).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Fix B (#2604): advanceCamera uses W/H from params, not hardcoded 800/600
 // ---------------------------------------------------------------------------
 

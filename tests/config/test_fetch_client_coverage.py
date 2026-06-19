@@ -75,6 +75,26 @@ class TestFetchValidation:
             assert result is None  # fails on network, not on validation
 
 
+class TestFetchClientConfigInjection:
+    def test_circuit_threshold_from_injected_env(self):
+        c = FetchClient(env={"QUODEQ_CIRCUIT_THRESHOLD": "3"})
+        assert c._CIRCUIT_THRESHOLD == 3
+
+    def test_max_retries_from_injected_env(self):
+        c = FetchClient(env={"QUODEQ_MAX_RETRIES": "5"})
+        assert c._MAX_RETRIES == 5
+
+    def test_retry_backoff_from_injected_env(self):
+        c = FetchClient(env={"QUODEQ_RETRY_BACKOFF_S": "1.5"})
+        assert c._RETRY_BACKOFF_S == 1.5
+
+    def test_defaults_when_keys_absent(self):
+        c = FetchClient(env={})
+        assert c._CIRCUIT_THRESHOLD == 5
+        assert c._MAX_RETRIES == 2
+        assert c._RETRY_BACKOFF_S == 0.5
+
+
 class TestFetchRetry:
     def test_successful_fetch(self):
         c = FetchClient(allow_private=True)

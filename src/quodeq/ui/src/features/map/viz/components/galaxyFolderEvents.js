@@ -59,38 +59,32 @@ export function createEventHandlers(refs, params) {
     if (refs.tooltipRef.current) refs.tooltipRef.current.style.display = 'none';
   }
 
-  function handleClick() {
-    if (refs.animRef.current || refs.flyRef.current) return;
-    const nav = refs.navRef.current;
-    const h = refs.hoveredRef.current;
-
-    if (h) {
-      if (h.type === 'folder') {
-        const s = h.data;
-        const ff = refs.focusedFolderRef.current;
-        if (ff && ff.starIdx === h.starIdx) {
-          return;
-        } else {
-          refs.zoomedFileRef.current = null;
-          refs.zoomTargetRef.current = null;
-          refs.focusedFolderRef.current = { x: s.x, y: s.y, starIdx: h.starIdx, data: s, autoEnter: true };
-          startTransition(false);
-          saveNav();
-        }
+  function handleNodeClick(h) {
+    if (h.type === 'folder') {
+      const s = h.data;
+      const ff = refs.focusedFolderRef.current;
+      if (ff && ff.starIdx === h.starIdx) {
         return;
-      }
-      if (h.type === 'file') {
-        const s = h.data;
-        refs.focusedFolderRef.current = null;
+      } else {
+        refs.zoomedFileRef.current = null;
         refs.zoomTargetRef.current = null;
-        refs.zoomedFileRef.current = { x: s.x, y: s.y, starIdx: h.starIdx, data: s };
+        refs.focusedFolderRef.current = { x: s.x, y: s.y, starIdx: h.starIdx, data: s, autoEnter: true };
         startTransition(false);
         saveNav();
-        return;
       }
+      return;
     }
+    if (h.type === 'file') {
+      const s = h.data;
+      refs.focusedFolderRef.current = null;
+      refs.zoomTargetRef.current = null;
+      refs.zoomedFileRef.current = { x: s.x, y: s.y, starIdx: h.starIdx, data: s };
+      startTransition(false);
+      saveNav();
+    }
+  }
 
-    // Click empty space
+  function handleEmptySpaceClick(nav) {
     if (refs.zoomedFileRef.current) {
       refs.zoomedFileRef.current = null;
       refs.zoomTargetRef.current = null;
@@ -140,6 +134,19 @@ export function createEventHandlers(refs, params) {
         swapped: false,
       };
     }
+  }
+
+  function handleClick() {
+    if (refs.animRef.current || refs.flyRef.current) return;
+    const nav = refs.navRef.current;
+    const h = refs.hoveredRef.current;
+
+    if (h) {
+      handleNodeClick(h);
+      return;
+    }
+
+    handleEmptySpaceClick(nav);
   }
 
   function goToPathIndex(idx) {

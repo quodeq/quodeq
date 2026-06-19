@@ -132,6 +132,17 @@ def test_write_does_not_trigger_ensure(tmp_path: Path):
     assert spy.ensure_calls == 0
 
 
+def test_ensure_projected_triggers_projection(tmp_path: Path):
+    """Public ensure_projected() delegates to _ensure_fresh / projection."""
+    _write_event(tmp_path / "events.jsonl")
+    spy = _SpyProjector()
+    repo = SqliteFindingsRepository(tmp_path, projector=spy)
+
+    repo.ensure_projected()
+
+    assert spy.ensure_calls == 1
+
+
 def test_read_skips_ensure_when_no_event_log(tmp_path: Path):
     spy = _SpyProjector()
     repo = SqliteFindingsRepository(tmp_path, projector=spy)
