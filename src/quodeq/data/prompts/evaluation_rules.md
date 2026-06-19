@@ -26,19 +26,19 @@ Compliance uses the same scale to mark importance of what's done right.
 
 ## Reachable input (provenance)
 
-A missing null/guard check (R-FT-2) or a path/key built from a value (S-AUT-3) is `critical` only when a bad value can reach the flagged line. Name the caller or source that delivers it.
+A missing null/undefined guard (R-FT-2) or a path/key built from a value (S-AUT-3) is `critical` only when a bad value can actually reach the flagged line. Name the source that delivers it. (The target language is named at the top of this prompt; read the patterns below in that language's idiom.)
 
-Internal input is NOT `critical`. The value is internal when it is a content hash or digest, a module-level constant or enum, a parameter with a default, or a value every visible call site passes valid (a React prop from a hook/default, an argument always given a literal). A missing guard on internal input is a hardening gap → `major` if 1–4 hold and the guard is genuinely worth adding, else drop.
+External source → stays `critical`. The value crosses a trust boundary: an HTTP request, query/route param, header, cookie, or body; a CLI argument; an environment variable; file, network, or message-queue payload; or any argument an untrusted caller controls.
 
-External input stays `critical`. The value reaches the line from an HTTP request, query string, request body, CLI argument, environment variable, file contents, or any caller across a trust boundary.
+Internal source → NOT `critical`, a hardening gap (`major` if 1–4 hold and the guard is worth adding, else drop). The value cannot be attacker-controlled: a content hash or digest (e.g. a SHA-256 hex string); a literal, constant, or enum; a parameter with a default that every visible call site relies on or passes a literal; or a value already validated (charset-restricted, length-checked, allow-listed) before this line.
 
-Not `critical`:
-- `stack.forEach(...)` on a prop with no null guard, where the prop is supplied by a hook or a default at every call site.
-- `[...thresholds]` or destructuring a hook argument whose value is backfilled from defaults.
-- a cache path `root / key[:2] / key[2:]` where `key` is a SHA-256 hex digest (or validated against a safe charset); the digest is not attacker-controlled.
+If you cannot name an external source, treat the value as internal; do not assume one off-screen.
 
-Genuinely `critical`:
-- a path built from `request.args["file"]`, or a dereference of a value parsed from an HTTP request body; provenance is external.
+Worked example (any language). A line opens or dereferences `x` with no check:
+- `x` comes from a request field or CLI arg, e.g. `open(request["file"])` → external → `critical`.
+- `x` is a digest, e.g. `open(cacheDir + "/" + sha256(content))` → internal, a hex digest no caller can choose → `major` or drop.
+
+Same code, opposite verdict: the source decides the severity.
 
 ## Test files
 
