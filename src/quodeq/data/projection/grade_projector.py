@@ -132,19 +132,4 @@ def recompute_grades(run_dir: Path, params: ScoringParams | None = None) -> None
     principle_rows, dimension_rows = compute_run_grades(run_dir, params)
 
     store = SQLiteStateStore(run_dir)
-    store.clear_grades()
-    for dim, p_grade in principle_rows:
-        store.record_principle_grade(
-            dimension=dim,
-            principle_id=p_grade["principle_id"],
-            score=p_grade["score"],
-            grade=p_grade["grade"],
-            finding_count=p_grade["finding_count"],
-            dismissed_count=p_grade["dismissed_count"],
-        )
-    for d_score in dimension_rows:
-        store.record_dimension_score(
-            dimension=d_score["dimension"],
-            score=d_score["score"],
-            grade=d_score["grade"],
-        )
+    store.batch_rewrite_grades(principle_rows, dimension_rows)
