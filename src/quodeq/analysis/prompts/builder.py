@@ -39,7 +39,7 @@ def _load_evaluation_rules() -> str:
     for name in ("evaluation_rules.md", "finding_format.md"):
         try:
             parts.append(load_template(template_name=name))
-        except (OSError, FileNotFoundError):
+        except OSError:
             _logger.warning("Failed to load prompt template %s, skipping", name)
             continue
     return "\n\n".join(p for p in parts if p)

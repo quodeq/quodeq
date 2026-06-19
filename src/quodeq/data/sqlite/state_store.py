@@ -173,8 +173,9 @@ class SQLiteStateStore:
     ) -> None:
         """Clear all grade tables and insert new rows in a single transaction.
 
-        The clear + all inserts are committed atomically: a mid-batch failure
-        rolls back the entire operation, leaving any pre-existing rows intact.
+        The clear + all inserts are committed atomically: on a mid-batch
+        failure the transaction is never committed and is discarded when the
+        connection closes, leaving any pre-existing rows intact.
 
         Args:
             principle_rows: Sequence of ``(dimension, principle_grade_dict)``
