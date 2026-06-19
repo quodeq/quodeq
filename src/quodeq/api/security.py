@@ -100,5 +100,23 @@ def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: st
     def _add_security_headers(response: Response) -> Response:
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
+        # connect-src: include alt-port origins probed by useServerHealth
+        # (DEFAULT_ALT_PORTS = [4180, 4181, 4182, 4183] in useServerHealth.js).
+        # CSP has no port wildcard so each origin is enumerated explicitly.
+        # These are loopback addresses only — cross-site exfil to external
+        # attackers is still blocked.
+        _alt_port_origins = " ".join(
+            f"http://127.0.0.1:{p} http://localhost:{p}"
+            for p in (4180, 4181, 4182, 4183)
+        )
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            f"connect-src 'self' {_alt_port_origins}; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data:; "
+            "mask-src 'self' data:; "
+            "frame-ancestors 'none'"
+        )
         return response

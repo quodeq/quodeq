@@ -77,7 +77,12 @@ def build_cache_writer(
     version = quodeq_version()
 
     def write(file_path: str, findings: list[dict]) -> None:
-        content_hash = _hash_file(src_root / file_path) or ""
+        target = src_root / file_path
+        try:
+            inside = target.resolve().is_relative_to(src_root.resolve())
+        except (OSError, ValueError):
+            inside = False
+        content_hash = (_hash_file(target) or "") if inside else ""
         key_struct = CacheKey(
             schema_version=_SCHEMA_VERSION,
             file_content_hash=content_hash,
