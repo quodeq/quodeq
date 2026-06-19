@@ -4,6 +4,7 @@ import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { useServerLog } from '../server-log/ServerLogContext.js';
 import { systemKeys } from '../../../api/queryKeys.js';
+import { getHealth } from '../../../api/index.js';
 
 const LOCAL_SERVER_HINT = (
   <>
@@ -13,23 +14,12 @@ const LOCAL_SERVER_HINT = (
 
 const HEALTH_POLL_MS = 10000;
 
-async function ping() {
-  try {
-    const res = await fetch('/api/health?_t=' + Date.now());
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.ok ? data : null;
-  } catch {
-    return null;
-  }
-}
-
 export default function ServerSection() {
   const serverLog = useServerLog();
 
   const { data: health, isLoading } = useQuery({
     queryKey: [...systemKeys.health(), 'settings-detail'],
-    queryFn: ping,
+    queryFn: () => getHealth().then((d) => (d?.ok ? d : null)).catch(() => null),
     refetchInterval: HEALTH_POLL_MS,
     refetchOnWindowFocus: false,
   });

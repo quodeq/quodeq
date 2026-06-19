@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 const MAX_LINES = 5000;
 const READYSTATE_CLOSED = 2;
+const INACTIVITY_MS = 60000;
 
 const TERMINAL_STATE_LINE = {
   cancelled: '── evaluation cancelled ──',
@@ -22,6 +23,7 @@ export function useJobLogStream(jobId) {
   const pendingRef = useRef([]);
   const rafRef = useRef(null);
   const timerRef = useRef(null);
+  const inactivityRef = useRef(null);
 
   useEffect(() => {
     setLogs([]);
@@ -34,6 +36,10 @@ export function useJobLogStream(jobId) {
     if (timerRef.current != null) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
+    }
+    if (inactivityRef.current != null) {
+      clearTimeout(inactivityRef.current);
+      inactivityRef.current = null;
     }
     if (!jobId) {
       setStatus('idle');
@@ -77,8 +83,27 @@ export function useJobLogStream(jobId) {
       }
     };
 
-    es.onmessage = (e) => append(e.data);
+    const resetInactivity = () => {
+      if (inactivityRef.current != null) {
+        clearTimeout(inactivityRef.current);
+      }
+      inactivityRef.current = setTimeout(() => {
+        es.close();
+        setStatus('error');
+      }, INACTIVITY_MS);
+    };
+
+    resetInactivity();
+
+    es.onmessage = (e) => {
+      resetInactivity();
+      append(e.data);
+    };
     es.addEventListener('done', (e) => {
+      if (inactivityRef.current != null) {
+        clearTimeout(inactivityRef.current);
+        inactivityRef.current = null;
+      }
       const state = (e?.data || '').trim().toLowerCase();
       append(TERMINAL_STATE_LINE[state] || '── evaluation complete ──');
       setTerminalState(state || 'done');
@@ -94,6 +119,10 @@ export function useJobLogStream(jobId) {
 
     return () => {
       es.close();
+      if (inactivityRef.current != null) {
+        clearTimeout(inactivityRef.current);
+        inactivityRef.current = null;
+      }
       if (rafRef.current != null) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;

@@ -8,6 +8,9 @@ const API_TIMEOUT_MS = 30000;
 export async function request(path, options = {}) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, controller.signal])
+    : controller.signal;
   try {
     const res = await fetch(`${BASE}${path}`, {
       headers: {
@@ -15,7 +18,7 @@ export async function request(path, options = {}) {
         ...(options.headers || {}),
       },
       ...options,
-      signal: controller.signal,
+      signal,
     });
 
     const payload = await res.json().catch(() => ({}));
