@@ -33,3 +33,23 @@ def _resolves_to_private(hostname: str) -> bool:
 def is_valid_repo_url(url: str) -> bool:
     """Return True if *url* matches the expected git repository URL format."""
     return _REPO_URL_RE.match(url) is not None
+
+
+def validate_remote_url(repo_input: str) -> None:
+    """Reject malformed / private / DNS-rebinding repository URLs.
+
+    Shared SSRF guard used by both the CLI clone path
+    (:func:`quodeq.data.fs.repo_clone.prepare_repository`) and the web API
+    registration path (:func:`quodeq.services.evaluation_mixin._register_project`),
+    so the two entry points cannot drift apart on what they consider safe.
+    Raises ``ValueError`` for any rejected URL.
+    """
+    if not _REPO_URL_RE.match(repo_input):
+        raise ValueError(f"Invalid repository URL format: {repo_input}. Expected: https://github.com/user/repo or git@github.com:user/repo.git")
+    if _PRIVATE_HOST_RE.match(repo_input):
+        raise ValueError("Repository URLs pointing to private/internal addresses are not allowed")
+    if repo_input.startswith("http"):
+        import urllib.parse
+        hostname = urllib.parse.urlparse(repo_input).hostname or ""
+        if hostname and _resolves_to_private(hostname):
+            raise ValueError("Repository URL resolves to a private/internal address")
