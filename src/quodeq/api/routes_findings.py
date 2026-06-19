@@ -182,7 +182,7 @@ def register_findings_routes(app: Flask) -> None:
         line = body.get("line")
         run_id = body.get("run_id") or body.get("runId")
         if not project or not req or not file or line is None:
-            return jsonify({"error": "project, req, file, and line are required"}), 400
+            return jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400
         dismiss_finding(_project_dir(_eval_dir(), project), body)
         scores = _scores_with_fallback(project, run_id)
         return jsonify({"scores": scores}), 200
@@ -196,7 +196,7 @@ def register_findings_routes(app: Flask) -> None:
         line = body.get("line")
         run_id = body.get("run_id") or body.get("runId")
         if not project or not req or not file or line is None:
-            return jsonify({"error": "project, req, file, and line are required"}), 400
+            return jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400
         restore_finding(_project_dir(_eval_dir(), project), body)
         scores = _scores_with_fallback(project, run_id)
         return jsonify({"scores": scores}), 200
@@ -207,7 +207,7 @@ def register_findings_routes(app: Flask) -> None:
         project = body.get("project", "")
         run_id = body.get("run_id") or body.get("runId")
         if not project:
-            return jsonify({"error": "project is required"}), 400
+            return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
         count = restore_all_findings(_project_dir(_eval_dir(), project))
         scores = _scores_with_fallback(project, run_id)
         return jsonify({"ok": True, "restored": count, "scores": scores}), 200
@@ -221,7 +221,7 @@ def register_findings_routes(app: Flask) -> None:
         file = body.get("file", "")
         run_id = body.get("run_id") or body.get("runId")
         if not project or not dimension or not principle or not file:
-            return jsonify({"error": "project, dimension, principle, and file are required"}), 400
+            return jsonify({"error": "project, dimension, principle, and file are required", "code": "MISSING_PARAM"}), 400
         swept = delete_finding(_project_dir(_eval_dir(), project), body)
         scores = _scores_with_fallback(project, run_id)
         return jsonify({"ok": True, "swept": swept, "scores": scores}), 200
@@ -232,7 +232,7 @@ def register_findings_routes(app: Flask) -> None:
         project = body.get("project", "")
         run_id = body.get("run_id") or body.get("runId")
         if not project:
-            return jsonify({"error": "project is required"}), 400
+            return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
         count = delete_all_dismissed(_project_dir(_eval_dir(), project))
         scores = _scores_with_fallback(project, run_id)
         return jsonify({"ok": True, "deleted": count, "scores": scores}), 200
