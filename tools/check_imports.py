@@ -40,7 +40,8 @@ def check_file(path: Path, layer: str) -> list[tuple[int, str, str]]:
     allowed = LAYER_RULES[layer] | CROSS_CUTTING | {layer}
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
-    except (OSError, UnicodeDecodeError):
+    except (OSError, UnicodeDecodeError) as e:
+        print(f"warning: skipping {path}: {e}", file=sys.stderr)
         return violations
     for lineno, line in enumerate(lines, 1):
         m = IMPORT_RE.match(line)

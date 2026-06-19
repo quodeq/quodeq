@@ -67,9 +67,9 @@ class ProjectionEngine:
                 handle(event, store)
                 last_ts = event.timestamp
                 count += 1
-            except Exception:
+            except (ValueError, KeyError, TypeError):
                 _logger.error(
-                    "Handler failed for event %s (type=%s) — skipping",
+                    "Handler failed for event %s (type=%s) - skipping",
                     event.event_id,
                     event.event_type,
                     exc_info=True,

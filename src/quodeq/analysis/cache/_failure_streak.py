@@ -132,7 +132,8 @@ class FailureStreakWatcher:
                 f.seek(offset)
                 chunk = f.read()
                 new_offset = f.tell()
-        except FileNotFoundError:
+        except OSError as e:
+            _logger.warning("Could not read failure-streak JSONL %s: %s", self._jsonl_path, e)
             return offset, streak, recent
         for raw in chunk.splitlines():
             raw = raw.strip()

@@ -40,6 +40,7 @@ def _load_evaluation_rules() -> str:
         try:
             parts.append(load_template(template_name=name))
         except (OSError, FileNotFoundError):
+            _logger.warning("Failed to load prompt template %s, skipping", name)
             continue
     return "\n\n".join(p for p in parts if p)
 

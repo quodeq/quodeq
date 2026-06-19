@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from quodeq.services.ports import RunInfo, read_run_data, safe_read_dir, summarize_dimensions
+
+_logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from quodeq.core.scoring.params import ScoringParams
@@ -146,6 +149,6 @@ def _has_fingerprints(reports_root: Path, project: str) -> bool:
                 continue
             if any(f.name.endswith("_fingerprint.json") for f in evidence_dir.iterdir()):
                 return True
-    except OSError:
-        pass
+    except OSError as e:
+        _logger.warning("Could not read fingerprint dir %s: %s", project_dir, e)
     return False
