@@ -51,7 +51,7 @@ def _is_trustworthy_eval(eval_data: dict[str, Any] | None) -> bool:
     we exclude it everywhere — cards, history, chart — so it can't
     pollute any user-facing aggregation.
     """
-    if not eval_data:
+    if not isinstance(eval_data, dict):
         return False
     files_read = eval_data.get("filesRead")
     return isinstance(files_read, int) and files_read > 0

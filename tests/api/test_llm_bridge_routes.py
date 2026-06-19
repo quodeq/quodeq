@@ -96,3 +96,55 @@ class TestKnownModels:
         assert resp.status_code == 200
         data = resp.get_json()
         assert "claude" in data
+
+
+# ---------------------------------------------------------------------------
+# #335 — estimate-agents must return 400 when model_size/gpu_memory are
+#         non-numeric (e.g. strings from a crafted JSON body)
+# ---------------------------------------------------------------------------
+
+class TestEstimateAgentsValidation:
+    def test_string_model_size_returns_400(self, client):
+        resp = client.post(
+            "/api/ollama/estimate-agents",
+            json={"model_size": "big", "gpu_memory": 32},
+            headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == 400
+
+    def test_string_gpu_memory_returns_400(self, client):
+        resp = client.post(
+            "/api/ollama/estimate-agents",
+            json={"model_size": 7, "gpu_memory": "all"},
+            headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == 400
+
+    def test_null_model_size_returns_400(self, client):
+        resp = client.post(
+            "/api/ollama/estimate-agents",
+            json={"model_size": None, "gpu_memory": 32},
+            headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == 400
+
+    def test_valid_numeric_inputs_pass_through(self, client):
+        with patch("quodeq.api.llm_bridge_routes.estimate_max_agents") as mock:
+            mock.return_value = {"agents": 3}
+            resp = client.post(
+                "/api/ollama/estimate-agents",
+                json={"model_size": 7, "gpu_memory": 32},
+                headers={"Origin": "http://localhost"},
+            )
+        assert resp.status_code == 200
+        mock.assert_called_once_with(model_size=7, gpu_memory=32)
+
+    def test_bool_model_size_returns_400(self, client):
+        # bool is a subclass of int in Python; must be rejected explicitly.
+        resp = client.post(
+            "/api/ollama/estimate-agents",
+            json={"model_size": True, "gpu_memory": 32000000000},
+            headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_PARAM"

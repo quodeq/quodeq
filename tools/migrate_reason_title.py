@@ -39,6 +39,8 @@ def _find_first_sep(text: str) -> tuple[int, str] | tuple[None, None]:
 
 def migrate_entry(entry: dict) -> bool:
     """Migrate a single violation/compliance entry. Returns True if changed."""
+    if not isinstance(entry, dict):
+        return False
     reason = entry.get("reason", "")
     if not reason:
         return False

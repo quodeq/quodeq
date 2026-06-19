@@ -34,7 +34,10 @@ def _judgment_to_violation(obj: dict) -> dict | None:
     }
     line = obj.get("line")
     if line is not None:
-        out["line"] = int(line)
+        try:
+            out["line"] = int(line)
+        except (ValueError, TypeError):
+            _logger.debug("Non-integer line value %r; omitting line", line)
     req = obj.get("req")
     if req:
         out["req"] = req

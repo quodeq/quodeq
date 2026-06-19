@@ -4,6 +4,37 @@ from unittest.mock import MagicMock
 from quodeq.analysis.mcp.handlers import handle_tools_list, handle_tools_call
 
 
+# ---------------------------------------------------------------------------
+# #207 — null 'arguments' in params must be treated as {} (not raise TypeError)
+# ---------------------------------------------------------------------------
+
+class TestToolsCallNullArguments:
+    def test_null_arguments_for_report_finding_does_not_raise(self) -> None:
+        """params.arguments = null must not crash handle_tools_call."""
+        router = MagicMock()
+        router.receive.return_value = ("ok", False)
+        # Simulate a JSON-RPC caller that sends {"arguments": null}
+        result = handle_tools_call(
+            request_id=1,
+            params={"name": "report_finding", "arguments": None},
+            router=router,
+        )
+        # Should return a valid ok-response (not a 500/AttributeError)
+        assert "result" in result
+        router.receive.assert_called_once_with({})
+
+    def test_missing_arguments_key_still_works(self) -> None:
+        router = MagicMock()
+        router.receive.return_value = ("ok", False)
+        result = handle_tools_call(
+            request_id=2,
+            params={"name": "report_finding"},
+            router=router,
+        )
+        assert "result" in result
+        router.receive.assert_called_once_with({})
+
+
 class TestToolsListIncludesMarker:
     def test_marker_listed(self):
         result = handle_tools_list(request_id=1, has_queue=True)
