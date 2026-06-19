@@ -27,6 +27,27 @@ def is_private_address(hostname: str) -> bool:
             if addr.is_private or addr.is_loopback or addr.is_link_local:
                 return True
     except (socket.gaierror, OSError) as exc:
-        _logger.warning("DNS resolution failed for %r — treating as private (fail-closed): %s", hostname, exc)
+        _logger.warning("DNS resolution failed for %r - treating as private (fail-closed): %s", hostname, exc)
         return True
     return False
+
+
+@lru_cache(maxsize=_LRU_CACHE_SIZE)
+def is_loopback_address(hostname: str) -> bool:
+    """Return True if *hostname* is a loopback address (127.x.x.x or ::1) or 'localhost'."""
+    if hostname in ("localhost", "localhost.localdomain"):
+        return True
+    try:
+        addr = ipaddress.ip_address(hostname)
+        return bool(addr.is_loopback)
+    except ValueError:
+        _logger.debug("Cannot parse %r as IP literal, falling through to DNS", hostname)
+    try:
+        for _fam, _typ, _pro, _can, sockaddr in socket.getaddrinfo(hostname, None):
+            addr = ipaddress.ip_address(sockaddr[0])
+            if not addr.is_loopback:
+                return False
+        return True
+    except (socket.gaierror, OSError) as exc:
+        _logger.warning("DNS resolution failed for %r - treating as private (fail-closed): %s", hostname, exc)
+        return False
