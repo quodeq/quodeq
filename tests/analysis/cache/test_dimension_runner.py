@@ -935,6 +935,74 @@ class TestCachedFindingsReachEventLog:
 # the next run will re-dispatch.
 
 
+class TestEvidenceFileCreatedBeforeBreaker:
+    """A fresh dimension (all misses, no cached findings) must not spam
+    'Could not read failure-streak JSONL' warnings at startup.
+
+    Repro: in the window before any finding lands, the per-dim evidence
+    JSONL doesn't exist yet. The FailureStreakWatcher polls it anyway and
+    every scan of the missing file logs a WARNING (the user saw this once
+    per heartbeat on a 1324-file dimension). The runner now touches the
+    evidence file before starting the breaker, so the watcher always reads
+    an existing (possibly empty) file and stays silent.
+    """
+
+    def test_no_startup_warning_when_dispatch_writes_nothing(
+        self, tmp_path: Path, cache: LocalFileBackend, monkeypatch,
+    ):
+        from quodeq.shared import cancellation
+        cancellation.reset()
+        # QUODEQ_FAILURE_STREAK overrides the options field, so clear it to
+        # keep threshold=5 below authoritative — otherwise a stray `=0` in
+        # the environment would disable the breaker and false-green this.
+        monkeypatch.delenv("QUODEQ_FAILURE_STREAK", raising=False)
+
+        config, src = _setup(tmp_path, {"a.py": "x"})
+        # Breaker must be enabled (threshold > 0) so the watcher actually
+        # scans the JSONL — a disabled breaker runs a no-op thread.
+        config = replace(
+            config, options=replace(config.options, failure_streak_threshold=5),
+        )
+
+        # Dispatcher that writes NOTHING to the JSONL and returns None,
+        # mirroring the fresh-dimension window before any finding is emitted.
+        def silent_dispatcher(cfg, dim_id, idx, ctx, callbacks):
+            return None
+
+        # Capture WARNING+ only, so the assertion isn't coupled to the exact
+        # warning string — any startup warning from the breaker fails the test.
+        handler = _ListHandler()
+        handler.setLevel(logging.WARNING)
+        breaker_logger = logging.getLogger(
+            "quodeq.analysis.cache._failure_streak"
+        )
+        breaker_logger.addHandler(handler)
+        try:
+            with patch(
+                "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+                new=silent_dispatcher,
+            ):
+                process_dimension_with_cache(
+                    config, "security", idx=1, ctx=_make_ctx(),
+                    callbacks=_make_callbacks(), cache=cache,
+                )
+        finally:
+            breaker_logger.removeHandler(handler)
+            cancellation.reset()
+
+        jsonl = (config.work_dir or config.src) / "security_evidence.jsonl"
+        assert jsonl.exists(), (
+            "evidence JSONL must be created before the breaker starts so the "
+            "watcher never reads a missing file"
+        )
+        # Happy path (empty file, no error markers): the breaker emits no
+        # WARNING+ records at all — not the missing-file warning, nothing.
+        assert handler.messages == [], (
+            "failure-streak watcher logged unexpected warning(s) at startup; "
+            f"messages={handler.messages}"
+        )
+
+
 class TestFilesReadReflectsAnalyzedCount:
     """files_read on the returned Evidence must equal the number of source
     files reproducible from cache at run end — NOT len(input_files)."""
