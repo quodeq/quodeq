@@ -82,8 +82,8 @@ export function useGalaxyCamera({ canvasRef, scene, size, showLabels, savedNavRe
       }
       return { x: size.w / 2, y: size.h / 2, z: fz };
     }
-    if (nav.depth === 1 && nav.dim !== null) { const s = scene.stars[nav.dim]; return { x: s.x, y: s.y, z: 5 }; }
-    if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) { const p = scene.principles[nav.dim][nav.prin]; return { x: p.x, y: p.y, z: 50 }; }
+    if (nav.depth === 1 && nav.dim !== null) { const s = scene.stars?.[nav.dim]; if (!s) return { x: size.w / 2, y: size.h / 2, z: fz }; return { x: s.x, y: s.y, z: 5 }; }
+    if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) { const s = scene.stars?.[nav.dim]; const p = s ? scene.principles?.[nav.dim]?.[nav.prin] : null; if (!p) return { x: size.w / 2, y: size.h / 2, z: fz }; return { x: p.x, y: p.y, z: 50 }; }
     return camRef.current;
   }, [scene, size.w, size.h, getFitZoom, navRef]);
 
@@ -120,7 +120,8 @@ export function useGalaxyCamera({ canvasRef, scene, size, showLabels, savedNavRe
       const rPrin = nav.prin ?? prev?.prin ?? null;
 
       if (rDim !== null) {
-        updatePrinciplePositions(scene.principles[rDim], scene.stars[rDim], t);
+        const rStar = scene.stars[rDim];
+        if (rStar) updatePrinciplePositions(scene.principles[rDim], rStar, t);
       }
 
       const tg = getTarget();

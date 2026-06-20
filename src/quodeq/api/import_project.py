@@ -28,7 +28,7 @@ from quodeq.api.zip import (
     _max_zip_size_bytes,
 )
 from quodeq.data.fs._index_io import _load_index, _save_index
-from quodeq.data.fs._models import ProjectIdentity
+from quodeq.data.fs._models import ProjectIdentity, ProjectRepository
 from quodeq.data.fs._resolution import _index_key
 
 _logger = logging.getLogger(__name__)
@@ -289,12 +289,24 @@ def _rewrite_repository_info(project_dir: Path, new_uuid: str) -> None:
         _logger.warning("import: could not rewrite repository_info.json: %s", exc)
 
 
-def _update_index(reports_root: Path, identity: ProjectIdentity, project_uuid: str) -> None:
-    """Best-effort: register the imported project in project_index.json."""
+def _update_index(
+    reports_root: Path,
+    identity: ProjectIdentity,
+    project_uuid: str,
+    repository: ProjectRepository | None = None,
+) -> None:
+    """Best-effort: register the imported project in project_index.json.
+
+    When *repository* is provided its ``load_index``/``save_index`` methods
+    are used instead of the default filesystem helpers, keeping the storage
+    layer injectable for testing or alternative backends.
+    """
+    load_fn = repository.load_index if repository is not None else _load_index
+    save_fn = repository.save_index if repository is not None else _save_index
     try:
-        index = _load_index(reports_root)
+        index = load_fn(reports_root)
         index[_index_key(identity)] = project_uuid
-        _save_index(reports_root, index)
+        save_fn(reports_root, index)
     except OSError as exc:
         _logger.warning("import: could not update project_index.json: %s", exc)
 
