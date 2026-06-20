@@ -92,6 +92,24 @@ def test_post_projects_url_ephemeral_skips_clone_dest(client, tmp_path):
     assert resp.status_code == 200, resp.get_json()
 
 
+def test_post_projects_rejects_metadata_endpoint_ssrf(client):
+    """SSRF: POST /api/projects pointed at a cloud metadata endpoint is rejected
+    with 400 and never reaches git clone."""
+    clone_calls = []
+    with patch(
+        "quodeq.services.evaluation_mixin.run_git_clone",
+        side_effect=lambda url, dest: clone_calls.append(url),
+    ):
+        resp = client.post(
+            "/api/projects",
+            json={"repo": "https://169.254.169.254/latest/meta-data", "ephemeral": True},
+            headers=_ORIGIN,
+        )
+    assert resp.status_code == 400, resp.get_json()
+    assert resp.get_json()["code"] == "INVALID_REPO"
+    assert clone_calls == [], "SSRF: git clone must never run for a metadata-endpoint URL"
+
+
 def test_post_projects_clone_dest_must_exist(client, tmp_path):
     nonexistent = tmp_path / "no-such-dir"
     resp = client.post(
