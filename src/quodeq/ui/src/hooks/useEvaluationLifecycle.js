@@ -1,11 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { useEvaluation } from '../features/evaluation/hooks/useEvaluation.js';
+import { useEvaluation, LOCAL_API_PROVIDERS } from '../features/evaluation/hooks/useEvaluation.js';
 import { getLevels, STORAGE_KEY as POWER_KEY } from '../features/evaluation/components/powerLevels.js';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../constants.js';
 
-// Providers that run inference locally via an API. Extensible via server-side
-// provider config (ai_providers.json) which can flag additional local providers.
-const LOCAL_API_PROVIDERS = ['ollama'];
 const TIER_NAMES = ['fast', 'balanced', 'thorough'];
 const DEFAULT_ANALYSIS_POWER = 2;
 
@@ -76,7 +73,7 @@ export function useEvaluationLifecycle({ settings, navigation, projects, storage
   }
 
   const activeProvider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
-  const isLocalApi = LOCAL_API_PROVIDERS.includes(activeProvider);
+  const isLocalApi = LOCAL_API_PROVIDERS.has(activeProvider);
 
   return {
     job, jobError, liveViolations,

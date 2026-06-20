@@ -15,7 +15,7 @@ const CLI_SERVER_ID = { 'codex-cli': 'codex', 'claude-code': 'claude' };
 async function detectCliProvider(id) {
   const serverId = CLI_SERVER_ID[id] || id;
   try {
-    const res = await fetch('/api/ai-clients', { method: 'GET' });
+    const res = await fetch('/api/ai-clients', { method: 'GET', signal: AbortSignal.timeout(5000) });
     if (!res.ok) return { id, classification: 'cli', detected: false, defaultModel: null };
     const data = await res.json();
     const detected = (data.clients || []).some((c) => c.id === serverId && c.type === 'cli');
@@ -27,7 +27,7 @@ async function detectCliProvider(id) {
 
 async function detectOllamaDaemon() {
   try {
-    const res = await fetch('/api/ollama/health', { method: 'GET' });
+    const res = await fetch('/api/ollama/health', { method: 'GET', signal: AbortSignal.timeout(5000) });
     return { id: 'ollama', classification: 'local-api', detected: res.ok, defaultModel: null };
   } catch {
     return { id: 'ollama', classification: 'local-api', detected: false };

@@ -17,6 +17,7 @@ from quodeq.core.evidence.parser import parse_jsonl_to_evidence, EvidenceContext
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.services.grade_formula import load_params
 from quodeq.analysis.report import write_dimension_report
+from quodeq.data.fs.repo_validation import validate_remote_url
 from quodeq.services._fs_clone import run_git_clone
 from quodeq.services._fs_scan import scan_project
 from quodeq.shared._env import get_clones_dir
@@ -138,6 +139,11 @@ def _register_project(
     Returns the project's UUID.
     """
     is_url = is_repo_url(repo)
+    if is_url:
+        # SSRF guard: reject private/loopback/link-local hosts before any clone
+        # or directory side effects. Mirrors the CLI prepare_repository path so
+        # the web API (POST /api/projects) cannot be pointed at internal hosts.
+        validate_remote_url(repo)
     if is_url and not ephemeral and clone_dest is None:
         raise ValueError(
             "URL repos require either clone_dest (user-chosen path) or ephemeral=True"

@@ -26,6 +26,7 @@ For EVERY finding (violation or compliance), call `report_finding` with:
 - `severity` — `critical`, `major`, or `minor`
 - `w` — short description
 - `reason` — why this is a violation or compliance
+- `vt` — OPTIONAL violation type taxonomy code: a short, stable, kebab-case class of the violation, e.g. `code-injection`, `hardcoded-secret`, `missing-error-handling`. Reuse the exact same code for every finding of the same kind so near-duplicates group together.
 
 ## Search Strategy
 
@@ -49,6 +50,8 @@ For each file read: identify applicable principles, then report violation or com
 Report ALL violations AND ALL compliance you observe — do not bias toward either. Do not fabricate findings to reach any quota.
 
 Skip generated, vendored, compiled, and dependency directories. Use the project type to decide what matters: a backend API has different concerns than a mobile app or CLI tool.
+
+{{EVALUATION_RULES}}
 
 ## Standards Checklist
 

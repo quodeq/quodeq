@@ -8,6 +8,7 @@ directly when using these endpoints.
 """
 from __future__ import annotations
 
+import logging
 from http import HTTPStatus
 from pathlib import Path
 
@@ -17,6 +18,8 @@ from quodeq.api.helpers import error_response
 from quodeq.api.routes_common import reports_dir
 from quodeq.services.scoring import get_project_scores, get_scores_raw
 from quodeq.shared.validation import validate_path_segment
+
+_logger = logging.getLogger(__name__)
 
 
 def register_scores_routes(app: Flask) -> None:
@@ -37,7 +40,12 @@ def register_scores_routes(app: Flask) -> None:
             return err
         as_of = request.args.get("asOf")
         eval_dir = reports_dir()
-        result = get_project_scores(Path(eval_dir), project, as_of)
+        try:
+            result = get_project_scores(Path(eval_dir), project, as_of)
+        except Exception:
+            _logger.exception("Unexpected error fetching scores for project %s", project)
+            body, status = error_response("Failed to load scores", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+            return jsonify(body), status
         if result is None:
             body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status

@@ -129,6 +129,6 @@ class ResourceSampler:
         while not self._stop.is_set():
             try:
                 log_info(self.sample_once())
-            except (OSError, ValueError):
+            except Exception:
                 pass  # best-effort: never let observability kill the run
             self._stop.wait(self._interval)

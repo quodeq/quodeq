@@ -21,6 +21,8 @@ def get_mcp_status(stream_file: Path) -> str | None:
             if not first:
                 return None
             d = json.loads(first)
+            if not isinstance(d, dict):
+                return None
             for srv in d.get("mcp_servers", []):
                 if srv.get("name") == _MCP_SERVER_NAME:
                     return srv.get("status")

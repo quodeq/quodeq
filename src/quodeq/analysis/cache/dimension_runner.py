@@ -343,6 +343,20 @@ def process_dimension_with_cache(
     )
     watcher.start()
 
+    # Create the evidence JSONL up front so the failure-streak watcher's
+    # first poll reads an existing (empty) file instead of logging a
+    # "Could not read ... No such file" warning every poll interval until
+    # the first finding lands. The file is otherwise created lazily when a
+    # worker emits its first finding; on a large dimension that startup
+    # window is seconds of misleading warnings. An empty file is safe: every
+    # downstream reader treats a 0-byte JSONL identically to a missing one
+    # (size guard, or line-by-line iteration that yields zero results).
+    # Only create when absent so a prior phase's pre-written cached findings
+    # (above) are left untouched.
+    jsonl.parent.mkdir(parents=True, exist_ok=True)
+    if not jsonl.exists():
+        jsonl.touch()
+
     breaker = FailureStreakWatcher(
         jsonl, threshold=_resolve_failure_streak_threshold(config.options),
     )

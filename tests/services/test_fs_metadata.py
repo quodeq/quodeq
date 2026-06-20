@@ -375,3 +375,25 @@ class TestHasFingerprints:
         run.mkdir(parents=True)
         # No evidence subdir
         assert _has_fingerprints(tmp_path, "proj") is False
+
+    def test_oserror_on_iterdir_logs_warning(self, tmp_path: Path, monkeypatch, caplog):
+        """#208 — OSError during dir iteration must be logged, not silently swallowed."""
+        import logging
+        proj = tmp_path / "proj"
+        proj.mkdir()
+
+        def _bad_iterdir(self):
+            raise OSError("permission denied")
+
+        monkeypatch.setattr(Path, "iterdir", _bad_iterdir)
+        # quodeq logger has propagate=False; enable temporarily so caplog sees records.
+        quodeq_logger = logging.getLogger("quodeq")
+        orig_propagate = quodeq_logger.propagate
+        quodeq_logger.propagate = True
+        try:
+            with caplog.at_level(logging.WARNING, logger="quodeq.services._fs_metadata"):
+                result = _has_fingerprints(tmp_path, "proj")
+        finally:
+            quodeq_logger.propagate = orig_propagate
+        assert result is False
+        assert "Could not read fingerprint dir" in caplog.text

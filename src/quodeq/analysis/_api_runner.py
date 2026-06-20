@@ -88,6 +88,15 @@ class _Finding(BaseModel):
         ),
     )
     severity: _Severity = Field(default=_Severity.minor)
+    vt: str | None = Field(
+        default=None,
+        description=(
+            "Violation type taxonomy code: a short, stable, kebab-case class "
+            "of the violation (e.g. 'code-injection', 'hardcoded-secret', "
+            "'missing-error-handling'). Reuse the exact same code for every "
+            "finding of the same kind so near-duplicates group together."
+        ),
+    )
     w: str = Field(description="Short title of the finding")
     snippet: str = Field(
         description=(
@@ -493,8 +502,9 @@ def run_api_analysis(
             or run_config.options.ai_model
             or "unknown"
         )
+        from quodeq.analysis.cache.local import default_cache_root as _dcr  # noqa: PLC0415
         cache_writer = build_cache_writer(
-            cache_root=Path.home() / ".quodeq" / "cache" / "results",
+            cache_root=_dcr(),
             src_root=run_config.src,
             standards_dir=run_config.standards_dir,
             dimension=dim_id,

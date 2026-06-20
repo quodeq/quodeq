@@ -21,11 +21,7 @@ from quodeq.context.online_cache import (
     ensure_clone,
     is_inside_cache,
 )
-from quodeq.data.fs.repo_validation import (
-    _PRIVATE_HOST_RE,
-    _REPO_URL_RE,
-    _resolves_to_private,
-)
+from quodeq.data.fs.repo_validation import validate_remote_url as _validate_remote_url
 
 _logger = logging.getLogger(__name__)
 
@@ -38,19 +34,6 @@ def _get_clone_timeout(env: dict[str, str] | None = None) -> int:
         return int((env or os.environ).get("QUODEQ_GIT_CLONE_TIMEOUT", str(_DEFAULT_CLONE_TIMEOUT_S)))
     except ValueError:
         return _DEFAULT_CLONE_TIMEOUT_S
-
-
-def _validate_remote_url(repo_input: str) -> None:
-    """Reject malformed / private / DNS-rebinding URLs."""
-    if not _REPO_URL_RE.match(repo_input):
-        raise ValueError(f"Invalid repository URL format: {repo_input}. Expected: https://github.com/user/repo or git@github.com:user/repo.git")
-    if _PRIVATE_HOST_RE.match(repo_input):
-        raise ValueError("Repository URLs pointing to private/internal addresses are not allowed")
-    if repo_input.startswith("http"):
-        import urllib.parse
-        hostname = urllib.parse.urlparse(repo_input).hostname or ""
-        if hostname and _resolves_to_private(hostname):
-            raise ValueError("Repository URL resolves to a private/internal address")
 
 
 def _legacy_tempdir_clone(repo_input: str) -> str:

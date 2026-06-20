@@ -4,7 +4,19 @@ from quodeq.analysis.mcp.schemas import (
     MARK_FILE_DONE_NAME,
     MARK_FILE_DONE_DESC,
     MARK_FILE_DONE_SCHEMA,
+    REPORT_FINDING_SCHEMA,
 )
+
+
+class TestReportFindingSchema:
+    def test_vt_is_optional_taxonomy_string(self):
+        vt = REPORT_FINDING_SCHEMA["properties"]["vt"]
+        assert vt["type"] == "string"
+        assert "vt" not in REPORT_FINDING_SCHEMA["required"]
+
+    def test_vt_description_mentions_taxonomy(self):
+        desc = REPORT_FINDING_SCHEMA["properties"]["vt"]["description"].lower()
+        assert "taxonomy" in desc
 
 
 class TestMarkFileDoneSchema:

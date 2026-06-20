@@ -40,14 +40,14 @@ class TestPersistFiltersByOkMarker:
             # c.py: explicit error
             {"_marker": "file_done", "file": "c.py", "status": "error", "reason": "token_limit"},
         ])
-        miss_keys = {f: f"key-{f}" for f in ("a.py", "b.py", "c.py")}
+        miss_keys = {f: f"key-{f}".replace(".", "-") for f in ("a.py", "b.py", "c.py")}
         persist_dispatch_results(
             config, "security", miss_files=["a.py", "b.py", "c.py"],
             jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
         )
-        assert cache.get("key-a.py") is not None
-        assert cache.get("key-b.py") is None
-        assert cache.get("key-c.py") is None
+        assert cache.get("key-a-py") is not None
+        assert cache.get("key-b-py") is None
+        assert cache.get("key-c-py") is None
 
     def test_clean_file_with_ok_marker_is_cached_empty(
         self, tmp_path: Path, cache: LocalFileBackend,

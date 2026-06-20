@@ -29,6 +29,15 @@ export function SidePane() {
     else delete root.dataset.paneResizing;
   }, []);
 
+  // Holds the cleanup function for the active drag, if any.
+  // Set on pointer-down, cleared on pointer-up or unmount.
+  const activeDragCleanupRef = useRef(null);
+
+  // Run any active drag cleanup on unmount to remove leaked window listeners.
+  useEffect(() => {
+    return () => { activeDragCleanupRef.current?.(); };
+  }, []);
+
   // Outer pane (left-edge) drag — resizes the whole dock width.
   // pointermove can fire 100+ times/sec on a 120Hz trackpad. Coalesce
   // multiple events into one CSS-var write per frame via rAF — same
@@ -56,8 +65,16 @@ export function SidePane() {
       pendingNext = clampSidePaneWidth(startWidth + delta, viewport);
       if (rafId == null) rafId = requestAnimationFrame(apply);
     };
-    const onUp = (ev) => {
+    const cleanup = () => {
       if (rafId != null) cancelAnimationFrame(rafId);
+      setResizingFlag(false);
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevSelect;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      activeDragCleanupRef.current = null;
+    };
+    const onUp = (ev) => {
       const delta = startX - ev.clientX;
       const finalWidth = clampSidePaneWidth(startWidth + delta, window.innerWidth);
       // Write final value to the var immediately so the column doesn't
@@ -65,14 +82,11 @@ export function SidePane() {
       document.documentElement.style.setProperty('--side-pane-width', `${finalWidth}px`);
       setPaneWidth(finalWidth);
       setIsDragging(false);
-      setResizingFlag(false);
-      document.body.style.cursor = prevCursor;
-      document.body.style.userSelect = prevSelect;
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
+      cleanup();
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    activeDragCleanupRef.current = cleanup;
   }, [paneWidth, setPaneWidth, setResizingFlag]);
 
   // Internal between-window resizer. Mutates the two adjacent slot
@@ -114,22 +128,27 @@ export function SidePane() {
       pendingRatio = Math.min(1 - MIN_WINDOW_RATIO, Math.max(MIN_WINDOW_RATIO, startRatio + delta / span));
       if (rafId == null) rafId = requestAnimationFrame(apply);
     };
-    const onUp = () => {
+    const cleanup = () => {
       if (rafId != null) cancelAnimationFrame(rafId);
+      setResizingFlag(false);
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevSelect;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      activeDragCleanupRef.current = null;
+    };
+    const onUp = () => {
       apply();
       setRatios((prev) => {
         const out = [...prev];
         out[index] = pendingRatio;
         return out;
       });
-      setResizingFlag(false);
-      document.body.style.cursor = prevCursor;
-      document.body.style.userSelect = prevSelect;
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
+      cleanup();
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    activeDragCleanupRef.current = cleanup;
   }, [ratios, setResizingFlag]);
 
   if (!isOpen) return null;
@@ -156,7 +175,18 @@ export function SidePane() {
         role="separator"
         aria-orientation="vertical"
         aria-label="Resize side pane"
+        tabIndex={0}
         onPointerDown={onOuterDividerPointerDown}
+        onKeyDown={(e) => {
+          const STEP = 16;
+          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            const delta = e.key === 'ArrowLeft' ? -STEP : STEP;
+            const newWidth = clampSidePaneWidth(paneWidth + delta, window.innerWidth);
+            document.documentElement.style.setProperty('--side-pane-width', `${newWidth}px`);
+            setPaneWidth(newWidth);
+          }
+        }}
       />
       {windows.map((spec, i) => (
         <React.Fragment key={spec.id}>
@@ -169,7 +199,23 @@ export function SidePane() {
               role="separator"
               aria-orientation="horizontal"
               aria-label={`Resize between window ${i + 1} and ${i + 2}`}
+              aria-valuenow={Math.round((ratios[i] ?? 0.5) * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              tabIndex={0}
               onPointerDown={onInnerDividerPointerDown(i)}
+              onKeyDown={(e) => {
+                const STEP = 0.05;
+                if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  const delta = e.key === 'ArrowUp' ? -STEP : STEP;
+                  setRatios((prev) => {
+                    const out = [...prev];
+                    out[i] = Math.min(1 - MIN_WINDOW_RATIO, Math.max(MIN_WINDOW_RATIO, (out[i] ?? 0.5) + delta));
+                    return out;
+                  });
+                }
+              }}
             />
           )}
         </React.Fragment>

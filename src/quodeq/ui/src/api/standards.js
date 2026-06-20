@@ -75,11 +75,19 @@ export async function importFromLibrary(file) {
  * @returns {Promise<Object>} Result with optional `_conflict` flag
  */
 export async function importStandard(data, force = false) {
-  const res = await fetch(`${BASE}/standards/import`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ data, force }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  let res;
+  try {
+    res = await fetch(`${BASE}/standards/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data, force }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
   const body = await res.json().catch(() => ({}));
   if (res.status === 409) return { ...body, _conflict: true };
   if (!res.ok) throw new Error(body.error || `Import failed: ${res.status}`);

@@ -11,6 +11,7 @@ sessions that ended in PRs #525-#528.)
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,27 @@ from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 _MAX_DISMISSED_LIMIT = 5000
+
+# Per-project locks for background projection.  A module-level guard lock
+# protects creation of per-project entries; after creation each project's Lock
+# is accessed without the guard.
+#
+# Intentionally unbounded: one tiny Lock object per distinct project name that
+# has ever triggered a background projection on this host.  In practice this
+# mirrors the number of projects on disk, which is small and naturally bounded
+# by real usage.  Contrast with _scored_jobs (bounded LRU) — scored jobs can
+# accumulate many run-ids per project, so a size cap there is meaningful;
+# here there is one entry per project, not per run.
+_projection_locks: dict[str, threading.Lock] = {}
+_projection_locks_guard = threading.Lock()
+
+
+def _get_projection_lock(project: str) -> threading.Lock:
+    """Return (and lazily create) the Lock for *project*."""
+    with _projection_locks_guard:
+        if project not in _projection_locks:
+            _projection_locks[project] = threading.Lock()
+        return _projection_locks[project]
 
 
 def _project_dir(evaluations_dir: str, project: str) -> Path:
@@ -147,13 +169,30 @@ def register_findings_routes(app: Flask) -> None:
         When the caller can't supply a usable ``run_id`` (Violations / Map
         nav paths don't carry one today), ``_rescore_run`` returns ``None`` —
         but the action *must* still propagate to SQL or the dismissed-tab
-        list won't see it. Project every run as the fallback so the entry
-        becomes visible without forcing the UI to retry.
+        list won't see it. Project every run in the background as the
+        fallback so the entry becomes visible without blocking the response.
+
+        A per-project non-blocking lock prevents duplicate concurrent
+        projections for the same project: if one projection is already
+        running, the second caller skips rather than queueing behind it
+        (the in-flight run will already cover the latest actions).
         """
         evaluations_dir = _eval_dir()
         scores = _rescore_run(evaluations_dir, project, run_id)
         if scores is None:
-            _project_all_runs(_project_dir(evaluations_dir, project))
+            proj_dir = _project_dir(evaluations_dir, project)
+            lock = _get_projection_lock(project)
+
+            def _bg_project() -> None:
+                if not lock.acquire(blocking=False):
+                    # Another projection for this project is already running.
+                    return
+                try:
+                    _project_all_runs(proj_dir)
+                finally:
+                    lock.release()
+
+            threading.Thread(target=_bg_project, daemon=True).start()
         return scores
 
     @app.get("/api/findings/dismissed")
@@ -182,7 +221,7 @@ def register_findings_routes(app: Flask) -> None:
         line = body.get("line")
         run_id = body.get("run_id") or body.get("runId")
         if not project or not req or not file or line is None:
-            return jsonify({"error": "project, req, file, and line are required"}), 400
+            return jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400
         dismiss_finding(_project_dir(_eval_dir(), project), body)
         scores = _scores_with_fallback(project, run_id)
         return jsonify({"scores": scores}), 200
@@ -196,7 +235,7 @@ def register_findings_routes(app: Flask) -> None:
         line = body.get("line")
         run_id = body.get("run_id") or body.get("runId")
         if not project or not req or not file or line is None:
-            return jsonify({"error": "project, req, file, and line are required"}), 400
+            return jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400
         restore_finding(_project_dir(_eval_dir(), project), body)
         scores = _scores_with_fallback(project, run_id)
         return jsonify({"scores": scores}), 200
@@ -207,7 +246,7 @@ def register_findings_routes(app: Flask) -> None:
         project = body.get("project", "")
         run_id = body.get("run_id") or body.get("runId")
         if not project:
-            return jsonify({"error": "project is required"}), 400
+            return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
         count = restore_all_findings(_project_dir(_eval_dir(), project))
         scores = _scores_with_fallback(project, run_id)
         return jsonify({"ok": True, "restored": count, "scores": scores}), 200
@@ -221,7 +260,7 @@ def register_findings_routes(app: Flask) -> None:
         file = body.get("file", "")
         run_id = body.get("run_id") or body.get("runId")
         if not project or not dimension or not principle or not file:
-            return jsonify({"error": "project, dimension, principle, and file are required"}), 400
+            return jsonify({"error": "project, dimension, principle, and file are required", "code": "MISSING_PARAM"}), 400
         swept = delete_finding(_project_dir(_eval_dir(), project), body)
         scores = _scores_with_fallback(project, run_id)
         return jsonify({"ok": True, "swept": swept, "scores": scores}), 200
@@ -232,7 +271,7 @@ def register_findings_routes(app: Flask) -> None:
         project = body.get("project", "")
         run_id = body.get("run_id") or body.get("runId")
         if not project:
-            return jsonify({"error": "project is required"}), 400
+            return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
         count = delete_all_dismissed(_project_dir(_eval_dir(), project))
         scores = _scores_with_fallback(project, run_id)
         return jsonify({"ok": True, "deleted": count, "scores": scores}), 200

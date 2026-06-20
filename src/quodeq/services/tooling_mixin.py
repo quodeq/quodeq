@@ -32,7 +32,7 @@ def _load_fallback_claude_models() -> list[str]:
     try:
         data = read_json(_AI_DEFAULTS_PATH)
         return data.get("fallback_claude_models", [])
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, ValueError):
         return []
 
 

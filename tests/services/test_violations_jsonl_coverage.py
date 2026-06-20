@@ -8,6 +8,35 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
+# ---------------------------------------------------------------------------
+# #145 — non-dict JSON values (lists, strings, numbers) must be skipped
+# ---------------------------------------------------------------------------
+
+class TestNonDictJsonlLineIsSkipped:
+    def test_non_dict_string_line_is_skipped(self):
+        from quodeq.services._violations_jsonl import _parse_jsonl_findings
+        lines = [
+            '"just a string"',
+            '[1, 2, 3]',
+            json.dumps({"p": "M-MOD-1", "t": "violation", "file": "a.py", "line": 1}),
+        ]
+        violations, _ = _parse_jsonl_findings(lines, "security")
+        assert len(violations) == 1
+
+    def test_non_dict_list_line_is_skipped(self):
+        from quodeq.services._violations_jsonl import _parse_jsonl_findings
+        lines = ['[{"p": "M-MOD-1", "t": "violation"}]']
+        violations, compliance = _parse_jsonl_findings(lines, "security")
+        assert violations == []
+        assert compliance == []
+
+    def test_non_dict_null_line_is_skipped(self):
+        from quodeq.services._violations_jsonl import _parse_jsonl_findings
+        lines = ['null', json.dumps({"p": "P1", "t": "compliance", "file": "b.py", "line": 2})]
+        _, compliance = _parse_jsonl_findings(lines, "security")
+        assert len(compliance) == 1
+
+
 class TestParseJsonlFindings:
     def test_empty_lines(self):
         from quodeq.services._violations_jsonl import _parse_jsonl_findings

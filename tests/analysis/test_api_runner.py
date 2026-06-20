@@ -176,6 +176,26 @@ class TestParserDropAccounting:
         assert dropped == 0
 
 
+class TestFindingVtTaxonomy:
+    """The optional 'vt' taxonomy code must survive _Finding validation, or
+    every fresh API run scores with taxonomy_used=False (free-text reason
+    grouping counts near-duplicates as distinct types and depresses scores)."""
+
+    _BASE = {
+        "req": "S-CON-3", "t": "violation", "file": "src/a.py", "line": 3,
+        "severity": "critical", "w": "eval usage",
+        "snippet": "eval(x)", "reason": "Direct code injection via eval.",
+    }
+
+    def test_vt_survives_validate_and_dump(self):
+        dumped = _Finding.model_validate({**self._BASE, "vt": "code-injection"}).model_dump()
+        assert dumped["vt"] == "code-injection"
+
+    def test_vt_defaults_to_none_when_absent(self):
+        dumped = _Finding.model_validate(self._BASE).model_dump()
+        assert dumped["vt"] is None
+
+
 class TestTruncationDetection:
     """A length-truncated response is incomplete: mark the call lossy so the
     file re-dispatches instead of being cached as a clean analysis."""
@@ -351,15 +371,11 @@ class TestSyncCacheWrite:
         src_root.mkdir()
         (src_root / "Foo.kt").write_text("class Foo")
 
-        # build_cache_writer hardcodes Path.home() / ".quodeq/cache/results",
-        # so redirect the user-home lookup to keep this test self-contained.
-        # POSIX's expanduser reads HOME; Windows' reads USERPROFILE first and
-        # ignores HOME when USERPROFILE is set (which it always is on CI).
-        # Setting both keeps the test cross-platform.
-        fake_home = tmp_path / "home"
-        monkeypatch.setenv("HOME", str(fake_home))
-        monkeypatch.setenv("USERPROFILE", str(fake_home))
-        cache_root = fake_home / ".quodeq" / "cache" / "results"
+        # default_cache_root() honours QUODEQ_CACHE_ROOT (Fix A, #2419/#2340),
+        # so redirect via that env var to keep this test self-contained.
+        fake_cache_base = tmp_path / "cache"
+        monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(fake_cache_base))
+        cache_root = fake_cache_base / "results"
 
         run_config = RunConfig(
             src=src_root,

@@ -60,3 +60,33 @@ def test_skips_malformed_lines(tmp_path: Path) -> None:
     result = load_violations_from_evidence(evidence_dir)
     assert len(result) == 1
     assert result[0]["file"] == "x.py"
+
+
+# ---------------------------------------------------------------------------
+# #448 — int(line) must not raise ValueError on non-integer line values
+# ---------------------------------------------------------------------------
+
+def test_non_integer_line_value_is_skipped_gracefully(tmp_path: Path) -> None:
+    """A violation with a non-integer 'line' value must not crash the reader."""
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    rows = [
+        # non-integer line — should be dropped (None) or coerced gracefully
+        {"p": "SEC", "t": "violation", "d": "security", "file": "a.py", "line": "not-a-number"},
+        # valid row without 'line' — should survive
+        {"p": "SEC", "t": "violation", "d": "security", "file": "b.py"},
+        # valid row with integer line — should survive
+        {"p": "SEC", "t": "violation", "d": "security", "file": "c.py", "line": 5},
+    ]
+    import json as _json
+    (evidence_dir / "security_evidence.jsonl").write_text(
+        "\n".join(_json.dumps(r) for r in rows) + "\n"
+    )
+    result = load_violations_from_evidence(evidence_dir)
+    files = {v["file"] for v in result}
+    assert "c.py" in files
+    assert "b.py" in files
+    # The non-integer line row must not raise; it may be skipped or have no 'line' key
+    for v in result:
+        if v.get("file") == "a.py":
+            assert "line" not in v or isinstance(v["line"], int)

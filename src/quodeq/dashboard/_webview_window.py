@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import html as _html
 import json
+import logging
 import os
 import signal
 import sys
@@ -10,6 +11,7 @@ import threading
 import urllib.parse
 import urllib.request
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path
 
 import webview
@@ -17,6 +19,8 @@ import webview
 from quodeq.dashboard._build_npm import _quodeq_dir
 from quodeq.dashboard._instance import InstanceController
 from quodeq.dashboard._webview_html import INJECT_JS, CLOSING_OVERLAY_JS
+
+_logger = logging.getLogger(__name__)
 
 _WINDOW_WIDTH = 1280
 _WINDOW_HEIGHT = 800
@@ -32,6 +36,24 @@ _DIALOG_FONT_SIZE = "0.82rem"
 _BUTTON_PADDING = "10px 16px"
 _BUTTON_BORDER_RADIUS = "6px"
 _BUTTON_FONT_SIZE = "0.85rem"
+
+
+def _is_safe_reload_url(url: str) -> bool:
+    """Return True only when *url* points to the local dashboard origin.
+
+    Rejects anything that is not http/https on 127.0.0.1, localhost, or ::1
+    so a rogue local process cannot navigate the privileged webview to an
+    arbitrary URL via the reload socket.
+    """
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except ValueError:
+        return False
+    return parsed.scheme in {"http", "https"} and parsed.hostname in {
+        "127.0.0.1",
+        "localhost",
+        "::1",
+    }
 
 
 class _WindowApi:
@@ -612,6 +634,23 @@ def _patch_pywebview_multi_monitor_drag() -> None:
     BrowserView.move = _patched_move
 
 
+def _make_on_reload(window: object) -> "Callable[[str], None]":
+    """Return the ``_on_reload`` handler bound to *window*.
+
+    Extracted from ``main()`` so the test suite can import and exercise the
+    real implementation rather than a hand-rolled duplicate.
+    """
+    def _on_reload(new_url: str) -> None:
+        if not _is_safe_reload_url(new_url):
+            _logger.warning("Ignoring unsafe reload URL: %s", new_url)
+            return
+        window.load_url(new_url)  # type: ignore[union-attr]
+        window.on_top = True  # type: ignore[union-attr]
+        window.on_top = False  # type: ignore[union-attr]
+
+    return _on_reload
+
+
 def main() -> None:
     _set_app_icon()
     _patch_pywebview_multi_monitor_drag()
@@ -637,10 +676,7 @@ def main() -> None:
                                     js_api=api)
     api.bind(window, api_pid=api_pid, instance=instance, base_url=url)
 
-    def _on_reload(new_url: str) -> None:
-        window.load_url(new_url)
-        window.on_top = True
-        window.on_top = False
+    _on_reload = _make_on_reload(window)
 
     def _on_loaded() -> None:
         window.show()

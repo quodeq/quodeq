@@ -313,6 +313,30 @@ class TestResolveProviderConfig:
             _, _, key = _resolve_provider_config(cfg)
         assert key == ""
 
+    def test_credential_registry_dispatches_registered_provider(self, monkeypatch):
+        """Fix C (#2291): a provider registered in _CREDENTIAL_LOADERS is
+        dispatched through the registry rather than via a hard-coded branch."""
+        from quodeq.analysis.subprocess import _CREDENTIAL_LOADERS
+        # Patch a fake provider into the registry for the duration of the test.
+        _CREDENTIAL_LOADERS["testprovider"] = lambda: "registry-key"
+        try:
+            provider = {"testprovider": {"type": "api", "model": "m", "api_base": "http://tp/v1"}}
+            cfg = AnalysisConfig(ai_cmd="testprovider", ai_model="m")
+            with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
+                _, _, key = _resolve_provider_config(cfg)
+            assert key == "registry-key"
+        finally:
+            _CREDENTIAL_LOADERS.pop("testprovider", None)
+
+    def test_unknown_provider_not_in_registry_returns_empty_key(self):
+        """Fix C: an unknown provider not in _CREDENTIAL_LOADERS falls through
+        to an empty key (existing behavior preserved)."""
+        provider = {"newprovider": {"type": "api", "model": "m", "api_base": "http://np/v1"}}
+        cfg = AnalysisConfig(ai_cmd="newprovider", ai_model="m")
+        with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
+            _, _, key = _resolve_provider_config(cfg)
+        assert key == ""
+
 
 # ---------------------------------------------------------------------------
 # run_analysis dispatch

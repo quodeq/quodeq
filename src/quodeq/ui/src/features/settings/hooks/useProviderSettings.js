@@ -41,7 +41,11 @@ function loadProviderState(providerId, overrides, storage = localStorage) {
 }
 
 function saveProviderSetting(providerId, key, value, storage = localStorage) {
-  storage.setItem(providerKey(providerId, key), String(value));
+  try {
+    storage.setItem(providerKey(providerId, key), String(value));
+  } catch (err) {
+    console.warn('[useProviderSettings] Could not persist setting to storage:', err);
+  }
 }
 
 export default function useProviderSettings(providerId, defaults, { storage = localStorage } = {}) {

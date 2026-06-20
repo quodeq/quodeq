@@ -43,6 +43,8 @@ def _parse_jsonl_findings(
             obj = json.loads(raw)
         except json.JSONDecodeError:
             continue
+        if not isinstance(obj, dict):
+            continue
         principle = obj.get("p") or obj.get("req")
         if not principle or obj.get("t") not in _FINDING_TYPES:
             continue

@@ -17,10 +17,7 @@ from quodeq.core.scoring.internals import (
     evidence_has_taxonomy,
     score_to_grade_label,
     severity_grade_floor,
-    tally_compliance_types_by_reason,
-    tally_compliance_types_by_taxonomy,
-    tally_types_by_reason,
-    tally_types_by_taxonomy,
+    tally_types,
     violation_base,
     violation_ceiling,
 )
@@ -46,10 +43,18 @@ class _PrincipleContext:
 def compute_tallies(
     violations: list, compliance: list,
 ) -> tuple[dict[str, int], dict[str, int], bool]:
-    """Tally violation and compliance type counts, selecting taxonomy or reason mode."""
+    """Tally distinct violation and compliance types per severity.
+
+    A ``vt`` taxonomy code is a per-finding grouping key, not a per-principle
+    mode switch: each finding is grouped by its ``vt`` when present and by its
+    ``reason`` otherwise, so a partly tagged principle still counts all of its
+    findings (including untagged criticals). ``using_taxonomy`` is reported
+    (any finding carries a ``vt``) for display only; it no longer changes which
+    findings are counted.
+    """
     using_taxonomy = evidence_has_taxonomy(violations)
-    vt_counts = tally_types_by_taxonomy(violations) if using_taxonomy else tally_types_by_reason(violations)
-    ct_counts = tally_compliance_types_by_taxonomy(compliance) if using_taxonomy else tally_compliance_types_by_reason(compliance)
+    vt_counts = tally_types(violations)
+    ct_counts = tally_types(compliance)
     return vt_counts, ct_counts, using_taxonomy
 
 

@@ -8,6 +8,7 @@ passed to every dimension runner.
 from __future__ import annotations
 
 import json as _json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -17,18 +18,33 @@ from quodeq.config.paths import default_paths
 from quodeq.shared.logging import log_warning
 
 
+def _is_path_safe_id(value: object) -> bool:
+    return (
+        isinstance(value, str) and bool(value)
+        and "/" not in value and "\\" not in value
+        and ".." not in value and os.sep not in value
+    )
+
+
 def _load_custom_dimensions(evaluators_dir: Path, dims_data: list[str]) -> list[str]:
     """Load evaluator IDs from JSON files in *evaluators_dir* not already in *dims_data*."""
     result = list(dims_data)
     seen = set(result)
     for _p in evaluators_dir.glob("*.json"):
         try:
-            _eid = _json.loads(_p.read_text(encoding="utf-8")).get("id")
+            _parsed = _json.loads(_p.read_text(encoding="utf-8"))
+            if not isinstance(_parsed, dict):
+                log_warning(f"Skipping custom evaluator {_p.name}: not a JSON object")
+                continue
+            _eid = _parsed.get("id")
             if _eid and _eid not in seen:
+                if not _is_path_safe_id(_eid):
+                    log_warning(f"Skipping custom evaluator {_p.name}: unsafe id {_eid!r}")
+                    continue
                 result.append(_eid)
                 seen.add(_eid)
-        except (OSError, ValueError, KeyError):
-            pass
+        except (OSError, ValueError, KeyError) as e:
+            log_warning(f"Skipping custom evaluator {_p.name}: {e}")
     return result
 
 

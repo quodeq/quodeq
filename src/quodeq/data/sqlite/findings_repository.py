@@ -59,6 +59,16 @@ class SqliteFindingsRepository:
                 project_dir=project_dir,
             )
 
+    def ensure_projected(self) -> None:
+        """Ensure the run's grade tables are up to date with the event log.
+
+        Public entry point for callers that need to project before reading
+        grade data directly (e.g. the SQL grade overlay).  Delegates to the
+        internal :meth:`_ensure_fresh` which is a fast no-op once the event
+        log size is stable.
+        """
+        self._ensure_fresh()
+
     def insert_finding(self, finding: dict[str, Any]) -> bool:
         row = finding_dict_to_row(finding)
         with open_evaluation_db(self._run_dir) as conn:
@@ -73,6 +83,20 @@ class SqliteFindingsRepository:
             rows = conn.execute(
                 f"SELECT {_SELECT_COLUMNS} FROM findings WHERE dimension = ? ORDER BY id",
                 (dimension,),
+            ).fetchall()
+        return [row_to_finding(r) for r in rows]
+
+    def list_all(self) -> list[Finding]:
+        """Return every finding in the DB in a single query (all dimensions).
+
+        Callers that need findings grouped by dimension should use this method
+        and group in Python rather than issuing N ``list_by_dimension`` calls.
+        """
+        self._ensure_fresh()
+        with open_evaluation_db(self._run_dir) as conn:
+            conn.row_factory = _dict_row
+            rows = conn.execute(
+                f"SELECT {_SELECT_COLUMNS} FROM findings ORDER BY id",
             ).fetchall()
         return [row_to_finding(r) for r in rows]
 

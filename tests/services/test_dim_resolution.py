@@ -14,6 +14,8 @@ appear in which view. The tests pin down its three guarantees:
 Together these make the migration in later phases safe: each call site
 can replace its local filter with a documented predicate from this module.
 """
+# NOTE: Additional tests for #356 (_is_trustworthy_eval non-dict guard) are at
+# the bottom of this file.
 from __future__ import annotations
 
 import json
@@ -339,3 +341,29 @@ class TestIsEligibleForChartBar:
         assert is_eligible_for_chart_bar(
             tmp_path, "proj", run, configured_dims=["security", "reliability"],
         ) is False
+
+
+# ---------------------------------------------------------------------------
+# #356 — _is_trustworthy_eval must not raise on non-dict eval_data
+# ---------------------------------------------------------------------------
+
+class TestIsTrustworthyEvalNonDict:
+    def test_list_eval_data_returns_false(self) -> None:
+        from quodeq.services.scoring_view._resolution import _is_trustworthy_eval
+        assert _is_trustworthy_eval([{"filesRead": 100}]) is False
+
+    def test_string_eval_data_returns_false(self) -> None:
+        from quodeq.services.scoring_view._resolution import _is_trustworthy_eval
+        assert _is_trustworthy_eval("filesRead: 100") is False
+
+    def test_int_eval_data_returns_false(self) -> None:
+        from quodeq.services.scoring_view._resolution import _is_trustworthy_eval
+        assert _is_trustworthy_eval(42) is False
+
+    def test_none_eval_data_returns_false(self) -> None:
+        from quodeq.services.scoring_view._resolution import _is_trustworthy_eval
+        assert _is_trustworthy_eval(None) is False
+
+    def test_valid_dict_with_files_read_returns_true(self) -> None:
+        from quodeq.services.scoring_view._resolution import _is_trustworthy_eval
+        assert _is_trustworthy_eval({"filesRead": 10}) is True

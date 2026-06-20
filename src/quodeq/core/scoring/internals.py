@@ -15,13 +15,9 @@ from quodeq.core.scoring._constants import (  # noqa: F401 — re-exports
     scale_multiplier,
 )
 from quodeq.core.scoring._tallies import (  # noqa: F401 — re-exports
-    _tally_types,
     _weighted_sum,
     evidence_has_taxonomy,
-    tally_compliance_types_by_reason,
-    tally_compliance_types_by_taxonomy,
-    tally_types_by_reason,
-    tally_types_by_taxonomy,
+    tally_types,
 )
 from quodeq.core.scoring.confidence import confidence_interval_for  # noqa: F401 — re-export
 from quodeq.core.scoring.numerical import (  # noqa: F401 — re-export

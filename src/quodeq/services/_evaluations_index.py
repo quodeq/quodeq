@@ -217,10 +217,16 @@ class EvaluationsIndex:
         reports_root = self._resolve_reports_root()
         if reports_root is None or not reports_root.is_dir():
             return None
+        resolved_root = reports_root.resolve()
         for project_dir in reports_root.iterdir():
             if not project_dir.is_dir():
                 continue
             candidate = project_dir / run_id
+            try:
+                if not candidate.resolve().is_relative_to(resolved_root):
+                    continue
+            except (OSError, ValueError):
+                continue
             if candidate.is_dir():
                 return candidate
         return None

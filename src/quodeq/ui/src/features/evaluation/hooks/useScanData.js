@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { scanPath } from '../../../api/index.js';
 import { projectKeys } from '../../../api/queryKeys.js';
+import { request } from '../../../api/request.js';
 
 /**
  * Fetch scan data for a project ID or a raw local path.
@@ -15,9 +16,7 @@ export function useScanData(projectId, localPath) {
       : ['project', 'scan-path', localPath || ''],
     queryFn: async ({ signal }) => {
       if (projectId) {
-        const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/scan`, { signal });
-        if (!res.ok) throw new Error(`Scan failed: ${res.status}`);
-        return res.json();
+        return request(`/projects/${encodeURIComponent(projectId)}/scan`, { signal });
       }
       return scanPath(localPath);
     },

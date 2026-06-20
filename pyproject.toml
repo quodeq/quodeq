@@ -1,6 +1,6 @@
 [project]
 name = "quodeq"
-version = "1.3.0"
+version = "1.4.0"
 description = "Source code quality evaluation platform powered by AI"
 readme = "README.md"
 license = "MIT"
@@ -35,7 +35,7 @@ Issues = "https://github.com/quodeq/quodeq/issues"
 
 [dependency-groups]
 dev = [
-    "pytest==9.0.3",
+    "pytest==9.1.0",
     "pytest-cov==7.1.0",
     "pytest-timeout==2.4.0",
 ]
@@ -65,8 +65,11 @@ timeout_method = "thread"
 
 [tool.coverage.run]
 source = ["quodeq"]
+branch = true
 
 [tool.coverage.report]
+# Enforced gate (activated by --cov in CI). Ratchet this up as coverage
+# improves; never lower it without justification.
 fail_under = 80
 
 [build-system]

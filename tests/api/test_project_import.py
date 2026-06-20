@@ -432,3 +432,60 @@ def test_import_export_roundtrip(app_client):
         resp = _post_zip(c, zip_bytes)
     assert resp.status_code == 200, resp.get_json()
     assert (eval_dir / src_uuid / "scan.json").exists()
+
+
+# ---------------------------------------------------------------------------
+# #2494 — _update_index must use an injected repository when provided
+# ---------------------------------------------------------------------------
+
+class TestUpdateIndexDI:
+    """_update_index must delegate to the injected ProjectRepository when given."""
+
+    def test_injected_repository_is_used_not_filesystem(self, tmp_path):
+        """When a repository is injected, load_index/save_index on it are called
+        instead of the default _load_index/_save_index filesystem helpers."""
+        from pathlib import Path
+        from quodeq.api.import_project import _update_index
+        from quodeq.data.fs._models import ProjectIdentity
+        from quodeq.data.fs._resolution import _index_key
+
+        captured_loads: list = []
+        captured_saves: list = []
+
+        class SpyRepository:
+            def load_index(self, reports_dir: Path) -> dict[str, str]:
+                captured_loads.append(reports_dir)
+                return {}
+
+            def save_index(self, reports_dir: Path, index: dict[str, str]) -> None:
+                captured_saves.append((reports_dir, dict(index)))
+
+        identity = ProjectIdentity(project_name="myrepo", repo_path="/tmp/myrepo")
+        project_uuid = "aaaabbbb-cccc-dddd-eeee-ffffaaaabbbb"
+        spy = SpyRepository()
+
+        _update_index(tmp_path, identity, project_uuid, repository=spy)
+
+        assert len(captured_loads) == 1
+        assert captured_loads[0] == tmp_path
+        assert len(captured_saves) == 1
+        saved_dir, saved_index = captured_saves[0]
+        assert saved_dir == tmp_path
+        assert saved_index[_index_key(identity)] == project_uuid
+
+    def test_no_repository_uses_filesystem(self, tmp_path):
+        """Without a repository, _update_index writes to project_index.json on disk."""
+        import json
+        from quodeq.api.import_project import _update_index
+        from quodeq.data.fs._models import ProjectIdentity
+        from quodeq.data.fs._resolution import _index_key
+
+        identity = ProjectIdentity(project_name="testrepo", repo_path="/tmp/testrepo")
+        project_uuid = "11112222-3333-4444-5555-666677778888"
+
+        _update_index(tmp_path, identity, project_uuid)
+
+        index_file = tmp_path / "project_index.json"
+        assert index_file.exists()
+        data = json.loads(index_file.read_text())
+        assert data[_index_key(identity)] == project_uuid

@@ -29,10 +29,6 @@ _logger = logging.getLogger(__name__)
 SCHEMA_VERSION = 1
 
 
-class UnsupportedIndexSchemaError(RuntimeError):
-    """Raised when index.db has schema_version > SCHEMA_VERSION."""
-
-
 @dataclass(frozen=True)
 class RunRow:
     """One row of the runs table, as a plain dataclass."""
@@ -97,8 +93,14 @@ def _read_schema_version(db: sqlite3.Connection) -> int | None:
 def open_index(db_path: Path) -> sqlite3.Connection:
     """Open (or create) the index DB at *db_path*, migrate to current schema.
 
-    Raises UnsupportedIndexSchemaError if the existing DB has a newer schema.
-    Recovers from a corrupt file by deleting and recreating.
+    The index is derived state — rebuildable from the run files on disk — so a
+    DB this binary can't use is discarded and recreated rather than fatal:
+
+    * a corrupt/unreadable file, or
+    * a downgraded index whose ``schema_version`` is newer than we support
+      (the user ran a newer quodeq, then installed an older one).
+
+    Either way the next ``sync_index`` repopulates it from disk.
     """
     db_path = Path(db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -127,10 +129,24 @@ def open_index(db_path: Path) -> sqlite3.Connection:
         _apply_schema_v1(db)
         return db
     if version > SCHEMA_VERSION:
-        db.close()
-        raise UnsupportedIndexSchemaError(
-            f"index schema_version={version} newer than supported ({SCHEMA_VERSION})"
+        # Downgrade: a newer quodeq migrated the index forward. It's a derived
+        # projection, so discard and rebuild rather than crash — mirrors the
+        # corrupt-file recovery above. The next sync_index repopulates it.
+        _logger.warning(
+            "index DB at %s has schema_version=%s newer than supported (%s) — "
+            "rebuilding from run files", db_path, version, SCHEMA_VERSION,
         )
+        # Close before unlink — Windows holds the file handle open otherwise.
+        try:
+            db.close()
+        except sqlite3.Error:
+            pass
+        db_path.unlink(missing_ok=True)
+        db = sqlite3.connect(str(db_path))
+        db.execute("PRAGMA journal_mode=WAL")
+        db.execute("PRAGMA busy_timeout=3000")
+        _apply_schema_v1(db)
+        return db
     return db
 
 

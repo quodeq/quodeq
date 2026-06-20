@@ -36,7 +36,7 @@ jobs:
         # send signals, which are inherently timing-sensitive on shared CI
         # runners. They run elsewhere (e.g. nightly) where flakes are
         # tolerable. PR CI should be fast and deterministic.
-        run: uv run pytest tests/ -q --tb=short -m "not integration"
+        run: uv run pytest tests/ -q --tb=short -m "not integration" --cov=quodeq --cov-report=term-missing
 
       - name: Run tests (Windows)
         if: runner.os == 'Windows'

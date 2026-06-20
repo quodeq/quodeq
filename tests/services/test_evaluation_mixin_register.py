@@ -124,6 +124,63 @@ def test_register_url_clone_dest_must_exist(tmp_path):
     assert not nonexistent.exists()
 
 
+def test_register_url_rejects_private_address_before_clone(tmp_path, monkeypatch):
+    """SSRF guard: a URL whose host is a private/link-local literal is rejected
+    before git clone runs, matching the CLI prepare_repository path."""
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+
+    clone_calls = []
+
+    def fake_clone(url, dest):
+        clone_calls.append(url)
+        Path(dest).mkdir(parents=True, exist_ok=True)
+        (Path(dest) / "README.md").write_text("# fake\n")
+        (Path(dest) / ".git").mkdir()
+
+    with patch("quodeq.services.evaluation_mixin.run_git_clone", side_effect=fake_clone):
+        with pytest.raises(ValueError, match="private"):
+            _register_project(
+                "https://169.254.169.254/latest/meta-data",
+                None,
+                str(reports),
+                ephemeral=True,
+            )
+
+    assert clone_calls == [], "git clone must not run for a private-host URL"
+
+
+def test_register_url_rejects_localhost_before_clone(tmp_path, monkeypatch):
+    """A localhost URL is rejected by the SSRF guard before any clone."""
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+
+    clone_calls = []
+
+    def fake_clone(url, dest):
+        clone_calls.append(url)
+        Path(dest).mkdir(parents=True, exist_ok=True)
+        (Path(dest) / "README.md").write_text("# fake\n")
+        (Path(dest) / ".git").mkdir()
+
+    with patch("quodeq.services.evaluation_mixin.run_git_clone", side_effect=fake_clone):
+        with pytest.raises(ValueError):
+            _register_project(
+                "https://localhost/git/repo.git",
+                None,
+                str(reports),
+                ephemeral=True,
+            )
+
+    assert clone_calls == []
+
+
 def test_start_evaluation_rejects_url_input(tmp_path):
     """start_evaluation no longer clones; URLs must already be registered as local."""
     from quodeq.services.base import EvaluationOptions

@@ -391,3 +391,17 @@ class TestRunApiAnalysisAppend:
             args = mock_ctx.call_args.args
             assert args[0] == tmp_path  # compiled_dir
             assert args[1] == "security"  # dimension
+
+
+# ---------------------------------------------------------------------------
+# Fix A (#2340): cache root in _api_runner honours QUODEQ_CACHE_ROOT
+# ---------------------------------------------------------------------------
+
+class TestApiRunnerCacheRootEnv:
+    def test_cache_root_honours_quodeq_cache_root_env(self, tmp_path, monkeypatch):
+        """QUODEQ_CACHE_ROOT must propagate to the cache_writer built inside
+        run_api_analysis so all three call sites agree on the same root."""
+        monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path))
+        # default_cache_root() should now return tmp_path / "results"
+        from quodeq.analysis.cache.local import default_cache_root
+        assert default_cache_root() == tmp_path / "results"

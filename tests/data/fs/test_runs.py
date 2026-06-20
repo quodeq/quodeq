@@ -1,6 +1,43 @@
 """Tests for list_runs() run discovery and status detection."""
+import json
 import os
 from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# #144 — _read_run_status must not raise when status.json parses to a non-dict
+# ---------------------------------------------------------------------------
+
+class TestReadRunStatusNonDict:
+    def _make_run(self, tmp_path: Path, run_id: str) -> Path:
+        run_dir = tmp_path / "proj" / run_id
+        (run_dir / "evidence").mkdir(parents=True)
+        (run_dir / "evidence" / "manifest.json").write_text("{}")
+        return run_dir
+
+    def test_list_payload_returns_complete(self, tmp_path: Path) -> None:
+        from quodeq.data.fs.report_parser.runs import list_runs
+        run_dir = self._make_run(tmp_path, "run-list")
+        (run_dir / "status.json").write_text(json.dumps([1, 2, 3]))
+        runs = list_runs(tmp_path, "proj")
+        assert len(runs) == 1
+        assert runs[0].status == "complete"
+
+    def test_string_payload_returns_complete(self, tmp_path: Path) -> None:
+        from quodeq.data.fs.report_parser.runs import list_runs
+        run_dir = self._make_run(tmp_path, "run-string")
+        (run_dir / "status.json").write_text('"cancelled"')
+        runs = list_runs(tmp_path, "proj")
+        assert len(runs) == 1
+        assert runs[0].status == "complete"
+
+    def test_null_payload_returns_complete(self, tmp_path: Path) -> None:
+        from quodeq.data.fs.report_parser.runs import list_runs
+        run_dir = self._make_run(tmp_path, "run-null")
+        (run_dir / "status.json").write_text("null")
+        runs = list_runs(tmp_path, "proj")
+        assert len(runs) == 1
+        assert runs[0].status == "complete"
 
 
 def test_list_runs_marks_in_progress_when_pid_is_live(tmp_path: Path) -> None:

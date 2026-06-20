@@ -50,6 +50,10 @@ def register_llm_bridge_routes(app: Flask) -> None:
         data = request.get_json() or {}
         model_size = data.get("model_size", 0)
         gpu_memory = data.get("gpu_memory", 0)
+        if (isinstance(model_size, bool) or isinstance(gpu_memory, bool)
+                or not isinstance(model_size, (int, float))
+                or not isinstance(gpu_memory, (int, float))):
+            return jsonify({"error": "model_size and gpu_memory must be numbers", "code": "INVALID_PARAM"}), 400
         return jsonify(estimate_max_agents(model_size=model_size, gpu_memory=gpu_memory))
 
     @app.get("/api/llamacpp/status")

@@ -26,55 +26,73 @@ import {
 export function drawFrame(ctx, scene, cam, nav, opts) {
   const { W, H, t, mx, my, showLabels, animating, rDim, rPrin, w2s, parentEl } = opts;
 
-  // --- Background ---
   const tc = getThemeColors(parentEl);
+  const { r: mr, g: mg, b: mb } = tc.textMuted;
+
+  drawBackground(ctx, scene, cam, tc, W, H, t, mr, mg, mb);
+  drawConstellations(ctx, scene, cam, nav, w2s, showLabels, W, H, mr, mg, mb);
+  const dimHovered = drawDimStars(ctx, scene, cam, nav, opts, tc, mr, mg, mb);
+  const prinHovered = drawPrinciples(ctx, scene, cam, nav, opts, tc, rDim);
+  drawZoomedPrinciple(ctx, scene, cam, opts, rDim, rPrin, tc, mr, mg, mb);
+
+  return { hovered: prinHovered ?? dimHovered };
+}
+
+/** Phase 1: radial gradient background + background star field. */
+function drawBackground(ctx, scene, cam, tc, W, H, t, mr, mg, mb) {
   const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.6);
   grad.addColorStop(0, tc.bgAlt); grad.addColorStop(1, tc.bg);
   ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-  const { r: mr, g: mg, b: mb } = tc.textMuted;
   scene.bg.forEach(s => {
     const a = 0.15 + 0.15 * Math.sin(t * s.sp + s.tw);
     ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.sz, 0, TAU);
     ctx.fillStyle = `rgba(${mr},${mg},${mb},${a})`; ctx.fill();
   });
+}
 
-  // --- Constellation lines and labels (only at galaxy level) ---
-  if (cam.z < 3) {
-    const conAlpha = Math.max(0, 1 - (cam.z - 1) / 2);
-    (scene.constellations || []).forEach(con => {
-      const isFocused = nav.clusterCx == null || (con.cx === nav.clusterCx && con.cy === nav.clusterCy);
-      const conClusterDim = isFocused ? 1 : Math.max(0.08, 1 - (cam.z - 1) / 2);
-      // Dashed circle around cluster
-      const csc = w2s(W / 2 + con.cx, H / 2 + con.cy);
-      const circleR = (con.spread + 10) * cam.z;
-      ctx.beginPath(); ctx.arc(csc.x, csc.y, circleR, 0, TAU);
-      ctx.strokeStyle = `rgba(${mr},${mg},${mb},${0.15 * conAlpha * conClusterDim})`;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([8, 14]); ctx.stroke(); ctx.setLineDash([]);
+/** Phase 2: constellation dashed circles, lines, and labels (galaxy level only). */
+function drawConstellations(ctx, scene, cam, nav, w2s, showLabels, W, H, mr, mg, mb) {
+  if (cam.z >= 3) return;
+  const conAlpha = Math.max(0, 1 - (cam.z - 1) / 2);
+  (scene.constellations || []).forEach(con => {
+    const isFocused = nav.clusterCx == null || (con.cx === nav.clusterCx && con.cy === nav.clusterCy);
+    const conClusterDim = isFocused ? 1 : Math.max(0.08, 1 - (cam.z - 1) / 2);
+    // Dashed circle around cluster
+    const csc = w2s(W / 2 + con.cx, H / 2 + con.cy);
+    const circleR = (con.spread + 10) * cam.z;
+    ctx.beginPath(); ctx.arc(csc.x, csc.y, circleR, 0, TAU);
+    ctx.strokeStyle = `rgba(${mr},${mg},${mb},${0.15 * conAlpha * conClusterDim})`;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([8, 14]); ctx.stroke(); ctx.setLineDash([]);
 
-      // Constellation lines between stars
-      con.lines.forEach(l => {
-        const sa = w2s(scene.stars[l.a].x, scene.stars[l.a].y);
-        const sb = w2s(scene.stars[l.b].x, scene.stars[l.b].y);
-        ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(sb.x, sb.y);
-        ctx.strokeStyle = `rgba(${mr},${mg},${mb},${0.4 * conAlpha * conClusterDim})`;
-        ctx.lineWidth = 0.8;
-        ctx.setLineDash([3, 5]); ctx.stroke(); ctx.setLineDash([]);
-      });
-      // Constellation label — above the dashed circle
-      if (showLabels && con.label) {
-        const lx = csc.x;
-        const ly = csc.y - circleR - 10;
-        ctx.font = '600 14px -apple-system,BlinkMacSystemFont,sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = `rgba(${mr},${mg},${mb},${0.55 * conAlpha * conClusterDim})`;
-        ctx.fillText(con.label, lx, ly);
-        con._lx = lx; con._ly = ly;
-      }
+    // Constellation lines between stars
+    con.lines.forEach(l => {
+      const sa = w2s(scene.stars[l.a].x, scene.stars[l.a].y);
+      const sb = w2s(scene.stars[l.b].x, scene.stars[l.b].y);
+      ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(sb.x, sb.y);
+      ctx.strokeStyle = `rgba(${mr},${mg},${mb},${0.4 * conAlpha * conClusterDim})`;
+      ctx.lineWidth = 0.8;
+      ctx.setLineDash([3, 5]); ctx.stroke(); ctx.setLineDash([]);
     });
-  }
+    // Constellation label — above the dashed circle
+    if (showLabels && con.label) {
+      const lx = csc.x;
+      const ly = csc.y - circleR - 10;
+      ctx.font = '600 14px -apple-system,BlinkMacSystemFont,sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = `rgba(${mr},${mg},${mb},${0.55 * conAlpha * conClusterDim})`;
+      ctx.fillText(con.label, lx, ly);
+      con._lx = lx; con._ly = ly;
+    }
+  });
+}
 
-  // --- Dimension stars + principle particles orbiting them ---
+/**
+ * Phase 3: dimension stars with principle particles, glow, labels, and hit-test.
+ * Returns the currently hovered element (or null).
+ */
+function drawDimStars(ctx, scene, cam, nav, opts, tc, mr, mg, mb) {
+  const { W, H, t, mx, my, showLabels, animating, rDim, w2s } = opts;
   let newHovered = null;
   scene.stars.forEach((s, i) => {
     const sc = w2s(s.x, s.y);
@@ -125,70 +143,78 @@ export function drawFrame(ctx, scene, cam, nav, opts) {
       if (dx * dx + dy * dy < hitR * hitR) newHovered = { type: 'dim', idx: i, data: s };
     }
   });
+  return newHovered;
+}
 
-  // --- Principles as planets (visible when zoomed into a dimension) ---
-  if (cam.z > 1.5 && rDim !== null) {
-    const dim = scene.stars[rDim];
-    const dsc = w2s(dim.x, dim.y);
-    const pAlpha = Math.min(1, (cam.z - 1.5) / 3);
-    const pScale = cam.z * 0.12;
-    (scene.principles[rDim] || []).forEach((p, pi) => {
-      const isSelectedPrin = nav.prin === pi;
-      const sc = w2s(p.x, p.y);
-      const sr = p.radius * pScale;
-      // orbit ring
-      ctx.beginPath(); ctx.arc(dsc.x, dsc.y, Math.hypot(sc.x - dsc.x, sc.y - dsc.y), 0, TAU);
-      ctx.strokeStyle = `rgba(50,55,80,${0.1 * pAlpha})`; ctx.lineWidth = 0.5; ctx.stroke();
-      // connection line
-      ctx.beginPath(); ctx.moveTo(dsc.x, dsc.y); ctx.lineTo(sc.x, sc.y);
-      ctx.strokeStyle = rgba(dim.col, 0.04 * pAlpha); ctx.lineWidth = 0.8; ctx.stroke();
-      // Violation/compliance particles — fade out on selected (large orbs take over), shrink on others
-      const particleFade = isSelectedPrin ? Math.max(0, 1 - (cam.z - 12) / 20) : 1;
-      // Non-selected: smaller particles but keep orbit wide so they don't collide with planet
-      const cappedScale = Math.min(0.8, 5 * 0.12 / Math.max(pScale, 0.01));
-      const particleDrawScale = isSelectedPrin ? pScale * 0.8 : pScale * cappedScale;
-      const particleOrbitScale = isSelectedPrin ? pScale * 0.8 : pScale * Math.max(cappedScale, 0.5);
-      if (particleFade > 0.01) drawParticles(ctx, p.particles, { cx: sc.x, cy: sc.y, scale: particleOrbitScale, alpha: pAlpha * particleFade, t, drawScale: particleDrawScale });
-      drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: p.col, alpha: pAlpha });
-      // Only fade labels/scores — hide on non-selected when zoomed into a principle
-      const prinLabelAlpha = isSelectedPrin ? Math.max(0, 1 - (cam.z - 12) / 20) : (nav.prin !== null ? Math.max(0, 1 - (cam.z - 12) / 15) : 1);
-      if (showLabels && prinLabelAlpha > 0.01) {
-        const la = pAlpha * prinLabelAlpha;
-        ctx.font = `600 14px -apple-system,BlinkMacSystemFont,sans-serif`;
-        ctx.textAlign = 'center'; ctx.fillStyle = rgba(tc.text, 0.6 * la);
-        ctx.fillText(p.name, sc.x, sc.y - sr - 10);
-        ctx.font = `12px -apple-system,BlinkMacSystemFont,sans-serif`;
-        ctx.fillStyle = rgba(tc.textMuted, 0.7 * la);
-        ctx.fillText(p.score.toFixed(1), sc.x, sc.y + sr + 16);
-      }
-      if (!animating && nav.depth === 1 && pAlpha > 0.4 && mx >= 0) {
-        const dx = mx - sc.x, dy = my - sc.y;
-        if (dx * dx + dy * dy < (sr + 10) * (sr + 10)) newHovered = { type: 'prin', idx: pi, data: p };
-      }
-    });
-  }
+/**
+ * Phase 4: principle planets visible when zoomed into a dimension.
+ * Returns the hovered principle element, or null.
+ */
+function drawPrinciples(ctx, scene, cam, nav, opts, tc, rDim) {
+  if (!(cam.z > 1.5 && rDim !== null)) return null;
+  const { t, mx, my, showLabels, animating, w2s } = opts;
+  const dim = scene.stars[rDim];
+  const dsc = w2s(dim.x, dim.y);
+  const pAlpha = Math.min(1, (cam.z - 1.5) / 3);
+  const pScale = cam.z * 0.12;
+  let newHovered = null;
+  (scene.principles[rDim] || []).forEach((p, pi) => {
+    const isSelectedPrin = nav.prin === pi;
+    const sc = w2s(p.x, p.y);
+    const sr = p.radius * pScale;
+    // orbit ring
+    ctx.beginPath(); ctx.arc(dsc.x, dsc.y, Math.hypot(sc.x - dsc.x, sc.y - dsc.y), 0, TAU);
+    ctx.strokeStyle = `rgba(50,55,80,${0.1 * pAlpha})`; ctx.lineWidth = 0.5; ctx.stroke();
+    // connection line
+    ctx.beginPath(); ctx.moveTo(dsc.x, dsc.y); ctx.lineTo(sc.x, sc.y);
+    ctx.strokeStyle = rgba(dim.col, 0.04 * pAlpha); ctx.lineWidth = 0.8; ctx.stroke();
+    // Violation/compliance particles — fade out on selected (large orbs take over), shrink on others
+    const particleFade = isSelectedPrin ? Math.max(0, 1 - (cam.z - 12) / 20) : 1;
+    // Non-selected: smaller particles but keep orbit wide so they don't collide with planet
+    const cappedScale = Math.min(0.8, 5 * 0.12 / Math.max(pScale, 0.01));
+    const particleDrawScale = isSelectedPrin ? pScale * 0.8 : pScale * cappedScale;
+    const particleOrbitScale = isSelectedPrin ? pScale * 0.8 : pScale * Math.max(cappedScale, 0.5);
+    if (particleFade > 0.01) drawParticles(ctx, p.particles, { cx: sc.x, cy: sc.y, scale: particleOrbitScale, alpha: pAlpha * particleFade, t, drawScale: particleDrawScale });
+    drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: p.col, alpha: pAlpha });
+    // Only fade labels/scores — hide on non-selected when zoomed into a principle
+    const prinLabelAlpha = isSelectedPrin ? Math.max(0, 1 - (cam.z - 12) / 20) : (nav.prin !== null ? Math.max(0, 1 - (cam.z - 12) / 15) : 1);
+    if (showLabels && prinLabelAlpha > 0.01) {
+      const la = pAlpha * prinLabelAlpha;
+      ctx.font = `600 14px -apple-system,BlinkMacSystemFont,sans-serif`;
+      ctx.textAlign = 'center'; ctx.fillStyle = rgba(tc.text, 0.6 * la);
+      ctx.fillText(p.name, sc.x, sc.y - sr - 10);
+      ctx.font = `12px -apple-system,BlinkMacSystemFont,sans-serif`;
+      ctx.fillStyle = rgba(tc.textMuted, 0.7 * la);
+      ctx.fillText(p.score.toFixed(1), sc.x, sc.y + sr + 16);
+    }
+    if (!animating && nav.depth === 1 && pAlpha > 0.4 && mx >= 0) {
+      const dx = mx - sc.x, dy = my - sc.y;
+      if (dx * dx + dy * dy < (sr + 10) * (sr + 10)) newHovered = { type: 'prin', idx: pi, data: p };
+    }
+  });
+  return newHovered;
+}
 
-  // --- Zoomed into principle — violation/compliance particles as large orbs ---
-  if (cam.z > 12 && rDim !== null && rPrin !== null) {
-    const prin = scene.principles[rDim][rPrin];
-    const psc = w2s(prin.x, prin.y);
-    const vAlpha = Math.min(1, (cam.z - 12) / 20);
-    const vScale = cam.z * 0.06;
-    prin.particles.forEach((p) => {
-      const a = t * p.os + p.op;
-      const px = psc.x + Math.cos(a) * p.or * p.ec * vScale;
-      const py = psc.y + Math.sin(a) * p.or * vScale;
-      const tw = 0.5 + 0.06 * Math.sin(t * 0.4 + p.tp);
-      const sr = p.sz * vScale * 0.5;
-      drawGlow(ctx, { x: px, y: py, r: sr, col: p.col, alpha: vAlpha * tw });
-      if (showLabels && sr > 3) {
-        const sevName = p.sev.charAt(0).toUpperCase() + p.sev.slice(1);
-        ctx.font = `500 ${Math.max(7, Math.min(11, sr * 0.8))}px -apple-system,BlinkMacSystemFont,sans-serif`;
-        ctx.textAlign = 'center'; ctx.fillStyle = rgba(p.col, 0.85 * vAlpha);
-        ctx.fillText(sevName, px, py - sr - 4);
-      }
-    });
-  }
-
-  return { hovered: newHovered };
+/** Phase 5: violation/compliance orbs when zoomed deeply into a principle. */
+function drawZoomedPrinciple(ctx, scene, cam, opts, rDim, rPrin, tc, mr, mg, mb) {
+  if (!(cam.z > 12 && rDim !== null && rPrin !== null)) return;
+  const { t, showLabels, w2s } = opts;
+  const prin = scene.principles[rDim][rPrin];
+  const psc = w2s(prin.x, prin.y);
+  const vAlpha = Math.min(1, (cam.z - 12) / 20);
+  const vScale = cam.z * 0.06;
+  prin.particles.forEach((p) => {
+    const a = t * p.os + p.op;
+    const px = psc.x + Math.cos(a) * p.or * p.ec * vScale;
+    const py = psc.y + Math.sin(a) * p.or * vScale;
+    const tw = 0.5 + 0.06 * Math.sin(t * 0.4 + p.tp);
+    const sr = p.sz * vScale * 0.5;
+    drawGlow(ctx, { x: px, y: py, r: sr, col: p.col, alpha: vAlpha * tw });
+    if (showLabels && sr > 3) {
+      const sevName = p.sev.charAt(0).toUpperCase() + p.sev.slice(1);
+      ctx.font = `500 ${Math.max(7, Math.min(11, sr * 0.8))}px -apple-system,BlinkMacSystemFont,sans-serif`;
+      ctx.textAlign = 'center'; ctx.fillStyle = rgba(p.col, 0.85 * vAlpha);
+      ctx.fillText(sevName, px, py - sr - 4);
+    }
+  });
 }

@@ -3,15 +3,16 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import tempfile
 import threading
 from pathlib import Path
 
-from quodeq.api._rate_limit_config import _rate_limit_max, _rate_limit_window
+from quodeq.api._rate_limit_config import _rate_limit_max, _rate_limit_window, default_rate_limit_path
 
 _logger = logging.getLogger(__name__)
 
-_DEFAULT_PATH = str(Path(tempfile.gettempdir()) / "quodeq_rate_limits.json")
+_DEFAULT_PATH = str(default_rate_limit_path())
 
 
 class FileRateLimitStore:
@@ -40,10 +41,28 @@ class FileRateLimitStore:
             return {}
 
     def _save(self, data: dict[str, list[float]]) -> None:
+        parent = self._path.parent
         try:
-            self._path.write_text(json.dumps(data), encoding="utf-8")
+            parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        except OSError:
+            _logger.warning("Failed to create rate-limit dir %s", parent)
+            return
+        # Write a fresh temp file then os.replace() onto the target. If an
+        # attacker planted a symlink at self._path, the rename replaces the
+        # link itself with our regular file and never truncates its target.
+        payload = json.dumps(data).encode("utf-8")
+        tmp_fd, tmp_name = tempfile.mkstemp(dir=parent, prefix=".rl-", suffix=".tmp")
+        try:
+            with os.fdopen(tmp_fd, "wb") as fh:
+                fh.write(payload)
+            os.chmod(tmp_name, 0o600)
+            os.replace(tmp_name, self._path)
         except OSError:
             _logger.warning("Failed to write rate-limit file %s", self._path)
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
 
     def record(self, ip: str, now: float) -> None:
         """Record a request from *ip* at time *now*."""
@@ -53,7 +72,11 @@ class FileRateLimitStore:
             data = self._load()
             timestamps = data.get(ip, [])
             timestamps.append(now)
-            data[ip] = [t for t in timestamps if now - t < self._window]
+            pruned = [t for t in timestamps if now - t < self._window]
+            if pruned:
+                data[ip] = pruned
+            else:
+                data.pop(ip, None)
             self._save(data)
 
     def check(self, ip: str, now: float) -> bool:

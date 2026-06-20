@@ -204,3 +204,47 @@ def test_cache_writer_key_matches_classify_files_via_cache(tmp_path):
     )
     assert entry.file_path == "Foo.kt"
     assert len(entry.findings) == 1
+
+
+def test_cache_writer_path_traversal_yields_empty_hash(tmp_path):
+    """A traversal file_path (e.g. '../outside/secret.txt') must NOT hash a
+    file outside src_root. The resulting cache entry's file_content_hash must
+    be empty, not a real hash of the escaped file."""
+    import json
+
+    from quodeq.analysis.cache.cache_writer import build_cache_writer
+
+    # Create a sentinel file OUTSIDE src_root with known content.
+    outside_dir = tmp_path / "outside"
+    outside_dir.mkdir()
+    sentinel = outside_dir / "secret.txt"
+    sentinel.write_text("TOP SECRET")
+
+    src_root = tmp_path / "src"
+    src_root.mkdir()
+
+    cache_root = tmp_path / "cache"
+    write = build_cache_writer(
+        cache_root=cache_root,
+        src_root=src_root,
+        standards_dir=None,
+        dimension="flexibility",
+        model_id="sonnet",
+        language="kotlin",
+    )
+
+    # Craft a traversal path that resolves to the sentinel outside src_root.
+    traversal_path = "../outside/secret.txt"
+    write(traversal_path, [])
+
+    entries = list(cache_root.rglob("entry.json"))
+    assert len(entries) == 1, f"Expected 1 cache entry, found {len(entries)}"
+    # Read the entry JSON directly -- the key computed with an empty hash
+    # differs from build_cache_key_for_file (which still reads the outside file),
+    # so we inspect the stored JSON rather than doing a cache.get() lookup.
+    entry_data = json.loads(entries[0].read_text())
+    # The hash must be empty -- the outside file must NOT have been read.
+    assert entry_data.get("file_content_hash") == "", (
+        f"Expected empty content hash for traversal path, "
+        f"got {entry_data.get('file_content_hash')!r}"
+    )

@@ -19,6 +19,7 @@ import urllib.error
 from pathlib import Path
 
 from quodeq.llm_bridge._ollama import _detect_memory, estimate_max_agents
+from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
 
@@ -46,11 +47,24 @@ def _normalize_base(base_url: str) -> str:
     return stripped
 
 
+def _safe_request(url: str) -> urllib.request.Request:
+    """Build a Request for *url* after validating it is safe to fetch.
+
+    Loopback addresses (localhost, 127.x.x.x) are allowed because omlx
+    normally runs on localhost.  Private-range IPs (10.x, 192.168.x) and
+    link-local/metadata addresses (169.254.x) are rejected to prevent SSRF.
+
+    Raises ``ValueError`` for unsafe URLs.
+    """
+    validate_url_safe(url, allow_loopback=True)
+    return urllib.request.Request(url)
+
+
 def get_omlx_status(base_url: str | None = None) -> dict:
     """Check if an omlx server is running and reachable."""
     root = _normalize_base(base_url or _OMLX_BASE)
     try:
-        req = urllib.request.Request(f"{root}/health")
+        req = _safe_request(f"{root}/health")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
             data = json.loads(resp.read() or b"{}")
             return {
@@ -85,7 +99,7 @@ def list_omlx_models(base_url: str | None = None, api_key: str | None = None) ->
     """
     root = _normalize_base(base_url or _OMLX_BASE)
     try:
-        req = urllib.request.Request(f"{root}/v1/models")
+        req = _safe_request(f"{root}/v1/models")
         key = api_key if api_key is not None else _read_omlx_api_key()
         if key:
             req.add_header("Authorization", f"Bearer {key}")

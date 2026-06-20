@@ -29,33 +29,42 @@ jobs:
           VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Wait for PyPI availability
+      - name: Wait for PyPI sdist and get URL + SHA256
+        id: sdist
+        # Poll the JSON API, not the legacy /packages/source/ redirect: the
+        # redirect lags far behind upload (v1.3.0 still 404'd there hours
+        # after the sdist was listed in the JSON API, timing out this gate
+        # and leaving the tap pointing at a dead URL until a manual fix).
+        # The API carries the canonical hashed download URL plus the
+        # authoritative sha256 digest, so the formula gets a URL that
+        # resolves immediately and we never hash an error-page body.
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          for i in $(seq 1 30); do
-            if curl -sf "https://files.pythonhosted.org/packages/source/q/quodeq/quodeq-${VERSION}.tar.gz" -o /dev/null; then
-              echo "Package available on PyPI"
+          for i in $(seq 1 40); do
+            SDIST="$(curl -sf "https://pypi.org/pypi/quodeq/${VERSION}/json" \
+              | jq -c '[.urls[] | select(.packagetype == "sdist")][0] // empty' || true)"
+            if [ -n "$SDIST" ]; then
+              URL="$(echo "$SDIST" | jq -r '.url')"
+              SHA="$(echo "$SDIST" | jq -r '.digests.sha256')"
+              echo "sdist available on PyPI: ${URL} (sha256: ${SHA})"
+              echo "url=$URL" >> "$GITHUB_OUTPUT"
+              echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            echo "Waiting for PyPI... ($i/30)"
-            sleep 10
+            echo "Waiting for PyPI sdist... ($i/40)"
+            sleep 30
           done
-          echo "Timed out waiting for PyPI"
+          echo "Timed out after 20 minutes waiting for sdist quodeq-${VERSION}.tar.gz on PyPI."
+          echo "Check that the publish workflow actually uploaded an sdist for ${VERSION}."
           exit 1
-
-      - name: Get SHA256 of tarball
-        id: sha
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          SHA=$(curl -sL "https://files.pythonhosted.org/packages/source/q/quodeq/quodeq-${VERSION}.tar.gz" | shasum -a 256 | cut -d' ' -f1)
-          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
 
       - name: Update homebrew-tap repo
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          SHA="${{ steps.sha.outputs.sha256 }}"
+          URL="${{ steps.sdist.outputs.url }}"
+          SHA="${{ steps.sdist.outputs.sha256 }}"
 
           # Get current file SHA from the tap repo
           FILE_SHA=$(gh api repos/quodeq/homebrew-tap/contents/quodeq.rb --jq '.sha')
@@ -67,7 +76,7 @@ jobs:
 
             desc "AI-powered source code quality evaluation platform"
             homepage "https://github.com/quodeq/quodeq"
-            url "https://files.pythonhosted.org/packages/source/q/quodeq/quodeq-${VERSION}.tar.gz"
+            url "${URL}"
             sha256 "${SHA}"
             license "MIT"
 

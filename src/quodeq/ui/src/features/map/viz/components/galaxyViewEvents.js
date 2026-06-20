@@ -73,6 +73,7 @@ export function handleCanvasClick(e, refs, scene, size, navigateTo, startTransit
 
   // At galaxy root: check if click is near a cluster -> zoom to it
   if (nav.depth === 0 && !animRef.current && scene?.constellations) {
+    if (!camRef.current) return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (rect) {
       const cmx = e.clientX - rect.left, cmy = e.clientY - rect.top;

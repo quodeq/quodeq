@@ -79,6 +79,8 @@ def _read_run_status(run_dir: Path) -> str | None:
             data = _json.load(fp)
     except (OSError, ValueError):
         return None
+    if not isinstance(data, dict):
+        return None
     state = data.get("state")
     return state if isinstance(state, str) else None
 
