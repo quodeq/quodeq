@@ -35,9 +35,16 @@ def default_write_json(path: Path, data: dict) -> None:
 
 
 def count_principles_and_requirements(data: dict) -> tuple[int, int]:
-    """Return (principle_count, requirement_count) from a standard's JSON."""
+    """Return (principle_count, requirement_count) from a standard's JSON.
+
+    Malformed payloads (principles not a list, or items not dicts) are
+    tolerated: non-list values are treated as empty, non-dict items are skipped.
+    """
     principles = data.get("principles", [])
-    return len(principles), sum(len(p.get("requirements", [])) for p in principles)
+    if not isinstance(principles, list):
+        principles = []
+    valid = [p for p in principles if isinstance(p, dict)]
+    return len(valid), sum(len(p.get("requirements", [])) for p in valid)
 
 
 def build_detail(data: dict, *, type_default: str = _TYPE_CUSTOM) -> StandardDetail:

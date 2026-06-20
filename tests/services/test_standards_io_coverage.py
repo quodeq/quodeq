@@ -67,6 +67,40 @@ class TestCountPrinciplesAndRequirements:
         data = {"principles": [{"name": "P1", "requirements": []}]}
         assert count_principles_and_requirements(data) == (1, 0)
 
+    # --- #293: malformed persisted data must not crash ---
+
+    def test_principles_not_a_list_returns_zero_counts(self):
+        """principles as a dict (not a list) must not raise."""
+        data = {"principles": {"P1": {"requirements": []}}}
+        assert count_principles_and_requirements(data) == (0, 0)
+
+    def test_principles_string_returns_zero_counts(self):
+        data = {"principles": "bad value"}
+        assert count_principles_and_requirements(data) == (0, 0)
+
+    def test_non_dict_items_in_principles_are_skipped(self):
+        """Non-dict items in the principles list are silently skipped."""
+        data = {
+            "principles": [
+                "not a dict",
+                42,
+                {"name": "P1", "requirements": [{"id": "R1"}]},
+                None,
+            ]
+        }
+        # Only the one valid dict counts
+        assert count_principles_and_requirements(data) == (1, 1)
+
+    def test_mix_of_valid_and_invalid_principles(self):
+        data = {
+            "principles": [
+                {"name": "P1", "requirements": [{"id": "R1"}, {"id": "R2"}]},
+                "garbage",
+                {"name": "P2", "requirements": []},
+            ]
+        }
+        assert count_principles_and_requirements(data) == (2, 2)
+
 
 class TestBuildDetail:
     def test_minimal(self):

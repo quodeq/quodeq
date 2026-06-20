@@ -35,6 +35,8 @@ def parse_stream_event(line: str) -> dict | None:
 
 def extract_files_from_event(data: dict) -> set[str]:
     """Dispatch to the appropriate file extractor based on event type."""
+    if not isinstance(data, dict):
+        return set()
     etype = data.get("type", "")
     if etype == "assistant":
         return extract_files_from_blocks(data.get("message", {}).get("content", []))
