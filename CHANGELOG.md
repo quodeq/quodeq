@@ -2,8 +2,22 @@
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-06-20
+
+### Features
+- **Finding taxonomy**: analysis now emits taxonomy codes so fresh runs group findings by their vulnerability taxonomy, not just by principle (PRs #622, #623, #624).
+
+### Improvements
+- **Analysis quality**: critical severity now requires reachable input provenance, sharply cutting false-positive criticals. New coverage and import-layer baseline gates keep quality from regressing (PRs #623, #636).
+- **Accessibility**: keyboard navigation across the map and galaxy visualizations, grade-boundary sliders, and resizable side-pane dividers; the evaluation error toast is now a proper button (PR #643).
+- **Performance**: heavy scoring and projection work moved off the request thread, an N+1 query batched into one, and rate-limit state is now bounded (PR #643).
+- **Resilience**: the dimension list is recovered from sidecars when run status is missing (PR #627); a downgraded `~/.quodeq/index.db` is discarded and rebuilt from the run files instead of crashing on first access (#621); more API errors carry machine-readable codes (PR #643).
+- **Configuration**: cache paths, dimensions, and provider settings are no longer hardcoded (PR #643).
+
 ### Fixes
-- **Index downgrade no longer crashes the dashboard**: when `~/.quodeq/index.db` was migrated forward by a newer quodeq and you then run an older one, the cross-run index is discarded and rebuilt from the run files on disk instead of raising an unhandled schema error on first access. The index is a derived projection, so nothing is lost (#621).
+- **Security**: a broad hardening pass - a Windows command-injection guard, an atomic no-follow rate-limit file write, path-traversal containment (cache keys, run-events job ids, custom-evaluator ids, cache hashing), SSRF guards on the omlx and project-clone paths (including git@ SSH and encoded-IPv4 bypasses), a tightened Content-Security-Policy, and a localhost-only webview reload allowlist (PRs #629, #642, #643, #644, #646).
+- **Reliability**: timeouts on all external HTTP and SSE calls, consistent exception handling, guards against malformed and non-dict input, atomic grade rewrites with concurrency locks, structured route error handling, and several UI crash guards including the galaxy view (PRs #634, #637, #646).
+- **Scoring**: stop dropping untagged violations under partial taxonomy coverage, and emit taxonomy codes in production so grouping works on real runs (PRs #624, #628).
 
 ## [1.3.0] - 2026-06-11
 
