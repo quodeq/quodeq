@@ -1,0 +1,13 @@
+{
+  "case": "external_header_deref",
+  "dimension": "reliability",
+  "req": "R-FT-2",
+  "display_file": "src/ui/ActiveUsers.jsx",
+  "target_line": 11,
+  "construct": "split",
+  "provenance": "external",
+  "expectation": "stays_critical",
+  "baseline_severity": "critical",
+  "source": "synthetic",
+  "note": "Unguarded deref (.split) of a response header that may be absent and is network-controlled. The gate must NOT relax this: it stays critical. Reliability-dimension external control; validated as a hard assert against gemma4:26b (3/3 critical)."
+}

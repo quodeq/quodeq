@@ -1,0 +1,13 @@
+{
+  "case": "internal_local_cache",
+  "dimension": "security",
+  "req": "S-AUT-3",
+  "display_file": "src/cache/local.py",
+  "target_line": 59,
+  "construct": "key[:2]",
+  "provenance": "internal",
+  "expectation": "not_critical",
+  "baseline_severity": "critical",
+  "source": "a84ab6f8 verbatim (pre-hardening; _SAFE_KEY_RE charset validation added later in c0edcd6f)",
+  "note": "DO NOT add guards to repo/. `key` is an internal SHA-256 hex digest, not attacker-controllable; the gate must keep this path-build non-critical. Twin of external_request_path (same construct, opposite provenance)."
+}
