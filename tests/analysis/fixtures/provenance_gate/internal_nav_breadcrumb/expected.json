@@ -1,0 +1,13 @@
+{
+  "case": "internal_nav_breadcrumb",
+  "dimension": "reliability",
+  "req": "R-FT-2",
+  "display_file": "src/ui/NavBreadcrumb.jsx",
+  "target_line": 48,
+  "construct": "stack.forEach",
+  "provenance": "internal",
+  "expectation": "not_critical",
+  "baseline_severity": "critical",
+  "source": "a84ab6f8 verbatim (pre-hardening; `= {}` default added later in 521f46c6)",
+  "note": "DO NOT add guards/defaults to repo/. Fixture must stay byte-for-byte a84ab6f8 so the prompt gate is the only variable. `stack` is an internal prop from useNavStack; no external source reaches this line, so the gate must keep it non-critical."
+}

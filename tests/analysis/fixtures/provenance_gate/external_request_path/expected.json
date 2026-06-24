@@ -1,0 +1,13 @@
+{
+  "case": "external_request_path",
+  "dimension": "security",
+  "req": "S-AUT-3",
+  "display_file": "src/server/download.py",
+  "target_line": 10,
+  "construct": "os.path.join",
+  "provenance": "external",
+  "expectation": "stays_critical",
+  "baseline_severity": "critical",
+  "source": "synthetic",
+  "note": "Path built directly from an HTTP request field. The gate must NOT relax this: it stays critical. Validated 3/3 critical in the #638 harness."
+}

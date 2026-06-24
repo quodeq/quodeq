@@ -1,0 +1,13 @@
+{
+  "case": "external_cli_arg_open",
+  "dimension": "security",
+  "req": "S-AUT-3",
+  "display_file": "src/cli/export.py",
+  "target_line": 8,
+  "construct": "argv",
+  "provenance": "external",
+  "expectation": "stays_critical",
+  "baseline_severity": "critical",
+  "source": "synthetic",
+  "note": "Path built from a CLI argument (attacker-influenced). The gate must NOT relax this: it stays critical. Second external source class; validated as a hard assert against gemma4:26b (3/3 critical)."
+}
