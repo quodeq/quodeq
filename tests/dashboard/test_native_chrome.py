@@ -25,3 +25,38 @@ class TestUaMarkerNoDrift:
 
     def test_user_agent_carries_marker(self):
         assert ww._WEBVIEW_UA_MARKER in ww._webview_user_agent()
+
+
+class TestSetTitlebarTheme:
+    def _api(self):
+        api = ww._WindowApi()
+        api._window = MagicMock()
+        return api
+
+    def test_dark_dispatches_macos(self):
+        api = self._api()
+        with patch.object(ww.sys, "platform", "darwin"), \
+             patch.object(ww, "_set_macos_titlebar_appearance") as mac:
+            api.set_titlebar_theme("dark")
+        mac.assert_called_once_with(api._window, True)
+
+    def test_light_dispatches_macos(self):
+        api = self._api()
+        with patch.object(ww.sys, "platform", "darwin"), \
+             patch.object(ww, "_set_macos_titlebar_appearance") as mac:
+            api.set_titlebar_theme("light")
+        mac.assert_called_once_with(api._window, False)
+
+    def test_dark_dispatches_windows(self):
+        api = self._api()
+        with patch.object(ww.sys, "platform", "win32"), \
+             patch.object(ww, "_set_windows_titlebar") as win:
+            api.set_titlebar_theme("dark")
+        win.assert_called_once_with(True)
+
+    def test_unknown_mode_is_noop(self):
+        api = self._api()
+        with patch.object(ww.sys, "platform", "darwin"), \
+             patch.object(ww, "_set_macos_titlebar_appearance") as mac:
+            api.set_titlebar_theme("purple")
+        mac.assert_not_called()

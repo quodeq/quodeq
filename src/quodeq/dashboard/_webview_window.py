@@ -298,6 +298,22 @@ class _WindowApi:
         except OSError:
             return False
 
+    def set_titlebar_theme(self, mode: str) -> None:
+        """Match the native titlebar to the active quodeq theme.
+
+        mode is 'dark' or 'light'; any other value is ignored. Safe no-op
+        before the native window handle exists — the frontend re-calls on
+        pywebviewready. Linux titlebars are window-manager controlled, so
+        this is a no-op there.
+        """
+        if mode not in ("dark", "light"):
+            return
+        dark = mode == "dark"
+        if sys.platform == "darwin":
+            _set_macos_titlebar_appearance(self._window, dark)
+        elif sys.platform == "win32":
+            _set_windows_titlebar(dark)
+
     def minimize(self) -> None:
         if self._window:
             self._window.minimize()
@@ -539,23 +555,42 @@ def _install_about_panel_override() -> None:
         print(f"[quodeq-about] NSTimer schedule failed: {exc}", file=_diag, flush=True)
 
 
-def _enable_windows_dark_titlebar(window_title: str) -> None:
-    """Tell DWM to render the native Windows titlebar in dark mode.
+def _set_macos_titlebar_appearance(window: object, dark: bool) -> None:
+    """Set the macOS native titlebar to dark or light aqua (on the UI thread)."""
+    if sys.platform != "darwin":
+        return
+    try:
+        from AppKit import (  # noqa: PLC0415
+            NSAppearance, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
+        )
+        from PyObjCTools import AppHelper  # noqa: PLC0415
+    except ImportError:
+        return
+    nswindow = getattr(window, "native", None) if window is not None else None
+    if nswindow is None:
+        return
+    name = NSAppearanceNameDarkAqua if dark else NSAppearanceNameAqua
 
-    Without this, frameless=False shows a light titlebar that clashes with
-    the dark UI. Uses DWMWA_USE_IMMERSIVE_DARK_MODE — attribute id 20 on
-    Windows 10 build 19041+ and Windows 11, falling back to id 19 on older
-    builds. Failures are non-fatal: a light titlebar is ugly but functional.
-    """
+    def _apply() -> None:
+        try:
+            nswindow.setAppearance_(NSAppearance.appearanceNamed_(name))
+        except (AttributeError, ValueError):
+            pass
+
+    AppHelper.callAfter(_apply)
+
+
+def _set_windows_titlebar(dark: bool, window_title: str = "quodeq") -> None:
+    """Set the native Windows titlebar dark/light via DWM (attr 20, fallback 19)."""
     if sys.platform != "win32":
         return
     try:
-        import ctypes
-        from ctypes import wintypes
+        import ctypes  # noqa: PLC0415
+        from ctypes import wintypes  # noqa: PLC0415
         hwnd = ctypes.windll.user32.FindWindowW(None, window_title)
         if not hwnd:
             return
-        value = ctypes.c_int(1)
+        value = ctypes.c_int(1 if dark else 0)
         size = ctypes.sizeof(value)
         for attr in (20, 19):
             res = ctypes.windll.dwmapi.DwmSetWindowAttribute(
@@ -653,8 +688,9 @@ def main() -> None:
         # targets the pre-pywebview NSApp and gets overridden.
         if sys.platform == "darwin":
             _set_macos_app_identity()
+            _set_macos_titlebar_appearance(window, True)
         elif sys.platform == "win32":
-            _enable_windows_dark_titlebar("quodeq")
+            _set_windows_titlebar(True)
 
     def _on_closing() -> bool:
         """Intercept native close (Cmd+Q, red button, window manager).
