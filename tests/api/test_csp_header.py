@@ -82,3 +82,30 @@ def test_csp_mask_src_allows_data_uris(csp):
     mask_src = _directive(csp, "mask-src")
     assert mask_src is not None, "mask-src must be present in CSP"
     assert "data:" in mask_src, "mask-src must include data: to allow inline SVG masks"
+
+
+# --- Webview-only unsafe-eval relaxation (UA-gated) -------------------------
+
+_WEBVIEW_UA = "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) QuodeqDesktop/1.4.0 Safari/605.1.15"
+
+
+def _csp_for_ua(ua: str | None) -> str:
+    app = create_app()
+    with app.test_client() as client:
+        headers = {"User-Agent": ua} if ua is not None else {}
+        return client.get("/api/health", headers=headers).headers["Content-Security-Policy"]
+
+
+def test_webview_ua_gets_unsafe_eval_in_script_src():
+    """The native webview UA must be served script-src with 'unsafe-eval' so
+    pywebview's new Function() bridge works under the otherwise-strict CSP."""
+    script_src = _directive(_csp_for_ua(_WEBVIEW_UA), "script-src")
+    assert script_src is not None
+    assert "'unsafe-eval'" in script_src
+
+
+def test_non_webview_ua_stays_strict():
+    """Any non-webview UA keeps the strict script-src (no unsafe-eval)."""
+    script_src = _directive(_csp_for_ua("Mozilla/5.0 (a regular browser)"), "script-src")
+    assert script_src is not None
+    assert "'unsafe-eval'" not in script_src
