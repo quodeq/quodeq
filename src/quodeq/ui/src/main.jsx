@@ -81,6 +81,17 @@ function markWebview() {
 markWebview();
 window.addEventListener('pywebviewready', markWebview);
 
+// The native OS title bar has no in-app back/forward, so keep the
+// Cmd+[ / Cmd+] history shortcuts the old injected chrome provided.
+// Only inside the native shell — in a browser these are already native.
+document.addEventListener('keydown', (e) => {
+  if (!window.pywebview) return;
+  const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+  const mod = isMac ? e.metaKey : e.ctrlKey;
+  if (mod && e.key === '[') { e.preventDefault(); history.back(); }
+  if (mod && e.key === ']') { e.preventDefault(); history.forward(); }
+});
+
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Root element #root not found in DOM');
 createRoot(rootEl).render(

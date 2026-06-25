@@ -1496,16 +1496,9 @@ button.term-sev-badge--clickable:focus-visible {
   min-height: 0;
   overflow-y: auto;
 }
-/* Full-width topbar: align breadcrumb with dashboard content below.
-   Only reserve 96px (traffic-light chrome + sidebar rail) when we're
-   running inside the pywebview native shell on macOS. In a regular
-   browser the OS draws its own chrome outside the viewport, so the
-   topbar can start flush-left against the sidebar rail. */
+/* Full-width topbar: align breadcrumb with dashboard content below. */
 .app-shell--with-topbar .topbar {
   padding-left: var(--term-space-3);
-}
-.platform-mac.in-webview .app-shell--with-topbar .topbar {
-  padding-left: 96px;
 }
 
 /* ============================================================
@@ -1861,10 +1854,6 @@ button.term-sev-badge--clickable:focus-visible {
   font-family: var(--term-font-mono);
   font-size: 13px;
 }
-/* Frameless pywebview window: the topbar acts as the OS-style title bar.
-   The drag itself is wired via the `pywebview-drag-region` class on the
-   <header> (pywebview's native API — works on its WKWebView, unlike
-   the Chromium-only -webkit-app-region). */
 /* --------------------------------------------------------------
    TopBar breadcrumb zone. Desktop shows the full NavBreadcrumb
    chain; mobile swaps it for a back button on the left, the
