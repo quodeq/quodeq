@@ -1,13 +1,11 @@
 """PyWebView window process — launched as a subprocess by _server.py."""
 from __future__ import annotations
 
-import html as _html
 import json
 import logging
 import os
 import signal
 import sys
-import threading
 import urllib.parse
 import urllib.request
 import webbrowser
@@ -18,7 +16,6 @@ import webview
 
 from quodeq.dashboard._build_npm import _quodeq_dir
 from quodeq.dashboard._instance import InstanceController
-from quodeq.dashboard._webview_html import CLOSING_OVERLAY_JS
 
 _logger = logging.getLogger(__name__)
 
@@ -32,14 +29,6 @@ _CLEANUP_JOIN_TIMEOUT_S = 0.3
 _WEBVIEW_UA_MARKER = "QuodeqDesktop"
 _EVAL_CHECK_TIMEOUT_S = 0.5
 _DOWNLOAD_TIMEOUT_S = 120
-
-# Dialog CSS layout constants
-_DIALOG_PADDING = "24px 28px"
-_DIALOG_BORDER_RADIUS = "12px"
-_DIALOG_FONT_SIZE = "0.82rem"
-_BUTTON_PADDING = "10px 16px"
-_BUTTON_BORDER_RADIUS = "6px"
-_BUTTON_FONT_SIZE = "0.85rem"
 
 
 def _is_safe_reload_url(url: str) -> bool:
@@ -76,89 +65,6 @@ class _WindowApi:
         self._api_pid = api_pid
         self._instance = instance
         self._base_url = base_url.rstrip('/')
-
-    def close(self) -> None:
-        # Check for running evaluation FIRST. Don't render the closing
-        # overlay yet — it covers the screen and would hide the dialog.
-        job = self._get_running_evaluation() if self._window else None
-        if job and self._window:
-            choice = self._await_close_dialog(job)
-            if choice == 'back':
-                return
-            if choice == 'cancel':
-                self._cancel_evaluation(job.get("jobId") or job.get("job_id"))
-            # Any other value (including 'keep') falls through to the exit path.
-
-        # Show closing overlay (only reached when user actually closes).
-        if self._window:
-            try:
-                self._window.evaluate_js(CLOSING_OVERLAY_JS)
-            except Exception:
-                pass
-
-        # Cleanup and exit — run in a thread so os._exit fires fast
-        def _cleanup():
-            if self._api_pid:
-                _kill_api(self._api_pid)
-            if self._instance:
-                self._instance.shutdown()
-        t = threading.Thread(target=_cleanup, daemon=True)
-        t.start()
-        t.join(timeout=_CLEANUP_JOIN_TIMEOUT_S)
-        os._exit(0)  # bypass cleanup — webview event loop would deadlock sys.exit
-
-    def _await_close_dialog(self, job: dict, timeout_s: float = 300.0) -> str | None:
-        """Render the close dialog and poll a JS global for the user's choice.
-
-        pywebview's evaluate_js does NOT await Promises — it returns None
-        immediately when given Promise-returning JS. That made the existing
-        `choice = evaluate_js(dialog_js)` call return None every time, skip
-        every if-branch, and fall through to os._exit. Instead, stash the
-        Promise result on a global and poll until it's set.
-        """
-        if not self._window:
-            return None
-        try:
-            self._window.evaluate_js(
-                "window._qd_close_result = null; "
-                "(" + self._build_close_dialog_js(job) + ")"
-                ".then(function(r){ window._qd_close_result = r; });"
-            )
-        except Exception:
-            return None
-        import time as _time  # noqa: PLC0415
-        deadline = _time.monotonic() + timeout_s
-        while _time.monotonic() < deadline:
-            try:
-                result = self._window.evaluate_js("window._qd_close_result")
-            except Exception:
-                result = None
-            if result:
-                return str(result)
-            _time.sleep(0.1)
-        return None
-
-    def _cancel_evaluation(self, job_id: str | None) -> None:
-        """Issue DELETE /api/evaluations/<job_id> to stop a running scan.
-
-        The API enforces an Origin header to reject cross-site requests; a
-        missing header returns 403 which silently fails this call, so we
-        set Origin explicitly to self._base_url.
-        """
-        if not job_id or not self._base_url:
-            return
-        try:
-            req = urllib.request.Request(
-                f"{self._base_url}/api/evaluations/{urllib.parse.quote(job_id)}",
-                method="DELETE",
-                headers={"Origin": self._base_url},
-            )
-            # Give the API enough time to SIGTERM the scan and respond —
-            # the 0.5s used for the eval-check poll is too tight here.
-            with urllib.request.urlopen(req, timeout=5.0):
-                pass
-        except Exception:
-            pass
 
     def _get_running_evaluation(self) -> dict | None:
         """Return the first non-stale running evaluation job, or None.
@@ -208,46 +114,6 @@ class _WindowApi:
             if not project or project in project_ids:
                 return j
         return None
-
-    @staticmethod
-    def _build_close_dialog_js(job: dict) -> str:
-        """Build JS for the close confirmation dialog with job info."""
-        phase = _html.escape(job.get("phase", "analyzing"))
-        dim = _html.escape(job.get("currentDimension", ""))
-        repo = _html.escape(job.get("repo", ""))
-        # Build info line
-        info_parts = []
-        if repo:
-            name = _html.escape(repo.rsplit("/", 1)[-1] if "/" in repo else repo)
-            info_parts.append(f"Project: <b>{name}</b>")
-        if dim:
-            info_parts.append(f"Dimension: <b>{dim}</b>")
-        if phase:
-            info_parts.append(f"Phase: <b>{phase}</b>")
-        info_html = "<br>".join(info_parts) if info_parts else "Running..."
-
-        return f"""
-            (function() {{
-                var d = document.createElement('div');
-                d.id = '_qd_close_dialog';
-                d.style.cssText = 'position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center';
-                d.innerHTML = '<div style="background:var(--color-surface,#1c2128);border:1px solid var(--color-border,#333);border-radius:{_DIALOG_BORDER_RADIUS};padding:{_DIALOG_PADDING};max-width:420px;color:var(--color-text,#e6edf3);font-family:inherit">'
-                    + '<h3 style="margin:0 0 12px;font-size:1rem">Evaluation in progress</h3>'
-                    + '<div style="margin:0 0 16px;padding:10px 14px;background:var(--color-surface-alt,#161b22);border-radius:{_BUTTON_BORDER_RADIUS};font-size:{_DIALOG_FONT_SIZE};line-height:1.6;color:var(--color-text-muted,#8b949e)">{info_html}</div>'
-                    + '<div style="display:flex;flex-direction:column;gap:8px">'
-                    + '<button id="_qd_close_keep" style="padding:{_BUTTON_PADDING};border:1px solid var(--color-border,#333);border-radius:{_BUTTON_BORDER_RADIUS};background:var(--color-surface-alt,#161b22);color:var(--color-text,#e6edf3);cursor:pointer;font-size:{_BUTTON_FONT_SIZE};line-height:1.5">Close window<br><span style="opacity:0.7;font-size:0.85em">evaluation continues in background</span></button>'
-                    + '<button id="_qd_close_cancel" style="padding:{_BUTTON_PADDING};border:1px solid #da3633;border-radius:{_BUTTON_BORDER_RADIUS};background:transparent;color:#f85149;cursor:pointer;font-size:{_BUTTON_FONT_SIZE}">Cancel evaluation and close</button>'
-                    + '<button id="_qd_close_back" style="padding:{_BUTTON_PADDING};border:none;border-radius:{_BUTTON_BORDER_RADIUS};background:transparent;color:var(--color-text-muted,#8b949e);cursor:pointer;font-size:{_BUTTON_FONT_SIZE}">Go back</button>'
-                    + '</div></div>';
-                document.body.appendChild(d);
-                return new Promise(function(resolve) {{
-                    document.getElementById('_qd_close_keep').onclick = function() {{ d.remove(); resolve('keep'); }};
-                    document.getElementById('_qd_close_cancel').onclick = function() {{ d.remove(); resolve('cancel'); }};
-                    document.getElementById('_qd_close_back').onclick = function() {{ d.remove(); resolve('back'); }};
-                    d.onclick = function(e) {{ if (e.target === d) {{ d.remove(); resolve('back'); }} }};
-                }});
-            }})()
-        """
 
     def open_browser(self, path: str = '/') -> None:
         """Open a URL in the system default browser."""
@@ -314,20 +180,6 @@ class _WindowApi:
         elif sys.platform == "win32":
             _set_windows_titlebar(dark)
 
-    def minimize(self) -> None:
-        if self._window:
-            self._window.minimize()
-
-    def maximize(self) -> None:
-        if not self._window:
-            return
-        if sys.platform == "win32":
-            if self._window.maximized:
-                self._window.restore()
-            else:
-                self._window.maximize()
-        else:
-            self._window.toggle_fullscreen()
 
 
 def _kill_api(pid: int) -> None:
@@ -667,6 +519,32 @@ def _create_window(url: str, api: "_WindowApi") -> "webview.Window":
     )
 
 
+def _make_on_closing(api: "_WindowApi", window: object) -> "Callable[[], bool]":
+    """Native close handler: confirm via a native dialog if a scan is running.
+
+    Returns True to allow the close, False to keep the window open. The scan
+    is a separate process, so 'Quit' just closes the window and the scan
+    keeps running.
+    """
+    def _on_closing() -> bool:
+        try:
+            job = api._get_running_evaluation()
+        except Exception:
+            job = None
+        if not job:
+            return True
+        try:
+            return bool(window.create_confirmation_dialog(
+                "Quit quodeq?",
+                "A scan is running. Click OK to quit — the scan keeps running "
+                "in the background. Click Cancel to stay.",
+            ))
+        except Exception:
+            # If the native dialog can't render, don't trap the user.
+            return True
+    return _on_closing
+
+
 def main() -> None:
     _set_app_icon()
     url = sys.argv[1]
@@ -692,31 +570,8 @@ def main() -> None:
         elif sys.platform == "win32":
             _set_windows_titlebar(True)
 
-    def _on_closing() -> bool:
-        """Intercept native close (Cmd+Q, red button, window manager).
-
-        Runs on pywebview's main thread. If a scan is running, render the
-        close dialog synchronously and branch on the user's choice:
-          - 'back'   → block the native close (return False)
-          - 'keep'   → allow close; scan continues in background
-          - 'cancel' → issue cancel API call, then allow close
-        If no scan is running, allow the close without prompting.
-        """
-        try:
-            job = api._get_running_evaluation()
-        except Exception:
-            job = None
-        if not job:
-            return True
-        choice = api._await_close_dialog(job)
-        if choice == 'back':
-            return False
-        if choice == 'cancel':
-            api._cancel_evaluation(job.get("jobId") or job.get("job_id"))
-        return True
-
     window.events.loaded += _on_loaded
-    window.events.closing += _on_closing
+    window.events.closing += _make_on_closing(api, window)
 
     instance.start_listening(on_reload=_on_reload)
 

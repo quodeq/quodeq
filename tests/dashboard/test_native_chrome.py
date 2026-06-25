@@ -60,3 +60,26 @@ class TestSetTitlebarTheme:
              patch.object(ww, "_set_macos_titlebar_appearance") as mac:
             api.set_titlebar_theme("purple")
         mac.assert_not_called()
+
+
+class TestOnClosing:
+    def _wire(self, job, confirm=True):
+        api = MagicMock()
+        api._get_running_evaluation.return_value = job
+        window = MagicMock()
+        window.create_confirmation_dialog.return_value = confirm
+        return ww._make_on_closing(api, window), window
+
+    def test_no_job_closes_without_dialog(self):
+        on_closing, window = self._wire(job=None)
+        assert on_closing() is True
+        window.create_confirmation_dialog.assert_not_called()
+
+    def test_running_job_confirm_allows_close(self):
+        on_closing, window = self._wire(job={"jobId": "x"}, confirm=True)
+        assert on_closing() is True
+        window.create_confirmation_dialog.assert_called_once()
+
+    def test_running_job_cancel_blocks_close(self):
+        on_closing, window = self._wire(job={"jobId": "x"}, confirm=False)
+        assert on_closing() is False
