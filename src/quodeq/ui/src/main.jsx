@@ -57,12 +57,10 @@ function applyInitialTheme(storage = localStorage, mediaQuery = window.matchMedi
 
 applyInitialTheme();
 
-// Tag <html> with the host platform so CSS can reserve space for native
-// chrome that overlays the window (e.g. the macOS traffic-light buttons
-// in the pywebview frameless app shell). A separate `in-webview` class
-// gates chrome-reservation rules to the native shell only — in a regular
-// browser the OS draws its own chrome outside the viewport, so we
-// shouldn't leave a gap for it.
+// Tag <html> with the host platform and an `in-webview` class so CSS can
+// apply native-shell-only styling. The window now uses native OS chrome on
+// every platform, so nothing in-page reserves space for window controls;
+// these classes remain for platform/shell-conditional styling.
 try {
   const ua = navigator.userAgent || '';
   const platform = navigator.platform || '';

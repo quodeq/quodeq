@@ -22,8 +22,6 @@ _logger = logging.getLogger(__name__)
 _WINDOW_WIDTH = 1280
 _WINDOW_HEIGHT = 800
 _WINDOW_BG_COLOR = '#0d1117'
-_CLEANUP_JOIN_TIMEOUT_S = 0.3
-
 # Marker embedded in the webview's User-Agent so the API serves it the
 # relaxed CSP (see quodeq.api.security._WEBVIEW_UA_MARKER — must match).
 _WEBVIEW_UA_MARKER = "QuodeqDesktop"
