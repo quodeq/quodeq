@@ -18,7 +18,7 @@ import webview
 
 from quodeq.dashboard._build_npm import _quodeq_dir
 from quodeq.dashboard._instance import InstanceController
-from quodeq.dashboard._webview_html import INJECT_JS, CLOSING_OVERLAY_JS
+from quodeq.dashboard._webview_html import CLOSING_OVERLAY_JS
 
 _logger = logging.getLogger(__name__)
 
@@ -26,6 +26,10 @@ _WINDOW_WIDTH = 1280
 _WINDOW_HEIGHT = 800
 _WINDOW_BG_COLOR = '#0d1117'
 _CLEANUP_JOIN_TIMEOUT_S = 0.3
+
+# Marker embedded in the webview's User-Agent so the API serves it the
+# relaxed CSP (see quodeq.api.security._WEBVIEW_UA_MARKER — must match).
+_WEBVIEW_UA_MARKER = "QuodeqDesktop"
 _EVAL_CHECK_TIMEOUT_S = 0.5
 _DOWNLOAD_TIMEOUT_S = 120
 
@@ -585,55 +589,6 @@ def _set_app_icon() -> None:
             pass
 
 
-def _patch_pywebview_multi_monitor_drag() -> None:
-    """Fix pywebview's multi-monitor frameless-window drag on macOS.
-
-    pywebview's bundled drag JS (``customize.js``) sends absolute screen
-    coordinates over the JS↔Python bridge each mousemove, and the macOS
-    backend's ``BrowserView.move`` then ADDS ``self.screen.origin.x`` to
-    that x value before calling ``setFrameTopLeftPoint:``. On a single-
-    monitor setup the cached ``self.screen`` is the primary (origin.x =
-    0) and the addition is a no-op — so the bug never fires. On a multi-
-    monitor setup where the window's cached screen has a non-zero origin
-    (e.g. a secondary monitor positioned to the LEFT of the primary at
-    screen X = −1920), the addition double-counts and the window jumps
-    off the visible workspace mid-drag — confirmed reproducible vs.
-    single-monitor.
-
-    Patch swaps ``BrowserView.move`` for a version that passes ``x``
-    through unchanged. The Y math is left as-is because typical
-    horizontal multi-monitor layouts have ``screen.origin.y == 0`` and
-    we don't have a confirmed Y-side reproduction.
-
-    Safe to leave installed on single-monitor: ``origin.x`` is 0 there,
-    so the behaviour is identical. Skipped silently on non-Darwin or if
-    pywebview's internal layout changes (no AttributeError).
-
-    Tracked upstream: https://github.com/r0x0r/pywebview/issues/1820 —
-    drop this helper once the fix ships in a pywebview release we
-    depend on.
-    """
-    if sys.platform != "darwin":
-        return
-    try:
-        from webview.platforms.cocoa import BrowserView  # noqa: PLC0415
-        import AppKit  # noqa: PLC0415
-    except ImportError:
-        return
-    if not hasattr(BrowserView, 'move'):
-        return
-
-    def _patched_move(self, x: float, y: float) -> None:
-        flipped_y = self.screen.size.height - y
-        # The original code added ``self.screen.origin.x`` to x here;
-        # see docstring above for why that's wrong on multi-monitor.
-        self.window.setFrameTopLeftPoint_(
-            AppKit.NSPoint(x, self.screen.origin.y + flipped_y)
-        )
-
-    BrowserView.move = _patched_move
-
-
 def _make_on_reload(window: object) -> "Callable[[str], None]":
     """Return the ``_on_reload`` handler bound to *window*.
 
@@ -651,9 +606,34 @@ def _make_on_reload(window: object) -> "Callable[[str], None]":
     return _on_reload
 
 
+def _webview_user_agent() -> str:
+    """Browser-recognisable UA carrying the webview marker.
+
+    The AppleWebKit/Safari tokens keep Google Fonts serving woff2; the
+    marker tells the API to relax the CSP (see _WEBVIEW_UA_MARKER).
+    """
+    return (
+        "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+        f"{_WEBVIEW_UA_MARKER}/{_quodeq_version()} Safari/605.1.15"
+    )
+
+
+def _create_window(url: str, api: "_WindowApi") -> "webview.Window":
+    """Create the dashboard window with native OS chrome on every platform.
+
+    Native chrome gives the conventional min/max/close controls, OS-handled
+    (flicker-free) cross-monitor drag, Snap/Mission-Control integration, and
+    a native close path — so no in-page control injection is needed.
+    """
+    return webview.create_window(
+        "quodeq", url, width=_WINDOW_WIDTH, height=_WINDOW_HEIGHT,
+        frameless=False, background_color=_WINDOW_BG_COLOR, hidden=True,
+        js_api=api, user_agent=_webview_user_agent(),
+    )
+
+
 def main() -> None:
     _set_app_icon()
-    _patch_pywebview_multi_monitor_drag()
     url = sys.argv[1]
     sock_path = Path(sys.argv[2])
     api_pid = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3] else 0
@@ -661,26 +641,13 @@ def main() -> None:
     instance = InstanceController(sock_path)
     api = _WindowApi()
 
-    # Windows uses native chrome so users get the conventional top-right
-    # min/max/close, Snap layouts and Alt+Space. macOS and Linux stay
-    # frameless and rely on the Mac-style traffic-light dots injected by
-    # _webview_html.INJECT_JS.
-    #
-    # easy_drag intercepts pointer events on any non-interactive element to
-    # move the window — that breaks our resize splitter (a <div>, not a
-    # <button>). Disable it and let the topbar opt-in via -webkit-app-region.
-    _frameless = sys.platform != "win32"
-    window = webview.create_window("quodeq", url, width=_WINDOW_WIDTH, height=_WINDOW_HEIGHT,
-                                    frameless=_frameless, easy_drag=False,
-                                    background_color=_WINDOW_BG_COLOR, hidden=True,
-                                    js_api=api)
+    window = _create_window(url, api)
     api.bind(window, api_pid=api_pid, instance=instance, base_url=url)
 
     _on_reload = _make_on_reload(window)
 
     def _on_loaded() -> None:
         window.show()
-        window.evaluate_js(INJECT_JS)
         # Re-apply the dock icon + bundle name now that pywebview's
         # NSApplication instance is live. Calling this earlier in main()
         # targets the pre-pywebview NSApp and gets overridden.
