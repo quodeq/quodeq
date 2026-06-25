@@ -30,6 +30,7 @@ import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { readVisibleStandardIds } from './utils/visibleStandards.js';
 import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
+import { syncNativeTitlebar } from './utils/nativeTitlebar.js';
 import { SidePane, useSidePane } from './features/side-pane/index.js';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.jsx';
@@ -64,6 +65,20 @@ function useEffectiveDark(themeMode) {
   if (themeMode === 'dark') return true;
   if (themeMode === 'light') return false;
   return prefersDark;
+}
+
+/**
+ * Push the on-screen dark/light theme to the native window titlebar
+ * whenever it changes, and once more when the pywebview bridge becomes
+ * ready (it can inject after first render). No-op in a browser.
+ */
+function useNativeTitlebarSync(effectiveDark) {
+  useEffect(() => {
+    syncNativeTitlebar(effectiveDark);
+    const onReady = () => syncNativeTitlebar(effectiveDark);
+    window.addEventListener('pywebviewready', onReady);
+    return () => window.removeEventListener('pywebviewready', onReady);
+  }, [effectiveDark]);
 }
 
 /**
@@ -503,6 +518,7 @@ export default function App() {
   // topbar's moon/sun toggle so the icon reflects what's on-screen,
   // not just the saved mode preference.
   const effectiveDark = useEffectiveDark(state.settings.themeMode);
+  useNativeTitlebarSync(effectiveDark);
   const toggleTheme = () => {
     state.settings.applyMode(effectiveDark ? 'light' : 'dark');
   };

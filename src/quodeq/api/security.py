@@ -27,6 +27,16 @@ _RATE_LIMIT_EXEMPT_PATHS = frozenset({
 })
 _LOCALHOST_ADDRS = {"127.0.0.1", "::1"}
 
+# Marker substring in the native webview's User-Agent (set by
+# quodeq.dashboard._webview_window). Requests carrying it are the trusted
+# local desktop shell and are served 'unsafe-eval' so pywebview's
+# new Function() JS bridge works; browsers keep the strict script-src.
+# Loopback-only exposure: a local process could spoof this UA, but it
+# would already have local code execution. The literal MUST match
+# _webview_window._WEBVIEW_UA_MARKER (drift-guarded by
+# tests/dashboard/test_native_chrome.py).
+_WEBVIEW_UA_MARKER = "QuodeqDesktop"
+
 
 def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
     """Verify API key authentication when *api_key* is set.
@@ -109,10 +119,12 @@ def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: st
             f"http://127.0.0.1:{p} http://localhost:{p}"
             for p in (4180, 4181, 4182, 4183)
         )
+        is_webview = _WEBVIEW_UA_MARKER in request.headers.get("User-Agent", "")
+        script_src = "script-src 'self' 'unsafe-eval'" if is_webview else "script-src 'self'"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             f"connect-src 'self' {_alt_port_origins}; "
-            "script-src 'self'; "
+            f"{script_src}; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data:; "
