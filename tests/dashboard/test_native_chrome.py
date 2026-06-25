@@ -58,21 +58,21 @@ class TestSetTitlebarTheme:
         with patch.object(ww.sys, "platform", "darwin"), \
              patch.object(ww, "_set_macos_titlebar_appearance") as mac:
             api.set_titlebar_theme("dark")
-        mac.assert_called_once_with(api._window, True)
+        mac.assert_called_once_with(api._window, True, None)
 
     def test_light_dispatches_macos(self):
         api = self._api()
         with patch.object(ww.sys, "platform", "darwin"), \
              patch.object(ww, "_set_macos_titlebar_appearance") as mac:
             api.set_titlebar_theme("light")
-        mac.assert_called_once_with(api._window, False)
+        mac.assert_called_once_with(api._window, False, None)
 
     def test_dark_dispatches_windows(self):
         api = self._api()
         with patch.object(ww.sys, "platform", "win32"), \
              patch.object(ww, "_set_windows_titlebar") as win:
             api.set_titlebar_theme("dark")
-        win.assert_called_once_with(True)
+        win.assert_called_once_with(True, None)
 
     def test_unknown_mode_is_noop(self):
         api = self._api()
@@ -103,3 +103,46 @@ class TestOnClosing:
     def test_running_job_cancel_blocks_close(self):
         on_closing, window = self._wire(job={"jobId": "x"}, confirm=False)
         assert on_closing() is False
+
+
+class TestTitlebarColor:
+    def _api(self):
+        api = ww._WindowApi()
+        api._window = MagicMock()
+        return api
+
+    def test_color_passed_through_on_macos(self):
+        api = self._api()
+        with patch.object(ww.sys, "platform", "darwin"), \
+             patch.object(ww, "_set_macos_titlebar_appearance") as mac:
+            api.set_titlebar_theme("dark", "#0a0e14")
+        mac.assert_called_once_with(api._window, True, "#0a0e14")
+
+    def test_color_optional_on_macos(self):
+        api = self._api()
+        with patch.object(ww.sys, "platform", "darwin"), \
+             patch.object(ww, "_set_macos_titlebar_appearance") as mac:
+            api.set_titlebar_theme("light")
+        mac.assert_called_once_with(api._window, False, None)
+
+    def test_color_passed_through_on_windows(self):
+        api = self._api()
+        with patch.object(ww.sys, "platform", "win32"), \
+             patch.object(ww, "_set_windows_titlebar") as win:
+            api.set_titlebar_theme("dark", "#161010")
+        win.assert_called_once_with(True, "#161010")
+
+
+class TestHexToColorref:
+    def test_converts_to_bbggrr(self):
+        # #0a0e14 -> r=0x0a g=0x0e b=0x14 -> 0x140e0a
+        assert ww._hex_to_colorref("#0a0e14") == 0x140e0a
+
+    def test_handles_no_hash(self):
+        assert ww._hex_to_colorref("0a0e14") == 0x140e0a
+
+    def test_rejects_bad_length(self):
+        assert ww._hex_to_colorref("#fff") is None
+
+    def test_rejects_non_hex(self):
+        assert ww._hex_to_colorref("#zzzzzz") is None

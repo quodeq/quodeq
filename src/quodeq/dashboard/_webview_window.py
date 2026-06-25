@@ -162,21 +162,23 @@ class _WindowApi:
         except OSError:
             return False
 
-    def set_titlebar_theme(self, mode: str) -> None:
+    def set_titlebar_theme(self, mode: str, color: str | None = None) -> None:
         """Match the native titlebar to the active quodeq theme.
 
-        mode is 'dark' or 'light'; any other value is ignored. Safe no-op
-        before the native window handle exists — the frontend re-calls on
-        pywebviewready. Linux titlebars are window-manager controlled, so
-        this is a no-op there.
+        mode is 'dark' or 'light'; any other value is ignored. color is an
+        optional '#rrggbb' painted onto the titlebar (macOS) / caption
+        (Windows 11) so the frame takes the theme color instead of generic
+        grey. Safe no-op before the native window handle exists — the
+        frontend re-calls on pywebviewready. Linux titlebars are
+        window-manager controlled, so this is a no-op there.
         """
         if mode not in ("dark", "light"):
             return
         dark = mode == "dark"
         if sys.platform == "darwin":
-            _set_macos_titlebar_appearance(self._window, dark)
+            _set_macos_titlebar_appearance(self._window, dark, color)
         elif sys.platform == "win32":
-            _set_windows_titlebar(dark)
+            _set_windows_titlebar(dark, color)
 
 
 
@@ -405,8 +407,14 @@ def _install_about_panel_override() -> None:
         print(f"[quodeq-about] NSTimer schedule failed: {exc}", file=_diag, flush=True)
 
 
-def _set_macos_titlebar_appearance(window: object, dark: bool) -> None:
-    """Set the macOS native titlebar to dark or light aqua (on the UI thread)."""
+def _set_macos_titlebar_appearance(window: object, dark: bool, color: str | None = None) -> None:
+    """Set the macOS native titlebar to the theme, on the UI thread.
+
+    Always sets dark/light appearance. When *color* is given, makes the
+    titlebar transparent and paints the window background that color (title
+    hidden) so the titlebar strip takes the theme color rather than the
+    generic grey.
+    """
     if sys.platform != "darwin":
         return
     try:
@@ -414,6 +422,7 @@ def _set_macos_titlebar_appearance(window: object, dark: bool) -> None:
             NSAppearance, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
         )
         from PyObjCTools import AppHelper  # noqa: PLC0415
+        from webview.platforms.cocoa import BrowserView  # noqa: PLC0415
     except ImportError:
         return
     nswindow = getattr(window, "native", None) if window is not None else None
@@ -424,14 +433,36 @@ def _set_macos_titlebar_appearance(window: object, dark: bool) -> None:
     def _apply() -> None:
         try:
             nswindow.setAppearance_(NSAppearance.appearanceNamed_(name))
+            if color:
+                nswindow.setTitlebarAppearsTransparent_(True)
+                nswindow.setTitleVisibility_(1)  # NSWindowTitleHidden
+                nswindow.setBackgroundColor_(BrowserView.nscolor_from_hex(color))
         except (AttributeError, ValueError):
             pass
 
     AppHelper.callAfter(_apply)
 
 
-def _set_windows_titlebar(dark: bool, window_title: str = "quodeq") -> None:
-    """Set the native Windows titlebar dark/light via DWM (attr 20, fallback 19)."""
+def _hex_to_colorref(color: str) -> int | None:
+    """Convert '#rrggbb' to a Win32 COLORREF (0x00BBGGRR), or None if invalid."""
+    s = color.lstrip("#")
+    if len(s) != 6:
+        return None
+    try:
+        r, g, b = int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16)
+    except ValueError:
+        return None
+    return (b << 16) | (g << 8) | r
+
+
+def _set_windows_titlebar(dark: bool, color: str | None = None, window_title: str = "quodeq") -> None:
+    """Set the native Windows titlebar to the theme via DWM.
+
+    Always sets dark/light (attr 20, fallback 19). When *color* is given and
+    the OS supports it (Windows 11), additionally tints the caption to that
+    color via DWMWA_CAPTION_COLOR (attr 35); unsupported builds ignore it and
+    keep the dark/light bar.
+    """
     if sys.platform != "win32":
         return
     try:
@@ -448,7 +479,15 @@ def _set_windows_titlebar(dark: bool, window_title: str = "quodeq") -> None:
                 ctypes.byref(value), wintypes.DWORD(size),
             )
             if res == 0:
-                return
+                break
+        if color:
+            colorref = _hex_to_colorref(color)
+            if colorref is not None:
+                cref = ctypes.c_int(colorref)
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    wintypes.HWND(hwnd), wintypes.DWORD(35),  # DWMWA_CAPTION_COLOR
+                    ctypes.byref(cref), wintypes.DWORD(ctypes.sizeof(cref)),
+                )
     except (AttributeError, OSError):
         pass
 
@@ -564,9 +603,9 @@ def main() -> None:
         # targets the pre-pywebview NSApp and gets overridden.
         if sys.platform == "darwin":
             _set_macos_app_identity()
-            _set_macos_titlebar_appearance(window, True)
+            _set_macos_titlebar_appearance(window, True, _WINDOW_BG_COLOR)
         elif sys.platform == "win32":
-            _set_windows_titlebar(True)
+            _set_windows_titlebar(True, _WINDOW_BG_COLOR)
 
     window.events.loaded += _on_loaded
     window.events.closing += _make_on_closing(api, window)
