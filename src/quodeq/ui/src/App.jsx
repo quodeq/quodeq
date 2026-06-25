@@ -72,13 +72,13 @@ function useEffectiveDark(themeMode) {
  * whenever it changes, and once more when the pywebview bridge becomes
  * ready (it can inject after first render). No-op in a browser.
  */
-function useNativeTitlebarSync(effectiveDark) {
+function useNativeTitlebarSync(effectiveDark, themeFamily) {
   useEffect(() => {
     syncNativeTitlebar(effectiveDark);
     const onReady = () => syncNativeTitlebar(effectiveDark);
     window.addEventListener('pywebviewready', onReady);
     return () => window.removeEventListener('pywebviewready', onReady);
-  }, [effectiveDark]);
+  }, [effectiveDark, themeFamily]);
 }
 
 /**
@@ -518,7 +518,7 @@ export default function App() {
   // topbar's moon/sun toggle so the icon reflects what's on-screen,
   // not just the saved mode preference.
   const effectiveDark = useEffectiveDark(state.settings.themeMode);
-  useNativeTitlebarSync(effectiveDark);
+  useNativeTitlebarSync(effectiveDark, state.settings.themeFamily);
   const toggleTheme = () => {
     state.settings.applyMode(effectiveDark ? 'light' : 'dark');
   };
