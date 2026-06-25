@@ -515,7 +515,7 @@ def _create_window(url: str, api: "_WindowApi") -> "webview.Window":
     return webview.create_window(
         "quodeq", url, width=_WINDOW_WIDTH, height=_WINDOW_HEIGHT,
         frameless=False, background_color=_WINDOW_BG_COLOR, hidden=True,
-        js_api=api, user_agent=_webview_user_agent(),
+        js_api=api,
     )
 
 
@@ -578,7 +578,8 @@ def main() -> None:
     storage_dir = str(_quodeq_dir() / "webview")
 
     try:
-        webview.start(private_mode=False, storage_path=storage_dir)
+        webview.start(private_mode=False, storage_path=storage_dir,
+                      user_agent=_webview_user_agent())
     finally:
         instance.shutdown()
         if api_pid:
