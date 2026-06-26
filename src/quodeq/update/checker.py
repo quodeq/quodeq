@@ -46,29 +46,32 @@ def should_check(state: UpdateState, env: dict[str, str] | None = None) -> bool:
 
 
 def run_check(env: dict[str, str] | None = None, force: bool = False) -> None:
-    state = read_state(env)
-    if not force and not should_check(state, env):
-        return
-    # Stamp the attempt time before the network call so it persists even on failure.
-    state.last_check_ts = _now_iso()
     try:
-        info = fetch_latest(_channel.detect_channel(), state.etag)
-        if info is None:
-            write_state(state, env)
+        state = read_state(env)
+        if not force and not should_check(state, env):
             return
-        if info.not_modified:
-            state.etag = info.etag or state.etag
+        # Stamp the attempt time before the network call so it persists even on failure.
+        state.last_check_ts = _now_iso()
+        try:
+            info = fetch_latest(_channel.detect_channel(), state.etag)
+            if info is None:
+                write_state(state, env)
+                return
+            if info.not_modified:
+                state.etag = info.etag or state.etag
+                write_state(state, env)
+                return
+            state.latest_version = info.version
+            state.latest_url = info.url
+            state.download_url = info.download_url
+            state.is_security = info.is_security
+            state.etag = info.etag
             write_state(state, env)
-            return
-        state.latest_version = info.version
-        state.latest_url = info.url
-        state.download_url = info.download_url
-        state.is_security = info.is_security
-        state.etag = info.etag
-        write_state(state, env)
-    except Exception:
-        _logger.debug("update check failed", exc_info=True)
-        write_state(state, env)  # always persist last_check_ts
+        except Exception:
+            _logger.debug("update check failed", exc_info=True)
+            write_state(state, env)  # always persist last_check_ts
+    except Exception:  # pragma: no cover - outer blanket guard
+        _logger.debug("run_check failed", exc_info=True)
 
 
 def check_async(env: dict[str, str] | None = None) -> None:
