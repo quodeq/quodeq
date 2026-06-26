@@ -25,9 +25,6 @@ _WINDOW_BG_COLOR = '#0d1117'
 # Marker embedded in the webview's User-Agent so the API serves it the
 # relaxed CSP (see quodeq.api.security._WEBVIEW_UA_MARKER — must match).
 _WEBVIEW_UA_MARKER = "QuodeqDesktop"
-# Vertical center for the macOS traffic lights, matching the topbar midline
-# (--app-header-h is 52px in terminal.css, so its center is 26px from the top).
-_MACOS_TRAFFIC_LIGHT_CENTER_Y = 26.0
 _EVAL_CHECK_TIMEOUT_S = 0.5
 _DOWNLOAD_TIMEOUT_S = 120
 
@@ -442,21 +439,19 @@ def _set_macos_titlebar_appearance(window: object, dark: bool) -> None:
 
 
 def _show_macos_traffic_lights(window: object) -> None:
-    """Re-show and vertically center the native traffic lights on the
-    frameless macOS window.
+    """Re-show the native traffic lights on the frameless macOS window.
 
     pywebview hides the standard window buttons for frameless windows, but
     frameless is what enables NSFullSizeContentView (the app's topbar running
-    under the titlebar). Un-hiding them gives the unified look, and they are
-    re-centered onto the topbar's midline so they line up with the breadcrumb
-    rather than sitting at the very top. macOS re-lays the buttons out on
-    resize, so this is also wired to the window's ``resized`` event. Runs on
-    the UI thread; no-op before the native handle exists.
+    under the titlebar). Un-hiding them gives the unified look — the buttons
+    keep their native top-left position (the CSS lays the compact macOS topbar
+    out to line up with them), so nothing is repositioned and there is nothing
+    to re-apply on resize. Runs on the UI thread; no-op before the native
+    handle exists.
     """
     if sys.platform != "darwin":
         return
     try:
-        import AppKit  # noqa: PLC0415
         from PyObjCTools import AppHelper  # noqa: PLC0415
     except ImportError:
         return
@@ -469,18 +464,9 @@ def _show_macos_traffic_lights(window: object) -> None:
         for button_id in (0, 1, 2):
             try:
                 btn = nswindow.standardWindowButton_(button_id)
-                if btn is None:
-                    continue
-                btn.setHidden_(False)
-                frame = btn.frame()
-                # The frame view is flipped (y measured from the top), so
-                # centering on the topbar midline lines the lights up with the
-                # breadcrumb instead of pinning them to the very top.
-                btn.setFrameOrigin_(AppKit.NSPoint(
-                    frame.origin.x,
-                    _MACOS_TRAFFIC_LIGHT_CENTER_Y - frame.size.height / 2.0,
-                ))
-            except (AttributeError, ValueError, TypeError):
+                if btn is not None:
+                    btn.setHidden_(False)
+            except (AttributeError, ValueError):
                 pass
 
     AppHelper.callAfter(_apply)
@@ -638,9 +624,6 @@ def main() -> None:
 
     window.events.loaded += _on_loaded
     window.events.closing += _make_on_closing(api, window)
-    # macOS re-lays the traffic lights out on resize; re-center them (no-op
-    # off macOS).
-    window.events.resized += lambda *_a: _show_macos_traffic_lights(window)
 
     instance.start_listening(on_reload=_on_reload)
 
