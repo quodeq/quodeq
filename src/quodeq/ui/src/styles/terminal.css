@@ -1521,6 +1521,18 @@ button.term-sev-badge--clickable:focus-visible {
 .platform-mac.in-webview .sidebar {
   background: var(--color-surface);
 }
+/* In macOS fullscreen the OS hides the traffic lights, so the light reservation
+   becomes a dead gap and the topbar's bottom border reads as a stray gray line
+   across the top. Drop both in fullscreen only — the windowed chrome above is
+   untouched. The `.macos-fullscreen` class is toggled by the native window's
+   fullscreen observer (see _webview_window.py _install_macos_fullscreen_observer);
+   a JS heuristic can't tell fullscreen from a zoomed window on a notched Mac. */
+.platform-mac.in-webview.macos-fullscreen .app-shell--with-topbar .topbar {
+  padding-left: var(--term-space-3);
+}
+.platform-mac.in-webview.macos-fullscreen .topbar {
+  border-bottom-color: transparent;
+}
 
 /* ============================================================
    Sidebar — collapsed by default (icon rail), expands on hover.

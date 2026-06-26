@@ -6,6 +6,7 @@ import logging
 import os
 import signal
 import sys
+import threading
 import urllib.parse
 import urllib.request
 import webbrowser
@@ -267,6 +268,9 @@ def _set_macos_app_identity() -> None:
 _about_target: object | None = None  # keep delegate alive for the menu item's weak ref
 _about_override_installed = False  # the _AboutHandler ObjC class may only be defined once
 _macos_toolbar_installed = False  # the unified toolbar (taller titlebar) is added once
+_macos_fullscreen_observer: object | None = None  # keep the ObjC observer alive
+_macos_fullscreen_observer_installed = False  # register the notifications once
+_macos_fullscreen_handler_class = None  # the ObjC handler class is defined once per process
 
 
 def _diag_path() -> Path:
@@ -508,6 +512,90 @@ def _set_macos_unified_toolbar(window: object) -> None:
     AppHelper.callAfter(_apply)
 
 
+def _set_macos_fullscreen_class(window: object, is_full: bool) -> None:
+    """Toggle the `macos-fullscreen` class on <html> from off the main thread.
+
+    pywebview's evaluate_js blocks waiting on the JS engine, which deadlocks
+    when called on the AppKit main thread (where notifications fire), so run it
+    on a short-lived worker thread.
+    """
+    flag = "true" if is_full else "false"
+    js = f"document.documentElement.classList.toggle('macos-fullscreen', {flag})"
+
+    def _run() -> None:
+        try:
+            window.evaluate_js(js)  # type: ignore[union-attr]
+        except Exception:  # noqa: BLE001 — window may be tearing down
+            _logger.debug("fullscreen class toggle failed", exc_info=True)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def _install_macos_fullscreen_observer(window: object) -> None:
+    """Toggle `macos-fullscreen` on <html> when the window enters/exits native
+    fullscreen, so CSS can drop the titlebar's bottom border and the
+    traffic-light reservation — both wrong once macOS hides the lights.
+
+    Uses NSWindow fullscreen notifications because they are the only reliable
+    signal: on a notched display a zoomed window and a fullscreen window report
+    identical inner/screen heights, so a JS heuristic can't tell them apart.
+
+    Registers the notifications once (the ObjC observer class may only be
+    defined a single time per process) but re-syncs the current state on every
+    call, so reloading the page while fullscreen keeps the chrome correct (the
+    notifications only fire on transitions). No-op off macOS or before the
+    native handle exists. Call from the ``loaded`` event.
+    """
+    global _macos_fullscreen_handler_class
+    if sys.platform != "darwin":
+        return
+    try:
+        import AppKit  # noqa: PLC0415
+        from Foundation import NSNotificationCenter  # noqa: PLC0415
+        from PyObjCTools import AppHelper  # noqa: PLC0415
+    except ImportError:
+        return
+    nswindow = getattr(window, "native", None) if window is not None else None
+    if nswindow is None:
+        return
+
+    # Define the ObjC handler class at most once: redefining an NSObject
+    # subclass in the same process raises objc.error (the same trap the About
+    # panel hit). It closes over this window, of which there is only one.
+    if _macos_fullscreen_handler_class is None:
+        class _FullScreenHandler(AppKit.NSObject):
+            def enteredFullScreen_(self, note):  # noqa: ARG002, N802 — ObjC selector
+                _set_macos_fullscreen_class(window, True)
+
+            def exitedFullScreen_(self, note):  # noqa: ARG002, N802 — ObjC selector
+                _set_macos_fullscreen_class(window, False)
+
+        _macos_fullscreen_handler_class = _FullScreenHandler
+
+    def _apply() -> None:
+        global _macos_fullscreen_observer, _macos_fullscreen_observer_installed
+        try:
+            if not _macos_fullscreen_observer_installed:
+                observer = _macos_fullscreen_handler_class.alloc().init()
+                center = NSNotificationCenter.defaultCenter()
+                center.addObserver_selector_name_object_(
+                    observer, "enteredFullScreen:",
+                    AppKit.NSWindowDidEnterFullScreenNotification, nswindow,
+                )
+                center.addObserver_selector_name_object_(
+                    observer, "exitedFullScreen:",
+                    AppKit.NSWindowDidExitFullScreenNotification, nswindow,
+                )
+                _macos_fullscreen_observer = observer  # keep it alive
+                _macos_fullscreen_observer_installed = True
+            is_full = bool(nswindow.styleMask() & AppKit.NSWindowStyleMaskFullScreen)
+            _set_macos_fullscreen_class(window, is_full)
+        except (AttributeError, ValueError, TypeError):
+            pass
+
+    AppHelper.callAfter(_apply)
+
+
 def _set_windows_titlebar(dark: bool, window_title: str = "quodeq") -> None:
     """Set the native Windows titlebar dark/light via DWM (attr 20, fallback 19)."""
     if sys.platform != "win32":
@@ -649,6 +737,9 @@ def main() -> None:
             _show_macos_traffic_lights(window)
             _set_macos_unified_toolbar(window)
             _set_macos_titlebar_appearance(window, True)
+            # Reflect fullscreen state in a CSS class so the topbar border and
+            # the traffic-light reservation drop when macOS hides the lights.
+            _install_macos_fullscreen_observer(window)
             # Re-apply the dock icon + bundle name now that pywebview's
             # NSApplication is live (the early call in main() targets the
             # pre-pywebview NSApp). Best-effort — never block the controls.

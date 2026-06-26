@@ -154,3 +154,73 @@ class TestMacAppIdentityIdempotent:
         # macOS, where AppKit isn't importable.)
         ww._set_macos_app_identity()
         ww._set_macos_app_identity()  # must not raise
+
+
+class _SyncThread:
+    """Stand-in for threading.Thread that runs the target inline on start()."""
+    def __init__(self, target=None, daemon=None, **_):  # noqa: ARG002
+        self._target = target
+
+    def start(self):
+        if self._target:
+            self._target()
+
+
+class TestMacFullscreenClass:
+    def test_toggle_true_adds_class(self):
+        window = MagicMock()
+        with patch.object(ww.threading, "Thread", _SyncThread):
+            ww._set_macos_fullscreen_class(window, True)
+        window.evaluate_js.assert_called_once()
+        js = window.evaluate_js.call_args.args[0]
+        assert "macos-fullscreen" in js
+        assert js.endswith("true)")
+
+    def test_toggle_false_removes_class(self):
+        window = MagicMock()
+        with patch.object(ww.threading, "Thread", _SyncThread):
+            ww._set_macos_fullscreen_class(window, False)
+        js = window.evaluate_js.call_args.args[0]
+        assert js.endswith("false)")
+
+    def test_evaluate_runs_off_the_main_thread(self):
+        # evaluate_js on the AppKit main thread deadlocks, so the toggle must
+        # always be dispatched to a worker thread.
+        window = MagicMock()
+        with patch.object(ww.threading, "Thread") as thread_cls:
+            ww._set_macos_fullscreen_class(window, True)
+        thread_cls.assert_called_once()
+        thread_cls.return_value.start.assert_called_once()
+        window.evaluate_js.assert_not_called()  # only the worker calls it
+
+
+class TestMacFullscreenObserver:
+    def test_noop_off_macos(self):
+        from PyObjCTools import AppHelper
+        window = MagicMock()
+        window.native = MagicMock()
+        with patch.object(ww.sys, "platform", "win32"), \
+             patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()) as ca:
+            ww._install_macos_fullscreen_observer(window)
+        ca.assert_not_called()
+
+    def test_noop_without_native_handle(self):
+        from PyObjCTools import AppHelper
+        window = MagicMock()
+        window.native = None
+        with patch.object(ww.sys, "platform", "darwin"), \
+             patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()) as ca:
+            ww._install_macos_fullscreen_observer(window)
+        ca.assert_not_called()
+
+    def test_install_twice_does_not_raise(self):
+        # The ObjC handler class may only be defined once per process;
+        # _on_loaded calls this on every (re)load, so repeat calls must not
+        # raise. (No-op off macOS, where AppKit isn't importable.)
+        from PyObjCTools import AppHelper
+        window = MagicMock()
+        window.native = MagicMock()
+        with patch.object(ww.sys, "platform", "darwin"), \
+             patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()):
+            ww._install_macos_fullscreen_observer(window)
+            ww._install_macos_fullscreen_observer(window)  # must not raise
