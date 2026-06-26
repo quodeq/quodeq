@@ -144,3 +144,13 @@ class TestMacTrafficLights:
              patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()) as ca:
             ww._show_macos_traffic_lights(window)
         ca.assert_not_called()
+
+
+class TestMacAppIdentityIdempotent:
+    def test_calling_twice_does_not_raise(self):
+        # Re-defining the _AboutHandler ObjC class raised objc.error and
+        # aborted _on_loaded before the traffic lights were shown. The
+        # one-time install guard must make repeat calls safe. (No-op off
+        # macOS, where AppKit isn't importable.)
+        ww._set_macos_app_identity()
+        ww._set_macos_app_identity()  # must not raise

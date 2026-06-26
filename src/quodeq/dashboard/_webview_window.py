@@ -265,6 +265,7 @@ def _set_macos_app_identity() -> None:
 
 
 _about_target: object | None = None  # keep delegate alive for the menu item's weak ref
+_about_override_installed = False  # the _AboutHandler ObjC class may only be defined once
 
 
 def _diag_path() -> Path:
@@ -325,13 +326,20 @@ def _install_about_panel_override() -> None:
     On the first call from the `loaded` event it's typically still nil, so
     schedule a repeating NSTimer that retries until the About item exists
     (or we give up after ~5s).
+
+    Installs at most once: the ``_AboutHandler`` ObjC class can only be
+    defined once per process, so a second call (e.g. on a repeat ``loaded``
+    event) would raise ``objc.error`` and abort the caller.
     """
-    global _about_target
+    global _about_target, _about_override_installed
+    if _about_override_installed:
+        return
     try:
         from AppKit import NSApplication, NSObject  # type: ignore[import-untyped]
         from Foundation import NSTimer  # type: ignore[import-untyped]
     except ImportError:
         return
+    _about_override_installed = True
 
     import datetime as _dt  # noqa: PLC0415
     version = _quodeq_version()
@@ -596,13 +604,19 @@ def main() -> None:
 
     def _on_loaded() -> None:
         window.show()
-        # Re-apply the dock icon + bundle name now that pywebview's
-        # NSApplication instance is live. Calling this earlier in main()
-        # targets the pre-pywebview NSApp and gets overridden.
         if sys.platform == "darwin":
-            _set_macos_app_identity()
-            _set_macos_titlebar_appearance(window, True)
+            # Show the native traffic lights FIRST: they are the only window
+            # controls on the frameless macOS window, so they must not be
+            # skipped if the best-effort app-identity setup below raises.
             _show_macos_traffic_lights(window)
+            _set_macos_titlebar_appearance(window, True)
+            # Re-apply the dock icon + bundle name now that pywebview's
+            # NSApplication is live (the early call in main() targets the
+            # pre-pywebview NSApp). Best-effort — never block the controls.
+            try:
+                _set_macos_app_identity()
+            except Exception:
+                _logger.debug("macOS app-identity setup failed", exc_info=True)
         elif sys.platform == "win32":
             _set_windows_titlebar(True)
 
