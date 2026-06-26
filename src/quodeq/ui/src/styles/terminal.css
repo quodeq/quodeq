@@ -1508,9 +1508,10 @@ button.term-sev-badge--clickable:focus-visible {
   /* Taller titlebar to match the macOS unified toolbar (added in
      _webview_window.py), which drops the native traffic lights to ~32px and
      keeps them centered there across resize (no per-frame repositioning).
-     The lights sit at ~32px; a 64px bar centers exactly on them, while a
-     shorter bar trades a few px of centering for a slimmer look. */
-  --app-header-h: 48px;
+     The lights sit at ~32px, so a 64px bar centers exactly on them — the one
+     height where the native lights are perfectly centered with zero
+     repositioning (robust, no jump on resize). */
+  --app-header-h: 64px;
 }
 .platform-mac.in-webview .app-shell--with-topbar .topbar {
   padding-left: 82px;
