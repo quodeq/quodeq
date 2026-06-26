@@ -266,6 +266,7 @@ def _set_macos_app_identity() -> None:
 
 _about_target: object | None = None  # keep delegate alive for the menu item's weak ref
 _about_override_installed = False  # the _AboutHandler ObjC class may only be defined once
+_macos_toolbar_installed = False  # the unified toolbar (taller titlebar) is added once
 
 
 def _diag_path() -> Path:
@@ -472,6 +473,38 @@ def _show_macos_traffic_lights(window: object) -> None:
     AppHelper.callAfter(_apply)
 
 
+def _set_macos_unified_toolbar(window: object) -> None:
+    """Add an empty unified NSToolbar so the native titlebar is taller and the
+    traffic lights sit lower (~32px from the top, vertically centered) with
+    room around them — matching the taller in-app topbar. macOS keeps the
+    lights centered across resize, so nothing is repositioned by hand (no
+    jump). Installed once; no-op off macOS or before the native handle exists.
+    """
+    global _macos_toolbar_installed
+    if _macos_toolbar_installed or sys.platform != "darwin":
+        return
+    try:
+        import AppKit  # noqa: PLC0415
+        from PyObjCTools import AppHelper  # noqa: PLC0415
+    except ImportError:
+        return
+    nswindow = getattr(window, "native", None) if window is not None else None
+    if nswindow is None:
+        return
+    _macos_toolbar_installed = True
+
+    def _apply() -> None:
+        try:
+            toolbar = AppKit.NSToolbar.alloc().initWithIdentifier_("quodeq-titlebar")
+            toolbar.setShowsBaselineSeparator_(False)
+            nswindow.setToolbar_(toolbar)
+            nswindow.setToolbarStyle_(1)  # NSWindowToolbarStyleUnified
+        except (AttributeError, ValueError, TypeError):
+            pass
+
+    AppHelper.callAfter(_apply)
+
+
 def _set_windows_titlebar(dark: bool, window_title: str = "quodeq") -> None:
     """Set the native Windows titlebar dark/light via DWM (attr 20, fallback 19)."""
     if sys.platform != "win32":
@@ -611,6 +644,7 @@ def main() -> None:
             # controls on the frameless macOS window, so they must not be
             # skipped if the best-effort app-identity setup below raises.
             _show_macos_traffic_lights(window)
+            _set_macos_unified_toolbar(window)
             _set_macos_titlebar_appearance(window, True)
             # Re-apply the dock icon + bundle name now that pywebview's
             # NSApplication is live (the early call in main() targets the

@@ -1505,11 +1505,11 @@ button.term-sev-badge--clickable:focus-visible {
    space so the breadcrumb clears the lights, and tint the topbar toward the
    theme accent so the unified titlebar visibly carries the theme. */
 .platform-mac.in-webview {
-  /* Compact titlebar height so the native traffic lights (left at their OS
-     default top-left position, ~16px from the top) sit centered in the bar,
-     lining up with the breadcrumb — no native button repositioning, nothing
-     to jump on resize. 32px puts the breadcrumb's midline at the lights. */
-  --app-header-h: 32px;
+  /* Taller titlebar to match the macOS unified toolbar (added in
+     _webview_window.py), which drops the native traffic lights to ~32px and
+     keeps them centered there across resize (no per-frame repositioning).
+     A 64px bar centers the breadcrumb on the lights with room around them. */
+  --app-header-h: 64px;
 }
 .platform-mac.in-webview .app-shell--with-topbar .topbar {
   padding-left: 82px;
