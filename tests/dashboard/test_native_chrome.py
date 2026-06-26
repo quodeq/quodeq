@@ -1,22 +1,48 @@
 """Native-chrome window: creation args, custom UA, and marker drift guard."""
 import inspect
+import sys
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 import webview as real_webview
 
 from quodeq.dashboard import _webview_window as ww
 
+# Some tests import PyObjCTools to patch AppHelper. pyobjc is darwin-only
+# (pywebview pulls it in under sys_platform == 'darwin'), so those tests can
+# only run on macOS — they would ModuleNotFoundError on Linux/Windows CI.
+_MACOS_ONLY = pytest.mark.skipif(
+    sys.platform != "darwin",
+    reason="exercises macOS AppKit/PyObjC native chrome; pyobjc is darwin-only",
+)
+
 
 class TestWindowCreation:
-    def test_create_window_uses_native_chrome(self):
+    def _kwargs_for_platform(self, platform):
+        with patch.object(ww.sys, "platform", platform), patch.object(ww, "webview") as wv:
+            ww._create_window("http://127.0.0.1:7863", MagicMock())
+        wv.create_window.assert_called_once()
+        return wv.create_window.call_args.kwargs
+
+    def test_frameless_on_macos_for_unified_titlebar(self):
+        # macOS goes frameless so NSFullSizeContentView lets the topbar run
+        # under the titlebar (the unified look).
+        assert self._kwargs_for_platform("darwin")["frameless"] is True
+
+    def test_native_chrome_off_macos(self):
+        assert self._kwargs_for_platform("win32")["frameless"] is False
+        assert self._kwargs_for_platform("linux")["frameless"] is False
+
+    def test_easy_drag_disabled(self):
+        # Only the topbar (pywebview-drag-region) drags the window.
+        assert self._kwargs_for_platform("darwin")["easy_drag"] is False
+
+    def test_js_api_bound(self):
         api = MagicMock()
         with patch.object(ww, "webview") as wv:
             ww._create_window("http://127.0.0.1:7863", api)
-        wv.create_window.assert_called_once()
-        kwargs = wv.create_window.call_args.kwargs
-        assert kwargs["frameless"] is False
-        assert kwargs["js_api"] is api
+        assert wv.create_window.call_args.kwargs["js_api"] is api
 
     def test_create_window_only_passes_supported_kwargs(self):
         """Guard against passing a kwarg the installed pywebview's
@@ -103,3 +129,146 @@ class TestOnClosing:
     def test_running_job_cancel_blocks_close(self):
         on_closing, window = self._wire(job={"jobId": "x"}, confirm=False)
         assert on_closing() is False
+
+
+@_MACOS_ONLY
+class TestMacTrafficLights:
+    def test_unhides_three_buttons_on_macos(self):
+        from PyObjCTools import AppHelper
+        nswindow = MagicMock()
+        window = MagicMock()
+        window.native = nswindow
+        with patch.object(ww.sys, "platform", "darwin"), \
+             patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()):
+            ww._show_macos_traffic_lights(window)
+        # one standardWindowButton_ lookup per traffic light (0,1,2), each un-hidden
+        assert nswindow.standardWindowButton_.call_count == 3
+        setter = nswindow.standardWindowButton_.return_value.setHidden_
+        assert setter.call_count == 3
+        assert all(c.args == (False,) for c in setter.call_args_list)
+
+    def test_noop_without_native_handle(self):
+        from PyObjCTools import AppHelper
+        window = MagicMock()
+        window.native = None
+        with patch.object(ww.sys, "platform", "darwin"), \
+             patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()) as ca:
+            ww._show_macos_traffic_lights(window)
+        ca.assert_not_called()
+
+
+class TestMacAppIdentityIdempotent:
+    def test_calling_twice_does_not_raise(self):
+        # Re-defining the _AboutHandler ObjC class raised objc.error and
+        # aborted _on_loaded before the traffic lights were shown. The
+        # one-time install guard must make repeat calls safe. (No-op off
+        # macOS, where AppKit isn't importable.)
+        ww._set_macos_app_identity()
+        ww._set_macos_app_identity()  # must not raise
+
+
+class _SyncThread:
+    """Stand-in for threading.Thread that runs the target inline on start()."""
+    def __init__(self, target=None, daemon=None, **_):  # noqa: ARG002
+        self._target = target
+
+    def start(self):
+        if self._target:
+            self._target()
+
+
+class TestMacFullscreenClass:
+    def test_toggle_true_adds_class(self):
+        window = MagicMock()
+        with patch.object(ww.threading, "Thread", _SyncThread):
+            ww._set_macos_fullscreen_class(window, True)
+        window.evaluate_js.assert_called_once()
+        js = window.evaluate_js.call_args.args[0]
+        assert "macos-fullscreen" in js
+        assert js.endswith("true)")
+
+    def test_toggle_false_removes_class(self):
+        window = MagicMock()
+        with patch.object(ww.threading, "Thread", _SyncThread):
+            ww._set_macos_fullscreen_class(window, False)
+        js = window.evaluate_js.call_args.args[0]
+        assert js.endswith("false)")
+
+    def test_evaluate_runs_off_the_main_thread(self):
+        # evaluate_js on the AppKit main thread deadlocks, so the toggle must
+        # always be dispatched to a worker thread.
+        window = MagicMock()
+        with patch.object(ww.threading, "Thread") as thread_cls:
+            ww._set_macos_fullscreen_class(window, True)
+        thread_cls.assert_called_once()
+        thread_cls.return_value.start.assert_called_once()
+        window.evaluate_js.assert_not_called()  # only the worker calls it
+
+
+class TestMacFullscreenChrome:
+    def test_fullscreen_drops_toolbar(self):
+        # macOS draws the unified toolbar as an empty gray bar at the top in
+        # fullscreen — drop it (the lights it centers are hidden there anyway).
+        window = MagicMock()
+        nswindow = window.native
+        with patch.object(ww.threading, "Thread", _SyncThread), \
+             patch.object(ww, "_apply_unified_toolbar") as restore:
+            ww._apply_macos_fullscreen_chrome(window, True)
+        nswindow.setToolbar_.assert_called_once_with(None)
+        restore.assert_not_called()
+        assert window.evaluate_js.call_args.args[0].endswith("true)")
+
+    def test_windowed_restores_toolbar(self):
+        window = MagicMock()
+        nswindow = window.native
+        with patch.object(ww.threading, "Thread", _SyncThread), \
+             patch.object(ww, "_apply_unified_toolbar") as restore:
+            ww._apply_macos_fullscreen_chrome(window, False)
+        restore.assert_called_once_with(nswindow)
+        nswindow.setToolbar_.assert_not_called()
+        assert window.evaluate_js.call_args.args[0].endswith("false)")
+
+    def test_load_sync_does_not_re_add_toolbar(self):
+        # The initial install owns the windowed toolbar; the load-time sync
+        # must not add a second one (restore_toolbar=False).
+        window = MagicMock()
+        nswindow = window.native
+        with patch.object(ww.threading, "Thread", _SyncThread), \
+             patch.object(ww, "_apply_unified_toolbar") as restore:
+            ww._apply_macos_fullscreen_chrome(window, False, restore_toolbar=False)
+        restore.assert_not_called()
+        nswindow.setToolbar_.assert_not_called()
+        assert window.evaluate_js.call_args.args[0].endswith("false)")
+
+
+@_MACOS_ONLY
+class TestMacFullscreenObserver:
+    def test_noop_off_macos(self):
+        from PyObjCTools import AppHelper
+        window = MagicMock()
+        window.native = MagicMock()
+        with patch.object(ww.sys, "platform", "win32"), \
+             patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()) as ca:
+            ww._install_macos_fullscreen_observer(window)
+        ca.assert_not_called()
+
+    def test_noop_without_native_handle(self):
+        from PyObjCTools import AppHelper
+        window = MagicMock()
+        window.native = None
+        with patch.object(ww.sys, "platform", "darwin"), \
+             patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()) as ca:
+            ww._install_macos_fullscreen_observer(window)
+        ca.assert_not_called()
+
+    def test_install_twice_does_not_raise(self):
+        # The ObjC handler class may only be defined once per process;
+        # _on_loaded calls this on every (re)load, so repeat calls must not
+        # raise. (No-op off macOS, where AppKit isn't importable.)
+        from PyObjCTools import AppHelper
+        window = MagicMock()
+        window.native = MagicMock()
+        with patch.object(ww.sys, "platform", "darwin"), \
+             patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()):
+            ww._install_macos_fullscreen_observer(window)
+            ww._install_macos_fullscreen_observer(window)  # must not raise

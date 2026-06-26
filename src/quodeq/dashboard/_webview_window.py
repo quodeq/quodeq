@@ -6,6 +6,7 @@ import logging
 import os
 import signal
 import sys
+import threading
 import urllib.parse
 import urllib.request
 import webbrowser
@@ -265,6 +266,11 @@ def _set_macos_app_identity() -> None:
 
 
 _about_target: object | None = None  # keep delegate alive for the menu item's weak ref
+_about_override_installed = False  # the _AboutHandler ObjC class may only be defined once
+_macos_toolbar_installed = False  # the unified toolbar (taller titlebar) is added once
+_macos_fullscreen_observer: object | None = None  # keep the ObjC observer alive
+_macos_fullscreen_observer_installed = False  # register the notifications once
+_macos_fullscreen_handler_class = None  # the ObjC handler class is defined once per process
 
 
 def _diag_path() -> Path:
@@ -325,13 +331,20 @@ def _install_about_panel_override() -> None:
     On the first call from the `loaded` event it's typically still nil, so
     schedule a repeating NSTimer that retries until the About item exists
     (or we give up after ~5s).
+
+    Installs at most once: the ``_AboutHandler`` ObjC class can only be
+    defined once per process, so a second call (e.g. on a repeat ``loaded``
+    event) would raise ``objc.error`` and abort the caller.
     """
-    global _about_target
+    global _about_target, _about_override_installed
+    if _about_override_installed:
+        return
     try:
         from AppKit import NSApplication, NSObject  # type: ignore[import-untyped]
         from Foundation import NSTimer  # type: ignore[import-untyped]
     except ImportError:
         return
+    _about_override_installed = True
 
     import datetime as _dt  # noqa: PLC0415
     version = _quodeq_version()
@@ -430,6 +443,212 @@ def _set_macos_titlebar_appearance(window: object, dark: bool) -> None:
     AppHelper.callAfter(_apply)
 
 
+def _show_macos_traffic_lights(window: object) -> None:
+    """Re-show the native traffic lights on the frameless macOS window.
+
+    pywebview hides the standard window buttons for frameless windows, but
+    frameless is what enables NSFullSizeContentView (the app's topbar running
+    under the titlebar). Un-hiding them gives the unified look — the buttons
+    keep their native top-left position (the CSS lays the compact macOS topbar
+    out to line up with them), so nothing is repositioned and there is nothing
+    to re-apply on resize. Runs on the UI thread; no-op before the native
+    handle exists.
+    """
+    if sys.platform != "darwin":
+        return
+    try:
+        from PyObjCTools import AppHelper  # noqa: PLC0415
+    except ImportError:
+        return
+    nswindow = getattr(window, "native", None) if window is not None else None
+    if nswindow is None:
+        return
+
+    def _apply() -> None:
+        # NSWindowCloseButton=0, NSWindowMiniaturizeButton=1, NSWindowZoomButton=2
+        for button_id in (0, 1, 2):
+            try:
+                btn = nswindow.standardWindowButton_(button_id)
+                if btn is not None:
+                    btn.setHidden_(False)
+            except (AttributeError, ValueError):
+                pass
+
+    AppHelper.callAfter(_apply)
+
+
+def _apply_unified_toolbar(nswindow: object) -> None:
+    """Attach an empty unified-compact NSToolbar so the native titlebar grows
+    just enough to drop the traffic lights to ~20px from the top — vertically
+    centered in the 40px in-app topbar (--app-header-h). macOS keeps the lights
+    centered across resize, so nothing is repositioned by hand (no jump).
+
+    Must run on the UI thread; AppKit failures are the caller's to swallow.
+    """
+    import AppKit  # noqa: PLC0415
+    toolbar = AppKit.NSToolbar.alloc().initWithIdentifier_("quodeq-titlebar")
+    toolbar.setShowsBaselineSeparator_(False)
+    nswindow.setToolbar_(toolbar)
+    nswindow.setToolbarStyle_(4)  # NSWindowToolbarStyleUnifiedCompact
+    # Remove the 1px separator line under the toolbar (most visible in
+    # fullscreen). NSTitlebarSeparatorStyleNone = 1 (macOS 11+).
+    nswindow.setTitlebarSeparatorStyle_(1)
+
+
+def _set_macos_unified_toolbar(window: object) -> None:
+    """Install the unified-compact toolbar (see _apply_unified_toolbar) on the
+    frameless macOS window. Installed once; no-op off macOS or before the
+    native handle exists.
+    """
+    global _macos_toolbar_installed
+    if _macos_toolbar_installed or sys.platform != "darwin":
+        return
+    try:
+        from PyObjCTools import AppHelper  # noqa: PLC0415
+    except ImportError:
+        return
+    nswindow = getattr(window, "native", None) if window is not None else None
+    if nswindow is None:
+        return
+    _macos_toolbar_installed = True
+
+    def _apply() -> None:
+        try:
+            _apply_unified_toolbar(nswindow)
+        except (AttributeError, ValueError, TypeError):
+            pass
+
+    AppHelper.callAfter(_apply)
+
+
+def _set_macos_fullscreen_class(window: object, is_full: bool) -> None:
+    """Toggle the `macos-fullscreen` class on <html> from off the main thread.
+
+    pywebview's evaluate_js blocks waiting on the JS engine, which deadlocks
+    when called on the AppKit main thread (where notifications fire), so run it
+    on a short-lived worker thread.
+    """
+    flag = "true" if is_full else "false"
+    js = f"document.documentElement.classList.toggle('macos-fullscreen', {flag})"
+
+    def _run() -> None:
+        try:
+            window.evaluate_js(js)  # type: ignore[union-attr]
+        except Exception:  # noqa: BLE001 — window may be tearing down
+            _logger.debug("fullscreen class toggle failed", exc_info=True)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def _apply_macos_fullscreen_chrome(
+    window: object, is_full: bool, *, restore_toolbar: bool = True,
+) -> None:
+    """Reflect fullscreen state in both the native and the web chrome.
+
+    In fullscreen macOS draws the unified toolbar as a persistent empty gray
+    bar across the top (the traffic lights it centers are hidden there), so
+    drop the toolbar in fullscreen and restore it windowed. Either way toggle
+    the `macos-fullscreen` CSS class, which also clears the topbar border and
+    the now-pointless traffic-light reservation.
+
+    The AppKit toolbar work runs inline — callers are on the UI thread (the
+    fullscreen notifications fire there) — while the JS class toggle is
+    dispatched off it (evaluate_js deadlocks on the main thread).
+
+    ``restore_toolbar=False`` skips re-adding the toolbar when windowed; the
+    initial install (_set_macos_unified_toolbar) already owns that, so the
+    load-time sync must not add a second one.
+    """
+    nswindow = getattr(window, "native", None) if window is not None else None
+    if nswindow is not None:
+        try:
+            if is_full:
+                nswindow.setToolbar_(None)
+            elif restore_toolbar:
+                _apply_unified_toolbar(nswindow)
+        except (AttributeError, ValueError, TypeError, ImportError):
+            pass
+    _set_macos_fullscreen_class(window, is_full)
+
+
+def _install_macos_fullscreen_observer(window: object) -> None:
+    """React to native fullscreen transitions so the chrome stays clean.
+
+    On enter/exit fullscreen, drop/restore the unified toolbar (macOS otherwise
+    leaves an empty gray toolbar bar at the top) and toggle a `macos-fullscreen`
+    class on <html> (CSS then drops the topbar border and the traffic-light
+    reservation). See _apply_macos_fullscreen_chrome.
+
+    Uses NSWindow fullscreen notifications because they are the only reliable
+    signal: on a notched display a zoomed window and a fullscreen window report
+    identical inner/screen heights, so a JS heuristic can't tell them apart.
+
+    Registers the notifications once (the ObjC observer class may only be
+    defined a single time per process) but re-syncs the current state on every
+    call, so reloading the page while fullscreen keeps the chrome correct (the
+    notifications only fire on transitions). No-op off macOS or before the
+    native handle exists. Call from the ``loaded`` event.
+    """
+    global _macos_fullscreen_handler_class
+    if sys.platform != "darwin":
+        return
+    try:
+        import AppKit  # noqa: PLC0415
+        from Foundation import NSNotificationCenter  # noqa: PLC0415
+        from PyObjCTools import AppHelper  # noqa: PLC0415
+    except ImportError:
+        return
+    nswindow = getattr(window, "native", None) if window is not None else None
+    if nswindow is None:
+        return
+
+    # Define the ObjC handler class at most once: redefining an NSObject
+    # subclass in the same process raises objc.error (the same trap the About
+    # panel hit). It closes over this window, of which there is only one.
+    if _macos_fullscreen_handler_class is None:
+        class _FullScreenHandler(AppKit.NSObject):
+            def willEnterFullScreen_(self, note):  # noqa: ARG002, N802 — ObjC selector
+                # Drop the toolbar BEFORE the enter animation, not after: the
+                # *Did*EnterFullScreen notification only fires once the grow
+                # animation completes, so the toolbar would stay attached for
+                # the whole animation and flash as a gray bar. *Will*Enter runs
+                # first, so the animation has no toolbar to show.
+                _apply_macos_fullscreen_chrome(window, True)
+
+            def didExitFullScreen_(self, note):  # noqa: ARG002, N802 — ObjC selector
+                # Restore only once fully windowed — re-adding during the exit
+                # animation would briefly reattach the toolbar while still
+                # fullscreen and flash gray again.
+                _apply_macos_fullscreen_chrome(window, False)
+
+        _macos_fullscreen_handler_class = _FullScreenHandler
+
+    def _apply() -> None:
+        global _macos_fullscreen_observer, _macos_fullscreen_observer_installed
+        try:
+            if not _macos_fullscreen_observer_installed:
+                observer = _macos_fullscreen_handler_class.alloc().init()
+                center = NSNotificationCenter.defaultCenter()
+                center.addObserver_selector_name_object_(
+                    observer, "willEnterFullScreen:",
+                    AppKit.NSWindowWillEnterFullScreenNotification, nswindow,
+                )
+                center.addObserver_selector_name_object_(
+                    observer, "didExitFullScreen:",
+                    AppKit.NSWindowDidExitFullScreenNotification, nswindow,
+                )
+                _macos_fullscreen_observer = observer  # keep it alive
+                _macos_fullscreen_observer_installed = True
+            is_full = bool(nswindow.styleMask() & AppKit.NSWindowStyleMaskFullScreen)
+            # Don't re-add the toolbar windowed — _set_macos_unified_toolbar
+            # already installed it; a second one would race/flicker.
+            _apply_macos_fullscreen_chrome(window, is_full, restore_toolbar=False)
+        except (AttributeError, ValueError, TypeError):
+            pass
+
+    AppHelper.callAfter(_apply)
+
+
 def _set_windows_titlebar(dark: bool, window_title: str = "quodeq") -> None:
     """Set the native Windows titlebar dark/light via DWM (attr 20, fallback 19)."""
     if sys.platform != "win32":
@@ -504,16 +723,21 @@ def _webview_user_agent() -> str:
 
 
 def _create_window(url: str, api: "_WindowApi") -> "webview.Window":
-    """Create the dashboard window with native OS chrome on every platform.
+    """Create the dashboard window.
 
-    Native chrome gives the conventional min/max/close controls, OS-handled
-    (flicker-free) cross-monitor drag, Snap/Mission-Control integration, and
-    a native close path — so no in-page control injection is needed.
+    macOS uses a frameless window so NSFullSizeContentView lets the app's
+    topbar run under the titlebar; the native traffic lights are re-shown over
+    it (see _show_macos_traffic_lights) for a unified look, and the topbar acts
+    as the drag region via the ``pywebview-drag-region`` class. Windows and
+    Linux use native OS chrome.
+
+    easy_drag is disabled so only the topbar drags the window — otherwise it
+    would hijack the resize splitter (a plain <div>).
     """
     return webview.create_window(
         "quodeq", url, width=_WINDOW_WIDTH, height=_WINDOW_HEIGHT,
-        frameless=False, background_color=_WINDOW_BG_COLOR, hidden=True,
-        js_api=api,
+        frameless=(sys.platform == "darwin"), easy_drag=False,
+        background_color=_WINDOW_BG_COLOR, hidden=True, js_api=api,
     )
 
 
@@ -559,12 +783,23 @@ def main() -> None:
 
     def _on_loaded() -> None:
         window.show()
-        # Re-apply the dock icon + bundle name now that pywebview's
-        # NSApplication instance is live. Calling this earlier in main()
-        # targets the pre-pywebview NSApp and gets overridden.
         if sys.platform == "darwin":
-            _set_macos_app_identity()
+            # Show the native traffic lights FIRST: they are the only window
+            # controls on the frameless macOS window, so they must not be
+            # skipped if the best-effort app-identity setup below raises.
+            _show_macos_traffic_lights(window)
+            _set_macos_unified_toolbar(window)
             _set_macos_titlebar_appearance(window, True)
+            # Reflect fullscreen state in a CSS class so the topbar border and
+            # the traffic-light reservation drop when macOS hides the lights.
+            _install_macos_fullscreen_observer(window)
+            # Re-apply the dock icon + bundle name now that pywebview's
+            # NSApplication is live (the early call in main() targets the
+            # pre-pywebview NSApp). Best-effort — never block the controls.
+            try:
+                _set_macos_app_identity()
+            except Exception:
+                _logger.debug("macOS app-identity setup failed", exc_info=True)
         elif sys.platform == "win32":
             _set_windows_titlebar(True)
 

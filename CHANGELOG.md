@@ -3,7 +3,10 @@
 ## [Unreleased]
 
 ### Fixes
-- **Dashboard window controls, native frame, and theme-driven titlebar**: the desktop window now uses native OS chrome on every platform, so the close/minimize/maximize controls always work. The strict CSP shipped in 1.4.0 had disabled the injected macOS controls — and, because pywebview builds its JS bridge with `new Function`, also broke the in-app `save_file` (Standards export) and `download_url` (project ZIP) actions; both are restored by serving the relaxed CSP only to the native webview. The native titlebar now follows the selected quodeq theme (dark/light, live, including OS-follow), cross-monitor dragging no longer flickers, and closing during a scan shows a native confirmation dialog (the scan keeps running in the background).
+- **Dashboard window controls and the in-app bridge**: the desktop window has working native close/minimize/maximize controls again. The strict CSP shipped in 1.4.0 had disabled the injected macOS controls — and, because pywebview builds its JS bridge with `new Function`, also broke the in-app `save_file` (Standards export) and `download_url` (project ZIP) actions; both are restored by serving the relaxed CSP only to the native webview. Closing during a scan now shows a native confirmation dialog (the scan keeps running in the background).
+
+### Improvements
+- **Unified macOS titlebar**: the macOS window now uses a frameless titlebar — the dashboard topbar runs to the top edge with the native traffic lights floating, vertically centered, over it, for a seamless look. The topbar and sidebar share one plain surface color. In fullscreen the titlebar is dropped so content fills the screen cleanly (no leftover gray bar) and restored on exit. Windows and Linux keep native OS chrome with a dark/light titlebar that follows the theme.
 
 ## [1.4.0] - 2026-06-20
 

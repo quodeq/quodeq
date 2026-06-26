@@ -1500,6 +1500,39 @@ button.term-sev-badge--clickable:focus-visible {
 .app-shell--with-topbar .topbar {
   padding-left: var(--term-space-3);
 }
+/* In the macOS native shell the window is frameless and the topbar runs to
+   the top edge with the native traffic lights floating over its left. Reserve
+   space so the breadcrumb clears the lights, and tint the topbar toward the
+   theme accent so the unified titlebar visibly carries the theme. */
+.platform-mac.in-webview {
+  /* Taller titlebar to match the macOS unified toolbar (added in
+     _webview_window.py), which drops the native traffic lights to ~32px and
+     keeps them centered there across resize (no per-frame repositioning).
+     With the unified-compact toolbar the native lights sit at ~20px, so a
+     40px bar centers them exactly — a slim, well-proportioned titlebar with
+     the lights perfectly centered, anchored (no repositioning, no jump). */
+  --app-header-h: 40px;
+}
+.platform-mac.in-webview .app-shell--with-topbar .topbar {
+  padding-left: 82px;
+}
+/* Topbar and sidebar share one cohesive chrome color: plain surface, no tint. */
+.platform-mac.in-webview .topbar,
+.platform-mac.in-webview .sidebar {
+  background: var(--color-surface);
+}
+/* In macOS fullscreen the OS hides the traffic lights, so the light reservation
+   becomes a dead gap and the topbar's bottom border reads as a stray gray line
+   across the top. Drop both in fullscreen only — the windowed chrome above is
+   untouched. The `.macos-fullscreen` class is toggled by the native window's
+   fullscreen observer (see _webview_window.py _install_macos_fullscreen_observer);
+   a JS heuristic can't tell fullscreen from a zoomed window on a notched Mac. */
+.platform-mac.in-webview.macos-fullscreen .app-shell--with-topbar .topbar {
+  padding-left: var(--term-space-3);
+}
+.platform-mac.in-webview.macos-fullscreen .topbar {
+  border-bottom-color: transparent;
+}
 
 /* ============================================================
    Sidebar — collapsed by default (icon rail), expands on hover.
