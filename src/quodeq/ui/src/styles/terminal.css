@@ -1508,7 +1508,7 @@ button.term-sev-badge--clickable:focus-visible {
   padding-left: 82px;
 }
 .platform-mac.in-webview .topbar {
-  background: color-mix(in srgb, var(--color-accent) 20%, var(--color-surface));
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
 }
 
 /* ============================================================
