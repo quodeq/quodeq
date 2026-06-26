@@ -474,11 +474,11 @@ def _show_macos_traffic_lights(window: object) -> None:
 
 
 def _set_macos_unified_toolbar(window: object) -> None:
-    """Add an empty unified NSToolbar so the native titlebar is taller and the
-    traffic lights sit lower (~32px from the top, vertically centered) with
-    room around them — matching the taller in-app topbar. macOS keeps the
-    lights centered across resize, so nothing is repositioned by hand (no
-    jump). Installed once; no-op off macOS or before the native handle exists.
+    """Add an empty unified-compact NSToolbar so the native titlebar grows just
+    enough to drop the traffic lights to ~20px from the top — vertically
+    centered in the 40px in-app topbar (--app-header-h). macOS keeps the lights
+    centered across resize, so nothing is repositioned by hand (no jump).
+    Installed once; no-op off macOS or before the native handle exists.
     """
     global _macos_toolbar_installed
     if _macos_toolbar_installed or sys.platform != "darwin":
@@ -498,7 +498,7 @@ def _set_macos_unified_toolbar(window: object) -> None:
             toolbar = AppKit.NSToolbar.alloc().initWithIdentifier_("quodeq-titlebar")
             toolbar.setShowsBaselineSeparator_(False)
             nswindow.setToolbar_(toolbar)
-            nswindow.setToolbarStyle_(1)  # NSWindowToolbarStyleUnified
+            nswindow.setToolbarStyle_(4)  # NSWindowToolbarStyleUnifiedCompact
         except (AttributeError, ValueError, TypeError):
             pass
 
