@@ -1500,6 +1500,16 @@ button.term-sev-badge--clickable:focus-visible {
 .app-shell--with-topbar .topbar {
   padding-left: var(--term-space-3);
 }
+/* In the macOS native shell the window is frameless and the topbar runs to
+   the top edge with the native traffic lights floating over its left. Reserve
+   space so the breadcrumb clears the lights, and tint the topbar toward the
+   theme accent so the unified titlebar visibly carries the theme. */
+.platform-mac.in-webview .app-shell--with-topbar .topbar {
+  padding-left: 82px;
+}
+.platform-mac.in-webview .topbar {
+  background: color-mix(in srgb, var(--color-accent) 20%, var(--color-surface));
+}
 
 /* ============================================================
    Sidebar — collapsed by default (icon rail), expands on hover.

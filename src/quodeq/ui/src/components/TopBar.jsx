@@ -106,7 +106,7 @@ export default function TopBar({
   onToggleTheme,
 }) {
   return (
-    <header className="topbar">
+    <header className="topbar pywebview-drag-region">
       {/* Compact-mode back button. Hidden entirely at the root of the
           nav stack — showing a disabled arrow adds visual noise without
           giving the user anything to click. */}

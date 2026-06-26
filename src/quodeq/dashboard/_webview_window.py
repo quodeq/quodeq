@@ -430,6 +430,38 @@ def _set_macos_titlebar_appearance(window: object, dark: bool) -> None:
     AppHelper.callAfter(_apply)
 
 
+def _show_macos_traffic_lights(window: object) -> None:
+    """Re-show the native traffic-light buttons on the frameless macOS window.
+
+    pywebview hides the standard window buttons for frameless windows, but
+    frameless is what enables NSFullSizeContentView (the app's topbar running
+    under the titlebar). Un-hiding the buttons gives the unified look: the
+    topbar reaches the top edge with the native lights floating over it.
+    Runs on the UI thread; no-op before the native handle exists.
+    """
+    if sys.platform != "darwin":
+        return
+    try:
+        from PyObjCTools import AppHelper  # noqa: PLC0415
+    except ImportError:
+        return
+    nswindow = getattr(window, "native", None) if window is not None else None
+    if nswindow is None:
+        return
+
+    def _apply() -> None:
+        # NSWindowCloseButton=0, NSWindowMiniaturizeButton=1, NSWindowZoomButton=2
+        for button_id in (0, 1, 2):
+            try:
+                btn = nswindow.standardWindowButton_(button_id)
+                if btn is not None:
+                    btn.setHidden_(False)
+            except (AttributeError, ValueError):
+                pass
+
+    AppHelper.callAfter(_apply)
+
+
 def _set_windows_titlebar(dark: bool, window_title: str = "quodeq") -> None:
     """Set the native Windows titlebar dark/light via DWM (attr 20, fallback 19)."""
     if sys.platform != "win32":
@@ -504,16 +536,21 @@ def _webview_user_agent() -> str:
 
 
 def _create_window(url: str, api: "_WindowApi") -> "webview.Window":
-    """Create the dashboard window with native OS chrome on every platform.
+    """Create the dashboard window.
 
-    Native chrome gives the conventional min/max/close controls, OS-handled
-    (flicker-free) cross-monitor drag, Snap/Mission-Control integration, and
-    a native close path — so no in-page control injection is needed.
+    macOS uses a frameless window so NSFullSizeContentView lets the app's
+    topbar run under the titlebar; the native traffic lights are re-shown over
+    it (see _show_macos_traffic_lights) for a unified look, and the topbar acts
+    as the drag region via the ``pywebview-drag-region`` class. Windows and
+    Linux use native OS chrome.
+
+    easy_drag is disabled so only the topbar drags the window — otherwise it
+    would hijack the resize splitter (a plain <div>).
     """
     return webview.create_window(
         "quodeq", url, width=_WINDOW_WIDTH, height=_WINDOW_HEIGHT,
-        frameless=False, background_color=_WINDOW_BG_COLOR, hidden=True,
-        js_api=api,
+        frameless=(sys.platform == "darwin"), easy_drag=False,
+        background_color=_WINDOW_BG_COLOR, hidden=True, js_api=api,
     )
 
 
@@ -565,6 +602,7 @@ def main() -> None:
         if sys.platform == "darwin":
             _set_macos_app_identity()
             _set_macos_titlebar_appearance(window, True)
+            _show_macos_traffic_lights(window)
         elif sys.platform == "win32":
             _set_windows_titlebar(True)
 

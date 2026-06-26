@@ -9,14 +9,30 @@ from quodeq.dashboard import _webview_window as ww
 
 
 class TestWindowCreation:
-    def test_create_window_uses_native_chrome(self):
+    def _kwargs_for_platform(self, platform):
+        with patch.object(ww.sys, "platform", platform), patch.object(ww, "webview") as wv:
+            ww._create_window("http://127.0.0.1:7863", MagicMock())
+        wv.create_window.assert_called_once()
+        return wv.create_window.call_args.kwargs
+
+    def test_frameless_on_macos_for_unified_titlebar(self):
+        # macOS goes frameless so NSFullSizeContentView lets the topbar run
+        # under the titlebar (the unified look).
+        assert self._kwargs_for_platform("darwin")["frameless"] is True
+
+    def test_native_chrome_off_macos(self):
+        assert self._kwargs_for_platform("win32")["frameless"] is False
+        assert self._kwargs_for_platform("linux")["frameless"] is False
+
+    def test_easy_drag_disabled(self):
+        # Only the topbar (pywebview-drag-region) drags the window.
+        assert self._kwargs_for_platform("darwin")["easy_drag"] is False
+
+    def test_js_api_bound(self):
         api = MagicMock()
         with patch.object(ww, "webview") as wv:
             ww._create_window("http://127.0.0.1:7863", api)
-        wv.create_window.assert_called_once()
-        kwargs = wv.create_window.call_args.kwargs
-        assert kwargs["frameless"] is False
-        assert kwargs["js_api"] is api
+        assert wv.create_window.call_args.kwargs["js_api"] is api
 
     def test_create_window_only_passes_supported_kwargs(self):
         """Guard against passing a kwarg the installed pywebview's
@@ -103,3 +119,28 @@ class TestOnClosing:
     def test_running_job_cancel_blocks_close(self):
         on_closing, window = self._wire(job={"jobId": "x"}, confirm=False)
         assert on_closing() is False
+
+
+class TestMacTrafficLights:
+    def test_unhides_three_buttons_on_macos(self):
+        from PyObjCTools import AppHelper
+        nswindow = MagicMock()
+        window = MagicMock()
+        window.native = nswindow
+        with patch.object(ww.sys, "platform", "darwin"), \
+             patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()):
+            ww._show_macos_traffic_lights(window)
+        # one standardWindowButton_ lookup per traffic light (0,1,2), each un-hidden
+        assert nswindow.standardWindowButton_.call_count == 3
+        setter = nswindow.standardWindowButton_.return_value.setHidden_
+        assert setter.call_count == 3
+        assert all(c.args == (False,) for c in setter.call_args_list)
+
+    def test_noop_without_native_handle(self):
+        from PyObjCTools import AppHelper
+        window = MagicMock()
+        window.native = None
+        with patch.object(ww.sys, "platform", "darwin"), \
+             patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()) as ca:
+            ww._show_macos_traffic_lights(window)
+        ca.assert_not_called()
