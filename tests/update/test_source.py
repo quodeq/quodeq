@@ -23,7 +23,7 @@ def _resp(status=200, payload=None, etag='"abc"'):
     return r
 
 
-def test_frozen_reads_github(monkeypatch) -> None:
+def test_frozen_reads_github() -> None:
     with patch("quodeq.update.source.httpx.get", return_value=_resp(payload=_GH_RELEASE)):
         info = fetch_latest("frozen")
     assert info is not None
@@ -68,5 +68,13 @@ def test_network_error_returns_none() -> None:
 def test_bad_json_returns_none() -> None:
     r = _resp()
     r.json.side_effect = ValueError("bad json")
+    with patch("quodeq.update.source.httpx.get", return_value=r):
+        assert fetch_latest("frozen") is None
+
+
+def test_non_dict_json_returns_none() -> None:
+    # Valid JSON that is a list, not an object — must not raise.
+    r = _resp()
+    r.json.return_value = ["not", "a", "dict"]  # bypass the `payload or {}` default
     with patch("quodeq.update.source.httpx.get", return_value=r):
         assert fetch_latest("frozen") is None

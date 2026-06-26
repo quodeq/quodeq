@@ -3,7 +3,6 @@ any error so the caller can never be broken by the network."""
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 
 import httpx
@@ -42,7 +41,7 @@ def _pick_download_url(release: dict) -> str | None:
         url = asset.get("browser_download_url")
         if url:
             return url
-    return release.get("html_url")
+    return None
 
 
 def fetch_latest(channel: str, etag: str | None = None) -> LatestInfo | None:
@@ -56,6 +55,8 @@ def fetch_latest(channel: str, etag: str | None = None) -> LatestInfo | None:
         if gh.status_code != 200:
             return None
         release = gh.json()
+        if not isinstance(release, dict):
+            return None
         new_etag = gh.headers.get("ETag")
     except (httpx.HTTPError, ValueError):
         return None
@@ -73,7 +74,10 @@ def fetch_latest(channel: str, etag: str | None = None) -> LatestInfo | None:
         try:
             pypi = httpx.get(_PYPI_URL, headers={"User-Agent": _user_agent()}, timeout=_TIMEOUT)
             if pypi.status_code == 200:
-                pypi_version = normalize(str(pypi.json().get("info", {}).get("version") or ""))
+                pypi_data = pypi.json()
+                if not isinstance(pypi_data, dict):
+                    raise ValueError("unexpected non-dict PyPI response")
+                pypi_version = normalize(str(pypi_data.get("info", {}).get("version") or ""))
                 if pypi_version:
                     info.version = pypi_version
         except (httpx.HTTPError, ValueError):
