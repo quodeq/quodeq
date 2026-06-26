@@ -1514,10 +1514,10 @@ button.term-sev-badge--clickable:focus-visible {
 .platform-mac.in-webview .app-shell--with-topbar .topbar {
   padding-left: 82px;
 }
-/* Topbar and sidebar share one cohesive chrome color (subtle theme tint). */
+/* Topbar and sidebar share one cohesive chrome color: plain surface, no tint. */
 .platform-mac.in-webview .topbar,
 .platform-mac.in-webview .sidebar {
-  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+  background: var(--color-surface);
 }
 
 /* ============================================================
