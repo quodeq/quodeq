@@ -1,11 +1,21 @@
 """Native-chrome window: creation args, custom UA, and marker drift guard."""
 import inspect
+import sys
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 import webview as real_webview
 
 from quodeq.dashboard import _webview_window as ww
+
+# Some tests import PyObjCTools to patch AppHelper. pyobjc is darwin-only
+# (pywebview pulls it in under sys_platform == 'darwin'), so those tests can
+# only run on macOS — they would ModuleNotFoundError on Linux/Windows CI.
+_MACOS_ONLY = pytest.mark.skipif(
+    sys.platform != "darwin",
+    reason="exercises macOS AppKit/PyObjC native chrome; pyobjc is darwin-only",
+)
 
 
 class TestWindowCreation:
@@ -121,6 +131,7 @@ class TestOnClosing:
         assert on_closing() is False
 
 
+@_MACOS_ONLY
 class TestMacTrafficLights:
     def test_unhides_three_buttons_on_macos(self):
         from PyObjCTools import AppHelper
@@ -194,6 +205,43 @@ class TestMacFullscreenClass:
         window.evaluate_js.assert_not_called()  # only the worker calls it
 
 
+class TestMacFullscreenChrome:
+    def test_fullscreen_drops_toolbar(self):
+        # macOS draws the unified toolbar as an empty gray bar at the top in
+        # fullscreen — drop it (the lights it centers are hidden there anyway).
+        window = MagicMock()
+        nswindow = window.native
+        with patch.object(ww.threading, "Thread", _SyncThread), \
+             patch.object(ww, "_apply_unified_toolbar") as restore:
+            ww._apply_macos_fullscreen_chrome(window, True)
+        nswindow.setToolbar_.assert_called_once_with(None)
+        restore.assert_not_called()
+        assert window.evaluate_js.call_args.args[0].endswith("true)")
+
+    def test_windowed_restores_toolbar(self):
+        window = MagicMock()
+        nswindow = window.native
+        with patch.object(ww.threading, "Thread", _SyncThread), \
+             patch.object(ww, "_apply_unified_toolbar") as restore:
+            ww._apply_macos_fullscreen_chrome(window, False)
+        restore.assert_called_once_with(nswindow)
+        nswindow.setToolbar_.assert_not_called()
+        assert window.evaluate_js.call_args.args[0].endswith("false)")
+
+    def test_load_sync_does_not_re_add_toolbar(self):
+        # The initial install owns the windowed toolbar; the load-time sync
+        # must not add a second one (restore_toolbar=False).
+        window = MagicMock()
+        nswindow = window.native
+        with patch.object(ww.threading, "Thread", _SyncThread), \
+             patch.object(ww, "_apply_unified_toolbar") as restore:
+            ww._apply_macos_fullscreen_chrome(window, False, restore_toolbar=False)
+        restore.assert_not_called()
+        nswindow.setToolbar_.assert_not_called()
+        assert window.evaluate_js.call_args.args[0].endswith("false)")
+
+
+@_MACOS_ONLY
 class TestMacFullscreenObserver:
     def test_noop_off_macos(self):
         from PyObjCTools import AppHelper

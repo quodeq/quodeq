@@ -477,18 +477,33 @@ def _show_macos_traffic_lights(window: object) -> None:
     AppHelper.callAfter(_apply)
 
 
-def _set_macos_unified_toolbar(window: object) -> None:
-    """Add an empty unified-compact NSToolbar so the native titlebar grows just
-    enough to drop the traffic lights to ~20px from the top — vertically
+def _apply_unified_toolbar(nswindow: object) -> None:
+    """Attach an empty unified-compact NSToolbar so the native titlebar grows
+    just enough to drop the traffic lights to ~20px from the top — vertically
     centered in the 40px in-app topbar (--app-header-h). macOS keeps the lights
     centered across resize, so nothing is repositioned by hand (no jump).
-    Installed once; no-op off macOS or before the native handle exists.
+
+    Must run on the UI thread; AppKit failures are the caller's to swallow.
+    """
+    import AppKit  # noqa: PLC0415
+    toolbar = AppKit.NSToolbar.alloc().initWithIdentifier_("quodeq-titlebar")
+    toolbar.setShowsBaselineSeparator_(False)
+    nswindow.setToolbar_(toolbar)
+    nswindow.setToolbarStyle_(4)  # NSWindowToolbarStyleUnifiedCompact
+    # Remove the 1px separator line under the toolbar (most visible in
+    # fullscreen). NSTitlebarSeparatorStyleNone = 1 (macOS 11+).
+    nswindow.setTitlebarSeparatorStyle_(1)
+
+
+def _set_macos_unified_toolbar(window: object) -> None:
+    """Install the unified-compact toolbar (see _apply_unified_toolbar) on the
+    frameless macOS window. Installed once; no-op off macOS or before the
+    native handle exists.
     """
     global _macos_toolbar_installed
     if _macos_toolbar_installed or sys.platform != "darwin":
         return
     try:
-        import AppKit  # noqa: PLC0415
         from PyObjCTools import AppHelper  # noqa: PLC0415
     except ImportError:
         return
@@ -499,13 +514,7 @@ def _set_macos_unified_toolbar(window: object) -> None:
 
     def _apply() -> None:
         try:
-            toolbar = AppKit.NSToolbar.alloc().initWithIdentifier_("quodeq-titlebar")
-            toolbar.setShowsBaselineSeparator_(False)
-            nswindow.setToolbar_(toolbar)
-            nswindow.setToolbarStyle_(4)  # NSWindowToolbarStyleUnifiedCompact
-            # Remove the 1px separator line under the toolbar (most visible in
-            # fullscreen). NSTitlebarSeparatorStyleNone = 1 (macOS 11+).
-            nswindow.setTitlebarSeparatorStyle_(1)
+            _apply_unified_toolbar(nswindow)
         except (AttributeError, ValueError, TypeError):
             pass
 
@@ -531,10 +540,44 @@ def _set_macos_fullscreen_class(window: object, is_full: bool) -> None:
     threading.Thread(target=_run, daemon=True).start()
 
 
+def _apply_macos_fullscreen_chrome(
+    window: object, is_full: bool, *, restore_toolbar: bool = True,
+) -> None:
+    """Reflect fullscreen state in both the native and the web chrome.
+
+    In fullscreen macOS draws the unified toolbar as a persistent empty gray
+    bar across the top (the traffic lights it centers are hidden there), so
+    drop the toolbar in fullscreen and restore it windowed. Either way toggle
+    the `macos-fullscreen` CSS class, which also clears the topbar border and
+    the now-pointless traffic-light reservation.
+
+    The AppKit toolbar work runs inline — callers are on the UI thread (the
+    fullscreen notifications fire there) — while the JS class toggle is
+    dispatched off it (evaluate_js deadlocks on the main thread).
+
+    ``restore_toolbar=False`` skips re-adding the toolbar when windowed; the
+    initial install (_set_macos_unified_toolbar) already owns that, so the
+    load-time sync must not add a second one.
+    """
+    nswindow = getattr(window, "native", None) if window is not None else None
+    if nswindow is not None:
+        try:
+            if is_full:
+                nswindow.setToolbar_(None)
+            elif restore_toolbar:
+                _apply_unified_toolbar(nswindow)
+        except (AttributeError, ValueError, TypeError, ImportError):
+            pass
+    _set_macos_fullscreen_class(window, is_full)
+
+
 def _install_macos_fullscreen_observer(window: object) -> None:
-    """Toggle `macos-fullscreen` on <html> when the window enters/exits native
-    fullscreen, so CSS can drop the titlebar's bottom border and the
-    traffic-light reservation — both wrong once macOS hides the lights.
+    """React to native fullscreen transitions so the chrome stays clean.
+
+    On enter/exit fullscreen, drop/restore the unified toolbar (macOS otherwise
+    leaves an empty gray toolbar bar at the top) and toggle a `macos-fullscreen`
+    class on <html> (CSS then drops the topbar border and the traffic-light
+    reservation). See _apply_macos_fullscreen_chrome.
 
     Uses NSWindow fullscreen notifications because they are the only reliable
     signal: on a notched display a zoomed window and a fullscreen window report
@@ -564,11 +607,19 @@ def _install_macos_fullscreen_observer(window: object) -> None:
     # panel hit). It closes over this window, of which there is only one.
     if _macos_fullscreen_handler_class is None:
         class _FullScreenHandler(AppKit.NSObject):
-            def enteredFullScreen_(self, note):  # noqa: ARG002, N802 — ObjC selector
-                _set_macos_fullscreen_class(window, True)
+            def willEnterFullScreen_(self, note):  # noqa: ARG002, N802 — ObjC selector
+                # Drop the toolbar BEFORE the enter animation, not after: the
+                # *Did*EnterFullScreen notification only fires once the grow
+                # animation completes, so the toolbar would stay attached for
+                # the whole animation and flash as a gray bar. *Will*Enter runs
+                # first, so the animation has no toolbar to show.
+                _apply_macos_fullscreen_chrome(window, True)
 
-            def exitedFullScreen_(self, note):  # noqa: ARG002, N802 — ObjC selector
-                _set_macos_fullscreen_class(window, False)
+            def didExitFullScreen_(self, note):  # noqa: ARG002, N802 — ObjC selector
+                # Restore only once fully windowed — re-adding during the exit
+                # animation would briefly reattach the toolbar while still
+                # fullscreen and flash gray again.
+                _apply_macos_fullscreen_chrome(window, False)
 
         _macos_fullscreen_handler_class = _FullScreenHandler
 
@@ -579,17 +630,19 @@ def _install_macos_fullscreen_observer(window: object) -> None:
                 observer = _macos_fullscreen_handler_class.alloc().init()
                 center = NSNotificationCenter.defaultCenter()
                 center.addObserver_selector_name_object_(
-                    observer, "enteredFullScreen:",
-                    AppKit.NSWindowDidEnterFullScreenNotification, nswindow,
+                    observer, "willEnterFullScreen:",
+                    AppKit.NSWindowWillEnterFullScreenNotification, nswindow,
                 )
                 center.addObserver_selector_name_object_(
-                    observer, "exitedFullScreen:",
+                    observer, "didExitFullScreen:",
                     AppKit.NSWindowDidExitFullScreenNotification, nswindow,
                 )
                 _macos_fullscreen_observer = observer  # keep it alive
                 _macos_fullscreen_observer_installed = True
             is_full = bool(nswindow.styleMask() & AppKit.NSWindowStyleMaskFullScreen)
-            _set_macos_fullscreen_class(window, is_full)
+            # Don't re-add the toolbar windowed — _set_macos_unified_toolbar
+            # already installed it; a second one would race/flicker.
+            _apply_macos_fullscreen_chrome(window, is_full, restore_toolbar=False)
         except (AttributeError, ValueError, TypeError):
             pass
 
