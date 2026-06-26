@@ -11,6 +11,7 @@ import sys
 from typing import Callable
 
 from quodeq.cli_parser import build_parser  # noqa: F401 — re-export
+from quodeq.update.checker import check_async, get_status, set_settings
 from quodeq.config.paths import default_paths, load_env_file
 from quodeq.dashboard.cli import main as dashboard_main
 
@@ -46,6 +47,44 @@ from quodeq._cli_evaluation import (  # noqa: F401 — public re-exports
 _COMMAND_HANDLERS: dict[str, Callable] = {
     "dashboard": lambda argv: dashboard_main(argv[1:] if argv is not None else sys.argv[2:]),
 }
+
+
+def maybe_emit_cli_notice(stream=None, env: dict[str, str] | None = None) -> None:
+    """Print a one-line update notice (and a one-time disclosure) after a command.
+
+    Interactive terminals only; silent in CI, when opted out, or when piped.
+    Fail-silent — never raises. Also kicks a throttled background check so the
+    NEXT invocation has fresh data.
+    """
+    import os
+
+    out = stream if stream is not None else sys.stdout
+    environ = env if env is not None else os.environ
+    try:
+        if not getattr(out, "isatty", lambda: False)():
+            return
+        if environ.get("QUODEQ_NO_UPDATE_NOTIFIER"):
+            return
+        if environ.get("CI") or environ.get("CONTINUOUS_INTEGRATION"):
+            return
+        check_async()
+        status = get_status()
+        if not status.get("disclosed"):
+            print(
+                "quodeq checks PyPI/GitHub for updates. Disable with "
+                "QUODEQ_NO_UPDATE_NOTIFIER=1 or in Settings.",
+                file=out,
+            )
+            set_settings(disclosed=True)
+        if status.get("update_available"):
+            tag = "Security update" if status.get("is_security") else "Update available"
+            action = status.get("action_command") or "see the releases page"
+            print(
+                f"{tag}: {status['current']} → {status['latest']}. Run: {action}",
+                file=out,
+            )
+    except Exception:  # pragma: no cover - defensive
+        pass
 
 
 def _install_broken_pipe_guard() -> None:
@@ -89,21 +128,24 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args, remaining = parser.parse_known_args(argv)
     command = getattr(args, "handler_command", None) or args.command
-    # Default to dashboard when no subcommand is given
+    # Default to dashboard when no subcommand is given — skip the notice (dashboard has its own banner)
     if command is None:
         return dashboard_main(argv[1:] if argv is not None else sys.argv[1:])
+
     if command == "evaluate":
-        return run_evaluate(args)
-    if command == "ci":
+        code = run_evaluate(args)
+    elif command == "ci":
         from quodeq.ci.cli import handle_ci
-        return handle_ci(args)
-    if command == "review":
+        code = handle_ci(args)
+    elif command == "review":
         from quodeq.ci.review import handle_review
-        return handle_review(args)
-    handler = _COMMAND_HANDLERS.get(command)
-    if handler:
-        return handler(argv)
-    return 1
+        code = handle_review(args)
+    else:
+        handler = _COMMAND_HANDLERS.get(command)
+        code = handler(argv) if handler else 1
+
+    maybe_emit_cli_notice()
+    return code
 
 
 if __name__ == "__main__":
