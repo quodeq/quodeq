@@ -499,6 +499,9 @@ def _set_macos_unified_toolbar(window: object) -> None:
             toolbar.setShowsBaselineSeparator_(False)
             nswindow.setToolbar_(toolbar)
             nswindow.setToolbarStyle_(4)  # NSWindowToolbarStyleUnifiedCompact
+            # Remove the 1px separator line under the toolbar (most visible in
+            # fullscreen). NSTitlebarSeparatorStyleNone = 1 (macOS 11+).
+            nswindow.setTitlebarSeparatorStyle_(1)
         except (AttributeError, ValueError, TypeError):
             pass
 
