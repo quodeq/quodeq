@@ -71,8 +71,11 @@ def test_get_dimension_eval_from_json(tmp_path: Path) -> None:
             "dimension": "maintainability",
             "overallScore": "4/10",
             "overallGrade": "Poor",
+            # Use a real maintainability principle: get_dimension_eval applies
+            # the standard guard (drops principles not in the dimension's
+            # standard), so a fictional name would be filtered out.
             "principles": [
-                {"name": "Separation of Concerns", "score": "4/10", "grade": "Poor"}
+                {"name": "Modularity", "score": "4/10", "grade": "Poor"}
             ],
         },
     )
@@ -83,7 +86,7 @@ def test_get_dimension_eval_from_json(tmp_path: Path) -> None:
     assert payload["dimension"] == "maintainability"
     grades = payload["principleGrades"]
     assert any(item["principle"] == "Overall" for item in grades)
-    assert any(item["principle"] == "Separation of Concerns" for item in grades)
+    assert any(item["principle"] == "Modularity" for item in grades)
 
 
 def test_browse_repo_filters_hidden(tmp_path: Path, monkeypatch) -> None:
