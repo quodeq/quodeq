@@ -24,6 +24,7 @@ from quodeq.api.standards_routes import register_standards_routes
 from quodeq.api.routes_findings import register_findings_routes
 from quodeq.api.llm_bridge_routes import register_llm_bridge_routes
 from quodeq.api.routes_rescore import register_rescore_routes
+from quodeq.api.routes_update import register_update_routes
 from quodeq.api._scores_routes import register_scores_routes
 from quodeq.api._grade_formula_routes import register_grade_formula_routes
 from quodeq.services.base import ActionProvider
@@ -59,5 +60,6 @@ def register_all_routes(
     register_llm_bridge_routes(app)
     if log_buffer:
         register_log_routes(app, log_buffer)
+    register_update_routes(app)
     register_index_routes(app)
     register_static_routes(app, static_dist)

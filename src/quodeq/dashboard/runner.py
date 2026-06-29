@@ -106,6 +106,16 @@ def _start_action_api(
     )
 
 
+def _kick_update_check() -> None:
+    """Fire a throttled, non-blocking update check. Fail-silent — never delays launch."""
+    try:
+        from quodeq.update.checker import check_async
+
+        check_async()
+    except Exception:  # pragma: no cover - defensive
+        pass
+
+
 def run_dashboard(config: DashboardConfig, env: dict[str, str] | None = None) -> int:
     """Start the dashboard: resolve paths, launch the action API, and serve until exit.
 
@@ -130,6 +140,8 @@ def run_dashboard(config: DashboardConfig, env: dict[str, str] | None = None) ->
     action_api_port = config.server.api_port or config.server.port
     api_config = ApiConfig(static_dist=config.static_dist, evaluations_dir=str(config.reports_dir))
     action_api_url, action_api_process = _start_action_api(config, action_api_host, action_api_port, api_config)
+
+    _kick_update_check()
 
     _server_mod.serve_and_wait(action_api_url, action_api_process, config)
     return 0

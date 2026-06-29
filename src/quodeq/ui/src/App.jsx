@@ -1,5 +1,6 @@
 import { lazy, Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
+import UpdateBanner from './features/updates/UpdateBanner.jsx';
 
 const DashboardPage = lazy(() => import('./features/dashboard/components/DashboardPage.jsx'));
 const ExplorerPage = lazy(() => import('./features/explorer/components/ExplorerPage.jsx'));
@@ -412,6 +413,7 @@ function AppShell({ sidebar, header, content }) {
       <div className="app-shell__body">
         {sidebar}
         <div className="app-shell__main-column">
+          <UpdateBanner />
           <main className="dashboard">
             {content}
           </main>
