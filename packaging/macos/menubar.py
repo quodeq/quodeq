@@ -86,6 +86,7 @@ class QuodeqApp(rumps.App):
         self._start_item = rumps.MenuItem("Start", callback=self._on_start)
         self._stop_item = rumps.MenuItem("Stop", callback=None)
         self._error_item = rumps.MenuItem("")
+        self._update_item = rumps.MenuItem("Check for Updates…", callback=self._on_check_updates)
 
         # Check prereqs on main thread so menu items render correctly
         self._cached_cmds = _find_commands()
@@ -101,7 +102,7 @@ class QuodeqApp(rumps.App):
 
         self.menu = [
             self._open_item, None, self._status_item, self._error_item, None,
-            self._start_item, self._stop_item, None,
+            self._start_item, self._stop_item, self._update_item, None,
             *self._prereq_items.values(),
         ]
         # Auto-start in background
@@ -113,6 +114,23 @@ class QuodeqApp(rumps.App):
 
     def _clear_error(self) -> None:
         self._error_item.title = ""
+
+    def _on_check_updates(self, _sender):
+        """Force a check and report the result via a notification."""
+        try:
+            from quodeq.update.checker import get_status, run_check
+
+            run_check(force=True)
+            status = get_status()
+            if status.get("update_available"):
+                rumps.notification(
+                    "Quodeq", "Update available",
+                    f"{status['current']} → {status['latest']}",
+                )
+            else:
+                rumps.notification("Quodeq", "Up to date", f"You're on {status['current']}.")
+        except Exception:
+            pass
 
     def _find_running_port(self) -> int | None:
         """Find the running dashboard port (delegates to cached helper)."""
@@ -165,6 +183,16 @@ class QuodeqApp(rumps.App):
             self.icon = self._icon_stopped
             self.template = True
             self._set_ui_state(running=False)
+
+        try:
+            from quodeq.update.checker import get_status
+
+            if get_status().get("update_available"):
+                self._update_item.title = "Update Available — Click to view"
+            else:
+                self._update_item.title = "Check for Updates…"
+        except Exception:
+            pass
 
     def _auto_start(self):
         """Auto-start the dashboard if not already running."""
