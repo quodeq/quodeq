@@ -1820,8 +1820,8 @@ button.term-sev-badge--clickable:focus-visible {
   border-radius: var(--term-radius);
   font-variant-numeric: tabular-nums;
   /* Constant min-width so single-digit counts don't render as a tiny dot,
-     plus a max-width as a final safety net (the JSX caps display at
-     "999+", so this should never actually ellipsize in practice). */
+     plus a max-width as a final safety net (the JSX collapses thousands to a
+     compact "k" form, so this should never actually ellipsize in practice). */
   min-width: 22px;
   max-width: 48px;
   text-align: center;
