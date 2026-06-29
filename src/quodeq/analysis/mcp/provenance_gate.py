@@ -68,3 +68,30 @@ def names_external_source(text: str | None) -> bool:
     if not text:
         return False
     return _TERM_PATTERN.search(text) is not None
+
+
+def apply_provenance_gate(finding: dict) -> bool:
+    """De-escalate a critical R-FT-2/S-AUT-3 finding that names no external
+    source to ``major``, in place. Returns True iff it downgraded.
+
+    Only touches violations at ``critical`` for the gated reqs; everything else
+    (other reqs, ``major``/``minor``, compliance) is left untouched. Never drops.
+    Detection reads the model's prose (``reason`` + title ``w``) only, so it is
+    language-independent; the code ``snippet`` is intentionally not consulted.
+    """
+    if finding.get("t") != "violation":
+        return False
+    if finding.get("req") not in PROVENANCE_GATED_REQS:
+        return False
+    if finding.get("severity") != "critical":
+        return False
+    haystack = " ".join(str(finding.get(k) or "") for k in ("reason", "w"))
+    if names_external_source(haystack):
+        return False
+    finding["severity"] = "major"
+    finding[DOWNGRADE_MARKER] = True
+    _log.debug(
+        "provenance gate: downgraded %s finding to major (no external source named): %s",
+        finding.get("req"), finding.get("file"),
+    )
+    return True
