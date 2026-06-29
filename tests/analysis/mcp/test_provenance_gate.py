@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pytest
 
+from quodeq.analysis.mcp.enricher import CompiledContext, FindingEnricher
 from quodeq.analysis.mcp.provenance_gate import (
     DOWNGRADE_MARKER,
     EXTERNAL_SOURCE_TERMS,
@@ -122,3 +123,31 @@ def test_gated_reqs_are_the_two_patterns():
 def test_plural_sources_detected():
     assert names_external_source("query parameters were not validated") is True
     assert names_external_source("reads multiple HTTP headers") is True
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: gate wired into FindingEnricher.enrich (issue #639)
+# ---------------------------------------------------------------------------
+
+def _enrich(args: dict) -> dict:
+    return FindingEnricher(CompiledContext()).enrich(args)
+
+
+def test_enrich_downgrades_internal_critical():
+    result = _enrich({
+        "t": "violation", "req": "S-AUT-3", "severity": "critical",
+        "file": "src/cache/local.py", "line": 59, "w": "Path traversal",
+        "reason": "builds a path from a SHA-256 cache key with no external input",
+    })
+    assert result["severity"] == "major"
+    assert result["provenance_downgrade"] is True
+
+
+def test_enrich_keeps_external_critical():
+    result = _enrich({
+        "t": "violation", "req": "S-AUT-3", "severity": "critical",
+        "file": "src/server/download.py", "line": 10, "w": "Path traversal",
+        "reason": "path built from the HTTP request filename, unvalidated",
+    })
+    assert result["severity"] == "critical"
+    assert "provenance_downgrade" not in result

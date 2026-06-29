@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
 from quodeq.analysis.mcp.enrichment import enrich_code
+from quodeq.analysis.mcp.provenance_gate import apply_provenance_gate
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
 from quodeq.context.path_role import NON_PROD_ROLES, path_role
 from quodeq.context.precedent import fingerprint as _precedent_fingerprint
@@ -179,5 +180,6 @@ class FindingEnricher:
         _apply_path_role_downweight(finding)
         _apply_shape_downweight(finding, self._project_shape)
         _apply_precedent_downweight(finding, self._precedent_fingerprints)
+        apply_provenance_gate(finding)  # deterministic critical-severity gate (#639)
 
         return finding
