@@ -1926,6 +1926,43 @@ button.term-sev-badge--clickable:focus-visible {
   text-overflow: ellipsis;
 }
 
+/* Mobile project indicator: the tappable accent label that mirrors the
+   desktop breadcrumb root. The surrounding title sets pointer-events:none on
+   mobile, so the button re-enables them for itself. */
+.topbar-mobile-project {
+  flex: 0 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: var(--color-accent);
+  font-weight: 500;
+  cursor: pointer;
+  pointer-events: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topbar-mobile-project::before {
+  content: '\25B8'; /* ▸ */
+  margin-right: 4px;
+  opacity: 0.85;
+}
+.topbar-mobile-sep {
+  flex: 0 0 auto;
+  margin: 0 5px;
+  color: var(--color-text-subtle);
+  opacity: 0.55;
+}
+.topbar-mobile-page {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 
 .topbar-actions {
   display: inline-flex;
