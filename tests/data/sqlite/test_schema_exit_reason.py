@@ -29,8 +29,8 @@ def test_fresh_db_dimension_scores_has_exit_reason_column(tmp_path: Path):
         conn.close()
 
 
-def test_schema_version_bumped_to_5():
-    assert SCHEMA_VERSION == 5
+def test_schema_version_bumped_to_6():
+    assert SCHEMA_VERSION == 6
 
 
 def test_upgrade_from_v4_adds_exit_reason(tmp_path: Path):
@@ -55,7 +55,7 @@ def test_upgrade_from_v4_adds_exit_reason(tmp_path: Path):
         apply_evaluation_schema(conn)
         cols = [row[1] for row in conn.execute("PRAGMA table_info(dimension_scores)").fetchall()]
         assert "exit_reason" in cols
-        # Confirm user_version was bumped.
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 5
+        # Applying walks all the way to the current schema version.
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     finally:
         conn.close()

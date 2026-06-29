@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 EVALUATION_DDL = """
-PRAGMA user_version = 5;
+PRAGMA user_version = 6;
 
 CREATE TABLE findings (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,6 +33,9 @@ CREATE TABLE findings (
     -- sure this is real." Slice 1 of the context-enricher plan adds this column;
     -- subsequent slices write < 100 to downweight false-positive patterns.
     confidence      INTEGER NOT NULL DEFAULT 100,
+    -- 1 when the deterministic provenance gate (#639) de-escalated this
+    -- finding from critical to major; 0 otherwise. UI/DB audit marker (#656).
+    provenance_downgrade INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -94,4 +97,4 @@ CREATE TABLE principle_grades (
 CREATE INDEX idx_principle_grades_dimension ON principle_grades(dimension);
 """
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6

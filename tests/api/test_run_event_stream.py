@@ -68,6 +68,21 @@ def test_serialize_finding_event_includes_judgment_fields():
     assert parsed["verdict"] == "violation"
 
 
+def test_payload_as_sse_finding_includes_provenance_downgrade():
+    # Issue #656: the live SSE finding payload lists fields explicitly, so the
+    # gate's provenance_downgrade marker must be added there too.
+    from quodeq.api._run_event_stream import _payload_as_sse_finding
+    from quodeq.core.events.models import Judgment
+
+    j = Judgment(
+        practice_id="R-FT-2", verdict="violation", dimension="security",
+        file="f.py", line=1, reason="r", severity="major",
+        provenance_downgrade=True,
+    )
+    payload = _payload_as_sse_finding(j, finding_id=1)
+    assert payload["provenance_downgrade"] is True
+
+
 # ---------------------------------------------------------------------------
 # WatcherState tests
 # ---------------------------------------------------------------------------

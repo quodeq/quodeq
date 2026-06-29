@@ -53,6 +53,7 @@ def wire_dict_to_judgment(d: dict[str, Any]) -> Judgment:
         req=d.get("req"),
         req_refs=_coerce_req_refs(d.get("req_refs")),
         cwe=d.get("cwe"),
+        provenance_downgrade=bool(d.get("provenance_downgrade")),
     )
 
 
@@ -81,6 +82,7 @@ def judgment_to_finding(j: Judgment, *, dismissed: bool = False) -> Finding:
         violation_type=j.violation_type,
         scope=j.scope,
         confidence=j.confidence,
+        provenance_downgrade=j.provenance_downgrade,
     )
 
 
@@ -102,4 +104,5 @@ def finding_to_response_dict(f: Finding) -> dict[str, Any]:
         "title": f.title,
         "req": f.req,
         "req_refs": req_refs,
+        "provenance_downgrade": f.provenance_downgrade,
     }

@@ -29,6 +29,14 @@ const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
     <div className={`vdetail-row vdetail-row--${v.severity}`}>
       <div className="vdetail-row-main">
         <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
+        {v.provenanceDowngrade && (
+          <span
+            className="provenance-downgrade-tag"
+            title="Provenance gate: de-escalated from critical to major because the finding named no reachable external input source."
+          >
+            downgraded from critical
+          </span>
+        )}
         {v.dimension && <span className="vrow-label">[{v.dimension}]</span>}
         {v.principle && <span className="vrow-label">[{v.principle}]</span>}
         {filename && (

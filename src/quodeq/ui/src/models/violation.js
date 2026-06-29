@@ -26,6 +26,7 @@
  * @property {ReqRef[]}      reqRefs
  * @property {string|null}   dimension
  * @property {string|null}   violationType
+ * @property {boolean}       provenanceDowngrade  true when the provenance gate (#639) de-escalated this from critical to major
  */
 
 /**
@@ -55,6 +56,7 @@ export function createViolation(raw) {
     reqRefs:       raw.reqRefs ?? raw.req_refs ?? [],
     dimension:     raw.dimension ?? null,
     violationType: raw.violationType ?? raw.violation_type ?? null,
+    provenanceDowngrade: raw.provenanceDowngrade ?? raw.provenance_downgrade ?? false,
   };
 }
 

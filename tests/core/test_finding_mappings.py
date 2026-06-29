@@ -169,6 +169,43 @@ class TestFindingToResponseDict:
         assert d["req_refs"] is None
 
 
+class TestProvenanceDowngradeField:
+    """Issue #656: the provenance gate stamps ``provenance_downgrade`` on a
+    finding dict it de-escalates. Promote it to a first-class field so it
+    travels Judgment -> Finding -> API response, not just the JSONL forensic.
+    """
+
+    def test_wire_dict_carries_downgrade_marker(self):
+        j = wire_dict_to_judgment({
+            "p": "P1", "t": "violation", "d": "D", "file": "f", "line": 1,
+            "reason": "r", "provenance_downgrade": True,
+        })
+        assert j.provenance_downgrade is True
+
+    def test_wire_dict_defaults_downgrade_to_false_when_absent(self):
+        j = wire_dict_to_judgment({"p": "P1", "t": "violation"})
+        assert j.provenance_downgrade is False
+
+    def test_judgment_to_finding_carries_downgrade(self):
+        j = Judgment(
+            practice_id="P1", verdict="violation", dimension="D",
+            file="f", line=1, reason="r", provenance_downgrade=True,
+        )
+        f = judgment_to_finding(j)
+        assert f.provenance_downgrade is True
+
+    def test_finding_to_response_dict_includes_downgrade(self):
+        f = Finding(
+            practice_id="P1", verdict="violation", file="f", line=1,
+            reason="r", severity="major", provenance_downgrade=True,
+        )
+        assert finding_to_response_dict(f)["provenance_downgrade"] is True
+
+    def test_response_dict_downgrade_false_by_default(self):
+        f = Finding(practice_id="P1", verdict="violation", file="f", line=1)
+        assert finding_to_response_dict(f)["provenance_downgrade"] is False
+
+
 class TestRoundTrip:
     def test_wire_dict_to_finding_via_judgment(self):
         d = {

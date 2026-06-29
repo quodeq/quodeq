@@ -59,6 +59,7 @@ def parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
         context=obj.get("context") or None, scope=obj.get("scope") or None,
         confidence=_jsonl_confidence(obj.get("confidence")),
         req_refs=req_refs,
+        provenance_downgrade=bool(obj.get("provenance_downgrade")),
     )
     return j, obj.get("refs")
 
@@ -89,6 +90,10 @@ def judgment_to_dict(j: Judgment) -> dict:
     # has full confidence; producers writing < 100 surface in the output.
     if j.confidence != 100:
         d["confidence"] = j.confidence
+    # Carry the provenance-gate marker forward only when set, mirroring
+    # confidence -- keeps the common (un-downgraded) finding dict compact.
+    if j.provenance_downgrade:
+        d["provenance_downgrade"] = True
     return d
 
 

@@ -63,6 +63,10 @@ class Judgment(BaseModel):
     req: Optional[str] = None
     req_refs: List[ReqRef] = Field(default_factory=list)
     cwe: Optional[str] = None
+    # True when the deterministic provenance gate (#639) de-escalated this
+    # finding from critical to major. UI/DB-visible audit marker (#656); the
+    # severity flip already drives the grade, this just makes it auditable.
+    provenance_downgrade: bool = False
 
     @field_validator("req_refs", mode="before")
     @classmethod

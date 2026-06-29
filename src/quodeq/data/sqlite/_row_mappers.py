@@ -61,6 +61,7 @@ def finding_dict_to_row(finding: dict[str, Any]) -> dict[str, Any]:
         "req_refs_json": json.dumps(refs) if refs is not None else None,
         "dedup_key": _dedup_key(practice_id, file, line, verdict),
         "confidence": _coerce_confidence(finding.get("confidence")),
+        "provenance_downgrade": 1 if finding.get("provenance_downgrade") else 0,
     }
 
 
@@ -90,6 +91,7 @@ def judgment_to_row(j: Judgment) -> dict[str, Any]:
         "req_refs_json": refs_json,
         "dedup_key": _dedup_key(j.practice_id, j.file, j.line, j.verdict),
         "confidence": _coerce_confidence(j.confidence),
+        "provenance_downgrade": 1 if j.provenance_downgrade else 0,
     }
 
 
@@ -115,4 +117,5 @@ def row_to_finding(row: dict[str, Any]) -> Finding:
         context=row.get("context", ""),
         scope=row.get("scope", ""),
         confidence=_coerce_confidence(row.get("confidence")),
+        provenance_downgrade=bool(row.get("provenance_downgrade")),
     )
