@@ -990,6 +990,21 @@ textarea:focus {
   border-color: var(--color-compliance-border);
 }
 
+/* Marker for a finding the deterministic provenance gate (#639) de-escalated
+   from critical to major. Dashed border + major color = "adjusted down". */
+.provenance-downgrade-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  border: 1px dashed var(--color-sev-major-border);
+  color: var(--color-sev-major-text);
+  background: transparent;
+  white-space: nowrap;
+}
+
 /* ── Grade chips ──────────────────────────────────────── */
 
 .chip {

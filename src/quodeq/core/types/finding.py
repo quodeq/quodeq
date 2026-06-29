@@ -42,3 +42,6 @@ class Finding:
     # Lower values flag noise (path role, project shape, precedent) the
     # context-enricher pipeline downweights post-LLM.
     confidence: int = 100
+    # True when the deterministic provenance gate (#639) de-escalated this
+    # finding from critical to major. Audit marker surfaced in the DB/UI (#656).
+    provenance_downgrade: bool = False

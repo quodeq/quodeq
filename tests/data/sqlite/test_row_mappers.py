@@ -143,6 +143,37 @@ def test_row_to_finding_preserves_explicit_confidence():
     assert row_to_finding(row).confidence == 30
 
 
+def test_finding_dict_to_row_sets_provenance_downgrade_flag():
+    # Issue #656: the gate stamps provenance_downgrade=True on dicts it
+    # de-escalates; persist it as 1/0 so the SQL projection can surface it.
+    on = finding_dict_to_row({"p": "P1", "t": "violation", "severity": "major",
+                              "provenance_downgrade": True})
+    assert on["provenance_downgrade"] == 1
+    off = finding_dict_to_row({"p": "P1", "t": "violation", "severity": "major"})
+    assert off["provenance_downgrade"] == 0
+
+
+def test_judgment_to_row_sets_provenance_downgrade_flag():
+    j = Judgment(
+        practice_id="P1", verdict="violation", dimension="d",
+        file="f.py", line=1, reason="r", severity="major",
+        provenance_downgrade=True,
+    )
+    assert judgment_to_row(j)["provenance_downgrade"] == 1
+
+
+def test_row_to_finding_reads_provenance_downgrade_flag():
+    assert row_to_finding({
+        "practice_id": "P1", "verdict": "violation", "severity": "major",
+        "file": "f.py", "line": 1, "provenance_downgrade": 1,
+    }).provenance_downgrade is True
+    # Legacy rows (pre-#656, no column) default to False.
+    assert row_to_finding({
+        "practice_id": "P1", "verdict": "violation", "severity": "major",
+        "file": "f.py", "line": 1,
+    }).provenance_downgrade is False
+
+
 def test_judgment_to_row_maps_required_fields():
     payload = Judgment(
         practice_id="P1",

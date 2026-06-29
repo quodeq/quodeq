@@ -85,6 +85,28 @@ def test_get_scores_raw_reads_from_sql_after_projection(tmp_path: Path) -> None:
     assert security_dim["overallScore"] is not None
 
 
+def test_get_scores_raw_surfaces_provenance_downgrade(tmp_path: Path) -> None:
+    """Issue #656: a finding the provenance gate downgraded must keep its
+    provenance_downgrade flag through the SQL-backed scores read path
+    (_build_response_from_grade_tables / _SELECT_ACTIVE), so the dashboard
+    badge can render. A dropped column here silently regresses it to False."""
+    violations = _scorable_violations()  # 5 distinct Security violations
+    violations[0] = {
+        **violations[0], "file": "downgraded.py",
+        "severity": "major", "provenance_downgrade": True,
+    }
+    _seed_run(tmp_path, "myproject", "r1", violations=violations)
+
+    result = get_scores_raw(tmp_path, "myproject", "r1")
+
+    security = next(d for d in result["dimensions"] if d["dimension"] == "Security")
+    target = next(v for v in security["violations"] if v["file"] == "downgraded.py")
+    assert target["provenanceDowngrade"] is True
+    # Parity: an un-downgraded finding stays False (no over-marking).
+    other = next(v for v in security["violations"] if v["file"] != "downgraded.py")
+    assert other["provenanceDowngrade"] is False
+
+
 def test_get_scores_raw_falls_back_when_db_schema_too_new(tmp_path: Path) -> None:
     """A run whose evaluation.db was written by a NEWER Quodeq (higher schema
     version) must not crash the score read on an older binary; get_scores_raw

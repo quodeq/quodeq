@@ -237,11 +237,42 @@ def _upgrade_v4_to_v5(conn: sqlite3.Connection) -> None:
             conn.execute("ALTER TABLE dimension_scores ADD COLUMN exit_reason TEXT")
 
 
+def _upgrade_v5_to_v6(conn: sqlite3.Connection) -> None:
+    """Add the provenance_downgrade column to findings (default 0, issue #656).
+
+    Marks findings the deterministic provenance gate (#639) de-escalated from
+    critical to major so the SQL projection and dashboard can surface it.
+
+    findings may not exist on DBs upgraded from very old (v1/v2) schemas that
+    only ever created a subset of tables -- only the fresh-DB DDL guarantees
+    it. Skip the ALTER in that case (mirrors the dimension_scores guard in
+    _upgrade_v4_to_v5); a future caller needing the column gets the fresh DDL.
+
+    Idempotency: the ALTER and the PRAGMA user_version bump in
+    apply_evaluation_schema commit separately (autocommit), so a crash in
+    between leaves the column added but the version still 5. Re-running the
+    bare ALTER would then raise "duplicate column name: provenance_downgrade"
+    -- a plain OperationalError the scoring/dashboard read seams don't catch,
+    permanently bricking the run. Skip if the column already exists.
+    """
+    has_findings = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='findings'"
+    ).fetchone() is not None
+    if not has_findings:
+        return
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
+    if "provenance_downgrade" not in columns:
+        conn.execute(
+            "ALTER TABLE findings ADD COLUMN provenance_downgrade INTEGER NOT NULL DEFAULT 0"
+        )
+
+
 _UPGRADES = {
     1: _upgrade_v1_to_v2,
     2: _upgrade_v2_to_v3,
     3: _upgrade_v3_to_v4,
     4: _upgrade_v4_to_v5,
+    5: _upgrade_v5_to_v6,
 }
 
 

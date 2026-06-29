@@ -46,6 +46,19 @@ def test_list_by_dimension_returns_judgments(tmp_path: Path):
     assert items[0].reason == "late"
 
 
+def test_insert_finding_persists_provenance_downgrade(tmp_path: Path):
+    # Issue #656: a finding the provenance gate downgraded must round-trip
+    # through the INSERT + SELECT column lists, not silently fall back to the
+    # default. A missing column in either list would regress to False here.
+    repo = SqliteFindingsRepository(tmp_path)
+    repo.insert_finding(_finding(p="R-FT-2", severity="major",
+                                 provenance_downgrade=True))
+    repo.insert_finding(_finding(p="P-normal", line=2, severity="major"))
+    by_id = {f.practice_id: f for f in repo.list_all()}
+    assert by_id["R-FT-2"].provenance_downgrade is True
+    assert by_id["P-normal"].provenance_downgrade is False
+
+
 def test_search_uses_fts5(tmp_path: Path):
     repo = SqliteFindingsRepository(tmp_path)
     repo.insert_finding(_finding(p="P1", reason="missing input validation"))

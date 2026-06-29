@@ -32,6 +32,7 @@ class FindingSpec:
     scope: str | None = None
     include_severity: bool = True
     confidence: int = 100
+    provenance_downgrade: bool = False
 
 
 def build_finding_base(spec: FindingSpec) -> Finding:
@@ -61,6 +62,7 @@ def build_finding_base(spec: FindingSpec) -> Finding:
         context=spec.context if spec.context else None,
         scope=spec.scope if spec.scope else None,
         confidence=spec.confidence,
+        provenance_downgrade=spec.provenance_downgrade,
     )
 
 
