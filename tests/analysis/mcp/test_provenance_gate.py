@@ -151,3 +151,36 @@ def test_enrich_keeps_external_critical():
     })
     assert result["severity"] == "critical"
     assert "provenance_downgrade" not in result
+
+
+def test_downgraded_finding_retains_all_other_fields():
+    """No-drop invariant: a downgrade mutates only severity (+marker), never
+    removes the finding or its other fields."""
+    f = _finding(
+        req="S-AUT-3", file="src/cache/local.py", line=59,
+        w="Path traversal", reason="builds a path from a SHA-256 cache key",
+    )
+    assert apply_provenance_gate(f) is True
+    assert f["severity"] == "major"
+    # every other field survives intact
+    assert f["t"] == "violation"
+    assert f["req"] == "S-AUT-3"
+    assert f["file"] == "src/cache/local.py"
+    assert f["line"] == 59
+    assert f["w"] == "Path traversal"
+    assert f["reason"] == "builds a path from a SHA-256 cache key"
+
+
+def test_non_referential_source_word_intentionally_kept_critical():
+    """KNOWN, INTENTIONAL conservative bias (pinned so a future vocab edit cannot
+    silently change it): the gate keeps `critical` whenever a vocabulary term
+    appears at all, even used non-referentially (here "header" inside "file
+    header bytes"). The gate never tries to disambiguate prose; it only ever
+    errs toward keeping critical, never toward an unjustified downgrade."""
+    f = _finding(
+        req="S-AUT-3",
+        reason="splits the file header bytes, a 4-byte internal magic number",
+    )
+    assert apply_provenance_gate(f) is False
+    assert f["severity"] == "critical"
+    assert "provenance_downgrade" not in f
