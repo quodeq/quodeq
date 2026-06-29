@@ -42,7 +42,7 @@ def get_update_state_path(env: dict[str, str] | None = None) -> str:
 def read_state(env: dict[str, str] | None = None) -> UpdateState:
     path = Path(get_update_state_path(env))
     try:
-        raw = json.loads(path.read_text())
+        raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return UpdateState()
     if not isinstance(raw, dict):
@@ -56,7 +56,7 @@ def write_state(state: UpdateState, env: dict[str, str] | None = None) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(asdict(state), indent=2))
+        tmp.write_text(json.dumps(asdict(state), indent=2), encoding="utf-8")
         os.replace(tmp, path)
     except OSError:
         pass  # fail-silent: a notice is never worth crashing over
