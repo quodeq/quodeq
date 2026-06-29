@@ -89,15 +89,10 @@ export default function Sidebar({
   historyCount = null,
   standardsCount = null,
   lastEvalAt = null,
-  serverConnected = null,
   /* Controlled pin state — when provided, the parent owns the toggle.
      Falls back to internal state when the parent doesn't care. */
   isPinned: controlledPinned,
   onPinChange,
-  /* Optional mobile-only extras rendered inside the drawer. Desktop still
-     shows these in the TopBar; on mobile the TopBar strips them so the bar
-     stays tidy, and the drawer surfaces them here instead. */
-  mobileExtras = null,
 }) {
   const [internalPinned, setInternalPinned] = useState(false);
   const isPinned = controlledPinned != null ? controlledPinned : internalPinned;
@@ -178,18 +173,6 @@ export default function Sidebar({
                 <span className="sidebar-status-label">Last eval</span>
                 <span className="sidebar-status-value">{lastEvalStr}</span>
               </div>
-            )}
-            {serverConnected != null && (
-              <div className="sidebar-status-row">
-                <span className="sidebar-status-label">Server</span>
-                <span className="sidebar-status-value">
-                  <span className={`sidebar-dot ${serverConnected ? 'sidebar-dot--ok' : 'sidebar-dot--err'}`} aria-hidden="true" />
-                  {serverConnected ? 'running' : 'offline'}
-                </span>
-              </div>
-            )}
-            {mobileExtras && (
-              <div className="sidebar-mobile-extras">{mobileExtras}</div>
             )}
           </div>
           <div className="sidebar-nav sidebar-block sidebar-block--flush">
