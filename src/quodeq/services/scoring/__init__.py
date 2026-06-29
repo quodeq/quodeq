@@ -204,7 +204,7 @@ def _build_response_from_grade_tables(
     _SELECT_ACTIVE = (
         "SELECT id, practice_id, dimension, requirement, verdict, severity, "
         "file, line, end_line, title, reason, snippet, violation_type, context, "
-        "scope, req_refs_json, confidence "
+        "scope, req_refs_json, confidence, provenance_downgrade "
         "FROM findings WHERE verdict != 'dismissed' ORDER BY id"
     )
 

@@ -190,6 +190,28 @@ test('buildTopOffendingFiles includes violationsBySeverity on each item', () => 
   assert.ok(Array.isArray(aEntry.violationsBySeverity.unknown));
 });
 
+test('buildTopOffendingFiles preserves provenanceDowngrade on aggregated violations (#656)', () => {
+  // The aggregator builds an explicit object literal; if it does not copy
+  // provenanceDowngrade, the FileDetailPage "downgraded from critical" badge
+  // silently never renders on the top-offending-files navigation path.
+  const dims = [
+    {
+      dimension: 'Security',
+      violations: [
+        { file: 'd.py', severity: 'major', principle: 'P', provenanceDowngrade: true },
+        { file: 'd.py', severity: 'major', principle: 'P', provenanceDowngrade: false },
+      ],
+    },
+  ];
+  const result = buildTopOffendingFiles(dims, {});
+  const entry = result.find(r => r.file === 'd.py');
+  assert.ok(entry);
+  const majors = entry.violationsBySeverity.major;
+  assert.equal(majors.length, 2);
+  assert.equal(majors[0].provenanceDowngrade, true);
+  assert.equal(majors[1].provenanceDowngrade, false);
+});
+
 test('buildTopOffendingFiles includes sorted dimensions array on each item', () => {
   const result = buildTopOffendingFiles(dimensions, {});
   const aEntry = result.find(r => r.file === 'lib/a.sh');
