@@ -5,9 +5,9 @@ src/quodeq/analysis/_api_runner.py:36:context
 src/quodeq/analysis/_api_runner.py:37:context
 src/quodeq/analysis/api_prompt_assembly.py:14:context
 src/quodeq/analysis/api_prompt_assembly.py:15:context
-src/quodeq/analysis/mcp/enricher.py:15:context
 src/quodeq/analysis/mcp/enricher.py:16:context
 src/quodeq/analysis/mcp/enricher.py:17:context
+src/quodeq/analysis/mcp/enricher.py:18:context
 src/quodeq/analysis/mcp/findings_server.py:20:context
 src/quodeq/analysis/mcp/findings_server.py:21:context
 src/quodeq/analysis/subprocess.py:232:llm_bridge

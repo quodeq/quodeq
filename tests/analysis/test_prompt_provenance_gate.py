@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
+from quodeq.analysis.mcp.provenance_gate import EXTERNAL_SOURCE_TERMS
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
 from quodeq.analysis.prompts._template import load_template
 from quodeq.context.path_role import Role, path_role
@@ -169,3 +170,14 @@ def test_internal_fixture_prompt_has_no_role_label(case):
     )
     assert "(role:" not in prompt
     assert "test_fixture" not in prompt
+
+
+def test_vocabulary_concepts_present_in_rules():
+    """The deterministic gate's source vocabulary must stay in sync with the
+    prompt gate's source taxonomy, so the two cannot silently diverge.
+    """
+    lower = RULES.lower()
+    # Representative concepts that the rules' source taxonomy lists.
+    for concept in ("request", "header", "cookie", "cli argument", "environment variable"):
+        assert concept in lower, f"rules no longer mention source concept {concept!r}"
+        assert concept in EXTERNAL_SOURCE_TERMS, f"vocabulary dropped {concept!r}"
