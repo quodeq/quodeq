@@ -30,11 +30,11 @@ function Logo() {
 }
 
 // Cap the count badge text so the absolutely-positioned chip can't grow
-// past the rail edge. Anything four digits or more reads as "999+", and
-// the title carries the exact number.
+// past the rail edge. Thousands collapse to a compact "k" form (1200 -> "1k",
+// 12500 -> "13k"), and the title carries the exact number.
 function formatNavCount(count) {
   if (count == null) return null;
-  if (count >= 1000) return '999+';
+  if (count >= 1000) return `${Math.round(count / 1000)}k`;
   return String(count);
 }
 
