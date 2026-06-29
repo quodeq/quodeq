@@ -18,6 +18,11 @@ from quodeq.context.precedent import fingerprint as _precedent_fingerprint
 from quodeq.context.project_shape import Deployment, ProjectShape
 
 _FINDING_SCHEMA_VERSION = 1
+# These downweights set `confidence`, a UI/triage signal ONLY: confidence drives
+# the dashboard's "Low confidence" grouping and does NOT affect the grade (it is
+# excluded from the scoring fields -- see _report_constants._VIOLATION_FIELDS and
+# #640). Severity, set by the analysis LLM and enforced by the provenance gate
+# (#639), is the lever that moves the score.
 _NON_PROD_DOWNWEIGHT = 50
 _SHAPE_DOWNWEIGHT = 40
 _PRECEDENT_DOWNWEIGHT = 25
