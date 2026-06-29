@@ -146,6 +146,19 @@ quodeq evaluate /path/to/project -d security        # Single dimension
 
 ---
 
+## Updates
+
+Quodeq checks for new versions once a day in the background (PyPI for
+`pip`/`pipx`/`uv` installs, GitHub Releases for the macOS/Windows apps) and
+shows a dismissible notice with the right upgrade step. It never auto-replaces
+itself and sends no telemetry — the only network call is an unauthenticated
+request to PyPI/GitHub.
+
+Disable it by setting `QUODEQ_NO_UPDATE_NOTIFIER=1`, or toggle "Automatic
+checks" off under Settings → Updates.
+
+---
+
 ## AI Providers
 
 Choose what fits your workflow. Configure in **Settings** from the dashboard.
