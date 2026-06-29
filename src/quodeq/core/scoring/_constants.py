@@ -18,8 +18,8 @@ _CEIL_SCALE: float = 0.5
 # Severity grade floor: minimum score by worst severity present
 _SEVERITY_GRADE_FLOOR: dict[str, float] = {
     "critical": 0.0,
-    "major": 3.0,
-    "minor": 5.0,
+    "major": 5.0,
+    "minor": 8.0,
 }
 
 # Legacy dampening constants

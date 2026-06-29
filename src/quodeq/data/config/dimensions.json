@@ -1,9 +1,9 @@
 {
-  "_note": "The per-dimension 'weight' field seeds the grade formula's default dimension weights (ScoringParams.dimension_weights). Weights affect scoring only when the user enables them in Settings > Grade formula; by default every aggregation path takes a plain unweighted mean of dimension scores.",
+  "_note": "The per-dimension 'weight' field seeds the grade formula's default dimension weights (ScoringParams.dimension_weights). The defaults are all 1.0, so the overall score is a plain unweighted mean of dimension scores; users can retune the per-dimension weights in Settings > Grade formula.",
   "applies": [
     {
       "id": "security",
-      "weight": 1.2,
+      "weight": 1.0,
       "iso_25010": "Security",
       "source": "ISO/IEC 25010:2023"
     },
@@ -21,19 +21,19 @@
     },
     {
       "id": "performance",
-      "weight": 0.8,
+      "weight": 1.0,
       "iso_25010": "Performance Efficiency",
       "source": "ISO/IEC 25010:2023"
     },
     {
       "id": "usability",
-      "weight": 0.6,
+      "weight": 1.0,
       "iso_25010": "Usability",
       "source": "ISO/IEC 25010:2023"
     },
     {
       "id": "flexibility",
-      "weight": 0.6,
+      "weight": 1.0,
       "iso_25010": "Flexibility",
       "source": "ISO/IEC 25010:2023"
     },

@@ -21,12 +21,12 @@ def test_defaults_match_q2_constants():
     assert DEFAULT_PARAMS.base_k == 0.12
     assert DEFAULT_PARAMS.lift_compress == 1.8
     assert DEFAULT_PARAMS.ceil_scale == 0.5
-    assert DEFAULT_PARAMS.floor_minor == 5.0
-    assert DEFAULT_PARAMS.floor_major == 3.0
+    assert DEFAULT_PARAMS.floor_minor == 8.0
+    assert DEFAULT_PARAMS.floor_major == 5.0
     assert DEFAULT_PARAMS.grade_thresholds == (
         (9.0, "Exemplary"), (7.0, "Good"), (5.0, "Adequate"), (3.0, "Poor"),
     )
-    assert DEFAULT_PARAMS.dimension_weights_enabled is False
+    assert DEFAULT_PARAMS.dimension_weights_enabled is True
 
 
 def test_default_dimension_weights_stay_in_sync_with_dimensions_json():
@@ -103,13 +103,21 @@ def test_validate_rejects_nonpositive_severity_weight():
 
 
 def test_dimension_weighted_average_disabled_is_plain_mean():
+    import dataclasses
+    params = dataclasses.replace(DEFAULT_PARAMS, dimension_weights_enabled=False)
     pairs = [("security", 8.0), ("performance", 6.0)]
-    assert dimension_weighted_average(pairs, DEFAULT_PARAMS) == 7.0
+    assert dimension_weighted_average(pairs, params) == 7.0
 
 
 def test_dimension_weighted_average_enabled_weights_by_dimension():
     import dataclasses
-    params = dataclasses.replace(DEFAULT_PARAMS, dimension_weights_enabled=True)
+    # Default weights are all 1.0; set explicit per-dimension weights to
+    # exercise the weighting math.
+    params = dataclasses.replace(
+        DEFAULT_PARAMS,
+        dimension_weights_enabled=True,
+        dimension_weights={"security": 1.2, "performance": 0.8},
+    )
     # security weight 1.2, performance 0.8 → (8*1.2 + 6*0.8) / 2.0 = 7.2
     pairs = [("security", 8.0), ("performance", 6.0)]
     assert dimension_weighted_average(pairs, params) == 7.2
@@ -117,7 +125,11 @@ def test_dimension_weighted_average_enabled_weights_by_dimension():
 
 def test_dimension_weighted_average_unknown_dimension_defaults_to_1():
     import dataclasses
-    params = dataclasses.replace(DEFAULT_PARAMS, dimension_weights_enabled=True)
+    params = dataclasses.replace(
+        DEFAULT_PARAMS,
+        dimension_weights_enabled=True,
+        dimension_weights={"security": 1.2},
+    )
     pairs = [("not-a-dim", 8.0), ("security", 6.0)]
     # (8*1.0 + 6*1.2) / 2.2 = 15.2/2.2 = 6.909... → 6.9
     assert dimension_weighted_average(pairs, params) == 6.9

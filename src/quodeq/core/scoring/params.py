@@ -22,14 +22,16 @@ from quodeq.core.scoring._constants import (
 # Canonical grade labels: positions are fixed, only the numeric boundaries move.
 GRADE_LABELS: tuple[str, ...] = ("Exemplary", "Good", "Adequate", "Poor")
 
-# Mirrors data/config/dimensions.json (pinned by a sync test).
+# Mirrors data/config/dimensions.json (pinned by a sync test). Defaults are
+# equal (1.0) so the overall score is a plain mean; users can retune per
+# dimension in Settings > Grade formula.
 _DEFAULT_DIMENSION_WEIGHTS: dict[str, float] = {
-    "security": 1.2,
+    "security": 1.0,
     "reliability": 1.0,
     "maintainability": 1.0,
-    "performance": 0.8,
-    "usability": 0.6,
-    "flexibility": 0.6,
+    "performance": 1.0,
+    "usability": 1.0,
+    "flexibility": 1.0,
     "clean-architecture": 1.0,
     "domain-driven-design": 1.0,
 }
@@ -60,7 +62,7 @@ class ScoringParams:
     floor_minor: float
     floor_major: float
     grade_thresholds: tuple[tuple[float, str], ...]
-    dimension_weights_enabled: bool = False
+    dimension_weights_enabled: bool = True
     dimension_weights: Mapping[str, float] = field(
         default_factory=lambda: dict(_DEFAULT_DIMENSION_WEIGHTS),
     )
