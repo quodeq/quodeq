@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getHealth, getProviderConfigs } from '../../../api/index.js';
 import AboutSection from './AboutSection.jsx';
 import AppearanceSection from './AppearanceSection.jsx';
+import UpdatesSection from './UpdatesSection.jsx';
 import ProviderTabs from './ProviderTabs.jsx';
 import ServerSection from './ServerSection.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
@@ -39,6 +40,7 @@ export default function SettingsPage({ theme, onOpenGradeFormula }) {
         <div className="settings-grid-col">
           <ServerSection />
           <AppearanceSection themeMode={themeMode} themeFamily={themeFamily} onApplyMode={onApplyMode} onApplyFamily={onApplyFamily} />
+          <UpdatesSection />
           <section className="panel settings-section">
             <div className="panel-header">
               <SectionLabel marker="▶">Grade formula</SectionLabel>
