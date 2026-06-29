@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor, act } from "@testing-library/react";
 import React from "react";
 import { useDashboard } from "./useDashboard";
 import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
@@ -72,6 +72,45 @@ describe("useDashboard", () => {
     );
     await waitFor(() => expect(result.current.dashboard).not.toBeNull());
     expect(typeof result.current.refreshDashboard).toBe("function");
+  });
+
+  // The dismiss path must stay lazy: invalidating with refetchType:'none'
+  // marks the cache stale but must NOT refetch the mounted observer (the
+  // dashboard payload is 10-20 MB; refetching on every dismiss froze the UI).
+  it("refreshDashboard does NOT refetch the mounted observer (lazy dismiss path)", async () => {
+    fakeApi.getDashboard.mockClear();
+    const { result } = renderHook(
+      () => useDashboard({ selectedProject: "p1", selectedRun: null }),
+      { wrapper: ({ children }) => wrap(children) },
+    );
+    await waitFor(() => expect(result.current.dashboard).not.toBeNull());
+    expect(fakeApi.getDashboard).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await result.current.refreshDashboard();
+    });
+    // Give any errant refetch a chance to fire, then assert it didn't.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(fakeApi.getDashboard).toHaveBeenCalledTimes(1);
+  });
+
+  // The eval-completion path must actively refetch the always-mounted Overview
+  // observer — otherwise a freshly-finished run leaves the Overview showing the
+  // stale (often null) pre-run payload until the user switches projects.
+  it("refreshDashboardActive refetches the mounted observer (eval-completion path)", async () => {
+    fakeApi.getDashboard.mockClear();
+    const { result } = renderHook(
+      () => useDashboard({ selectedProject: "p1", selectedRun: null }),
+      { wrapper: ({ children }) => wrap(children) },
+    );
+    await waitFor(() => expect(result.current.dashboard).not.toBeNull());
+    expect(fakeApi.getDashboard).toHaveBeenCalledTimes(1);
+    expect(typeof result.current.refreshDashboardActive).toBe("function");
+
+    await act(async () => {
+      await result.current.refreshDashboardActive();
+    });
+    await waitFor(() => expect(fakeApi.getDashboard).toHaveBeenCalledTimes(2));
   });
 });
 
