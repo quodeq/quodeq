@@ -4,6 +4,7 @@ from __future__ import annotations
 import pytest
 
 from quodeq.analysis.mcp.provenance_gate import (
+    DOWNGRADE_MARKER,
     EXTERNAL_SOURCE_TERMS,
     PROVENANCE_GATED_REQS,
     apply_provenance_gate,
@@ -73,7 +74,7 @@ def test_downgrades_critical_internal_to_major():
     f = _finding(req="S-AUT-3", reason="builds a path from a SHA-256 cache key")
     assert apply_provenance_gate(f) is True
     assert f["severity"] == "major"
-    assert f["provenance_downgrade"] is True
+    assert f[DOWNGRADE_MARKER] is True
 
 
 def test_downgrades_real_fa56db32_cache_fp():
@@ -92,7 +93,7 @@ def test_keeps_critical_when_external_source_named():
     f = _finding(req="S-AUT-3", reason="path built from the HTTP request filename")
     assert apply_provenance_gate(f) is False
     assert f["severity"] == "critical"
-    assert "provenance_downgrade" not in f
+    assert DOWNGRADE_MARKER not in f
 
 
 def test_ignores_non_gated_req():
@@ -105,7 +106,7 @@ def test_ignores_non_critical_severity():
     f = _finding(req="R-FT-2", severity="major", reason="builds a path from the key")
     assert apply_provenance_gate(f) is False
     assert f["severity"] == "major"
-    assert "provenance_downgrade" not in f
+    assert DOWNGRADE_MARKER not in f
 
 
 def test_ignores_compliance():
@@ -116,3 +117,8 @@ def test_ignores_compliance():
 
 def test_gated_reqs_are_the_two_patterns():
     assert PROVENANCE_GATED_REQS == frozenset({"R-FT-2", "S-AUT-3"})
+
+
+def test_plural_sources_detected():
+    assert names_external_source("query parameters were not validated") is True
+    assert names_external_source("reads multiple HTTP headers") is True

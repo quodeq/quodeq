@@ -43,7 +43,7 @@ EXTERNAL_SOURCE_TERMS: frozenset[str] = frozenset({
     "command-line", "command line", "command-line argument", "cli argument",
     "cli arg", "argv",
     # environment
-    "environment variable", "env var",
+    "environment variable", "env var", "env variable",
     # io / ipc
     "stdin", "standard input", "upload", "uploaded file", "file upload",
     "message queue", "queue message",
