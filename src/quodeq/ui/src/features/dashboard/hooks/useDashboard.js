@@ -69,6 +69,22 @@ export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = t
     });
   }, [queryClient, selectedProject]);
 
+  // Force-refresh variant for when fresh data is genuinely expected NOW and the
+  // user is parked on a mounted observer that won't otherwise refetch — namely
+  // when an evaluation finishes. Unlike ``refreshDashboard`` (refetchType:'none',
+  // used by the high-frequency dismiss path to avoid re-pulling the 10-20 MB
+  // payload), this uses the default refetchType:'active' so the always-mounted
+  // Overview observer actually refetches. Without it, a freshly-completed run
+  // leaves the Overview showing the stale pre-run payload (empty "No
+  // evaluations yet" state) until the user switches projects and back, which is
+  // the only other action that re-subscribes the observer to its query key.
+  const refreshDashboardActive = useCallback(() => {
+    if (!selectedProject) return;
+    queryClient.invalidateQueries({
+      queryKey: projectKeys.project(selectedProject),
+    });
+  }, [queryClient, selectedProject]);
+
   return {
     dashboard: dashboardWithTrend,
     accumulated: scores?.accumulated || null,
@@ -84,5 +100,6 @@ export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = t
       : (scoresError || null),
     availableRuns,
     refreshDashboard,
+    refreshDashboardActive,
   };
 }
