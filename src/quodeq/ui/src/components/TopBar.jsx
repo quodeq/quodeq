@@ -11,6 +11,7 @@
  */
 import { useSidePane } from '../features/side-pane/index.js';
 import { FileTextIcon, SparkleIcon } from './CopyButton.jsx';
+import ServerStatusDot from './ServerStatusDot.jsx';
 
 function SidePaneSpecButton({ type, label, icon, modifier }) {
   const ctx = useSidePane();
@@ -43,10 +44,6 @@ function ReportToolbarButton() {
 
 function FixPlanToolbarButton() {
   return <SidePaneSpecButton type="fixplan" label="Fix plan" icon={<SparkleIcon />} modifier="fixplan" />;
-}
-
-function Dot({ ok }) {
-  return <span className={`topbar-dot ${ok ? 'topbar-dot--ok' : 'topbar-dot--err'}`} aria-hidden="true" />;
 }
 
 function BurgerIcon() {
@@ -128,6 +125,7 @@ export default function TopBar({
       <div className="topbar-spacer" />
 
       <div className="topbar-actions">
+        <ServerStatusDot connected={serverConnected} url={serverUrl} />
         <FixPlanToolbarButton />
         <ReportToolbarButton />
 

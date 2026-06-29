@@ -630,22 +630,8 @@ export default function App() {
               violationsCount={filteredAccumulated?.summary?.totalViolations ?? state.accumulated?.summary?.totalViolations ?? null}
               historyCount={filteredTrend.length || state.dashboard?.trend?.length || null}
               lastEvalAt={state.accumulated?.summary?.lastEvaluatedAt || state.accumulated?.summary?.createdAt || null}
-              serverConnected={state.serverConnected}
               isPinned={sidebarPinned}
               onPinChange={setSidebarPinned}
-              mobileExtras={(
-                <div className="sidebar-mobile-extras__grid">
-                  {(sidebarProvider || sidebarModel) && (
-                    <div className="sidebar-status-row">
-                      <span className="sidebar-status-label">Provider</span>
-                      <span className="sidebar-status-value">
-                        {sidebarProvider || '\u2014'}
-                        {sidebarModel && <>&nbsp;·&nbsp;<span style={{ opacity: 0.7 }}>{sidebarModel}</span></>}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
             />
           }
           header={
@@ -653,7 +639,7 @@ export default function App() {
               projectName={resolvedDisplayName}
               activeTab={activeTab}
               serverConnected={state.serverConnected}
-              serverUrl={state.serverHealth?.url || null}
+              serverUrl={typeof window !== 'undefined' ? window.location.origin : null}
               provider={sidebarProvider}
               model={sidebarModel}
               onEvaluate={state.projects?.length > 0 ? (() => navTab('evaluate')) : null}
