@@ -95,7 +95,7 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulated
     <section className="acc-eval-panel acc-eval-panel--terminal">
       <div className="acc-eval-panel__top">
         <TermHeader
-          name={projectInfo?.displayName || projectInfo?.name || projectName || 'overview'}
+          name="overview"
           sub={buildLanguageSub(projectInfo) || (lastDate ? `last_evaluated · ${lastDate}` : null)}
         />
         <LastFetchedLine lastFetchedAt={projectInfo?.lastFetchedAt} />

@@ -314,8 +314,8 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
     <div className="history-page history-page--terminal">
       <div className="history-page__top">
         <TermHeader
-          name={`history · ${trend.length} eval${trend.length !== 1 ? 's' : ''}`}
-          sub={languageSub}
+          name="history"
+          sub={`${trend.length} eval${trend.length !== 1 ? 's' : ''}${languageSub ? ` · ${languageSub}` : ''}`}
         />
         {availableRuns && availableRuns.length > 0 && (
           <div className="history-run-nav">

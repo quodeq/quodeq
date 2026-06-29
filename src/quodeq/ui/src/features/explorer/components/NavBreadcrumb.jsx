@@ -42,9 +42,9 @@ export function labelFor(entry) {
  * segments are clickable to pop the nav stack; the current segment is
  * accent-colored and non-interactive.
  */
-export default function NavBreadcrumb({ stack = [], onGoTo, projectName }) {
+export default function NavBreadcrumb({ stack = [], onGoTo, projectName, onSelectProject }) {
   const crumbs = [];
-  if (projectName) crumbs.push({ label: projectName, index: -1 });
+  if (projectName) crumbs.push({ label: projectName, index: -1, isProject: true });
   stack.forEach((entry, i) => crumbs.push({ label: labelFor(entry), index: i }));
 
   if (crumbs.length === 0) return null;
@@ -54,13 +54,25 @@ export default function NavBreadcrumb({ stack = [], onGoTo, projectName }) {
       <ol className="nav-breadcrumb__crumbs">
         {crumbs.map((seg, i) => {
           const isLast = i === crumbs.length - 1;
-          const isClickable = !isLast && seg.index >= 0;
+          // The project root is the persistent indicator: clickable whenever a
+          // handler is wired, regardless of position. Other crumbs only pop the
+          // nav stack and only when they aren't the current page.
+          const isProjectButton = seg.isProject && typeof onSelectProject === 'function';
+          const isClickable = isProjectButton || (!isLast && seg.index >= 0);
+          const crumbClass = `nav-breadcrumb__crumb${isLast ? ' is-current' : ''}${
+            seg.isProject ? ' nav-breadcrumb__crumb--project' : ''
+          }`;
           return (
             <Fragment key={`${seg.label}-${i}`}>
               {i > 0 && <li className="nav-breadcrumb__sep" aria-hidden="true">/</li>}
-              <li className={`nav-breadcrumb__crumb${isLast ? ' is-current' : ''}`}>
+              <li className={crumbClass}>
                 {isClickable ? (
-                  <button type="button" onClick={() => onGoTo(seg.index)}>{seg.label}</button>
+                  <button
+                    type="button"
+                    onClick={() => (seg.isProject ? onSelectProject() : onGoTo(seg.index))}
+                  >
+                    {seg.label}
+                  </button>
                 ) : (
                   <span>{seg.label}</span>
                 )}

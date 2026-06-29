@@ -646,11 +646,13 @@ export default function App() {
               evaluating={state.evalLifecycle?.job?.status === 'running'}
               onProviderClick={() => navTab('settings')}
               onMenuToggle={() => setSidebarPinned((v) => !v)}
+              onSelectProject={() => navTab('projects')}
               breadcrumb={
                 <NavBreadcrumb
                   stack={navStack}
-                  onBack={navPop}
                   onGoTo={navGoTo}
+                  projectName={resolvedDisplayName}
+                  onSelectProject={() => navTab('projects')}
                 />
               }
               mobileTitle={navStack.length ? navLabelFor(navStack[navStack.length - 1]) : (activeTab || '')}
