@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 vi.mock('../../api/index.js', () => ({
@@ -6,7 +6,7 @@ vi.mock('../../api/index.js', () => ({
   dismissUpdate: vi.fn(() => Promise.resolve({ ok: true })),
   markUpdateDisclosed: vi.fn(() => Promise.resolve({ ok: true })),
 }));
-import { getUpdateStatus, dismissUpdate } from '../../api/index.js';
+import { getUpdateStatus, dismissUpdate, markUpdateDisclosed } from '../../api/index.js';
 import UpdateBanner from './UpdateBanner.jsx';
 
 const AVAILABLE = {
@@ -29,6 +29,12 @@ describe('UpdateBanner', () => {
     getUpdateStatus.mockResolvedValue(AVAILABLE);
     render(<UpdateBanner />);
     await waitFor(() => expect(screen.getByText(/1\.5\.0/)).toBeInTheDocument());
+  });
+
+  it('calls markUpdateDisclosed when status.disclosed is false', async () => {
+    getUpdateStatus.mockResolvedValue({ ...AVAILABLE, disclosed: false });
+    render(<UpdateBanner />);
+    await waitFor(() => expect(markUpdateDisclosed).toHaveBeenCalledTimes(1));
   });
 
   it('dismiss calls dismissUpdate with the latest version and hides', async () => {
