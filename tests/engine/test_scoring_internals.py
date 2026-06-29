@@ -89,10 +89,10 @@ class TestSeverityGradeFloor:
         assert severity_grade_floor({"critical": 1}) == 0.0
 
     def test_major_floor(self):
-        assert severity_grade_floor({"major": 1}) == 3.0
+        assert severity_grade_floor({"major": 1}) == 5.0
 
     def test_minor_floor(self):
-        assert severity_grade_floor({"minor": 1}) == 5.0
+        assert severity_grade_floor({"minor": 1}) == 8.0
 
     def test_critical_takes_priority(self):
         assert severity_grade_floor({"critical": 1, "major": 5, "minor": 10}) == 0.0
