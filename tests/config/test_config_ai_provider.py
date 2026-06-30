@@ -13,6 +13,18 @@ def test_configure_provider_writes_env(tmp_path):
     assert "AI_PROVIDER=claude" in paths.env_file.read_text()
 
 
+def test_configure_provider_works_without_fchmod(tmp_path, monkeypatch):
+    """os.fchmod is absent on Windows; saving provider config must still
+    succeed there (the post-replace os.chmod carries the 0600 guarantee)."""
+    import os
+    monkeypatch.delattr(os, "fchmod", raising=False)
+    paths = ConfigPaths.from_root(tmp_path)
+    exit_code = configure_provider_noninteractive("claude", paths)
+    assert exit_code == 0
+    assert paths.env_file.exists()
+    assert "AI_PROVIDER=claude" in paths.env_file.read_text()
+
+
 def test_get_current_provider_prefers_env_file(tmp_path):
     env_file = tmp_path / ".quodeq.env"
     env_file.write_text("export AI_PROVIDER=codex\n")

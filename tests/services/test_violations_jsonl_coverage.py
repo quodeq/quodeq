@@ -127,6 +127,14 @@ class TestLoadReqToPrinciple:
         result = _load_req_to_principle("security", tmp_path)
         assert result == {}
 
+    @pytest.mark.parametrize("payload", ['[{"name": "x"}]', "null", '"hello"', "42"])
+    def test_non_dict_top_level_returns_empty(self, tmp_path, payload):
+        """A valid-JSON-but-non-dict evaluator file must not crash with
+        AttributeError on data.get(); it degrades to an empty mapping."""
+        from quodeq.services._violations_jsonl import _load_req_to_principle
+        (tmp_path / "security.json").write_text(payload)
+        assert _load_req_to_principle("security", tmp_path) == {}
+
 
 class TestParseViolationsFromJsonl:
     def test_missing_file(self, tmp_path):

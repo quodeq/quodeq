@@ -26,7 +26,7 @@ export function useVisibleRuns(dailyRuns, dashboard, activePage, setSelectedRun,
       const bucket = bucketKey(trendByRunId.get(run.runId)?.dateISO, granularity);
       return visibleDates.has(bucket);
     });
-  }, [dailyRuns, dashboard, activePage, granularity]);
+  }, [dailyRuns, dashboard, granularity]);
 
   const visibleRunIdsKey = visibleDailyRuns.map((r) => r.runId).join(',');
   const prevRunIdsKeyRef = useRef(visibleRunIdsKey);

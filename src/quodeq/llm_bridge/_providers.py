@@ -32,7 +32,9 @@ def _is_local_api(provider_id: str) -> bool:
     """Check if an API provider is local (e.g. Ollama)."""
     configs = get_provider_configs()
     cfg = configs.get(provider_id, {})
-    api_base = cfg.get("api_base", "")
+    # `or ""`: a present-but-null api_base returns None from .get(default),
+    # which would crash the .lower() below.
+    api_base = cfg.get("api_base") or ""
     return any(marker in api_base.lower() for marker in _LOCAL_API_MARKERS)
 
 

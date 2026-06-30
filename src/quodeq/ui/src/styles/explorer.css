@@ -224,18 +224,12 @@
 }
 
 /* Project root — the persistent "which project" indicator. Accent-colored
-   and clickable (opens the Projects tab), with a leading ▸ marker. Kept as
-   plain text per this breadcrumb's no-chips convention. */
+   and clickable (opens the Projects tab). Kept as plain text per this
+   breadcrumb's no-chips convention. */
 .nav-breadcrumb__crumb--project > button,
 .nav-breadcrumb__crumb--project > span {
   color: var(--color-accent);
   font-weight: 500;
-}
-.nav-breadcrumb__crumb--project > button::before,
-.nav-breadcrumb__crumb--project > span::before {
-  content: '\25B8'; /* ▸ */
-  margin-right: 5px;
-  opacity: 0.85;
 }
 .nav-breadcrumb__crumb--project > button:hover {
   color: var(--color-accent-hover);

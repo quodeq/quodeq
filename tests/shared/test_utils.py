@@ -48,6 +48,16 @@ class TestReadJson:
         with pytest.raises((FileNotFoundError, ValueError)):
             utils.read_json(tmp_path / "missing.json")
 
+    @pytest.mark.parametrize("payload", ["[1, 2, 3]", "null", '"hello"', "42"])
+    def test_raises_on_non_object_json(self, tmp_path, payload):
+        """read_json is annotated -> dict; a valid-JSON-but-non-object payload
+        must raise ValueError (the same failure mode as a read/parse error) so
+        callers never receive a non-dict and crash later on .get()."""
+        f = tmp_path / "data.json"
+        f.write_text(payload)
+        with pytest.raises(ValueError):
+            utils.read_json(f)
+
 
 class TestConfigure:
     def test_overrides_defaults(self):

@@ -23,15 +23,11 @@ export function useServerLogPoll(active) {
   const [logs, setLogs] = useState([]);
   const sinceRef = useRef(-1);
 
-  // Reset when toggling off; on toggle-on the next queryFn picks up since=-1.
+  // Reset whenever `active` toggles; on toggle-on the next queryFn picks up
+  // since=-1. Both branches were identical, so the reset is unconditional.
   useEffect(() => {
-    if (!active) {
-      setLogs([]);
-      sinceRef.current = -1;
-    } else {
-      setLogs([]);
-      sinceRef.current = -1;
-    }
+    setLogs([]);
+    sinceRef.current = -1;
   }, [active]);
 
   useQuery({

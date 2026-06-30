@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { gradeLetter } from '../../../utils/formatters.js';
+import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
 import {
   ComposedChart,
   Bar,
@@ -156,6 +157,14 @@ export default function HistoryChartPanel({ trend = [], selectedRunId = null, on
 
   const fmt = (n) => (n == null ? '—' : n.toFixed(1));
 
+  const kbdItems = onBarClick
+    ? data.map((d, i) => ({
+        key: d.runId ?? i,
+        text: `${d.dateLabel}: ${Number.isFinite(d.numericAverage) ? d.numericAverage.toFixed(1) : '?'}, grade ${gradeLetter(d.overallGrade)}${d.runId === selectedRunId ? ' (selected)' : ''}`,
+        onActivate: () => d.runId && onBarClick(d.runId),
+      }))
+    : [];
+
   return (
     <section className="run-history-panel run-history-panel--terminal panel" aria-label="Score history chart">
       <div className="run-history-panel__header">
@@ -164,10 +173,13 @@ export default function HistoryChartPanel({ trend = [], selectedRunId = null, on
           LATEST {fmt(latest)} · AVG {fmt(avg)} · MIN {fmt(min)} · MAX {fmt(max)}
         </span>
       </div>
-      <ScoreHistoryChart
-        data={data}
-        interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }}
-      />
+      <div className="chart-with-kbd">
+        <ScoreHistoryChart
+          data={data}
+          interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }}
+        />
+        <ChartKeyboardControls label="Score history runs — Tab to a run, Enter to open it" items={kbdItems} />
+      </div>
     </section>
   );
 }
