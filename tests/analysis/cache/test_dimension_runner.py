@@ -35,6 +35,7 @@ from quodeq.analysis.cache import (
     build_cache_key_for_file,
 )
 from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache._failure_streak import CircuitBreakerError
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 from quodeq.analysis.subagents.runner import DimensionCallbacks
 from quodeq.core.evidence.model import Evidence
@@ -1242,3 +1243,93 @@ class TestFilesReadReflectsAnalyzedCount:
         assert ev.files_read == 1, (
             f"expected files_read=1 (just the cache hit), got {ev.files_read}"
         )
+
+
+def _finding_line(file: str) -> str:
+    """A realistic violation finding (the producer's compact schema) that the
+    evidence parser groups under principle ``Adaptability``."""
+    return json.dumps({
+        "schema_version": 1, "req": "F-ADP-1", "t": "violation",
+        "file": file, "line": 1, "severity": "minor",
+        "w": "hardcoded value", "snippet": "x = 1",
+        "reason": "hardcoded environment-specific value",
+        "p": "Adaptability", "d": "flexibility",
+    })
+
+
+class _SalvageDispatcher:
+    """Writes one real finding + N consecutive error markers to trip the breaker.
+
+    Models a dimension whose model calls start failing after some real work
+    has already been persisted to the JSONL.
+    """
+
+    def __init__(self, n_errors: int) -> None:
+        self.n_errors = n_errors
+
+    def __call__(self, config, dim_id, idx, ctx, callbacks):
+        jsonl = (config.work_dir or config.src) / f"{dim_id}_evidence.jsonl"
+        jsonl.parent.mkdir(parents=True, exist_ok=True)
+        with jsonl.open("a") as out:
+            out.write(_finding_line("a.py") + "\n")
+            out.write(json.dumps(
+                {"_marker": "file_done", "file": "a.py", "status": "ok"}) + "\n")
+            for i in range(self.n_errors):
+                out.write(json.dumps({
+                    "_marker": "file_done", "file": f"e{i}.py",
+                    "status": "error", "reason": "model call failed",
+                }) + "\n")
+        return None
+
+
+class _AllErrorsDispatcher:
+    """Writes only error markers — nothing to salvage."""
+
+    def __init__(self, n_errors: int) -> None:
+        self.n_errors = n_errors
+
+    def __call__(self, config, dim_id, idx, ctx, callbacks):
+        jsonl = (config.work_dir or config.src) / f"{dim_id}_evidence.jsonl"
+        jsonl.parent.mkdir(parents=True, exist_ok=True)
+        with jsonl.open("a") as out:
+            for i in range(self.n_errors):
+                out.write(json.dumps({
+                    "_marker": "file_done", "file": f"e{i}.py",
+                    "status": "error", "reason": "model call failed",
+                }) + "\n")
+        return None
+
+
+class TestBreakerSalvage:
+    @pytest.fixture(autouse=True)
+    def _reset_cancel(self):
+        from quodeq.shared import cancellation
+        cancellation.reset()
+        yield
+        cancellation.reset()
+
+    def test_breaker_trip_salvages_partial_evidence(self, tmp_path, cache):
+        config, _src = _setup(tmp_path, {"a.py": "x"})
+        config = replace(
+            config, options=replace(config.options, failure_streak_threshold=3))
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=_SalvageDispatcher(n_errors=3),
+        ):
+            ev = process_dimension_with_cache(
+                config, "flexibility", 1, _make_ctx(), _make_callbacks(), cache=cache)
+        assert ev is not None, "breaker trip should salvage collected findings, not discard"
+        assert ev.exit_reason == "failure_streak"
+        assert ev.principles, "salvaged Evidence should carry the collected findings"
+
+    def test_breaker_trip_with_no_findings_raises(self, tmp_path, cache):
+        config, _src = _setup(tmp_path, {"a.py": "x"})
+        config = replace(
+            config, options=replace(config.options, failure_streak_threshold=3))
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=_AllErrorsDispatcher(n_errors=3),
+        ):
+            with pytest.raises(CircuitBreakerError):
+                process_dimension_with_cache(
+                    config, "flexibility", 1, _make_ctx(), _make_callbacks(), cache=cache)
