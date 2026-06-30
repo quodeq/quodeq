@@ -8,58 +8,41 @@ const TREND = [
   { runId: 'r1', dateLabel: 'Apr 3', dimensionDetails: [{ dimension: 'maintainability', score: 5.2 }] },
 ];
 
-describe('DimensionScoreHistoryPanel chart keyboard accessibility (#1979)', () => {
-  it('chart wrapper has tabIndex=0 when onBarClick is provided', () => {
-    const onBarClick = vi.fn();
+// #1800: the old keyboard handler only ever activated the LAST data point, so
+// keyboard users could not select earlier runs. The chart now exposes one
+// focusable control per run that reaches the same handler as a mouse click.
+describe('DimensionScoreHistoryPanel chart keyboard accessibility (#1800)', () => {
+  it('exposes a focusable control for every run, not just the last', () => {
     render(
-      <DimensionScoreHistoryPanel
-        trend={TREND}
-        dimension="maintainability"
-        onBarClick={onBarClick}
-      />
+      <DimensionScoreHistoryPanel trend={TREND} dimension="maintainability" onBarClick={vi.fn()} />,
     );
-    // The chart keyboard wrapper should be focusable
-    const wrapper = document.querySelector('[tabindex="0"]');
-    expect(wrapper).not.toBeNull();
+    expect(screen.getAllByRole('button')).toHaveLength(2);
   });
 
-  it('Enter key on chart wrapper fires onBarClick with last data point', () => {
+  it('activating an EARLIER run fires onBarClick with that run (the #1800 gap)', () => {
     const onBarClick = vi.fn();
     render(
-      <DimensionScoreHistoryPanel
-        trend={TREND}
-        dimension="maintainability"
-        onBarClick={onBarClick}
-      />
+      <DimensionScoreHistoryPanel trend={TREND} dimension="maintainability" onBarClick={onBarClick} />,
     );
-    const wrapper = document.querySelector('[tabindex="0"]');
-    expect(wrapper).not.toBeNull();
-    fireEvent.keyDown(wrapper, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: /Apr 3/ }));
     expect(onBarClick).toHaveBeenCalledTimes(1);
+    expect(onBarClick.mock.calls[0][0]).toMatchObject({ runId: 'r1' });
   });
 
-  it('Space key on chart wrapper fires onBarClick', () => {
+  it('activates on Enter and Space', () => {
     const onBarClick = vi.fn();
     render(
-      <DimensionScoreHistoryPanel
-        trend={TREND}
-        dimension="maintainability"
-        onBarClick={onBarClick}
-      />
+      <DimensionScoreHistoryPanel trend={TREND} dimension="maintainability" onBarClick={onBarClick} />,
     );
-    const wrapper = document.querySelector('[tabindex="0"]');
-    fireEvent.keyDown(wrapper, { key: ' ' });
-    expect(onBarClick).toHaveBeenCalledTimes(1);
+    const btn = screen.getByRole('button', { name: /Apr 5/ });
+    fireEvent.keyDown(btn, { key: 'Enter' });
+    fireEvent.keyDown(btn, { key: ' ' });
+    expect(onBarClick).toHaveBeenCalledTimes(2);
+    expect(onBarClick.mock.calls[0][0]).toMatchObject({ runId: 'r2' });
   });
 
-  it('does not add tabIndex when onBarClick is absent', () => {
-    render(
-      <DimensionScoreHistoryPanel
-        trend={TREND}
-        dimension="maintainability"
-      />
-    );
-    const wrapper = document.querySelector('[tabindex="0"]');
-    expect(wrapper).toBeNull();
+  it('renders no keyboard controls when onBarClick is absent', () => {
+    render(<DimensionScoreHistoryPanel trend={TREND} dimension="maintainability" />);
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 });

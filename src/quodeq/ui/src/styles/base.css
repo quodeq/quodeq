@@ -2061,3 +2061,52 @@ fieldset.gf-tab-body:disabled .gf-boundary-divider { pointer-events: none; curso
 }
 .update-banner-dismiss:hover { opacity: 1; }
 
+/* Keyboard/screen-reader access layer for charts without per-datapoint DOM
+   (Recharts bars, canvas). Each data point gets a focusable button, visually
+   hidden until keyboard focus reveals it over the chart's top-left corner.
+   See components/ChartKeyboardControls.jsx. */
+.chart-with-kbd { position: relative; }
+.chart-kbd-controls {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+.chart-kbd-controls button {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.chart-kbd-controls button:focus-visible {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 5;
+  width: auto;
+  height: auto;
+  padding: 5px 9px;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: nowrap;
+  pointer-events: auto;
+  font-size: var(--text-xs);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border-radius: 6px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
