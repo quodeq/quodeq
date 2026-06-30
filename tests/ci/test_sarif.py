@@ -71,3 +71,120 @@ def test_safe_uri_rejects_blank_and_escaping():
     assert _safe_uri(None) is None
     assert _safe_uri("../outside.py") is None
     assert _safe_uri("a/../../b.py") is None
+
+
+from quodeq.ci.sarif import build_sarif
+
+
+def _report(dimension, violations, **extra):
+    return {"dimension": dimension, "violations": violations, "compliance": [], **extra}
+
+
+def _violation(**kw):
+    base = {
+        "principle": "Fault Tolerance",
+        "file": "app.py",
+        "line": 58,
+        "end_line": 59,
+        "title": "Empty except swallows errors",
+        "reason": "The bare except hides failures.",
+        "snippet": "except:\n    pass",
+        "severity": "major",
+        "req": "R-FT-1",
+        "req_refs": [{"label": "CWE-390", "url": "https://cwe.mitre.org/data/definitions/390.html"}],
+    }
+    base.update(kw)
+    return base
+
+
+def test_build_sarif_top_level_shape():
+    doc = build_sarif([_report("reliability", [_violation()])], tool_version="1.4.0")
+    assert doc["version"] == "2.1.0"
+    assert doc["$schema"].endswith("sarif-2.1.0.json")
+    assert len(doc["runs"]) == 1
+    run = doc["runs"][0]
+    assert run["tool"]["driver"]["name"] == "Quodeq"
+    assert run["tool"]["driver"]["version"] == "1.4.0"
+    assert run["automationDetails"]["id"] == "quodeq/scan"
+
+
+def test_build_sarif_result_fields():
+    doc = build_sarif([_report("reliability", [_violation()])], tool_version="1.4.0")
+    result = doc["runs"][0]["results"][0]
+    assert result["ruleId"] == "reliability/fault-tolerance"
+    assert result["level"] == "error"
+    assert result["message"]["text"]
+    loc = result["locations"][0]["physicalLocation"]
+    assert loc["artifactLocation"]["uri"] == "app.py"
+    assert loc["region"]["startLine"] == 58
+    assert loc["region"]["endLine"] == 59
+    assert result["partialFingerprints"]["quodeqReqSnippet/v1"]
+    assert result["properties"]["quodeq"]["req"] == "R-FT-1"
+
+
+def test_build_sarif_rule_carries_cwe_and_security_severity():
+    doc = build_sarif([_report("reliability", [_violation()])], tool_version="1.4.0")
+    rules = doc["runs"][0]["tool"]["driver"]["rules"]
+    assert len(rules) == 1
+    rule = rules[0]
+    assert rule["id"] == "reliability/fault-tolerance"
+    assert rule["properties"]["security-severity"] == "7.0"
+    assert "security" in rule["properties"]["tags"]
+    assert "external/cwe/cwe-390" in rule["properties"]["tags"]
+
+
+def test_build_sarif_worst_severity_drives_rule_security_severity():
+    violations = [
+        _violation(severity="minor", title="minor one", snippet="a"),
+        _violation(severity="critical", title="crit one", snippet="b"),
+    ]
+    doc = build_sarif([_report("reliability", violations)], tool_version="1.4.0")
+    rule = doc["runs"][0]["tool"]["driver"]["rules"][0]
+    assert rule["properties"]["security-severity"] == "9.0"  # worst = critical
+
+
+def test_build_sarif_merges_dimensions_into_one_run():
+    doc = build_sarif(
+        [
+            _report("reliability", [_violation()]),
+            _report("security", [_violation(principle="Authentication", req="S-AUT-1")]),
+        ],
+        tool_version="1.4.0",
+    )
+    assert len(doc["runs"]) == 1
+    rule_ids = {r["id"] for r in doc["runs"][0]["tool"]["driver"]["rules"]}
+    assert rule_ids == {"reliability/fault-tolerance", "security/authentication"}
+
+
+def test_build_sarif_excludes_compliance_and_dismissed():
+    rep = _report("reliability", [_violation(verdict="violation")])
+    rep["compliance"] = [{"principle": "X", "file": "y.py"}]
+    doc = build_sarif([rep], tool_version="1.4.0")
+    assert len(doc["runs"][0]["results"]) == 1
+
+
+def test_build_sarif_empty_when_no_violations():
+    doc = build_sarif([_report("reliability", [])], tool_version="1.4.0")
+    assert doc["runs"][0]["results"] == []
+    assert doc["runs"][0]["tool"]["driver"]["rules"] == []
+
+
+def test_build_sarif_is_deterministic():
+    reports = [
+        _report("security", [_violation(principle="Authentication", req="S-AUT-1", file="b.py")]),
+        _report("reliability", [_violation(file="a.py")]),
+    ]
+    import json
+    assert json.dumps(build_sarif(reports, tool_version="1.4.0")) == json.dumps(
+        build_sarif(reports, tool_version="1.4.0")
+    )
+
+
+def test_build_sarif_clamps_startline_and_tolerates_missing_fields():
+    v = _violation(line=0, end_line=None, file=None, req=None, req_refs=None, snippet=None)
+    doc = build_sarif([_report("reliability", [v])], tool_version="1.4.0")
+    result = doc["runs"][0]["results"][0]
+    # No usable file -> no locations, but the result still exists with a message.
+    assert result.get("locations", []) == []
+    assert result["message"]["text"]
+    assert "partialFingerprints" not in result  # req and snippet both blank

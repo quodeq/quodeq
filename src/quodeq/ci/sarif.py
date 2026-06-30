@@ -83,3 +83,157 @@ def _safe_uri(file: str | None) -> str | None:
     if ".." in parts:
         return None
     return uri
+
+
+_SCHEMA_URI = "https://json.schemastore.org/sarif-2.1.0.json"
+_INFO_URI = "https://github.com/quodeq/quodeq"
+
+
+def _message_text(violation: dict) -> str:
+    title = str(violation.get("title") or "").strip()
+    reason = str(violation.get("reason") or "").strip()
+    text = ". ".join(p for p in (title, reason) if p)
+    return text or str(violation.get("principle") or "Quodeq finding")
+
+
+def _location(violation: dict, *, include_snippets: bool) -> dict | None:
+    uri = _safe_uri(violation.get("file"))
+    if uri is None:
+        return None
+    region: dict = {}
+    line = violation.get("line")
+    if isinstance(line, int) and line >= 1:
+        region["startLine"] = line
+        end = violation.get("end_line")
+        if isinstance(end, int) and end >= line:
+            region["endLine"] = end
+    if include_snippets and violation.get("snippet"):
+        region["snippet"] = {"text": str(violation["snippet"])}
+    physical: dict = {"artifactLocation": {"uri": uri, "uriBaseId": "SRCROOT"}}
+    if region:
+        physical["region"] = region
+    return {"physicalLocation": physical}
+
+
+def _result(violation: dict, dimension: str, *, include_snippets: bool) -> dict:
+    severity = violation.get("severity") or "unknown"
+    result: dict = {
+        "ruleId": _rule_id(dimension, violation.get("principle")),
+        "level": _severity_level(severity),
+        "message": {"text": _message_text(violation)},
+        "properties": {
+            "quodeq": {
+                "dimension": dimension,
+                "principle": violation.get("principle"),
+                "req": violation.get("req"),
+                "severity": severity,
+                "cwe": [
+                    str(r.get("label"))
+                    for r in (violation.get("req_refs") or [])
+                    if str(r.get("label", "")).lower().startswith("cwe-")
+                ],
+            }
+        },
+    }
+    location = _location(violation, include_snippets=include_snippets)
+    if location is not None:
+        result["locations"] = [location]
+    fp = fingerprint(violation.get("req"), violation.get("snippet"))
+    if fp:
+        result["partialFingerprints"] = {"quodeqReqSnippet/v1": fp}
+    return result
+
+
+def _rule(rule_id: str, principle: str, dimension: str, *, severity: str, cwe_tags: list[str]) -> dict:
+    tags = ["quodeq", dimension.lower()]
+    if cwe_tags:
+        tags.append("security")
+        tags.extend(cwe_tags)
+    # GitHub soft-caps tags at 10; keep order, trim defensively.
+    tags = tags[:10]
+    return {
+        "id": rule_id,
+        "name": principle or rule_id,
+        "shortDescription": {"text": principle or rule_id},
+        "fullDescription": {"text": f"{dimension.capitalize()} principle: {principle or rule_id}"},
+        "helpUri": _INFO_URI,
+        "properties": {"tags": tags, "security-severity": _security_severity(severity)},
+    }
+
+
+def build_sarif(
+    reports: list[dict],
+    *,
+    tool_version: str,
+    min_severity: str | None = None,
+    include_snippets: bool = False,
+) -> dict:
+    """Build a SARIF 2.1.0 document from Quodeq evaluation reports.
+
+    Violations only (compliance/dismissed excluded). Single run, all
+    dimensions merged. Rules are one per (dimension, principle); each rule
+    carries the union of its CWEs and a worst-of security-severity. Never
+    emits absolute paths or the host `project` field. Deterministic output.
+    """
+    results: list[dict] = []
+    # rule_id -> {"principle", "dimension", "worst_rank", "worst_sev", "cwe_tags"(ordered set)}
+    rule_acc: dict[str, dict] = {}
+
+    for report in reports:
+        dimension = str(report.get("dimension") or "unknown")
+        for violation in report.get("violations") or []:
+            if min_severity is not None and _severity_rank(violation.get("severity")) < _severity_rank(min_severity):
+                continue
+            results.append(_result(violation, dimension, include_snippets=include_snippets))
+            rid = _rule_id(dimension, violation.get("principle"))
+            acc = rule_acc.setdefault(
+                rid,
+                {
+                    "principle": violation.get("principle") or rid,
+                    "dimension": dimension,
+                    "worst_rank": -1,
+                    "worst_sev": "unknown",
+                    "cwe_tags": [],
+                },
+            )
+            rank = _severity_rank(violation.get("severity"))
+            if rank > acc["worst_rank"]:
+                acc["worst_rank"] = rank
+                acc["worst_sev"] = violation.get("severity") or "unknown"
+            for tag in _cwe_tags(violation.get("req_refs")):
+                if tag not in acc["cwe_tags"]:
+                    acc["cwe_tags"].append(tag)
+
+    rules = [
+        _rule(rid, acc["principle"], acc["dimension"], severity=acc["worst_sev"], cwe_tags=acc["cwe_tags"])
+        for rid, acc in rule_acc.items()
+    ]
+    rules.sort(key=lambda r: r["id"])
+    results.sort(
+        key=lambda r: (
+            (r.get("locations", [{}])[0].get("physicalLocation", {}).get("artifactLocation", {}).get("uri", "")),
+            (r.get("locations", [{}])[0].get("physicalLocation", {}).get("region", {}).get("startLine", 0)),
+            r["ruleId"],
+        )
+    )
+
+    return {
+        "$schema": _SCHEMA_URI,
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "Quodeq",
+                        "informationUri": _INFO_URI,
+                        "version": tool_version,
+                        "semanticVersion": tool_version,
+                        "rules": rules,
+                    }
+                },
+                "automationDetails": {"id": "quodeq/scan"},
+                "results": results,
+                "columnKind": "utf16CodeUnits",
+            }
+        ],
+    }
