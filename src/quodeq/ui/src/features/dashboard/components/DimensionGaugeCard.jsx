@@ -45,6 +45,11 @@ function buildPartialTooltip({ filesRead, sourceFileCount, exitReason }) {
   }
   if (typeof exitReason === 'string') {
     parts.push(`stopped: ${exitReason}`);
+    // A failure-streak (circuit-breaker) dimension is salvaged and shown with a
+    // provisional score, but kept out of the overall grade. Say so explicitly.
+    if (exitReason === 'failure_streak') {
+      parts.push('excluded from grade');
+    }
   }
   return parts.join(' · ');
 }

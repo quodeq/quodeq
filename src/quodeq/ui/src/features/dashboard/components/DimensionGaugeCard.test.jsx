@@ -80,6 +80,25 @@ describe('DimensionGaugeCard', () => {
       );
     });
 
+    it('appends "excluded from grade" for a failure_streak (circuit breaker) dimension', () => {
+      render(
+        <DimensionGaugeCard
+          item={{
+            ...baseItem,
+            filesRead: 90,
+            sourceFileCount: 100,
+            exitReason: 'failure_streak',
+          }}
+          dateLabel={dateLabel}
+          onDimensionClick={() => {}}
+        />,
+      );
+      const line = screen.getByText(coverageLineMatcher(`${dateLabel} · 90%`));
+      expect(line.getAttribute('title')).toBe(
+        'Partial run · 90 of 100 files · stopped: failure_streak · excluded from grade',
+      );
+    });
+
     it('flags partial when exitReason is "deadline" even if file counts match', () => {
       render(
         <DimensionGaugeCard
