@@ -107,9 +107,9 @@ function useDashboardHandlers(onNavigate, dashboard) {
 }
 
 export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
-  const { selectedProject, selectedRun, projects = [], dashboard, accumulated, loading, isFetching, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day' } = data;
+  const { selectedProject, selectedRun, projects = [], dashboard, accumulated, loading, isFetching, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange } = data;
   const projectInfo = projects.find((p) => (p.id || p.name) === selectedProject) || null;
-  const { onNavigate, onRunSelect, onProjectsReload, onGranularityChange } = callbacks;
+  const { onNavigate, onRunSelect, onProjectsReload } = callbacks;
   // After a successful clone-on-add migration the project's repository_info.json
   // has been rewritten with location: "local". Refetch the projects list so the
   // sidebar/header reflect the new state. Fall back to a full reload if no
