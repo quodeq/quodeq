@@ -220,3 +220,36 @@ def test_with_snippets_toggles_snippet_text():
     on = build_sarif(reports, tool_version="1.4.0", include_snippets=True)
     region_on = on["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"]
     assert region_on["snippet"]["text"] == "secret = 'x'"
+
+
+import json as _json
+
+
+def test_no_absolute_paths_or_project_field_anywhere():
+    report = _report(
+        "reliability",
+        [_violation(file="src/api/x.py")],
+        project="/Users/victor/GitHub/secret-project",
+        runId="abc123",
+    )
+    doc = build_sarif([report], tool_version="1.4.0", include_snippets=True)
+    blob = _json.dumps(doc)
+    assert "/Users/" not in blob
+    assert "secret-project" not in blob
+    assert "abc123" not in blob
+    # Every uri is relative POSIX.
+    for run in doc["runs"]:
+        for result in run["results"]:
+            for loc in result.get("locations", []):
+                uri = loc["physicalLocation"]["artifactLocation"]["uri"]
+                assert not uri.startswith("/")
+                assert "\\" not in uri
+
+
+def test_windows_style_path_is_relativized():
+    doc = build_sarif(
+        [_report("reliability", [_violation(file="src\\api\\x.py")])],
+        tool_version="1.4.0",
+    )
+    uri = doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+    assert uri == "src/api/x.py"
