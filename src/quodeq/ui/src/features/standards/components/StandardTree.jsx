@@ -12,7 +12,13 @@ function TreeNodeRow({ node, actions, titles, expand }) {
       onClick={() => { onClick(); if (showExpand) setExpanded((v) => !v); }}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onClick()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+          if (showExpand) setExpanded((v) => !v);
+        }
+      }}
     >
       {showExpand ? (
         <span className="tree-expand-btn" aria-hidden="true">

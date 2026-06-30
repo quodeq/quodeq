@@ -140,7 +140,8 @@ def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> 
     if provider == "ollama":
         try:
             _ollama_base = _env.get("OLLAMA_BASE_URL", "http://localhost:11434")
-            urllib.request.urlopen(f"{_ollama_base}/api/tags", timeout=_API_CHECK_TIMEOUT_S)
+            with urllib.request.urlopen(f"{_ollama_base}/api/tags", timeout=_API_CHECK_TIMEOUT_S):
+                pass
         except (urllib.error.URLError, OSError) as exc:
             raise RuntimeError(
                 "Ollama is configured as your AI provider but the server is not running.\n\n"
@@ -151,7 +152,8 @@ def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> 
     elif provider == "llamacpp":
         try:
             _base = _env.get("LLAMACPP_BASE_URL", "http://localhost:8080")
-            urllib.request.urlopen(f"{_base}/health", timeout=_API_CHECK_TIMEOUT_S)
+            with urllib.request.urlopen(f"{_base}/health", timeout=_API_CHECK_TIMEOUT_S):
+                pass
         except (urllib.error.URLError, OSError) as exc:
             raise RuntimeError(
                 "llama.cpp is configured as your AI provider but llama-server is not running.\n\n"
