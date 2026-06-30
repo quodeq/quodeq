@@ -3,8 +3,29 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.core.events.models import Judgment
-from quodeq.data.projection.grade_projector import recompute_grades
+from quodeq.data.projection.grade_projector import (
+    _read_source_file_count,
+    recompute_grades,
+)
 from quodeq.data.sqlite.state_store import SQLiteStateStore
+
+
+def test_read_source_file_count_skips_non_dict_json(tmp_path: Path) -> None:
+    """A valid-JSON-but-non-dict dim file (a top-level list or null) must be
+    skipped, not crash the loop with AttributeError on data.get(...)."""
+    eval_dir = tmp_path / "evaluation"
+    eval_dir.mkdir()
+    (eval_dir / "security.json").write_text("[1, 2, 3]")  # list, not a dict
+    assert _read_source_file_count(tmp_path) == 0
+
+
+def test_read_source_file_count_skips_non_dict_then_finds_valid(tmp_path: Path) -> None:
+    """A malformed dim file does not abort the scan of the remaining files."""
+    eval_dir = tmp_path / "evaluation"
+    eval_dir.mkdir()
+    (eval_dir / "a_security.json").write_text("null")
+    (eval_dir / "b_reliability.json").write_text('{"sourceFileCount": 7}')
+    assert _read_source_file_count(tmp_path) == 7
 
 
 def _seed(store: SQLiteStateStore, *, req: str, principle: str, dimension: str, severity: str = "medium") -> None:
