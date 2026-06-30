@@ -2379,3 +2379,58 @@ button.term-sev-badge--clickable:focus-visible {
 .eval-job-stat-strip .term-stat__value {
   font-size: 18px;
 }
+
+/* ------------------------------------------------------------
+   PeriodSelect: Day / Week / Month grouping selector
+   ------------------------------------------------------------ */
+.term-period-select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.term-period-select {
+  appearance: none;
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  line-height: 1;
+  padding: var(--term-space-1) calc(var(--term-space-3) + 6px) var(--term-space-1) var(--term-space-2);
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+.term-period-select:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+.term-period-select:focus {
+  outline: none;
+}
+.term-period-select:focus-visible {
+  outline: none;
+  border-color: var(--color-text-muted);
+}
+.term-period-select__caret {
+  position: absolute;
+  right: var(--term-space-2);
+  font-size: 9px;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------
+   RunHistoryPanel: score-history chart with grouping selector
+   ------------------------------------------------------------ */
+.run-history-panel--terminal .run-history-panel__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--term-space-3);
+}
+.run-history-panel--terminal .run-history-panel__sparse {
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin: 0;
+}

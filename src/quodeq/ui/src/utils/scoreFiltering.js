@@ -5,6 +5,8 @@
  * returned by the unified /scores endpoint.
  */
 
+import { bucketKey } from './dailyGrouping.js';
+
 const roundOneDecimal = (n) => Math.round(n * 10) / 10;
 
 /**
@@ -45,21 +47,22 @@ export function filterTrendByVisibleStandards(trend, visibleSet) {
 }
 
 /**
- * Filter trend and collapse to daily entries (one per calendar day).
+ * Filter trend and collapse to period entries (one per calendar day, week, or month).
  *
  * Walks the raw trend oldest-first to build accumulated averages,
- * then maps onto dailyTrend entries (collapsed by day) for display.
- * Used by the Overview panel where bars represent days, not individual runs.
+ * then maps onto periodTrend entries (collapsed by the specified granularity) for display.
+ * Used by the Overview panel where bars represent periods, not individual runs.
  *
  * @param {Array} trend - Raw trend entries (newest-first)
- * @param {Array} dailyTrend - Daily-collapsed trend entries (from collapseByDay)
+ * @param {Array} periodTrend - Period-collapsed trend entries (from collapseByPeriod)
  * @param {Set<string>} visibleSet - Lowercase dimension IDs to include
- * @returns {Array} Filtered daily trend entries (newest-first)
+ * @param {'day'|'week'|'month'} [granularity='day'] - Bucket granularity
+ * @returns {Array} Filtered period trend entries (newest-first)
  */
-export function filterTrendByVisibleStandardsDaily(trend, dailyTrend, visibleSet) {
+export function filterTrendByVisibleStandardsDaily(trend, periodTrend, visibleSet, granularity = 'day') {
   const accByDim = {};
-  const accByDate = new Map(); // date string -> accAvg
-  const visibleDates = new Set();
+  const accByKey = new Map(); // bucket key -> accAvg
+  const visibleKeys = new Set();
   const rawReversed = [...trend].reverse(); // oldest first
   for (const entry of rawReversed) {
     let hasVisible = false;
@@ -73,17 +76,17 @@ export function filterTrendByVisibleStandardsDaily(trend, dailyTrend, visibleSet
     if (hasVisible) {
       const accScores = Object.values(accByDim).filter((s) => s != null);
       const accAvg = accScores.length > 0 ? roundOneDecimal(accScores.reduce((a, b) => a + b, 0) / accScores.length) : null;
-      const datePart = (entry.dateISO || '').slice(0, 10);
-      accByDate.set(datePart, accAvg);
-      visibleDates.add(datePart);
+      const key = bucketKey(entry.dateISO, granularity);
+      accByKey.set(key, accAvg);
+      visibleKeys.add(key);
     }
   }
-  // Match daily entries by date, only include days with visible evaluations
-  return dailyTrend
-    .filter((entry) => visibleDates.has((entry.dateISO || '').slice(0, 10)))
+  // Match period entries by bucket key, only include periods with visible evaluations
+  return periodTrend
+    .filter((entry) => visibleKeys.has(bucketKey(entry.dateISO, granularity)))
     .map((entry) => {
-      const datePart = (entry.dateISO || '').slice(0, 10);
-      const accAvg = accByDate.get(datePart) ?? null;
+      const key = bucketKey(entry.dateISO, granularity);
+      const accAvg = accByKey.get(key) ?? null;
       const details = (entry.dimensionDetails || []).filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
       const runScores = details.map((d) => d.score).filter((s) => s != null);
       const runAvg = runScores.length > 0 ? roundOneDecimal(runScores.reduce((a, b) => a + b, 0) / runScores.length) : null;

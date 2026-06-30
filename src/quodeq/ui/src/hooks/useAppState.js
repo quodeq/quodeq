@@ -1,7 +1,8 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useDashboard } from '../features/dashboard/hooks/useDashboard.js';
 import { usePrefetchAdjacentRuns } from '../features/dashboard/hooks/usePrefetchAdjacentRuns.js';
-import { buildDailyRuns } from '../utils/dailyGrouping.js';
+import { buildPeriodRuns } from '../utils/dailyGrouping.js';
+import { readScoreHistoryGranularity, writeScoreHistoryGranularity } from '../utils/scoreHistoryPrefs.js';
 import { useServerHealth } from './useServerHealth.js';
 import { useNavStack } from './useNavStack.js';
 import { useRunNavigator } from './useRunNavigator.js';
@@ -97,6 +98,11 @@ export function useAppState() {
     selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject,
   } = projectBundle;
   const settings = useAppSettings();
+  const [granularity, setGranularity] = useState(() => readScoreHistoryGranularity());
+  const handleGranularityChange = useCallback((next) => {
+    setGranularity(next);
+    writeScoreHistoryGranularity(next);
+  }, []);
   const isHistoryRun = activePage.page === 'history-run';
   const isHistoryTab = activePage.page === 'history';
   const effectiveRun = isHistoryRun ? historySelectedRun : selectedRun;
@@ -113,10 +119,10 @@ export function useAppState() {
     keepPlaceholder: !isHistoryRun && !isHistoryTab,
   });
   const { dailyRuns: rawDailyRuns, headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => ({
-    dailyRuns: buildDailyRuns(availableRuns, dashboard?.trend || []),
+    dailyRuns: buildPeriodRuns(availableRuns, dashboard?.trend || [], granularity),
     ...computeDerivedState(accumulated, dashboard, selectedProject, projects),
-  }), [availableRuns, dashboard, accumulated, selectedProject, projects]);
-  const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, activePage.page, setSelectedRun);
+  }), [availableRuns, dashboard, accumulated, selectedProject, projects, granularity]);
+  const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, activePage.page, setSelectedRun, granularity);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: visibleDailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const prefetchHandlers = usePrefetchAdjacentRuns({ selectedProject, availableRuns: visibleDailyRuns, overviewRunIndex });
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
@@ -154,5 +160,6 @@ export function useAppState() {
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
     historySelectedRun, setHistorySelectedRun,
     evalLifecycle, settings, activeTab, showProjectHeader, showRunNav, refreshDashboard,
+    granularity, onGranularityChange: handleGranularityChange,
   };
 }
