@@ -68,7 +68,14 @@ export default function HeatGridView({ node, onDrillDown, onFileClick, onCellCli
         <thead>
           <tr>
             {COLUMNS.map((col) => (
-              <th key={col.id} className={`heat-grid-th-sort${col.align === 'left' ? ' left' : ''}`} onClick={() => handleSort(col.id)}>
+              <th
+                key={col.id}
+                className={`heat-grid-th-sort${col.align === 'left' ? ' left' : ''}`}
+                onClick={() => handleSort(col.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSort(col.id); } }}
+                tabIndex={0}
+                aria-sort={sortCol === col.id ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
                 {col.label}{sortCol === col.id ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
               </th>
             ))}

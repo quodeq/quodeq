@@ -32,7 +32,11 @@ export default function HeatGridCells({ row, onCellClick, variant = 'heat' }) {
               className={`heat-grid-cell${hasValue ? ' clickable' : ' empty'}`}
               style={style}
               onClick={() => hasValue && onCellClick?.({ row, severity: sev })}
+              onKeyDown={hasValue ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCellClick?.({ row, severity: sev }); }
+              } : undefined}
               role={hasValue ? 'button' : undefined}
+              tabIndex={hasValue ? 0 : undefined}
               aria-label={`${sev}: ${count} violation${count !== 1 ? 's' : ''} in ${row.name || 'row'}`}
             >
               {count || '—'}
@@ -44,7 +48,11 @@ export default function HeatGridCells({ row, onCellClick, variant = 'heat' }) {
         <div
           className={`heat-grid-num${row.violations > 0 ? ' clickable' : ''}`}
           onClick={() => row.violations > 0 && onCellClick?.({ row, severity: null })}
+          onKeyDown={row.violations > 0 ? (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCellClick?.({ row, severity: null }); }
+          } : undefined}
           role={row.violations > 0 ? 'button' : undefined}
+          tabIndex={row.violations > 0 ? 0 : undefined}
         >
           {row.violations}
         </div>

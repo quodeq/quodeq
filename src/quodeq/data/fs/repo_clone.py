@@ -91,6 +91,8 @@ def cleanup_cloned_repo(repo_path: str) -> None:
         return
     parent = str(Path(repo_path).resolve().parent)
     try:
-        shutil.rmtree(parent, ignore_errors=True)
+        # No ignore_errors=True: it would swallow the OSError and make the
+        # warning below unreachable. Let rmtree raise so the failure is logged.
+        shutil.rmtree(parent)
     except OSError as exc:
         _logger.warning("Failed to clean up temp repo dir %s: %s", parent, exc)

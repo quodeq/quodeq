@@ -22,7 +22,7 @@ export function useVisibleRuns(dailyRuns, dashboard, activePage, setSelectedRun)
       const datePart = (trendByRunId.get(run.runId)?.dateISO || '').slice(0, 10);
       return visibleDates.has(datePart);
     });
-  }, [dailyRuns, dashboard, activePage]);
+  }, [dailyRuns, dashboard]);
 
   const visibleRunIdsKey = visibleDailyRuns.map((r) => r.runId).join(',');
   const prevRunIdsKeyRef = useRef(visibleRunIdsKey);
