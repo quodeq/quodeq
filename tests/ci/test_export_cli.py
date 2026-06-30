@@ -52,3 +52,39 @@ def test_handle_export_missing_dir_returns_error(tmp_path, capsys):
 def test_handle_export_unknown_format_returns_error(tmp_path):
     code = handle_export(_args(export_format="xml", evaluation_dir=str(tmp_path), output="x"))
     assert code == 1
+
+
+from quodeq.cli_parser import build_parser
+
+
+def test_parser_export_sarif_args():
+    parser = build_parser()
+    args = parser.parse_args([
+        "export", "sarif",
+        "--evaluation-dir", "/tmp/e",
+        "-o", "/tmp/out.sarif",
+        "--min-severity", "major",
+        "--with-snippets",
+    ])
+    assert args.command == "export"
+    assert args.export_format == "sarif"
+    assert args.evaluation_dir == "/tmp/e"
+    assert args.output == "/tmp/out.sarif"
+    assert args.min_severity == "major"
+    assert args.with_snippets is True
+
+
+def test_parser_evaluate_sarif_flags_default_off():
+    parser = build_parser()
+    args = parser.parse_args(["evaluate", "."])
+    assert args.sarif is None
+    assert args.min_severity is None
+    assert args.with_snippets is False
+
+
+def test_parser_evaluate_sarif_flags_set():
+    parser = build_parser()
+    args = parser.parse_args(["evaluate", ".", "--sarif", "q.sarif", "--min-severity", "critical", "--with-snippets"])
+    assert args.sarif == "q.sarif"
+    assert args.min_severity == "critical"
+    assert args.with_snippets is True
