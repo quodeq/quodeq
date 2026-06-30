@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { gradeLetter } from '../../../utils/formatters.js';
-import { SectionLabel } from '../../../components/terminal/index.js';
+import { SectionLabel, PeriodSelect } from '../../../components/terminal/index.js';
 import {
   ComposedChart,
   Area,
@@ -26,6 +26,7 @@ import {
 
 const MAX_CHART_RUNS = 20;
 const CHART_HEIGHT = 160;
+const GRANULARITY_SUFFIX = { day: 'd', week: 'w', month: 'mo' };
 
 
 function buildTrendData(trend, selectedRunId) {
@@ -137,29 +138,44 @@ function ScoreHistoryChart({ data, interaction }) {
   );
 }
 
-export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBarClick }) {
+export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBarClick, granularity = 'day', onGranularityChange }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   // Hooks must run in the same order every render, so compute before any early return.
   const data = useMemo(() => buildTrendData(trend, selectedRunId), [trend, selectedRunId]);
 
-  if (!trend || trend.length < 2) return null;
+  // The parent only mounts this panel when there are ≥2 days of data, so an
+  // empty trend shouldn't happen — but guard the truly-empty case. A single
+  // bucket (e.g. all runs fall in one month) still renders the header so the
+  // selector stays reachable; only the chart body + MIN/MAX/AVG are hidden.
+  if (!trend || trend.length < 1) return null;
 
-  const min = Math.min(...data.map((d) => d.numericAverage).filter((n) => !Number.isNaN(n)));
-  const max = Math.max(...data.map((d) => d.numericAverage).filter((n) => !Number.isNaN(n)));
-  const avg = data.reduce((s, d) => s + (Number.isNaN(d.numericAverage) ? 0 : d.numericAverage), 0) / data.length;
+  const hasChart = data.length >= 2;
+  const suffix = GRANULARITY_SUFFIX[granularity] || 'd';
+  let stats = null;
+  if (hasChart) {
+    const min = Math.min(...data.map((d) => d.numericAverage).filter((n) => !Number.isNaN(n)));
+    const max = Math.max(...data.map((d) => d.numericAverage).filter((n) => !Number.isNaN(n)));
+    const avg = data.reduce((s, d) => s + (Number.isNaN(d.numericAverage) ? 0 : d.numericAverage), 0) / data.length;
+    stats = `MIN ${min.toFixed(1)} / MAX ${max.toFixed(1)} / AVG ${avg.toFixed(1)}`;
+  }
 
   return (
     <section className="run-history-panel run-history-panel--terminal panel" aria-label="Score history chart">
       <div className="run-history-panel__header">
-        <SectionLabel>score_history · {data.length}d</SectionLabel>
-        <span className="run-history-panel__stats">
-          MIN {min.toFixed(1)} / MAX {max.toFixed(1)} / AVG {avg.toFixed(1)}
+        <SectionLabel>score_history · {data.length}{suffix}</SectionLabel>
+        <span className="run-history-panel__controls">
+          {onGranularityChange && <PeriodSelect value={granularity} onChange={onGranularityChange} />}
+          {stats && <span className="run-history-panel__stats">{stats}</span>}
         </span>
       </div>
-      <ScoreHistoryChart
-        data={data}
-        interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }}
-      />
+      {hasChart ? (
+        <ScoreHistoryChart
+          data={data}
+          interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }}
+        />
+      ) : (
+        <p className="run-history-panel__sparse">Only one {granularity} of data — choose a finer grouping to see a trend.</p>
+      )}
     </section>
   );
 }

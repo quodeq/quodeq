@@ -2422,3 +2422,18 @@ button.term-sev-badge--clickable:focus-visible {
   color: var(--color-text-muted);
   pointer-events: none;
 }
+
+/* ------------------------------------------------------------
+   RunHistoryPanel: score-history chart with grouping selector
+   ------------------------------------------------------------ */
+.run-history-panel--terminal .run-history-panel__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--term-space-3);
+}
+.run-history-panel--terminal .run-history-panel__sparse {
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
