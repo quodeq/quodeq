@@ -188,3 +188,35 @@ def test_build_sarif_clamps_startline_and_tolerates_missing_fields():
     assert result.get("locations", []) == []
     assert result["message"]["text"]
     assert "partialFingerprints" not in result  # req and snippet both blank
+
+
+def test_min_severity_filters_below_threshold():
+    violations = [
+        _violation(severity="critical", title="c", snippet="c"),
+        _violation(severity="major", title="m", snippet="m"),
+        _violation(severity="minor", title="n", snippet="n"),
+        _violation(severity="unknown", title="u", snippet="u"),
+    ]
+    reports = [_report("reliability", violations)]
+
+    all_doc = build_sarif(reports, tool_version="1.4.0")
+    assert len(all_doc["runs"][0]["results"]) == 4
+
+    major_doc = build_sarif(reports, tool_version="1.4.0", min_severity="major")
+    levels = [r["properties"]["quodeq"]["severity"] for r in major_doc["runs"][0]["results"]]
+    assert sorted(levels) == ["critical", "major"]
+
+    minor_doc = build_sarif(reports, tool_version="1.4.0", min_severity="minor")
+    assert len(minor_doc["runs"][0]["results"]) == 3  # drops unknown
+
+
+def test_with_snippets_toggles_snippet_text():
+    reports = [_report("reliability", [_violation(snippet="secret = 'x'")])]
+
+    off = build_sarif(reports, tool_version="1.4.0", include_snippets=False)
+    region_off = off["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"]
+    assert "snippet" not in region_off
+
+    on = build_sarif(reports, tool_version="1.4.0", include_snippets=True)
+    region_on = on["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"]
+    assert region_on["snippet"]["text"] == "secret = 'x'"
