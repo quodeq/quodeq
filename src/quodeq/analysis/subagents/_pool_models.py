@@ -7,7 +7,7 @@ from pathlib import Path
 _AGENT_ID_PREFIX = "agent"
 _FUTURE_POLL_INTERVAL_S = 0.5
 _HEARTBEAT_JOIN_TIMEOUT_S = 2
-_SCOUT_TIMEOUT_S = 180             # 3 min before forcing scale-up
+_SCOUT_TIMEOUT_S = 30              # 30s before forcing scale-up
 _DEFAULT_MAX_DURATION_S = 600      # 10 min per-agent ceiling; clamped lower by remaining run budget when set
 _DEFAULT_FILES_PER_AGENT = 30
 
