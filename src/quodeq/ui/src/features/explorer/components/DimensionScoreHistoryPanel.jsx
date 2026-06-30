@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { SectionLabel } from '../../../components/terminal/index.js';
 import { gradeLetter } from '../../../utils/formatters.js';
+import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
 import {
   cssVar,
   scoreBarColor,
@@ -155,22 +156,21 @@ export default function DimensionScoreHistoryPanel({ trend = [], dimension, sele
       {data.length === 0 ? (
         <div className="qd-history-empty">no history yet for this dimension</div>
       ) : (
-        <div
-          tabIndex={onBarClick ? 0 : undefined}
-          onKeyDown={onBarClick ? (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              const last = data[data.length - 1];
-              if (last) onBarClick(last);
-            }
-          } : undefined}
-        >
+        <div className="chart-with-kbd">
           <DimensionHistoryChart
             data={data}
             selectedRunId={selectedRunId}
             hoveredIndex={hoveredIndex}
             setHoveredIndex={setHoveredIndex}
             onBarClick={onBarClick}
+          />
+          <ChartKeyboardControls
+            label={`${dimension} score history — Tab to a run, Enter to open it`}
+            items={onBarClick ? data.map((d, i) => ({
+              key: d.runId ?? i,
+              text: `${d.dateLabel}: ${Number.isFinite(d.numericAverage) ? d.numericAverage.toFixed(1) : '?'}, grade ${gradeLetter(d.overallGrade)}${d.runId === selectedRunId ? ' (selected)' : ''}`,
+              onActivate: () => onBarClick(d),
+            })) : []}
           />
         </div>
       )}
