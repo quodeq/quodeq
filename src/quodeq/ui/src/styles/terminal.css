@@ -1944,11 +1944,6 @@ button.term-sev-badge--clickable:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.topbar-mobile-project::before {
-  content: '\25B8'; /* ▸ */
-  margin-right: 4px;
-  opacity: 0.85;
-}
 .topbar-mobile-sep {
   flex: 0 0 auto;
   margin: 0 5px;
