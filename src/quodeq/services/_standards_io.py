@@ -44,7 +44,11 @@ def count_principles_and_requirements(data: dict) -> tuple[int, int]:
     if not isinstance(principles, list):
         principles = []
     valid = [p for p in principles if isinstance(p, dict)]
-    return len(valid), sum(len(p.get("requirements", [])) for p in valid)
+    # A present-but-null or non-list 'requirements' contributes zero rather
+    # than crashing: .get(..., []) returns the null value, not the default.
+    return len(valid), sum(
+        len(reqs) for p in valid if isinstance(reqs := p.get("requirements"), list)
+    )
 
 
 def build_detail(data: dict, *, type_default: str = _TYPE_CUSTOM) -> StandardDetail:
@@ -61,7 +65,8 @@ def build_detail(data: dict, *, type_default: str = _TYPE_CUSTOM) -> StandardDet
 
 
 def build_builtin_detail(data: dict, standard_id: str, weight: float) -> StandardDetail:
-    source = data.get("source", "") or ", ".join(data.get("sources", []))
+    sources = data.get("sources")
+    source = data.get("source") or (", ".join(sources) if isinstance(sources, list) else "")
     description = data.get("description") or f"{data.get('name', standard_id)} standard"
     return StandardDetail(
         id=standard_id, name=data.get("name", standard_id),

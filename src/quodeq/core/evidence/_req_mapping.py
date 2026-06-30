@@ -46,7 +46,11 @@ def _build_req_to_principle_map(dimension: str, evaluators_dir: Path | None = No
                 if rid and pname:
                     mapping[rid] = pname
         return mapping
-    except (OSError, ValueError):
+    except (OSError, ValueError, AttributeError, TypeError):
+        # AttributeError/TypeError: a valid-JSON-but-non-dict payload (a list
+        # or null at the top level, or non-dict principle/requirement items)
+        # makes .get() raise. The contract is an empty map on any malformed
+        # input so callers stay permissive, never a crash.
         return {}
 
 
