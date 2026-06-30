@@ -146,9 +146,9 @@ def _result(violation: dict, dimension: str, *, include_snippets: bool) -> dict:
 
 def _rule(rule_id: str, principle: str, dimension: str, *, severity: str, cwe_tags: list[str]) -> dict:
     tags = ["quodeq", dimension.lower()]
-    if cwe_tags:
+    if cwe_tags and "security" not in tags:
         tags.append("security")
-        tags.extend(cwe_tags)
+    tags.extend(t for t in cwe_tags if t not in tags)
     # GitHub soft-caps tags at 10; keep order, trim defensively.
     tags = tags[:10]
     return {
