@@ -46,3 +46,40 @@ def _slug(text: str | None) -> str:
 
 def _rule_id(dimension: str | None, principle: str | None) -> str:
     return f"{(dimension or 'unknown').lower()}/{_slug(principle) or 'unknown'}"
+
+
+def _cwe_tags(req_refs: list[dict] | None) -> list[str]:
+    """GitHub-form CWE tags (``external/cwe/cwe-NNN``) from a violation's req_refs.
+
+    GitHub's Security-tab CWE filter reads these from rule.properties.tags.
+    Preserves order, de-duplicates, ignores non-CWE labels.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for ref in req_refs or []:
+        label = str(ref.get("label", "")).strip().lower()
+        if not label.startswith("cwe-"):
+            continue
+        tag = f"external/cwe/{label}"
+        if tag not in seen:
+            seen.add(tag)
+            out.append(tag)
+    return out
+
+
+def _safe_uri(file: str | None) -> str | None:
+    """Repo-root-relative POSIX URI, or None if unusable.
+
+    Violation `file` is already repo-root-relative; this only hardens it:
+    backslashes -> '/', strip a leading '/', reject blanks and paths that
+    escape the root via '..'. Never emits an absolute path.
+    """
+    if not file:
+        return None
+    uri = file.replace("\\", "/").lstrip("/")
+    if not uri:
+        return None
+    parts = uri.split("/")
+    if ".." in parts:
+        return None
+    return uri
