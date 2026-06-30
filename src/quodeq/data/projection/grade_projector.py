@@ -44,6 +44,8 @@ def _read_source_file_count(run_dir: Path) -> int:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
+        if not isinstance(data, dict):
+            continue  # a valid-JSON-but-non-dict file: skip, don't crash the loop
         count = data.get("sourceFileCount")
         if isinstance(count, int) and count > 0:
             return count
