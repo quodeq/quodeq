@@ -5,6 +5,7 @@ from pathlib import Path
 from quodeq.core.events.models import Judgment
 from quodeq.data.projection.grade_projector import recompute_grades
 from quodeq.data.sqlite.state_store import SQLiteStateStore
+from quodeq.shared.dimensions_state import DimState, write_dim_state
 
 
 def _seed(store: SQLiteStateStore, *, req: str, principle: str, dimension: str, severity: str = "medium") -> None:
@@ -118,3 +119,35 @@ def test_recompute_grades_no_findings_clears_tables(tmp_path: Path) -> None:
     recompute_grades(tmp_path)
     assert store.read_dimension_scores() == []
     assert store.read_principle_grades() == []
+
+
+def test_recompute_grades_carries_exit_reason_from_dim_state(tmp_path: Path) -> None:
+    """A dimension marked DONE with exit_reason=failure_streak in dimensions.json
+    carries that reason onto its dimension_scores row (so the grade layer can
+    flag/exclude it)."""
+    store = SQLiteStateStore(tmp_path)
+    for i in range(5):
+        _seed(store, req=f"P1-{i}", principle="P1", dimension="flexibility", severity="high")
+    write_dim_state(tmp_path, "flexibility", DimState.RUNNING)
+    write_dim_state(tmp_path, "flexibility", DimState.DONE, exit_reason="failure_streak")
+
+    recompute_grades(tmp_path)
+
+    rows = store.read_dimension_scores()
+    flex = next(r for r in rows if r["dimension"] == "flexibility")
+    assert flex["score"] is not None
+    assert flex["exit_reason"] == "failure_streak"
+
+
+def test_recompute_grades_exit_reason_none_when_done_clean(tmp_path: Path) -> None:
+    store = SQLiteStateStore(tmp_path)
+    for i in range(5):
+        _seed(store, req=f"P1-{i}", principle="P1", dimension="security", severity="high")
+    write_dim_state(tmp_path, "security", DimState.RUNNING)
+    write_dim_state(tmp_path, "security", DimState.DONE)
+
+    recompute_grades(tmp_path)
+
+    rows = store.read_dimension_scores()
+    sec = next(r for r in rows if r["dimension"] == "security")
+    assert sec["exit_reason"] is None
