@@ -2,6 +2,7 @@
 """CLI handler for the `quodeq export` subcommand."""
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -12,7 +13,7 @@ def _tool_version() -> str:
     return __version__ or "0.0.0+dev"
 
 
-def handle_export(args) -> int:
+def handle_export(args: argparse.Namespace) -> int:
     """Handle `quodeq export <format>`. Returns an exit code."""
     if getattr(args, "export_format", None) != "sarif":
         print("Usage: quodeq export sarif --evaluation-dir DIR -o FILE", file=sys.stderr)
@@ -20,7 +21,7 @@ def handle_export(args) -> int:
     return _handle_sarif(args)
 
 
-def _handle_sarif(args) -> int:
+def _handle_sarif(args: argparse.Namespace) -> int:
     from quodeq.ci.reporter import load_evaluation_reports
     from quodeq.ci.sarif import build_sarif
 

@@ -6,6 +6,7 @@ Pure: report dicts in, a SARIF dict out. No I/O. The CLI glue
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from quodeq.context.precedent import fingerprint
 
@@ -48,7 +49,7 @@ def _rule_id(dimension: str | None, principle: str | None) -> str:
     return f"{(dimension or 'unknown').lower()}/{_slug(principle) or 'unknown'}"
 
 
-def _cwe_tags(req_refs: list[dict] | None) -> list[str]:
+def _cwe_tags(req_refs: list[dict[str, Any]] | None) -> list[str]:
     """GitHub-form CWE tags (``external/cwe/cwe-NNN``) from a violation's req_refs.
 
     GitHub's Security-tab CWE filter reads these from rule.properties.tags.
@@ -89,18 +90,18 @@ _SCHEMA_URI = "https://json.schemastore.org/sarif-2.1.0.json"
 _INFO_URI = "https://github.com/quodeq/quodeq"
 
 
-def _message_text(violation: dict) -> str:
+def _message_text(violation: dict[str, Any]) -> str:
     title = str(violation.get("title") or "").strip()
     reason = str(violation.get("reason") or "").strip()
     text = ". ".join(p for p in (title, reason) if p)
     return text or str(violation.get("principle") or "Quodeq finding")
 
 
-def _location(violation: dict, *, include_snippets: bool) -> dict | None:
+def _location(violation: dict[str, Any], *, include_snippets: bool) -> dict[str, Any] | None:
     uri = _safe_uri(violation.get("file"))
     if uri is None:
         return None
-    region: dict = {}
+    region: dict[str, Any] = {}
     line = violation.get("line")
     if isinstance(line, int) and line >= 1:
         region["startLine"] = line
@@ -109,15 +110,15 @@ def _location(violation: dict, *, include_snippets: bool) -> dict | None:
             region["endLine"] = end
     if include_snippets and violation.get("snippet"):
         region["snippet"] = {"text": str(violation["snippet"])}
-    physical: dict = {"artifactLocation": {"uri": uri, "uriBaseId": "SRCROOT"}}
+    physical: dict[str, Any] = {"artifactLocation": {"uri": uri, "uriBaseId": "SRCROOT"}}
     if region:
         physical["region"] = region
     return {"physicalLocation": physical}
 
 
-def _result(violation: dict, dimension: str, *, include_snippets: bool) -> dict:
+def _result(violation: dict[str, Any], dimension: str, *, include_snippets: bool) -> dict[str, Any]:
     severity = violation.get("severity") or "unknown"
-    result: dict = {
+    result: dict[str, Any] = {
         "ruleId": _rule_id(dimension, violation.get("principle")),
         "level": _severity_level(severity),
         "message": {"text": _message_text(violation)},
@@ -144,7 +145,7 @@ def _result(violation: dict, dimension: str, *, include_snippets: bool) -> dict:
     return result
 
 
-def _rule(rule_id: str, principle: str, dimension: str, *, severity: str, cwe_tags: list[str]) -> dict:
+def _rule(rule_id: str, principle: str, dimension: str, *, severity: str, cwe_tags: list[str]) -> dict[str, Any]:
     tags = ["quodeq", dimension.lower()]
     if cwe_tags and "security" not in tags:
         tags.append("security")
@@ -162,12 +163,12 @@ def _rule(rule_id: str, principle: str, dimension: str, *, severity: str, cwe_ta
 
 
 def build_sarif(
-    reports: list[dict],
+    reports: list[dict[str, Any]],
     *,
     tool_version: str,
     min_severity: str | None = None,
     include_snippets: bool = False,
-) -> dict:
+) -> dict[str, Any]:
     """Build a SARIF 2.1.0 document from Quodeq evaluation reports.
 
     Violations only (compliance/dismissed excluded). Single run, all
@@ -175,9 +176,9 @@ def build_sarif(
     carries the union of its CWEs and a worst-of security-severity. Never
     emits absolute paths or the host `project` field. Deterministic output.
     """
-    results: list[dict] = []
+    results: list[dict[str, Any]] = []
     # rule_id -> {"principle", "dimension", "worst_rank", "worst_sev", "cwe_tags"(ordered set)}
-    rule_acc: dict[str, dict] = {}
+    rule_acc: dict[str, dict[str, Any]] = {}
 
     for report in reports:
         dimension = str(report.get("dimension") or "unknown")
