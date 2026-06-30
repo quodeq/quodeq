@@ -137,6 +137,11 @@ function drawDimStars(ctx, scene, cam, nav, opts, tc, mr, mg, mb) {
       ctx.fillStyle = rgba(tc.textMuted, 0.8 * labelAlpha);
       ctx.fillText(s.score.toFixed(1), sc.x, sc.y + sr + 24 * fs);
     }
+    // Keyboard focus ring (a11y, #675) — drawn at the dim's hit radius so it
+    // lines up with where Enter activates.
+    if (nav.depth === 0 && opts.focusedIdx === i) {
+      drawFocusRing(ctx, sc.x, sc.y, Math.max(sr * 2, 20) + 4, tc);
+    }
     if (!animating && nav.depth === 0 && mx >= 0) {
       const dx = mx - sc.x, dy = my - sc.y;
       const hitR = Math.max(sr * 2, 20);
@@ -144,6 +149,19 @@ function drawDimStars(ctx, scene, cam, nav, opts, tc, mr, mg, mb) {
     }
   });
   return newHovered;
+}
+
+/** Dashed ring marking the keyboard-focused node (a11y, #675). */
+function drawFocusRing(ctx, cx, cy, r, tc) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, TAU);
+  ctx.strokeStyle = rgba(tc.text, 0.9);
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
 }
 
 /**
@@ -186,6 +204,9 @@ function drawPrinciples(ctx, scene, cam, nav, opts, tc, rDim) {
       ctx.font = `12px -apple-system,BlinkMacSystemFont,sans-serif`;
       ctx.fillStyle = rgba(tc.textMuted, 0.7 * la);
       ctx.fillText(p.score.toFixed(1), sc.x, sc.y + sr + 16);
+    }
+    if (nav.depth === 1 && opts.focusedIdx === pi) {
+      drawFocusRing(ctx, sc.x, sc.y, sr + 10 + 4, tc);
     }
     if (!animating && nav.depth === 1 && pAlpha > 0.4 && mx >= 0) {
       const dx = mx - sc.x, dy = my - sc.y;
