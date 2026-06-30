@@ -1,4 +1,5 @@
 import { getGradeThresholds } from './gradeThresholds.js';
+import { isoWeekKey } from './dailyGrouping.js';
 
 /**
  * Grade-to-CSS-class mapping.
@@ -261,4 +262,36 @@ export function mostFrequentGrade(grades) {
     }
   });
   return capitalizeGrade(maxGrade);
+}
+
+const PERIOD_MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+/**
+ * Human label for a score-history bucket at the given grouping granularity.
+ * - day   -> the entry's specific date label (e.g. "25 Mar 2026")
+ * - month -> "March 2026" (from the YYYY-MM prefix; timezone-naive)
+ * - week  -> "Week 13, 2026" (from the ISO week key)
+ * Falls back to the entry's dateLabel (then dateISO) when unparseable.
+ *
+ * @param {{ dateISO?: string, dateLabel?: string }} entry
+ * @param {'day'|'week'|'month'} [granularity='day']
+ * @returns {string}
+ */
+export function formatPeriodLabel(entry, granularity = 'day') {
+  const iso = entry?.dateISO || '';
+  const fallback = entry?.dateLabel || iso;
+  if (granularity === 'month') {
+    const [y, m] = iso.slice(0, 7).split('-');
+    const idx = Number(m) - 1;
+    return (y && PERIOD_MONTH_NAMES[idx]) ? `${PERIOD_MONTH_NAMES[idx]} ${y}` : fallback;
+  }
+  if (granularity === 'week') {
+    const key = isoWeekKey(iso); // 'YYYY-Www' or ''
+    const [y, w] = key.split('-W');
+    return (y && w) ? `Week ${Number(w)}, ${y}` : fallback;
+  }
+  return fallback;
 }

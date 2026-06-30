@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { gradeLetter } from '../../../utils/formatters.js';
+import { gradeLetter, formatPeriodLabel } from '../../../utils/formatters.js';
 import { SectionLabel, PeriodSelect } from '../../../components/terminal/index.js';
 import {
   ComposedChart,
@@ -29,12 +29,13 @@ const CHART_HEIGHT = 160;
 const GRANULARITY_SUFFIX = { day: 'd', week: 'w', month: 'mo' };
 
 
-function buildTrendData(trend, selectedRunId) {
+function buildTrendData(trend, selectedRunId, granularity = 'day') {
   return [...trend].slice(0, MAX_CHART_RUNS).reverse().map((row, i, arr) => {
     const numericAverage = parseFloat(row.numericAverage);
     return {
       ...row,
       numericAverage,
+      periodLabel: formatPeriodLabel(row, granularity),
       delta: i > 0 ? numericAverage - parseFloat(arr[i - 1].numericAverage) : null,
     };
   });
@@ -49,7 +50,7 @@ function RunHistoryTooltip({ active, payload }) {
   const grade = gradeLetter(entry.overallGrade);
   return (
     <div className="run-history-tooltip">
-      <span className="rht-date">{entry.dateLabel}</span>
+      <span className="rht-date">{entry.periodLabel || entry.dateLabel}</span>
       <span className="rht-score">{score} - {grade}</span>
     </div>
   );
@@ -141,7 +142,7 @@ function ScoreHistoryChart({ data, interaction }) {
 export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBarClick, granularity = 'day', onGranularityChange }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   // Hooks must run in the same order every render, so compute before any early return.
-  const data = useMemo(() => buildTrendData(trend, selectedRunId), [trend, selectedRunId]);
+  const data = useMemo(() => buildTrendData(trend, selectedRunId, granularity), [trend, selectedRunId, granularity]);
 
   // The parent only mounts this panel when there are ≥2 days of data, so an
   // empty trend shouldn't happen — but guard the truly-empty case. A single
