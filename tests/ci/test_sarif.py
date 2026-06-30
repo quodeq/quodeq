@@ -291,3 +291,40 @@ def test_empty_sarif_validates_against_official_schema():
     doc = build_sarif([_report("reliability", [])], tool_version="1.4.0")
     errors = list(jsonschema.Draft202012Validator(schema).iter_errors(doc))
     assert errors == [], "\n".join(str(e) for e in errors)
+
+
+def test_golden_two_findings():
+    reports = [
+        _report("reliability", [
+            _violation(file="app.py", line=58, end_line=59, severity="major",
+                       title="Empty except", reason="Bare except hides failures.", req="R-FT-1",
+                       req_refs=[{"label": "CWE-390", "url": "https://cwe.mitre.org/data/definitions/390.html"}],
+                       snippet="except:\n    pass"),
+        ]),
+        _report("security", [
+            _violation(principle="Authentication", file="auth.py", line=5, end_line=5, severity="critical",
+                       title="Hardcoded creds", reason="Credentials in source.", req="S-AUT-1",
+                       req_refs=[{"label": "CWE-798", "url": "https://cwe.mitre.org/data/definitions/798.html"}],
+                       snippet="PASS = 'admin'"),
+        ]),
+    ]
+    doc = build_sarif(reports, tool_version="1.4.0")
+
+    run = doc["runs"][0]
+    # Rules sorted by id; two distinct (dimension, principle).
+    assert [r["id"] for r in run["tool"]["driver"]["rules"]] == [
+        "reliability/fault-tolerance",
+        "security/authentication",
+    ]
+    # Results sorted by (uri, startLine, ruleId).
+    assert [r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] for r in run["results"]] == [
+        "app.py",
+        "auth.py",
+    ]
+    # Security rule has worst-of critical security-severity and the CWE tag.
+    sec_rule = next(r for r in run["tool"]["driver"]["rules"] if r["id"] == "security/authentication")
+    assert sec_rule["properties"]["security-severity"] == "9.0"
+    assert "external/cwe/cwe-798" in sec_rule["properties"]["tags"]
+    # Snippets omitted by default.
+    region = run["results"][0]["locations"][0]["physicalLocation"]["region"]
+    assert "snippet" not in region

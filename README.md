@@ -144,6 +144,30 @@ quodeq evaluate /path/to/project --scope src/api    # Scoped to a subdirectory
 quodeq evaluate /path/to/project -d security        # Single dimension
 ```
 
+### SARIF / GitHub code scanning
+
+Quodeq can emit findings as [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
+for GitHub code scanning (the Security tab), GitLab SAST, or any SARIF
+consumer. Generate it during a scan, or export it from a past run:
+
+```bash
+quodeq evaluate . --sarif quodeq.sarif            # during a scan
+quodeq export sarif --evaluation-dir <dir> -o quodeq.sarif   # from existing reports
+```
+
+Code snippets are omitted by default (so source never leaves your machine on
+upload); pass `--with-snippets` to include them. Use `--min-severity` to drop
+low-severity findings.
+
+Upload to GitHub code scanning:
+
+```yaml
+- run: quodeq evaluate . --sarif quodeq.sarif
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: quodeq.sarif
+```
+
 ---
 
 ## Updates
