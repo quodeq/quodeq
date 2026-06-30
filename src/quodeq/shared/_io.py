@@ -27,11 +27,25 @@ def open_text(path: str | Path, mode: str = "r") -> IO[str]:
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    """Read and parse a JSON file, returning the parsed dict."""
+    """Read and parse a JSON object file, returning the parsed dict.
+
+    Enforces the ``-> dict`` contract: a valid-JSON-but-non-object payload (a
+    top-level list, string, number, or null) raises ``ValueError`` — the same
+    failure mode as a read/parse error. This shuts down the recurring crash
+    class where a caller does ``read_json(p).get(...)`` and a hand-edited or
+    malformed file that is valid JSON but not an object raises an unhandled
+    ``AttributeError`` deep in the caller. Callers that load top-level arrays
+    must use a plain ``json.loads`` (or ``default_read_json``), not this helper.
+    """
     try:
-        return json.loads(path.read_text(encoding=TEXT_ENCODING))
+        data = json.loads(path.read_text(encoding=TEXT_ENCODING))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Cannot read JSON file {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"Expected a JSON object in {path}, got {type(data).__name__}"
+        )
+    return data
 
 
 def configure_stdio_utf8() -> None:
