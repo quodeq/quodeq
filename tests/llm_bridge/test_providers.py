@@ -21,6 +21,16 @@ class TestGetProviderConfigs:
         assert "claude" in configs or "ollama" in configs
 
 
+class TestIsLocalApiNullApiBase:
+    def test_null_api_base_does_not_crash(self):
+        """A provider config whose api_base is null (operator-edited
+        ai_providers.json) must not crash on .lower()."""
+        from quodeq.llm_bridge import _providers
+        cfgs = {"weird": {"type": "api", "api_base": None}}
+        with patch.object(_providers, "get_provider_configs", return_value=cfgs):
+            assert _providers._is_local_api("weird") is False
+
+
 class TestGetProviderType:
     def test_cli_provider(self):
         assert get_provider_type("claude") == "cli"

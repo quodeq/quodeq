@@ -80,6 +80,9 @@ def migrate_file(path: Path, apply: bool) -> tuple[int, int]:
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         print(f"  SKIP  cannot read {path}: {exc}")
         return 0, 0
+    if not isinstance(data, dict):
+        print(f"  SKIP  unexpected payload type in {path}: {type(data).__name__}")
+        return 0, 0
     v_count = sum(1 for entry in data.get("violations", []) if migrate_entry(entry))
     c_count = sum(1 for entry in data.get("compliance", []) if migrate_entry(entry))
 
