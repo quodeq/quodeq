@@ -131,5 +131,18 @@ def recompute_grades(run_dir: Path, params: ScoringParams | None = None) -> None
         params = grade_formula.load_params()
     principle_rows, dimension_rows = compute_run_grades(run_dir, params)
 
+    # Carry the per-dim exit_reason (failure_streak, time_limit, ...) from the
+    # authoritative dim-state file so the grade layer can flag/exclude
+    # interrupted dimensions. Match case-insensitively: findings carry the
+    # dimension label, dimensions.json carries the dimension id.
+    from quodeq.shared.dimensions_state import read_dimensions  # noqa: PLC0415
+    dim_states = read_dimensions(run_dir).get("dimensions", {})
+    exit_by_dim = {
+        str(name).lower(): entry.get("exit_reason")
+        for name, entry in dim_states.items()
+    }
+    for row in dimension_rows:
+        row["exit_reason"] = exit_by_dim.get(str(row["dimension"]).lower())
+
     store = SQLiteStateStore(run_dir)
     store.batch_rewrite_grades(principle_rows, dimension_rows)
