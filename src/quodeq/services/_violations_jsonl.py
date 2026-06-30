@@ -90,6 +90,8 @@ def _load_req_to_principle(dimension: str, evaluators_dir: "Path | None" = None)
         return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return {}  # valid JSON but not an object: degrade, don't crash
         mapping: dict[str, str] = {}
         for p in data.get("principles", []):
             pname = p.get("name", "")
