@@ -104,6 +104,41 @@ def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> b
 
 
 # ---------------------------------------------------------------------------
+# SARIF export helper
+# ---------------------------------------------------------------------------
+
+def _write_sarif_if_requested(args: argparse.Namespace, evaluation_dir: Path) -> None:
+    """Write a SARIF file if --sarif was passed. Fail-soft: never raises.
+
+    Called from run_evaluate AFTER the run lifecycle has fully closed, so a
+    failure here can never flip a successful run to failed. The scored reports
+    are already on disk in evaluation_dir.
+    """
+    sarif_path = getattr(args, "sarif", None)
+    if not sarif_path:
+        return
+    try:
+        from quodeq import __version__
+        from quodeq.ci.reporter import load_evaluation_reports
+        from quodeq.ci.sarif import build_sarif
+
+        reports = load_evaluation_reports(evaluation_dir)
+        doc = build_sarif(
+            reports,
+            tool_version=__version__ or "0.0.0+dev",
+            min_severity=getattr(args, "min_severity", None),
+            include_snippets=getattr(args, "with_snippets", False),
+        )
+        out = Path(sarif_path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+        count = sum(len(r["results"]) for r in doc["runs"])
+        log_info(f"Wrote {count} finding(s) to SARIF: {out}")
+    except Exception as exc:  # noqa: BLE001 — fail-soft: SARIF must never sink a scan
+        log_warning(f"SARIF export failed (evaluation results are safe): {exc}")
+
+
+# ---------------------------------------------------------------------------
 # Run directory setup
 # ---------------------------------------------------------------------------
 
@@ -416,4 +451,17 @@ def run_evaluate(args: argparse.Namespace) -> int:
         if worktree_dir and worktree_origin:
             _cleanup_worktree(worktree_origin, worktree_dir)
         raise
-    return _run_pipeline_with_cleanup(args, inputs, paths)
+    result = _run_pipeline_with_cleanup(args, inputs, paths)
+    # Fail-soft SARIF export, OUTSIDE the run lifecycle (it has fully closed by
+    # now), only on success and only when scored reports exist. A SARIF error
+    # here can never flip the run state. --diff-from / --evidence-only produce
+    # no scored reports, so skip them.
+    if (
+        result == 0
+        and getattr(args, "sarif", None)
+        and not getattr(args, "diff_from", None)
+        and not getattr(args, "evidence_only", False)
+    ):
+        _, _evidence_dir, evaluation_dir = paths
+        _write_sarif_if_requested(args, evaluation_dir)
+    return result

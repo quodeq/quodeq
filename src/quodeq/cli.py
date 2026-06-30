@@ -140,6 +140,9 @@ def main(argv: list[str] | None = None) -> int:
     elif command == "review":
         from quodeq.ci.review import handle_review
         code = handle_review(args)
+    elif command == "export":
+        from quodeq.ci.export_cli import handle_export
+        code = handle_export(args)
     else:
         handler = _COMMAND_HANDLERS.get(command)
         code = handler(argv) if handler else 1
