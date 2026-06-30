@@ -20,7 +20,7 @@ src/quodeq/api/routes_findings.py:107:data
 src/quodeq/data/fs/project_resolver.py:17:services
 src/quodeq/data/fs/repo_clone.py:19:context
 src/quodeq/data/fs/report_parser/runs.py:111:services
-src/quodeq/data/projection/grade_projector.py:130:services
+src/quodeq/data/projection/grade_projector.py:132:services
 src/quodeq/data/projection/grade_projector.py:20:services
 src/quodeq/data/sqlite/state_store.py:240:services
 src/quodeq/engine/scoring_pipeline.py:10:services
