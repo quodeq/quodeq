@@ -27,6 +27,7 @@ from quodeq.data.fs.report_parser.runs import (
     RunInfo as RunInfo,
     list_runs,
     read_run_data,
+    read_run_scalars,
     safe_read_dir,
 )
 from quodeq.data.ports.findings import FindingsRepository
@@ -65,6 +66,7 @@ __all__ = [
     "most_frequent_grade",
     "parse_numeric_score",
     "read_run_data",
+    "read_run_scalars",
     "safe_read_dir",
     "summarize_dimensions",
 ]

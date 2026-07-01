@@ -19,6 +19,8 @@ _logger = logging.getLogger(__name__)
 
 _CACHE_WAIT_TIMEOUT_S = 30
 
+_Reader = Callable[[Path, str, str], list[DimensionResult]]
+
 
 @dataclass
 class _CacheContext:
@@ -26,11 +28,16 @@ class _CacheContext:
     cache: OrderedDict
     lock: threading.Lock
     max_size: int
+    reader: _Reader | None = None
     inflight: dict[tuple, threading.Event] = field(default_factory=dict)
+
+    def get_reader(self) -> _Reader:
+        """Return the configured reader, defaulting to read_run_data."""
+        return self.reader if self.reader is not None else read_run_data
 
 
 def _fetch_dimensions_from_disk(
-    reports_root: Path, project: str, run_id: str,
+    reports_root: Path, project: str, run_id: str, reader: _Reader | None = None,
 ) -> list[DimensionResult]:
     """Read dimension data from disk with error handling.
 
@@ -38,8 +45,9 @@ def _fetch_dimensions_from_disk(
     so that slow reads do not block other cache lookups.  Per-key mutual
     exclusion is guaranteed by the inflight-event mechanism in the caller.
     """
+    _reader = reader if reader is not None else read_run_data
     try:
-        return read_run_data(reports_root, project, run_id)
+        return _reader(reports_root, project, run_id)
     except (OSError, ValueError, KeyError) as exc:
         _logger.warning(
             "Failed to read run data for %s/%s: %s", project, run_id, exc,
@@ -83,7 +91,7 @@ def _fetch_and_store(
     ctx: _CacheContext,
 ) -> list[DimensionResult]:
     """Perform the disk fetch, store in cache, and notify waiters."""
-    data = _fetch_dimensions_from_disk(reports_root, project, run_id)
+    data = _fetch_dimensions_from_disk(reports_root, project, run_id, ctx.get_reader())
     if data:
         _cache_store(key, data, ctx)
     with ctx.lock:
@@ -99,6 +107,7 @@ def make_lru_dimension_fetcher(
     cache: OrderedDict[tuple, list[DimensionResult]],
     lock: threading.Lock,
     max_size: int,
+    reader: _Reader | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a callable that fetches dimension data for a run.
 
@@ -110,7 +119,7 @@ def make_lru_dimension_fetcher(
     threads that request the same key while I/O is in progress wait on the
     event and then read the result from the cache.
     """
-    ctx = _CacheContext(cache=cache, lock=lock, max_size=max_size)
+    ctx = _CacheContext(cache=cache, lock=lock, max_size=max_size, reader=reader)
 
     def get_run_dimensions(run_id: str) -> list[DimensionResult]:
         key = (reports_root, project, run_id)

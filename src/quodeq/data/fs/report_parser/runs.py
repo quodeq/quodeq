@@ -68,6 +68,85 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[Dimensi
     return overlay_sql_grades(run_dir, dimensions)
 
 
+def read_run_scalars(reports_root: Path, project: str, run_id: str) -> list[DimensionResult]:
+    """Load a run's per-dimension SCALARS (score/grade/principles) only.
+
+    Fast path for the dashboard trend and accumulated carry-forward, which need
+    only ``overall_score`` / ``overall_grade`` per dimension — not the full
+    findings.  Reads the authoritative SQL grade tables directly instead of
+    parsing the evaluation JSON, then falls back to :func:`read_run_data`
+    whenever the SQL tables can't faithfully reproduce the overlaid result:
+    legacy run (no ``events.jsonl``) or no ``evaluation.db``; SQLite disabled or
+    db unreadable; empty grade tables; a NULL SQL score (overlay would keep the
+    eval-time score); or the SQL dim count != the on-disk ``evaluation/*.json``
+    count (partial projection).  Returned dimensions carry empty findings.
+    """
+    validate_path_segment(project, run_id)
+    run_dir = reports_root / project / run_id
+
+    from quodeq.data.fs.report_parser._evidence_sqlite import has_evaluation_db  # noqa: PLC0415
+    from quodeq.shared._env import sqlite_disabled  # noqa: PLC0415
+
+    if (
+        sqlite_disabled()
+        or not has_evaluation_db(run_dir)
+        or not (run_dir / "events.jsonl").is_file()
+    ):
+        return read_run_data(reports_root, project, run_id)
+
+    import sqlite3  # noqa: PLC0415
+
+    from quodeq.core.types.report import PrincipleGrade  # noqa: PLC0415
+    from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
+    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
+
+    try:
+        SqliteFindingsRepository(run_dir).ensure_projected()
+        store = SQLiteStateStore(run_dir)
+        dim_rows = store.read_dimension_scores()
+        principle_rows = store.read_principle_grades()
+    except sqlite3.DatabaseError:
+        return read_run_data(reports_root, project, run_id)
+
+    if not dim_rows:
+        return read_run_data(reports_root, project, run_id)
+
+    if any(r.get("score") is None for r in dim_rows):
+        return read_run_data(reports_root, project, run_id)
+
+    eval_dir = run_dir / "evaluation"
+    on_disk = (
+        sum(1 for p in eval_dir.iterdir() if p.suffix == ".json")
+        if eval_dir.is_dir() else 0
+    )
+    if on_disk and len(dim_rows) != on_disk:
+        return read_run_data(reports_root, project, run_id)
+
+    # No eval-time grade fallback here (unlike overlay_sql_grades): the fast
+    # path doesn't read the JSON, and a projected dim past the NULL-score
+    # guard always carries a real grade label ("Insufficient" or better),
+    # never "".
+    principles_by_dim: dict[str, list[PrincipleGrade]] = {}
+    for r in principle_rows:
+        principles_by_dim.setdefault(r["dimension"], []).append(PrincipleGrade(
+            principle=r["principle_id"],
+            score=f'{r["score"]}/10' if r.get("score") is not None else None,
+            grade=r.get("grade"),
+        ))
+
+    dimensions = [
+        DimensionResult(
+            dimension=r["dimension"],
+            overall_score=f'{r["score"]}/10',
+            overall_grade=r.get("grade"),
+            principles=principles_by_dim.get(r["dimension"], []),
+        )
+        for r in dim_rows
+    ]
+    dimensions.sort(key=lambda d: d.dimension)
+    return dimensions
+
+
 def _read_run_status(run_dir: Path) -> str | None:
     """Read state from status.json if present. Returns the state string or None."""
     import json as _json  # noqa: PLC0415
