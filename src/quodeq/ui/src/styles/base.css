@@ -17,6 +17,19 @@ body,
   min-height: 100%;
 }
 
+/* ── Focus ────────────────────────────────────────────── */
+
+/* The dashboard runs in a native WKWebView (pywebview), and WebKit draws the
+   default focus ring on :focus for plain mouse clicks, not just keyboard focus
+   like Chromium does. On custom focusable elements (div/span/svg with a
+   tabindex) that reads as a stray border after a click. Gate the ring behind
+   :focus-visible for every tabbable element: pointer focus shows nothing,
+   keyboard focus keeps its indicator. Zero specificity via :where() so any
+   component's own :focus / :focus-visible styling always wins. */
+:where([tabindex]):focus:not(:focus-visible) {
+  outline: none;
+}
+
 /* ── Base ─────────────────────────────────────────────── */
 
 body {
