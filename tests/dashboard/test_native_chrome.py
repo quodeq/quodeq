@@ -109,26 +109,184 @@ class TestSetTitlebarTheme:
 
 
 class TestOnClosing:
-    def _wire(self, job, confirm=True):
+    """The close handler behaves differently by backend (see _make_on_closing):
+
+    macOS/GTK/Qt marshal the dialog onto the GUI thread and block the caller, so
+    it must run OFF the GUI thread (worker + veto + destroy). Windows/winforms
+    shows a direct modal MessageBox and runs its closing handler on the UI
+    thread, so it shows the dialog inline. Tests pin the platform explicitly so
+    they are deterministic regardless of the host OS.
+    """
+
+    def _wire(self, job, confirm=True, platform="darwin"):
         api = MagicMock()
         api._get_running_evaluation.return_value = job
         window = MagicMock()
         window.create_confirmation_dialog.return_value = confirm
-        return ww._make_on_closing(api, window), window
+        with patch.object(ww.sys, "platform", platform):
+            on_closing = ww._make_on_closing(api, window)
+        return on_closing, window
+
+    @staticmethod
+    def _join(on_closing):
+        worker = getattr(on_closing, "_worker", None)
+        if worker is not None:
+            worker.join(timeout=2)
+            # A hung worker is the exact failure class this fix targets — surface
+            # it as itself, not as a downstream mock-call-count mismatch.
+            assert not worker.is_alive(), "close-confirm worker did not finish (possible re-deadlock)"
+
+    # --- macOS / GTK / Qt: dialog runs off the GUI thread -------------------
 
     def test_no_job_closes_without_dialog(self):
         on_closing, window = self._wire(job=None)
         assert on_closing() is True
         window.create_confirmation_dialog.assert_not_called()
 
-    def test_running_job_confirm_allows_close(self):
+    def test_running_job_vetoes_the_close_and_prompts_async(self):
+        # A running scan must NOT be answered synchronously: pywebview's
+        # create_confirmation_dialog marshals the alert onto the GUI thread and
+        # blocks the caller, so calling it from the closing handler (which runs
+        # ON the GUI thread) self-deadlocks. The handler vetoes this close and
+        # shows the dialog on a worker thread instead.
         on_closing, window = self._wire(job={"jobId": "x"}, confirm=True)
-        assert on_closing() is True
+        assert on_closing() is False
+        self._join(on_closing)
         window.create_confirmation_dialog.assert_called_once()
 
-    def test_running_job_cancel_blocks_close(self):
+    def test_dialog_runs_off_the_calling_thread(self):
+        # The dialog blocks its caller until the GUI thread renders it; if the
+        # caller IS the GUI thread it deadlocks. So it must be invoked from a
+        # different thread than the one that runs _on_closing.
+        import threading
+        caller = threading.get_ident()
+        seen = {}
+        api = MagicMock()
+        api._get_running_evaluation.return_value = {"jobId": "x"}
+        window = MagicMock()
+        window.create_confirmation_dialog.side_effect = (
+            lambda *a, **k: seen.__setitem__("tid", threading.get_ident()) or False
+        )
+        with patch.object(ww.sys, "platform", "darwin"):
+            on_closing = ww._make_on_closing(api, window)
+        assert on_closing() is False
+        self._join(on_closing)
+        assert seen["tid"] != caller
+
+    def test_on_closing_returns_without_waiting_on_the_dialog(self):
+        # The core invariant of the whole fix: _on_closing must return promptly,
+        # never blocking on the dialog/worker. Simulate the real semaphore (only
+        # the GUI thread can release it) with an Event the caller never gets to
+        # set until AFTER _on_closing has returned. A regression that joins the
+        # worker (or shows the dialog inline) would park here and re-deadlock.
+        import threading
+        release = threading.Event()
+        api = MagicMock()
+        api._get_running_evaluation.return_value = {"jobId": "x"}
+        window = MagicMock()
+        window.create_confirmation_dialog.side_effect = lambda *a, **k: release.wait() or True
+        with patch.object(ww.sys, "platform", "darwin"):
+            on_closing = ww._make_on_closing(api, window)
+        result = []
+        caller = threading.Thread(target=lambda: result.append(on_closing()))
+        caller.start()
+        caller.join(timeout=2)
+        try:
+            assert not caller.is_alive(), "_on_closing blocked on the dialog — re-deadlock regression"
+            assert result == [False]
+        finally:
+            release.set()
+            self._join(on_closing)
+
+    def test_confirm_destroys_window_then_allows_close(self):
+        on_closing, window = self._wire(job={"jobId": "x"}, confirm=True)
+        on_closing()
+        self._join(on_closing)
+        window.destroy.assert_called_once()
+        # The re-issued close (from destroy) is allowed straight through.
+        assert on_closing() is True
+
+    def test_cancel_keeps_window_open_and_can_reprompt(self):
         on_closing, window = self._wire(job={"jobId": "x"}, confirm=False)
         assert on_closing() is False
+        self._join(on_closing)
+        window.destroy.assert_not_called()
+        # Cancelling leaves the window open; a later close prompts again.
+        assert on_closing() is False
+        self._join(on_closing)
+        assert window.create_confirmation_dialog.call_count == 2
+
+    def test_double_close_while_prompting_spawns_one_worker(self):
+        # Clicking close again while the dialog is already up must not spawn a
+        # second worker / second alert — the `prompting` guard covers this.
+        import threading
+        import time
+        release = threading.Event()
+        api = MagicMock()
+        api._get_running_evaluation.return_value = {"jobId": "x"}
+        window = MagicMock()
+        window.create_confirmation_dialog.side_effect = lambda *a, **k: release.wait() or True
+        with patch.object(ww.sys, "platform", "darwin"):
+            on_closing = ww._make_on_closing(api, window)
+        assert on_closing() is False
+        first_worker = on_closing._worker
+        for _ in range(200):  # wait until the worker is actually showing the dialog
+            if window.create_confirmation_dialog.call_count == 1:
+                break
+            time.sleep(0.01)
+        assert window.create_confirmation_dialog.call_count == 1
+        # Second close while still prompting: vetoed, no new worker, no new dialog.
+        assert on_closing() is False
+        assert on_closing._worker is first_worker
+        assert window.create_confirmation_dialog.call_count == 1
+        release.set()
+        self._join(on_closing)
+
+    def test_dialog_failure_does_not_trap_the_user(self):
+        # If the native dialog can't render, fall through to closing the window
+        # rather than leaving it un-closeable.
+        on_closing, window = self._wire(job={"jobId": "x"})
+        window.create_confirmation_dialog.side_effect = RuntimeError("no GUI")
+        assert on_closing() is False
+        self._join(on_closing)
+        window.destroy.assert_called_once()
+
+    # --- Windows / winforms: dialog runs inline on the UI thread ------------
+
+    def test_windows_no_job_closes_without_dialog(self):
+        on_closing, window = self._wire(job=None, platform="win32")
+        assert on_closing() is True
+        window.create_confirmation_dialog.assert_not_called()
+
+    def test_windows_shows_dialog_inline_on_the_calling_thread(self):
+        # winforms' create_confirmation_dialog is a direct modal MessageBox with
+        # no GUI-thread marshaling; showing it on a worker thread would make it
+        # ownerless/non-modal. The winforms closing handler already runs on the
+        # UI thread, so it must be shown inline and answered synchronously.
+        import threading
+        caller = threading.get_ident()
+        seen = {}
+        api = MagicMock()
+        api._get_running_evaluation.return_value = {"jobId": "x"}
+        window = MagicMock()
+        window.create_confirmation_dialog.side_effect = (
+            lambda *a, **k: seen.__setitem__("tid", threading.get_ident()) or True
+        )
+        with patch.object(ww.sys, "platform", "win32"):
+            on_closing = ww._make_on_closing(api, window)
+        assert on_closing() is True  # returns the dialog's answer directly
+        assert seen["tid"] == caller  # shown on the UI thread, not a worker
+        window.create_confirmation_dialog.assert_called_once()
+        window.destroy.assert_not_called()  # inline path lets the native close proceed
+
+    def test_windows_cancel_blocks_close(self):
+        on_closing, window = self._wire(job={"jobId": "x"}, confirm=False, platform="win32")
+        assert on_closing() is False
+
+    def test_windows_dialog_failure_does_not_trap_the_user(self):
+        on_closing, window = self._wire(job={"jobId": "x"}, platform="win32")
+        window.create_confirmation_dialog.side_effect = RuntimeError("no GUI")
+        assert on_closing() is True
 
 
 @_MACOS_ONLY
