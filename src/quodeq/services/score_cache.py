@@ -132,6 +132,11 @@ def write_cached_accumulated(
 ) -> None:
     """Replace the cached accumulated payload for *project* at *version*.
 
+    Single-slot per project: the DELETE clears any prior version first, so the
+    table holds at most one accumulated payload per project. The default
+    dashboard uses ``as_of=None`` (one version), so this is stable; rapidly
+    alternating distinct ``as_of`` historical views would each miss + overwrite.
+
     Best-effort: logs and returns on any SQLite/serialization error.
     """
     try:
