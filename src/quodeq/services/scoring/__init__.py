@@ -43,6 +43,13 @@ from quodeq.services.dashboard import (
 from quodeq.services.grade_formula import load_params
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
+from quodeq.services._fs_projects import find_children
+from quodeq.services.score_cache import (
+    accumulated_cache_version,
+    cached_accumulated,
+    make_cache_backed_fetcher,
+    score_cache_version,
+)
 from quodeq.services.ports import RunInfo, list_runs, read_run_scalars
 from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
 from quodeq.services.scoring._summary import recompute_summary
@@ -352,14 +359,21 @@ def _make_trend_fetcher(
     else. Uses a fresh per-call LRU cache so scalar (findings-less) results
     never collide with the shared full-data cache used elsewhere.
 
-    Slow path: when dismissals/deletions are active, fall back to the existing
-    findings-based rescoring fetcher, which recomputes grades from findings.
+    Heavy path: when dismissals/deletions are active, wrap the findings-based
+    rescoring fetcher with the read-through score cache. The cache version is a
+    content-hash of the project's dismissals/deletions/params, so any change
+    auto-invalidates without a write-path hook.
     """
     project_dir = reports_root / project
     if dismissed_keys(project_dir) or deleted_keys(project_dir):
-        # _make_rescoring_fetcher re-reads dismissed/deleted internally; the
-        # extra read is cheap and keeps this branch a thin delegate.
-        return _make_rescoring_fetcher(reports_root, project, params=params)
+        # Heavy path: wrap the findings-based rescoring fetcher with the
+        # read-through score cache. Version is a content hash of the project's
+        # dismissals/deletions/params, so any change auto-invalidates.
+        # dismissed/deleted are read here (branch test), in _make_rescoring_fetcher,
+        # and in score_cache_version -- three reads total, each ~0.01s, acceptable.
+        base = _make_rescoring_fetcher(reports_root, project, params=params)
+        version = score_cache_version(project_dir, params)
+        return make_cache_backed_fetcher(project, version, base)
     cache, lock = create_dimension_cache()
     return make_lru_dimension_fetcher(
         reports_root, project, cache, lock,
@@ -474,14 +488,23 @@ def get_project_scores(
         }
 
     # Build accumulated using the existing service (returns full data with violations)
-    accumulated = compute_accumulated(
-        str(reports_root), project, as_of, params=params,
-    )
-    if accumulated is None:
-        accumulated = {"dimensions": [], "summary": {}}
+    def _compute_accumulated_payload() -> dict:
+        acc = compute_accumulated(str(reports_root), project, as_of, params=params)
+        if acc is None:
+            acc = {"dimensions": [], "summary": {}}
+        return _rescore_accumulated_response(acc, reports_root, project, params=params)
 
-    # Apply rescore to accumulated dimensions
-    accumulated = _rescore_accumulated_response(accumulated, reports_root, project, params=params)
+    if find_children(reports_root, project):
+        # Parent aggregation pulls child projects' dismissals/runs into the
+        # payload, which the project-scoped cache version can't see -- bypass
+        # the cache for parents to avoid serving stale data.
+        accumulated = _compute_accumulated_payload()
+    else:
+        acc_version = accumulated_cache_version(
+            reports_root / project, params,
+            [(r.run_id, r.status) for r in all_runs], as_of,
+        )
+        accumulated = cached_accumulated(project, acc_version, _compute_accumulated_payload)
 
     # Build trend using the appropriate fetcher: scalar fast path when there
     # are no active dismissals/deletions, rescoring (findings) path otherwise.
