@@ -114,6 +114,31 @@ class _WindowApi:
                 return j
         return None
 
+    def _cancel_evaluation(self, job_id: str | None) -> None:
+        """Issue DELETE /api/evaluations/<job_id> to stop a running scan.
+
+        The API enforces an Origin header to reject cross-site requests, so set
+        it explicitly to the dashboard base URL; without it the call 403s and
+        silently no-ops. Best-effort: any failure is swallowed so a close is
+        never blocked by a failed cancel.
+        """
+        if not job_id or not self._base_url:
+            return
+        try:
+            req = urllib.request.Request(
+                f"{self._base_url}/api/evaluations/{urllib.parse.quote(job_id)}",
+                method="DELETE",
+                headers={"Origin": self._base_url},
+            )
+            # Give the API time to SIGTERM the scan and respond; the 0.5s used
+            # for the eval-check poll is too tight here.
+            with urllib.request.urlopen(req, timeout=5.0):
+                pass
+        except Exception:
+            # Best-effort: a failed cancel must never block the close, but log it
+            # so a silently-uncancelled scan is at least diagnosable.
+            _logger.warning("cancel-on-quit for job %s failed", job_id, exc_info=True)
+
     def open_browser(self, path: str = '/') -> None:
         """Open a URL in the system default browser."""
         url = self._base_url + path if self._base_url else path
@@ -741,12 +766,142 @@ def _create_window(url: str, api: "_WindowApi") -> "webview.Window":
     )
 
 
+_CLOSE_CONFIRM_TITLE = "Quit quodeq?"
+# 2-button backends (OK = quit and keep scanning, Cancel = stay open).
+_CLOSE_CONFIRM_BODY = (
+    "A scan is running. Quit anyway? The scan keeps running in the background."
+)
+# macOS 3-button alert informative text.
+_CLOSE_CONFIRM_BODY_3WAY = (
+    "A scan is running. It keeps running in the background unless you cancel it."
+)
+
+
+def _alert_return_to_choice(ret: int, first: int, second: int) -> str:
+    """Map an NSAlert ``runModal()`` return code to a close choice.
+
+    first button -> 'keep' (quit, scan continues), second -> 'cancel' (stop the
+    scan, then quit), anything else (third/Stay/Escape) -> 'stay'.
+    """
+    if ret == first:
+        return "keep"
+    if ret == second:
+        return "cancel"
+    return "stay"
+
+
+def _macos_confirm_close(window: object) -> str:
+    """Show the macOS 3-button close dialog and return 'keep', 'cancel', or 'stay'.
+
+    Runs the modal on the GUI/main thread (``NSAlert.runModal`` requires it) via
+    ``AppHelper.callAfter``, blocking the *calling* worker thread on a semaphore
+    — the same mechanism pywebview's own dialogs use, so this must be called OFF
+    the GUI thread. Falls back to 'keep' if AppKit is unavailable or the alert
+    fails, so the user is never trapped. No-op ('keep') off macOS.
+
+    The alert is app-modal (not sheeted on the window), so *window* is accepted
+    only for call-site symmetry with the 2-button branch and is unused here.
+    """
+    if sys.platform != "darwin":
+        return "keep"
+    try:
+        import AppKit  # noqa: PLC0415
+        from PyObjCTools import AppHelper  # noqa: PLC0415
+    except ImportError:
+        return "keep"
+    result = {"choice": "keep"}
+    done = threading.Semaphore(0)
+
+    def _show() -> None:
+        try:
+            AppKit.NSApplication.sharedApplication()
+            AppKit.NSRunningApplication.currentApplication().activateWithOptions_(
+                AppKit.NSApplicationActivateIgnoringOtherApps,
+            )
+            alert = AppKit.NSAlert.alloc().init()
+            alert.setMessageText_(_CLOSE_CONFIRM_TITLE)
+            alert.setInformativeText_(_CLOSE_CONFIRM_BODY_3WAY)
+            alert.setAlertStyle_(AppKit.NSWarningAlertStyle)
+            quit_btn = alert.addButtonWithTitle_("Quit, keep scanning")
+            alert.addButtonWithTitle_("Cancel scan and quit")
+            stay = alert.addButtonWithTitle_("Stay")
+            # Make "Stay" the default so a reflexive Enter during a scan does not
+            # quit; the two actions need a deliberate click. Add order (not which
+            # button is default) still fixes the return codes mapped below.
+            quit_btn.setKeyEquivalent_("")
+            stay.setKeyEquivalent_("\r")
+            result["choice"] = _alert_return_to_choice(
+                alert.runModal(),
+                AppKit.NSAlertFirstButtonReturn,
+                AppKit.NSAlertSecondButtonReturn,
+            )
+        except Exception:
+            result["choice"] = "keep"
+        finally:
+            done.release()
+
+    AppHelper.callAfter(_show)
+    done.acquire()
+    return result["choice"]
+
+
+def _ask_close_choice(window: object) -> str:
+    """Ask the user how to close while a scan runs; return 'keep', 'cancel', or 'stay'.
+
+    macOS gets a 3-button native alert (keep scanning / cancel scan / stay);
+    other backends get pywebview's 2-button dialog (OK = keep scanning, Cancel =
+    stay). If the dialog can't render, return 'keep' so the user is never
+    trapped in an un-closeable window.
+    """
+    if sys.platform == "darwin":
+        return _macos_confirm_close(window)
+    try:
+        ok = bool(window.create_confirmation_dialog(
+            _CLOSE_CONFIRM_TITLE, _CLOSE_CONFIRM_BODY,
+        ))
+    except Exception:
+        return "keep"
+    return "keep" if ok else "stay"
+
+
 def _make_on_closing(api: "_WindowApi", window: object) -> "Callable[[], bool]":
     """Native close handler: confirm via a native dialog if a scan is running.
 
-    Returns True to allow the close, False to keep the window open. The scan
-    is a separate process, so 'Quit' just closes the window and the scan
-    keeps running.
+    The scan is a separate process, so quitting just closes the window and the
+    scan keeps running — unless the user picks "Cancel scan and quit" (macOS),
+    which stops it first.
+
+    pywebview's ``closing`` event is a *locking* event: its handler runs
+    synchronously on the GUI thread (on macOS, inside ``windowShouldClose:``).
+    How the confirmation dialog can be shown from there depends on the backend:
+
+    * macOS / GTK / Qt — the native dialog marshals back onto the GUI thread and
+      then blocks its caller on a semaphore. Called from the GUI-thread closing
+      handler it self-deadlocks (the alert can never run — the GUI thread is
+      parked in the handler), which froze the window whenever a scan was in
+      flight. So we don't answer inline: veto the close (return False), show the
+      dialog on a worker thread (off the GUI thread the semaphore is safe), and
+      re-issue the close via ``window.destroy`` once the user confirms.
+
+    * Windows — winforms' ``create_confirmation_dialog`` is a *direct* modal
+      ``MessageBox.Show`` with no GUI-thread marshaling. Showing it from a
+      worker thread would make it ownerless and non-modal, so on Windows we show
+      it inline on the (already UI-thread) closing handler and answer
+      synchronously. winforms doesn't self-block, so there is no deadlock.
+    """
+    if sys.platform == "win32":
+        return _make_on_closing_inline(api, window)
+    return _make_on_closing_async(api, window)
+
+
+def _make_on_closing_inline(api: "_WindowApi", window: object) -> "Callable[[], bool]":
+    """Windows path: the closing handler runs on the UI thread and the dialog is
+    a direct modal MessageBox, so show it inline and answer synchronously.
+
+    Windows shows the 2-button dialog (OK = keep scanning, Cancel = stay); the
+    cancel-the-scan option is macOS-only for now. Answers with the dialog
+    directly rather than via ``_ask_close_choice`` so it does not re-dispatch on
+    ``sys.platform`` (this handler is already the win32-only branch).
     """
     def _on_closing() -> bool:
         try:
@@ -757,13 +912,73 @@ def _make_on_closing(api: "_WindowApi", window: object) -> "Callable[[], bool]":
             return True
         try:
             return bool(window.create_confirmation_dialog(
-                "Quit quodeq?",
-                "A scan is running. Click OK to quit — the scan keeps running "
-                "in the background. Click Cancel to stay.",
+                _CLOSE_CONFIRM_TITLE, _CLOSE_CONFIRM_BODY,
             ))
         except Exception:
             # If the native dialog can't render, don't trap the user.
             return True
+    _on_closing._worker = None  # type: ignore[attr-defined]  # parity with the async path
+    return _on_closing
+
+
+def _make_on_closing_async(api: "_WindowApi", window: object) -> "Callable[[], bool]":
+    """macOS / GTK / Qt path: run the (GUI-thread-marshaling, caller-blocking)
+    dialog on a worker thread so it can't self-deadlock the closing handler.
+
+    ``state`` is shared between the GUI thread (``_on_closing``) and the worker
+    (``_prompt_and_close``). Dict-item writes are atomic under the GIL; the
+    running job id is passed to the worker as an argument (not shared) so a
+    re-entrant close can't make it cancel a different job. ``prompting`` stays
+    set until the worker either resolves to 'stay' (which clears it, allowing a
+    later re-prompt) or commits to closing (``confirmed``), so exactly one prompt
+    is ever in flight — even across the possibly-slow cancel call.
+    """
+    state = {"prompting": False, "confirmed": False}
+
+    def _prompt_and_close(job_id: str | None) -> None:
+        try:
+            choice = _ask_close_choice(window)  # 'keep' | 'cancel' | 'stay'
+        except Exception:
+            choice = "keep"  # never trap the user on an unexpected dialog error
+        if choice == "stay":
+            state["prompting"] = False  # re-promptable: a later close asks again
+            return
+        if choice == "cancel":
+            api._cancel_evaluation(job_id)
+        # Set `confirmed` BEFORE destroy(): on GTK/Qt/winforms window.destroy()
+        # re-fires the closing event, and the guard in _on_closing is what lets
+        # that re-issued close through instead of looping into another prompt.
+        # (On macOS destroy() bypasses windowShouldClose:, so the guard is inert
+        # there — but do not reorder this to "after destroy succeeds", it would
+        # reintroduce the re-entry loop on the other backends.) `prompting` is
+        # deliberately left set through the cancel call above so a second close
+        # during that window can't pop a duplicate dialog.
+        state["confirmed"] = True
+        try:
+            window.destroy()  # type: ignore[union-attr]
+        except Exception:
+            _logger.debug("window.destroy after close-confirm failed", exc_info=True)
+
+    def _on_closing() -> bool:
+        if state["confirmed"]:
+            return True  # user already confirmed; let the re-issued close through
+        try:
+            job = api._get_running_evaluation()
+        except Exception:
+            job = None
+        if not job:
+            return True
+        if not state["prompting"]:
+            state["prompting"] = True
+            job_id = job.get("jobId") or job.get("job_id")
+            worker = threading.Thread(
+                target=_prompt_and_close, args=(job_id,), daemon=True,
+            )
+            _on_closing._worker = worker  # type: ignore[attr-defined]
+            worker.start()
+        return False  # veto now; the worker re-closes the window if confirmed
+
+    _on_closing._worker = None  # type: ignore[attr-defined]
     return _on_closing
 
 
