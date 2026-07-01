@@ -18,10 +18,8 @@ def _clear_cache():
 
 def test_reads_scalars_from_db_without_findings(tmp_path: Path) -> None:
     reports = tmp_path / "evaluations"
-    build_projected_run(reports, "proj", "r1", [
-        {"dimension": "security", "severity": "major"},
-        {"dimension": "reliability", "severity": "minor"},
-    ])
+    build_projected_run(reports, "proj", "r1",
+                        {"security": (8.5, "Good"), "reliability": (6.0, "Fair")})
 
     by_name = {d.dimension: d for d in read_run_scalars(reports, "proj", "r1")}
 
@@ -33,15 +31,18 @@ def test_reads_scalars_from_db_without_findings(tmp_path: Path) -> None:
 
 def test_scalars_match_read_run_data_scores(tmp_path: Path) -> None:
     reports = tmp_path / "evaluations"
-    build_projected_run(reports, "proj", "r1", [
-        {"dimension": "security", "severity": "major"},
-        {"dimension": "reliability", "severity": "minor"},
-    ])
+    build_projected_run(reports, "proj", "r1",
+                        {"security": (8.5, "Good"), "reliability": (6.0, "Fair")})
 
     scalar = {d.dimension: (d.overall_score, d.overall_grade) for d in read_run_scalars(reports, "proj", "r1")}
     heavy = {d.dimension: (d.overall_score, d.overall_grade) for d in read_run_data(reports, "proj", "r1")}
+    # Equal to each other AND to the concrete non-NULL values: proves the fast
+    # path returns real scores, not "None/10" from a silent fallback.
     assert scalar == heavy
-    assert all(v[0] is not None for v in scalar.values())
+    assert scalar == {
+        "security": ("8.5/10", "Good"),
+        "reliability": ("6.0/10", "Fair"),
+    }
 
 
 def test_legacy_run_falls_back_to_read_run_data(tmp_path: Path) -> None:
@@ -56,8 +57,7 @@ def test_legacy_run_falls_back_to_read_run_data(tmp_path: Path) -> None:
 
 def test_null_sql_score_falls_back(tmp_path: Path) -> None:
     reports = tmp_path / "evaluations"
-    run_dir = build_projected_run(reports, "proj", "r1",
-                                  [{"dimension": "security", "severity": "major"}])
+    run_dir = build_projected_run(reports, "proj", "r1", {"security": (8.5, "Good")})
     SQLiteStateStore(run_dir).record_dimension_score(
         dimension="reliability", score=None, grade="Insufficient")
     import json
@@ -73,3 +73,18 @@ def test_null_sql_score_falls_back(tmp_path: Path) -> None:
 def test_path_traversal_rejected(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         read_run_scalars(tmp_path, "proj", "../escape")
+
+
+def test_fast_path_does_not_fall_back(tmp_path: Path, monkeypatch) -> None:
+    """With non-NULL SQL scores, read_run_scalars must NOT call read_run_data."""
+    reports = tmp_path / "evaluations"
+    build_projected_run(reports, "proj", "r1", {"security": (8.5, "Good")})
+
+    import quodeq.data.fs.report_parser.runs as runs_mod
+
+    def boom(*_a, **_k):
+        raise AssertionError("read_run_scalars fell back to read_run_data")
+    monkeypatch.setattr(runs_mod, "read_run_data", boom)
+
+    dims = {d.dimension: d.overall_score for d in read_run_scalars(reports, "proj", "r1")}
+    assert dims == {"security": "8.5/10"}
