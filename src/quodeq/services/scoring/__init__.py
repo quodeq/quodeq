@@ -43,6 +43,7 @@ from quodeq.services.dashboard import (
 from quodeq.services.grade_formula import load_params
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
+from quodeq.services.score_cache import make_cache_backed_fetcher, score_cache_version
 from quodeq.services.ports import RunInfo, list_runs, read_run_scalars
 from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
 from quodeq.services.scoring._summary import recompute_summary
@@ -357,9 +358,12 @@ def _make_trend_fetcher(
     """
     project_dir = reports_root / project
     if dismissed_keys(project_dir) or deleted_keys(project_dir):
-        # _make_rescoring_fetcher re-reads dismissed/deleted internally; the
-        # extra read is cheap and keeps this branch a thin delegate.
-        return _make_rescoring_fetcher(reports_root, project, params=params)
+        # Heavy path: wrap the findings-based rescoring fetcher with the
+        # read-through score cache. Version is a content hash of the project's
+        # dismissals/deletions/params, so any change auto-invalidates.
+        base = _make_rescoring_fetcher(reports_root, project, params=params)
+        version = score_cache_version(project_dir, params)
+        return make_cache_backed_fetcher(project, version, base)
     cache, lock = create_dimension_cache()
     return make_lru_dimension_fetcher(
         reports_root, project, cache, lock,

@@ -36,10 +36,18 @@ def test_active_dismissal_uses_heavy_path(tmp_path: Path, monkeypatch) -> None:
     # Force a non-empty dismissed set so the scalar fast path is bypassed.
     monkeypatch.setattr("quodeq.services.scoring.dismissed_keys", lambda _pd: {("R1", "a.py", 1)})
     monkeypatch.setattr("quodeq.services.scoring.deleted_keys", lambda _pd: set())
+    # Use a tmp score cache so the test stays isolated.
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
 
-    sentinel = object()
-    monkeypatch.setattr("quodeq.services.scoring._make_rescoring_fetcher",
-                        lambda rr, p, params=None: sentinel)
+    rescoring_calls: list[str] = []
+
+    def fake_rescoring_fetcher(rr, p, params=None):
+        def fetch(run_id: str) -> list[DimensionResult]:
+            rescoring_calls.append(run_id)
+            return [DimensionResult(dimension="security", overall_score="7.0/10", overall_grade="Fair")]
+        return fetch
+
+    monkeypatch.setattr("quodeq.services.scoring._make_rescoring_fetcher", fake_rescoring_fetcher)
 
     def boom(*_a):
         raise AssertionError("scalar reader used despite active dismissals")
@@ -47,21 +55,36 @@ def test_active_dismissal_uses_heavy_path(tmp_path: Path, monkeypatch) -> None:
 
     fetcher = _make_trend_fetcher(reports, project)
 
-    # Heavy path: _make_trend_fetcher returns the rescoring fetcher unchanged.
-    assert fetcher is sentinel
+    # Heavy path: the cache-wrapper is returned (not the raw rescoring fetcher).
+    # Calling it must invoke the rescoring fetcher (not the scalar reader).
+    result = fetcher("r1")
+    assert [d.overall_score for d in result] == ["7.0/10"]
+    assert rescoring_calls == ["r1"]  # rescoring fetcher was used, not the scalar reader
 
 
 def test_active_deletion_uses_heavy_path(tmp_path: Path, monkeypatch) -> None:
     reports, project = _make_project(tmp_path)
     monkeypatch.setattr("quodeq.services.scoring.dismissed_keys", lambda _pd: set())
     monkeypatch.setattr("quodeq.services.scoring.deleted_keys", lambda _pd: {("sec", "prin", "a.py")})
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
 
-    sentinel = object()
-    monkeypatch.setattr("quodeq.services.scoring._make_rescoring_fetcher",
-                        lambda rr, p, params=None: sentinel)
+    rescoring_calls: list[str] = []
+
+    def fake_rescoring_fetcher(rr, p, params=None):
+        def fetch(run_id: str) -> list[DimensionResult]:
+            rescoring_calls.append(run_id)
+            return [DimensionResult(dimension="security", overall_score="6.0/10", overall_grade="Fair")]
+        return fetch
+
+    monkeypatch.setattr("quodeq.services.scoring._make_rescoring_fetcher", fake_rescoring_fetcher)
 
     def boom(*_a):
         raise AssertionError("scalar reader used despite active deletions")
     monkeypatch.setattr("quodeq.services.scoring.read_run_scalars", boom)
 
-    assert _make_trend_fetcher(reports, project) is sentinel
+    fetcher = _make_trend_fetcher(reports, project)
+
+    # Heavy path: rescoring fetcher is wrapped in the cache; scalar reader must NOT be called.
+    result = fetcher("r2")
+    assert [d.overall_score for d in result] == ["6.0/10"]
+    assert rescoring_calls == ["r2"]
