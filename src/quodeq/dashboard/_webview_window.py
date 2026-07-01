@@ -741,13 +741,46 @@ def _create_window(url: str, api: "_WindowApi") -> "webview.Window":
     )
 
 
+_CLOSE_CONFIRM_TITLE = "Quit quodeq?"
+_CLOSE_CONFIRM_BODY = (
+    "A scan is running. Click OK to quit — the scan keeps running "
+    "in the background. Click Cancel to stay."
+)
+
+
 def _make_on_closing(api: "_WindowApi", window: object) -> "Callable[[], bool]":
     """Native close handler: confirm via a native dialog if a scan is running.
 
-    Returns True to allow the close, False to keep the window open. The scan
-    is a separate process, so 'Quit' just closes the window and the scan
-    keeps running.
+    The scan is a separate process, so 'Quit' just closes the window and the
+    scan keeps running.
+
+    pywebview's ``closing`` event is a *locking* event: its handler runs
+    synchronously on the GUI thread (on macOS, inside ``windowShouldClose:``).
+    How the confirmation dialog can be shown from there depends on the backend:
+
+    * macOS / GTK / Qt — ``create_confirmation_dialog`` marshals the native
+      alert back onto the GUI thread and then blocks its caller on a semaphore.
+      Called from the GUI-thread closing handler it self-deadlocks (the alert
+      can never run — the GUI thread is parked in the handler), which froze the
+      window whenever a scan was in flight. So we don't answer inline: veto the
+      close (return False), show the dialog on a worker thread (off the GUI
+      thread the semaphore is safe), and re-issue the close via
+      ``window.destroy`` once the user confirms.
+
+    * Windows — winforms' ``create_confirmation_dialog`` is a *direct* modal
+      ``MessageBox.Show`` with no GUI-thread marshaling. Showing it from a
+      worker thread would make it ownerless and non-modal, so on Windows we show
+      it inline on the (already UI-thread) closing handler and answer
+      synchronously. winforms doesn't self-block, so there is no deadlock.
     """
+    if sys.platform == "win32":
+        return _make_on_closing_inline(api, window)
+    return _make_on_closing_async(api, window)
+
+
+def _make_on_closing_inline(api: "_WindowApi", window: object) -> "Callable[[], bool]":
+    """Windows path: the closing handler runs on the UI thread and the dialog is
+    a direct modal MessageBox, so show it inline and answer synchronously."""
     def _on_closing() -> bool:
         try:
             job = api._get_running_evaluation()
@@ -757,13 +790,67 @@ def _make_on_closing(api: "_WindowApi", window: object) -> "Callable[[], bool]":
             return True
         try:
             return bool(window.create_confirmation_dialog(
-                "Quit quodeq?",
-                "A scan is running. Click OK to quit — the scan keeps running "
-                "in the background. Click Cancel to stay.",
+                _CLOSE_CONFIRM_TITLE, _CLOSE_CONFIRM_BODY,
             ))
         except Exception:
             # If the native dialog can't render, don't trap the user.
             return True
+    _on_closing._worker = None  # type: ignore[attr-defined]  # parity with the async path
+    return _on_closing
+
+
+def _make_on_closing_async(api: "_WindowApi", window: object) -> "Callable[[], bool]":
+    """macOS / GTK / Qt path: run the (GUI-thread-marshaling, caller-blocking)
+    dialog on a worker thread so it can't self-deadlock the closing handler.
+
+    ``state`` is shared between the GUI thread (``_on_closing``) and the worker
+    (``_prompt_and_close``). Dict-item writes are atomic under the GIL and only
+    one prompt is ever in flight — the ``prompting`` guard plus the modal (which
+    parks the GUI thread until it is answered) serialise access — so no lock is
+    needed.
+    """
+    state = {"prompting": False, "confirmed": False}
+
+    def _prompt_and_close() -> None:
+        try:
+            ok = bool(window.create_confirmation_dialog(
+                _CLOSE_CONFIRM_TITLE, _CLOSE_CONFIRM_BODY,
+            ))
+        except Exception:
+            # If the native dialog can't render, don't trap the user.
+            ok = True
+        state["prompting"] = False
+        if not ok:
+            return
+        # Set `confirmed` BEFORE destroy(): on GTK/Qt/winforms window.destroy()
+        # re-fires the closing event, and the guard in _on_closing is what lets
+        # that re-issued close through instead of looping into another prompt.
+        # (On macOS destroy() bypasses windowShouldClose:, so the guard is inert
+        # there — but do not reorder this to "after destroy succeeds", it would
+        # reintroduce the re-entry loop on the other backends.)
+        state["confirmed"] = True
+        try:
+            window.destroy()  # type: ignore[union-attr]
+        except Exception:
+            _logger.debug("window.destroy after close-confirm failed", exc_info=True)
+
+    def _on_closing() -> bool:
+        if state["confirmed"]:
+            return True  # user already confirmed; let the re-issued close through
+        try:
+            job = api._get_running_evaluation()
+        except Exception:
+            job = None
+        if not job:
+            return True
+        if not state["prompting"]:
+            state["prompting"] = True
+            worker = threading.Thread(target=_prompt_and_close, daemon=True)
+            _on_closing._worker = worker  # type: ignore[attr-defined]
+            worker.start()
+        return False  # veto now; the worker re-closes the window if confirmed
+
+    _on_closing._worker = None  # type: ignore[attr-defined]
     return _on_closing
 
 
