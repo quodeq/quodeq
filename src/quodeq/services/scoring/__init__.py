@@ -353,14 +353,18 @@ def _make_trend_fetcher(
     else. Uses a fresh per-call LRU cache so scalar (findings-less) results
     never collide with the shared full-data cache used elsewhere.
 
-    Slow path: when dismissals/deletions are active, fall back to the existing
-    findings-based rescoring fetcher, which recomputes grades from findings.
+    Heavy path: when dismissals/deletions are active, wrap the findings-based
+    rescoring fetcher with the read-through score cache. The cache version is a
+    content-hash of the project's dismissals/deletions/params, so any change
+    auto-invalidates without a write-path hook.
     """
     project_dir = reports_root / project
     if dismissed_keys(project_dir) or deleted_keys(project_dir):
         # Heavy path: wrap the findings-based rescoring fetcher with the
         # read-through score cache. Version is a content hash of the project's
         # dismissals/deletions/params, so any change auto-invalidates.
+        # dismissed/deleted are read here (branch test), in _make_rescoring_fetcher,
+        # and in score_cache_version -- three reads total, each ~0.01s, acceptable.
         base = _make_rescoring_fetcher(reports_root, project, params=params)
         version = score_cache_version(project_dir, params)
         return make_cache_backed_fetcher(project, version, base)

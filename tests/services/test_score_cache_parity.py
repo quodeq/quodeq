@@ -51,7 +51,8 @@ def test_trend_identical_cached_vs_direct(tmp_path, monkeypatch):
     warm = get_project_scores(reports, "proj")   # warm cache: hits
 
     monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
-    direct = get_project_scores(reports, "proj")  # cache off: direct rescoring
+    # cache off (kill switch -> make_cache_backed_fetcher returns base unchanged): direct rescoring
+    direct = get_project_scores(reports, "proj")
 
     assert cold["trend"] == direct["trend"]
     assert warm["trend"] == direct["trend"]
