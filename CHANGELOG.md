@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.1] - 2026-07-01
+
+### Fixes
+- **Close button no longer freezes the app during a scan**: closing the desktop window while an evaluation was running could hang the app ("stays loading"), a regression introduced with the native close confirmation in 1.5.0. The confirmation now runs off the GUI thread so it can no longer deadlock, and is shown inline on Windows where the native dialog is not marshaled, so the window closes cleanly and the scan keeps running in the background.
+- **Restored the "Cancel scan and quit" option**: closing during a scan on macOS again offers three choices (Quit and keep scanning / Cancel scan and quit / Stay) instead of two, so you can stop a running scan as you quit. The safe "Stay" is the default. Windows and Linux keep the two-button dialog.
+
 ## [1.5.0] - 2026-07-01
 
 ### Features
