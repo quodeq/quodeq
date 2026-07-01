@@ -96,7 +96,6 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
   const frameRef = useRef(null);
   const prevNavRef = useRef(null);
   const [liveMsg, setLiveMsg] = useState('');
-  const [canvasFocused, setCanvasFocused] = useState(false);
   const announce = useCallback((msg) => setLiveMsg(msg), []);
 
   const saveNav = useCallback(() => {
@@ -141,18 +140,15 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', opacity: visible ? 1 : 0, transition: 'opacity 0.4s ease' }}>
       <canvas ref={canvasRef} width={size.w} height={size.h}
-        style={{
-          width: '100%', height: '100%', display: 'block',
-          outline: canvasFocused ? '2px solid var(--color-accent)' : 'none',
-          outlineOffset: '-2px',
-        }}
+        className="viz-focusable"
+        style={{ width: '100%', height: '100%', display: 'block' }}
         onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} onClick={handleClick}
         tabIndex={0}
         role="application"
         aria-label="Galaxy visualization of project compliance. Use arrow keys to move between nodes, Enter to open, Escape to go back."
         onKeyDown={handleKeyDown}
-        onFocus={() => { setCanvasFocused(true); handleFocus(); }}
-        onBlur={() => { setCanvasFocused(false); handleBlur(); }} />
+        onFocus={handleFocus}
+        onBlur={handleBlur} />
       <div aria-live="polite" aria-atomic="true" style={{
         position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
         overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0,

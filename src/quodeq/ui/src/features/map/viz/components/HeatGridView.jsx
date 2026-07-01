@@ -70,7 +70,7 @@ export default function HeatGridView({ node, onDrillDown, onFileClick, onCellCli
             {COLUMNS.map((col) => (
               <th
                 key={col.id}
-                className={`heat-grid-th-sort${col.align === 'left' ? ' left' : ''}`}
+                className={`heat-grid-th-sort viz-focusable${col.align === 'left' ? ' left' : ''}`}
                 onClick={() => handleSort(col.id)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSort(col.id); } }}
                 tabIndex={0}
@@ -88,7 +88,7 @@ export default function HeatGridView({ node, onDrillDown, onFileClick, onCellCli
               <tr key={row.path}>
                 <td>
                   <div
-                    className={`heat-grid-file${canDrill || row.isFile ? ' clickable' : ''}`}
+                    className={`heat-grid-file${canDrill || row.isFile ? ' clickable viz-focusable' : ''}`}
                     role={canDrill || row.isFile ? 'button' : undefined}
                     tabIndex={canDrill || row.isFile ? 0 : undefined}
                     onClick={() => canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row)}

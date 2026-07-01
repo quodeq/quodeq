@@ -45,6 +45,12 @@ describe('RiskMatrixView drillable circle keyboard accessibility (#1936)', () =>
     expect(circle).toHaveAttribute('tabindex', '0');
   });
 
+  it('drillable circle carries the viz-focusable class (suppresses stray focus ring)', () => {
+    const { container } = render(<RiskMatrixView node={NODE} onDrillDown={vi.fn()} />);
+    const circle = getDrillableCircle(container);
+    expect(circle).toHaveClass('viz-focusable');
+  });
+
   it('drillable circle has role="button"', () => {
     const { container } = render(<RiskMatrixView node={NODE} onDrillDown={vi.fn()} />);
     const circle = getDrillableCircle(container);

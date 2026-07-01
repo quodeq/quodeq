@@ -72,7 +72,7 @@ function BubbleGroup({ points, px, py, br, entered, showLabels, tip, setTip, onD
               <animate attributeName="opacity" values="0.3;0.1;0.3" dur="2s" repeatCount="indefinite" />
             </circle>}
             {canDrill ? (
-              <circle cx={cx} cy={cy} r={r} fill={color} fillOpacity={0.85}
+              <circle className="viz-focusable" cx={cx} cy={cy} r={r} fill={color} fillOpacity={0.85}
                 stroke={border} strokeWidth={1}
                 filter={tip?.name === child.name ? 'url(#glow)' : undefined}
                 style={{ cursor: 'pointer', transition: 'fill-opacity 0.2s ease' }}
