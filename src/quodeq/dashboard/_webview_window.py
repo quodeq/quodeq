@@ -135,7 +135,9 @@ class _WindowApi:
             with urllib.request.urlopen(req, timeout=5.0):
                 pass
         except Exception:
-            pass
+            # Best-effort: a failed cancel must never block the close, but log it
+            # so a silently-uncancelled scan is at least diagnosable.
+            _logger.warning("cancel-on-quit for job %s failed", job_id, exc_info=True)
 
     def open_browser(self, path: str = '/') -> None:
         """Open a URL in the system default browser."""
@@ -796,6 +798,9 @@ def _macos_confirm_close(window: object) -> str:
     — the same mechanism pywebview's own dialogs use, so this must be called OFF
     the GUI thread. Falls back to 'keep' if AppKit is unavailable or the alert
     fails, so the user is never trapped. No-op ('keep') off macOS.
+
+    The alert is app-modal (not sheeted on the window), so *window* is accepted
+    only for call-site symmetry with the 2-button branch and is unused here.
     """
     if sys.platform != "darwin":
         return "keep"
@@ -817,10 +822,14 @@ def _macos_confirm_close(window: object) -> str:
             alert.setMessageText_(_CLOSE_CONFIRM_TITLE)
             alert.setInformativeText_(_CLOSE_CONFIRM_BODY_3WAY)
             alert.setAlertStyle_(AppKit.NSWarningAlertStyle)
-            alert.addButtonWithTitle_("Quit, keep scanning")
+            quit_btn = alert.addButtonWithTitle_("Quit, keep scanning")
             alert.addButtonWithTitle_("Cancel scan and quit")
             stay = alert.addButtonWithTitle_("Stay")
-            stay.setKeyEquivalent_("\033")  # Escape maps to the safe option
+            # Make "Stay" the default so a reflexive Enter during a scan does not
+            # quit; the two actions need a deliberate click. Add order (not which
+            # button is default) still fixes the return codes mapped below.
+            quit_btn.setKeyEquivalent_("")
+            stay.setKeyEquivalent_("\r")
             result["choice"] = _alert_return_to_choice(
                 alert.runModal(),
                 AppKit.NSAlertFirstButtonReturn,
@@ -917,29 +926,33 @@ def _make_on_closing_async(api: "_WindowApi", window: object) -> "Callable[[], b
     dialog on a worker thread so it can't self-deadlock the closing handler.
 
     ``state`` is shared between the GUI thread (``_on_closing``) and the worker
-    (``_prompt_and_close``). Dict-item writes are atomic under the GIL and only
-    one prompt is ever in flight — the ``prompting`` guard plus the modal (which
-    parks the GUI thread until it is answered) serialise access — so no lock is
-    needed.
+    (``_prompt_and_close``). Dict-item writes are atomic under the GIL; the
+    running job id is passed to the worker as an argument (not shared) so a
+    re-entrant close can't make it cancel a different job. ``prompting`` stays
+    set until the worker either resolves to 'stay' (which clears it, allowing a
+    later re-prompt) or commits to closing (``confirmed``), so exactly one prompt
+    is ever in flight — even across the possibly-slow cancel call.
     """
-    state = {"prompting": False, "confirmed": False, "job_id": None}
+    state = {"prompting": False, "confirmed": False}
 
-    def _prompt_and_close() -> None:
+    def _prompt_and_close(job_id: str | None) -> None:
         try:
             choice = _ask_close_choice(window)  # 'keep' | 'cancel' | 'stay'
         except Exception:
             choice = "keep"  # never trap the user on an unexpected dialog error
-        state["prompting"] = False
         if choice == "stay":
+            state["prompting"] = False  # re-promptable: a later close asks again
             return
         if choice == "cancel":
-            api._cancel_evaluation(state["job_id"])
+            api._cancel_evaluation(job_id)
         # Set `confirmed` BEFORE destroy(): on GTK/Qt/winforms window.destroy()
         # re-fires the closing event, and the guard in _on_closing is what lets
         # that re-issued close through instead of looping into another prompt.
         # (On macOS destroy() bypasses windowShouldClose:, so the guard is inert
         # there — but do not reorder this to "after destroy succeeds", it would
-        # reintroduce the re-entry loop on the other backends.)
+        # reintroduce the re-entry loop on the other backends.) `prompting` is
+        # deliberately left set through the cancel call above so a second close
+        # during that window can't pop a duplicate dialog.
         state["confirmed"] = True
         try:
             window.destroy()  # type: ignore[union-attr]
@@ -957,8 +970,10 @@ def _make_on_closing_async(api: "_WindowApi", window: object) -> "Callable[[], b
             return True
         if not state["prompting"]:
             state["prompting"] = True
-            state["job_id"] = job.get("jobId") or job.get("job_id")
-            worker = threading.Thread(target=_prompt_and_close, daemon=True)
+            job_id = job.get("jobId") or job.get("job_id")
+            worker = threading.Thread(
+                target=_prompt_and_close, args=(job_id,), daemon=True,
+            )
             _on_closing._worker = worker  # type: ignore[attr-defined]
             worker.start()
         return False  # veto now; the worker re-closes the window if confirmed

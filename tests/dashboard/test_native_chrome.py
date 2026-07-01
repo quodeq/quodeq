@@ -256,6 +256,32 @@ class TestOnClosing:
             release.set()
             self._join(on_closing)
 
+    def test_second_close_during_cancel_does_not_reprompt(self):
+        # On 'cancel', `prompting` is held through the (possibly slow) cancel
+        # call, so a second close during it must not spawn a second worker/dialog.
+        import threading
+        cancel_started = threading.Event()
+        release = threading.Event()
+        on_closing, window, api = self._wire(job={"jobId": "x"})
+
+        def _cancel(_job_id):
+            cancel_started.set()
+            release.wait()
+
+        api._cancel_evaluation.side_effect = _cancel
+        with patch.object(ww, "_ask_close_choice", return_value="cancel") as choose:
+            assert on_closing() is False
+            first_worker = on_closing._worker
+            assert cancel_started.wait(2)  # worker is now inside the cancel call
+            # Second close while the cancel is in flight: vetoed, no new prompt.
+            assert on_closing() is False
+            assert on_closing._worker is first_worker
+            assert choose.call_count == 1
+            release.set()
+            self._join(on_closing)
+        window.destroy.assert_called_once()
+        api._cancel_evaluation.assert_called_once_with("x")
+
     def test_dialog_error_does_not_trap_the_user(self):
         # If the choice can't be obtained, fall through to closing the window
         # (treat as 'keep') rather than leaving it un-closeable.
@@ -340,6 +366,16 @@ class TestOnClosing:
             api._cancel_evaluation(None)         # no job id
         uo.assert_not_called()
 
+    def test_cancel_evaluation_swallows_urlopen_error(self):
+        # Best-effort: a failed cancel must not propagate (the worker destroys
+        # the window right after, so a raise would trap the user mid-close).
+        import urllib.error
+        api = ww._WindowApi()
+        api._base_url = "http://127.0.0.1:7863"
+        with patch.object(ww.urllib.request, "urlopen",
+                          side_effect=urllib.error.URLError("boom")):
+            api._cancel_evaluation("job-42")  # must not raise
+
     # --- Windows / winforms: dialog runs inline on the UI thread (2-button) -
 
     def test_windows_no_job_closes_without_dialog(self):
@@ -363,6 +399,7 @@ class TestOnClosing:
         assert seen["tid"] == caller  # shown on the UI thread, not a worker
         window.create_confirmation_dialog.assert_called_once()
         window.destroy.assert_not_called()  # inline path lets the native close proceed
+        api._cancel_evaluation.assert_not_called()  # cancel-scan is macOS-only
 
     def test_windows_cancel_blocks_close(self):
         on_closing, window, api = self._wire(job={"jobId": "x"}, platform="win32")
@@ -373,6 +410,64 @@ class TestOnClosing:
         on_closing, window, api = self._wire(job={"jobId": "x"}, platform="win32")
         window.create_confirmation_dialog.side_effect = RuntimeError("no GUI")
         assert on_closing() is True
+
+
+@_MACOS_ONLY
+class TestMacConfirmClose:
+    """Exercise the real _macos_confirm_close AppKit body with AppHelper.callAfter
+    run inline and NSAlert mocked, so button order, choice mapping, the
+    Stay-is-default fix, and semaphore-release-on-error are verified without a
+    real modal (mirrors TestMacTrafficLights)."""
+
+    def _run(self, run_modal_result=None, run_modal_error=None):
+        import AppKit
+        from PyObjCTools import AppHelper
+        added = []
+        keyeq = {}
+
+        def _add(title):
+            added.append(title)
+            btn = MagicMock()
+            btn.setKeyEquivalent_.side_effect = lambda k, t=title: keyeq.__setitem__(t, k)
+            return btn
+
+        alert = MagicMock()
+        alert.addButtonWithTitle_.side_effect = _add
+        if run_modal_error is not None:
+            alert.runModal.side_effect = run_modal_error
+        else:
+            alert.runModal.return_value = run_modal_result
+        with patch.object(AppKit, "NSAlert") as NSAlert, \
+             patch.object(AppKit, "NSApplication"), \
+             patch.object(AppKit, "NSRunningApplication"), \
+             patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()), \
+             patch.object(ww.sys, "platform", "darwin"):
+            NSAlert.alloc.return_value.init.return_value = alert
+            choice = ww._macos_confirm_close(MagicMock())
+        return choice, added, keyeq
+
+    def test_buttons_added_in_order_keep_cancel_stay(self):
+        import AppKit
+        _, added, _ = self._run(run_modal_result=AppKit.NSAlertFirstButtonReturn)
+        assert added == ["Quit, keep scanning", "Cancel scan and quit", "Stay"]
+
+    def test_choice_mapping_matches_button_order(self):
+        import AppKit
+        assert self._run(run_modal_result=AppKit.NSAlertFirstButtonReturn)[0] == "keep"
+        assert self._run(run_modal_result=AppKit.NSAlertSecondButtonReturn)[0] == "cancel"
+        assert self._run(run_modal_result=AppKit.NSAlertThirdButtonReturn)[0] == "stay"
+
+    def test_stay_is_the_default_enter_button(self):
+        import AppKit
+        _, _, keyeq = self._run(run_modal_result=AppKit.NSAlertThirdButtonReturn)
+        assert keyeq.get("Stay") == "\r"                 # Enter -> the safe option
+        assert keyeq.get("Quit, keep scanning") == ""      # a reflexive Enter no longer quits
+
+    def test_runmodal_error_returns_keep_and_does_not_hang(self):
+        # The semaphore must be released in the finally even if runModal raises,
+        # or the worker would hang (the deadlock class this file already hit).
+        choice, _, _ = self._run(run_modal_error=RuntimeError("boom"))
+        assert choice == "keep"
 
 
 @_MACOS_ONLY
