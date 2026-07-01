@@ -122,6 +122,10 @@ def read_run_scalars(reports_root: Path, project: str, run_id: str) -> list[Dime
     if on_disk and len(dim_rows) != on_disk:
         return read_run_data(reports_root, project, run_id)
 
+    # No eval-time grade fallback here (unlike overlay_sql_grades): the fast
+    # path doesn't read the JSON, and a projected dim past the NULL-score
+    # guard always carries a real grade label ("Insufficient" or better),
+    # never "".
     principles_by_dim: dict[str, list[PrincipleGrade]] = {}
     for r in principle_rows:
         principles_by_dim.setdefault(r["dimension"], []).append(PrincipleGrade(

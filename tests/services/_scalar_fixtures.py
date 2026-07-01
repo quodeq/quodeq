@@ -67,8 +67,9 @@ def build_legacy_run(
             "dimension": dim, "overallScore": score, "overallGrade": grade,
             "principles": [], "violations": [], "compliance": [],
             "totals": {"violationCount": 0, "complianceCount": 0, "severity": {}},
-        }))
+        }), encoding="utf-8")
     evidence_dir = run_dir / "evidence"
     evidence_dir.mkdir(parents=True)
-    (evidence_dir / "manifest.json").write_text(json.dumps({"language_stats": {}}))
+    (evidence_dir / "manifest.json").write_text(
+        json.dumps({"language_stats": {}}), encoding="utf-8")
     return run_dir
