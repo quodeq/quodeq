@@ -12,13 +12,13 @@ import logging
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Callable, Iterator
 
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import DimensionResult
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.shared._env import get_score_cache_path
+from quodeq.shared._env import get_score_cache_path, score_cache_disabled
 
 _logger = logging.getLogger(__name__)
 _BUSY_TIMEOUT_MS = 5000
@@ -131,3 +131,50 @@ def score_cache_version(project_dir: Path, params: ScoringParams) -> str:
         "params": _params_fingerprint(params),
     }, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def make_cache_backed_fetcher(
+    project: str, version: str,
+    base_fetcher: Callable[[str], list[DimensionResult]],
+) -> Callable[[str], list[DimensionResult]]:
+    """Wrap *base_fetcher* (returns rescored dims) with the read-through cache.
+
+    Bulk-loads all cached runs for (project, version) once, serves hits from
+    memory, and on a miss computes via *base_fetcher*, extracts scalars, writes
+    them back, and returns the scalars. Returns scalar-only DimensionResults
+    (dimension/overall_score/overall_grade). If the kill switch is set, returns
+    *base_fetcher* unchanged.
+    """
+    if score_cache_disabled():
+        return base_fetcher
+
+    by_run: dict[str, list[DimensionResult]] = {}
+    try:
+        with open_score_cache() as conn:
+            for rid, dim, score, grade in conn.execute(
+                "SELECT run_id, dimension, overall_score, overall_grade FROM run_scalars "
+                "WHERE project=? AND version=? ORDER BY run_id, dimension",
+                (project, version),
+            ):
+                by_run.setdefault(rid, []).append(
+                    DimensionResult(dimension=dim, overall_score=score, overall_grade=grade))
+    except sqlite3.Error:
+        by_run = {}
+
+    def fetch(run_id: str) -> list[DimensionResult]:
+        hit = by_run.get(run_id)
+        if hit is not None:
+            return hit
+        dims = base_fetcher(run_id)
+        scalars = [DimensionResult(dimension=d.dimension, overall_score=d.overall_score,
+                                   overall_grade=d.overall_grade)
+                   for d in dims if d.dimension]
+        by_run[run_id] = scalars
+        try:
+            with open_score_cache() as conn:
+                write_cached_rows(conn, project, run_id, version, scalars)
+        except sqlite3.Error:
+            pass
+        return scalars
+
+    return fetch
