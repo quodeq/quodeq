@@ -114,18 +114,20 @@ class TestOnClosing:
     macOS/GTK/Qt marshal the dialog onto the GUI thread and block the caller, so
     it must run OFF the GUI thread (worker + veto + destroy). Windows/winforms
     shows a direct modal MessageBox and runs its closing handler on the UI
-    thread, so it shows the dialog inline. Tests pin the platform explicitly so
-    they are deterministic regardless of the host OS.
+    thread, so it shows the dialog inline. macOS shows a 3-button alert (keep
+    scanning / cancel scan / stay); other backends show a 2-button dialog (OK =
+    keep scanning, Cancel = stay). Tests pin the platform explicitly so they are
+    deterministic regardless of the host OS, and patch the choice seam so no
+    real native alert is shown.
     """
 
-    def _wire(self, job, confirm=True, platform="darwin"):
+    def _wire(self, job, platform="darwin"):
         api = MagicMock()
         api._get_running_evaluation.return_value = job
         window = MagicMock()
-        window.create_confirmation_dialog.return_value = confirm
         with patch.object(ww.sys, "platform", platform):
             on_closing = ww._make_on_closing(api, window)
-        return on_closing, window
+        return on_closing, window, api
 
     @staticmethod
     def _join(on_closing):
@@ -136,125 +138,248 @@ class TestOnClosing:
             # it as itself, not as a downstream mock-call-count mismatch.
             assert not worker.is_alive(), "close-confirm worker did not finish (possible re-deadlock)"
 
-    # --- macOS / GTK / Qt: dialog runs off the GUI thread -------------------
+    # --- async (macOS / GTK / Qt): dialog runs off the GUI thread -----------
 
-    def test_no_job_closes_without_dialog(self):
-        on_closing, window = self._wire(job=None)
-        assert on_closing() is True
-        window.create_confirmation_dialog.assert_not_called()
+    def test_no_job_closes_without_prompt(self):
+        on_closing, window, api = self._wire(job=None)
+        with patch.object(ww, "_ask_close_choice") as choose:
+            assert on_closing() is True
+        choose.assert_not_called()
 
     def test_running_job_vetoes_the_close_and_prompts_async(self):
-        # A running scan must NOT be answered synchronously: pywebview's
-        # create_confirmation_dialog marshals the alert onto the GUI thread and
-        # blocks the caller, so calling it from the closing handler (which runs
-        # ON the GUI thread) self-deadlocks. The handler vetoes this close and
-        # shows the dialog on a worker thread instead.
-        on_closing, window = self._wire(job={"jobId": "x"}, confirm=True)
-        assert on_closing() is False
-        self._join(on_closing)
-        window.create_confirmation_dialog.assert_called_once()
+        # A running scan must NOT be answered synchronously: the native dialog
+        # marshals onto the GUI thread and blocks its caller, so answering from
+        # the closing handler (which runs ON the GUI thread) self-deadlocks. The
+        # handler vetoes this close and shows the dialog on a worker thread.
+        on_closing, window, api = self._wire(job={"jobId": "x"})
+        with patch.object(ww, "_ask_close_choice", return_value="stay") as choose:
+            assert on_closing() is False
+            self._join(on_closing)
+        choose.assert_called_once()
 
     def test_dialog_runs_off_the_calling_thread(self):
-        # The dialog blocks its caller until the GUI thread renders it; if the
-        # caller IS the GUI thread it deadlocks. So it must be invoked from a
-        # different thread than the one that runs _on_closing.
         import threading
         caller = threading.get_ident()
         seen = {}
-        api = MagicMock()
-        api._get_running_evaluation.return_value = {"jobId": "x"}
-        window = MagicMock()
-        window.create_confirmation_dialog.side_effect = (
-            lambda *a, **k: seen.__setitem__("tid", threading.get_ident()) or False
-        )
-        with patch.object(ww.sys, "platform", "darwin"):
-            on_closing = ww._make_on_closing(api, window)
-        assert on_closing() is False
-        self._join(on_closing)
+        on_closing, window, api = self._wire(job={"jobId": "x"})
+
+        def _choose(_w):
+            seen["tid"] = threading.get_ident()
+            return "stay"
+
+        with patch.object(ww, "_ask_close_choice", side_effect=_choose):
+            assert on_closing() is False
+            self._join(on_closing)
         assert seen["tid"] != caller
 
     def test_on_closing_returns_without_waiting_on_the_dialog(self):
         # The core invariant of the whole fix: _on_closing must return promptly,
-        # never blocking on the dialog/worker. Simulate the real semaphore (only
-        # the GUI thread can release it) with an Event the caller never gets to
-        # set until AFTER _on_closing has returned. A regression that joins the
-        # worker (or shows the dialog inline) would park here and re-deadlock.
+        # never blocking on the dialog/worker. A regression that joins the worker
+        # (or answers inline) would park here and re-deadlock.
         import threading
         release = threading.Event()
-        api = MagicMock()
-        api._get_running_evaluation.return_value = {"jobId": "x"}
-        window = MagicMock()
-        window.create_confirmation_dialog.side_effect = lambda *a, **k: release.wait() or True
-        with patch.object(ww.sys, "platform", "darwin"):
-            on_closing = ww._make_on_closing(api, window)
-        result = []
-        caller = threading.Thread(target=lambda: result.append(on_closing()))
-        caller.start()
-        caller.join(timeout=2)
-        try:
-            assert not caller.is_alive(), "_on_closing blocked on the dialog — re-deadlock regression"
-            assert result == [False]
-        finally:
-            release.set()
-            self._join(on_closing)
+        on_closing, window, api = self._wire(job={"jobId": "x"})
 
-    def test_confirm_destroys_window_then_allows_close(self):
-        on_closing, window = self._wire(job={"jobId": "x"}, confirm=True)
-        on_closing()
-        self._join(on_closing)
+        def _choose(_w):
+            release.wait()
+            return "keep"
+
+        with patch.object(ww, "_ask_close_choice", side_effect=_choose):
+            result = []
+            caller = threading.Thread(target=lambda: result.append(on_closing()))
+            caller.start()
+            caller.join(timeout=2)
+            try:
+                assert not caller.is_alive(), "_on_closing blocked on the dialog — re-deadlock regression"
+                assert result == [False]
+            finally:
+                release.set()
+                self._join(on_closing)
+
+    def test_keep_scanning_closes_window_without_cancelling(self):
+        on_closing, window, api = self._wire(job={"jobId": "x"})
+        with patch.object(ww, "_ask_close_choice", return_value="keep"):
+            on_closing()
+            self._join(on_closing)
         window.destroy.assert_called_once()
+        api._cancel_evaluation.assert_not_called()
         # The re-issued close (from destroy) is allowed straight through.
         assert on_closing() is True
 
-    def test_cancel_keeps_window_open_and_can_reprompt(self):
-        on_closing, window = self._wire(job={"jobId": "x"}, confirm=False)
-        assert on_closing() is False
-        self._join(on_closing)
-        window.destroy.assert_not_called()
-        # Cancelling leaves the window open; a later close prompts again.
-        assert on_closing() is False
-        self._join(on_closing)
-        assert window.create_confirmation_dialog.call_count == 2
+    def test_cancel_scan_and_quit_cancels_then_closes(self):
+        on_closing, window, api = self._wire(job={"jobId": "job-42"})
+        with patch.object(ww, "_ask_close_choice", return_value="cancel"):
+            on_closing()
+            self._join(on_closing)
+        api._cancel_evaluation.assert_called_once_with("job-42")
+        window.destroy.assert_called_once()
+        assert on_closing() is True
 
-    def test_double_close_while_prompting_spawns_one_worker(self):
+    def test_stay_keeps_window_open_and_can_reprompt(self):
+        on_closing, window, api = self._wire(job={"jobId": "x"})
+        with patch.object(ww, "_ask_close_choice", return_value="stay") as choose:
+            assert on_closing() is False
+            self._join(on_closing)
+            window.destroy.assert_not_called()
+            api._cancel_evaluation.assert_not_called()
+            # Staying leaves the window open; a later close prompts again.
+            assert on_closing() is False
+            self._join(on_closing)
+        assert choose.call_count == 2
+
+    def test_double_close_while_prompting_prompts_once(self):
         # Clicking close again while the dialog is already up must not spawn a
         # second worker / second alert — the `prompting` guard covers this.
         import threading
         import time
         release = threading.Event()
-        api = MagicMock()
-        api._get_running_evaluation.return_value = {"jobId": "x"}
-        window = MagicMock()
-        window.create_confirmation_dialog.side_effect = lambda *a, **k: release.wait() or True
-        with patch.object(ww.sys, "platform", "darwin"):
-            on_closing = ww._make_on_closing(api, window)
-        assert on_closing() is False
-        first_worker = on_closing._worker
-        for _ in range(200):  # wait until the worker is actually showing the dialog
-            if window.create_confirmation_dialog.call_count == 1:
-                break
-            time.sleep(0.01)
-        assert window.create_confirmation_dialog.call_count == 1
-        # Second close while still prompting: vetoed, no new worker, no new dialog.
-        assert on_closing() is False
-        assert on_closing._worker is first_worker
-        assert window.create_confirmation_dialog.call_count == 1
-        release.set()
-        self._join(on_closing)
+        calls = []
+        on_closing, window, api = self._wire(job={"jobId": "x"})
 
-    def test_dialog_failure_does_not_trap_the_user(self):
-        # If the native dialog can't render, fall through to closing the window
-        # rather than leaving it un-closeable.
-        on_closing, window = self._wire(job={"jobId": "x"})
-        window.create_confirmation_dialog.side_effect = RuntimeError("no GUI")
-        assert on_closing() is False
-        self._join(on_closing)
+        def _choose(_w):
+            calls.append(1)
+            release.wait()
+            return "keep"
+
+        with patch.object(ww, "_ask_close_choice", side_effect=_choose):
+            assert on_closing() is False
+            first_worker = on_closing._worker
+            for _ in range(200):  # wait until the worker is actually prompting
+                if len(calls) == 1:
+                    break
+                time.sleep(0.01)
+            assert len(calls) == 1
+            # Second close while still prompting: vetoed, no new worker/prompt.
+            assert on_closing() is False
+            assert on_closing._worker is first_worker
+            assert len(calls) == 1
+            release.set()
+            self._join(on_closing)
+
+    def test_second_close_during_cancel_does_not_reprompt(self):
+        # On 'cancel', `prompting` is held through the (possibly slow) cancel
+        # call, so a second close during it must not spawn a second worker/dialog.
+        import threading
+        cancel_started = threading.Event()
+        release = threading.Event()
+        on_closing, window, api = self._wire(job={"jobId": "x"})
+
+        def _cancel(_job_id):
+            cancel_started.set()
+            release.wait()
+
+        api._cancel_evaluation.side_effect = _cancel
+        with patch.object(ww, "_ask_close_choice", return_value="cancel") as choose:
+            assert on_closing() is False
+            first_worker = on_closing._worker
+            assert cancel_started.wait(2)  # worker is now inside the cancel call
+            # Second close while the cancel is in flight: vetoed, no new prompt.
+            assert on_closing() is False
+            assert on_closing._worker is first_worker
+            assert choose.call_count == 1
+            release.set()
+            self._join(on_closing)
         window.destroy.assert_called_once()
+        api._cancel_evaluation.assert_called_once_with("x")
 
-    # --- Windows / winforms: dialog runs inline on the UI thread ------------
+    def test_dialog_error_does_not_trap_the_user(self):
+        # If the choice can't be obtained, fall through to closing the window
+        # (treat as 'keep') rather than leaving it un-closeable.
+        on_closing, window, api = self._wire(job={"jobId": "x"})
+        with patch.object(ww, "_ask_close_choice", side_effect=RuntimeError("no GUI")):
+            assert on_closing() is False
+            self._join(on_closing)
+        window.destroy.assert_called_once()
+        api._cancel_evaluation.assert_not_called()
+
+    # --- _ask_close_choice: platform dispatch + 2-button mapping ------------
+
+    def test_ask_close_choice_macos_dispatches_to_native_alert(self):
+        window = MagicMock()
+        with patch.object(ww.sys, "platform", "darwin"), \
+             patch.object(ww, "_macos_confirm_close", return_value="cancel") as mac:
+            assert ww._ask_close_choice(window) == "cancel"
+        mac.assert_called_once_with(window)
+
+    def test_ask_close_choice_non_macos_ok_is_keep(self):
+        window = MagicMock()
+        window.create_confirmation_dialog.return_value = True
+        with patch.object(ww.sys, "platform", "linux"):
+            assert ww._ask_close_choice(window) == "keep"
+
+    def test_ask_close_choice_non_macos_cancel_is_stay(self):
+        window = MagicMock()
+        window.create_confirmation_dialog.return_value = False
+        with patch.object(ww.sys, "platform", "linux"):
+            assert ww._ask_close_choice(window) == "stay"
+
+    def test_ask_close_choice_non_macos_dialog_error_is_keep(self):
+        window = MagicMock()
+        window.create_confirmation_dialog.side_effect = RuntimeError("no GUI")
+        with patch.object(ww.sys, "platform", "linux"):
+            assert ww._ask_close_choice(window) == "keep"
+
+    # --- NSAlert return -> choice mapping (pure) ----------------------------
+
+    def test_alert_return_to_choice_mapping(self):
+        assert ww._alert_return_to_choice(1000, 1000, 1001) == "keep"
+        assert ww._alert_return_to_choice(1001, 1000, 1001) == "cancel"
+        assert ww._alert_return_to_choice(1002, 1000, 1001) == "stay"
+
+    def test_macos_confirm_close_off_macos_is_safe_default(self):
+        # macOS-only path: off darwin it must degrade without touching AppKit.
+        with patch.object(ww.sys, "platform", "linux"):
+            assert ww._macos_confirm_close(MagicMock()) == "keep"
+
+    # --- _cancel_evaluation -------------------------------------------------
+
+    def test_cancel_evaluation_issues_delete_with_origin(self):
+        api = ww._WindowApi()
+        api._base_url = "http://127.0.0.1:7863"
+        captured = {}
+
+        class _Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        def _fake_urlopen(req, timeout=None):
+            captured["url"] = req.full_url
+            captured["method"] = req.get_method()
+            captured["origin"] = req.headers.get("Origin")
+            return _Resp()
+
+        with patch.object(ww.urllib.request, "urlopen", side_effect=_fake_urlopen):
+            api._cancel_evaluation("job-42")
+        assert captured["url"] == "http://127.0.0.1:7863/api/evaluations/job-42"
+        assert captured["method"] == "DELETE"
+        assert captured["origin"] == "http://127.0.0.1:7863"
+
+    def test_cancel_evaluation_noop_without_job_or_base_url(self):
+        api = ww._WindowApi()
+        with patch.object(ww.urllib.request, "urlopen") as uo:
+            api._base_url = ""
+            api._cancel_evaluation("job-42")   # no base url
+            api._base_url = "http://x"
+            api._cancel_evaluation(None)         # no job id
+        uo.assert_not_called()
+
+    def test_cancel_evaluation_swallows_urlopen_error(self):
+        # Best-effort: a failed cancel must not propagate (the worker destroys
+        # the window right after, so a raise would trap the user mid-close).
+        import urllib.error
+        api = ww._WindowApi()
+        api._base_url = "http://127.0.0.1:7863"
+        with patch.object(ww.urllib.request, "urlopen",
+                          side_effect=urllib.error.URLError("boom")):
+            api._cancel_evaluation("job-42")  # must not raise
+
+    # --- Windows / winforms: dialog runs inline on the UI thread (2-button) -
 
     def test_windows_no_job_closes_without_dialog(self):
-        on_closing, window = self._wire(job=None, platform="win32")
+        on_closing, window, api = self._wire(job=None, platform="win32")
         assert on_closing() is True
         window.create_confirmation_dialog.assert_not_called()
 
@@ -262,31 +387,87 @@ class TestOnClosing:
         # winforms' create_confirmation_dialog is a direct modal MessageBox with
         # no GUI-thread marshaling; showing it on a worker thread would make it
         # ownerless/non-modal. The winforms closing handler already runs on the
-        # UI thread, so it must be shown inline and answered synchronously.
+        # UI thread, so it is shown inline and answered synchronously.
         import threading
         caller = threading.get_ident()
         seen = {}
-        api = MagicMock()
-        api._get_running_evaluation.return_value = {"jobId": "x"}
-        window = MagicMock()
+        on_closing, window, api = self._wire(job={"jobId": "x"}, platform="win32")
         window.create_confirmation_dialog.side_effect = (
             lambda *a, **k: seen.__setitem__("tid", threading.get_ident()) or True
         )
-        with patch.object(ww.sys, "platform", "win32"):
-            on_closing = ww._make_on_closing(api, window)
-        assert on_closing() is True  # returns the dialog's answer directly
+        assert on_closing() is True  # OK -> keep -> allow the native close
         assert seen["tid"] == caller  # shown on the UI thread, not a worker
         window.create_confirmation_dialog.assert_called_once()
         window.destroy.assert_not_called()  # inline path lets the native close proceed
+        api._cancel_evaluation.assert_not_called()  # cancel-scan is macOS-only
 
     def test_windows_cancel_blocks_close(self):
-        on_closing, window = self._wire(job={"jobId": "x"}, confirm=False, platform="win32")
+        on_closing, window, api = self._wire(job={"jobId": "x"}, platform="win32")
+        window.create_confirmation_dialog.return_value = False
         assert on_closing() is False
 
     def test_windows_dialog_failure_does_not_trap_the_user(self):
-        on_closing, window = self._wire(job={"jobId": "x"}, platform="win32")
+        on_closing, window, api = self._wire(job={"jobId": "x"}, platform="win32")
         window.create_confirmation_dialog.side_effect = RuntimeError("no GUI")
         assert on_closing() is True
+
+
+@_MACOS_ONLY
+class TestMacConfirmClose:
+    """Exercise the real _macos_confirm_close AppKit body with AppHelper.callAfter
+    run inline and NSAlert mocked, so button order, choice mapping, the
+    Stay-is-default fix, and semaphore-release-on-error are verified without a
+    real modal (mirrors TestMacTrafficLights)."""
+
+    def _run(self, run_modal_result=None, run_modal_error=None):
+        import AppKit
+        from PyObjCTools import AppHelper
+        added = []
+        keyeq = {}
+
+        def _add(title):
+            added.append(title)
+            btn = MagicMock()
+            btn.setKeyEquivalent_.side_effect = lambda k, t=title: keyeq.__setitem__(t, k)
+            return btn
+
+        alert = MagicMock()
+        alert.addButtonWithTitle_.side_effect = _add
+        if run_modal_error is not None:
+            alert.runModal.side_effect = run_modal_error
+        else:
+            alert.runModal.return_value = run_modal_result
+        with patch.object(AppKit, "NSAlert") as NSAlert, \
+             patch.object(AppKit, "NSApplication"), \
+             patch.object(AppKit, "NSRunningApplication"), \
+             patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()), \
+             patch.object(ww.sys, "platform", "darwin"):
+            NSAlert.alloc.return_value.init.return_value = alert
+            choice = ww._macos_confirm_close(MagicMock())
+        return choice, added, keyeq
+
+    def test_buttons_added_in_order_keep_cancel_stay(self):
+        import AppKit
+        _, added, _ = self._run(run_modal_result=AppKit.NSAlertFirstButtonReturn)
+        assert added == ["Quit, keep scanning", "Cancel scan and quit", "Stay"]
+
+    def test_choice_mapping_matches_button_order(self):
+        import AppKit
+        assert self._run(run_modal_result=AppKit.NSAlertFirstButtonReturn)[0] == "keep"
+        assert self._run(run_modal_result=AppKit.NSAlertSecondButtonReturn)[0] == "cancel"
+        assert self._run(run_modal_result=AppKit.NSAlertThirdButtonReturn)[0] == "stay"
+
+    def test_stay_is_the_default_enter_button(self):
+        import AppKit
+        _, _, keyeq = self._run(run_modal_result=AppKit.NSAlertThirdButtonReturn)
+        assert keyeq.get("Stay") == "\r"                 # Enter -> the safe option
+        assert keyeq.get("Quit, keep scanning") == ""      # a reflexive Enter no longer quits
+
+    def test_runmodal_error_returns_keep_and_does_not_hang(self):
+        # The semaphore must be released in the finally even if runModal raises,
+        # or the worker would hang (the deadlock class this file already hit).
+        choice, _, _ = self._run(run_modal_error=RuntimeError("boom"))
+        assert choice == "keep"
 
 
 @_MACOS_ONLY
