@@ -19,6 +19,7 @@ _DEFAULT_MAX_TURNS = int(os.environ.get("QUODEQ_DEFAULT_MAX_TURNS", "200"))
 _DEFAULT_MAX_DURATION = int(os.environ.get("QUODEQ_DEFAULT_MAX_DURATION", "1800"))  # 30 minutes
 _MCP_TOOL_REPORT_FINDING = "mcp__findings__report_finding"
 _MCP_TOOL_GET_NEXT_FILES = "mcp__findings__get_next_files"
+_MCP_TOOL_MARK_FILE_DONE = "mcp__findings__mark_file_done"
 
 
 @dataclass(frozen=True)

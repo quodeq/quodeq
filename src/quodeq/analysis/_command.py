@@ -12,6 +12,7 @@ from quodeq.analysis._config import (
     AnalysisConfig,
     _AgentParams,
     _MCP_TOOL_GET_NEXT_FILES,
+    _MCP_TOOL_MARK_FILE_DONE,
     _MCP_TOOL_REPORT_FINDING,
 )
 from quodeq.analysis._mcp_config import _create_mcp_config
@@ -99,6 +100,10 @@ def _build_mcp_args(
         allowed = _MCP_TOOL_REPORT_FINDING
         if config.queue_path:
             allowed += f",{_MCP_TOOL_GET_NEXT_FILES}"
+        # mark_file_done is always exposed by the findings server (see
+        # handlers.handle_tools_list) and drives cache writes, so allow it
+        # unconditionally rather than leaving it to bypassPermissions.
+        allowed += f",{_MCP_TOOL_MARK_FILE_DONE}"
         args.extend(["--allowedTools", allowed])
     # bypassPermissions is intentional: the CLI analysis tool runs in a
     # sandboxed, non-interactive subprocess where MCP tool calls (e.g.
