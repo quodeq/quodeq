@@ -43,7 +43,13 @@ from quodeq.services.dashboard import (
 from quodeq.services.grade_formula import load_params
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.score_cache import make_cache_backed_fetcher, score_cache_version
+from quodeq.services._fs_projects import find_children
+from quodeq.services.score_cache import (
+    accumulated_cache_version,
+    cached_accumulated,
+    make_cache_backed_fetcher,
+    score_cache_version,
+)
 from quodeq.services.ports import RunInfo, list_runs, read_run_scalars
 from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
 from quodeq.services.scoring._summary import recompute_summary
@@ -482,14 +488,23 @@ def get_project_scores(
         }
 
     # Build accumulated using the existing service (returns full data with violations)
-    accumulated = compute_accumulated(
-        str(reports_root), project, as_of, params=params,
-    )
-    if accumulated is None:
-        accumulated = {"dimensions": [], "summary": {}}
+    def _compute_accumulated_payload() -> dict:
+        acc = compute_accumulated(str(reports_root), project, as_of, params=params)
+        if acc is None:
+            acc = {"dimensions": [], "summary": {}}
+        return _rescore_accumulated_response(acc, reports_root, project, params=params)
 
-    # Apply rescore to accumulated dimensions
-    accumulated = _rescore_accumulated_response(accumulated, reports_root, project, params=params)
+    if find_children(reports_root, project):
+        # Parent aggregation pulls child projects' dismissals/runs into the
+        # payload, which the project-scoped cache version can't see -- bypass
+        # the cache for parents to avoid serving stale data.
+        accumulated = _compute_accumulated_payload()
+    else:
+        acc_version = accumulated_cache_version(
+            reports_root / project, params,
+            [(r.run_id, r.status) for r in all_runs], as_of,
+        )
+        accumulated = cached_accumulated(project, acc_version, _compute_accumulated_payload)
 
     # Build trend using the appropriate fetcher: scalar fast path when there
     # are no active dismissals/deletions, rescoring (findings) path otherwise.
