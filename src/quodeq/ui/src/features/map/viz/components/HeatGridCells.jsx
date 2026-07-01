@@ -28,7 +28,7 @@ export default function HeatGridCells({ row, onCellClick, variant = 'heat' }) {
         return (
           <td key={sev}>
             <div
-              className={`heat-grid-cell${hasValue ? ' clickable' : ' empty'}`}
+              className={`heat-grid-cell${hasValue ? ' clickable viz-focusable' : ' empty'}`}
               style={style}
               onClick={() => hasValue && onCellClick?.({ row, severity: sev })}
               role={hasValue ? 'button' : undefined}

@@ -14,7 +14,7 @@ export default function PackCircles({ circles, folderIndices, fileIndices, hover
         const isRoot = c.depth === 0;
         const isHovered = hover === i;
         return (
-          <circle key={d.path || i} cx={c.x} cy={c.y} r={c.r}
+          <circle key={d.path || i} className="viz-focusable" cx={c.x} cy={c.y} r={c.r}
             fill={isRoot ? 'var(--color-surface-alt)' : nodeColor(d, viewMode)}
             stroke={isRoot ? 'var(--color-border)' : nodeBorderColor(d, viewMode)}
             strokeWidth={FOLDER_STROKE_WIDTH} vectorEffect="non-scaling-stroke"
