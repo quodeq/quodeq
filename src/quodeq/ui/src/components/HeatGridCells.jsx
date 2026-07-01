@@ -4,12 +4,17 @@ const SEVERITY_LEVELS = ['critical', 'major', 'minor'];
 
 /**
  * Renders the severity + violations + health cells for a heat grid row.
- * Shared between HeatGridView (file tree) and DimensionHeatGridView (violations).
  *
- * The two consumers want different visual weights: the file-tree view
- * keeps the filled "heat-map" cells, while the violations table wants a
- * leaner text-only treatment. Pass `variant="flat"` to opt into the
- * text-only variant.
+ * Single shared component for both heat grids:
+ *  - HeatGridView (Map page file tree) — default filled "heat" variant.
+ *  - DimensionHeatGridView (Violations tab by-dimension/by-file tables) —
+ *    pass `variant="flat"` for the leaner text-only treatment.
+ *
+ * This used to be two copies (one here, one under features/map/viz/components)
+ * that drifted apart: the violations copy gained keyboard activation + aria
+ * labels while the map copy gained the `viz-focusable` keyboard focus ring.
+ * They were merged into this file so every clickable cell in both grids gets
+ * the same treatment — keep it that way rather than re-forking.
  */
 export default function HeatGridCells({ row, onCellClick, variant = 'heat' }) {
   const total = row.violations + row.compliance;
@@ -29,7 +34,7 @@ export default function HeatGridCells({ row, onCellClick, variant = 'heat' }) {
         return (
           <td key={sev}>
             <div
-              className={`heat-grid-cell${hasValue ? ' clickable' : ' empty'}`}
+              className={`heat-grid-cell${hasValue ? ' clickable viz-focusable' : ' empty'}`}
               style={style}
               onClick={() => hasValue && onCellClick?.({ row, severity: sev })}
               onKeyDown={hasValue ? (e) => {
@@ -46,7 +51,7 @@ export default function HeatGridCells({ row, onCellClick, variant = 'heat' }) {
       })}
       <td>
         <div
-          className={`heat-grid-num${row.violations > 0 ? ' clickable' : ''}`}
+          className={`heat-grid-num${row.violations > 0 ? ' clickable viz-focusable' : ''}`}
           onClick={() => row.violations > 0 && onCellClick?.({ row, severity: null })}
           onKeyDown={row.violations > 0 ? (e) => {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCellClick?.({ row, severity: null }); }
