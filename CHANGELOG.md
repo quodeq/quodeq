@@ -1,12 +1,24 @@
 # Changelog
 
-## [Unreleased]
+## [1.5.0] - 2026-07-01
 
-### Fixes
-- **Dashboard window controls and the in-app bridge**: the desktop window has working native close/minimize/maximize controls again. The strict CSP shipped in 1.4.0 had disabled the injected macOS controls — and, because pywebview builds its JS bridge with `new Function`, also broke the in-app `save_file` (Standards export) and `download_url` (project ZIP) actions; both are restored by serving the relaxed CSP only to the native webview. Closing during a scan now shows a native confirmation dialog (the scan keeps running in the background).
+### Features
+- **Update notifications**: Quodeq now checks whether a newer version is available (via PyPI and GitHub) and surfaces it unobtrusively. A dismissible banner appears in the dashboard, Settings gains an Updates section, the CLI prints a one-line notice after commands, and the macOS menubar app gets a "Check for Updates" item. All checks are fail-silent and can be turned off, with a first-run disclosure explaining what is sent.
+- **SARIF export**: emit findings as SARIF 2.1.0 for GitHub code scanning, GitLab, and other tools. Run `quodeq export sarif` on a completed run, or pass `--sarif` to `evaluate` to write it right after a scan. Snippets are off by default (opt in with `--with-snippets`), absolute host paths are never leaked, and emission is fail-soft so it can't turn a finished run into a failed one. The README documents a GitHub Actions snippet.
+- **Score history grouping**: the overview score-history chart can be grouped by day, week, or month with a new granularity selector. The choice persists across sessions and the tooltip shows the period label.
 
 ### Improvements
-- **Unified macOS titlebar**: the macOS window now uses a frameless titlebar — the dashboard topbar runs to the top edge with the native traffic lights floating, vertically centered, over it, for a seamless look. The topbar and sidebar share one plain surface color. In fullscreen the titlebar is dropped so content fills the screen cleanly (no leftover gray bar) and restored on exit. Windows and Linux keep native OS chrome with a dark/light titlebar that follows the theme.
+- **Much faster dashboard launch**: a dedicated on-disk score cache plus a scalar fast-path make opening a dismissal-heavy project roughly 10x faster (sub-second when warm), with byte-identical scores. The cache invalidates on any change to dismissals, deletions, or the grade formula, rebuilds itself if corrupted, and has a kill switch.
+- **Unified macOS titlebar**: the macOS window uses a frameless titlebar, with the dashboard topbar running to the top edge and the native traffic lights floating, vertically centered, over it. The topbar and sidebar share one plain surface color, and in fullscreen the titlebar is dropped so content fills the screen cleanly and restored on exit. Windows and Linux keep native OS chrome with a titlebar that follows the theme.
+- **Accessibility**: full keyboard navigation for the galaxy canvas and the run/dimension history charts. Focus rings are now gated behind `:focus-visible` app-wide, so a stray border no longer appears on click in the desktop app.
+- **Sharper analysis quality**: a finding's requirement is now authoritative for its dimension, so misfiled findings are rerouted instead of appearing under the wrong principle (this also retired the phantom "N/A" principle card). Provenance downgrades are tracked as a first-class field and surfaced in the dashboard, and dimensions killed by the failure-streak breaker are excluded from the projected grade and accumulated summary.
+- **More resilient scans**: when the circuit breaker trips it salvages the partial evidence already gathered instead of discarding it, and the dimension loop stops promptly on cancellation. The default grade formula now matches the tuned preset.
+- **Performance and dependencies**: the subagent scout timeout is lowered to 30s, and Python and dashboard dependencies were refreshed.
+
+### Fixes
+- **Dashboard window controls and the in-app bridge**: the desktop window has working native close/minimize/maximize controls again. The strict CSP shipped in 1.4.0 had disabled the injected macOS controls, and, because pywebview builds its JS bridge with `new Function`, also broke the in-app `save_file` (Standards export) and `download_url` (project ZIP) actions; both are restored by serving the relaxed CSP only to the native webview. Closing during a scan now shows a native confirmation dialog and the scan keeps running in the background.
+- **Robustness**: JSON reads now enforce their dict contract, killing a recurring crash class where non-dict JSON hit `.get()`; malformed standards, req-mapping, and config files are tolerated rather than fatal; the grade projector is guarded against non-dict input; and external-link opening is scheme-checked.
+- **UI polish**: the overview refetches when an evaluation finishes so it never shows stale scores; tab headers are consistent with a persistent project indicator; server status moved to a compact toolbar dot; the nav count shows a compact "k" instead of a hard 999+ cap; score history gains dotted 0%/100% gridlines; and the decorative arrow before the project name is gone.
 
 ## [1.4.0] - 2026-06-20
 
