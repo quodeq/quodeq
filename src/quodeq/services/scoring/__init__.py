@@ -20,8 +20,6 @@ from __future__ import annotations
 
 import logging
 import os
-import threading
-from collections import OrderedDict
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
@@ -34,14 +32,15 @@ from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.types.dimension import DimensionResult, DimensionSummary, GradeBreakdown
+from quodeq.services._cache import make_lru_dimension_fetcher
+from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.dashboard import (
     DashboardCacheConfig,
     _make_run_dimension_fetcher,
+    create_dimension_cache,
 )
 from quodeq.services.grade_formula import load_params
-from quodeq.services._cache import make_lru_dimension_fetcher
-from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.ports import RunInfo, list_runs, read_run_scalars
@@ -358,9 +357,12 @@ def _make_trend_fetcher(
     """
     project_dir = reports_root / project
     if dismissed_keys(project_dir) or deleted_keys(project_dir):
+        # _make_rescoring_fetcher re-reads dismissed/deleted internally; the
+        # extra read is cheap and keeps this branch a thin delegate.
         return _make_rescoring_fetcher(reports_root, project, params=params)
+    cache, lock = create_dimension_cache()
     return make_lru_dimension_fetcher(
-        reports_root, project, OrderedDict(), threading.Lock(),
+        reports_root, project, cache, lock,
         _max_history_runs(), reader=read_run_scalars,
     )
 
@@ -481,7 +483,8 @@ def get_project_scores(
     # Apply rescore to accumulated dimensions
     accumulated = _rescore_accumulated_response(accumulated, reports_root, project, params=params)
 
-    # Build trend using a rescoring fetcher (applies dismissals to each run).
+    # Build trend using the appropriate fetcher: scalar fast path when there
+    # are no active dismissals/deletions, rescoring (findings) path otherwise.
     # Exclude cancelled/failed runs — their partial scores are misleading on
     # the history chart. They remain in availableRuns so the UI can show them
     # when the user asks for them explicitly.

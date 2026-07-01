@@ -49,3 +49,19 @@ def test_active_dismissal_uses_heavy_path(tmp_path: Path, monkeypatch) -> None:
 
     # Heavy path: _make_trend_fetcher returns the rescoring fetcher unchanged.
     assert fetcher is sentinel
+
+
+def test_active_deletion_uses_heavy_path(tmp_path: Path, monkeypatch) -> None:
+    reports, project = _make_project(tmp_path)
+    monkeypatch.setattr("quodeq.services.scoring.dismissed_keys", lambda _pd: set())
+    monkeypatch.setattr("quodeq.services.scoring.deleted_keys", lambda _pd: {("sec", "prin", "a.py")})
+
+    sentinel = object()
+    monkeypatch.setattr("quodeq.services.scoring._make_rescoring_fetcher",
+                        lambda rr, p, params=None: sentinel)
+
+    def boom(*_a):
+        raise AssertionError("scalar reader used despite active deletions")
+    monkeypatch.setattr("quodeq.services.scoring.read_run_scalars", boom)
+
+    assert _make_trend_fetcher(reports, project) is sentinel
