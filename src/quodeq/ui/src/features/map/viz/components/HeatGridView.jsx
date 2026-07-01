@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import HeatGridCells from './HeatGridCells.jsx';
+import HeatGridCells from '../../../../components/HeatGridCells.jsx';
 import { ICON_FOLDER } from '../../../../constants/navigation.jsx';
 
 const COL_NAME = 'name';
