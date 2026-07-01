@@ -29,6 +29,10 @@ _SCHEMA = (
     " updated_at TEXT NOT NULL DEFAULT (datetime('now')),"
     " PRIMARY KEY (project, run_id, dimension, version));"
     "CREATE INDEX IF NOT EXISTS idx_run_scalars_lookup ON run_scalars(project, version);"
+    "CREATE TABLE IF NOT EXISTS accumulated_cache ("
+    " project TEXT NOT NULL, version TEXT NOT NULL, payload TEXT NOT NULL,"
+    " updated_at TEXT NOT NULL DEFAULT (datetime('now')),"
+    " PRIMARY KEY (project, version));"
 )
 
 
@@ -102,6 +106,48 @@ def write_cached_rows(
         conn.commit()
     except sqlite3.Error:
         _logger.warning("score cache write failed for %s/%s", project, run_id, exc_info=True)
+
+
+def read_cached_accumulated(
+    conn: sqlite3.Connection, project: str, version: str,
+) -> dict | None:
+    """Return the cached accumulated payload for (project, version), or None."""
+    try:
+        row = conn.execute(
+            "SELECT payload FROM accumulated_cache WHERE project=? AND version=?",
+            (project, version),
+        ).fetchone()
+    except sqlite3.Error:
+        return None
+    if row is None:
+        return None
+    try:
+        return json.loads(row[0])
+    except (ValueError, TypeError):
+        return None
+
+
+def write_cached_accumulated(
+    conn: sqlite3.Connection, project: str, version: str, payload: dict,
+) -> None:
+    """Replace the cached accumulated payload for *project* at *version*.
+
+    Best-effort: logs and returns on any SQLite/serialization error.
+    """
+    try:
+        blob = json.dumps(payload)
+    except (TypeError, ValueError):
+        _logger.warning("accumulated payload for %s not serializable; skipping cache", project)
+        return
+    try:
+        conn.execute("DELETE FROM accumulated_cache WHERE project=?", (project,))
+        conn.execute(
+            "INSERT OR REPLACE INTO accumulated_cache (project, version, payload) VALUES (?, ?, ?)",
+            (project, version, blob),
+        )
+        conn.commit()
+    except sqlite3.Error:
+        _logger.warning("accumulated cache write failed for %s", project, exc_info=True)
 
 
 def _params_fingerprint(params: ScoringParams) -> str:
