@@ -238,7 +238,9 @@ class TestBuildAiCmd:
         )
         assert mcp_path is not None
         assert "--mcp-config" in args
-        assert "mcp__findings__report_finding" in args
+        # report_finding is in the --allowedTools value, which may be a
+        # comma-joined list (e.g. with mark_file_done), so match as substring.
+        assert any("mcp__findings__report_finding" in a for a in args)
 
     def test_print_mode_always_set(self):
         """Analysis must run in --print (non-interactive) mode."""
