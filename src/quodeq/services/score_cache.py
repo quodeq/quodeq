@@ -179,6 +179,49 @@ def score_cache_version(project_dir: Path, params: ScoringParams) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def accumulated_cache_version(
+    project_dir: Path, params: ScoringParams,
+    run_fingerprint: list[tuple[str, str]], as_of: str | None,
+) -> str:
+    """Version for the accumulated cache: the base dismissals/deletions/params
+    hash plus the run-set (run_id, status) and *as_of*, so a new scan, a status
+    change, or a historical view all invalidate. Run-set is sorted for order
+    independence.
+    """
+    payload = json.dumps({
+        "base": score_cache_version(project_dir, params),
+        "runs": sorted(list(t) for t in run_fingerprint),
+        "as_of": as_of or "",
+    }, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def cached_accumulated(
+    project: str, version: str, compute: Callable[[], dict],
+) -> dict:
+    """Read-through cache for the accumulated payload.
+
+    Hit -> return the deserialized cached payload. Miss (or kill switch / cache
+    error) -> call *compute*, cache the result best-effort, return it.
+    """
+    if score_cache_disabled():
+        return compute()
+    try:
+        with open_score_cache() as conn:
+            cached = read_cached_accumulated(conn, project, version)
+        if cached is not None:
+            return cached
+    except sqlite3.Error:
+        return compute()
+    result = compute()
+    try:
+        with open_score_cache() as conn:
+            write_cached_accumulated(conn, project, version, result)
+    except sqlite3.Error:
+        pass
+    return result
+
+
 def make_cache_backed_fetcher(
     project: str, version: str,
     base_fetcher: Callable[[str], list[DimensionResult]],
