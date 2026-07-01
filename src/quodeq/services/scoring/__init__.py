@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
+from collections import OrderedDict
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
@@ -38,10 +40,11 @@ from quodeq.services.dashboard import (
     _make_run_dimension_fetcher,
 )
 from quodeq.services.grade_formula import load_params
+from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.ports import RunInfo, list_runs
+from quodeq.services.ports import RunInfo, list_runs, read_run_scalars
 from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
 from quodeq.services.scoring._summary import recompute_summary
 
@@ -339,6 +342,29 @@ def _make_rescoring_fetcher(
     return rescoring_fetcher
 
 
+def _make_trend_fetcher(
+    reports_root: Path, project: str,
+    params: ScoringParams = DEFAULT_PARAMS,
+) -> Callable[[str], list[DimensionResult]]:
+    """Return the dimension fetcher for the trend chart.
+
+    Fast path: when the project has no active dismissals/deletions, read only
+    the per-run scalar grades (``read_run_scalars``) -- the trend needs nothing
+    else. Uses a fresh per-call LRU cache so scalar (findings-less) results
+    never collide with the shared full-data cache used elsewhere.
+
+    Slow path: when dismissals/deletions are active, fall back to the existing
+    findings-based rescoring fetcher, which recomputes grades from findings.
+    """
+    project_dir = reports_root / project
+    if dismissed_keys(project_dir) or deleted_keys(project_dir):
+        return _make_rescoring_fetcher(reports_root, project, params=params)
+    return make_lru_dimension_fetcher(
+        reports_root, project, OrderedDict(), threading.Lock(),
+        _max_history_runs(), reader=read_run_scalars,
+    )
+
+
 def _rescore_runs_by_dimension(
     dims: list[dict], reports_root: Path, project: str,
     dismissed: set[tuple], deleted: set[tuple] | None = None,
@@ -461,8 +487,8 @@ def get_project_scores(
     # when the user asks for them explicitly.
     scoreable_runs = [r for r in all_runs if r.status not in ("cancelled", "failed")]
     history_runs = scoreable_runs[:_max_history_runs()]
-    rescoring_fetcher = _make_rescoring_fetcher(reports_root, project, params=params)
-    trend = build_accumulated_trend(history_runs, rescoring_fetcher, params=params)
+    trend_fetcher = _make_trend_fetcher(reports_root, project, params=params)
+    trend = build_accumulated_trend(history_runs, trend_fetcher, params=params)
 
     # Build available runs list
     available_runs = [
