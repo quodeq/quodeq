@@ -98,6 +98,24 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
             "Produces evidence only — no scored evaluation reports."
         ),
     )
+    parser.add_argument(
+        "--sarif",
+        default=None,
+        metavar="PATH",
+        help="Also write findings as a SARIF 2.1.0 file at PATH (for GitHub code scanning / GitLab).",
+    )
+    parser.add_argument(
+        "--min-severity",
+        default=None,
+        choices=["critical", "major", "minor"],
+        help="When writing SARIF, drop findings below this severity.",
+    )
+    parser.add_argument(
+        "--with-snippets",
+        action="store_true",
+        dest="with_snippets",
+        help="Include code snippets in SARIF output (off by default; snippets leave the machine when uploaded).",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -140,6 +158,21 @@ def build_parser() -> argparse.ArgumentParser:
             "instead of scored evaluation/<dim>.json reports. Use for PR diff "
             "mode runs that skip the scoring phase."
         ),
+    )
+
+    export_parser = subparsers.add_parser("export", help="Export findings in machine-readable formats")
+    export_parser.set_defaults(handler_command="export")
+    export_sub = export_parser.add_subparsers(dest="export_format")
+    sarif_parser = export_sub.add_parser("sarif", help="Export findings as a SARIF 2.1.0 file")
+    sarif_parser.add_argument("--evaluation-dir", required=True, help="Directory containing evaluation/<dim>.json reports")
+    sarif_parser.add_argument("-o", "--output", required=True, help="Path to write the .sarif file")
+    sarif_parser.add_argument(
+        "--min-severity", default=None, choices=["critical", "major", "minor"],
+        help="Drop findings below this severity.",
+    )
+    sarif_parser.add_argument(
+        "--with-snippets", action="store_true", dest="with_snippets",
+        help="Include code snippets (off by default; snippets leave the machine when uploaded).",
     )
 
     review_parser = subparsers.add_parser(

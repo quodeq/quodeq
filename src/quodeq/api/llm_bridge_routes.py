@@ -128,6 +128,7 @@ def register_llm_bridge_routes(app: Flask) -> None:
         if not api_key and api_key_env:
             return jsonify({
                 "success": False,
+                "code": "MISSING_API_KEY",
                 "error": f"{api_key_env} is not set in the dashboard's environment. "
                          f"Export it in your shell (e.g. ~/.zshrc) and relaunch the dashboard from that terminal.",
             })

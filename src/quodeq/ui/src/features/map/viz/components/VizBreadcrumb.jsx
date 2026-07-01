@@ -25,6 +25,7 @@ export default function VizBreadcrumb({ items }) {
           <span key={i} style={{ display: 'flex', alignItems: 'center', gap: BREADCRUMB_GAP }}>
             {i > 0 && <span style={{ color: 'var(--color-border)' }}>{'\u203A'}</span>}
             <span
+              className={clickable ? 'viz-focusable' : undefined}
               style={{ color: isLast ? 'var(--color-text)' : 'var(--color-text-muted)', cursor: clickable ? 'pointer' : 'default', padding: BREADCRUMB_ITEM_PADDING, borderRadius: BREADCRUMB_BORDER_RADIUS, transition: 'all 0.2s' }}
               onClick={clickable ? item.onClick : undefined}
               onMouseEnter={clickable ? (e) => { e.target.style.background = 'color-mix(in srgb, var(--color-accent) 15%, transparent)'; e.target.style.color = 'var(--color-text)'; } : undefined}

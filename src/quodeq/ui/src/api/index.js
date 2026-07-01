@@ -368,6 +368,28 @@ export async function importProject(file, opts = {}) {
 // read err.status and err.existingProjectId on a 409 duplicate response —
 // request() throws plain Error and discards both. Refactoring request() to
 // enrich errors is a separate concern.
+
+// --- Update notifications ---
+
+export function getUpdateStatus() {
+  return request('/update/status');
+}
+
+export function checkForUpdates() {
+  return request('/update/check', { method: 'POST' });
+}
+
+export function dismissUpdate(version) {
+  return request('/update/dismiss', { method: 'POST', body: JSON.stringify({ version }) });
+}
+
+export function setUpdateAutoCheck(enabled) {
+  return request('/update/settings', { method: 'POST', body: JSON.stringify({ auto_check_enabled: enabled }) });
+}
+
+export function markUpdateDisclosed() {
+  return request('/update/settings', { method: 'POST', body: JSON.stringify({ disclosed: true }) });
+}
 /**
  * Register a new project without starting an evaluation.
  * Used by the onboarding wizard's Repo & Scan step.

@@ -11,3 +11,4 @@ export { default as SectionLabel } from './SectionLabel.jsx';
 export { GridTable, GridRow, GridCell } from './GridTable.jsx';
 export { default as CodeGutter } from './CodeGutter.jsx';
 export { default as KeyHint } from './KeyHint.jsx';
+export { default as PeriodSelect } from './PeriodSelect.jsx';

@@ -51,6 +51,14 @@ class TestBuildFindingBase:
         assert finding.context == "API endpoint"
         assert finding.scope == "src/"
 
+    def test_provenance_downgrade_carried(self):
+        # Issue #656: the violations-parsing path must preserve the gate's marker.
+        spec = FindingSpec(practice_id="P1", provenance_downgrade=True)
+        assert build_finding_base(spec).provenance_downgrade is True
+
+    def test_provenance_downgrade_defaults_false(self):
+        assert build_finding_base(FindingSpec(practice_id="P1")).provenance_downgrade is False
+
     def test_severity_defaults_minor_when_none(self):
         spec = FindingSpec(practice_id="P1", severity=None)
         finding = build_finding_base(spec)

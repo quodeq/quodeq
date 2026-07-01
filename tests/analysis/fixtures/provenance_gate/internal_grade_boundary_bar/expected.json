@@ -1,0 +1,13 @@
+{
+  "case": "internal_grade_boundary_bar",
+  "dimension": "reliability",
+  "req": "R-FT-2",
+  "display_file": "src/ui/GradeBoundaryBar.jsx",
+  "target_line": 19,
+  "construct": "thresholds",
+  "provenance": "internal",
+  "expectation": "not_critical",
+  "baseline_severity": "critical",
+  "source": "a84ab6f8 verbatim (pre-hardening)",
+  "note": "DO NOT add guards/defaults to repo/. `thresholds` is backfilled from DEFAULT_PARAMS; no external source reaches the spread, so the gate must keep it non-critical."
+}

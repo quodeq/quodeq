@@ -39,6 +39,12 @@ describe('PackCircles keyboard accessibility (#2056)', () => {
     expect(circle).toHaveAttribute('tabindex', '0');
   });
 
+  it('folder circle carries the viz-focusable class (suppresses stray focus ring)', () => {
+    renderPackCircles();
+    const circle = document.querySelector('circle');
+    expect(circle).toHaveClass('viz-focusable');
+  });
+
   it('folder circle has role="button"', () => {
     renderPackCircles();
     const circle = document.querySelector('circle');

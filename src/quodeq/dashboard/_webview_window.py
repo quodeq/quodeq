@@ -1,7 +1,6 @@
 """PyWebView window process — launched as a subprocess by _server.py."""
 from __future__ import annotations
 
-import html as _html
 import json
 import logging
 import os
@@ -18,24 +17,17 @@ import webview
 
 from quodeq.dashboard._build_npm import _quodeq_dir
 from quodeq.dashboard._instance import InstanceController
-from quodeq.dashboard._webview_html import INJECT_JS, CLOSING_OVERLAY_JS
 
 _logger = logging.getLogger(__name__)
 
 _WINDOW_WIDTH = 1280
 _WINDOW_HEIGHT = 800
 _WINDOW_BG_COLOR = '#0d1117'
-_CLEANUP_JOIN_TIMEOUT_S = 0.3
+# Marker embedded in the webview's User-Agent so the API serves it the
+# relaxed CSP (see quodeq.api.security._WEBVIEW_UA_MARKER — must match).
+_WEBVIEW_UA_MARKER = "QuodeqDesktop"
 _EVAL_CHECK_TIMEOUT_S = 0.5
 _DOWNLOAD_TIMEOUT_S = 120
-
-# Dialog CSS layout constants
-_DIALOG_PADDING = "24px 28px"
-_DIALOG_BORDER_RADIUS = "12px"
-_DIALOG_FONT_SIZE = "0.82rem"
-_BUTTON_PADDING = "10px 16px"
-_BUTTON_BORDER_RADIUS = "6px"
-_BUTTON_FONT_SIZE = "0.85rem"
 
 
 def _is_safe_reload_url(url: str) -> bool:
@@ -72,89 +64,6 @@ class _WindowApi:
         self._api_pid = api_pid
         self._instance = instance
         self._base_url = base_url.rstrip('/')
-
-    def close(self) -> None:
-        # Check for running evaluation FIRST. Don't render the closing
-        # overlay yet — it covers the screen and would hide the dialog.
-        job = self._get_running_evaluation() if self._window else None
-        if job and self._window:
-            choice = self._await_close_dialog(job)
-            if choice == 'back':
-                return
-            if choice == 'cancel':
-                self._cancel_evaluation(job.get("jobId") or job.get("job_id"))
-            # Any other value (including 'keep') falls through to the exit path.
-
-        # Show closing overlay (only reached when user actually closes).
-        if self._window:
-            try:
-                self._window.evaluate_js(CLOSING_OVERLAY_JS)
-            except Exception:
-                pass
-
-        # Cleanup and exit — run in a thread so os._exit fires fast
-        def _cleanup():
-            if self._api_pid:
-                _kill_api(self._api_pid)
-            if self._instance:
-                self._instance.shutdown()
-        t = threading.Thread(target=_cleanup, daemon=True)
-        t.start()
-        t.join(timeout=_CLEANUP_JOIN_TIMEOUT_S)
-        os._exit(0)  # bypass cleanup — webview event loop would deadlock sys.exit
-
-    def _await_close_dialog(self, job: dict, timeout_s: float = 300.0) -> str | None:
-        """Render the close dialog and poll a JS global for the user's choice.
-
-        pywebview's evaluate_js does NOT await Promises — it returns None
-        immediately when given Promise-returning JS. That made the existing
-        `choice = evaluate_js(dialog_js)` call return None every time, skip
-        every if-branch, and fall through to os._exit. Instead, stash the
-        Promise result on a global and poll until it's set.
-        """
-        if not self._window:
-            return None
-        try:
-            self._window.evaluate_js(
-                "window._qd_close_result = null; "
-                "(" + self._build_close_dialog_js(job) + ")"
-                ".then(function(r){ window._qd_close_result = r; });"
-            )
-        except Exception:
-            return None
-        import time as _time  # noqa: PLC0415
-        deadline = _time.monotonic() + timeout_s
-        while _time.monotonic() < deadline:
-            try:
-                result = self._window.evaluate_js("window._qd_close_result")
-            except Exception:
-                result = None
-            if result:
-                return str(result)
-            _time.sleep(0.1)
-        return None
-
-    def _cancel_evaluation(self, job_id: str | None) -> None:
-        """Issue DELETE /api/evaluations/<job_id> to stop a running scan.
-
-        The API enforces an Origin header to reject cross-site requests; a
-        missing header returns 403 which silently fails this call, so we
-        set Origin explicitly to self._base_url.
-        """
-        if not job_id or not self._base_url:
-            return
-        try:
-            req = urllib.request.Request(
-                f"{self._base_url}/api/evaluations/{urllib.parse.quote(job_id)}",
-                method="DELETE",
-                headers={"Origin": self._base_url},
-            )
-            # Give the API enough time to SIGTERM the scan and respond —
-            # the 0.5s used for the eval-check poll is too tight here.
-            with urllib.request.urlopen(req, timeout=5.0):
-                pass
-        except Exception:
-            pass
 
     def _get_running_evaluation(self) -> dict | None:
         """Return the first non-stale running evaluation job, or None.
@@ -205,46 +114,6 @@ class _WindowApi:
                 return j
         return None
 
-    @staticmethod
-    def _build_close_dialog_js(job: dict) -> str:
-        """Build JS for the close confirmation dialog with job info."""
-        phase = _html.escape(job.get("phase", "analyzing"))
-        dim = _html.escape(job.get("currentDimension", ""))
-        repo = _html.escape(job.get("repo", ""))
-        # Build info line
-        info_parts = []
-        if repo:
-            name = _html.escape(repo.rsplit("/", 1)[-1] if "/" in repo else repo)
-            info_parts.append(f"Project: <b>{name}</b>")
-        if dim:
-            info_parts.append(f"Dimension: <b>{dim}</b>")
-        if phase:
-            info_parts.append(f"Phase: <b>{phase}</b>")
-        info_html = "<br>".join(info_parts) if info_parts else "Running..."
-
-        return f"""
-            (function() {{
-                var d = document.createElement('div');
-                d.id = '_qd_close_dialog';
-                d.style.cssText = 'position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center';
-                d.innerHTML = '<div style="background:var(--color-surface,#1c2128);border:1px solid var(--color-border,#333);border-radius:{_DIALOG_BORDER_RADIUS};padding:{_DIALOG_PADDING};max-width:420px;color:var(--color-text,#e6edf3);font-family:inherit">'
-                    + '<h3 style="margin:0 0 12px;font-size:1rem">Evaluation in progress</h3>'
-                    + '<div style="margin:0 0 16px;padding:10px 14px;background:var(--color-surface-alt,#161b22);border-radius:{_BUTTON_BORDER_RADIUS};font-size:{_DIALOG_FONT_SIZE};line-height:1.6;color:var(--color-text-muted,#8b949e)">{info_html}</div>'
-                    + '<div style="display:flex;flex-direction:column;gap:8px">'
-                    + '<button id="_qd_close_keep" style="padding:{_BUTTON_PADDING};border:1px solid var(--color-border,#333);border-radius:{_BUTTON_BORDER_RADIUS};background:var(--color-surface-alt,#161b22);color:var(--color-text,#e6edf3);cursor:pointer;font-size:{_BUTTON_FONT_SIZE};line-height:1.5">Close window<br><span style="opacity:0.7;font-size:0.85em">evaluation continues in background</span></button>'
-                    + '<button id="_qd_close_cancel" style="padding:{_BUTTON_PADDING};border:1px solid #da3633;border-radius:{_BUTTON_BORDER_RADIUS};background:transparent;color:#f85149;cursor:pointer;font-size:{_BUTTON_FONT_SIZE}">Cancel evaluation and close</button>'
-                    + '<button id="_qd_close_back" style="padding:{_BUTTON_PADDING};border:none;border-radius:{_BUTTON_BORDER_RADIUS};background:transparent;color:var(--color-text-muted,#8b949e);cursor:pointer;font-size:{_BUTTON_FONT_SIZE}">Go back</button>'
-                    + '</div></div>';
-                document.body.appendChild(d);
-                return new Promise(function(resolve) {{
-                    document.getElementById('_qd_close_keep').onclick = function() {{ d.remove(); resolve('keep'); }};
-                    document.getElementById('_qd_close_cancel').onclick = function() {{ d.remove(); resolve('cancel'); }};
-                    document.getElementById('_qd_close_back').onclick = function() {{ d.remove(); resolve('back'); }};
-                    d.onclick = function(e) {{ if (e.target === d) {{ d.remove(); resolve('back'); }} }};
-                }});
-            }})()
-        """
-
     def open_browser(self, path: str = '/') -> None:
         """Open a URL in the system default browser."""
         url = self._base_url + path if self._base_url else path
@@ -294,20 +163,22 @@ class _WindowApi:
         except OSError:
             return False
 
-    def minimize(self) -> None:
-        if self._window:
-            self._window.minimize()
+    def set_titlebar_theme(self, mode: str) -> None:
+        """Match the native titlebar to the active quodeq theme.
 
-    def maximize(self) -> None:
-        if not self._window:
+        mode is 'dark' or 'light'; any other value is ignored. Safe no-op
+        before the native window handle exists — the frontend re-calls on
+        pywebviewready. Linux titlebars are window-manager controlled, so
+        this is a no-op there.
+        """
+        if mode not in ("dark", "light"):
             return
-        if sys.platform == "win32":
-            if self._window.maximized:
-                self._window.restore()
-            else:
-                self._window.maximize()
-        else:
-            self._window.toggle_fullscreen()
+        dark = mode == "dark"
+        if sys.platform == "darwin":
+            _set_macos_titlebar_appearance(self._window, dark)
+        elif sys.platform == "win32":
+            _set_windows_titlebar(dark)
+
 
 
 def _kill_api(pid: int) -> None:
@@ -395,6 +266,11 @@ def _set_macos_app_identity() -> None:
 
 
 _about_target: object | None = None  # keep delegate alive for the menu item's weak ref
+_about_override_installed = False  # the _AboutHandler ObjC class may only be defined once
+_macos_toolbar_installed = False  # the unified toolbar (taller titlebar) is added once
+_macos_fullscreen_observer: object | None = None  # keep the ObjC observer alive
+_macos_fullscreen_observer_installed = False  # register the notifications once
+_macos_fullscreen_handler_class = None  # the ObjC handler class is defined once per process
 
 
 def _diag_path() -> Path:
@@ -455,13 +331,20 @@ def _install_about_panel_override() -> None:
     On the first call from the `loaded` event it's typically still nil, so
     schedule a repeating NSTimer that retries until the About item exists
     (or we give up after ~5s).
+
+    Installs at most once: the ``_AboutHandler`` ObjC class can only be
+    defined once per process, so a second call (e.g. on a repeat ``loaded``
+    event) would raise ``objc.error`` and abort the caller.
     """
-    global _about_target
+    global _about_target, _about_override_installed
+    if _about_override_installed:
+        return
     try:
         from AppKit import NSApplication, NSObject  # type: ignore[import-untyped]
         from Foundation import NSTimer  # type: ignore[import-untyped]
     except ImportError:
         return
+    _about_override_installed = True
 
     import datetime as _dt  # noqa: PLC0415
     version = _quodeq_version()
@@ -535,23 +418,248 @@ def _install_about_panel_override() -> None:
         print(f"[quodeq-about] NSTimer schedule failed: {exc}", file=_diag, flush=True)
 
 
-def _enable_windows_dark_titlebar(window_title: str) -> None:
-    """Tell DWM to render the native Windows titlebar in dark mode.
+def _set_macos_titlebar_appearance(window: object, dark: bool) -> None:
+    """Set the macOS native titlebar to dark or light aqua (on the UI thread)."""
+    if sys.platform != "darwin":
+        return
+    try:
+        from AppKit import (  # noqa: PLC0415
+            NSAppearance, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
+        )
+        from PyObjCTools import AppHelper  # noqa: PLC0415
+    except ImportError:
+        return
+    nswindow = getattr(window, "native", None) if window is not None else None
+    if nswindow is None:
+        return
+    name = NSAppearanceNameDarkAqua if dark else NSAppearanceNameAqua
 
-    Without this, frameless=False shows a light titlebar that clashes with
-    the dark UI. Uses DWMWA_USE_IMMERSIVE_DARK_MODE — attribute id 20 on
-    Windows 10 build 19041+ and Windows 11, falling back to id 19 on older
-    builds. Failures are non-fatal: a light titlebar is ugly but functional.
+    def _apply() -> None:
+        try:
+            nswindow.setAppearance_(NSAppearance.appearanceNamed_(name))
+        except (AttributeError, ValueError):
+            pass
+
+    AppHelper.callAfter(_apply)
+
+
+def _show_macos_traffic_lights(window: object) -> None:
+    """Re-show the native traffic lights on the frameless macOS window.
+
+    pywebview hides the standard window buttons for frameless windows, but
+    frameless is what enables NSFullSizeContentView (the app's topbar running
+    under the titlebar). Un-hiding them gives the unified look — the buttons
+    keep their native top-left position (the CSS lays the compact macOS topbar
+    out to line up with them), so nothing is repositioned and there is nothing
+    to re-apply on resize. Runs on the UI thread; no-op before the native
+    handle exists.
     """
+    if sys.platform != "darwin":
+        return
+    try:
+        from PyObjCTools import AppHelper  # noqa: PLC0415
+    except ImportError:
+        return
+    nswindow = getattr(window, "native", None) if window is not None else None
+    if nswindow is None:
+        return
+
+    def _apply() -> None:
+        # NSWindowCloseButton=0, NSWindowMiniaturizeButton=1, NSWindowZoomButton=2
+        for button_id in (0, 1, 2):
+            try:
+                btn = nswindow.standardWindowButton_(button_id)
+                if btn is not None:
+                    btn.setHidden_(False)
+            except (AttributeError, ValueError):
+                pass
+
+    AppHelper.callAfter(_apply)
+
+
+def _apply_unified_toolbar(nswindow: object) -> None:
+    """Attach an empty unified-compact NSToolbar so the native titlebar grows
+    just enough to drop the traffic lights to ~20px from the top — vertically
+    centered in the 40px in-app topbar (--app-header-h). macOS keeps the lights
+    centered across resize, so nothing is repositioned by hand (no jump).
+
+    Must run on the UI thread; AppKit failures are the caller's to swallow.
+    """
+    import AppKit  # noqa: PLC0415
+    toolbar = AppKit.NSToolbar.alloc().initWithIdentifier_("quodeq-titlebar")
+    toolbar.setShowsBaselineSeparator_(False)
+    nswindow.setToolbar_(toolbar)
+    nswindow.setToolbarStyle_(4)  # NSWindowToolbarStyleUnifiedCompact
+    # Remove the 1px separator line under the toolbar (most visible in
+    # fullscreen). NSTitlebarSeparatorStyleNone = 1 (macOS 11+).
+    nswindow.setTitlebarSeparatorStyle_(1)
+
+
+def _set_macos_unified_toolbar(window: object) -> None:
+    """Install the unified-compact toolbar (see _apply_unified_toolbar) on the
+    frameless macOS window. Installed once; no-op off macOS or before the
+    native handle exists.
+    """
+    global _macos_toolbar_installed
+    if _macos_toolbar_installed or sys.platform != "darwin":
+        return
+    try:
+        from PyObjCTools import AppHelper  # noqa: PLC0415
+    except ImportError:
+        return
+    nswindow = getattr(window, "native", None) if window is not None else None
+    if nswindow is None:
+        return
+    _macos_toolbar_installed = True
+
+    def _apply() -> None:
+        try:
+            _apply_unified_toolbar(nswindow)
+        except (AttributeError, ValueError, TypeError):
+            pass
+
+    AppHelper.callAfter(_apply)
+
+
+def _set_macos_fullscreen_class(window: object, is_full: bool) -> None:
+    """Toggle the `macos-fullscreen` class on <html> from off the main thread.
+
+    pywebview's evaluate_js blocks waiting on the JS engine, which deadlocks
+    when called on the AppKit main thread (where notifications fire), so run it
+    on a short-lived worker thread.
+    """
+    flag = "true" if is_full else "false"
+    js = f"document.documentElement.classList.toggle('macos-fullscreen', {flag})"
+
+    def _run() -> None:
+        try:
+            window.evaluate_js(js)  # type: ignore[union-attr]
+        except Exception:  # noqa: BLE001 — window may be tearing down
+            _logger.debug("fullscreen class toggle failed", exc_info=True)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def _apply_macos_fullscreen_chrome(
+    window: object, is_full: bool, *, restore_toolbar: bool = True,
+) -> None:
+    """Reflect fullscreen state in both the native and the web chrome.
+
+    In fullscreen macOS draws the unified toolbar as a persistent empty gray
+    bar across the top (the traffic lights it centers are hidden there), so
+    drop the toolbar in fullscreen and restore it windowed. Either way toggle
+    the `macos-fullscreen` CSS class, which also clears the topbar border and
+    the now-pointless traffic-light reservation.
+
+    The AppKit toolbar work runs inline — callers are on the UI thread (the
+    fullscreen notifications fire there) — while the JS class toggle is
+    dispatched off it (evaluate_js deadlocks on the main thread).
+
+    ``restore_toolbar=False`` skips re-adding the toolbar when windowed; the
+    initial install (_set_macos_unified_toolbar) already owns that, so the
+    load-time sync must not add a second one.
+    """
+    nswindow = getattr(window, "native", None) if window is not None else None
+    if nswindow is not None:
+        try:
+            if is_full:
+                nswindow.setToolbar_(None)
+            elif restore_toolbar:
+                _apply_unified_toolbar(nswindow)
+        except (AttributeError, ValueError, TypeError, ImportError):
+            pass
+    _set_macos_fullscreen_class(window, is_full)
+
+
+def _install_macos_fullscreen_observer(window: object) -> None:
+    """React to native fullscreen transitions so the chrome stays clean.
+
+    On enter/exit fullscreen, drop/restore the unified toolbar (macOS otherwise
+    leaves an empty gray toolbar bar at the top) and toggle a `macos-fullscreen`
+    class on <html> (CSS then drops the topbar border and the traffic-light
+    reservation). See _apply_macos_fullscreen_chrome.
+
+    Uses NSWindow fullscreen notifications because they are the only reliable
+    signal: on a notched display a zoomed window and a fullscreen window report
+    identical inner/screen heights, so a JS heuristic can't tell them apart.
+
+    Registers the notifications once (the ObjC observer class may only be
+    defined a single time per process) but re-syncs the current state on every
+    call, so reloading the page while fullscreen keeps the chrome correct (the
+    notifications only fire on transitions). No-op off macOS or before the
+    native handle exists. Call from the ``loaded`` event.
+    """
+    global _macos_fullscreen_handler_class
+    if sys.platform != "darwin":
+        return
+    try:
+        import AppKit  # noqa: PLC0415
+        from Foundation import NSNotificationCenter  # noqa: PLC0415
+        from PyObjCTools import AppHelper  # noqa: PLC0415
+    except ImportError:
+        return
+    nswindow = getattr(window, "native", None) if window is not None else None
+    if nswindow is None:
+        return
+
+    # Define the ObjC handler class at most once: redefining an NSObject
+    # subclass in the same process raises objc.error (the same trap the About
+    # panel hit). It closes over this window, of which there is only one.
+    if _macos_fullscreen_handler_class is None:
+        class _FullScreenHandler(AppKit.NSObject):
+            def willEnterFullScreen_(self, note):  # noqa: ARG002, N802 — ObjC selector
+                # Drop the toolbar BEFORE the enter animation, not after: the
+                # *Did*EnterFullScreen notification only fires once the grow
+                # animation completes, so the toolbar would stay attached for
+                # the whole animation and flash as a gray bar. *Will*Enter runs
+                # first, so the animation has no toolbar to show.
+                _apply_macos_fullscreen_chrome(window, True)
+
+            def didExitFullScreen_(self, note):  # noqa: ARG002, N802 — ObjC selector
+                # Restore only once fully windowed — re-adding during the exit
+                # animation would briefly reattach the toolbar while still
+                # fullscreen and flash gray again.
+                _apply_macos_fullscreen_chrome(window, False)
+
+        _macos_fullscreen_handler_class = _FullScreenHandler
+
+    def _apply() -> None:
+        global _macos_fullscreen_observer, _macos_fullscreen_observer_installed
+        try:
+            if not _macos_fullscreen_observer_installed:
+                observer = _macos_fullscreen_handler_class.alloc().init()
+                center = NSNotificationCenter.defaultCenter()
+                center.addObserver_selector_name_object_(
+                    observer, "willEnterFullScreen:",
+                    AppKit.NSWindowWillEnterFullScreenNotification, nswindow,
+                )
+                center.addObserver_selector_name_object_(
+                    observer, "didExitFullScreen:",
+                    AppKit.NSWindowDidExitFullScreenNotification, nswindow,
+                )
+                _macos_fullscreen_observer = observer  # keep it alive
+                _macos_fullscreen_observer_installed = True
+            is_full = bool(nswindow.styleMask() & AppKit.NSWindowStyleMaskFullScreen)
+            # Don't re-add the toolbar windowed — _set_macos_unified_toolbar
+            # already installed it; a second one would race/flicker.
+            _apply_macos_fullscreen_chrome(window, is_full, restore_toolbar=False)
+        except (AttributeError, ValueError, TypeError):
+            pass
+
+    AppHelper.callAfter(_apply)
+
+
+def _set_windows_titlebar(dark: bool, window_title: str = "quodeq") -> None:
+    """Set the native Windows titlebar dark/light via DWM (attr 20, fallback 19)."""
     if sys.platform != "win32":
         return
     try:
-        import ctypes
-        from ctypes import wintypes
+        import ctypes  # noqa: PLC0415
+        from ctypes import wintypes  # noqa: PLC0415
         hwnd = ctypes.windll.user32.FindWindowW(None, window_title)
         if not hwnd:
             return
-        value = ctypes.c_int(1)
+        value = ctypes.c_int(1 if dark else 0)
         size = ctypes.sizeof(value)
         for attr in (20, 19):
             res = ctypes.windll.dwmapi.DwmSetWindowAttribute(
@@ -585,55 +693,6 @@ def _set_app_icon() -> None:
             pass
 
 
-def _patch_pywebview_multi_monitor_drag() -> None:
-    """Fix pywebview's multi-monitor frameless-window drag on macOS.
-
-    pywebview's bundled drag JS (``customize.js``) sends absolute screen
-    coordinates over the JS↔Python bridge each mousemove, and the macOS
-    backend's ``BrowserView.move`` then ADDS ``self.screen.origin.x`` to
-    that x value before calling ``setFrameTopLeftPoint:``. On a single-
-    monitor setup the cached ``self.screen`` is the primary (origin.x =
-    0) and the addition is a no-op — so the bug never fires. On a multi-
-    monitor setup where the window's cached screen has a non-zero origin
-    (e.g. a secondary monitor positioned to the LEFT of the primary at
-    screen X = −1920), the addition double-counts and the window jumps
-    off the visible workspace mid-drag — confirmed reproducible vs.
-    single-monitor.
-
-    Patch swaps ``BrowserView.move`` for a version that passes ``x``
-    through unchanged. The Y math is left as-is because typical
-    horizontal multi-monitor layouts have ``screen.origin.y == 0`` and
-    we don't have a confirmed Y-side reproduction.
-
-    Safe to leave installed on single-monitor: ``origin.x`` is 0 there,
-    so the behaviour is identical. Skipped silently on non-Darwin or if
-    pywebview's internal layout changes (no AttributeError).
-
-    Tracked upstream: https://github.com/r0x0r/pywebview/issues/1820 —
-    drop this helper once the fix ships in a pywebview release we
-    depend on.
-    """
-    if sys.platform != "darwin":
-        return
-    try:
-        from webview.platforms.cocoa import BrowserView  # noqa: PLC0415
-        import AppKit  # noqa: PLC0415
-    except ImportError:
-        return
-    if not hasattr(BrowserView, 'move'):
-        return
-
-    def _patched_move(self, x: float, y: float) -> None:
-        flipped_y = self.screen.size.height - y
-        # The original code added ``self.screen.origin.x`` to x here;
-        # see docstring above for why that's wrong on multi-monitor.
-        self.window.setFrameTopLeftPoint_(
-            AppKit.NSPoint(x, self.screen.origin.y + flipped_y)
-        )
-
-    BrowserView.move = _patched_move
-
-
 def _make_on_reload(window: object) -> "Callable[[str], None]":
     """Return the ``_on_reload`` handler bound to *window*.
 
@@ -651,9 +710,65 @@ def _make_on_reload(window: object) -> "Callable[[str], None]":
     return _on_reload
 
 
+def _webview_user_agent() -> str:
+    """Browser-recognisable UA carrying the webview marker.
+
+    The AppleWebKit/Safari tokens keep Google Fonts serving woff2; the
+    marker tells the API to relax the CSP (see _WEBVIEW_UA_MARKER).
+    """
+    return (
+        "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+        f"{_WEBVIEW_UA_MARKER}/{_quodeq_version()} Safari/605.1.15"
+    )
+
+
+def _create_window(url: str, api: "_WindowApi") -> "webview.Window":
+    """Create the dashboard window.
+
+    macOS uses a frameless window so NSFullSizeContentView lets the app's
+    topbar run under the titlebar; the native traffic lights are re-shown over
+    it (see _show_macos_traffic_lights) for a unified look, and the topbar acts
+    as the drag region via the ``pywebview-drag-region`` class. Windows and
+    Linux use native OS chrome.
+
+    easy_drag is disabled so only the topbar drags the window — otherwise it
+    would hijack the resize splitter (a plain <div>).
+    """
+    return webview.create_window(
+        "quodeq", url, width=_WINDOW_WIDTH, height=_WINDOW_HEIGHT,
+        frameless=(sys.platform == "darwin"), easy_drag=False,
+        background_color=_WINDOW_BG_COLOR, hidden=True, js_api=api,
+    )
+
+
+def _make_on_closing(api: "_WindowApi", window: object) -> "Callable[[], bool]":
+    """Native close handler: confirm via a native dialog if a scan is running.
+
+    Returns True to allow the close, False to keep the window open. The scan
+    is a separate process, so 'Quit' just closes the window and the scan
+    keeps running.
+    """
+    def _on_closing() -> bool:
+        try:
+            job = api._get_running_evaluation()
+        except Exception:
+            job = None
+        if not job:
+            return True
+        try:
+            return bool(window.create_confirmation_dialog(
+                "Quit quodeq?",
+                "A scan is running. Click OK to quit — the scan keeps running "
+                "in the background. Click Cancel to stay.",
+            ))
+        except Exception:
+            # If the native dialog can't render, don't trap the user.
+            return True
+    return _on_closing
+
+
 def main() -> None:
     _set_app_icon()
-    _patch_pywebview_multi_monitor_drag()
     url = sys.argv[1]
     sock_path = Path(sys.argv[2])
     api_pid = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3] else 0
@@ -661,66 +776,43 @@ def main() -> None:
     instance = InstanceController(sock_path)
     api = _WindowApi()
 
-    # Windows uses native chrome so users get the conventional top-right
-    # min/max/close, Snap layouts and Alt+Space. macOS and Linux stay
-    # frameless and rely on the Mac-style traffic-light dots injected by
-    # _webview_html.INJECT_JS.
-    #
-    # easy_drag intercepts pointer events on any non-interactive element to
-    # move the window — that breaks our resize splitter (a <div>, not a
-    # <button>). Disable it and let the topbar opt-in via -webkit-app-region.
-    _frameless = sys.platform != "win32"
-    window = webview.create_window("quodeq", url, width=_WINDOW_WIDTH, height=_WINDOW_HEIGHT,
-                                    frameless=_frameless, easy_drag=False,
-                                    background_color=_WINDOW_BG_COLOR, hidden=True,
-                                    js_api=api)
+    window = _create_window(url, api)
     api.bind(window, api_pid=api_pid, instance=instance, base_url=url)
 
     _on_reload = _make_on_reload(window)
 
     def _on_loaded() -> None:
         window.show()
-        window.evaluate_js(INJECT_JS)
-        # Re-apply the dock icon + bundle name now that pywebview's
-        # NSApplication instance is live. Calling this earlier in main()
-        # targets the pre-pywebview NSApp and gets overridden.
         if sys.platform == "darwin":
-            _set_macos_app_identity()
+            # Show the native traffic lights FIRST: they are the only window
+            # controls on the frameless macOS window, so they must not be
+            # skipped if the best-effort app-identity setup below raises.
+            _show_macos_traffic_lights(window)
+            _set_macos_unified_toolbar(window)
+            _set_macos_titlebar_appearance(window, True)
+            # Reflect fullscreen state in a CSS class so the topbar border and
+            # the traffic-light reservation drop when macOS hides the lights.
+            _install_macos_fullscreen_observer(window)
+            # Re-apply the dock icon + bundle name now that pywebview's
+            # NSApplication is live (the early call in main() targets the
+            # pre-pywebview NSApp). Best-effort — never block the controls.
+            try:
+                _set_macos_app_identity()
+            except Exception:
+                _logger.debug("macOS app-identity setup failed", exc_info=True)
         elif sys.platform == "win32":
-            _enable_windows_dark_titlebar("quodeq")
-
-    def _on_closing() -> bool:
-        """Intercept native close (Cmd+Q, red button, window manager).
-
-        Runs on pywebview's main thread. If a scan is running, render the
-        close dialog synchronously and branch on the user's choice:
-          - 'back'   → block the native close (return False)
-          - 'keep'   → allow close; scan continues in background
-          - 'cancel' → issue cancel API call, then allow close
-        If no scan is running, allow the close without prompting.
-        """
-        try:
-            job = api._get_running_evaluation()
-        except Exception:
-            job = None
-        if not job:
-            return True
-        choice = api._await_close_dialog(job)
-        if choice == 'back':
-            return False
-        if choice == 'cancel':
-            api._cancel_evaluation(job.get("jobId") or job.get("job_id"))
-        return True
+            _set_windows_titlebar(True)
 
     window.events.loaded += _on_loaded
-    window.events.closing += _on_closing
+    window.events.closing += _make_on_closing(api, window)
 
     instance.start_listening(on_reload=_on_reload)
 
     storage_dir = str(_quodeq_dir() / "webview")
 
     try:
-        webview.start(private_mode=False, storage_path=storage_dir)
+        webview.start(private_mode=False, storage_path=storage_dir,
+                      user_agent=_webview_user_agent())
     finally:
         instance.shutdown()
         if api_pid:

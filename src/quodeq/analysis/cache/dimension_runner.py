@@ -53,6 +53,7 @@ from quodeq.analysis.cache.dimension_helpers import (
 )
 from quodeq.analysis.cache.gc import maybe_collect_legacy_entries
 from quodeq.analysis.cache.local import LocalFileBackend
+from quodeq.analysis.mcp.provenance_gate import apply_provenance_gate
 from quodeq.analysis.subagents._source_files import _list_source_files
 from quodeq.analysis.subagents.runner import (
     DimensionCallbacks,
@@ -196,6 +197,15 @@ def _write_findings(
     jsonl: Path, findings: list[dict], *, append: bool,
     emit_events: bool = True,
 ) -> None:
+    # Re-gate cached findings on the replay path (issue #657). The live
+    # finding path gates in FindingEnricher.enrich(); cache replay bypasses
+    # enrich(), so a stale, un-gated critical R-FT-2/S-AUT-3 finding written
+    # by a pre-#639 quodeq version would otherwise replay at critical and
+    # inflate the grade. The gate only touches un-gated criticals, so
+    # re-gating an already-gated (or non-critical) finding is a no-op --
+    # safe to apply unconditionally to every cached finding.
+    for finding in findings:
+        apply_provenance_gate(finding)
     jsonl.parent.mkdir(parents=True, exist_ok=True)
     mode = "a" if append else "w"
     with jsonl.open(mode, encoding="utf-8") as out:
@@ -387,9 +397,22 @@ def process_dimension_with_cache(
         breaker.stop_and_join(timeout=5.0)
 
     if breaker.trip_event is not None:
-        # The breaker tripped. Surface a typed exception so the pipeline
-        # layer can mark this dim's state with reason=circuit_breaker and
-        # the lifecycle layer can record exit_reason=failure_streak.
+        # The breaker tripped, but the finally block above already persisted
+        # every completed file to the JSONL. Salvage that work instead of
+        # discarding the whole dimension: parse the collected findings into
+        # Evidence and flag it failure_streak so the loop scores it (DONE +
+        # exit_reason) and the grade layer can exclude it. The breaker already
+        # requested run-wide cancellation, so the run still ends after this dim.
+        if jsonl.exists():
+            salvaged = parse_evidence_from_jsonl(
+                config, dim_id, ctx, jsonl,
+                files_read=_compute_files_read(classify, jsonl, files),
+            )
+            if salvaged is not None and salvaged.principles:
+                salvaged.exit_reason = "failure_streak"
+                return salvaged
+        # Nothing collected -- no score to fabricate. Surface the typed
+        # exception so the dim is marked INCOMPLETE/unscored as before.
         raise CircuitBreakerError("circuit_breaker")
 
     if miss_evidence is None:

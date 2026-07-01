@@ -2,13 +2,13 @@ import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
 import { invalidateThemeColors, LEGEND_ITEMS } from '../core/galaxyCore.js';
 import VizBreadcrumb from './VizBreadcrumb.jsx';
 import { buildScene, updateSceneLiveData } from './galaxyViewScene.js';
-import { updateTooltip, handleCanvasClick } from './galaxyViewEvents.js';
+import { updateTooltip, handleCanvasClick, createKeyboardHandlers } from './galaxyViewEvents.js';
 import { computeLevelInfo, buildBreadcrumb, LevelInfoPanel } from './galaxyViewInfo.jsx';
 import { useGalaxyCamera } from './useGalaxyCamera.js';
 
 /* ── Custom hook: mouse/click handler setup ── */
 
-function useGalaxyHandlers({ canvasRef, navRef, animRef, camRef, hoveredRef, mouseRef, tooltipRef, prevNavRef, scene, size, startTransition, saveNav, w2s }) {
+function useGalaxyHandlers({ canvasRef, navRef, animRef, camRef, hoveredRef, mouseRef, tooltipRef, prevNavRef, focusedIdxRef, announce, scene, size, startTransition, saveNav, w2s }) {
   const navigateTo = useCallback((depth, dim, prin) => {
     if (animRef.current) return;
     const wasDepth = navRef.current.depth;
@@ -44,7 +44,15 @@ function useGalaxyHandlers({ canvasRef, navRef, animRef, camRef, hoveredRef, mou
     else if (d === 1) navigateTo(1, nav.dim);
   }, [navRef, navigateTo]);
 
-  return { handleMouseMove, handleMouseLeave, navigateTo, handleClick, goToDepth };
+  const { handleKeyDown, handleFocus, handleBlur } = useMemo(
+    () => createKeyboardHandlers(
+      { navRef, animRef, focusedIdxRef },
+      { scene, navigateTo, startTransition, saveNav, announce },
+    ),
+    [navRef, animRef, focusedIdxRef, scene, navigateTo, startTransition, saveNav, announce],
+  );
+
+  return { handleMouseMove, handleMouseLeave, navigateTo, handleClick, goToDepth, handleKeyDown, handleFocus, handleBlur };
 }
 
 export default function GalaxyView({ dimensions, onNavigate, showLabels = true, setShowLabels, darkMode, resetKey = 0, projectName = '', standardTypes = {} }) {
@@ -83,9 +91,12 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
   const [navVersion, setNavVersion] = useState(0);
   const mouseRef = useRef({ x: -1, y: -1 });
   const hoveredRef = useRef(null);
+  const focusedIdxRef = useRef(null);
   const tooltipRef = useRef(null);
   const frameRef = useRef(null);
   const prevNavRef = useRef(null);
+  const [liveMsg, setLiveMsg] = useState('');
+  const announce = useCallback((msg) => setLiveMsg(msg), []);
 
   const saveNav = useCallback(() => {
     savedNavRef.current = { ...navRef.current };
@@ -95,7 +106,7 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
 
   const { camRef, w2s, startTransition } = useGalaxyCamera({
     canvasRef, scene, size, showLabels, savedNavRef, savedCamRef,
-    navRef, prevNavRef, animRef, mouseRef, hoveredRef, frameRef,
+    navRef, prevNavRef, animRef, mouseRef, hoveredRef, focusedIdxRef, frameRef,
   });
 
   // Reset on resetKey change
@@ -112,8 +123,8 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
     }
   }, [resetKey, saveNav, startTransition]);
 
-  const { handleMouseMove, handleMouseLeave, handleClick, goToDepth } = useGalaxyHandlers({
-    canvasRef, navRef, animRef, camRef, hoveredRef, mouseRef, tooltipRef, prevNavRef,
+  const { handleMouseMove, handleMouseLeave, handleClick, goToDepth, handleKeyDown, handleFocus, handleBlur } = useGalaxyHandlers({
+    canvasRef, navRef, animRef, camRef, hoveredRef, mouseRef, tooltipRef, prevNavRef, focusedIdxRef, announce,
     scene, size, startTransition, saveNav, w2s,
   });
 
@@ -129,9 +140,19 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', opacity: visible ? 1 : 0, transition: 'opacity 0.4s ease' }}>
       <canvas ref={canvasRef} width={size.w} height={size.h}
+        className="viz-focusable"
         style={{ width: '100%', height: '100%', display: 'block' }}
         onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} onClick={handleClick}
-        role="img" aria-label="Galaxy visualization of project compliance" />
+        tabIndex={0}
+        role="application"
+        aria-label="Galaxy visualization of project compliance. Use arrow keys to move between nodes, Enter to open, Escape to go back."
+        onKeyDown={handleKeyDown}
+        onFocus={handleFocus}
+        onBlur={handleBlur} />
+      <div aria-live="polite" aria-atomic="true" style={{
+        position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
+        overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0,
+      }}>{liveMsg}</div>
       <VizBreadcrumb items={breadcrumb.map((bc, i) => ({
         label: bc.label,
         onClick: i < breadcrumb.length - 1 ? () => {

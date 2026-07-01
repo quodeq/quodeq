@@ -1,4 +1,110 @@
 /**
+ * ISO-8601 week key (Monday start; week 1 contains the first Thursday).
+ * Operates timezone-naively on the YYYY-MM-DD prefix via Date.UTC, matching
+ * how the day grouping slices the date string.
+ *
+ * @param {string} dateISO
+ * @returns {string} e.g. "2026-W13", or "" when the date is missing/invalid
+ */
+export function isoWeekKey(dateISO) {
+  const datePart = (dateISO || '').slice(0, 10);
+  const [y, m, d] = datePart.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const dayNum = date.getUTCDay() || 7;           // Mon=1 .. Sun=7
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum); // shift to this week's Thursday
+  const isoYear = date.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(isoYear, 0, 1));
+  const weekNo = Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
+  return `${isoYear}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+/**
+ * Bucket key for a trend/run entry's date at the given granularity.
+ * Empty dates produce "" (their own group), matching legacy day behavior.
+ *
+ * @param {string} dateISO
+ * @param {'day'|'week'|'month'} [granularity='day']
+ * @returns {string}
+ */
+export function bucketKey(dateISO, granularity = 'day') {
+  if (granularity === 'month') return (dateISO || '').slice(0, 7);
+  if (granularity === 'week') return isoWeekKey(dateISO);
+  return (dateISO || '').slice(0, 10);
+}
+
+/**
+ * Collapse trend entries (newest-first) into one entry per period bucket,
+ * keeping the first (newest) entry of each bucket — the most up-to-date
+ * accumulated state for that period.
+ *
+ * @param {Array} trend - Trend entries, newest first
+ * @param {'day'|'week'|'month'} [granularity='day']
+ * @returns {Array} Collapsed entries, one per bucket
+ */
+export function collapseByPeriod(trend, granularity = 'day') {
+  if (!trend || trend.length === 0) return trend;
+  const collapsed = [];
+  let currentKey = null;
+  for (const entry of trend) {
+    const key = bucketKey(entry.dateISO, granularity);
+    if (key !== currentKey) {
+      currentKey = key;
+      collapsed.push({ ...entry });
+    }
+  }
+  return collapsed;
+}
+
+/**
+ * Build a Set of dimension names evaluated in the selected run's period.
+ *
+ * @param {Array} trend - Raw trend entries (all runs)
+ * @param {string} selectedRunId
+ * @param {'day'|'week'|'month'} [granularity='day']
+ * @returns {Set<string>} Lowercase dimension names evaluated that period
+ */
+export function collectPeriodDimensions(trend, selectedRunId, granularity = 'day') {
+  if (!trend || !trend.length || !selectedRunId) return new Set();
+  const entry = trend.find((t) => t.runId === selectedRunId);
+  if (!entry) return new Set();
+  const selectedKey = bucketKey(entry.dateISO, granularity);
+  if (!selectedKey) return new Set();
+  const names = new Set();
+  for (const t of trend) {
+    if (bucketKey(t.dateISO, granularity) === selectedKey) {
+      for (const dim of t.dimensions || []) names.add(dim.toLowerCase());
+    }
+  }
+  return names;
+}
+
+/**
+ * Build period-level available runs, keeping the first (newest) run per bucket.
+ *
+ * @param {Array} availableRuns - Raw available runs (newest first)
+ * @param {Array} trend - Trend entries with dateISO
+ * @param {'day'|'week'|'month'} [granularity='day']
+ * @returns {Array} One run per bucket
+ */
+export function buildPeriodRuns(availableRuns, trend, granularity = 'day') {
+  if (!availableRuns || !availableRuns.length) return [];
+  const trendMap = new Map(trend.map((r) => [r.runId, r]));
+  const byBucket = [];
+  let lastKey = null;
+  for (const run of availableRuns) {
+    const t = trendMap.get(run.runId);
+    const key = bucketKey(t?.dateISO, granularity);
+    if (key !== lastKey) {
+      byBucket.push(run);
+      lastKey = key;
+    }
+  }
+  return byBucket;
+}
+
+// ── Day-named wrappers (preserve existing call sites and tests) ─────────────
+/**
  * Collapse trend entries (newest-first) into one entry per calendar day.
  * Keeps the first (newest) entry of each day, which has the most
  * up-to-date accumulated state.
@@ -7,17 +113,7 @@
  * @returns {Array} Collapsed entries, one per day
  */
 export function collapseByDay(trend) {
-  if (!trend || trend.length === 0) return trend;
-  const collapsed = [];
-  let currentDay = null;
-  for (const entry of trend) {
-    const datePart = (entry.dateISO || '').slice(0, 10);
-    if (datePart !== currentDay) {
-      currentDay = datePart;
-      collapsed.push({ ...entry });
-    }
-  }
-  return collapsed;
+  return collapseByPeriod(trend, 'day');
 }
 
 /**
@@ -29,18 +125,7 @@ export function collapseByDay(trend) {
  * @returns {Set<string>} Lowercase dimension names evaluated that day
  */
 export function collectDayDimensions(trend, selectedRunId) {
-  if (!trend || !trend.length || !selectedRunId) return new Set();
-  const entry = trend.find((t) => t.runId === selectedRunId);
-  if (!entry) return new Set();
-  const selectedDate = (entry.dateISO || '').slice(0, 10);
-  if (!selectedDate) return new Set();
-  const names = new Set();
-  for (const t of trend) {
-    if ((t.dateISO || '').slice(0, 10) === selectedDate) {
-      for (const d of t.dimensions || []) names.add(d.toLowerCase());
-    }
-  }
-  return names;
+  return collectPeriodDimensions(trend, selectedRunId, 'day');
 }
 
 /**
@@ -52,17 +137,5 @@ export function collectDayDimensions(trend, selectedRunId) {
  * @returns {Array} One entry per day
  */
 export function buildDailyRuns(availableRuns, trend) {
-  if (!availableRuns || !availableRuns.length) return [];
-  const trendMap = new Map(trend.map((r) => [r.runId, r]));
-  const byDay = [];
-  let lastDate = null;
-  for (const run of availableRuns) {
-    const t = trendMap.get(run.runId);
-    const datePart = (t?.dateISO || '').slice(0, 10);
-    if (datePart !== lastDate) {
-      byDay.push(run);
-      lastDate = datePart;
-    }
-  }
-  return byDay;
+  return buildPeriodRuns(availableRuns, trend, 'day');
 }

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
+import UpdateBanner from './features/updates/UpdateBanner.jsx';
 
 const DashboardPage = lazy(() => import('./features/dashboard/components/DashboardPage.jsx'));
 const ExplorerPage = lazy(() => import('./features/explorer/components/ExplorerPage.jsx'));
@@ -30,6 +31,7 @@ import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { readVisibleStandardIds } from './utils/visibleStandards.js';
 import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
+import { syncNativeTitlebar } from './utils/nativeTitlebar.js';
 import { SidePane, useSidePane } from './features/side-pane/index.js';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.jsx';
@@ -64,6 +66,20 @@ function useEffectiveDark(themeMode) {
   if (themeMode === 'dark') return true;
   if (themeMode === 'light') return false;
   return prefersDark;
+}
+
+/**
+ * Push the on-screen dark/light theme to the native window titlebar
+ * whenever it changes, and once more when the pywebview bridge becomes
+ * ready (it can inject after first render). No-op in a browser.
+ */
+function useNativeTitlebarSync(effectiveDark) {
+  useEffect(() => {
+    syncNativeTitlebar(effectiveDark);
+    const onReady = () => syncNativeTitlebar(effectiveDark);
+    window.addEventListener('pywebviewready', onReady);
+    return () => window.removeEventListener('pywebviewready', onReady);
+  }, [effectiveDark]);
 }
 
 /**
@@ -397,6 +413,7 @@ function AppShell({ sidebar, header, content }) {
       <div className="app-shell__body">
         {sidebar}
         <div className="app-shell__main-column">
+          <UpdateBanner />
           <main className="dashboard">
             {content}
           </main>
@@ -503,6 +520,7 @@ export default function App() {
   // topbar's moon/sun toggle so the icon reflects what's on-screen,
   // not just the saved mode preference.
   const effectiveDark = useEffectiveDark(state.settings.themeMode);
+  useNativeTitlebarSync(effectiveDark);
   const toggleTheme = () => {
     state.settings.applyMode(effectiveDark ? 'light' : 'dark');
   };
@@ -526,6 +544,7 @@ export default function App() {
       dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
       availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
       selectedDisplayName: state.selectedDisplayName,
+      granularity: state.granularity, onGranularityChange: state.onGranularityChange,
     },
     navigation: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
@@ -612,22 +631,8 @@ export default function App() {
               violationsCount={filteredAccumulated?.summary?.totalViolations ?? state.accumulated?.summary?.totalViolations ?? null}
               historyCount={filteredTrend.length || state.dashboard?.trend?.length || null}
               lastEvalAt={state.accumulated?.summary?.lastEvaluatedAt || state.accumulated?.summary?.createdAt || null}
-              serverConnected={state.serverConnected}
               isPinned={sidebarPinned}
               onPinChange={setSidebarPinned}
-              mobileExtras={(
-                <div className="sidebar-mobile-extras__grid">
-                  {(sidebarProvider || sidebarModel) && (
-                    <div className="sidebar-status-row">
-                      <span className="sidebar-status-label">Provider</span>
-                      <span className="sidebar-status-value">
-                        {sidebarProvider || '\u2014'}
-                        {sidebarModel && <>&nbsp;·&nbsp;<span style={{ opacity: 0.7 }}>{sidebarModel}</span></>}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
             />
           }
           header={
@@ -635,18 +640,20 @@ export default function App() {
               projectName={resolvedDisplayName}
               activeTab={activeTab}
               serverConnected={state.serverConnected}
-              serverUrl={state.serverHealth?.url || null}
+              serverUrl={typeof window !== 'undefined' ? window.location.origin : null}
               provider={sidebarProvider}
               model={sidebarModel}
               onEvaluate={state.projects?.length > 0 ? (() => navTab('evaluate')) : null}
               evaluating={state.evalLifecycle?.job?.status === 'running'}
               onProviderClick={() => navTab('settings')}
               onMenuToggle={() => setSidebarPinned((v) => !v)}
+              onSelectProject={() => navTab('projects')}
               breadcrumb={
                 <NavBreadcrumb
                   stack={navStack}
-                  onBack={navPop}
                   onGoTo={navGoTo}
+                  projectName={resolvedDisplayName}
+                  onSelectProject={() => navTab('projects')}
                 />
               }
               mobileTitle={navStack.length ? navLabelFor(navStack[navStack.length - 1]) : (activeTab || '')}

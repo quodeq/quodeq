@@ -32,16 +32,25 @@ from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.types.dimension import DimensionResult, DimensionSummary, GradeBreakdown
+from quodeq.services._cache import make_lru_dimension_fetcher
+from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.dashboard import (
     DashboardCacheConfig,
     _make_run_dimension_fetcher,
+    create_dimension_cache,
 )
 from quodeq.services.grade_formula import load_params
-from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.ports import RunInfo, list_runs
+from quodeq.services._fs_projects import find_children
+from quodeq.services.score_cache import (
+    accumulated_cache_version,
+    cached_accumulated,
+    make_cache_backed_fetcher,
+    score_cache_version,
+)
+from quodeq.services.ports import RunInfo, list_runs, read_run_scalars
 from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
 from quodeq.services.scoring._summary import recompute_summary
 
@@ -204,7 +213,7 @@ def _build_response_from_grade_tables(
     _SELECT_ACTIVE = (
         "SELECT id, practice_id, dimension, requirement, verdict, severity, "
         "file, line, end_line, title, reason, snippet, violation_type, context, "
-        "scope, req_refs_json, confidence "
+        "scope, req_refs_json, confidence, provenance_downgrade "
         "FROM findings WHERE verdict != 'dismissed' ORDER BY id"
     )
 
@@ -339,6 +348,39 @@ def _make_rescoring_fetcher(
     return rescoring_fetcher
 
 
+def _make_trend_fetcher(
+    reports_root: Path, project: str,
+    params: ScoringParams = DEFAULT_PARAMS,
+) -> Callable[[str], list[DimensionResult]]:
+    """Return the dimension fetcher for the trend chart.
+
+    Fast path: when the project has no active dismissals/deletions, read only
+    the per-run scalar grades (``read_run_scalars``) -- the trend needs nothing
+    else. Uses a fresh per-call LRU cache so scalar (findings-less) results
+    never collide with the shared full-data cache used elsewhere.
+
+    Heavy path: when dismissals/deletions are active, wrap the findings-based
+    rescoring fetcher with the read-through score cache. The cache version is a
+    content-hash of the project's dismissals/deletions/params, so any change
+    auto-invalidates without a write-path hook.
+    """
+    project_dir = reports_root / project
+    if dismissed_keys(project_dir) or deleted_keys(project_dir):
+        # Heavy path: wrap the findings-based rescoring fetcher with the
+        # read-through score cache. Version is a content hash of the project's
+        # dismissals/deletions/params, so any change auto-invalidates.
+        # dismissed/deleted are read here (branch test), in _make_rescoring_fetcher,
+        # and in score_cache_version -- three reads total, each ~0.01s, acceptable.
+        base = _make_rescoring_fetcher(reports_root, project, params=params)
+        version = score_cache_version(project_dir, params)
+        return make_cache_backed_fetcher(project, version, base)
+    cache, lock = create_dimension_cache()
+    return make_lru_dimension_fetcher(
+        reports_root, project, cache, lock,
+        _max_history_runs(), reader=read_run_scalars,
+    )
+
+
 def _rescore_runs_by_dimension(
     dims: list[dict], reports_root: Path, project: str,
     dismissed: set[tuple], deleted: set[tuple] | None = None,
@@ -446,23 +488,33 @@ def get_project_scores(
         }
 
     # Build accumulated using the existing service (returns full data with violations)
-    accumulated = compute_accumulated(
-        str(reports_root), project, as_of, params=params,
-    )
-    if accumulated is None:
-        accumulated = {"dimensions": [], "summary": {}}
+    def _compute_accumulated_payload() -> dict:
+        acc = compute_accumulated(str(reports_root), project, as_of, params=params)
+        if acc is None:
+            acc = {"dimensions": [], "summary": {}}
+        return _rescore_accumulated_response(acc, reports_root, project, params=params)
 
-    # Apply rescore to accumulated dimensions
-    accumulated = _rescore_accumulated_response(accumulated, reports_root, project, params=params)
+    if find_children(reports_root, project):
+        # Parent aggregation pulls child projects' dismissals/runs into the
+        # payload, which the project-scoped cache version can't see -- bypass
+        # the cache for parents to avoid serving stale data.
+        accumulated = _compute_accumulated_payload()
+    else:
+        acc_version = accumulated_cache_version(
+            reports_root / project, params,
+            [(r.run_id, r.status) for r in all_runs], as_of,
+        )
+        accumulated = cached_accumulated(project, acc_version, _compute_accumulated_payload)
 
-    # Build trend using a rescoring fetcher (applies dismissals to each run).
+    # Build trend using the appropriate fetcher: scalar fast path when there
+    # are no active dismissals/deletions, rescoring (findings) path otherwise.
     # Exclude cancelled/failed runs — their partial scores are misleading on
     # the history chart. They remain in availableRuns so the UI can show them
     # when the user asks for them explicitly.
     scoreable_runs = [r for r in all_runs if r.status not in ("cancelled", "failed")]
     history_runs = scoreable_runs[:_max_history_runs()]
-    rescoring_fetcher = _make_rescoring_fetcher(reports_root, project, params=params)
-    trend = build_accumulated_trend(history_runs, rescoring_fetcher, params=params)
+    trend_fetcher = _make_trend_fetcher(reports_root, project, params=params)
+    trend = build_accumulated_trend(history_runs, trend_fetcher, params=params)
 
     # Build available runs list
     available_runs = [

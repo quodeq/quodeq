@@ -12,7 +12,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v7.0.0
         with:
           # Check out the exact commit the release was published from -- the tag
           # commit that triggered "Publish to PyPI" -- NOT `develop`. publish.yml

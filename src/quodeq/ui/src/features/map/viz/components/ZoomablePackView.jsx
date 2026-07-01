@@ -194,6 +194,7 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onMouseMove={(e) => { const r = containerRef.current?.getBoundingClientRect(); if (r) { mousePos.current = { x: e.clientX - r.left, y: e.clientY - r.top }; } }}>
       <svg
+        className="viz-focusable"
         viewBox={`${-PAD} ${-PAD} ${BASE_SIZE + PAD * 2} ${BASE_SIZE + PAD * 2}`}
         style={{ width: '100%', height: '100%', overflow: 'hidden' }}
         tabIndex={0}

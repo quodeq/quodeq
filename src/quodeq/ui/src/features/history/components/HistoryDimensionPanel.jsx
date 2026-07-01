@@ -11,6 +11,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { formatShortDate, angleFromDelta, gradeLetter } from '../../../utils/formatters.js';
+import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
 
 // Module-level CSS variable cache. Use clearCssVarCache() for test resets.
 const _cssVarCache = new Map();
@@ -208,7 +209,17 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, runDa
           </span>
         )}
       </div>
-      <DimensionBarChart data={data} onBarClick={onBarClick} />
+      <div className="chart-with-kbd">
+        <DimensionBarChart data={data} onBarClick={onBarClick} />
+        <ChartKeyboardControls
+          label="Dimension scores — Tab to a dimension, Enter to open it"
+          items={onBarClick ? data.map((d, i) => ({
+            key: d.dimension ?? i,
+            text: `${d.dimension}: ${Number.isFinite(d.numericScore) ? d.numericScore.toFixed(1) : '?'} / 10, grade ${gradeLetter(d.overallGrade)}`,
+            onActivate: () => onBarClick(d),
+          })) : []}
+        />
+      </div>
     </section>
   );
 }

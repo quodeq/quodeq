@@ -23,3 +23,7 @@ export const VISIBLE_STANDARDS_STORAGE_KEY = 'quodeq-visible-standards';
 export const DEFAULT_VISIBLE_STANDARDS = [
   'security', 'reliability', 'maintainability', 'performance', 'usability', 'flexibility',
 ];
+
+export const SCORE_HISTORY_GRANULARITY_STORAGE_KEY = 'quodeq-score-history-granularity';
+export const SCORE_HISTORY_GRANULARITIES = ['day', 'week', 'month'];
+export const DEFAULT_SCORE_HISTORY_GRANULARITY = 'day';

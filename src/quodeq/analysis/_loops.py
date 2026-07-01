@@ -248,6 +248,9 @@ def run_incremental_loop(
         if deadline is not None and time.monotonic() >= deadline:
             log_info(f"[loop] deadline reached -- skipping {dimension} and remaining dims")
             break
+        if cancellation.is_cancelled():
+            log_info(f"[loop] cancellation requested -- skipping {dimension} and remaining dims")
+            break
         run_dir = _run_dir_for(config)
         _safe_write_dim_state(run_dir, dimension, DimState.RUNNING)
         emit_marker("analyzing", dimension=dimension)
@@ -372,6 +375,10 @@ def run_per_dimension_loop(
         if deadline is not None and time.monotonic() >= deadline:
             log_info(f"[loop] deadline reached -- skipping {dimension} and remaining dims")
             # Remaining dims stay in PENDING (they were never RUNNING). No write needed.
+            break
+        if cancellation.is_cancelled():
+            log_info(f"[loop] cancellation requested -- skipping {dimension} and remaining dims")
+            # Remaining dims stay in PENDING. No write needed.
             break
         run_dir = _run_dir_for(config)
         _safe_write_dim_state(run_dir, dimension, DimState.RUNNING)

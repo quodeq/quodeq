@@ -59,5 +59,5 @@ def is_loopback_address(hostname: str) -> bool:
                 return False
         return True
     except (socket.gaierror, OSError) as exc:
-        _logger.warning("DNS resolution failed for %r - treating as private (fail-closed): %s", hostname, exc)
+        _logger.warning("DNS resolution failed for %r - treating as non-loopback: %s", hostname, exc)
         return False

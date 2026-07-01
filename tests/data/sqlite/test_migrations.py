@@ -263,6 +263,82 @@ def test_upgrade_v2_to_v3_idempotent_when_principle_grades_already_present():
     assert row[0] == 100
 
 
+# Findings table as it existed at SCHEMA_VERSION=5, before issue #656 added
+# the provenance_downgrade column. Used to verify the v5 -> v6 upgrade path.
+_V5_FINDINGS_DDL = """
+    PRAGMA user_version = 5;
+    CREATE TABLE findings (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        schema_version  INTEGER NOT NULL DEFAULT 1,
+        practice_id     TEXT NOT NULL,
+        dimension       TEXT NOT NULL DEFAULT '',
+        requirement     TEXT,
+        verdict         TEXT NOT NULL CHECK (verdict IN ('violation','compliance','dismissed')),
+        severity        TEXT NOT NULL CHECK (severity IN ('critical','major','high','medium','low','minor')),
+        file            TEXT NOT NULL DEFAULT '',
+        line            INTEGER NOT NULL DEFAULT 0,
+        end_line        INTEGER NOT NULL DEFAULT 0,
+        title           TEXT NOT NULL DEFAULT '',
+        reason          TEXT NOT NULL DEFAULT '',
+        snippet         TEXT NOT NULL DEFAULT '',
+        violation_type  TEXT NOT NULL DEFAULT '',
+        context         TEXT NOT NULL DEFAULT '',
+        scope           TEXT NOT NULL DEFAULT '',
+        req_refs_json   TEXT,
+        dedup_key       TEXT NOT NULL UNIQUE,
+        confidence      INTEGER NOT NULL DEFAULT 100,
+        created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+"""
+
+
+def test_fresh_db_has_provenance_downgrade_column_at_default_zero():
+    conn = sqlite3.connect(":memory:")
+    apply_evaluation_schema(conn)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
+    assert "provenance_downgrade" in columns
+    # The column default is 0 (not downgraded).
+    conn.execute(
+        "INSERT INTO findings (practice_id, verdict, severity, dedup_key) "
+        "VALUES ('P1', 'violation', 'major', 'k')",
+    )
+    assert conn.execute(
+        "SELECT provenance_downgrade FROM findings WHERE practice_id='P1'"
+    ).fetchone()[0] == 0
+
+
+def test_upgrade_v5_to_v6_adds_provenance_downgrade_column():
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(_V5_FINDINGS_DDL)
+    conn.execute(
+        "INSERT INTO findings (practice_id, verdict, severity, dedup_key) "
+        "VALUES ('P-5', 'violation', 'major', 'k5')",
+    )
+
+    apply_evaluation_schema(conn)
+
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
+    assert "provenance_downgrade" in columns
+    # Pre-existing rows inherit the default (not downgraded).
+    assert conn.execute(
+        "SELECT provenance_downgrade FROM findings WHERE practice_id='P-5'"
+    ).fetchone()[0] == 0
+
+
+def test_upgrade_v5_to_v6_idempotent_when_column_already_present():
+    """An interrupted v5->v6 migration can leave provenance_downgrade added
+    but user_version still 5 (the ALTER committed, the PRAGMA bump didn't).
+    Re-running must self-heal to v6, not raise 'duplicate column name'."""
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(EVALUATION_DDL)        # full v6 schema: column present
+    conn.execute("PRAGMA user_version = 5")   # pretend the version bump never landed
+
+    apply_evaluation_schema(conn)             # must not raise
+
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+
+
 def test_apply_evaluation_schema_rejects_unknown_version_with_no_upgrade_path():
     conn = sqlite3.connect(":memory:")
     # Set user_version to a non-zero value with no upgrade path defined.

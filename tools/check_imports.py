@@ -15,9 +15,13 @@ LAYER_RULES = {
     "engine": {"core", "analysis"},
     "data": {"core"},
     "services": {"core", "data"},
-    "api": {"core", "services"},
+    # `update` is a self-contained version-check notifier: it imports nothing
+    # from the app (a leaf), and is consumed by api, dashboard, and the CLI.
+    # Empty rule + the implicit self/cross-cutting allowances keep it a leaf.
+    "update": set(),
+    "api": {"core", "services", "update"},
     "analysis": {"core", "engine", "data", "services"},
-    "dashboard": {"services", "api"},
+    "dashboard": {"services", "api", "update"},
 }
 CROSS_CUTTING = {"shared", "config"}
 IMPORT_RE = re.compile(

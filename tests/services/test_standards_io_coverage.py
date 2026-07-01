@@ -101,6 +101,20 @@ class TestCountPrinciplesAndRequirements:
         }
         assert count_principles_and_requirements(data) == (2, 2)
 
+    def test_requirements_null_treated_as_empty(self):
+        """A principle whose 'requirements' is explicitly null must not raise.
+
+        .get('requirements', []) returns None (not the default) when the key
+        is present with a null value, so len() would crash without a guard.
+        """
+        data = {"principles": [{"name": "P1", "requirements": None}]}
+        assert count_principles_and_requirements(data) == (1, 0)
+
+    def test_requirements_non_list_treated_as_empty(self):
+        """A non-list 'requirements' value contributes zero, never a bad count."""
+        data = {"principles": [{"name": "P1", "requirements": {"R1": {}}}]}
+        assert count_principles_and_requirements(data) == (1, 0)
+
 
 class TestBuildDetail:
     def test_minimal(self):
@@ -154,6 +168,16 @@ class TestBuildBuiltinDetail:
 
     def test_no_source(self):
         data = {"name": "Test", "principles": []}
+        detail = build_builtin_detail(data, "test", 1.0)
+        assert detail.source == ""
+
+    def test_sources_null_treated_as_empty(self):
+        """'sources' explicitly null must not raise.
+
+        ', '.join(data.get('sources', [])) crashes on None because .get
+        returns the null value, not the default, when the key is present.
+        """
+        data = {"name": "Test", "sources": None, "principles": []}
         detail = build_builtin_detail(data, "test", 1.0)
         assert detail.source == ""
 

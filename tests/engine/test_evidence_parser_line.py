@@ -43,6 +43,46 @@ class TestParseJsonlLine:
     def test_invalid_json(self):
         assert _parse_jsonl_line("not json") is None
 
+
+class TestProvenanceDowngradeRoundTrip:
+    """Issue #656: the provenance_downgrade marker must survive the
+    JSONL -> Judgment -> PrincipleEvidence-dict round-trip so it reaches the
+    report JSON (and from there the dashboard)."""
+
+    def test_parse_reads_provenance_downgrade(self):
+        line = json.dumps({
+            "p": "R-FT-2", "t": "violation", "d": "security",
+            "file": "f.py", "line": 1, "reason": "r", "severity": "major",
+            "provenance_downgrade": True,
+        })
+        result = _parse_jsonl_line(line)
+        assert result is not None
+        j, _ = result
+        assert j.provenance_downgrade is True
+
+    def test_parse_defaults_provenance_downgrade_false(self):
+        result = _parse_jsonl_line(_evidence_line())
+        assert result is not None
+        j, _ = result
+        assert j.provenance_downgrade is False
+
+    def test_judgment_to_dict_emits_marker_only_when_true(self):
+        from quodeq.core.events.models import Judgment
+        from quodeq.core.evidence._jsonl import judgment_to_dict
+
+        downgraded = Judgment(
+            practice_id="R-FT-2", verdict="violation", dimension="security",
+            file="f.py", line=1, reason="r", severity="major",
+            provenance_downgrade=True,
+        )
+        assert judgment_to_dict(downgraded)["provenance_downgrade"] is True
+
+        normal = Judgment(
+            practice_id="P1", verdict="violation", dimension="d",
+            file="f.py", line=1, reason="r",
+        )
+        assert "provenance_downgrade" not in judgment_to_dict(normal)
+
     def test_defaults(self):
         line = json.dumps({"p": "ts-001", "t": "violation"})
         result = _parse_jsonl_line(line)

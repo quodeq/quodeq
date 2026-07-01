@@ -1,8 +1,6 @@
 """Tests for FindingEnricher — pure dict transformation, no file I/O."""
 from __future__ import annotations
 
-import pytest
-
 from quodeq.analysis.mcp.enricher import (
     CompiledContext,
     FindingEnricher,
@@ -197,3 +195,53 @@ def test_dedup_key_uses_explicit_principle() -> None:
         {"p": "Custom", "file": "a.py", "line": 1, "t": "violation"}
     )
     assert key[0] == "Custom"
+
+
+# ---------------------------------------------------------------------------
+# Dimension/requirement agreement gate (#661)
+# ---------------------------------------------------------------------------
+
+def test_reroutes_finding_to_requirement_dimension() -> None:
+    """The requirement is authoritative: a finding the model declared under
+    one dimension is rerouted to the dimension its requirement belongs to
+    (multi-dimension scans populate req_to_dim across standards)."""
+    req_to_dim = {"S-CON-1": "security"}
+    result = _enricher(req_to_dim=req_to_dim).enrich(
+        {"t": "violation", "req": "S-CON-1", "d": "maintainability",
+         "severity": "critical", "file": "a.py", "line": 1}
+    )
+    assert result["d"] == "security"
+
+
+def test_does_not_reroute_correctly_filed_finding() -> None:
+    req_to_dim = {"M-MOD-1": "maintainability"}
+    result = _enricher(req_to_dim=req_to_dim).enrich(
+        {"t": "violation", "req": "M-MOD-1", "d": "maintainability",
+         "file": "a.py", "line": 1}
+    )
+    assert result["d"] == "maintainability"
+
+
+def test_keeps_declared_dimension_when_requirement_unresolvable() -> None:
+    """Single-dimension scans leave req_to_dim empty; an unresolvable req
+    cannot be rerouted, so the declared dimension is preserved (the unmapped
+    finding is quarantined downstream at principle grouping, not here)."""
+    result = _enricher(dimension="maintainability").enrich(
+        {"t": "violation", "req": "N/A", "d": "maintainability",
+         "severity": "critical", "file": "a.py", "line": 1}
+    )
+    assert result["d"] == "maintainability"
+
+
+def test_reroute_is_logged(caplog) -> None:
+    import logging
+    req_to_dim = {"S-CON-1": "security"}
+    with caplog.at_level(logging.WARNING):
+        _enricher(req_to_dim=req_to_dim).enrich(
+            {"t": "violation", "req": "S-CON-1", "d": "maintainability",
+             "severity": "critical", "file": "a.py", "line": 1}
+        )
+    assert any(
+        "security" in r.getMessage() and "maintainability" in r.getMessage()
+        for r in caplog.records
+    )

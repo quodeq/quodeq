@@ -38,4 +38,12 @@ describe('ZoomablePackView container Escape key (#1907)', () => {
     fireEvent.keyDown(svg, { key: 'Escape' });
     expect(onDrillDown).toHaveBeenCalled();
   });
+
+  it('svg container carries the viz-focusable class (suppresses stray focus ring)', () => {
+    const { container } = render(
+      <ZoomablePackView node={NODE} viewMode="violations" onDrillDown={vi.fn()} />
+    );
+    const svg = container.querySelector('svg');
+    expect(svg).toHaveClass('viz-focusable');
+  });
 });

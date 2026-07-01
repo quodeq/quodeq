@@ -52,7 +52,7 @@ function interpolateCamera(cam, tg, anim, frameCount) {
 /**
  * Manages camera state, target computation, and the animation loop for GalaxyView.
  */
-export function useGalaxyCamera({ canvasRef, scene, size, showLabels, savedNavRef, savedCamRef, navRef, prevNavRef, animRef, mouseRef, hoveredRef, frameRef }) {
+export function useGalaxyCamera({ canvasRef, scene, size, showLabels, savedNavRef, savedCamRef, navRef, prevNavRef, animRef, mouseRef, hoveredRef, focusedIdxRef, frameRef }) {
   const camRef = useRef(savedCamRef.current ? { ...savedCamRef.current } : null);
   const frameCount = useRef(0);
   const timeRef = useRef(0);
@@ -135,6 +135,7 @@ export function useGalaxyCamera({ canvasRef, scene, size, showLabels, savedNavRe
         mx: mouseRef.current.x, my: mouseRef.current.y,
         showLabels, animating: !!anim,
         rDim, rPrin, w2s,
+        focusedIdx: focusedIdxRef?.current ?? null,
         parentEl: canvasRef.current?.parentElement,
       });
       hoveredRef.current = hovered;
@@ -144,7 +145,7 @@ export function useGalaxyCamera({ canvasRef, scene, size, showLabels, savedNavRe
 
     frameRef.current = requestAnimationFrame(frame);
     return () => { running = false; cancelAnimationFrame(frameRef.current); };
-  }, [scene, size, showLabels, w2s, getTarget, canvasRef, navRef, prevNavRef, animRef, mouseRef, hoveredRef, frameRef, getFitZoom]);
+  }, [scene, size, showLabels, w2s, getTarget, canvasRef, navRef, prevNavRef, animRef, mouseRef, hoveredRef, focusedIdxRef, frameRef, getFitZoom]);
 
   return { camRef, w2s, startTransition, getTarget };
 }

@@ -6,7 +6,7 @@
 </p>
 
 <h2 align="center">AI-powered code quality and security scanner</h2>
-<p align="center"><strong>v1.4.0</strong></p>
+<p align="center"><strong>v1.5.0</strong></p>
 <p align="center">
   <a href="https://github.com/quodeq/quodeq/actions/workflows/test.yml"><img src="https://github.com/quodeq/quodeq/actions/workflows/test.yml/badge.svg" alt="Tests" /></a>
   <a href="https://github.com/quodeq/quodeq/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
@@ -143,6 +143,43 @@ quodeq evaluate /path/to/project
 quodeq evaluate /path/to/project --scope src/api    # Scoped to a subdirectory
 quodeq evaluate /path/to/project -d security        # Single dimension
 ```
+
+### SARIF / GitHub code scanning
+
+Quodeq can emit findings as [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
+for GitHub code scanning (the Security tab), GitLab SAST, or any SARIF
+consumer. Generate it during a scan, or export it from a past run:
+
+```bash
+quodeq evaluate . --sarif quodeq.sarif            # during a scan
+quodeq export sarif --evaluation-dir <dir> -o quodeq.sarif   # from existing reports
+```
+
+Code snippets are omitted by default (so source never leaves your machine on
+upload); pass `--with-snippets` to include them. Use `--min-severity` to drop
+low-severity findings.
+
+Upload to GitHub code scanning:
+
+```yaml
+- run: quodeq evaluate . --sarif quodeq.sarif
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: quodeq.sarif
+```
+
+---
+
+## Updates
+
+Quodeq checks for new versions once a day in the background (PyPI for
+`pip`/`pipx`/`uv` installs, GitHub Releases for the macOS/Windows apps) and
+shows a dismissible notice with the right upgrade step. It never auto-replaces
+itself and sends no telemetry — the only network call is an unauthenticated
+request to PyPI/GitHub.
+
+Disable it by setting `QUODEQ_NO_UPDATE_NOTIFIER=1`, or toggle "Automatic
+checks" off under Settings → Updates.
 
 ---
 

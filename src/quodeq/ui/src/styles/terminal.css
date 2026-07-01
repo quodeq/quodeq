@@ -1496,16 +1496,42 @@ button.term-sev-badge--clickable:focus-visible {
   min-height: 0;
   overflow-y: auto;
 }
-/* Full-width topbar: align breadcrumb with dashboard content below.
-   Only reserve 96px (traffic-light chrome + sidebar rail) when we're
-   running inside the pywebview native shell on macOS. In a regular
-   browser the OS draws its own chrome outside the viewport, so the
-   topbar can start flush-left against the sidebar rail. */
+/* Full-width topbar: align breadcrumb with dashboard content below. */
 .app-shell--with-topbar .topbar {
   padding-left: var(--term-space-3);
 }
+/* In the macOS native shell the window is frameless and the topbar runs to
+   the top edge with the native traffic lights floating over its left. Reserve
+   space so the breadcrumb clears the lights, and tint the topbar toward the
+   theme accent so the unified titlebar visibly carries the theme. */
+.platform-mac.in-webview {
+  /* Taller titlebar to match the macOS unified toolbar (added in
+     _webview_window.py), which drops the native traffic lights to ~32px and
+     keeps them centered there across resize (no per-frame repositioning).
+     With the unified-compact toolbar the native lights sit at ~20px, so a
+     40px bar centers them exactly — a slim, well-proportioned titlebar with
+     the lights perfectly centered, anchored (no repositioning, no jump). */
+  --app-header-h: 40px;
+}
 .platform-mac.in-webview .app-shell--with-topbar .topbar {
-  padding-left: 96px;
+  padding-left: 82px;
+}
+/* Topbar and sidebar share one cohesive chrome color: plain surface, no tint. */
+.platform-mac.in-webview .topbar,
+.platform-mac.in-webview .sidebar {
+  background: var(--color-surface);
+}
+/* In macOS fullscreen the OS hides the traffic lights, so the light reservation
+   becomes a dead gap and the topbar's bottom border reads as a stray gray line
+   across the top. Drop both in fullscreen only — the windowed chrome above is
+   untouched. The `.macos-fullscreen` class is toggled by the native window's
+   fullscreen observer (see _webview_window.py _install_macos_fullscreen_observer);
+   a JS heuristic can't tell fullscreen from a zoomed window on a notched Mac. */
+.platform-mac.in-webview.macos-fullscreen .app-shell--with-topbar .topbar {
+  padding-left: var(--term-space-3);
+}
+.platform-mac.in-webview.macos-fullscreen .topbar {
+  border-bottom-color: transparent;
 }
 
 /* ============================================================
@@ -1794,8 +1820,8 @@ button.term-sev-badge--clickable:focus-visible {
   border-radius: var(--term-radius);
   font-variant-numeric: tabular-nums;
   /* Constant min-width so single-digit counts don't render as a tiny dot,
-     plus a max-width as a final safety net (the JSX caps display at
-     "999+", so this should never actually ellipsize in practice). */
+     plus a max-width as a final safety net (the JSX collapses thousands to a
+     compact "k" form, so this should never actually ellipsize in practice). */
   min-width: 22px;
   max-width: 48px;
   text-align: center;
@@ -1835,17 +1861,6 @@ button.term-sev-badge--clickable:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
-.sidebar-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-text-muted);
-}
-.sidebar-dot--ok   { background: var(--color-success); }
-.sidebar-dot--warn { background: var(--color-warning); }
-.sidebar-dot--err  { background: var(--color-danger); }
-
 /* ============================================================
    TopBar — replaces ProjectHeader
    ============================================================ */
@@ -1861,10 +1876,6 @@ button.term-sev-badge--clickable:focus-visible {
   font-family: var(--term-font-mono);
   font-size: 13px;
 }
-/* Frameless pywebview window: the topbar acts as the OS-style title bar.
-   The drag itself is wired via the `pywebview-drag-region` class on the
-   <header> (pywebview's native API — works on its WKWebView, unlike
-   the Chromium-only -webkit-app-region). */
 /* --------------------------------------------------------------
    TopBar breadcrumb zone. Desktop shows the full NavBreadcrumb
    chain; mobile swaps it for a back button on the left, the
@@ -1909,6 +1920,38 @@ button.term-sev-badge--clickable:focus-visible {
   font-size: 14px;
   font-weight: 500;
   color: var(--color-text);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Mobile project indicator: the tappable accent label that mirrors the
+   desktop breadcrumb root. The surrounding title sets pointer-events:none on
+   mobile, so the button re-enables them for itself. */
+.topbar-mobile-project {
+  flex: 0 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: var(--color-accent);
+  font-weight: 500;
+  cursor: pointer;
+  pointer-events: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topbar-mobile-sep {
+  flex: 0 0 auto;
+  margin: 0 5px;
+  color: var(--color-text-subtle);
+  opacity: 0.55;
+}
+.topbar-mobile-page {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -1969,13 +2012,24 @@ button.term-sev-badge--clickable:focus-visible {
 
 .topbar-dot {
   display: inline-block;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
+  box-sizing: border-box;
   background: var(--color-text-muted);
 }
 .topbar-dot--ok  { background: var(--color-success); }
-.topbar-dot--err { background: var(--color-danger); }
+/* Offline reads as a hollow ring so it stays distinguishable from "running"
+   without relying on the red/green hue alone (WCAG 1.4.1, use of color). */
+.topbar-dot--err { background: transparent; border: 2px solid var(--color-danger); }
+
+/* Wrapper makes the 8px dot a comfortable hover/tooltip target and keeps it
+   vertically centered as the leading item in the actions row. */
+.topbar-status-dot {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 2px;
+}
 
 .topbar-btn {
   display: inline-flex;
@@ -2108,21 +2162,6 @@ button.term-sev-badge--clickable:focus-visible {
   border-color: var(--color-text-muted);
 }
 
-/* Mobile-extras slot inside the sidebar footer (server status, provider). */
-.sidebar-mobile-extras {
-  padding-top: var(--term-space-2);
-  margin-top: var(--term-space-2);
-  border-top: 1px dotted color-mix(in srgb, var(--color-border) 60%, transparent);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 11px;
-}
-.sidebar-mobile-extras__grid {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
 .dim-score-panel--terminal .dim-score-rows {
   display: flex;
   flex-direction: column;
@@ -2339,4 +2378,59 @@ button.term-sev-badge--clickable:focus-visible {
 }
 .eval-job-stat-strip .term-stat__value {
   font-size: 18px;
+}
+
+/* ------------------------------------------------------------
+   PeriodSelect: Day / Week / Month grouping selector
+   ------------------------------------------------------------ */
+.term-period-select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.term-period-select {
+  appearance: none;
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  line-height: 1;
+  padding: var(--term-space-1) calc(var(--term-space-3) + 6px) var(--term-space-1) var(--term-space-2);
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+.term-period-select:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+.term-period-select:focus {
+  outline: none;
+}
+.term-period-select:focus-visible {
+  outline: none;
+  border-color: var(--color-text-muted);
+}
+.term-period-select__caret {
+  position: absolute;
+  right: var(--term-space-2);
+  font-size: 9px;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------
+   RunHistoryPanel: score-history chart with grouping selector
+   ------------------------------------------------------------ */
+.run-history-panel--terminal .run-history-panel__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--term-space-3);
+}
+.run-history-panel--terminal .run-history-panel__sparse {
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin: 0;
 }

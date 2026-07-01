@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { collapseByDay, collectDayDimensions, buildDailyRuns } from './dailyGrouping.js';
+import {
+  collapseByDay, collectDayDimensions, buildDailyRuns,
+  bucketKey, isoWeekKey, collapseByPeriod, collectPeriodDimensions, buildPeriodRuns,
+} from './dailyGrouping.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -139,4 +142,115 @@ test('buildDailyRuns: all runs on same day returns one entry', () => {
   const result = buildDailyRuns(runs, trend);
   assert.equal(result.length, 1);
   assert.equal(result[0].runId, 'r1');
+});
+
+// ---------------------------------------------------------------------------
+// New test fixtures for day/week/month grouping
+// ---------------------------------------------------------------------------
+
+// Runs spanning 3 days / 3 ISO-weeks / 3 months (newest-first).
+const MULTI = [
+  { runId: 'm1', dateISO: '2026-05-02T12:00:00', dimensions: ['security'] },        // Sat W18, 2026-05
+  { runId: 'm2', dateISO: '2026-04-14T18:00:00', dimensions: ['maintainability'] }, // Tue W16, 2026-04
+  { runId: 'm3', dateISO: '2026-04-14T09:00:00', dimensions: ['reliability'] },     // Tue W16 (older same day)
+  { runId: 'm4', dateISO: '2026-03-25T14:00:00', dimensions: ['security'] },        // Wed W13, 2026-03
+  { runId: 'm5', dateISO: '2026-03-23T10:00:00', dimensions: ['performance'] },     // Mon W13, 2026-03
+];
+
+const MULTI_RUNS = [
+  { runId: 'm1', dateLabel: '2 May 2026' },
+  { runId: 'm2', dateLabel: '14 Apr 2026' },
+  { runId: 'm3', dateLabel: '14 Apr 2026' },
+  { runId: 'm4', dateLabel: '25 Mar 2026' },
+  { runId: 'm5', dateLabel: '23 Mar 2026' },
+];
+
+// ---------------------------------------------------------------------------
+// isoWeekKey
+// ---------------------------------------------------------------------------
+
+test('isoWeekKey: ISO week with Monday start', () => {
+  assert.equal(isoWeekKey('2026-03-23T10:00:00'), '2026-W13'); // Monday
+  assert.equal(isoWeekKey('2026-03-25T14:00:00'), '2026-W13'); // Wednesday same week
+  assert.equal(isoWeekKey('2026-04-14T18:00:00'), '2026-W16');
+  assert.equal(isoWeekKey('2026-01-05T00:00:00'), '2026-W02');
+});
+
+test('isoWeekKey: year-boundary week belongs to the ISO year of its Thursday', () => {
+  assert.equal(isoWeekKey('2025-12-29T00:00:00'), '2026-W01'); // Mon whose Thu is 2026-01-01
+  assert.equal(isoWeekKey('2026-01-01T00:00:00'), '2026-W01'); // Thursday
+  assert.equal(isoWeekKey('2026-01-04T00:00:00'), '2026-W01'); // Sunday, still W01
+});
+
+test('isoWeekKey: missing/empty date returns empty string', () => {
+  assert.equal(isoWeekKey(''), '');
+  assert.equal(isoWeekKey(null), '');
+});
+
+// ---------------------------------------------------------------------------
+// bucketKey
+// ---------------------------------------------------------------------------
+
+test('bucketKey: day/week/month keys', () => {
+  assert.equal(bucketKey('2026-03-25T14:00:00', 'day'), '2026-03-25');
+  assert.equal(bucketKey('2026-03-25T14:00:00', 'month'), '2026-03');
+  assert.equal(bucketKey('2026-03-25T14:00:00', 'week'), '2026-W13');
+  assert.equal(bucketKey('2026-03-25T14:00:00'), '2026-03-25'); // default day
+  assert.equal(bucketKey('', 'week'), '');
+});
+
+// ---------------------------------------------------------------------------
+// collapseByPeriod
+// ---------------------------------------------------------------------------
+
+test('collapseByPeriod: day matches collapseByDay (no-op parity)', () => {
+  assert.deepEqual(collapseByPeriod(TREND, 'day'), collapseByDay(TREND));
+});
+
+test('collapseByPeriod: week keeps newest run per ISO week', () => {
+  const result = collapseByPeriod(MULTI, 'week');
+  assert.deepEqual(result.map((r) => r.runId), ['m1', 'm2', 'm4']);
+});
+
+test('collapseByPeriod: month keeps newest run per month', () => {
+  const result = collapseByPeriod(MULTI, 'month');
+  assert.deepEqual(result.map((r) => r.runId), ['m1', 'm2', 'm4']);
+});
+
+// ---------------------------------------------------------------------------
+// collectPeriodDimensions
+// ---------------------------------------------------------------------------
+
+test('collectPeriodDimensions: month gathers all dims in the run\'s month', () => {
+  const dims = collectPeriodDimensions(MULTI, 'm4', 'month'); // 2026-03: m4 + m5
+  assert.equal(dims.size, 2);
+  assert.ok(dims.has('security'));
+  assert.ok(dims.has('performance'));
+});
+
+test('collectPeriodDimensions: week gathers all dims in the run\'s ISO week', () => {
+  const dims = collectPeriodDimensions(MULTI, 'm2', 'week'); // W16: m2 + m3
+  assert.equal(dims.size, 2);
+  assert.ok(dims.has('maintainability'));
+  assert.ok(dims.has('reliability'));
+});
+
+test('collectPeriodDimensions: day matches collectDayDimensions', () => {
+  assert.deepEqual(
+    [...collectPeriodDimensions(TREND, 'r3', 'day')].sort(),
+    [...collectDayDimensions(TREND, 'r3')].sort(),
+  );
+});
+
+// ---------------------------------------------------------------------------
+// buildPeriodRuns
+// ---------------------------------------------------------------------------
+
+test('buildPeriodRuns: month keeps newest run per month', () => {
+  const result = buildPeriodRuns(MULTI_RUNS, MULTI, 'month');
+  assert.deepEqual(result.map((r) => r.runId), ['m1', 'm2', 'm4']);
+});
+
+test('buildPeriodRuns: day matches buildDailyRuns', () => {
+  assert.deepEqual(buildPeriodRuns(AVAILABLE_RUNS, TREND, 'day'), buildDailyRuns(AVAILABLE_RUNS, TREND));
 });

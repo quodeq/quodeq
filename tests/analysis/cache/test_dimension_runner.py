@@ -35,6 +35,7 @@ from quodeq.analysis.cache import (
     build_cache_key_for_file,
 )
 from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache._failure_streak import CircuitBreakerError
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 from quodeq.analysis.subagents.runner import DimensionCallbacks
 from quodeq.core.evidence.model import Evidence
@@ -1003,6 +1004,111 @@ class TestEvidenceFileCreatedBeforeBreaker:
         )
 
 
+class TestCacheReplayAppliesProvenanceGate:
+    """Issue #657: findings replayed from a pre-#639 cache entry must pass
+    through the deterministic provenance gate too.
+
+    The live finding path gates in ``FindingEnricher.enrich()``, but cache
+    replay (``_write_findings``) writes cached findings straight to the
+    per-dim JSONL and the event log, bypassing ``enrich()``. A stale,
+    un-gated ``critical`` R-FT-2 / S-AUT-3 finding produced by an older
+    quodeq version would otherwise replay at ``critical`` and inflate the
+    grade. Re-gating on the replay write path keeps cached and
+    freshly-dispatched findings consistent.
+    """
+
+    @staticmethod
+    def _cached_critical(file: str, reason: str) -> dict:
+        return {
+            "file": file, "line": 1, "t": "violation",
+            "w": "Unguarded index access", "p": "Fault Tolerance",
+            "d": "security", "req": "R-FT-2", "severity": "critical",
+            "snippet": "arr[idx]", "reason": reason,
+        }
+
+    @staticmethod
+    def _findings_in(jsonl: Path) -> list[dict]:
+        return [
+            json.loads(ln) for ln in jsonl.read_text().splitlines()
+            if ln.strip() and "_marker" not in ln
+        ]
+
+    def _replay_all_hits(
+        self, tmp_path: Path, cache: LocalFileBackend, reason: str,
+    ) -> tuple[RunConfig, FakeDispatcher]:
+        config, src = _setup(tmp_path, {"a.py": "x"})
+        key = build_cache_key_for_file(config, "a.py", "security")
+        cache.put(key, CacheEntry(
+            key=key, schema_version=1,
+            findings=[self._cached_critical("a.py", reason)],
+            files_read=1, file_path="a.py", dimension="security",
+            model_id="test-model",
+        ))
+        dispatcher = FakeDispatcher(src)
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=dispatcher,
+        ):
+            process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+            )
+        assert dispatcher.calls == [], "all-hits path must not dispatch"
+        return config, dispatcher
+
+    def test_cached_critical_without_external_source_is_downgraded(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        # A pre-#639 critical R-FT-2 whose reason names no external ingress
+        # source -- "argument" is deliberately NOT a trust-boundary term.
+        config, _ = self._replay_all_hits(
+            tmp_path, cache,
+            "Index derived from a function argument with no bounds check.",
+        )
+
+        jsonl = (config.work_dir or config.src) / "security_evidence.jsonl"
+        findings = self._findings_in(jsonl)
+        assert len(findings) == 1
+        assert findings[0]["severity"] == "major", (
+            "cache-replayed critical R-FT-2 without an external source must "
+            "be downgraded to major by the provenance gate"
+        )
+        assert findings[0].get("provenance_downgrade") is True
+
+        # The gated severity must also reach the event log -- that's the
+        # path the SQL projection / grade reads, so a stale critical here
+        # would still inflate the score even after the JSONL was fixed.
+        events_log = (config.work_dir or config.src).parent / "events.jsonl"
+        events = [
+            json.loads(ln) for ln in events_log.read_text().splitlines()
+            if ln.strip()
+        ] if events_log.exists() else []
+        judgments = [e for e in events if e.get("event_type") == "JUDGMENT_CREATED"]
+        assert judgments, "cache replay must emit a JUDGMENT_CREATED event"
+        assert judgments[0]["payload"]["severity"] == "major", (
+            "the gated severity must reach events.jsonl, not the stale critical"
+        )
+
+    def test_cached_critical_naming_external_source_is_preserved(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        # Same finding, but the reason names a reachable external source --
+        # the gate must leave it critical.
+        config, _ = self._replay_all_hits(
+            tmp_path, cache,
+            "Index taken straight from the HTTP request body, unvalidated.",
+        )
+
+        jsonl = (config.work_dir or config.src) / "security_evidence.jsonl"
+        findings = self._findings_in(jsonl)
+        assert len(findings) == 1
+        assert findings[0]["severity"] == "critical", (
+            "a cache-replayed critical naming an external source must NOT be "
+            "downgraded"
+        )
+        assert "provenance_downgrade" not in findings[0]
+
+
 class TestFilesReadReflectsAnalyzedCount:
     """files_read on the returned Evidence must equal the number of source
     files reproducible from cache at run end — NOT len(input_files)."""
@@ -1137,3 +1243,93 @@ class TestFilesReadReflectsAnalyzedCount:
         assert ev.files_read == 1, (
             f"expected files_read=1 (just the cache hit), got {ev.files_read}"
         )
+
+
+def _finding_line(file: str) -> str:
+    """A realistic violation finding (the producer's compact schema) that the
+    evidence parser groups under principle ``Adaptability``."""
+    return json.dumps({
+        "schema_version": 1, "req": "F-ADP-1", "t": "violation",
+        "file": file, "line": 1, "severity": "minor",
+        "w": "hardcoded value", "snippet": "x = 1",
+        "reason": "hardcoded environment-specific value",
+        "p": "Adaptability", "d": "flexibility",
+    })
+
+
+class _SalvageDispatcher:
+    """Writes one real finding + N consecutive error markers to trip the breaker.
+
+    Models a dimension whose model calls start failing after some real work
+    has already been persisted to the JSONL.
+    """
+
+    def __init__(self, n_errors: int) -> None:
+        self.n_errors = n_errors
+
+    def __call__(self, config, dim_id, idx, ctx, callbacks):
+        jsonl = (config.work_dir or config.src) / f"{dim_id}_evidence.jsonl"
+        jsonl.parent.mkdir(parents=True, exist_ok=True)
+        with jsonl.open("a") as out:
+            out.write(_finding_line("a.py") + "\n")
+            out.write(json.dumps(
+                {"_marker": "file_done", "file": "a.py", "status": "ok"}) + "\n")
+            for i in range(self.n_errors):
+                out.write(json.dumps({
+                    "_marker": "file_done", "file": f"e{i}.py",
+                    "status": "error", "reason": "model call failed",
+                }) + "\n")
+        return None
+
+
+class _AllErrorsDispatcher:
+    """Writes only error markers — nothing to salvage."""
+
+    def __init__(self, n_errors: int) -> None:
+        self.n_errors = n_errors
+
+    def __call__(self, config, dim_id, idx, ctx, callbacks):
+        jsonl = (config.work_dir or config.src) / f"{dim_id}_evidence.jsonl"
+        jsonl.parent.mkdir(parents=True, exist_ok=True)
+        with jsonl.open("a") as out:
+            for i in range(self.n_errors):
+                out.write(json.dumps({
+                    "_marker": "file_done", "file": f"e{i}.py",
+                    "status": "error", "reason": "model call failed",
+                }) + "\n")
+        return None
+
+
+class TestBreakerSalvage:
+    @pytest.fixture(autouse=True)
+    def _reset_cancel(self):
+        from quodeq.shared import cancellation
+        cancellation.reset()
+        yield
+        cancellation.reset()
+
+    def test_breaker_trip_salvages_partial_evidence(self, tmp_path, cache):
+        config, _src = _setup(tmp_path, {"a.py": "x"})
+        config = replace(
+            config, options=replace(config.options, failure_streak_threshold=3))
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=_SalvageDispatcher(n_errors=3),
+        ):
+            ev = process_dimension_with_cache(
+                config, "flexibility", 1, _make_ctx(), _make_callbacks(), cache=cache)
+        assert ev is not None, "breaker trip should salvage collected findings, not discard"
+        assert ev.exit_reason == "failure_streak"
+        assert ev.principles, "salvaged Evidence should carry the collected findings"
+
+    def test_breaker_trip_with_no_findings_raises(self, tmp_path, cache):
+        config, _src = _setup(tmp_path, {"a.py": "x"})
+        config = replace(
+            config, options=replace(config.options, failure_streak_threshold=3))
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=_AllErrorsDispatcher(n_errors=3),
+        ):
+            with pytest.raises(CircuitBreakerError):
+                process_dimension_with_cache(
+                    config, "flexibility", 1, _make_ctx(), _make_callbacks(), cache=cache)

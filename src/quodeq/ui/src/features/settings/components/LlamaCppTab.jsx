@@ -118,7 +118,7 @@ export default function LlamaCppTab({ state, update }) {
               <span className="settings-description">Estimated from your VRAM. Run a quick test for a more accurate number.</span>
             </div>
             <div className="settings-budget-control">
-              <input type="number" className="settings-model-input" min={MIN_SUBAGENTS} max={MAX_SUBAGENTS} value={state.subagents} onChange={(e) => update('subagents', e.target.value)} />
+              <input type="number" aria-label="Max parallel agents" className="settings-model-input" min={MIN_SUBAGENTS} max={MAX_SUBAGENTS} value={state.subagents} onChange={(e) => update('subagents', e.target.value)} />
               <button type="button" className="settings-action-btn" onClick={runTest} disabled={testing || !models.length}>
                 {testing ? 'Testing...' : 'Auto-detect'}
               </button>

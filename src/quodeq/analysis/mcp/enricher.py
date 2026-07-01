@@ -6,17 +6,26 @@ all transformation here and keeps only routing concerns (dedup, I/O, events).
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
 from quodeq.analysis.mcp.enrichment import enrich_code
+from quodeq.analysis.mcp.provenance_gate import apply_provenance_gate
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
 from quodeq.context.path_role import NON_PROD_ROLES, path_role
 from quodeq.context.precedent import fingerprint as _precedent_fingerprint
 from quodeq.context.project_shape import Deployment, ProjectShape
 
+_logger = logging.getLogger(__name__)
+
 _FINDING_SCHEMA_VERSION = 1
+# These downweights set `confidence`, a UI/triage signal ONLY: confidence drives
+# the dashboard's "Low confidence" grouping and does NOT affect the grade (it is
+# excluded from the scoring fields -- see _report_constants._VIOLATION_FIELDS and
+# #640). Severity, set by the analysis LLM and enforced by the provenance gate
+# (#639), is the lever that moves the score.
 _NON_PROD_DOWNWEIGHT = 50
 _SHAPE_DOWNWEIGHT = 40
 _PRECEDENT_DOWNWEIGHT = 25
@@ -164,11 +173,26 @@ class FindingEnricher:
         if not args.get("p") and req and req in self._reqs:
             finding["p"] = self._reqs[req]["principle"]
 
-        if not args.get("d"):
-            if req and req in self._req_to_dim:
-                finding["d"] = self._req_to_dim[req]
-            elif self._dimension:
-                finding["d"] = self._dimension
+        # The requirement is authoritative for a finding's dimension. When a
+        # requirement maps to a dimension (multi-dimension scans populate
+        # req_to_dim across standards), use it even if the model declared a
+        # different dimension -- this reroutes a misfiled finding to where it is
+        # actually scored, rather than letting a, say, security issue land under
+        # maintainability. Falls back to the model's value, then the scanned
+        # dimension. (An unresolvable requirement that cannot be rerouted is
+        # quarantined downstream at principle grouping.)
+        req_dim = self._req_to_dim.get(req) if req else None
+        declared = args.get("d")
+        if req_dim:
+            if declared and declared != req_dim:
+                _logger.warning(
+                    "Rerouting finding from declared dimension %r to %r per "
+                    "requirement %r (severity=%s, file=%s)",
+                    declared, req_dim, req, args.get("severity"), args.get("file"),
+                )
+            finding["d"] = req_dim
+        elif not declared and self._dimension:
+            finding["d"] = self._dimension
 
         if req and req in self._refs:
             finding["req_refs"] = select_best_refs(
@@ -179,5 +203,6 @@ class FindingEnricher:
         _apply_path_role_downweight(finding)
         _apply_shape_downweight(finding, self._project_shape)
         _apply_precedent_downweight(finding, self._precedent_fingerprints)
+        apply_provenance_gate(finding)  # deterministic critical-severity gate (#639)
 
         return finding

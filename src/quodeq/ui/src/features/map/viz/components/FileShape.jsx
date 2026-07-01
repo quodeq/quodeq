@@ -29,6 +29,7 @@ export default function FileShape({ cx, cy, r, color, borderColor, glow, handler
       transform={`translate(${cx},${cy}) scale(${scale})`}
     >
       <path
+        className={handlers?.onClick ? 'viz-focusable' : undefined}
         d={BODY}
         fill={color} fillOpacity={FILE_FILL_OPACITY} stroke={stroke} strokeWidth={0.8 / totalScale}
         filter={glow ? 'url(#glow)' : undefined}

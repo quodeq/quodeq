@@ -31,7 +31,14 @@ function CweList({ filtered, onSelect, onClose }) {
   return (
     <div className="cwe-browser-list">
       {filtered.map((c) => (
-        <div key={c.id} className="cwe-browser-item" onClick={() => { onSelect(c); onClose(); }}>
+        <div
+          key={c.id}
+          className="cwe-browser-item"
+          onClick={() => { onSelect(c); onClose(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(c); onClose(); } }}
+          role="button"
+          tabIndex={0}
+        >
           <div className="cwe-browser-item-header">
             <span className="cwe-browser-item-id">CWE-{c.id}</span>
             <span className="cwe-browser-item-abstraction">{c.abstraction}</span>

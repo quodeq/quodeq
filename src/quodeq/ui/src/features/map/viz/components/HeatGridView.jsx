@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import HeatGridCells from './HeatGridCells.jsx';
+import HeatGridCells from '../../../../components/HeatGridCells.jsx';
 import { ICON_FOLDER } from '../../../../constants/navigation.jsx';
 
 const COL_NAME = 'name';
@@ -68,7 +68,14 @@ export default function HeatGridView({ node, onDrillDown, onFileClick, onCellCli
         <thead>
           <tr>
             {COLUMNS.map((col) => (
-              <th key={col.id} className={`heat-grid-th-sort${col.align === 'left' ? ' left' : ''}`} onClick={() => handleSort(col.id)}>
+              <th
+                key={col.id}
+                className={`heat-grid-th-sort viz-focusable${col.align === 'left' ? ' left' : ''}`}
+                onClick={() => handleSort(col.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSort(col.id); } }}
+                tabIndex={0}
+                aria-sort={sortCol === col.id ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
                 {col.label}{sortCol === col.id ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
               </th>
             ))}
@@ -81,7 +88,7 @@ export default function HeatGridView({ node, onDrillDown, onFileClick, onCellCli
               <tr key={row.path}>
                 <td>
                   <div
-                    className={`heat-grid-file${canDrill || row.isFile ? ' clickable' : ''}`}
+                    className={`heat-grid-file${canDrill || row.isFile ? ' clickable viz-focusable' : ''}`}
                     role={canDrill || row.isFile ? 'button' : undefined}
                     tabIndex={canDrill || row.isFile ? 0 : undefined}
                     onClick={() => canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row)}

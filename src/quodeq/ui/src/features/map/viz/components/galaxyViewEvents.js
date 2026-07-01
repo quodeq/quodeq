@@ -110,3 +110,115 @@ export function handleCanvasClick(e, refs, scene, size, navigateTo, startTransit
     saveNav();
   }
 }
+
+/**
+ * The nodes a keyboard user can move focus across at the current depth.
+ * Depth 0 → dimension stars; depth 1 → the active dimension's principles;
+ * depth 2 (zoomed into a single principle) has no siblings to traverse.
+ *
+ * @param {object|null} scene - The scene data
+ * @param {object} nav - Navigation state { depth, dim, prin }
+ * @returns {Array} focusable node objects (may be empty)
+ */
+export function focusableNodes(scene, nav) {
+  if (!scene) return [];
+  if (nav.depth === 0) return scene.stars ?? [];
+  if (nav.depth === 1 && nav.dim !== null && nav.dim !== undefined) {
+    return scene.principles?.[nav.dim] ?? [];
+  }
+  return [];
+}
+
+function announceNode(announce, node, idx, total) {
+  if (!announce || !node) return;
+  const score = typeof node.score === 'number' ? `, score ${node.score.toFixed(1)}` : '';
+  announce(`${node.name}${score}, ${idx + 1} of ${total}`);
+}
+
+/**
+ * Build keyboard handlers for the galaxy canvas (a11y, #675).
+ *
+ * The canvas has no per-node DOM, so focus is tracked as an index into the
+ * current depth's node list (`focusedIdxRef`) and the renderer draws a ring
+ * on it. Arrow keys move focus across siblings; Enter/Space drills in via the
+ * same `navigateTo` the mouse click uses; Escape steps back up. Movements are
+ * announced through an aria-live region so screen-reader users get feedback.
+ *
+ * @param {object} refs - { navRef, animRef, focusedIdxRef }
+ * @param {object} params - { scene, navigateTo, startTransition, saveNav, announce }
+ * @returns {{ handleKeyDown: Function, handleFocus: Function, handleBlur: Function }}
+ */
+export function createKeyboardHandlers(refs, params) {
+  const { navRef, animRef, focusedIdxRef } = refs;
+  const { scene, navigateTo, startTransition, saveNav, announce } = params;
+
+  function focusAt(idx) {
+    const nodes = focusableNodes(scene, navRef.current);
+    if (!nodes.length) return;
+    const clamped = ((idx % nodes.length) + nodes.length) % nodes.length;
+    focusedIdxRef.current = clamped;
+    announceNode(announce, nodes[clamped], clamped, nodes.length);
+  }
+
+  function move(delta) {
+    const nodes = focusableNodes(scene, navRef.current);
+    if (!nodes.length) return;
+    const cur = focusedIdxRef.current;
+    focusAt(cur === null ? (delta > 0 ? 0 : nodes.length - 1) : cur + delta);
+  }
+
+  function activate() {
+    const nav = navRef.current;
+    const nodes = focusableNodes(scene, nav);
+    const idx = focusedIdxRef.current;
+    if (idx === null || !nodes[idx]) return;
+    const node = nodes[idx];
+    if (nav.depth === 0) navigateTo(1, idx);
+    else if (nav.depth === 1) navigateTo(2, nav.dim, idx);
+    else return;
+    focusedIdxRef.current = null;
+    if (announce) announce(`Opened ${node.name}`);
+  }
+
+  function goUp() {
+    const nav = navRef.current;
+    if (nav.depth === 2) { navigateTo(1, nav.dim); announce?.('Returned to principles'); }
+    else if (nav.depth === 1) { navigateTo(0); announce?.('Returned to galaxy overview'); }
+    else if (nav.clusterCx != null) {
+      nav.clusterCx = null; nav.clusterCy = null;
+      startTransition(true); saveNav();
+      announce?.('Returned to galaxy overview');
+    } else return false;
+    focusedIdxRef.current = null;
+    return true;
+  }
+
+  function handleKeyDown(e) {
+    if (animRef.current) return; // mid-transition: let the camera settle first
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        e.preventDefault(); move(1); break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        e.preventDefault(); move(-1); break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault(); activate(); break;
+      case 'Escape':
+        if (goUp() !== false) e.preventDefault();
+        break;
+      default: break;
+    }
+  }
+
+  function handleFocus() {
+    if (focusedIdxRef.current === null) focusAt(0);
+  }
+
+  function handleBlur() {
+    focusedIdxRef.current = null;
+  }
+
+  return { handleKeyDown, handleFocus, handleBlur };
+}

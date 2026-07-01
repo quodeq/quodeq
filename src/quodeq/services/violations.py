@@ -137,7 +137,7 @@ def resolve_dimension_eval(
     eval_path = base / "evaluation" / f"{dimension}.json"
     if _exists(eval_path):
         return _filter_dismissed_from_result(
-            parse_eval_from_json(eval_path, project, run_id, dimension),
+            parse_eval_from_json(eval_path, project, run_id, dimension, compiled_dir=compiled_dir),
             dkeys, delkeys, dimension,
         )
 

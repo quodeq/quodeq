@@ -18,9 +18,14 @@ _DEFAULT_PATH = str(default_rate_limit_path())
 class FileRateLimitStore:
     """Rate-limit store backed by a JSON file.
 
-    Suitable for single-machine multi-worker deployments where processes
-    need to share rate-limit state without Redis.  Not recommended for
-    high-throughput production use.
+    Lets the workers of a single-machine deployment share rate-limit state
+    through a common file without Redis. NOTE: the ``threading.Lock`` below
+    only serializes access within a SINGLE process; under multiple worker
+    processes the file read-modify-write can still interleave, so the counts
+    are best-effort (a concurrent burst may slip a few requests past the
+    limit) rather than strictly exact across processes. Not recommended for
+    high-throughput production use; add OS-level file locking
+    (``fcntl.flock``) if exact cross-process enforcement is required.
     """
 
     def __init__(

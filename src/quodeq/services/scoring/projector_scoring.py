@@ -145,9 +145,14 @@ def compute_run_score(
 
     Applies per-dimension weights when params enable them.
     """
+    # Dimensions aborted by the failure-streak circuit breaker carry a
+    # provisional, structurally-optimistic score (the errored files are the
+    # ones with no findings). Show the per-dim score but keep it OUT of the
+    # overall grade. time_limit and other partial reasons still count.
     pairs = [
         (d.get("dimension"), d["score"])
-        for d in dimension_scores if d.get("score") is not None
+        for d in dimension_scores
+        if d.get("score") is not None and d.get("exit_reason") != "failure_streak"
     ]
     avg = dimension_weighted_average(pairs, params)
     if avg is None:

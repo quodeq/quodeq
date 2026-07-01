@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.core.events.models import Judgment
+
+_logger = logging.getLogger(__name__)
 
 _SEV_RANKS = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 
@@ -43,8 +46,25 @@ def _build_req_to_principle_map(dimension: str, evaluators_dir: Path | None = No
                 if rid and pname:
                     mapping[rid] = pname
         return mapping
-    except (OSError, ValueError):
+    except (OSError, ValueError, AttributeError, TypeError):
+        # AttributeError/TypeError: a valid-JSON-but-non-dict payload (a list
+        # or null at the top level, or non-dict principle/requirement items)
+        # makes .get() raise. The contract is an empty map on any malformed
+        # input so callers stay permissive, never a crash.
         return {}
+
+
+def principle_names_for_dimension(
+    dimension: str, evaluators_dir: Path | None = None,
+) -> set[str]:
+    """Return the principle names defined by *dimension*'s standard.
+
+    Empty when the standard is unavailable, so callers stay permissive (no
+    standard to validate against) rather than dropping everything. The
+    *evaluators_dir* must be supplied by the caller; the core layer does not
+    resolve paths itself.
+    """
+    return {p for p in _build_req_to_principle_map(dimension, evaluators_dir).values() if p}
 
 
 def _group_judgments(
@@ -53,12 +73,26 @@ def _group_judgments(
     evaluators_dir: Path | None = None,
 ) -> _GroupedJudgments:
     req_to_principle = _build_req_to_principle_map(dimension, evaluators_dir) if dimension else {}
+    canonical = {p for p in req_to_principle.values() if p}
     sc_violations: dict[str, list[Judgment]] = {}
     sc_compliance: dict[str, list[Judgment]] = {}
     sc_severity: dict[str, str] = {}
 
     for j in judgments:
         principle = req_to_principle.get(j.practice_id, j.practice_id)
+        # When the dimension has a standard, a finding whose principle is not
+        # one the standard defines is unmappable: quarantine it (keep it out of
+        # principle scoring) and log, so a misfiled finding -- a critical, in the
+        # worst case -- is never silently turned into a phantom principle (e.g.
+        # an "N/A" card on the dashboard). Without a standard (canonical empty),
+        # stay permissive and group by the raw principle.
+        if canonical and principle not in canonical:
+            _logger.warning(
+                "Quarantining unmapped %s finding in dimension %r: principle %r "
+                "not in standard (practice_id=%r, req=%r, file=%s)",
+                j.severity or "?", dimension, principle, j.practice_id, j.req, j.file,
+            )
+            continue
         if j.verdict == "violation":
             sc_violations.setdefault(principle, []).append(j)
         elif j.verdict == "compliance":

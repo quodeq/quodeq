@@ -30,11 +30,11 @@ function Logo() {
 }
 
 // Cap the count badge text so the absolutely-positioned chip can't grow
-// past the rail edge. Anything four digits or more reads as "999+", and
-// the title carries the exact number.
+// past the rail edge. Thousands collapse to a compact "k" form (1200 -> "1k",
+// 12500 -> "13k"), and the title carries the exact number.
 function formatNavCount(count) {
   if (count == null) return null;
-  if (count >= 1000) return '999+';
+  if (count >= 1000) return `${Math.round(count / 1000)}k`;
   return String(count);
 }
 
@@ -89,15 +89,10 @@ export default function Sidebar({
   historyCount = null,
   standardsCount = null,
   lastEvalAt = null,
-  serverConnected = null,
   /* Controlled pin state — when provided, the parent owns the toggle.
      Falls back to internal state when the parent doesn't care. */
   isPinned: controlledPinned,
   onPinChange,
-  /* Optional mobile-only extras rendered inside the drawer. Desktop still
-     shows these in the TopBar; on mobile the TopBar strips them so the bar
-     stays tidy, and the drawer surfaces them here instead. */
-  mobileExtras = null,
 }) {
   const [internalPinned, setInternalPinned] = useState(false);
   const isPinned = controlledPinned != null ? controlledPinned : internalPinned;
@@ -178,18 +173,6 @@ export default function Sidebar({
                 <span className="sidebar-status-label">Last eval</span>
                 <span className="sidebar-status-value">{lastEvalStr}</span>
               </div>
-            )}
-            {serverConnected != null && (
-              <div className="sidebar-status-row">
-                <span className="sidebar-status-label">Server</span>
-                <span className="sidebar-status-value">
-                  <span className={`sidebar-dot ${serverConnected ? 'sidebar-dot--ok' : 'sidebar-dot--err'}`} aria-hidden="true" />
-                  {serverConnected ? 'running' : 'offline'}
-                </span>
-              </div>
-            )}
-            {mobileExtras && (
-              <div className="sidebar-mobile-extras">{mobileExtras}</div>
             )}
           </div>
           <div className="sidebar-nav sidebar-block sidebar-block--flush">

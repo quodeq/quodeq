@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { gradeLetter } from '../../../utils/formatters.js';
-import { SectionLabel } from '../../../components/terminal/index.js';
+import { gradeLetter, formatPeriodLabel } from '../../../utils/formatters.js';
+import { SectionLabel, PeriodSelect } from '../../../components/terminal/index.js';
 import {
   ComposedChart,
   Area,
@@ -26,14 +26,16 @@ import {
 
 const MAX_CHART_RUNS = 20;
 const CHART_HEIGHT = 160;
+const GRANULARITY_SUFFIX = { day: 'd', week: 'w', month: 'mo' };
 
 
-function buildTrendData(trend, selectedRunId) {
+function buildTrendData(trend, selectedRunId, granularity = 'day') {
   return [...trend].slice(0, MAX_CHART_RUNS).reverse().map((row, i, arr) => {
     const numericAverage = parseFloat(row.numericAverage);
     return {
       ...row,
       numericAverage,
+      periodLabel: formatPeriodLabel(row, granularity),
       delta: i > 0 ? numericAverage - parseFloat(arr[i - 1].numericAverage) : null,
     };
   });
@@ -48,7 +50,7 @@ function RunHistoryTooltip({ active, payload }) {
   const grade = gradeLetter(entry.overallGrade);
   return (
     <div className="run-history-tooltip">
-      <span className="rht-date">{entry.dateLabel}</span>
+      <span className="rht-date">{entry.periodLabel || entry.dateLabel}</span>
       <span className="rht-score">{score} - {grade}</span>
     </div>
   );
@@ -125,10 +127,12 @@ function ScoreHistoryChart({ data, interaction }) {
         <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<RunHistoryTooltip />} />
         {/* Soft horizontal reference lines at 25% / 50% / 75% of the range —
             kept as subtle grid anchors even though the numeric ticks are
-            hidden. */}
-        <ReferenceLine y={REF_LINE_LOW}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.45} />
-        <ReferenceLine y={REF_LINE_MID}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.45} />
-        <ReferenceLine y={REF_LINE_HIGH} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.45} />
+            hidden. The 0% / 100% bounds are drawn a touch stronger. */}
+        <ReferenceLine y={0}             stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
+        <ReferenceLine y={REF_LINE_LOW}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.2} />
+        <ReferenceLine y={REF_LINE_MID}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
+        <ReferenceLine y={REF_LINE_HIGH} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.2} />
+        <ReferenceLine y={10}            stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
         <Area dataKey="numericAverage" type="monotone" fill="url(#scoreAreaGrad)" stroke="none" isAnimationActive={false} />
         <ScoreBars data={data} hoveredIndex={hoveredIndex} selectedRunId={selectedRunId} />
         <Line isAnimationActive={false} dataKey="numericAverage" type="monotone" stroke={cssVar('--color-accent')} strokeOpacity={0.9} strokeWidth={2} dot={<SelectedDot selectedRunId={selectedRunId} />} activeDot={false} />
@@ -137,29 +141,44 @@ function ScoreHistoryChart({ data, interaction }) {
   );
 }
 
-export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBarClick }) {
+export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBarClick, granularity = 'day', onGranularityChange }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   // Hooks must run in the same order every render, so compute before any early return.
-  const data = useMemo(() => buildTrendData(trend, selectedRunId), [trend, selectedRunId]);
+  const data = useMemo(() => buildTrendData(trend, selectedRunId, granularity), [trend, selectedRunId, granularity]);
 
-  if (!trend || trend.length < 2) return null;
+  // The parent only mounts this panel when there are ≥2 days of data, so an
+  // empty trend shouldn't happen — but guard the truly-empty case. A single
+  // bucket (e.g. all runs fall in one month) still renders the header so the
+  // selector stays reachable; only the chart body + MIN/MAX/AVG are hidden.
+  if (!trend || trend.length < 1) return null;
 
-  const min = Math.min(...data.map((d) => d.numericAverage).filter((n) => !Number.isNaN(n)));
-  const max = Math.max(...data.map((d) => d.numericAverage).filter((n) => !Number.isNaN(n)));
-  const avg = data.reduce((s, d) => s + (Number.isNaN(d.numericAverage) ? 0 : d.numericAverage), 0) / data.length;
+  const hasChart = data.length >= 2;
+  const suffix = GRANULARITY_SUFFIX[granularity] || 'd';
+  let stats = null;
+  if (hasChart) {
+    const min = Math.min(...data.map((d) => d.numericAverage).filter((n) => !Number.isNaN(n)));
+    const max = Math.max(...data.map((d) => d.numericAverage).filter((n) => !Number.isNaN(n)));
+    const avg = data.reduce((s, d) => s + (Number.isNaN(d.numericAverage) ? 0 : d.numericAverage), 0) / data.length;
+    stats = `MIN ${min.toFixed(1)} / MAX ${max.toFixed(1)} / AVG ${avg.toFixed(1)}`;
+  }
 
   return (
     <section className="run-history-panel run-history-panel--terminal panel" aria-label="Score history chart">
       <div className="run-history-panel__header">
-        <SectionLabel>score_history · {data.length}d</SectionLabel>
-        <span className="run-history-panel__stats">
-          MIN {min.toFixed(1)} / MAX {max.toFixed(1)} / AVG {avg.toFixed(1)}
+        <SectionLabel>score_history · {data.length}{suffix}</SectionLabel>
+        <span className="run-history-panel__controls">
+          {onGranularityChange && <PeriodSelect value={granularity} onChange={onGranularityChange} />}
+          {stats && <span className="run-history-panel__stats">{stats}</span>}
         </span>
       </div>
-      <ScoreHistoryChart
-        data={data}
-        interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }}
-      />
+      {hasChart ? (
+        <ScoreHistoryChart
+          data={data}
+          interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }}
+        />
+      ) : (
+        <p className="run-history-panel__sparse">Only one {granularity} of data — choose a finer grouping to see a trend.</p>
+      )}
     </section>
   );
 }

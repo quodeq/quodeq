@@ -26,7 +26,11 @@ def recompute_summary(
 
     for d in dimensions:
         score_str = d.get("overallScore")
-        if score_str:
+        # A failure_streak dimension carries a provisional, optimistic score
+        # (its errored files contribute no findings). Tally its violations
+        # below, but keep it out of the overall numeric average. Other
+        # exit_reasons (time_limit, etc.) still count.
+        if score_str and d.get("exitReason") != "failure_streak":
             val = parse_numeric_score(score_str)
             if val is not None:
                 score_pairs.append((d.get("dimension"), val))

@@ -21,11 +21,11 @@ _INSERT_FINDING = """
 INSERT OR IGNORE INTO findings (
     schema_version, practice_id, dimension, requirement, verdict, severity,
     file, line, end_line, title, reason, snippet, violation_type, context,
-    scope, req_refs_json, dedup_key, confidence
+    scope, req_refs_json, dedup_key, confidence, provenance_downgrade
 ) VALUES (
     :schema_version, :practice_id, :dimension, :requirement, :verdict, :severity,
     :file, :line, :end_line, :title, :reason, :snippet, :violation_type, :context,
-    :scope, :req_refs_json, :dedup_key, :confidence
+    :scope, :req_refs_json, :dedup_key, :confidence, :provenance_downgrade
 )
 """
 
@@ -202,9 +202,11 @@ class SQLiteStateStore:
                 )
             for d_score in dimension_rows:
                 conn.execute(
-                    "INSERT INTO dimension_scores (dimension, score, grade, completed_at) "
-                    "VALUES (?, ?, ?, datetime('now'))",
-                    (d_score["dimension"], d_score["score"], d_score["grade"]),
+                    "INSERT INTO dimension_scores "
+                    "(dimension, score, grade, exit_reason, completed_at) "
+                    "VALUES (?, ?, ?, ?, datetime('now'))",
+                    (d_score["dimension"], d_score["score"], d_score["grade"],
+                     d_score.get("exit_reason")),
                 )
             conn.commit()
 
@@ -217,9 +219,13 @@ class SQLiteStateStore:
     def read_dimension_scores(self) -> list[dict]:
         with open_evaluation_db(self._run_dir) as conn:
             rows = conn.execute(
-                "SELECT dimension, score, grade FROM dimension_scores ORDER BY dimension"
+                "SELECT dimension, score, grade, exit_reason "
+                "FROM dimension_scores ORDER BY dimension"
             ).fetchall()
-        return [{"dimension": r[0], "score": r[1], "grade": r[2]} for r in rows]
+        return [
+            {"dimension": r[0], "score": r[1], "grade": r[2], "exit_reason": r[3]}
+            for r in rows
+        ]
 
     def read_principle_grades(self) -> list[dict]:
         with open_evaluation_db(self._run_dir) as conn:

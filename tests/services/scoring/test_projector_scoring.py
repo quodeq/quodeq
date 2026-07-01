@@ -238,7 +238,11 @@ def test_compute_dimension_score_with_custom_thresholds_changes_grade():
 
 
 def test_compute_run_score_applies_dimension_weights_when_enabled():
-    params = dataclasses.replace(DEFAULT_PARAMS, dimension_weights_enabled=True)
+    params = dataclasses.replace(
+        DEFAULT_PARAMS,
+        dimension_weights_enabled=True,
+        dimension_weights={"security": 1.2, "performance": 0.8},
+    )
     from quodeq.services.scoring.projector_scoring import compute_run_score
     dims = [
         {"dimension": "security", "score": 8.0},
@@ -264,7 +268,11 @@ def test_summary_builders_agree_under_dimension_weights():
     from quodeq.data.fs.report_parser._summary import summarize_dimensions
     from quodeq.services.scoring import _build_summary_from_dim_dicts
 
-    params = dataclasses.replace(DEFAULT_PARAMS, dimension_weights_enabled=True)
+    params = dataclasses.replace(
+        DEFAULT_PARAMS,
+        dimension_weights_enabled=True,
+        dimension_weights={"security": 1.2, "performance": 0.8},
+    )
 
     dims = [
         DimensionResult(dimension="security", overall_grade="Good", overall_score="8.0/10"),
@@ -322,7 +330,11 @@ def test_recompute_summary_applies_dimension_weights_when_enabled():
     performance 0.8) → 7.2, not the plain mean 7.0."""
     from quodeq.services.scoring._summary import recompute_summary
 
-    params = dataclasses.replace(DEFAULT_PARAMS, dimension_weights_enabled=True)
+    params = dataclasses.replace(
+        DEFAULT_PARAMS,
+        dimension_weights_enabled=True,
+        dimension_weights={"security": 1.2, "performance": 0.8},
+    )
     dims = [
         {"dimension": "security", "overallScore": "8.0/10", "overallGrade": "Good"},
         {"dimension": "performance", "overallScore": "6.0/10", "overallGrade": "Adequate"},

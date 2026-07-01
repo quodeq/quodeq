@@ -11,6 +11,7 @@
  */
 import { useSidePane } from '../features/side-pane/index.js';
 import { FileTextIcon, SparkleIcon } from './CopyButton.jsx';
+import ServerStatusDot from './ServerStatusDot.jsx';
 
 function SidePaneSpecButton({ type, label, icon, modifier }) {
   const ctx = useSidePane();
@@ -43,10 +44,6 @@ function ReportToolbarButton() {
 
 function FixPlanToolbarButton() {
   return <SidePaneSpecButton type="fixplan" label="Fix plan" icon={<SparkleIcon />} modifier="fixplan" />;
-}
-
-function Dot({ ok }) {
-  return <span className={`topbar-dot ${ok ? 'topbar-dot--ok' : 'topbar-dot--err'}`} aria-hidden="true" />;
 }
 
 function BurgerIcon() {
@@ -94,6 +91,7 @@ export default function TopBar({
   evaluating = false,
   onProviderClick,
   onMenuToggle,
+  onSelectProject,
   breadcrumb = null,
   mobileTitle = '',
   canGoBack = false,
@@ -121,13 +119,32 @@ export default function TopBar({
         </button>
       )}
 
-      {/* Desktop: full breadcrumb chain. Mobile: just the current page title. */}
+      {/* Desktop: full breadcrumb chain. Mobile: tappable project + current
+          page title. The breadcrumb slot is display:none on mobile and this
+          row is display:none on desktop, so only one project control is ever
+          live per viewport. */}
       {breadcrumb && <div className="topbar-breadcrumb-slot">{breadcrumb}</div>}
-      <div className="topbar-mobile-title" aria-hidden={!mobileTitle}>{mobileTitle}</div>
+      <div className="topbar-mobile-title" aria-hidden={!mobileTitle && !projectName}>
+        {projectName && onSelectProject && (
+          <button
+            type="button"
+            className="topbar-mobile-project"
+            onClick={onSelectProject}
+            title="Open projects"
+          >
+            {projectName}
+          </button>
+        )}
+        {projectName && onSelectProject && mobileTitle && (
+          <span className="topbar-mobile-sep" aria-hidden="true">/</span>
+        )}
+        {mobileTitle && <span className="topbar-mobile-page">{mobileTitle}</span>}
+      </div>
 
       <div className="topbar-spacer" />
 
       <div className="topbar-actions">
+        <ServerStatusDot connected={serverConnected} url={serverUrl} />
         <FixPlanToolbarButton />
         <ReportToolbarButton />
 

@@ -213,3 +213,28 @@ class TestMakeLruDimensionFetcher:
         assert results[1] is not None
         # Only one disk read should have occurred
         assert call_count["n"] == 1
+
+
+def test_make_lru_dimension_fetcher_uses_custom_reader():
+    """A custom reader is invoked instead of read_run_data, and results cache."""
+    import threading
+    from collections import OrderedDict
+
+    from quodeq.core.types import DimensionResult
+    from quodeq.services._cache import make_lru_dimension_fetcher
+
+    calls: list[str] = []
+
+    def fake_reader(reports_root, project, run_id):
+        calls.append(run_id)
+        return [DimensionResult(dimension="security", overall_score="9.0/10", overall_grade="Good")]
+
+    fetcher = make_lru_dimension_fetcher(
+        Path("/reports"), "proj", OrderedDict(), threading.Lock(), 8, reader=fake_reader,
+    )
+    result = fetcher("r1")
+    result_again = fetcher("r1")  # served from cache, reader not called twice
+
+    assert [d.overall_score for d in result] == ["9.0/10"]
+    assert result_again == result
+    assert calls == ["r1"]  # cached: reader ran exactly once

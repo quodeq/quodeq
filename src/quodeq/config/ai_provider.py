@@ -81,7 +81,12 @@ def _write_env(paths: ConfigPaths, provider: str, api_key_var: str, api_key_valu
     fd, tmp_path = tempfile.mkstemp(dir=str(paths.env_file.parent), suffix=".tmp")
     closed = False
     try:
-        os.fchmod(fd, _OWNER_RW_PERMS)
+        # os.fchmod is POSIX-only; on Windows it is absent. The
+        # post-replace os.chmod below carries the 0600 guarantee on POSIX,
+        # and mkstemp already creates the temp file 0600, so skipping
+        # fchmod on Windows loses no hardening.
+        if hasattr(os, "fchmod"):
+            os.fchmod(fd, _OWNER_RW_PERMS)
         os.write(fd, ("\n".join(lines) + "\n").encode())
         os.close(fd)
         closed = True

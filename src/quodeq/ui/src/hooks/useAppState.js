@@ -1,7 +1,8 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useDashboard } from '../features/dashboard/hooks/useDashboard.js';
 import { usePrefetchAdjacentRuns } from '../features/dashboard/hooks/usePrefetchAdjacentRuns.js';
-import { buildDailyRuns } from '../utils/dailyGrouping.js';
+import { buildPeriodRuns } from '../utils/dailyGrouping.js';
+import { readScoreHistoryGranularity, writeScoreHistoryGranularity } from '../utils/scoreHistoryPrefs.js';
 import { useServerHealth } from './useServerHealth.js';
 import { useNavStack } from './useNavStack.js';
 import { useRunNavigator } from './useRunNavigator.js';
@@ -97,6 +98,11 @@ export function useAppState() {
     selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject,
   } = projectBundle;
   const settings = useAppSettings();
+  const [granularity, setGranularity] = useState(() => readScoreHistoryGranularity());
+  const handleGranularityChange = useCallback((next) => {
+    setGranularity(next);
+    writeScoreHistoryGranularity(next);
+  }, []);
   const isHistoryRun = activePage.page === 'history-run';
   const isHistoryTab = activePage.page === 'history';
   const effectiveRun = isHistoryRun ? historySelectedRun : selectedRun;
@@ -107,30 +113,36 @@ export function useAppState() {
   // usually nearly identical. The dashboard-refreshing class dims the
   // page during the background refetch so the user sees that something
   // is happening without the jarring full-screen LoadingScreen.
-  const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, refreshDashboard } = useDashboard({
+  const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, refreshDashboard, refreshDashboardActive } = useDashboard({
     selectedProject,
     selectedRun: effectiveRun,
     keepPlaceholder: !isHistoryRun && !isHistoryTab,
   });
   const { dailyRuns: rawDailyRuns, headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => ({
-    dailyRuns: buildDailyRuns(availableRuns, dashboard?.trend || []),
+    dailyRuns: buildPeriodRuns(availableRuns, dashboard?.trend || [], granularity),
     ...computeDerivedState(accumulated, dashboard, selectedProject, projects),
-  }), [availableRuns, dashboard, accumulated, selectedProject, projects]);
-  const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, activePage.page, setSelectedRun);
+  }), [availableRuns, dashboard, accumulated, selectedProject, projects, granularity]);
+  const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, activePage.page, setSelectedRun, granularity);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: visibleDailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const prefetchHandlers = usePrefetchAdjacentRuns({ selectedProject, availableRuns: visibleDailyRuns, overviewRunIndex });
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
 
-  // Refresh all dashboard data (including latestAccumulated) when an evaluation finishes
+  // Refresh all dashboard data (including latestAccumulated) when an evaluation
+  // finishes. This uses the *active* refetch (not the lazy refreshDashboard the
+  // dismiss path uses): the Overview's useDashboard observer is mounted here at
+  // the app root and never remounts on tab navigation, so a mark-stale-only
+  // invalidation would never actually refetch while the user stays on the same
+  // project — leaving the Overview on the stale pre-run payload until a project
+  // switch. A completed run is exactly when a real refetch is warranted.
   const evalRefreshedRef = useRef(null);
   useEffect(() => {
     const job = evalLifecycle.job;
     const finished = job && job.status !== 'running' && job.outputRunId;
     if (finished && evalRefreshedRef.current !== job.outputRunId) {
       evalRefreshedRef.current = job.outputRunId;
-      refreshDashboard();
+      refreshDashboardActive();
     }
-  }, [evalLifecycle.job, refreshDashboard]);
+  }, [evalLifecycle.job, refreshDashboardActive]);
 
   const activeTab = KNOWN_TABS.includes(activePage.page) ? activePage.page
     : activePage.sourceTab && KNOWN_TABS.includes(activePage.sourceTab) ? activePage.sourceTab
@@ -148,5 +160,6 @@ export function useAppState() {
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
     historySelectedRun, setHistorySelectedRun,
     evalLifecycle, settings, activeTab, showProjectHeader, showRunNav, refreshDashboard,
+    granularity, onGranularityChange: handleGranularityChange,
   };
 }

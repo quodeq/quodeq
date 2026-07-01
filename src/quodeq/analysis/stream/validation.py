@@ -24,6 +24,8 @@ def get_mcp_status(stream_file: Path) -> str | None:
             if not isinstance(d, dict):
                 return None
             for srv in d.get("mcp_servers", []):
+                if not isinstance(srv, dict):
+                    continue  # skip a non-dict element, keep scanning the rest
                 if srv.get("name") == _MCP_SERVER_NAME:
                     return srv.get("status")
     except (json.JSONDecodeError, OSError) as exc:
@@ -38,6 +40,8 @@ def _is_error_event(line: str, stream_file: Path) -> bool | None:
     except json.JSONDecodeError as exc:
         log_debug(f"Skipping malformed stream line in {stream_file}: {exc}")
         return None
+    if not isinstance(d, dict):
+        return False  # a valid-JSON non-object line is not an error event
     if d.get("type") == "result" and d.get("is_error"):
         return True
     return False
