@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -22,13 +23,16 @@ def build_chat_env(env: dict | None = None) -> dict:
 
 def scratch_cwd(base: Path) -> Path:
     cwd = Path(base) / "assistant-scratch"
-    cwd.mkdir(parents=True, exist_ok=True)
+    if cwd.exists():
+        shutil.rmtree(cwd)
+    cwd.mkdir(parents=True)
     return cwd
 
 
 def assert_no_dangerous_args(argv: list[str]) -> None:
     for token in argv:
-        if token in _DANGEROUS:
+        candidates = [token, *token.split("=")]
+        if any(c in _DANGEROUS for c in candidates):
             raise AssertionError(f"assistant spawn must never use {token!r}")
 
 
