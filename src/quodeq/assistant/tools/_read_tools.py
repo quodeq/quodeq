@@ -9,15 +9,6 @@ from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 from quodeq.services.standards import StandardsService
 
-# NOTE: deviates from the task brief, which listed "requirement" here. The
-# `Finding` dataclass (src/quodeq/core/types/finding.py) has no `requirement`
-# attribute -- the requirement id is stored as `req` (see
-# data/sqlite/_row_mappers.py row_to_finding: `req=row.get("requirement")`).
-# Using "requirement" would raise AttributeError on every call.
-_FINDING_FIELDS = ("dimension", "req", "severity", "file", "line",
-                   "reason", "snippet")
-
-
 def _require_run(ctx: ToolContext):
     if ctx.run_dir is None or not ctx.run_dir.exists():
         raise ToolError("no run selected for this session")
@@ -27,8 +18,12 @@ def _require_run(ctx: ToolContext):
 def _search_findings(ctx: ToolContext, query: str, limit: int = 20) -> dict:
     run_dir = _require_run(ctx)
     hits = SqliteFindingsRepository(run_dir).search(query, limit=min(int(limit), 50))
+    # Model-facing key is "requirement"; the Finding attribute is `req`
+    # (see data/sqlite/_row_mappers.py row_to_finding).
     return {"findings": [
-        {k: getattr(f, k) for k in _FINDING_FIELDS} for f in hits
+        {"dimension": f.dimension, "requirement": f.req, "severity": f.severity,
+         "file": f.file, "line": f.line, "reason": f.reason, "snippet": f.snippet}
+        for f in hits
     ]}
 
 

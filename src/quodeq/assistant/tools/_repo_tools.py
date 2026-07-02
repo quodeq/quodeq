@@ -29,7 +29,8 @@ def _read_repo_file(ctx: ToolContext, path: str) -> dict:
     target = _jail(ctx, path)
     if not target.is_file():
         raise ToolError(f"not a file: {path}")
-    raw = target.read_bytes()[: _MAX_FILE_BYTES + 1]
+    with target.open("rb") as fh:
+        raw = fh.read(_MAX_FILE_BYTES + 1)
     if b"\x00" in raw[:1024]:
         raise ToolError("binary file")
     truncated = len(raw) > _MAX_FILE_BYTES

@@ -10,12 +10,14 @@ from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
 
 def _finding(**over):
+    # FindingsRouter wire dict: short keys per finding_dict_to_row
+    # (src/quodeq/data/sqlite/_row_mappers.py).
     base = {
-        "practice_id": "req-1", "dimension": "security", "requirement": "req-1",
-        "verdict": "violation", "severity": "major", "file": "src/a.py",
-        "line": 3, "end_line": 3, "title": "t", "reason": "sql injection risk",
-        "snippet": "cur.execute(q)", "violation_type": "code", "context": "",
-        "scope": "file", "req_refs_json": "[]", "confidence": 0.9,
+        "p": "req-1", "d": "security", "req": "req-1",
+        "t": "violation", "severity": "major", "file": "src/a.py",
+        "line": 3, "end_line": 3, "w": "t", "reason": "sql injection risk",
+        "snippet": "cur.execute(q)", "vt": "code", "context": "",
+        "scope": "file", "req_refs": [], "confidence": 90,
         "provenance_downgrade": 0,
     }
     base.update(over)
@@ -58,6 +60,8 @@ def test_search_findings(ctx):
     (hit,) = out["result"]["findings"]
     assert hit["file"] == "src/a.py"
     assert hit["severity"] == "major"
+    assert hit["dimension"] == "security"
+    assert hit["requirement"] == "req-1"
 
 
 def test_search_findings_without_run(ctx):
