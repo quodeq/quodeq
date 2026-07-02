@@ -39,3 +39,12 @@ describe('HelpPage providers section', () => {
     expect(screen.getByRole('heading', { level: 3, name: /omlx on Apple Silicon/ })).toBeInTheDocument();
   });
 });
+
+describe('HelpPage settings section', () => {
+  it('documents update notifications', () => {
+    render(<HelpPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(screen.getByRole('heading', { level: 3, name: 'Updates' })).toBeInTheDocument();
+    expect(screen.getByText(/QUODEQ_NO_UPDATE_NOTIFIER/)).toBeInTheDocument();
+  });
+});

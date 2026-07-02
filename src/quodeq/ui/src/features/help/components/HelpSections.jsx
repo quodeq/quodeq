@@ -507,6 +507,8 @@ export function Settings() {
         <li><strong>Cloud</strong> hosted APIs (OpenRouter or a custom OpenAI-compatible endpoint). API key, base URL, model id, and a <em>Test connection</em> button.</li>
         <li><strong>CLI</strong> local AI CLIs you have authenticated (Claude Code, Codex). Pick the binary, then a model id.</li>
         <li><strong>Ollama</strong> models on your local Ollama server. Quodeq lists whatever you have pulled.</li>
+        <li><strong>llama.cpp</strong> a local llama-server instance. Shows the GGUF currently loaded.</li>
+        <li><strong>Omlx</strong> an MLX-native local server. The tab appears only on Apple Silicon Macs.</li>
       </ul>
       <p>Each tab also exposes <strong>sub-agent count</strong> and a <strong>time budget</strong> default. Start an evaluation and you can override these per-run.</p>
 
@@ -518,6 +520,17 @@ export function Settings() {
 
       <h3>Appearance</h3>
       <p>Light or dark mode plus a theme family selector. Themes change accent colors and surface tones; layout stays the same.</p>
+
+      <h3>Updates</h3>
+      <p>Quodeq checks PyPI and GitHub once a day for a newer version. When one exists, a banner appears at the top of the dashboard and the <em>Updates</em> section shows the version jump plus the exact upgrade command for your install (pipx, uv, or Homebrew). Dismissing the banner silences that version; the next release brings it back.</p>
+      <ul>
+        <li><strong>check now</strong> asks immediately, ignoring the daily throttle.</li>
+        <li><strong>Automatic checks</strong> turns the daily background check on or off.</li>
+        <li>Set <code>QUODEQ_NO_UPDATE_NOTIFIER=1</code> to disable automatic checks and CLI notices entirely.</li>
+      </ul>
+
+      <h3>Grade formula</h3>
+      <p>The <em>Grade formula</em> section opens the formula editor, where severity weights, curve shape, grade boundaries, and dimension weights live. See the <strong>Grade Formula</strong> help section for the full tour.</p>
 
       <h3>About</h3>
       <p>Version info, links to docs and the repo, and the kill-switch environment variables you can set if you need to disable side features. Most users will not need this section.</p>
