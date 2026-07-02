@@ -31,3 +31,11 @@ describe('HelpPage history section', () => {
     expect(screen.getByRole('heading', { level: 3, name: /Group by day, week, or month/ })).toBeInTheDocument();
   });
 });
+
+describe('HelpPage providers section', () => {
+  it('documents the omlx provider', () => {
+    render(<HelpPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'AI Providers' }));
+    expect(screen.getByRole('heading', { level: 3, name: /omlx on Apple Silicon/ })).toBeInTheDocument();
+  });
+});

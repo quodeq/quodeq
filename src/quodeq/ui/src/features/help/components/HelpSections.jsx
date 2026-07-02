@@ -169,6 +169,14 @@ export function Providers() {
         More sub-agents finish faster but use more tokens (cloud) or more VRAM (local). For local Ollama on a 32 GB machine, start with 2 or 3 and scale up only if you have headroom.
       </Tip>
 
+      <h3>omlx on Apple Silicon</h3>
+      <p>On Apple Silicon Macs an extra local option appears: <strong>Omlx</strong>, an MLX-native server that runs models tuned for unified memory. The tab only shows on supported machines.</p>
+      <ol>
+        <li>Start the server with <code>omlx serve</code> or the omlx menu bar app.</li>
+        <li>In <strong>Settings, Omlx</strong>, pick a model. The list comes from your local server; add models through the omlx admin UI at <code>http://localhost:8000/admin</code>.</li>
+        <li>Under <em>Advanced</em> you can set a custom server address, an API key, and run the parallel-agent auto-detect, which recommends a sub-agent count based on your unified memory.</li>
+      </ol>
+
       <h3>Power tiers</h3>
       <p>Each provider exposes three power levels that map to model size:</p>
       <KeyTable rows={[
