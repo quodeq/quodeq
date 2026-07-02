@@ -1,5 +1,6 @@
 import HelpFigure from '../../../components/HelpFigure.jsx';
 import GradeFormulaCurveFigure from './figures/GradeFormulaCurveFigure.jsx';
+import ScoreGroupingFigure from './figures/ScoreGroupingFigure.jsx';
 import gradeFormulaDark from '../../../assets/help/grade-formula.dark.webp';
 import gradeFormulaLight from '../../../assets/help/grade-formula.light.webp';
 
@@ -369,6 +370,13 @@ export function History() {
 
       <h3>The trend chart</h3>
       <p>A small chart above the list plots overall score over time, with per-dimension lines you can toggle. Hover a point to see that run's stats; click to open it.</p>
+
+      <h3>Group by day, week, or month</h3>
+      <p>The <em>score history</em> chart on the <strong>Overview</strong> groups runs per day by default. Use the selector in the chart header to switch to <strong>Week</strong> or <strong>Month</strong>. Each bar aggregates the runs of one period, tooltips carry the period label, and your choice is remembered across sessions.</p>
+      <p>If all your runs fit inside a single week or month, the chart suggests a finer grouping instead of drawing one lonely bar.</p>
+      <HelpFigure caption="The score history header. The select groups bars by day, week, or month.">
+        <ScoreGroupingFigure />
+      </HelpFigure>
 
       <h3>Run detail and the navigator</h3>
       <p>Clicking a run opens its <strong>Run Detail</strong> page: the same shell as Overview but locked to that single run. From there, the run navigator at the top lets you step <strong>previous / next / latest</strong> without going back to the list. Drill into any dimension and the Explorer keeps the run id, so you stay anchored to that snapshot.</p>

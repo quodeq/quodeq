@@ -23,3 +23,11 @@ describe('HelpPage grade formula section', () => {
     expect(screen.getByText(/RESET Q²/)).toBeInTheDocument();
   });
 });
+
+describe('HelpPage history section', () => {
+  it('documents day, week, month score grouping', () => {
+    render(<HelpPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'History & Trends' }));
+    expect(screen.getByRole('heading', { level: 3, name: /Group by day, week, or month/ })).toBeInTheDocument();
+  });
+});
