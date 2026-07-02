@@ -167,7 +167,7 @@ export default function DimensionScoreHistoryPanel({ trend = [], dimension, sele
             onBarClick={onBarClick}
           />
           <ChartKeyboardControls
-            label={`${dimension} score history — Tab to a run, Enter to open it`}
+            label={`${dimension} score history. Tab to a run, Enter to open it`}
             items={onBarClick ? data.map((d, i) => ({
               key: d.runId ?? i,
               text: `${d.dateLabel}: ${Number.isFinite(d.numericAverage) ? d.numericAverage.toFixed(1) : '?'}, grade ${gradeLetter(d.overallGrade)}${d.runId === selectedRunId ? ' (selected)' : ''}`,

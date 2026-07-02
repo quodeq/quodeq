@@ -178,7 +178,7 @@ export default function HistoryChartPanel({ trend = [], selectedRunId = null, on
           data={data}
           interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }}
         />
-        <ChartKeyboardControls label="Score history runs — Tab to a run, Enter to open it" items={kbdItems} />
+        <ChartKeyboardControls label="Score history runs. Tab to a run, Enter to open it" items={kbdItems} />
       </div>
     </section>
   );

@@ -212,7 +212,7 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, runDa
       <div className="chart-with-kbd">
         <DimensionBarChart data={data} onBarClick={onBarClick} />
         <ChartKeyboardControls
-          label="Dimension scores — Tab to a dimension, Enter to open it"
+          label="Dimension scores. Tab to a dimension, Enter to open it"
           items={onBarClick ? data.map((d, i) => ({
             key: d.dimension ?? i,
             text: `${d.dimension}: ${Number.isFinite(d.numericScore) ? d.numericScore.toFixed(1) : '?'} / 10, grade ${gradeLetter(d.overallGrade)}`,
