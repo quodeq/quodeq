@@ -177,7 +177,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBa
           interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }}
         />
       ) : (
-        <p className="run-history-panel__sparse">Only one {granularity} of data — choose a finer grouping to see a trend.</p>
+        <p className="run-history-panel__sparse">Only one {granularity} of data. Choose a finer grouping to see a trend.</p>
       )}
     </section>
   );

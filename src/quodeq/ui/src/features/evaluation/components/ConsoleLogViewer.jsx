@@ -123,7 +123,7 @@ function FollowToggle({ active, onToggle }) {
     <button
       type="button"
       className={`console-follow-btn${active ? ' console-follow-btn--active' : ''}`}
-      title={active ? 'Following — click to stop' : 'Click to follow new output'}
+      title={active ? 'Following, click to stop' : 'Click to follow new output'}
       aria-pressed={active}
       onClick={onToggle}
     >

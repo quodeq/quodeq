@@ -80,7 +80,7 @@ function StarToggle({ isVisible, standardId, onToggleVisibility }) {
     <button
       type="button"
       className={`standards-star-btn${isVisible ? ' standards-star-btn--on' : ''}`}
-      title={isVisible ? 'Enabled — click to disable' : 'Disabled — click to enable'}
+      title={isVisible ? 'Enabled, click to disable' : 'Disabled, click to enable'}
       onClick={(e) => { e.stopPropagation(); onToggleVisibility(standardId); }}
     >
       {isVisible ? ICON_STAR_FILLED : ICON_STAR_OUTLINE}

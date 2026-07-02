@@ -3,7 +3,7 @@ import { TermHeader } from '../../../../components/terminal/index.js';
 const PREVIEW_ITEMS = [
   { label: 'connect a repository', sub: 'git url or local folder' },
   { label: 'pick an ai provider', sub: 'local cli, ollama, or cloud' },
-  { label: 'pick a standard', sub: 'start with one — run more later' },
+  { label: 'pick a standard', sub: 'start with one, run more later' },
 ];
 
 export default function WelcomeStep({ onStart, onSkip }) {
