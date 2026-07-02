@@ -122,3 +122,18 @@ def test_reject_action(client, app):
 
 def test_apply_unknown_action_404(client):
     assert client.post("/api/assistant/actions/missing/apply").status_code == 404
+
+
+def test_apply_invalid_payload_400(client, app):
+    # A malformed stored draft (missing "principles") must yield a clean 400,
+    # not a 500 — import_from_file raises ValueError on validation failure.
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    invalid = {k: v for k, v in _VALID_STANDARD.items() if k != "principles"}
+    repo.create_action(action_id="a-bad", session_id="s1",
+                       action_type="create_standard",
+                       payload=invalid, content_hash="h")
+    resp = client.post("/api/assistant/actions/a-bad/apply")
+    assert resp.status_code == 400
+    assert resp.get_json()["error"]
+    assert repo.get_action("a-bad")["status"] == "drafted"

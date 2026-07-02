@@ -15,8 +15,8 @@ from quodeq.api._assistant_helpers import (
     local_provider_busy,
 )
 from quodeq.api._sse_log_helpers import sse_line
+from quodeq.assistant import get_provider_configs
 from quodeq.assistant.orchestrator import TurnRequest, run_turn
-from quodeq.llm_bridge import get_provider_configs
 from quodeq.services.standards import StandardsService
 
 _running_turns: set[str] = set()
@@ -122,7 +122,10 @@ def register_assistant_routes(app: Flask) -> None:
         # StandardsService.import_from_file returns {"status": "conflict"|"imported", ...}
         # (see src/quodeq/services/_standards_crud.py:86-105) — not a boolean "conflict"
         # key the original plan assumed.
-        result = service.import_from_file(action["payload"], force=False)
+        try:
+            result = service.import_from_file(action["payload"], force=False)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         if result.get("status") == "conflict":
             return jsonify({"error": "standard id already exists"}), 409
         repo.set_action_status(action_id, "applied")

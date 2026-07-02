@@ -6,8 +6,8 @@ from pathlib import Path
 
 from flask import Flask, current_app
 
+from quodeq.assistant import AssistantRepository
 from quodeq.assistant.tools import ToolContext
-from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 _LOCAL_PROVIDERS = frozenset({"ollama", "llamacpp", "omlx"})
 _POLL_SECONDS = 0.25
