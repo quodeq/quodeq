@@ -27,6 +27,24 @@ def test_codex_item_completed_text():
     assert assistant_text(ev) == ["hi"]
 
 
+def test_null_message_does_not_crash():
+    ev = {"type": "assistant", "message": None}
+    assert assistant_text(ev) == []
+    assert tool_uses(ev) == []
+
+
+def test_null_item_does_not_crash():
+    ev = {"type": "item.completed", "item": None}
+    assert assistant_text(ev) == []
+    assert tool_uses(ev) == []
+
+
+def test_null_content_does_not_crash():
+    ev = {"type": "assistant", "message": {"content": None}}
+    assert assistant_text(ev) == []
+    assert tool_uses(ev) == []
+
+
 def test_session_id_from_system_and_result():
     assert session_id({"type": "system", "session_id": "uuid-1"}) == "uuid-1"
     assert session_id({"type": "result", "session_id": "uuid-2"}) == "uuid-2"

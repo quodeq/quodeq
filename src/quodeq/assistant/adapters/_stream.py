@@ -29,12 +29,15 @@ def _texts_from_blocks(blocks) -> list[str]:
 def assistant_text(event: dict) -> list[str]:
     etype = event.get("type")
     if etype == "assistant":
-        return _texts_from_blocks(event.get("message", {}).get("content"))
+        msg = event.get("message")
+        blocks = msg.get("content") if isinstance(msg, dict) else None
+        return _texts_from_blocks(blocks)
     if etype == "result":
         result = event.get("result")
         return [result] if isinstance(result, str) else []
     if etype == "item.completed":
-        item = event.get("item", {})
+        item = event.get("item")
+        item = item if isinstance(item, dict) else {}
         if item.get("type") == "agent_message":
             if isinstance(item.get("text"), str):
                 return [item["text"]]
@@ -44,9 +47,11 @@ def assistant_text(event: dict) -> list[str]:
 
 def tool_uses(event: dict) -> list[str]:
     if event.get("type") == "assistant":
-        blocks = event.get("message", {}).get("content")
+        msg = event.get("message")
+        blocks = msg.get("content") if isinstance(msg, dict) else None
     elif event.get("type") == "item.completed":
-        blocks = event.get("item", {}).get("content")
+        item = event.get("item")
+        blocks = item.get("content") if isinstance(item, dict) else None
     else:
         blocks = None
     names = []
