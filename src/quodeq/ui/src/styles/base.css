@@ -15,6 +15,12 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
+  /* The dashboard runs in a native WKWebView. When the content scroller
+     (.dashboard) hits its edge, WebKit chains the overscroll to the main
+     frame and rubber-bands the WHOLE web view — sidebar and topbar included.
+     Refuse the viewport-level bounce so the app chrome stays put; the
+     content keeps its own elastic overscroll (see .dashboard below). */
+  overscroll-behavior: none;
 }
 
 /* ── Focus ────────────────────────────────────────────── */
@@ -750,6 +756,10 @@ textarea:focus {
   min-width: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  /* Keep this scroller's own elastic overscroll, but `contain` stops it from
+     chaining to the main frame so the bounce never spreads to the sidebar or
+     topbar. Pairs with `overscroll-behavior: none` on the viewport above. */
+  overscroll-behavior-y: contain;
 }
 
 /* ── Content header ───────────────────────────────────── */
