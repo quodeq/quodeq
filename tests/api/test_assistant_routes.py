@@ -55,9 +55,23 @@ def test_create_session(client):
     assert resp.get_json()["sessionId"]
 
 
-def test_create_session_rejects_unknown_and_cli_provider(client):
+def test_create_session_rejects_unknown_provider(client):
     assert client.post("/api/assistant/sessions", json={"provider": "nope"}).status_code == 400
-    assert client.post("/api/assistant/sessions", json={"provider": "claude"}).status_code == 400
+
+
+def test_create_session_accepts_cli_provider(client):
+    resp = client.post("/api/assistant/sessions", json={"provider": "claude", "model": "sonnet"})
+    assert resp.status_code == 201
+    assert resp.get_json()["sessionId"]
+
+
+def test_cli_provider_not_busy_gated(client, app, monkeypatch):
+    # even with a running job, a CLI provider session accepts a message (no single-slot contention)
+    monkeypatch.setattr("quodeq.api._assistant_helpers.local_provider_busy", lambda p: False)
+    monkeypatch.setattr("quodeq.api.assistant_routes.run_turn", lambda *a, **k: None)
+    sid = client.post("/api/assistant/sessions", json={"provider": "claude"}).get_json()["sessionId"]
+    resp = client.post(f"/api/assistant/sessions/{sid}/messages", json={"text": "hi"})
+    assert resp.status_code == 202
 
 
 def test_post_message_spawns_turn_and_streams(client, app, monkeypatch):

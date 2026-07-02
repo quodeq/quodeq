@@ -35,11 +35,16 @@ def _api_provider(provider_id: str) -> dict | None:
     return cfg
 
 
+def _known_provider(provider_id: str) -> dict | None:
+    """Any catalog entry regardless of type (api or cli); unknown ids are None."""
+    return get_provider_configs().get(provider_id)
+
+
 def register_assistant_routes(app: Flask) -> None:
     @app.post("/api/assistant/sessions")
     def create_assistant_session():
         body = request.get_json(silent=True) or {}
-        provider_cfg = _api_provider(str(body.get("provider", "")))
+        provider_cfg = _known_provider(str(body.get("provider", "")))
         if provider_cfg is None:
             return jsonify({"error": "unknown or unsupported provider"}), 400
         session_id = uuid.uuid4().hex
@@ -68,12 +73,20 @@ def register_assistant_routes(app: Flask) -> None:
                 return jsonify({"error": "a turn is already running"}), 409
             _running_turns.add(sid)
         provider_cfg = _api_provider(session["provider"]) or {}
+        catalog_cfg = _known_provider(session["provider"])
+        # CLI providers (claude/codex/gemini) have no HTTP endpoint to pin or
+        # override — the orchestrator's run_turn dispatches them internally
+        # (spawning the CLI subprocess), so apiBase/apiKey are meaningless
+        # here and left unset.
+        if catalog_cfg is not None and catalog_cfg.get("type") == "cli":
+            api_base = ""
+            api_key = None
         # Fixed-endpoint local providers (ollama/llamacpp/omlx) always talk to
         # the server's catalog api_base; a caller-supplied apiBase would let a
         # request redirect the turn (and its tool calls) at an arbitrary host.
         # Only genuinely caller-defined providers (custom, openrouter) may
         # override apiBase/apiKey from the request body.
-        if session["provider"] in _FIXED_ENDPOINT_PROVIDERS:
+        elif session["provider"] in _FIXED_ENDPOINT_PROVIDERS:
             api_base = provider_cfg.get("api_base", "")
             api_key = None
         else:
