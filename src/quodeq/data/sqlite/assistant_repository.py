@@ -20,6 +20,10 @@ class AssistantRepository:
     def __init__(self, db_path: Path) -> None:
         self._db_path = Path(db_path)
 
+    @property
+    def db_path(self) -> Path:
+        return self._db_path
+
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)

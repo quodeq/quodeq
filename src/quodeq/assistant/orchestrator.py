@@ -40,7 +40,7 @@ def _provider_type(provider: str) -> str:
 
 def _mcp_server_args(request: TurnRequest, tool_ctx: ToolContext) -> list[str]:
     return [
-        "--db-path", str(tool_ctx.repository._db_path),  # noqa: SLF001 - same data layer
+        "--db-path", str(tool_ctx.repository.db_path),
         "--session-id", request.session_id,
         "--evaluators-dir", str(tool_ctx.evaluators_dir),
         "--compiled-dir", str(tool_ctx.compiled_dir),
@@ -73,9 +73,9 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
                 messages=messages,
                 config=CliTurnConfig(
                     provider=request.provider, model=request.model,
-                    scratch_base=tool_ctx.repository._db_path.parent,  # noqa: SLF001
+                    scratch_base=tool_ctx.repository.db_path.parent,
                     mcp_server_args=_mcp_server_args(request, tool_ctx),
-                    db_path=tool_ctx.repository._db_path,  # noqa: SLF001
+                    db_path=tool_ctx.repository.db_path,
                 ),
                 session_id=request.session_id,
                 prior_session_id=(repository.get_session(request.session_id) or {}).get("cli_session_id"),

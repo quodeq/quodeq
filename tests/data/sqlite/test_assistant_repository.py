@@ -5,6 +5,10 @@ def _repo(tmp_path):
     return AssistantRepository(tmp_path / "assistant.db")
 
 
+def test_db_path_exposed(tmp_path):
+    assert AssistantRepository(tmp_path / "a.db").db_path == tmp_path / "a.db"
+
+
 def test_create_and_get_session(tmp_path):
     repo = _repo(tmp_path)
     created = repo.create_session(session_id="s1", provider="ollama", model="qwen3")
