@@ -42,7 +42,7 @@ export function BoundariesTab({ draft, update }) {
   return (
     <div>
       <span className="settings-label">GRADE LABELS</span>
-      <span className="settings-description"> drag the dividers. These labels drive every gauge and badge in the app.</span>
+      <span className="settings-description"> drag the dividers, or focus one and use the arrow keys. These labels drive every gauge and badge in the app.</span>
       <GradeBoundaryBar
         thresholds={draft.gradeThresholds}
         onChange={(t) => update({ gradeThresholds: t })}
