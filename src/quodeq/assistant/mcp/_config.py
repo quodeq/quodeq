@@ -29,7 +29,7 @@ def write_mcp_config(server_args: list[str], path: Path) -> None:
 def register_cli_mcp(cmd: str, server_args: list[str], *, separator: bool = True) -> None:
     key = f"{cmd}:{_SERVER_NAME}"
     with _lock:
-        unregister_cli_mcp(cmd)
+        _unregister_locked(cmd)
         register_cmd = [cmd, "mcp", "add", _SERVER_NAME]
         if separator:
             register_cmd.append("--")
@@ -38,7 +38,8 @@ def register_cli_mcp(cmd: str, server_args: list[str], *, separator: bool = True
         _registered.add(key)
 
 
-def unregister_cli_mcp(cmd: str) -> None:
+def _unregister_locked(cmd: str) -> None:
+    """Remove the server from a CLI's registry. Caller must hold `_lock`."""
     key = f"{cmd}:{_SERVER_NAME}"
     try:
         subprocess.run([cmd, "mcp", "remove", _SERVER_NAME],
@@ -46,3 +47,8 @@ def unregister_cli_mcp(cmd: str) -> None:
     except (OSError, subprocess.SubprocessError):
         pass
     _registered.discard(key)
+
+
+def unregister_cli_mcp(cmd: str) -> None:
+    with _lock:
+        _unregister_locked(cmd)

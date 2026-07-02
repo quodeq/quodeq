@@ -44,3 +44,22 @@ def test_tools_call_unknown_tool_is_error():
     out = _run([{"jsonrpc": "2.0", "id": 4, "method": "tools/call",
                  "params": {"name": "nope", "arguments": {}}}])
     assert out[0]["result"]["isError"] is True
+
+
+def test_dispatch_exception_answers_with_error_frame():
+    reg = _registry()
+
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError("kaboom")
+
+    reg.dispatch = _boom  # force the dispatch path to raise
+    stdin = io.StringIO(json.dumps(
+        {"jsonrpc": "2.0", "id": 7, "method": "tools/call",
+         "params": {"name": "get_scores", "arguments": {}}}) + "\n")
+    stdout, stderr = io.StringIO(), io.StringIO()
+    server.serve(reg, stdin=stdin, stdout=stdout, stderr=stderr)
+    frames = [json.loads(l) for l in stdout.getvalue().splitlines() if l.strip()]
+    assert len(frames) == 1
+    assert frames[0]["id"] == 7
+    assert frames[0]["error"]["code"] == -32603
+    assert "kaboom" in frames[0]["error"]["message"]
