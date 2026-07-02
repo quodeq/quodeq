@@ -16,7 +16,9 @@ def test_claude_chat_config():
 
 def test_codex_chat_config_is_read_only():
     cfg = load_cli_chat_config("codex")
-    assert cfg.assistant_args[:2] == ["exec", "--json"]
+    # exec is supplied by cmd_subcommand, not assistant_args (no duplicate exec token)
+    assert "exec" not in cfg.assistant_args
+    assert "--json" in cfg.assistant_args
     assert "-s" in cfg.assistant_args and cfg.assistant_args[cfg.assistant_args.index("-s") + 1] == "read-only"
     assert "--dangerously-bypass-approvals-and-sandbox" not in cfg.assistant_args
     assert cfg.resume_style == "exec-resume"

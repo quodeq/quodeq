@@ -52,6 +52,22 @@ def test_codex_turnN_exec_resume():
     assert spec.argv[-1] == "hi"
 
 
+def test_codex_turn1_full_argv():
+    spec = _spec("codex")
+    assert spec.argv == [
+        "codex", "exec", "--json", "-s", "read-only", "-a", "never",
+        "--model", "m", "hi",
+    ]
+
+
+def test_codex_turnN_full_argv():
+    spec = _spec("codex", prior_session_id="th-1")
+    assert spec.argv == [
+        "codex", "exec", "resume", "th-1", "--json", "-s", "read-only",
+        "-a", "never", "--model", "m", "hi",
+    ]
+
+
 def test_gemini_turn1_preassign_and_resume():
     spec1 = _spec("gemini")
     assert "--session-id" in spec1.argv and spec1.session_id == "sid-1"

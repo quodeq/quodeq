@@ -57,7 +57,7 @@
     "env_set_if_missing": {},
     "env_remove": [],
     "assistant": {
-      "assistant_args": ["exec", "--json", "-s", "read-only", "-a", "never"],
+      "assistant_args": ["--json", "-s", "read-only", "-a", "never"],
       "resume_style": "exec-resume",
       "session_id_source": "parse-jsonl"
     }
