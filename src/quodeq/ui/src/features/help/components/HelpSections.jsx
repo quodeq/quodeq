@@ -296,11 +296,12 @@ MINOR       src/utils.py:23     Bare except clause hides errors            CWE-3
 COMPLIANT   src/api.py:88       Parameterized query prevents injection     CWE-89
             cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))`}</pre>
 
-      <h3>Two views, one dataset</h3>
-      <p>Use the view switcher at the top of the tab:</p>
+      <h3>Three sub-tabs, one dataset</h3>
+      <p>Use the pills at the top of the tab:</p>
       <ul>
-        <li><strong>Heatgrid</strong> a dimension × severity matrix with counts per cell. Click a cell to filter by both dimension and severity at once.</li>
-        <li><strong>File tree</strong> the same findings grouped by directory, with a breadcrumb you can drill into. Useful for tracking down a single hot spot.</li>
+        <li><strong>by-dimension</strong> a table of dimensions with their principles indented below, showing critical, major, and minor counts, total violations, and health per row.</li>
+        <li><strong>by-file</strong> the same findings arranged as your directory tree, with a breadcrumb you can drill into. Useful for tracking down a single hot spot.</li>
+        <li><strong>dismissed</strong> everything you dismissed, with its reason, ready to restore or delete for good.</li>
       </ul>
 
       <h3>Drilling in</h3>

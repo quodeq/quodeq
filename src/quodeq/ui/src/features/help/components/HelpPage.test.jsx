@@ -48,3 +48,13 @@ describe('HelpPage settings section', () => {
     expect(screen.getByText(/QUODEQ_NO_UPDATE_NOTIFIER/)).toBeInTheDocument();
   });
 });
+
+describe('HelpPage violations section', () => {
+  it('describes the real sub-tabs', () => {
+    render(<HelpPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Violations & Fix Plans' }));
+    expect(screen.getByText('by-dimension')).toBeInTheDocument();
+    expect(screen.getByText('by-file')).toBeInTheDocument();
+    expect(screen.queryByText(/Heatgrid/)).toBeNull();
+  });
+});
