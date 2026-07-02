@@ -1,0 +1,101 @@
+"""Drive a CLI provider as one chat turn: hardened spawn, live stream, resume + replay."""
+from __future__ import annotations
+
+import logging
+import tempfile
+import uuid
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable
+
+from quodeq.assistant.adapters import _stream
+from quodeq.assistant.adapters._cli_command import build_turn_argv
+from quodeq.assistant.adapters._cli_config import load_cli_chat_config
+from quodeq.assistant.adapters._cli_spawn import build_chat_env, scratch_cwd, spawn_turn
+from quodeq.assistant.adapters._linereader import iter_lines
+from quodeq.assistant.mcp import _config as mcp_config
+from quodeq.data.sqlite.assistant_repository import AssistantRepository
+
+_logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class CliTurnConfig:
+    provider: str
+    model: str | None
+    scratch_base: Path
+    mcp_server_args: list[str]
+    db_path: Path
+
+
+def _latest_user(messages: list[dict]) -> str:
+    for m in reversed(messages):
+        if m["role"] == "user":
+            return m["content"]
+    return ""
+
+
+def _full_transcript(messages: list[dict]) -> str:
+    # system + all prior turns collapsed into one prompt for a fresh (no-resume) run
+    return "\n\n".join(f"[{m['role']}]\n{m['content']}" for m in messages)
+
+
+def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
+              prior_session_id: str | None, new_session_id: str,
+              repository: AssistantRepository, emit: Callable[[dict], None],
+              spawn_fn) -> tuple[str, str | None, int]:
+    mcp_config_path = None
+    if cli_cfg.mcp_style == "config-file":
+        tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+        tmp.close()
+        mcp_config_path = tmp.name
+        mcp_config.write_mcp_config(cfg.mcp_server_args, Path(mcp_config_path))
+    else:
+        mcp_config.register_cli_mcp(cli_cfg.cmd, cfg.mcp_server_args,
+                                    separator=cli_cfg.mcp_add_separator)
+    try:
+        spec = build_turn_argv(cli_cfg, prompt=prompt, model=cfg.model,
+                               mcp_config_path=mcp_config_path,
+                               prior_session_id=prior_session_id, new_session_id=new_session_id)
+        proc = spawn_fn(spec.argv, scratch_cwd(cfg.scratch_base), build_chat_env())
+        texts, parsed_sid = [], spec.session_id
+        for line in iter_lines(proc.stdout):
+            event = _stream.parse_line(line)
+            if event is None:
+                continue
+            for t in _stream.assistant_text(event):
+                texts.append(t)
+                emit({"type": "token", "text": t})
+            for name in _stream.tool_uses(event):
+                emit({"type": "tool_call", "name": name})
+            sid = _stream.session_id(event)
+            if sid:
+                parsed_sid = sid
+        returncode = proc.wait(timeout=1)
+        final = texts[-1] if texts else ""
+        if parsed_sid:
+            repository.set_cli_session_id(session_id, parsed_sid)
+        return final, parsed_sid, returncode
+    finally:
+        if mcp_config_path:
+            Path(mcp_config_path).unlink(missing_ok=True)
+        if cli_cfg.mcp_style != "config-file":
+            mcp_config.unregister_cli_mcp(cli_cfg.cmd)
+
+
+def run_cli_turn(*, messages: list[dict], config: CliTurnConfig, session_id: str,
+                 prior_session_id: str | None, repository: AssistantRepository,
+                 emit: Callable[[dict], None], spawn_fn=None) -> str:
+    spawn_fn = spawn_fn or spawn_turn
+    cli_cfg = load_cli_chat_config(config.provider)
+    final, _sid, returncode = _run_once(
+        config, cli_cfg, prompt=_latest_user(messages), session_id=session_id,
+        prior_session_id=prior_session_id, new_session_id=str(uuid.uuid4()),
+        repository=repository, emit=emit, spawn_fn=spawn_fn)
+    if prior_session_id is not None and (returncode != 0 or final == ""):
+        emit({"type": "warning", "message": "session rebuilt"})
+        final, _sid, _rc = _run_once(
+            config, cli_cfg, prompt=_full_transcript(messages), session_id=session_id,
+            prior_session_id=None, new_session_id=str(uuid.uuid4()),
+            repository=repository, emit=emit, spawn_fn=spawn_fn)
+    return final

@@ -1,0 +1,88 @@
+import io
+from pathlib import Path
+
+from quodeq.assistant.adapters._cli import CliTurnConfig, run_cli_turn
+from quodeq.data.sqlite.assistant_repository import AssistantRepository
+
+
+class FakeProc:
+    def __init__(self, lines, returncode=0):
+        self.stdout = io.StringIO("".join(l + "\n" for l in lines))
+        self.stderr = io.StringIO("")
+        self.returncode = returncode
+
+    def wait(self, timeout=None):
+        return self.returncode
+
+
+def _config(tmp_path):
+    return CliTurnConfig(provider="claude", model="sonnet", scratch_base=tmp_path,
+                         mcp_server_args=["--db-path", str(tmp_path / "a.db"),
+                                          "--session-id", "s1", "--evaluators-dir", str(tmp_path),
+                                          "--compiled-dir", str(tmp_path),
+                                          "--dimensions-file", str(tmp_path / "d.json")],
+                         db_path=tmp_path / "a.db")
+
+
+def _repo(tmp_path):
+    repo = AssistantRepository(tmp_path / "a.db")
+    repo.create_session(session_id="s1", provider="claude", model="sonnet")
+    return repo
+
+
+def test_streams_tokens_and_captures_session_id(tmp_path):
+    repo = _repo(tmp_path)
+    lines = [
+        '{"type": "system", "session_id": "claude-uuid-1"}',
+        '{"type": "assistant", "message": {"content": [{"type": "text", "text": "Hello"}]}}',
+        '{"type": "result", "result": "Hello", "session_id": "claude-uuid-1"}',
+    ]
+    frames = []
+    text = run_cli_turn(
+        messages=[{"role": "system", "content": "sys"}, {"role": "user", "content": "hi"}],
+        config=_config(tmp_path), session_id="s1", prior_session_id=None,
+        repository=repo, emit=frames.append,
+        spawn_fn=lambda argv, cwd, env: FakeProc(lines))
+    assert text == "Hello"
+    assert {"type": "token", "text": "Hello"} in frames
+    assert repo.get_session("s1")["cli_session_id"] == "claude-uuid-1"
+
+
+def test_tool_use_emits_frame(tmp_path):
+    repo = _repo(tmp_path)
+    lines = [
+        '{"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "get_scores", "input": {}}]}}',
+        '{"type": "result", "result": "done"}',
+    ]
+    frames = []
+    run_cli_turn(messages=[{"role": "user", "content": "scores?"}], config=_config(tmp_path),
+                 session_id="s1", prior_session_id=None, repository=repo,
+                 emit=frames.append, spawn_fn=lambda argv, cwd, env: FakeProc(lines))
+    assert any(f["type"] == "tool_call" and f["name"] == "get_scores" for f in frames)
+
+
+def test_resume_failure_triggers_replay_fallback(tmp_path):
+    repo = _repo(tmp_path)
+    repo.set_cli_session_id("s1", "old-uuid")
+    repo.add_message("s1", "user", "earlier")
+    repo.add_message("s1", "assistant", "earlier answer")
+    calls = []
+
+    def spawn(argv, cwd, env):
+        calls.append(argv)
+        if len(calls) == 1:
+            return FakeProc([], returncode=1)  # resume attempt fails
+        return FakeProc(['{"type": "result", "result": "recovered"}'])  # replay succeeds
+
+    frames = []
+    text = run_cli_turn(messages=[{"role": "system", "content": "sys"},
+                                  {"role": "user", "content": "earlier"},
+                                  {"role": "assistant", "content": "earlier answer"},
+                                  {"role": "user", "content": "again"}],
+                        config=_config(tmp_path), session_id="s1",
+                        prior_session_id="old-uuid", repository=repo,
+                        emit=frames.append, spawn_fn=spawn)
+    assert text == "recovered"
+    assert len(calls) == 2
+    assert calls[0] != calls[1]  # first used --resume, second rebuilt
+    assert any(f["type"] == "warning" and "rebuilt" in f["message"] for f in frames)

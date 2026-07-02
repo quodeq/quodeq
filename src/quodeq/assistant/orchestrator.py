@@ -4,9 +4,11 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from quodeq.assistant import get_provider_configs
 from quodeq.assistant._context import build_system_prompt, build_turn_message
 from quodeq.assistant.adapters._api import ApiTurnConfig, run_api_turn
 from quodeq.assistant.adapters._capabilities import supports_native_tools
+from quodeq.assistant.adapters._cli import CliTurnConfig, run_cli_turn
 from quodeq.assistant.skills import load_skills
 from quodeq.assistant.tools import ToolContext, build_registry
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
@@ -32,10 +34,26 @@ def _split_skill(text: str):
     return name, rest.strip()
 
 
+def _provider_type(provider: str) -> str:
+    return get_provider_configs().get(provider, {}).get("type", "cli")
+
+
+def _mcp_server_args(request: TurnRequest, tool_ctx: ToolContext) -> list[str]:
+    return [
+        "--db-path", str(tool_ctx.repository._db_path),  # noqa: SLF001 - same data layer
+        "--session-id", request.session_id,
+        "--evaluators-dir", str(tool_ctx.evaluators_dir),
+        "--compiled-dir", str(tool_ctx.compiled_dir),
+        "--dimensions-file", str(tool_ctx.dimensions_file),
+    ]
+
+
 def run_turn(request: TurnRequest, *, repository: AssistantRepository,
-             tool_ctx: ToolContext, turn_fn=None, capability_fn=None) -> None:
+             tool_ctx: ToolContext, turn_fn=None, capability_fn=None,
+             cli_turn_fn=None) -> None:
     turn_fn = turn_fn or run_api_turn
     capability_fn = capability_fn or supports_native_tools
+    cli_turn_fn = cli_turn_fn or run_cli_turn
     emit = lambda frame: repository.append_event(request.session_id, frame)  # noqa: E731
     try:
         skill_name, text = _split_skill(request.text)
@@ -50,14 +68,28 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
         history = repository.list_messages(request.session_id)
         messages = [{"role": "system", "content": build_system_prompt(skill=skill)},
                     *({"role": m["role"], "content": m["content"]} for m in history)]
-        config = ApiTurnConfig(
-            api_base=request.api_base, api_key=request.api_key,
-            model=request.model,
-            native_tools=capability_fn(request.provider, request.api_base,
-                                       request.model),
-        )
-        final = turn_fn(messages=messages, config=config,
-                        registry=build_registry(tool_ctx), emit=emit)
+        if _provider_type(request.provider) == "cli":
+            final = cli_turn_fn(
+                messages=messages,
+                config=CliTurnConfig(
+                    provider=request.provider, model=request.model,
+                    scratch_base=tool_ctx.repository._db_path.parent,  # noqa: SLF001
+                    mcp_server_args=_mcp_server_args(request, tool_ctx),
+                    db_path=tool_ctx.repository._db_path,  # noqa: SLF001
+                ),
+                session_id=request.session_id,
+                prior_session_id=(repository.get_session(request.session_id) or {}).get("cli_session_id"),
+                repository=repository, emit=emit,
+            )
+        else:
+            config = ApiTurnConfig(
+                api_base=request.api_base, api_key=request.api_key,
+                model=request.model,
+                native_tools=capability_fn(request.provider, request.api_base,
+                                           request.model),
+            )
+            final = turn_fn(messages=messages, config=config,
+                            registry=build_registry(tool_ctx), emit=emit)
         repository.add_message(request.session_id, "assistant", final)
         emit({"type": "done"})
     except Exception as exc:  # noqa: BLE001 - turn thread must never die silently

@@ -107,3 +107,22 @@ def test_history_replayed_on_second_turn(setup):
              turn_fn=fake_turn, capability_fn=lambda *a, **k: True)
     roles = [m["role"] for m in seen["messages"]]
     assert roles == ["system", "user", "assistant", "user"]
+
+
+def test_run_turn_dispatches_cli_provider(setup, monkeypatch):
+    repo, ctx = setup
+    monkeypatch.setattr("quodeq.assistant.orchestrator.get_provider_configs",
+                        lambda: {"claude": {"type": "cli"}})
+    called = {}
+
+    def fake_cli_turn(**kwargs):
+        called["hit"] = True
+        return "cli answer"
+
+    monkeypatch.setattr("quodeq.assistant.orchestrator.run_cli_turn", fake_cli_turn)
+    req = TurnRequest(session_id="s1", text="hi", ui_state=None, api_base="", api_key=None,
+                      provider="claude", model="sonnet")
+    run_turn(req, repository=repo, tool_ctx=ctx)
+    assert called.get("hit") is True
+    msgs = repo.list_messages("s1")
+    assert msgs[-1]["content"] == "cli answer"
