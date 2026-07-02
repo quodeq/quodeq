@@ -9,6 +9,7 @@ from pathlib import Path
 from flask import Flask, Response, current_app, jsonify, request
 
 from quodeq.api._assistant_helpers import (
+    _LOCAL_PROVIDERS as _FIXED_ENDPOINT_PROVIDERS,
     build_tool_context,
     event_frames,
     get_repository,
@@ -67,10 +68,21 @@ def register_assistant_routes(app: Flask) -> None:
                 return jsonify({"error": "a turn is already running"}), 409
             _running_turns.add(sid)
         provider_cfg = _api_provider(session["provider"]) or {}
+        # Fixed-endpoint local providers (ollama/llamacpp/omlx) always talk to
+        # the server's catalog api_base; a caller-supplied apiBase would let a
+        # request redirect the turn (and its tool calls) at an arbitrary host.
+        # Only genuinely caller-defined providers (custom, openrouter) may
+        # override apiBase/apiKey from the request body.
+        if session["provider"] in _FIXED_ENDPOINT_PROVIDERS:
+            api_base = provider_cfg.get("api_base", "")
+            api_key = None
+        else:
+            api_base = body.get("apiBase") or provider_cfg.get("api_base", "")
+            api_key = body.get("apiKey")
         turn = TurnRequest(
             session_id=sid, text=text, ui_state=body.get("uiState"),
-            api_base=body.get("apiBase") or provider_cfg.get("api_base", ""),
-            api_key=body.get("apiKey"), provider=session["provider"],
+            api_base=api_base,
+            api_key=api_key, provider=session["provider"],
             model=body.get("model") or session.get("model") or provider_cfg.get("model", ""),
         )
         tool_ctx = build_tool_context(app, session)
@@ -98,8 +110,12 @@ def register_assistant_routes(app: Flask) -> None:
 
         def _generate():
             yield ":keepalive\n\n"
-            for seq, frame in event_frames(repo, sid, after):
-                yield sse_line(json.dumps(frame, ensure_ascii=False), event_id=seq)
+            for item in event_frames(repo, sid, after):
+                if item is None:
+                    yield ":keepalive\n\n"
+                else:
+                    seq, frame = item
+                    yield sse_line(json.dumps(frame, ensure_ascii=False), event_id=seq)
 
         resp = Response(_generate(), mimetype="text/event-stream")
         resp.headers["Cache-Control"] = "no-cache"

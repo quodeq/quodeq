@@ -78,9 +78,44 @@ def test_post_message_spawns_turn_and_streams(client, app, monkeypatch):
     assert '"type": "done"' in body
 
 
+def test_events_stream_heartbeats_while_idle(client, monkeypatch):
+    # No message ever posted -> no rows to replay. With small _POLL_SECONDS/
+    # _IDLE_LIMIT the stream must emit repeated ":keepalive" comments (not
+    # just the one at open) instead of hanging until the idle limit, proving
+    # event_frames yields a heartbeat sentinel on each idle tick.
+    monkeypatch.setattr("quodeq.api._assistant_helpers._POLL_SECONDS", 0.001)
+    monkeypatch.setattr("quodeq.api._assistant_helpers._IDLE_LIMIT", 5)
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
+    stream = client.get(f"/api/assistant/sessions/{sid}/events?after=0")
+    body = stream.get_data(as_text=True)
+    assert body.count(":keepalive") >= 2
+
+
 def test_post_message_unknown_session_404(client):
     assert client.post("/api/assistant/sessions/nope/messages",
                        json={"text": "x"}).status_code == 404
+
+
+def test_local_provider_ignores_request_api_base(client, app, monkeypatch):
+    captured = {}
+
+    def fake_run_turn(request, *, repository, tool_ctx, **kw):
+        captured["api_base"] = request.api_base
+        captured["api_key"] = request.api_key
+        repository.append_event(request.session_id, {"type": "done"})
+
+    monkeypatch.setattr("quodeq.api.assistant_routes.run_turn", fake_run_turn)
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
+    resp = client.post(
+        f"/api/assistant/sessions/{sid}/messages",
+        json={"text": "hello", "apiBase": "http://evil.internal/v1", "apiKey": "leaked"},
+    )
+    assert resp.status_code == 202
+    time.sleep(0.3)
+    assert captured["api_base"] == "http://localhost:11434/v1"
+    assert captured["api_key"] is None
 
 
 def test_apply_action_creates_standard(client, app):

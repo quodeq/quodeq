@@ -22,6 +22,8 @@ def _jail(ctx: ToolContext, rel_path: str) -> Path:
     name = target.name.lower()
     if name.startswith(_DENY_BASENAMES) or name.endswith(_DENY_SUFFIXES):
         raise ToolError("path is on the secrets denylist")
+    if target.name == ".git" or ".git" in {p.name for p in target.parents}:
+        raise ToolError("path is inside the .git directory")
     return target
 
 

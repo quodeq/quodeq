@@ -11,6 +11,8 @@ def ctx(tmp_path):
     (repo_root / "src" / "app.py").write_text("print('hi')\n")
     (repo_root / ".env").write_text("SECRET=x\n")
     (repo_root / "logo.bin").write_bytes(b"\x00\x01\x02")
+    (repo_root / ".git").mkdir()
+    (repo_root / ".git" / "config").write_text("[core]\n\ttoken = secret\n")
     store = AssistantRepository(tmp_path / "assistant.db")
     store.create_session(session_id="s1", provider="ollama")
     return ToolContext(
@@ -37,6 +39,12 @@ def test_denylist_and_binary_blocked(ctx):
     reg = build_registry(ctx)
     assert reg.dispatch("read_repo_file", {"path": ".env"})["ok"] is False
     assert reg.dispatch("read_repo_file", {"path": "logo.bin"})["ok"] is False
+
+
+def test_git_dir_blocked(ctx):
+    reg = build_registry(ctx)
+    assert reg.dispatch("read_repo_file", {"path": ".git/config"})["ok"] is False
+    assert reg.dispatch("list_repo_dir", {"path": ".git"})["ok"] is False
 
 
 def test_list_repo_dir(ctx):

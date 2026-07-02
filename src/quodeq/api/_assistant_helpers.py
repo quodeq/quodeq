@@ -54,12 +54,20 @@ def local_provider_busy(provider_id: str) -> bool:
 
 
 def event_frames(repository: AssistantRepository, session_id: str, after_seq: int):
-    """Generator of (seq, frame) tuples: replay then poll until done/error/idle."""
+    """Generator of (seq, frame) tuples or ``None`` heartbeats.
+
+    Replays stored events after ``after_seq``, then polls until a done/error
+    frame arrives or the idle limit is hit. Each idle tick with no new rows
+    yields ``None`` (a heartbeat sentinel the caller turns into an SSE
+    comment) instead of sleeping silently, so slow-starting local models and
+    long gaps between frames don't trip proxy/connection idle timeouts.
+    """
     last, idle = after_seq, 0
     while idle < _IDLE_LIMIT:
         rows = repository.events_after(session_id, last)
         if not rows:
             idle += 1
+            yield None
             time.sleep(_POLL_SECONDS)
             continue
         idle = 0
