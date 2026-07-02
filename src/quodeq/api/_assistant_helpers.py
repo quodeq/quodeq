@@ -1,0 +1,70 @@
+"""Request plumbing for assistant routes: repo/context construction, busy check."""
+from __future__ import annotations
+
+import time
+from pathlib import Path
+
+from flask import Flask, current_app
+
+from quodeq.assistant.tools import ToolContext
+from quodeq.data.sqlite.assistant_repository import AssistantRepository
+
+_LOCAL_PROVIDERS = frozenset({"ollama", "llamacpp", "omlx"})
+_POLL_SECONDS = 0.25
+_IDLE_LIMIT = 240  # 240 * 0.25s = 60s without frames → close stream
+
+
+def get_repository(app: Flask) -> AssistantRepository:
+    if not hasattr(app, "_assistant_repository"):
+        app._assistant_repository = AssistantRepository(
+            Path(app.config["ASSISTANT_DB_PATH"])
+        )
+    return app._assistant_repository
+
+
+def build_tool_context(app: Flask, session: dict) -> ToolContext:
+    """Build a ToolContext from a session row.
+
+    Plan 1 naming note: the session row's ``run_id`` column holds the UI's
+    ``runDir`` and ``project_uuid`` holds the UI's ``repoRoot`` — the
+    create-session route maps those request fields onto these columns.
+    Plan 3 revisits this naming with a schema v2 if needed.
+    """
+    run_dir = session.get("run_id")
+    return ToolContext(
+        repository=get_repository(app),
+        session_id=session["id"],
+        run_dir=Path(run_dir) if run_dir else None,
+        repo_root=Path(session["project_uuid"]) if session.get("project_uuid") else None,
+        evaluators_dir=Path(app.config["STANDARDS_EVALUATORS_DIR"]),
+        compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
+        dimensions_file=Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
+    )
+
+
+def local_provider_busy(provider_id: str) -> bool:
+    """True when a local single-slot model is likely serving an evaluation."""
+    if provider_id not in _LOCAL_PROVIDERS:
+        return False
+    action_provider = current_app.config.get("_provider")
+    jobs = getattr(action_provider, "_jobs", None)
+    if jobs is None:
+        return False
+    return any(j.status == "running" for j in jobs.list_jobs(limit=20))
+
+
+def event_frames(repository: AssistantRepository, session_id: str, after_seq: int):
+    """Generator of (seq, frame) tuples: replay then poll until done/error/idle."""
+    last, idle = after_seq, 0
+    while idle < _IDLE_LIMIT:
+        rows = repository.events_after(session_id, last)
+        if not rows:
+            idle += 1
+            time.sleep(_POLL_SECONDS)
+            continue
+        idle = 0
+        for seq, frame in rows:
+            last = seq
+            yield seq, frame
+            if frame.get("type") in ("done", "error"):
+                return

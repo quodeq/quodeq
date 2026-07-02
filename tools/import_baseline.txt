@@ -11,7 +11,9 @@ src/quodeq/analysis/mcp/enricher.py:19:context
 src/quodeq/analysis/mcp/findings_server.py:20:context
 src/quodeq/analysis/mcp/findings_server.py:21:context
 src/quodeq/analysis/subprocess.py:232:llm_bridge
+src/quodeq/api/_assistant_helpers.py:10:data
 src/quodeq/api/_evaluation_routes.py:21:analysis
+src/quodeq/api/assistant_routes.py:19:llm_bridge
 src/quodeq/api/import_project.py:30:data
 src/quodeq/api/import_project.py:31:data
 src/quodeq/api/import_project.py:32:data
