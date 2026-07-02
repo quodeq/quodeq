@@ -109,6 +109,9 @@ def create_app(
         app.config["STANDARDS_COMPILED_DIR"] = str(paths.standards_dir / "compiled")
         app.config["STANDARDS_DIMENSIONS_FILE"] = str(paths.dimensions_file)
 
+    if "ASSISTANT_DB_PATH" not in app.config:
+        app.config["ASSISTANT_DB_PATH"] = str(Path.home() / ".quodeq" / "assistant.db")
+
     if api_key is None:
         _logger.warning(
             "QUODEQ_API_KEY is not set — API restricted to localhost only. "
