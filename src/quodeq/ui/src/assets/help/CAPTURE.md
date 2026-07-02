@@ -56,3 +56,4 @@ also the spec for a future automated capture script.
   per-dimension gauges (OVERALL plus one per dimension, each with a
   score and grade label), APPLY and RESET Q² buttons visible.
 - Full page including sidebar (it is an orientation shot).
+- The status hint next to RESET may read "custom formula active" depending on local settings. Acceptable for this orientation shot. Never reset the user's formula just for a capture (RESET rescores all runs).

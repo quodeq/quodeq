@@ -1,3 +1,8 @@
+import HelpFigure from '../../../components/HelpFigure.jsx';
+import GradeFormulaCurveFigure from './figures/GradeFormulaCurveFigure.jsx';
+import gradeFormulaDark from '../../../assets/help/grade-formula.dark.webp';
+import gradeFormulaLight from '../../../assets/help/grade-formula.light.webp';
+
 const ICON_EYE_ON = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ verticalAlign: 'middle', marginBottom: 2 }}>
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -374,6 +379,43 @@ export function History() {
       <Tip title="Comparing across time">
         The Run Detail navigator is the fastest way to A/B compare. Open the dimension you care about in run N, hit <em>previous</em>, and watch the principle scores shift.
       </Tip>
+    </section>
+  );
+}
+
+export function GradeFormula() {
+  return (
+    <section className="help-section">
+      <h2>Grade Formula</h2>
+      <p>The grade formula turns findings into scores and letter grades. You can tune every part of it: open <strong>Settings</strong>, find the <em>Grade formula</em> section, and press <strong>open editor</strong>. Changes preview live before anything is saved.</p>
+
+      <HelpFigure
+        caption="The Grade Formula editor. Parameter tabs on top, live preview strip below."
+        srcDark={gradeFormulaDark}
+        srcLight={gradeFormulaLight}
+        alt="Grade Formula editor showing the preview strip with per-dimension gauges, the severity weight sliders, and the APPLY and RESET buttons"
+      />
+
+      <h3>The four tabs</h3>
+      <KeyTable rows={[
+        ['SEVERITY', 'Weight sliders for critical, major, and minor violation types. A readout shows how much a critical finding currently weighs relative to a minor one.'],
+        ['CURVE', 'Shape controls for the scoring curve: strictness K (how fast violations hurt), lift compress (how much compliance evidence can lift), and ceiling scale (the maximum score under violation load).'],
+        ['BOUNDARIES', 'Drag the dividers (or focus one and use the arrow keys) between CRITICAL, POOR, ADEQUATE, GOOD, and EXEMPLARY to move the grade thresholds. Severity floors below set the worst score possible when no critical findings exist.'],
+        ['DIMENSIONS', 'Optional per-dimension weights. When the toggle is off, the overall grade is a plain mean across dimensions.'],
+      ]} />
+
+      <HelpFigure caption="Default severity weights set how hard each finding pushes a score down the curve. Solid line is the base score, dashed is the ceiling.">
+        <GradeFormulaCurveFigure />
+      </HelpFigure>
+
+      <h3>Preview, then apply</h3>
+      <p>The preview strip recomputes your selected project's latest run with the draft parameters and shows before and after, per dimension. Nothing is stored until you press <strong>APPLY</strong>, which saves the formula and rescores every run in every project. <strong>RESET Q²</strong> returns to the built-in defaults, also rescoring everything.</p>
+
+      <Tip title="Where you see the effect">
+        Rescoring updates run detail pages, the accumulated overview, trend charts, and project cards. The grade labels from the BOUNDARIES tab drive every gauge and badge in the app.
+      </Tip>
+
+      <p>The formula never touches the insufficient-evidence gate. Principles with too little evidence stay Insufficient regardless of your settings.</p>
     </section>
   );
 }
