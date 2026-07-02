@@ -1,6 +1,8 @@
 import io
 from pathlib import Path
 
+import pytest
+
 from quodeq.assistant.adapters._cli import CliTurnConfig, run_cli_turn
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
@@ -10,9 +12,16 @@ class FakeProc:
         self.stdout = io.StringIO("".join(l + "\n" for l in lines))
         self.stderr = io.StringIO("")
         self.returncode = returncode
+        self.killed = False
 
     def wait(self, timeout=None):
         return self.returncode
+
+    def poll(self):
+        return self.returncode  # scripted proc has already exited
+
+    def kill(self):
+        self.killed = True
 
 
 def _config(tmp_path):
@@ -86,3 +95,29 @@ def test_resume_failure_triggers_replay_fallback(tmp_path):
     assert len(calls) == 2
     assert calls[0] != calls[1]  # first used --resume, second rebuilt
     assert any(f["type"] == "warning" and "rebuilt" in f["message"] for f in frames)
+
+
+def test_nonzero_exit_with_output_does_not_replay(tmp_path):
+    repo = _repo(tmp_path)
+    repo.set_cli_session_id("s1", "old-uuid")
+    calls = []
+
+    def spawn(argv, cwd, env):
+        calls.append(argv)
+        return FakeProc(['{"type": "result", "result": "ok"}'], returncode=1)
+
+    frames = []
+    text = run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
+                        session_id="s1", prior_session_id="old-uuid", repository=repo,
+                        emit=frames.append, spawn_fn=spawn)
+    assert text == "ok"  # non-empty answer is success despite rc=1
+    assert len(calls) == 1  # no replay
+    assert not any(f["type"] == "warning" for f in frames)
+
+
+def test_empty_output_raises(tmp_path):
+    repo = _repo(tmp_path)
+    with pytest.raises(RuntimeError):
+        run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
+                     session_id="s1", prior_session_id=None, repository=repo,
+                     emit=lambda f: None, spawn_fn=lambda argv, cwd, env: FakeProc([]))

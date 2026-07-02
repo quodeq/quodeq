@@ -126,3 +126,20 @@ def test_run_turn_dispatches_cli_provider(setup, monkeypatch):
     assert called.get("hit") is True
     msgs = repo.list_messages("s1")
     assert msgs[-1]["content"] == "cli answer"
+
+
+def test_run_turn_cli_empty_output_emits_error(setup, monkeypatch):
+    repo, ctx = setup
+    monkeypatch.setattr("quodeq.assistant.orchestrator.get_provider_configs",
+                        lambda: {"claude": {"type": "cli"}})
+
+    def boom(**kwargs):
+        raise RuntimeError("CLI produced no output")
+
+    monkeypatch.setattr("quodeq.assistant.orchestrator.run_cli_turn", boom)
+    req = TurnRequest(session_id="s1", text="hi", ui_state=None, api_base="", api_key=None,
+                      provider="claude", model="sonnet")
+    run_turn(req, repository=repo, tool_ctx=ctx)
+    frames = [f for _, f in repo.events_after("s1", 0)]
+    assert frames[-1]["type"] == "error"
+    assert "no output" in frames[-1]["message"]

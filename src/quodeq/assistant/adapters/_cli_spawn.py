@@ -40,6 +40,6 @@ def spawn_turn(argv: list[str], *, cwd: Path, env: dict) -> subprocess.Popen:
     assert_no_dangerous_args(argv)
     return subprocess.Popen(
         argv, cwd=str(cwd), env=env,
-        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         text=True, start_new_session=True,
     )

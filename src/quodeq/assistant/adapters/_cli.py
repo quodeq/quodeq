@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import logging
+import subprocess
 import tempfile
+import threading
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +19,8 @@ from quodeq.assistant.mcp import _config as mcp_config
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 _logger = logging.getLogger(__name__)
+
+TURN_TIMEOUT_S = 300
 
 
 @dataclass(frozen=True)
@@ -53,11 +57,16 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
     else:
         mcp_config.register_cli_mcp(cli_cfg.cmd, cfg.mcp_server_args,
                                     separator=cli_cfg.mcp_add_separator)
+    proc = None
+    timer = None
     try:
         spec = build_turn_argv(cli_cfg, prompt=prompt, model=cfg.model,
                                mcp_config_path=mcp_config_path,
                                prior_session_id=prior_session_id, new_session_id=new_session_id)
         proc = spawn_fn(spec.argv, scratch_cwd(cfg.scratch_base), build_chat_env())
+        # wall-clock guard: a hung/silent CLI can't wedge the turn slot forever
+        timer = threading.Timer(TURN_TIMEOUT_S, proc.kill)
+        timer.start()
         texts, parsed_sid = [], spec.session_id
         for line in iter_lines(proc.stdout):
             event = _stream.parse_line(line)
@@ -71,12 +80,20 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
             sid = _stream.session_id(event)
             if sid:
                 parsed_sid = sid
-        returncode = proc.wait(timeout=1)
+        try:
+            returncode = proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            returncode = proc.wait()
         final = texts[-1] if texts else ""
         if parsed_sid:
             repository.set_cli_session_id(session_id, parsed_sid)
         return final, parsed_sid, returncode
     finally:
+        if timer is not None:
+            timer.cancel()
+        if proc is not None and proc.poll() is None:
+            proc.kill()
         if mcp_config_path:
             Path(mcp_config_path).unlink(missing_ok=True)
         if cli_cfg.mcp_style != "config-file":
@@ -88,14 +105,18 @@ def run_cli_turn(*, messages: list[dict], config: CliTurnConfig, session_id: str
                  emit: Callable[[dict], None], spawn_fn=None) -> str:
     spawn_fn = spawn_fn or spawn_turn
     cli_cfg = load_cli_chat_config(config.provider)
-    final, _sid, returncode = _run_once(
+    final, _sid, _rc = _run_once(
         config, cli_cfg, prompt=_latest_user(messages), session_id=session_id,
         prior_session_id=prior_session_id, new_session_id=str(uuid.uuid4()),
         repository=repository, emit=emit, spawn_fn=spawn_fn)
-    if prior_session_id is not None and (returncode != 0 or final == ""):
+    # replay only on a genuinely empty result; a non-empty answer is success
+    # regardless of the exit code (some CLIs exit non-zero on benign warnings).
+    if prior_session_id is not None and final == "":
         emit({"type": "warning", "message": "session rebuilt"})
         final, _sid, _rc = _run_once(
             config, cli_cfg, prompt=_full_transcript(messages), session_id=session_id,
             prior_session_id=None, new_session_id=str(uuid.uuid4()),
             repository=repository, emit=emit, spawn_fn=spawn_fn)
+    if final == "":
+        raise RuntimeError("CLI produced no output")
     return final

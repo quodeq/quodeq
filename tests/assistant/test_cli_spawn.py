@@ -53,6 +53,19 @@ def test_scratch_cwd_cleared_on_reuse(tmp_path):
     assert list(cwd2.iterdir()) == []
 
 
+def test_spawn_turn_discards_stderr(tmp_path, monkeypatch):
+    captured = {}
+
+    class _P:
+        def __init__(self, *args, **kwargs):
+            captured.update(kwargs)
+            self.stdout = None
+
+    monkeypatch.setattr(subprocess, "Popen", _P)
+    spawn_turn(["claude", "-p", "hi"], cwd=scratch_cwd(tmp_path), env={})
+    assert captured["stderr"] is subprocess.DEVNULL
+
+
 def test_spawn_turn_streams_stdout(tmp_path):
     # a trivial process that emits two lines then exits
     argv = [sys.executable, "-c", "print('a'); print('b')"]
