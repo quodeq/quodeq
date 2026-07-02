@@ -169,11 +169,11 @@ export function Providers() {
         More sub-agents finish faster but use more tokens (cloud) or more VRAM (local). For local Ollama on a 32 GB machine, start with 2 or 3 and scale up only if you have headroom.
       </Tip>
 
-      <h3>omlx on Apple Silicon</h3>
-      <p>On Apple Silicon Macs an extra local option appears: <strong>Omlx</strong>, an MLX-native server that runs models tuned for unified memory. The tab only shows on supported machines.</p>
+      <h3>omlx (Apple Silicon only)</h3>
+      <p>On Apple Silicon Macs an extra local option appears: <strong>Omlx</strong>, an MLX-native server that runs models tuned for unified memory.</p>
       <ol>
         <li>Start the server with <code>omlx serve</code> or the omlx menu bar app.</li>
-        <li>In <strong>Settings, Omlx</strong>, pick a model. The list comes from your local server; add models through the omlx admin UI at <code>http://localhost:8000/admin</code>.</li>
+        <li>In <strong>Settings → Omlx</strong>, pick a model. The list comes from your local server; add models through the omlx admin UI at <code>http://localhost:8000/admin</code>.</li>
         <li>Under <em>Advanced</em> you can set a custom server address, an API key, and run the parallel-agent auto-detect, which recommends a sub-agent count based on your unified memory.</li>
       </ol>
 
@@ -318,7 +318,7 @@ COMPLIANT   src/api.py:88       Parameterized query prevents injection     CWE-8
       <h3>Dismissing a finding</h3>
       <p>If a finding is a false positive or an accepted trade-off, dismiss it from the violation detail. You will be asked for a reason. Dismissed findings:</p>
       <ul>
-        <li>move to the <strong>Dismissed</strong> sub-tab,</li>
+        <li>move to the <strong>dismissed</strong> sub-tab,</li>
         <li>are <strong>excluded from scoring</strong> (the dimension score updates immediately),</li>
         <li>are <strong>excluded from future evaluations</strong> for the same principle and file,</li>
         <li>can be <strong>restored</strong> individually or in bulk via <em>Restore all</em>.</li>
@@ -380,7 +380,7 @@ export function History() {
       <h3>The trend chart</h3>
       <p>A small chart above the list plots overall score over time, with per-dimension lines you can toggle. Hover a point to see that run's stats; click to open it.</p>
 
-      <h3>Group by day, week, or month</h3>
+      <h3>Group the Overview chart by day, week, or month</h3>
       <p>The <em>score history</em> chart on the <strong>Overview</strong> groups runs per day by default. Use the selector in the chart header to switch to <strong>Week</strong> or <strong>Month</strong>. Each bar aggregates the runs of one period, tooltips carry the period label, and your choice is remembered across sessions.</p>
       <p>If all your runs fit inside a single week or month, the chart suggests a finer grouping instead of drawing one lonely bar.</p>
       <HelpFigure caption="The score history header. The select groups bars by day, week, or month.">
@@ -508,8 +508,8 @@ export function Settings() {
         <li><strong>Cloud</strong> hosted APIs (OpenRouter or a custom OpenAI-compatible endpoint). API key, base URL, model id, and a <em>Test connection</em> button.</li>
         <li><strong>CLI</strong> local AI CLIs you have authenticated (Claude Code, Codex). Pick the binary, then a model id.</li>
         <li><strong>Ollama</strong> models on your local Ollama server. Quodeq lists whatever you have pulled.</li>
-        <li><strong>llama.cpp</strong> a local llama-server instance. Shows the GGUF currently loaded.</li>
         <li><strong>Omlx</strong> an MLX-native local server. The tab appears only on Apple Silicon Macs.</li>
+        <li><strong>llama.cpp</strong> a local llama-server instance. Shows the GGUF currently loaded.</li>
       </ul>
       <p>Each tab also exposes <strong>sub-agent count</strong> and a <strong>time budget</strong> default. Start an evaluation and you can override these per-run.</p>
 
