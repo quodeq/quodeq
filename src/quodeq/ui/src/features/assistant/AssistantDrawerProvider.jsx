@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createAssistantSession, postAssistantMessage } from '../../api/assistant.js';
 import { useAssistantStream } from './useAssistantStream.js';
 
@@ -66,6 +66,17 @@ export function AssistantDrawerProvider({ children }) {
   // label the conversation. Sourced from the ctx passed to startSession.
   const [sessionMeta, setSessionMeta] = useState({ provider: null, model: null });
   const [userTurns, setUserTurns] = useState([]);
+  // Local error surface for failures the stream can't report: a rejected
+  // session-start or message POST. Rendered by the drawer alongside (and
+  // taking precedence over) the stream's own error frames.
+  const [localError, setLocalError] = useState(null);
+  // Tracks the most recently *requested* session context key, set
+  // synchronously at startSession call time. Because startSession awaits a
+  // network round-trip, a check-then-act guard on React state would let two
+  // rapid context switches both create sessions and let the older-context
+  // response win. We instead commit a resolved session only if its key is
+  // still the latest requested one.
+  const latestKeyRef = useRef(null);
 
   const stream = useAssistantStream(sessionId);
 
@@ -94,17 +105,42 @@ export function AssistantDrawerProvider({ children }) {
   const startSession = useCallback(async (ctx) => {
     const key = `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}`;
     if (key === sessionCtxKey && sessionId) return;
-    const { sessionId: newSessionId } = await createAssistantSession(ctx);
+    // Record this as the latest requested context synchronously, before the
+    // await, so a later call can invalidate this one's resolution.
+    latestKeyRef.current = key;
+    let created;
+    try {
+      created = await createAssistantSession(ctx);
+    } catch (err) {
+      // Only surface the failure if this is still the context the user wants;
+      // a superseded stale request shouldn't clobber a newer session's UI.
+      if (latestKeyRef.current === key) {
+        setLocalError(`Couldn't start assistant session: ${err?.message || err}`);
+      }
+      return;
+    }
+    // Ignore a stale resolution: a newer startSession for a different context
+    // has since been requested, so committing this (older) one would let the
+    // last-resolving response win regardless of request order.
+    if (latestKeyRef.current !== key) return;
+    setLocalError(null);
     setUserTurns([]);
     setSessionCtxKey(key);
-    setSessionId(newSessionId);
+    setSessionId(created.sessionId);
     setSessionMeta({ provider: ctx?.provider ?? null, model: ctx?.model ?? null });
   }, [sessionCtxKey, sessionId]);
 
-  const sendMessage = useCallback((text, uiState) => {
+  const sendMessage = useCallback(async (text, uiState) => {
     if (!sessionId) return;
+    setLocalError(null);
     setUserTurns((prev) => [...prev, { role: 'user', text, atIndex: stream.messages.length }]);
-    postAssistantMessage(sessionId, { text, uiState });
+    try {
+      await postAssistantMessage(sessionId, { text, uiState });
+    } catch (err) {
+      // The optimistic user turn stays in the transcript; surface the failure
+      // so the user knows the message didn't reach the assistant.
+      setLocalError(`Couldn't send message: ${err?.message || err}`);
+    }
   }, [sessionId, stream.messages.length]);
 
   const messages = useMemo(
@@ -115,11 +151,11 @@ export function AssistantDrawerProvider({ children }) {
   const value = useMemo(() => ({
     isOpen, open, close, toggle,
     height, setHeight,
-    messages, streaming: stream.streaming, error: stream.error,
+    messages, streaming: stream.streaming, error: localError || stream.error,
     sessionReady: sessionId != null,
     provider: sessionMeta.provider, model: sessionMeta.model,
     startSession, sendMessage,
-  }), [isOpen, open, close, toggle, height, setHeight, messages, stream.streaming, stream.error, sessionId, sessionMeta, startSession, sendMessage]);
+  }), [isOpen, open, close, toggle, height, setHeight, messages, stream.streaming, stream.error, localError, sessionId, sessionMeta, startSession, sendMessage]);
 
   return (
     <AssistantDrawerContext.Provider value={value}>

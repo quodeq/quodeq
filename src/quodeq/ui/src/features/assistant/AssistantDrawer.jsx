@@ -71,7 +71,7 @@ export function AssistantDrawer({ uiState }) {
       />
       <header className="assistant-drawer-header">
         <span className="assistant-drawer-title">
-          ✦ assistant · {provider} · {model}
+          ✦ assistant · {provider}{model ? ` · ${model}` : ''}
         </span>
         <div className="assistant-drawer-controls">
           <button
