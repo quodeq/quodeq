@@ -51,7 +51,7 @@ def test_streams_tokens_and_captures_session_id(tmp_path):
         messages=[{"role": "system", "content": "sys"}, {"role": "user", "content": "hi"}],
         config=_config(tmp_path), session_id="s1", prior_session_id=None,
         repository=repo, emit=frames.append,
-        spawn_fn=lambda argv, cwd, env: FakeProc(lines))
+        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
     assert text == "Hello"
     assert {"type": "token", "text": "Hello"} in frames
     assert repo.get_session("s1")["cli_session_id"] == "claude-uuid-1"
@@ -66,7 +66,7 @@ def test_tool_use_emits_frame(tmp_path):
     frames = []
     run_cli_turn(messages=[{"role": "user", "content": "scores?"}], config=_config(tmp_path),
                  session_id="s1", prior_session_id=None, repository=repo,
-                 emit=frames.append, spawn_fn=lambda argv, cwd, env: FakeProc(lines))
+                 emit=frames.append, spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
     assert any(f["type"] == "tool_call" and f["name"] == "get_scores" for f in frames)
 
 
@@ -77,7 +77,7 @@ def test_resume_failure_triggers_replay_fallback(tmp_path):
     repo.add_message("s1", "assistant", "earlier answer")
     calls = []
 
-    def spawn(argv, cwd, env):
+    def spawn(argv, *, cwd, env):
         calls.append(argv)
         if len(calls) == 1:
             return FakeProc([], returncode=1)  # resume attempt fails
@@ -102,7 +102,7 @@ def test_nonzero_exit_with_output_does_not_replay(tmp_path):
     repo.set_cli_session_id("s1", "old-uuid")
     calls = []
 
-    def spawn(argv, cwd, env):
+    def spawn(argv, *, cwd, env):
         calls.append(argv)
         return FakeProc(['{"type": "result", "result": "ok"}'], returncode=1)
 
@@ -120,4 +120,4 @@ def test_empty_output_raises(tmp_path):
     with pytest.raises(RuntimeError):
         run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
                      session_id="s1", prior_session_id=None, repository=repo,
-                     emit=lambda f: None, spawn_fn=lambda argv, cwd, env: FakeProc([]))
+                     emit=lambda f: None, spawn_fn=lambda argv, *, cwd, env: FakeProc([]))

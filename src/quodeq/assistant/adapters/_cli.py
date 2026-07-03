@@ -63,7 +63,7 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
         spec = build_turn_argv(cli_cfg, prompt=prompt, model=cfg.model,
                                mcp_config_path=mcp_config_path,
                                prior_session_id=prior_session_id, new_session_id=new_session_id)
-        proc = spawn_fn(spec.argv, scratch_cwd(cfg.scratch_base), build_chat_env())
+        proc = spawn_fn(spec.argv, cwd=scratch_cwd(cfg.scratch_base), env=build_chat_env())
         # wall-clock guard: a hung/silent CLI can't wedge the turn slot forever
         timer = threading.Timer(TURN_TIMEOUT_S, proc.kill)
         timer.start()
