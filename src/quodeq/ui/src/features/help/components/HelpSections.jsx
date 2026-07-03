@@ -1,3 +1,9 @@
+import HelpFigure from '../../../components/HelpFigure.jsx';
+import GradeFormulaCurveFigure from './figures/GradeFormulaCurveFigure.jsx';
+import ScoreGroupingFigure from './figures/ScoreGroupingFigure.jsx';
+import gradeFormulaDark from '../../../assets/help/grade-formula.dark.webp';
+import gradeFormulaLight from '../../../assets/help/grade-formula.light.webp';
+
 const ICON_EYE_ON = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ verticalAlign: 'middle', marginBottom: 2 }}>
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -163,6 +169,22 @@ export function Providers() {
         More sub-agents finish faster but use more tokens (cloud) or more VRAM (local). For local Ollama on a 32 GB machine, start with 2 or 3 and scale up only if you have headroom.
       </Tip>
 
+      <h3>omlx (Apple Silicon only)</h3>
+      <p>On Apple Silicon Macs an extra local option appears: <strong>Omlx</strong>, an MLX-native server that runs models tuned for unified memory.</p>
+      <ol>
+        <li>Start the server with <code>omlx serve</code> or the omlx menu bar app.</li>
+        <li>In <strong>Settings → Omlx</strong>, pick a model. The list comes from your local server; add models through the omlx admin UI at <code>http://localhost:8000/admin</code>.</li>
+        <li>Under <em>Advanced</em> you can set a custom server address, an API key, and run the parallel-agent auto-detect, which recommends a sub-agent count based on your unified memory.</li>
+      </ol>
+
+      <h3>llama.cpp (local, GGUF models)</h3>
+      <p>Points Quodeq at a llama-server instance you run yourself. It serves one GGUF model at a time, fixed at launch.</p>
+      <ol>
+        <li>Start the server with <code>llama-server -m model.gguf --port 8080</code>.</li>
+        <li>In <strong>Settings → llama.cpp</strong>, the loaded model appears automatically. To switch models, restart llama-server with a different GGUF.</li>
+        <li>Under <em>Advanced</em>, run the parallel-agent auto-detect, which tests the server and recommends a sub-agent count.</li>
+      </ol>
+
       <h3>Power tiers</h3>
       <p>Each provider exposes three power levels that map to model size:</p>
       <KeyTable rows={[
@@ -282,11 +304,12 @@ MINOR       src/utils.py:23     Bare except clause hides errors            CWE-3
 COMPLIANT   src/api.py:88       Parameterized query prevents injection     CWE-89
             cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))`}</pre>
 
-      <h3>Two views, one dataset</h3>
-      <p>Use the view switcher at the top of the tab:</p>
+      <h3>Three sub-tabs, one dataset</h3>
+      <p>Use the pills at the top of the tab:</p>
       <ul>
-        <li><strong>Heatgrid</strong> a dimension × severity matrix with counts per cell. Click a cell to filter by both dimension and severity at once.</li>
-        <li><strong>File tree</strong> the same findings grouped by directory, with a breadcrumb you can drill into. Useful for tracking down a single hot spot.</li>
+        <li><strong>by-dimension</strong> a table of dimensions with their principles indented below, showing critical, major, and minor counts, total violations, and health per row.</li>
+        <li><strong>by-file</strong> the same findings arranged as your directory tree, with a breadcrumb you can drill into. Useful for tracking down a single hot spot.</li>
+        <li><strong>dismissed</strong> everything you dismissed, with its reason, ready to restore or delete for good.</li>
       </ul>
 
       <h3>Drilling in</h3>
@@ -303,7 +326,7 @@ COMPLIANT   src/api.py:88       Parameterized query prevents injection     CWE-8
       <h3>Dismissing a finding</h3>
       <p>If a finding is a false positive or an accepted trade-off, dismiss it from the violation detail. You will be asked for a reason. Dismissed findings:</p>
       <ul>
-        <li>move to the <strong>Dismissed</strong> sub-tab,</li>
+        <li>move to the <strong>dismissed</strong> sub-tab,</li>
         <li>are <strong>excluded from scoring</strong> (the dimension score updates immediately),</li>
         <li>are <strong>excluded from future evaluations</strong> for the same principle and file,</li>
         <li>can be <strong>restored</strong> individually or in bulk via <em>Restore all</em>.</li>
@@ -365,6 +388,13 @@ export function History() {
       <h3>The trend chart</h3>
       <p>A small chart above the list plots overall score over time, with per-dimension lines you can toggle. Hover a point to see that run's stats; click to open it.</p>
 
+      <h3>Group the Overview chart by day, week, or month</h3>
+      <p>The <em>score history</em> chart on the <strong>Overview</strong> groups runs per day by default. Use the selector in the chart header to switch to <strong>Week</strong> or <strong>Month</strong>. Each bar aggregates the runs of one period, tooltips carry the period label, and your choice is remembered across sessions.</p>
+      <p>If all your runs fit inside a single week or month, the chart suggests a finer grouping instead of drawing one lonely bar.</p>
+      <HelpFigure caption="The score history header. The select groups bars by day, week, or month.">
+        <ScoreGroupingFigure />
+      </HelpFigure>
+
       <h3>Run detail and the navigator</h3>
       <p>Clicking a run opens its <strong>Run Detail</strong> page: the same shell as Overview but locked to that single run. From there, the run navigator at the top lets you step <strong>previous / next / latest</strong> without going back to the list. Drill into any dimension and the Explorer keeps the run id, so you stay anchored to that snapshot.</p>
 
@@ -374,6 +404,43 @@ export function History() {
       <Tip title="Comparing across time">
         The Run Detail navigator is the fastest way to A/B compare. Open the dimension you care about in run N, hit <em>previous</em>, and watch the principle scores shift.
       </Tip>
+    </section>
+  );
+}
+
+export function GradeFormula() {
+  return (
+    <section className="help-section">
+      <h2>Grade Formula</h2>
+      <p>The grade formula turns findings into scores and letter grades. You can tune every part of it: open <strong>Settings</strong>, find the <em>Grade formula</em> section, and press <strong>open editor</strong>. Changes preview live before anything is saved.</p>
+
+      <HelpFigure
+        caption="The Grade Formula editor. Parameter tabs on top, live preview strip below."
+        srcDark={gradeFormulaDark}
+        srcLight={gradeFormulaLight}
+        alt="Grade Formula editor showing the preview strip with per-dimension gauges, the severity weight sliders, and the APPLY and RESET buttons"
+      />
+
+      <h3>The four tabs</h3>
+      <KeyTable rows={[
+        ['SEVERITY', 'Weight sliders for critical, major, and minor violation types. A readout shows how much a critical finding currently weighs relative to a minor one.'],
+        ['CURVE', 'Shape controls for the scoring curve: strictness K (how fast violations hurt), lift compress (how much compliance evidence can lift), and ceiling scale (the maximum score under violation load).'],
+        ['BOUNDARIES', 'Drag the dividers (or focus one and use the arrow keys) between CRITICAL, POOR, ADEQUATE, GOOD, and EXEMPLARY to move the grade thresholds. Severity floors below set the worst score possible when no critical findings exist.'],
+        ['DIMENSIONS', 'Optional per-dimension weights. When the toggle is off, the overall grade is a plain mean across dimensions.'],
+      ]} />
+
+      <HelpFigure caption="Default severity weights set how hard each finding pushes a score down the curve. Solid line is the base score, dashed is the ceiling.">
+        <GradeFormulaCurveFigure />
+      </HelpFigure>
+
+      <h3>Preview, then apply</h3>
+      <p>The preview strip recomputes your selected project's latest run with the draft parameters and shows before and after, per dimension. Nothing is stored until you press <strong>APPLY</strong>, which saves the formula and rescores every run in every project. <strong>RESET Q²</strong> returns to the built-in defaults, also rescoring everything.</p>
+
+      <Tip title="Where you see the effect">
+        Rescoring updates run detail pages, the accumulated overview, trend charts, and project cards. The grade labels from the BOUNDARIES tab drive every gauge and badge in the app.
+      </Tip>
+
+      <p>The formula never touches the insufficient-evidence gate. Principles with too little evidence stay Insufficient regardless of your settings.</p>
     </section>
   );
 }
@@ -449,6 +516,8 @@ export function Settings() {
         <li><strong>Cloud</strong> hosted APIs (OpenRouter or a custom OpenAI-compatible endpoint). API key, base URL, model id, and a <em>Test connection</em> button.</li>
         <li><strong>CLI</strong> local AI CLIs you have authenticated (Claude Code, Codex). Pick the binary, then a model id.</li>
         <li><strong>Ollama</strong> models on your local Ollama server. Quodeq lists whatever you have pulled.</li>
+        <li><strong>Omlx</strong> an MLX-native local server. The tab appears only on Apple Silicon Macs.</li>
+        <li><strong>llama.cpp</strong> a local llama-server instance. Shows the GGUF currently loaded.</li>
       </ul>
       <p>Each tab also exposes <strong>sub-agent count</strong> and a <strong>time budget</strong> default. Start an evaluation and you can override these per-run.</p>
 
@@ -460,6 +529,17 @@ export function Settings() {
 
       <h3>Appearance</h3>
       <p>Light or dark mode plus a theme family selector. Themes change accent colors and surface tones; layout stays the same.</p>
+
+      <h3>Updates</h3>
+      <p>Quodeq checks PyPI and GitHub once a day for a newer version. When one exists, a banner appears at the top of the dashboard and the <em>Updates</em> section shows the version jump plus the exact upgrade command for your install (pipx, uv, or Homebrew). Dismissing the banner silences that version; the next release brings it back.</p>
+      <ul>
+        <li><strong>check now</strong> asks immediately, ignoring the daily throttle.</li>
+        <li><strong>Automatic checks</strong> turns the daily background check on or off.</li>
+        <li>Set <code>QUODEQ_NO_UPDATE_NOTIFIER=1</code> to disable automatic checks and CLI notices entirely.</li>
+      </ul>
+
+      <h3>Grade formula</h3>
+      <p>The <em>Grade formula</em> section opens the formula editor, where severity weights, curve shape, grade boundaries, and dimension weights live. See the <strong>Grade Formula</strong> help section for the full tour.</p>
 
       <h3>About</h3>
       <p>Version info, links to docs and the repo, and the kill-switch environment variables you can set if you need to disable side features. Most users will not need this section.</p>

@@ -11,7 +11,7 @@ export default function EmptyStateWithTour({ onAdd, onTour, isEvaluating = false
   return (
     <section className="empty-state empty-state--with-tour">
       <TermHeader name="projects" sub="no projects yet" />
-      <p>set up your first repository — quodeq scans it locally and runs an evaluation against the standards you pick.</p>
+      <p>set up your first repository. quodeq scans it locally and runs an evaluation against the standards you pick.</p>
       <div className="empty-state__actions">
         <button
           type="button"

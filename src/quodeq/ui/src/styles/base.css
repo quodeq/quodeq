@@ -15,6 +15,12 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
+  /* The dashboard runs in a native WKWebView. When the content scroller
+     (.dashboard) hits its edge, WebKit chains the overscroll to the main
+     frame and rubber-bands the WHOLE web view — sidebar and topbar included.
+     Refuse the viewport-level bounce so the app chrome stays put; the
+     content keeps its own elastic overscroll (see .dashboard below). */
+  overscroll-behavior: none;
 }
 
 /* ── Focus ────────────────────────────────────────────── */
@@ -750,6 +756,10 @@ textarea:focus {
   min-width: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  /* Keep this scroller's own elastic overscroll, but `contain` stops it from
+     chaining to the main frame so the bounce never spreads to the sidebar or
+     topbar. Pairs with `overscroll-behavior: none` on the viewport above. */
+  overscroll-behavior-y: contain;
 }
 
 /* ── Content header ───────────────────────────────────── */
@@ -1117,22 +1127,48 @@ textarea:focus {
   gap: var(--space-4);
 }
 
+/* Adaptive lanes: at least 360px wide, count adapts to the screen, lanes
+   stretch edge to edge (no width cap). Multicol auto-balances lane heights
+   in browsers without grid-lanes; the count cap of 3 matches how many
+   balanced lanes the current sections can fill — without it the balancer
+   leaves trailing empty lanes and squeezes content left on wide screens. */
 .settings-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-5);
-  align-items: start;
+  columns: 360px 3;
+  column-gap: var(--space-5);
   width: 100%;
 }
 
-.settings-grid-col {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
+.settings-grid > .panel {
+  break-inside: avoid;
+  margin-bottom: var(--space-5);
+}
+
+/* Lane gaps/margins carry the rhythm; without this the .panel + .panel
+   margin (see Panels section) would double the vertical spacing. */
+.settings-grid .panel + .panel {
+  margin-top: 0;
+}
+
+/* CSS Grid Lanes (masonry) where supported: same adaptive lane count, but
+   blocks pack top-aligned in source order and never reshuffle across lanes
+   when one changes height. Chrome/Firefox fall back to multicol above
+   until they ship it. */
+@supports (display: grid-lanes) {
+  .settings-grid {
+    display: grid-lanes;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: var(--space-5);
+    align-items: start;
+  }
+
+  .settings-grid > .panel {
+    margin-bottom: 0;
+  }
 }
 
 @container settings (max-width: 900px) {
   .settings-grid {
+    columns: 1;
     grid-template-columns: 1fr;
   }
 }

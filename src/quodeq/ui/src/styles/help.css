@@ -277,3 +277,81 @@
     padding-top: 0;
   }
 }
+
+/* ── Figures (HelpFigure) ────────────────────────────── */
+
+.help-figure {
+  margin: var(--space-4) 0;
+}
+
+.help-figure__frame {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+  padding: var(--space-4);
+  overflow: hidden;
+}
+
+.help-figure__frame--image {
+  padding: 0;
+  aspect-ratio: 16 / 10; /* screenshots are captured at 1440x900 */
+}
+
+.help-figure__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* alt-text presentation when the asset fails to load */
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.help-figure__caption {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+/* ── Illustration figure internals ───────────────────────── */
+
+.gf-curve-figure svg {
+  display: block;
+  width: 100%;
+  height: 96px;
+}
+
+.gf-curve-figure__chips {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.gf-curve-figure__chips .severity-tag {
+  margin-right: 0; /* the chips row spaces via flex gap, not prose margins */
+}
+
+.sg-figure__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.sg-figure__select {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
+  color: var(--color-text);
+}
+
+.sg-figure svg {
+  display: block;
+  width: 100%;
+  height: 56px;
+}

@@ -128,7 +128,7 @@ export function buildDimensionReport({ evalData, principleGrades, allViolations,
   lines.push(...buildComplianceSection(compliance));
 
   if (evalData?.partial) {
-    lines.push('> **Note:** Evaluation in progress — results may be incomplete.');
+    lines.push('> **Note:** Evaluation in progress. Results may be incomplete.');
     lines.push('');
   }
 

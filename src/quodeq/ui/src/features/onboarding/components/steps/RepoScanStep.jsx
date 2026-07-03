@@ -125,7 +125,7 @@ export default function RepoScanStep({ state, actions, createProject, getProject
     <div className="onboarding-step onboarding-step--repo-scan">
       <TermHeader name="repo" sub={`step ${stepIndex} of ${stepTotal} · paste a url or local folder`} />
       <p className="onboarding-step__pitch">
-        Paste a Git URL or pick a local folder. quodeq will scan it locally — no AI tokens used yet.
+        Paste a Git URL or pick a local folder. quodeq will scan it locally. No AI tokens used yet.
       </p>
 
       <div className={sub === 'idle' ? 'onboarding-repo-row' : 'onboarding-repo-row onboarding-form-locked'}>

@@ -183,7 +183,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   const errorBanner = isFailed
     ? <div className="scan-progress__error">{lastRelevantLog(job.logs) || 'Analysis failed'}</div>
     : isLost
-      ? <div className="scan-progress__error">Server restarted — job tracking lost</div>
+      ? <div className="scan-progress__error">Server restarted, job tracking lost</div>
       : null;
 
   return (

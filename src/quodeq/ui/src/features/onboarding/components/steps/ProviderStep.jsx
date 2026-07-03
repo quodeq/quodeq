@@ -99,7 +99,7 @@ export default function ProviderStep({ state, actions, onContinue, onBack, stepI
     <div className="onboarding-step onboarding-step--provider">
       <TermHeader name="provider" sub={`step ${stepIndex} of ${stepTotal} · pick an ai provider`} />
       <p className="onboarding-step__pitch">
-        quodeq sends source files to an AI model for review. Pick the provider you want to use — uninstalled providers are shown disabled with install hints.
+        quodeq sends source files to an AI model for review. Pick the provider you want to use. Uninstalled providers are shown disabled with install hints.
       </p>
 
       {summary}
