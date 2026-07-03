@@ -122,6 +122,7 @@ def register_assistant_routes(app: Flask) -> None:
                 api_base=api_base,
                 api_key=api_key, provider=session["provider"],
                 model=body.get("model") or session.get("model") or provider_cfg.get("model", ""),
+                web_enabled=bool(body.get("webEnabled", False)),
             )
             tool_ctx = build_tool_context(app, session)
 
