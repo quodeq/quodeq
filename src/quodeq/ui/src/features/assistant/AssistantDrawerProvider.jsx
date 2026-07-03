@@ -62,6 +62,9 @@ export function AssistantDrawerProvider({ children }) {
   const [height, setHeightState] = useState(readStoredHeight);
   const [sessionId, setSessionId] = useState(null);
   const [sessionCtxKey, setSessionCtxKey] = useState(null);
+  // Provider/model of the active session, surfaced so the drawer header can
+  // label the conversation. Sourced from the ctx passed to startSession.
+  const [sessionMeta, setSessionMeta] = useState({ provider: null, model: null });
   const [userTurns, setUserTurns] = useState([]);
 
   const stream = useAssistantStream(sessionId);
@@ -95,6 +98,7 @@ export function AssistantDrawerProvider({ children }) {
     setUserTurns([]);
     setSessionCtxKey(key);
     setSessionId(newSessionId);
+    setSessionMeta({ provider: ctx?.provider ?? null, model: ctx?.model ?? null });
   }, [sessionCtxKey, sessionId]);
 
   const sendMessage = useCallback((text, uiState) => {
@@ -113,8 +117,9 @@ export function AssistantDrawerProvider({ children }) {
     height, setHeight,
     messages, streaming: stream.streaming, error: stream.error,
     sessionReady: sessionId != null,
+    provider: sessionMeta.provider, model: sessionMeta.model,
     startSession, sendMessage,
-  }), [isOpen, open, close, toggle, height, setHeight, messages, stream.streaming, stream.error, sessionId, startSession, sendMessage]);
+  }), [isOpen, open, close, toggle, height, setHeight, messages, stream.streaming, stream.error, sessionId, sessionMeta, startSession, sendMessage]);
 
   return (
     <AssistantDrawerContext.Provider value={value}>
