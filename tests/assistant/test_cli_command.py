@@ -73,3 +73,22 @@ def test_gemini_turn1_preassign_and_resume():
     assert "--session-id" in spec1.argv and spec1.session_id == "sid-1"
     spec2 = _spec("gemini", prior_session_id="g-1")
     assert "-r" in spec2.argv and spec2.argv[spec2.argv.index("-r") + 1] == "g-1"
+
+
+def test_claude_web_enabled_swaps_native_web_tools():
+    spec = _spec("claude", web_enabled=True)
+    disallowed = spec.argv[spec.argv.index("--disallowedTools") + 1]
+    allowed = spec.argv[spec.argv.index("--allowedTools") + 1]
+    assert disallowed == "Bash Edit Write NotebookEdit"
+    assert allowed == "mcp__quodeq-assistant WebSearch WebFetch"
+
+
+def test_claude_web_disabled_keeps_hardened_defaults():
+    spec = _spec("claude")  # web_enabled defaults to False
+    assert spec.argv[spec.argv.index("--allowedTools") + 1] == "mcp__quodeq-assistant"
+    assert "WebFetch" in spec.argv[spec.argv.index("--disallowedTools") + 1]
+
+
+def test_web_flag_is_inert_for_codex_and_gemini():
+    assert _spec("codex", web_enabled=True).argv == _spec("codex").argv
+    assert _spec("gemini", web_enabled=True).argv == _spec("gemini").argv
