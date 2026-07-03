@@ -9,6 +9,8 @@ const TAB_LABELS = { assistant: '✦ Assistant', terminal: '❯_ Terminal' };
 
 // Providers where the web toggle does something: claude flips its native
 // WebSearch/WebFetch; local providers get in-process search_web/fetch_url.
+// Mirrors the backend gate (LOCAL_PROVIDERS in llm_bridge/_providers.py plus
+// the claude argv path in adapters/_cli_command.py) — keep the two in sync.
 const WEB_PROVIDERS = new Set(['claude', 'ollama', 'omlx', 'llamacpp']);
 
 /**

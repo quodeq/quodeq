@@ -349,3 +349,26 @@ def test_mcp_server_module_never_references_web_tools():
     # CLI web access with the toggle OFF (blanket --allowedTools on the server).
     source = Path(mcp_server.__file__).read_text(encoding="utf-8")
     assert "register_web_tools" not in source and "_web_tools" not in source
+
+
+def test_fetch_url_invalid_url_is_tool_error(no_ssrf, monkeypatch):
+    # httpx.InvalidURL is NOT an HTTPError subclass; it must still surface
+    # as a readable ToolError, not dispatch's "failed internally"
+    def boom(method, url, **kwargs):
+        raise httpx.InvalidURL("Invalid non-printable ASCII character in URL")
+
+    monkeypatch.setattr(httpx, "stream", boom)
+    with pytest.raises(ToolError, match="could not fetch"):
+        _web_tools._fetch_url("https://example.com/\tweird")
+
+
+def test_fetch_url_binary_content_rejected_before_body_read(no_ssrf, monkeypatch):
+    resp = _FakeStreamResponse(headers={"content-type": "image/png"}, body=b"\x89PNG")
+
+    def explode(*args, **kwargs):
+        raise AssertionError("body must not be read for binary content")
+
+    resp.iter_bytes = explode
+    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    with pytest.raises(ToolError, match="content type"):
+        _web_tools._fetch_url("https://example.com/logo.png")

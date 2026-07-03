@@ -152,6 +152,13 @@ def _fetch_url(url: str) -> dict:
             if resp.status_code != 200:
                 raise ToolError(f"could not fetch {url}: HTTP {resp.status_code}")
             content_type = resp.headers.get("content-type", "").lower()
+            # reject known-binary types before reading the body; empty
+            # content-type falls through to the texty default
+            is_texty = ("text/" in content_type or "json" in content_type
+                        or "xml" in content_type or content_type == "")
+            if not is_texty:
+                raise ToolError(f"unsupported content type {content_type!r}; only "
+                                "HTML, text, JSON and XML pages can be fetched")
             deadline = time.monotonic() + _MAX_FETCH_SECONDS
             parts: list[bytes] = []
             received = 0
@@ -168,13 +175,10 @@ def _fetch_url(url: str) -> dict:
                     break
             body = b"".join(parts)[:_MAX_FETCH_BYTES]
             encoding = resp.encoding or "utf-8"
-    except httpx.HTTPError as exc:
+    # InvalidURL is NOT an HTTPError subclass: a malformed-but-SSRF-passing URL
+    # (e.g. embedded tab) must fail readably, not as "failed internally"
+    except (httpx.HTTPError, httpx.InvalidURL) as exc:
         raise ToolError(f"could not fetch {url}: {exc}") from exc
-    is_texty = ("text/" in content_type or "json" in content_type
-                or "xml" in content_type or content_type == "")
-    if not is_texty:
-        raise ToolError(f"unsupported content type {content_type!r}; only HTML, "
-                        "text, JSON and XML pages can be fetched")
     try:
         text = body.decode(encoding, errors="replace")
     except (LookupError, UnicodeError):
