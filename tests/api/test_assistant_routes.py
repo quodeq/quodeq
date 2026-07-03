@@ -158,6 +158,26 @@ def test_explicit_rundir_still_wins(client, monkeypatch):
     assert resp.status_code == 201
 
 
+def test_resolve_run_location_rejects_path_traversal(monkeypatch, tmp_path):
+    # Evaluations root with a real run inside it, plus a sibling dir OUTSIDE
+    # the root that a "../.." project id could otherwise reach.
+    evals = tmp_path / "evaluations"
+    (evals / "proj" / "run-1").mkdir(parents=True)
+    outside = tmp_path / "outside" / "run-1"
+    outside.mkdir(parents=True)
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.get_evaluations_dir", lambda: str(evals)
+    )
+    from quodeq.api._assistant_helpers import resolve_run_location
+    # A traversal project id that would escape the root must NOT resolve, even
+    # though the escaped target ("../outside/run-1") exists on disk.
+    assert resolve_run_location("../outside", "run-1") == (None, None)
+    assert resolve_run_location("../..", "outside") == (None, None)
+    # Sanity: a legit project id still resolves inside the root.
+    run_dir, _ = resolve_run_location("proj", "run-1")
+    assert run_dir == str((evals / "proj" / "run-1").resolve())
+
+
 def test_apply_action_creates_standard(client, app):
     repo = _repo(app)
     repo.create_session(session_id="s1", provider="ollama")

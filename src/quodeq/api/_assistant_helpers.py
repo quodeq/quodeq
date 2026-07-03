@@ -29,7 +29,16 @@ def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str 
     the run directory does not exist on disk.
     """
     evaluations_root = Path(get_evaluations_dir())
-    run_dir = evaluations_root / project_id / run_id
+    # Jail the run dir to the evaluations root: a crafted project_id/run_id
+    # (e.g. "../..") must not resolve to a directory outside it. Mirrors the
+    # guard in services/_fs_projects.get_project_info (is_relative_to check)
+    # and routes_common.reports_dir. Store the RESOLVED path so the session
+    # column can never carry ".." segments.
+    run_dir = (evaluations_root / project_id / run_id).resolve()
+    try:
+        run_dir.relative_to(evaluations_root.resolve())
+    except ValueError:
+        return None, None
     if not run_dir.is_dir():
         return None, None
     info = get_project_info(str(evaluations_root), project_id)
