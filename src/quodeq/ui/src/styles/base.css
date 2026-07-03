@@ -2096,17 +2096,36 @@ fieldset.gf-tab-body:disabled .gf-boundary-divider { pointer-events: none; curso
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.5rem 1rem;
-  background: var(--panel, #1c1c1c);
-  border-bottom: 1px solid var(--border, #333);
-  font-size: 0.85rem;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface-alt);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: var(--text-sm);
 }
-.update-banner--security { border-bottom-color: #c0392b; }
-.update-banner-actions { display: flex; align-items: center; gap: 0.5rem; }
+.update-banner-text { min-width: 0; }
+/* Matches the inline-code idiom from .help-section code; the banner bg is
+   already surface-alt, so the chip drops to the page bg to stand out. */
+.update-banner-cmd {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  padding: 2px 7px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent);
+  white-space: nowrap;
+  user-select: all; /* one click selects the whole command for copy */
+}
+.update-banner--security {
+  background: color-mix(in srgb, var(--color-danger) 10%, var(--color-bg));
+  border-bottom-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
+}
+.update-banner-actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
 .update-banner-dismiss {
   background: none; border: none; cursor: pointer;
   font-size: 1.1rem; line-height: 1; color: inherit; opacity: 0.7;
+  padding: 2px 6px;
 }
 .update-banner-dismiss:hover { opacity: 1; }
 
