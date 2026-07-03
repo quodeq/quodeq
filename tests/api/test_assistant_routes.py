@@ -182,6 +182,33 @@ def test_idle_limit_is_a_600s_safety_cap_not_a_60s_timeout():
     assert _assistant_helpers._IDLE_LIMIT == 2400
 
 
+def test_turn_lock_is_freed_when_setup_raises(client, app, monkeypatch):
+    # If build_tool_context (or anything else between the lock `add` and the
+    # worker thread starting) raises, the session's slot must still be freed
+    # -- otherwise every future POST to this session 409s forever.
+    calls = {"n": 0}
+
+    def _boom(*_a, **_kw):
+        calls["n"] += 1
+        raise RuntimeError("setup exploded")
+
+    monkeypatch.setattr("quodeq.api.assistant_routes.build_tool_context", _boom)
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
+
+    # TESTING=True propagates unhandled exceptions to the test client instead
+    # of converting them to a 500 response -- assert the exception surfaces
+    # (mirroring the real 500 a caller would get), not a canned status code.
+    with pytest.raises(RuntimeError, match="setup exploded"):
+        client.post(f"/api/assistant/sessions/{sid}/messages", json={"text": "hi"})
+    assert calls["n"] == 1
+
+    # The slot must have been freed -- a second POST must NOT see a stale 409.
+    with pytest.raises(RuntimeError, match="setup exploded"):
+        client.post(f"/api/assistant/sessions/{sid}/messages", json={"text": "hi again"})
+    assert calls["n"] == 2
+
+
 def test_post_message_unknown_session_404(client):
     assert client.post("/api/assistant/sessions/nope/messages",
                        json={"text": "x"}).status_code == 404
@@ -240,12 +267,23 @@ def test_create_session_stores_project_id_without_run(client, app):
     assert sess["run_id"] is None
 
 
-def test_explicit_rundir_still_wins(client, monkeypatch):
+def test_client_supplied_rundir_repo_root_are_ignored(client, app, monkeypatch):
+    # Client-supplied runDir/repoRoot must NOT be stored verbatim -- they'd
+    # flow to the MCP subprocess's --run-dir/--repo-root with no path jail,
+    # giving arbitrary server-side file access. Without projectId/runId the
+    # session must stay unscoped, not adopt the raw client values.
     monkeypatch.setattr("quodeq.api._assistant_helpers.resolve_run_location",
                         lambda *a: (_ for _ in ()).throw(AssertionError("should not resolve")))
     resp = client.post("/api/assistant/sessions",
                        json={"provider": "ollama", "runDir": "/explicit/run", "repoRoot": "/explicit/repo"})
     assert resp.status_code == 201
+    sid = resp.get_json()["sessionId"]
+    from quodeq.data.sqlite.assistant_repository import AssistantRepository
+    sess = AssistantRepository(app.config["ASSISTANT_DB_PATH"]).get_session(sid)
+    assert sess["run_id"] != "/explicit/run"
+    assert sess["project_uuid"] != "/explicit/repo"
+    assert sess["run_id"] is None
+    assert sess["project_uuid"] is None
 
 
 def test_resolve_run_location_rejects_path_traversal(monkeypatch, tmp_path):

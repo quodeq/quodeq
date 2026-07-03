@@ -113,11 +113,18 @@ it('null sessionId opens no stream', () => {
   expect(MockES.instances.length).toBe(0);
 });
 
-it('60s with no data frames at all times out (no heartbeat to save it)', () => {
-  const { result } = renderHook(() => useAssistantStream('s1'));
+it('60s with no data frames at all times out and ends the turn cleanly (no heartbeat to save it)', () => {
+  const onDone = vi.fn();
+  const { result } = renderHook(() => useAssistantStream('s1', { onDone }));
+  const es = MockES.instances[0];
   act(() => { vi.advanceTimersByTime(61000); });
   expect(result.current.error).toBe('stream timed out');
   expect(result.current.streaming).toBe(false);
+  // The timeout must end the turn (so turnActive doesn't stick forever) and
+  // must NOT close the stream -- a closed EventSource with no reconnect
+  // would wedge the drawer permanently.
+  expect(onDone).toHaveBeenCalledTimes(1);
+  expect(es.closed).toBeFalsy();
 });
 
 it('a heartbeat data frame resets inactivity so a slow model does not time out', () => {

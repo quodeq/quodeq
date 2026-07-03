@@ -76,6 +76,22 @@ def test_tools_call_dispatches_registry():
     assert "security" in result["content"][0]["text"]
 
 
+def test_tools_call_truncates_oversized_result():
+    reg = ToolRegistry()
+    huge = "x" * (server.MAX_TOOL_RESULT_CHARS + 5000)
+    reg.register(ToolSpec("get_scores", "scores", {"type": "object", "properties": {}},
+                          lambda: {"blob": huge}))
+    stdin = io.StringIO(json.dumps(
+        {"jsonrpc": "2.0", "id": 5, "method": "tools/call",
+         "params": {"name": "get_scores", "arguments": {}}}) + "\n")
+    stdout, stderr = io.StringIO(), io.StringIO()
+    server.serve(reg, stdin=stdin, stdout=stdout, stderr=stderr)
+    frames = [json.loads(l) for l in stdout.getvalue().splitlines() if l.strip()]
+    text = frames[0]["result"]["content"][0]["text"]
+    assert len(text) <= server.MAX_TOOL_RESULT_CHARS + len(" ...[truncated]")
+    assert text.endswith(" ...[truncated]")
+
+
 def test_tools_call_unknown_tool_is_error():
     out = _run([{"jsonrpc": "2.0", "id": 4, "method": "tools/call",
                  "params": {"name": "nope", "arguments": {}}}])

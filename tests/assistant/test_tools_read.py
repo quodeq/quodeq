@@ -82,6 +82,14 @@ def test_search_findings(ctx):
     assert hit["requirement"] == "req-1"
 
 
+def test_search_findings_limit_floor_clamped(ctx):
+    # limit=0 (or negative) must not reach the repo -- clamp to >=1 instead.
+    reg = build_registry(ctx)
+    out = reg.dispatch("search_findings", {"query": "sql injection", "limit": 0})
+    assert out["ok"] is True
+    assert len(out["result"]["findings"]) == 1
+
+
 def test_search_findings_without_run(ctx):
     no_run = replace(ctx, run_dir=None)
     out = build_registry(no_run).dispatch("search_findings", {"query": "x"})
@@ -218,10 +226,15 @@ def test_get_report_accumulated(acc_ctx):
     out = build_registry(acc_ctx).dispatch("get_report", {"dimension": "security"})["result"]
     assert out["overallGrade"] == "Exemplary"
     assert out["fromRun"] == "runA"
-    assert out["principles"] == [{"principle": "S1", "grade": "A"}]
+    # `principle` is normalized to also carry `name` so callers don't need to
+    # know which scope (run vs. accumulated) they're reading.
+    assert out["principles"] == [{"principle": "S1", "grade": "A", "name": "S1"}]
     # practiceId is normalized to `principle`; snippet/context dropped.
     assert {v["principle"] for v in out["violations"]} == {"S1", "S2"}
     assert all("snippet" not in v and "context" not in v for v in out["violations"])
+    # DimensionResult has no coverage field -- omit rather than return a key
+    # that's always null in this scope.
+    assert "coveragePct" not in out
 
 
 def test_get_report_accumulated_unknown_dimension(acc_ctx):

@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import logging
+import os
+import shutil
+import signal
 import subprocess
 import tempfile
 import threading
@@ -21,6 +24,22 @@ from quodeq.data.sqlite.assistant_repository import AssistantRepository
 _logger = logging.getLogger(__name__)
 
 TURN_TIMEOUT_S = 300
+
+
+def _kill_proc_tree(proc) -> None:
+    # The proc is spawned with start_new_session=True (its own process
+    # group): killing only the leader can leave orphaned children (e.g. a
+    # spawned MCP server child) running. Kill the whole group; fall back to
+    # killing just the leader when the pid isn't a real process group (a
+    # scripted test double, or the process already reaped).
+    pid = getattr(proc, "pid", None)
+    try:
+        os.killpg(os.getpgid(pid), signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError, TypeError, AttributeError):
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
 
 
 @dataclass(frozen=True)
@@ -59,13 +78,15 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
                                     separator=cli_cfg.mcp_add_separator)
     proc = None
     timer = None
+    cwd = None
     try:
         spec = build_turn_argv(cli_cfg, prompt=prompt, model=cfg.model,
                                mcp_config_path=mcp_config_path,
                                prior_session_id=prior_session_id, new_session_id=new_session_id)
-        proc = spawn_fn(spec.argv, cwd=scratch_cwd(cfg.scratch_base), env=build_chat_env())
+        cwd = scratch_cwd(cfg.scratch_base)
+        proc = spawn_fn(spec.argv, cwd=cwd, env=build_chat_env())
         # wall-clock guard: a hung/silent CLI can't wedge the turn slot forever
-        timer = threading.Timer(TURN_TIMEOUT_S, proc.kill)
+        timer = threading.Timer(TURN_TIMEOUT_S, lambda: _kill_proc_tree(proc))
         timer.start()
         texts, parsed_sid = [], spec.session_id
         last_emitted = None
@@ -93,7 +114,7 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
         try:
             returncode = proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
-            proc.kill()
+            _kill_proc_tree(proc)
             returncode = proc.wait()
         final = texts[-1] if texts else ""
         if parsed_sid:
@@ -103,11 +124,13 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
         if timer is not None:
             timer.cancel()
         if proc is not None and proc.poll() is None:
-            proc.kill()
+            _kill_proc_tree(proc)
         if mcp_config_path:
             Path(mcp_config_path).unlink(missing_ok=True)
         if cli_cfg.mcp_style != "config-file":
             mcp_config.unregister_cli_mcp(cli_cfg.cmd)
+        if cwd is not None:
+            shutil.rmtree(cwd, ignore_errors=True)
 
 
 def run_cli_turn(*, messages: list[dict], config: CliTurnConfig, session_id: str,

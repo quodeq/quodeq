@@ -80,7 +80,7 @@ def _severity_key(v: dict):
 
 def _search_findings(ctx: ToolContext, query: str, limit: int = 20) -> dict:
     run_dir = _require_run(ctx)
-    hits = SqliteFindingsRepository(run_dir).search(query, limit=min(int(limit), 50))
+    hits = SqliteFindingsRepository(run_dir).search(query, limit=max(1, min(int(limit), 50)))
     # Model-facing key is "requirement"; the Finding attribute is `req`
     # (see data/sqlite/_row_mappers.py row_to_finding).
     return {"findings": [
@@ -134,13 +134,20 @@ def _get_report(ctx: ToolContext, dimension: str) -> dict:
         raise ToolError(
             f"no report for dimension: {dimension}. Available: {avail or '(none)'}")
     viols = entry.get("violations") or []
+    # Run-scoped principles are keyed "name"; the accumulated (PrincipleGrade)
+    # shape keys the same thing "principle" -- normalize so callers can always
+    # read `name` regardless of scope, without dropping any existing keys.
+    principles = [{**p, "name": p.get("name") or p.get("principle")}
+                  for p in (entry.get("principles") or [])]
     return {
         "dimension": entry.get("dimension"),
         "overallScore": entry.get("overallScore"),
         "overallGrade": entry.get("overallGrade"),
-        "principles": entry.get("principles"),
+        "principles": principles,
         "totals": entry.get("totals"),
-        "coveragePct": entry.get("coveragePct"),
+        # No coveragePct key here: DimensionResult (the accumulated payload)
+        # has no coverage field, so this was always None -- omit rather than
+        # return a key that's permanently null.
         # The accumulated view picks each dimension's latest run independently;
         # expose which run this dimension's data came from.
         "fromRun": entry.get("fromRunId"),

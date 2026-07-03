@@ -50,15 +50,17 @@ def register_assistant_routes(app: Flask) -> None:
             return jsonify({"error": "unknown or unsupported provider"}), 400
         session_id = uuid.uuid4().hex
         # Plan 1 mapping: runDir → run_id column, repoRoot → project_uuid column.
-        # Plan 3: the UI may only know {projectId, runId}; resolve run_dir/repo_root
-        # server-side in that case. Explicit runDir/repoRoot always win.
-        run_dir = body.get("runDir")
-        repo_root = body.get("repoRoot")
+        # Client-supplied runDir/repoRoot are NOT honored: they'd flow to the
+        # MCP subprocess's --run-dir/--repo-root with no path jail, giving a
+        # remote API-key caller arbitrary server-side file access. The real UI
+        # never sends these — it sends {projectId, runId} and the server
+        # resolves run_dir/repo_root itself via the jailed resolver.
+        run_dir, repo_root = None, None
         # Only bind a single run when the UI selected a SPECIFIC run. On the
         # overview it sends projectId with no runId → the session stays
         # run-unscoped and the detail tools read the accumulated
         # (per-dimension-latest) composition from project_id + reports_dir.
-        if not run_dir and body.get("projectId") and body.get("runId"):
+        if body.get("projectId") and body.get("runId"):
             run_dir, repo_root = _assistant_helpers.resolve_run_location(
                 str(body["projectId"]), str(body["runId"]),
             )
@@ -87,42 +89,51 @@ def register_assistant_routes(app: Flask) -> None:
             if sid in _running_turns:
                 return jsonify({"error": "a turn is already running"}), 409
             _running_turns.add(sid)
-        provider_cfg = _api_provider(session["provider"]) or {}
-        catalog_cfg = _known_provider(session["provider"])
-        # CLI providers (claude/codex/gemini) have no HTTP endpoint to pin or
-        # override — the orchestrator's run_turn dispatches them internally
-        # (spawning the CLI subprocess), so apiBase/apiKey are meaningless
-        # here and left unset.
-        if catalog_cfg is not None and catalog_cfg.get("type") == "cli":
-            api_base = ""
-            api_key = None
-        # Fixed-endpoint local providers (ollama/llamacpp/omlx) always talk to
-        # the server's catalog api_base; a caller-supplied apiBase would let a
-        # request redirect the turn (and its tool calls) at an arbitrary host.
-        # Only genuinely caller-defined providers (custom, openrouter) may
-        # override apiBase/apiKey from the request body.
-        elif session["provider"] in _FIXED_ENDPOINT_PROVIDERS:
-            api_base = provider_cfg.get("api_base", "")
-            api_key = None
-        else:
-            api_base = body.get("apiBase") or provider_cfg.get("api_base", "")
-            api_key = body.get("apiKey")
-        turn = TurnRequest(
-            session_id=sid, text=text, ui_state=body.get("uiState"),
-            api_base=api_base,
-            api_key=api_key, provider=session["provider"],
-            model=body.get("model") or session.get("model") or provider_cfg.get("model", ""),
-        )
-        tool_ctx = build_tool_context(app, session)
+        # Everything from here through Thread.start() must free the slot on
+        # failure — otherwise an exception (e.g. build_tool_context blowing
+        # up) leaves `sid` in `_running_turns` forever and every future POST
+        # to this session 409s permanently.
+        try:
+            provider_cfg = _api_provider(session["provider"]) or {}
+            catalog_cfg = _known_provider(session["provider"])
+            # CLI providers (claude/codex/gemini) have no HTTP endpoint to pin or
+            # override — the orchestrator's run_turn dispatches them internally
+            # (spawning the CLI subprocess), so apiBase/apiKey are meaningless
+            # here and left unset.
+            if catalog_cfg is not None and catalog_cfg.get("type") == "cli":
+                api_base = ""
+                api_key = None
+            # Fixed-endpoint local providers (ollama/llamacpp/omlx) always talk to
+            # the server's catalog api_base; a caller-supplied apiBase would let a
+            # request redirect the turn (and its tool calls) at an arbitrary host.
+            # Only genuinely caller-defined providers (custom, openrouter) may
+            # override apiBase/apiKey from the request body.
+            elif session["provider"] in _FIXED_ENDPOINT_PROVIDERS:
+                api_base = provider_cfg.get("api_base", "")
+                api_key = None
+            else:
+                api_base = body.get("apiBase") or provider_cfg.get("api_base", "")
+                api_key = body.get("apiKey")
+            turn = TurnRequest(
+                session_id=sid, text=text, ui_state=body.get("uiState"),
+                api_base=api_base,
+                api_key=api_key, provider=session["provider"],
+                model=body.get("model") or session.get("model") or provider_cfg.get("model", ""),
+            )
+            tool_ctx = build_tool_context(app, session)
 
-        def _worker():
-            try:
-                run_turn(turn, repository=repo, tool_ctx=tool_ctx)
-            finally:
-                with _running_lock:
-                    _running_turns.discard(sid)
+            def _worker():
+                try:
+                    run_turn(turn, repository=repo, tool_ctx=tool_ctx)
+                finally:
+                    with _running_lock:
+                        _running_turns.discard(sid)
 
-        threading.Thread(target=_worker, daemon=True).start()
+            threading.Thread(target=_worker, daemon=True).start()
+        except Exception:
+            with _running_lock:
+                _running_turns.discard(sid)
+            raise
         return jsonify({"accepted": True}), 202
 
     @app.get("/api/assistant/sessions/<sid>/events")

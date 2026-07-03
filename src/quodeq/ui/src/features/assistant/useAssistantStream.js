@@ -46,11 +46,6 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
       if (timer.current == null) timer.current = setTimeout(flushTokens, 50);
     };
     const append = (msg) => setMessages((prev) => [...prev, msg]);
-    const resetInactivity = () => {
-      if (inactivity.current) clearTimeout(inactivity.current);
-      inactivity.current = setTimeout(() => { es.close(); setStreaming(false); setError('stream timed out'); }, INACTIVITY_MS);
-    };
-
     const es = new EventSource(assistantEventsUrl(sessionId, 0));
     // End the TURN (flush, clear spinner, mark a boundary, notify the
     // provider) WITHOUT closing the connection — the stream stays open so the
@@ -58,6 +53,16 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
     // effect cleanup (sessionId change / unmount).
     const endTurn = () => { flushTokens(); setStreaming(false);
       turnBoundary.current = true; onDoneRef.current?.(); };
+    const resetInactivity = () => {
+      if (inactivity.current) clearTimeout(inactivity.current);
+      // End the turn cleanly (same as any other terminal frame) instead of
+      // closing the stream: closing here would leave the provider's
+      // turnActive stuck true forever (endTurn never ran) AND kill the
+      // EventSource with nothing left to reconnect it, wedging the drawer.
+      // Leaving the connection open lets the next turn (or a heartbeat)
+      // recover it.
+      inactivity.current = setTimeout(() => { setError('stream timed out'); endTurn(); }, INACTIVITY_MS);
+    };
     // First content frame of a turn: re-arm streaming and, once a turn
     // boundary has been crossed, clear any stale stream error from the prior
     // turn so a retry starts clean.

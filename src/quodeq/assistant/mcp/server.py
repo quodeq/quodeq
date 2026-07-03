@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import TextIO
 
+from quodeq.assistant.guard import MAX_TOOL_RESULT_CHARS
 from quodeq.assistant.mcp import _jsonrpc
 from quodeq.assistant.tools import ToolContext, build_registry
 from quodeq.assistant.tools._registry import ToolRegistry
@@ -27,7 +28,10 @@ def _tools_list(registry: ToolRegistry) -> dict:
 
 def _tools_call(registry: ToolRegistry, params: dict) -> dict:
     result = registry.dispatch(params.get("name", ""), params.get("arguments") or {})
-    return {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}],
+    text = json.dumps(result, ensure_ascii=False)
+    if len(text) > MAX_TOOL_RESULT_CHARS:
+        text = text[:MAX_TOOL_RESULT_CHARS] + " ...[truncated]"
+    return {"content": [{"type": "text", "text": text}],
             "isError": not result.get("ok", False)}
 
 
