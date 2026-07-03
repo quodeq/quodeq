@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.2] - 2026-07-03
+
+### Improvements
+- **In-app Help refreshed for the 1.3-1.5 features**: the Help screen now documents the Grade Formula editor, score history grouping, the omlx and llama.cpp local providers, and update notifications, illustrated with theme-paired screenshots throughout. The Violations help matches the real sub-tabs and the provider list is complete.
+- **Adaptive Settings layout**: the Settings screen flows its option groups into as many columns as the window width allows (CSS grid lanes with a multi-column fallback) instead of a single fixed column.
+- **Theme-reactive views**: dark-mode detection moved to a shared reactive hook, so the map and other visualizations repaint immediately when you switch between light and dark themes.
+
+### Fixes
+- **Elastic overscroll confined to content**: on macOS the rubber-band scroll is now limited to the content area, so the topbar and sidebar stay fixed instead of bouncing with the whole window.
+- **Grade-formula boundaries hint**: the hint now mentions the arrow-key path for nudging grade boundaries, matching the keyboard support already in place.
+- **Plain punctuation in the UI**: em-dashes were removed from user-facing strings.
+
 ## [1.5.1] - 2026-07-01
 
 ### Fixes
