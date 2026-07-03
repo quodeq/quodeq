@@ -418,10 +418,20 @@
   background: color-mix(in srgb, var(--color-accent) 10%, transparent);
 }
 .drawer-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-/* Provider·model hint — was too faint in `--color-text-muted`; use a clearly
-   readable de-emphasized tone. */
-.assistant-drawer-subtitle {
-  font-size: 0.75rem;
-  color: color-mix(in srgb, var(--color-text) 78%, transparent);
-  padding: 2px 1rem 0;
+/* Model pill in the drawer header (Assistant tab): a compact accent chip that
+   integrates the provider/model without a separate subtitle line. */
+.drawer-model-chip {
+  align-self: center;
+  max-width: 45%;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

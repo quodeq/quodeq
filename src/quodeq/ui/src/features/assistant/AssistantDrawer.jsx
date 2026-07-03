@@ -13,7 +13,9 @@ import { MessageList } from './MessageList.jsx';
  * tab) and forwarded verbatim to `sendMessage` on every send.
  */
 export function AssistantPane({ uiState }) {
-  const { provider, model, messages, streaming, error, sendMessage } = useAssistantDrawer();
+  // provider/model are shown as a pill in the drawer header (BottomDrawer),
+  // not here — keeps the pane's content area clean.
+  const { messages, streaming, error, sendMessage } = useAssistantDrawer();
   const [draft, setDraft] = useState('');
 
   const handleSend = useCallback(() => {
@@ -29,7 +31,6 @@ export function AssistantPane({ uiState }) {
 
   return (
     <>
-      <div className="assistant-drawer-subtitle">{provider}{model ? ` · ${model}` : ''}</div>
       <MessageList messages={messages} streaming={streaming} />
       {error && <div className="assistant-drawer-error" role="alert">{error}</div>}
       <div className="assistant-drawer-input-row">

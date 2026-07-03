@@ -17,7 +17,7 @@ const TAB_LABELS = { assistant: '✦ Assistant', terminal: '❯_ Terminal' };
  */
 export function BottomDrawer({ uiState }) {
   const { isOpen, height, setHeight, closeActiveTab, openPanels, activeTab, selectTab,
-          maximized, toggleMaximized, setMaximized } = useAssistantDrawer();
+          maximized, toggleMaximized, setMaximized, provider, model } = useAssistantDrawer();
   const dragRef = useRef(null);
 
   const handleDragMove = useCallback((event) => {
@@ -64,6 +64,11 @@ export function BottomDrawer({ uiState }) {
           ))}
         </div>
         <div className="assistant-drawer-controls">
+          {active === 'assistant' && (model || provider) && (
+            <span className="drawer-model-chip" title={`${provider || ''}${model ? ` · ${model}` : ''}`}>
+              {model || provider}
+            </span>
+          )}
           <button type="button" className="assistant-drawer-btn" onClick={toggleMaximized}
             aria-label={maximized ? 'Restore drawer' : 'Maximize drawer'}
             aria-pressed={maximized}
