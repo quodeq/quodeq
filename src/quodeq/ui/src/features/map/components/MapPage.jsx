@@ -8,21 +8,14 @@ import useMapPageState from './useMapPageState.js';
 import { TermHeader } from '../../../components/terminal/index.js';
 import EmptyState from '../../../components/EmptyState.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
+import { useThemeIsDark } from '../../../hooks/useThemeIsDark.js';
 
-function getAppThemeInfo() {
-  const attr = document.documentElement.getAttribute('data-theme') || '';
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const isDark = attr.includes('dark') || (!attr.includes('light') && prefersDark);
-  const family = attr.replace(/-?(dark|light)$/, '') || 'daruma';
-  return { isDark, family, attr };
-}
-
-function isAppDark() {
-  return getAppThemeInfo().isDark;
-}
-
+// data-theme attr for forcing the viz dark while the app is light: keep the
+// active theme family, swap the mode suffix. Attribute values: absent =
+// daruma family in system mode; otherwise 'light' | 'dark' | '<family>-<mode>'.
 function getDarkThemeAttr() {
-  const { family } = getAppThemeInfo();
+  const attr = document.documentElement.getAttribute('data-theme') || '';
+  const family = attr.replace(/-?(dark|light)$/, '') || 'daruma';
   return family === 'daruma' ? 'dark' : `${family}-dark`;
 }
 
@@ -132,19 +125,20 @@ function MapBreadcrumb({ path, onNavigate, projectName }) {
 }
 
 function MapVizContainer({ vizState, treeState, dimensions, callbacks, display }) {
+  const appIsDark = useThemeIsDark();
   const { vizStyle, viewMode, galaxyMode, setGalaxyMode } = vizState;
   const { node, fullTree, currentPath, onPathChange } = treeState;
   const { onDrillDown, onFileClick, onNavigate, onBreadcrumbNav } = callbacks;
   const { showLabels, setShowLabels, darkMode, setDarkMode, breadcrumb, resetKey, projectName, standardTypes } = display;
   return (
-    <div className="map-viz-container" {...(darkMode && !isAppDark() ? { 'data-theme': getDarkThemeAttr() } : {})}>
+    <div className="map-viz-container" {...(darkMode && !appIsDark ? { 'data-theme': getDarkThemeAttr() } : {})}>
       {vizStyle !== 'galaxy' && <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} projectName={projectName} />}
       <div className="map-viz-toggles">
         <label className="map-label-toggle">
           <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} />
           Labels
         </label>
-        {!isAppDark() && (
+        {!appIsDark && (
           <label className="map-label-toggle">
             <input type="checkbox" checked={!darkMode} onChange={(e) => setDarkMode(!e.target.checked)} />
             Light
