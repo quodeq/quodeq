@@ -58,35 +58,59 @@ export default function TerminalPane({ active }) {
   // Mount xterm once when we're allowed and active.
   useEffect(() => {
     if (!socketActive || termRef.current || !rootRef.current) return undefined;
-    // Same --font-mono family + 12px as the violations code panel.
-    // (letterSpacing left at the default 0 — negative values clip glyphs in
-    // xterm's cell renderer.)
-    const term = new Terminal({
-      scrollback: 5000,
-      fontFamily: 'var(--font-mono, monospace)',
-      fontSize: 12,
-      lineHeight: 1.5,
-      cursorBlink: true,
-      cursorStyle: 'bar',     // sleeker than the default square block
-      theme: themeFromCss(),
-    });
-    const fit = new FitAddon();
-    term.loadAddon(fit);
-    term.open(rootRef.current);
-    term.attachCustomKeyEventHandler((e) => !isReservedChord(e));
-    term.onData((d) => send(d));
-    fit.fit();
-    resize(term.cols, term.rows);
-    termRef.current = term; fitRef.current = fit;
-    // Not implemented in JSDOM; guard so tests (and any environment lacking it) don't crash.
-    const ro = typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(() => { try { fit.fit(); resize(term.cols, term.rows); } catch { /* noop */ } })
-      : null;
-    ro?.observe(rootRef.current);
-    const onTheme = () => { term.options.theme = themeFromCss(); };
-    const mo = typeof MutationObserver !== 'undefined' ? new MutationObserver(onTheme) : null;
-    mo?.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => { ro?.disconnect(); mo?.disconnect(); term.dispose(); termRef.current = null; fitRef.current = null; };
+    let disposed = false;
+    let ro = null;
+    let mo = null;
+
+    const setup = () => {
+      if (disposed || termRef.current || !rootRef.current) return;
+      // Same --font-mono family + 12px as the violations code panel.
+      const term = new Terminal({
+        scrollback: 5000,
+        fontFamily: 'var(--font-mono, monospace)',
+        fontSize: 12,
+        lineHeight: 1.5,
+        cursorBlink: true,
+        cursorStyle: 'bar',     // sleeker than the default square block
+        theme: themeFromCss(),
+      });
+      const fit = new FitAddon();
+      term.loadAddon(fit);
+      term.open(rootRef.current);
+      term.attachCustomKeyEventHandler((e) => !isReservedChord(e));
+      term.onData((d) => send(d));
+      fit.fit();
+      resize(term.cols, term.rows);
+      termRef.current = term; fitRef.current = fit;
+      // Not implemented in JSDOM; guard so tests (and any environment lacking it) don't crash.
+      ro = typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(() => { try { fit.fit(); resize(term.cols, term.rows); } catch { /* noop */ } })
+        : null;
+      ro?.observe(rootRef.current);
+      const onTheme = () => { term.options.theme = themeFromCss(); };
+      mo = typeof MutationObserver !== 'undefined' ? new MutationObserver(onTheme) : null;
+      mo?.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    };
+
+    // JetBrains Mono is an async Google webfont (display=swap). xterm measures
+    // the character-cell width ONCE at open(); if that happens before the font
+    // loads it caches the fallback's cell, then JBM's glyphs render inside the
+    // wrong-width cells -> visible extra space between characters. Build the
+    // terminal only after the font is ready (falls back gracefully if it fails
+    // or the Font Loading API is absent, e.g. jsdom tests -> synchronous).
+    const fonts = typeof document !== 'undefined' ? document.fonts : null;
+    if (fonts && fonts.load) {
+      Promise.resolve(fonts.load('12px "JetBrains Mono"')).catch(() => {}).then(setup);
+    } else {
+      setup();
+    }
+
+    return () => {
+      disposed = true;
+      ro?.disconnect(); mo?.disconnect();
+      if (termRef.current) { termRef.current.dispose(); }
+      termRef.current = null; fitRef.current = null;
+    };
   }, [socketActive, send, resize]);
 
   // Refit when the tab becomes active again (drawer was on the other tab).
