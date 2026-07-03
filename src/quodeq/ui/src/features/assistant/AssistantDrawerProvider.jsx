@@ -78,7 +78,15 @@ export function AssistantDrawerProvider({ children }) {
   // still the latest requested one.
   const latestKeyRef = useRef(null);
 
-  const stream = useAssistantStream(sessionId);
+  // Whether a turn is actually in flight (between sending a message and the
+  // stream's terminal done/error frame). This — NOT the SSE connection state —
+  // drives the drawer's loading indicator and input-disable. Merely opening a
+  // session connects the event stream, which must not look like "loading".
+  const [turnActive, setTurnActive] = useState(false);
+  const stream = useAssistantStream(sessionId, { onDone: () => setTurnActive(false) });
+
+  // A fresh session (open, project/run switch) has no turn in flight.
+  useEffect(() => { setTurnActive(false); }, [sessionId]);
 
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
@@ -134,12 +142,14 @@ export function AssistantDrawerProvider({ children }) {
     if (!sessionId) return;
     setLocalError(null);
     setUserTurns((prev) => [...prev, { role: 'user', text, atIndex: stream.messages.length }]);
+    setTurnActive(true);  // turn is now in flight until the stream's done/error
     try {
       await postAssistantMessage(sessionId, { text, uiState });
     } catch (err) {
       // The optimistic user turn stays in the transcript; surface the failure
       // so the user knows the message didn't reach the assistant.
       setLocalError(`Couldn't send message: ${err?.message || err}`);
+      setTurnActive(false);
     }
   }, [sessionId, stream.messages.length]);
 
@@ -151,11 +161,11 @@ export function AssistantDrawerProvider({ children }) {
   const value = useMemo(() => ({
     isOpen, open, close, toggle,
     height, setHeight,
-    messages, streaming: stream.streaming, error: localError || stream.error,
+    messages, streaming: turnActive, error: localError || stream.error,
     sessionReady: sessionId != null,
     provider: sessionMeta.provider, model: sessionMeta.model,
     startSession, sendMessage,
-  }), [isOpen, open, close, toggle, height, setHeight, messages, stream.streaming, stream.error, localError, sessionId, sessionMeta, startSession, sendMessage]);
+  }), [isOpen, open, close, toggle, height, setHeight, messages, turnActive, stream.error, localError, sessionId, sessionMeta, startSession, sendMessage]);
 
   return (
     <AssistantDrawerContext.Provider value={value}>

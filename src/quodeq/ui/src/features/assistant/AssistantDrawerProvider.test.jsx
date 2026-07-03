@@ -7,8 +7,12 @@ vi.mock('../../api/assistant.js', () => ({
   postAssistantMessage: vi.fn(async () => ({ accepted: true })),
   assistantEventsUrl: (id, a) => `/api/assistant/sessions/${id}/events?after=${a}`,
 }));
+const _streamHooks = { onDone: null };
 vi.mock('./useAssistantStream.js', () => ({
-  useAssistantStream: () => ({ messages: [], streaming: false, error: null, reset: vi.fn() }),
+  useAssistantStream: (_sessionId, opts) => {
+    _streamHooks.onDone = opts?.onDone || null;  // capture so tests can fire it
+    return { messages: [], streaming: false, error: null, reset: vi.fn() };
+  },
 }));
 import { createAssistantSession, postAssistantMessage } from '../../api/assistant.js';
 
@@ -17,6 +21,7 @@ function Probe() {
   return (
     <div>
       <span data-testid="open">{String(d.isOpen)}</span>
+      <span data-testid="streaming">{String(d.streaming)}</span>
       <span data-testid="provider">{String(d.provider)}</span>
       <span data-testid="model">{String(d.model)}</span>
       <span data-testid="error">{String(d.error)}</span>
@@ -31,6 +36,20 @@ function Probe() {
 
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => localStorage.clear());
+
+it('streaming reflects an in-flight turn, not the open session/connection', async () => {
+  render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+  // Opening a session must NOT look like loading (regression: streaming was
+  // true on SSE connect, so the drawer span forever with a disabled input).
+  await act(async () => { screen.getByText('start').click(); });
+  expect(screen.getByTestId('streaming').textContent).toBe('false');
+  // Sending a message starts a turn → loading.
+  await act(async () => { screen.getByText('send').click(); });
+  expect(screen.getByTestId('streaming').textContent).toBe('true');
+  // The stream's terminal done/error frame ends the turn → not loading.
+  act(() => { _streamHooks.onDone?.(); });
+  expect(screen.getByTestId('streaming').textContent).toBe('false');
+});
 
 it('toggle flips visibility', () => {
   render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
