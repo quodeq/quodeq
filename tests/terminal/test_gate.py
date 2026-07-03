@@ -1,6 +1,16 @@
-from quodeq.terminal.gate import terminal_gate_reason
+from quodeq.terminal.gate import terminal_env_reason, terminal_gate_reason
 
 OK = dict(host="127.0.0.1", api_key=None, origin="http://localhost:7863", request_host="localhost:7863")
+
+
+def test_env_reason_ignores_origin():
+    # The env gate (used by /status, a same-origin GET with no Origin header)
+    # allows regardless of Origin, but still enforces loopback bind/host + no key.
+    assert terminal_env_reason(host="127.0.0.1", api_key=None, request_host="localhost:7863") is None
+    assert terminal_env_reason(host="127.0.0.1", api_key=None, request_host="localhost") is None
+    assert terminal_env_reason(host="0.0.0.0", api_key=None, request_host="localhost") is not None
+    assert terminal_env_reason(host="127.0.0.1", api_key="k", request_host="localhost") is not None
+    assert terminal_env_reason(host="127.0.0.1", api_key=None, request_host="evil.com") is not None
 
 
 def test_allows_loopback_local_matching_origin():

@@ -29,7 +29,7 @@ export function AssistantPane({ uiState }) {
 
   return (
     <>
-      <div className="assistant-drawer-subtitle">✦ assistant · {provider}{model ? ` · ${model}` : ''}</div>
+      <div className="assistant-drawer-subtitle">{provider}{model ? ` · ${model}` : ''}</div>
       <MessageList messages={messages} streaming={streaming} />
       {error && <div className="assistant-drawer-error" role="alert">{error}</div>}
       <div className="assistant-drawer-input-row">

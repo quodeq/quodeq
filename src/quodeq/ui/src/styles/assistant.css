@@ -354,11 +354,29 @@
 }
 
 /* ── Tab strip + tab panels ───────────────────────────── */
-.drawer-tabs { display: flex; gap: 4px; }
+.drawer-tabs { display: flex; gap: 2px; align-items: stretch; }
 .drawer-tab {
-  background: transparent; border: none; color: var(--color-text-muted);
-  font-family: var(--font-mono); font-size: 0.8125rem; padding: 2px 8px; cursor: pointer; border-radius: 4px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  padding: 4px 12px;
+  cursor: pointer;
+  border-radius: 5px 5px 0 0;
+  white-space: nowrap;
+  transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
 }
-.drawer-tab--active { color: var(--color-text); background: color-mix(in srgb, var(--color-text) 10%, transparent); }
+.drawer-tab:hover {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+.drawer-tab--active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
 .drawer-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .assistant-drawer-subtitle { font-size: 0.75rem; color: var(--color-text-muted); padding: 2px 8px 0; }

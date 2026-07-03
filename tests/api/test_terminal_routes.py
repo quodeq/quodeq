@@ -46,6 +46,17 @@ def test_status_allowed_on_loopback(app):
     assert r.get_json()["enabled"] is True
 
 
+def test_status_enabled_without_origin_header(app):
+    # Regression: /status is a same-origin GET and browsers omit the Origin
+    # header on those. It must report enabled (env gate only), NOT refuse with
+    # "Missing Origin header" — that bug made the terminal appear broken on mac.
+    c = app.test_client()
+    r = c.get("/api/terminal/status", base_url="http://localhost")  # no Origin
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["enabled"] is True and body["reason"] is None
+
+
 def test_status_refused_with_api_key(app):
     app.config["QUODEQ_API_KEY"] = "secret"
     c = app.test_client()

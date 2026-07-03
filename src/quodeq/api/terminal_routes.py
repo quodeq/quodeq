@@ -13,11 +13,24 @@ import threading
 from flask import Flask, current_app, jsonify, request
 from flask_sock import Sock
 
-from quodeq.terminal.gate import terminal_gate_reason
+from quodeq.terminal.gate import terminal_env_reason, terminal_gate_reason
 from quodeq.terminal.manager import TerminalManager
 
 
+def _env_reason() -> str | None:
+    # Environment availability only (no Origin) — for /status, a same-origin
+    # GET the browser sends WITHOUT an Origin header. Gating it on Origin would
+    # wrongly report the terminal disabled ("Missing Origin header").
+    return terminal_env_reason(
+        host=current_app.config.get("QUODEQ_BIND_HOST", ""),
+        api_key=current_app.config.get("QUODEQ_API_KEY"),
+        request_host=request.host,
+    )
+
+
 def _gate_reason() -> str | None:
+    # Full gate incl. Origin — for the WS handshake (browsers DO send Origin on
+    # WS) and the /kill POST (Origin also enforced by the global CSRF hook).
     return terminal_gate_reason(
         host=current_app.config.get("QUODEQ_BIND_HOST", ""),
         api_key=current_app.config.get("QUODEQ_API_KEY"),
@@ -59,7 +72,7 @@ def register_terminal_routes(app: Flask, manager: TerminalManager | None = None)
 
     @app.get("/api/terminal/status")
     def terminal_status():
-        reason = _gate_reason()
+        reason = _env_reason()
         return jsonify({"enabled": reason is None, "running": manager.alive, "reason": reason})
 
     @app.post("/api/terminal/kill")
