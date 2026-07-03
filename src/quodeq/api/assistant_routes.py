@@ -54,13 +54,13 @@ def register_assistant_routes(app: Flask) -> None:
         # server-side in that case. Explicit runDir/repoRoot always win.
         run_dir = body.get("runDir")
         repo_root = body.get("repoRoot")
-        # Resolve when a project is known, even without a specific run: on the
-        # overview the UI sends only projectId, and resolve_run_location falls
-        # back to the project's latest run so detail tools still work there.
-        if not run_dir and body.get("projectId"):
+        # Only bind a single run when the UI selected a SPECIFIC run. On the
+        # overview it sends projectId with no runId → the session stays
+        # run-unscoped and the detail tools read the accumulated
+        # (per-dimension-latest) composition from project_id + reports_dir.
+        if not run_dir and body.get("projectId") and body.get("runId"):
             run_dir, repo_root = _assistant_helpers.resolve_run_location(
-                str(body["projectId"]),
-                str(body["runId"]) if body.get("runId") else None,
+                str(body["projectId"]), str(body["runId"]),
             )
         project_id = body.get("projectId")
         get_repository(app).create_session(

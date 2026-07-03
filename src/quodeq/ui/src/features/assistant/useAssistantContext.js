@@ -26,13 +26,14 @@ export function deriveAssistantContext(appState, gate) {
     ? projects.find((p) => (p.id || p.name) === selectedProject)
     : null;
   const projectId = found ? (found.id || found.name) : (selectedProject || undefined);
-  // On the overview no run is explicitly selected, but the dashboard is still
-  // backing its display with one concrete run (currentOverviewRun). Bind it so
-  // the backend resolves run_dir and the run-scoped tools (get_report /
-  // get_scores / get_violations / search_findings) work there — the model can
-  // answer principle/violation/detail questions without asking the user to
-  // switch to a specific run. An explicit selection still wins.
-  const runId = selectedRun || currentOverviewRun || undefined;
+  // Only bind a run when the user EXPLICITLY selected one. On the overview we
+  // deliberately send no runId: the session stays run-unscoped and the detail
+  // tools (get_report/get_scores/get_violations) read the accumulated view —
+  // each dimension's latest run, aggregated, matching the dashboard — rather
+  // than locking to one whole run (which would show stale data for dimensions
+  // whose latest run is newer). currentOverviewRun still rides along in
+  // uiState so "this run" resolves, but it does not scope the session.
+  const runId = selectedRun || undefined;
 
   // `view` names the active tab so the model can pick the right data source:
   // overview/history → accumulated (get_overview); a concrete run → run-scoped

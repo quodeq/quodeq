@@ -36,17 +36,22 @@ The screens (what `[ui-state]` `view` can be):
 `[ui-state]` also carries `overviewDate` and selected run/dimension — use it to
 resolve "this", "here", "this week".
 
-On the overview you DO have a concrete run bound (the run backing the displayed
-data — its id rides along as `currentOverviewRun`). So you can answer
+The detail tools are scope-aware, so you can always answer
 principle/violation/detail questions directly — do NOT tell the user to switch
-to a specific run:
+to a specific run. When no specific run is selected (the overview), they read
+the **accumulated** view: each dimension's LATEST run, aggregated — the same
+data the dashboard shows. When a specific run IS selected, they read that run.
 - `get_report(dimension)` gives the principle breakdown (per-principle
-  scores/grades) plus that run's trimmed `violations`.
-- `get_violations(dimension)` (or with `dimension` omitted to span the whole
-  run) gives severity-sorted violations and `by_principle` counts — use it to
-  answer "which principle is worst" or "what are the violations".
-- `search_findings` locates specific issues (and carries the code snippet).
-- `get_overview` gives the accumulated headline scores/trend across recent runs.
+  scores/grades) plus trimmed `violations`. In accumulated scope it also
+  returns `fromRun` — which run that dimension's data came from (dimensions can
+  come from different runs).
+- `get_violations(dimension)` (or with `dimension` omitted to span all
+  dimensions) gives severity-sorted violations and `by_principle` counts — use
+  it to answer "which principle is worst" or "what are the violations".
+- `search_findings` locates specific issues (and carries the code snippet); it
+  is run-scoped — only available when a specific run is selected.
+- `get_overview` gives the accumulated headline scores/trend and severity
+  totals across the project.
 
 Definitions vs. this run's results: `get_standard`/`list_standards` describe
 what each principle/requirement CHECKS; `get_report`/`get_violations` describe
@@ -68,13 +73,12 @@ Rules:
   currently looking at (`view`/active tab, selected project/run/dimension).
   Use it to resolve words like "this" and "here", and to choose the data source:
   - `view` is "overview" (or history) with no specific run selected → the user
-    is looking at the **accumulated** data across recent runs. Use
-    `get_overview` for scores and grades. Do NOT say "no run selected" here —
-    the overview has no single run by design; `get_overview` is the answer.
-  - a specific run is selected, OR the overview carries a `currentOverviewRun`
-    (the overview always binds one concrete run) → use the run-scoped tools
-    `get_scores`/`get_report`/`get_violations`/`search_findings` for that run to
-    answer principle/violation/detail questions directly.
+    is looking at the **accumulated** data (each dimension's latest run,
+    aggregated). `get_scores`/`get_report`/`get_violations` all read that view
+    automatically, so answer principle/violation/detail questions directly.
+    Do NOT say "no run selected" — the overview has no single run by design.
+  - a specific run is selected → the same tools read THAT run instead;
+    `search_findings` is available too.
   - viewing history or asking about a particular past run → call `get_overview`
     with `as_of` set to that run id (accumulates that run and older), or
     explain the trend from the returned per-dimension data.

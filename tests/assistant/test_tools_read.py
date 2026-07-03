@@ -163,3 +163,95 @@ def test_get_violations_without_run(ctx):
     out = build_registry(no_run).dispatch("get_violations", {"dimension": "security"})
     assert out["ok"] is False
     assert "get_overview" in out["error"]
+
+
+# --- Accumulated (per-dimension-latest) scope: no specific run selected. ------
+# The overview picks each dimension's LATEST run independently, so the payload
+# spans several runs (fromRunId differs) and keys the principle as "practiceId"
+# (serialized Finding) rather than the raw run JSON's "principle".
+_ACC = {
+    "project": "p",
+    "dimensions": [
+        {"dimension": "security", "overallScore": "9.6/10", "overallGrade": "Exemplary",
+         "fromRunId": "runA", "principles": [{"principle": "S1", "grade": "A"}],
+         "totals": {"violations": 2}, "coveragePct": 80,
+         "violations": [
+             {"practiceId": "S1", "file": "a.kt", "line": 1, "severity": "minor",
+              "title": "t1", "reason": "r1", "snippet": "x", "context": "c"},
+             {"practiceId": "S2", "file": "b.kt", "line": 2, "severity": "critical",
+              "title": "t2", "reason": "r2"},
+         ]},
+        {"dimension": "reliability", "overallScore": "9.0/10", "overallGrade": "Exemplary",
+         "fromRunId": "runB", "principles": [{"principle": "R1", "grade": "A"}],
+         "totals": {"violations": 1},
+         "violations": [
+             {"practiceId": "R1", "file": "r.kt", "line": 3, "severity": "major",
+              "title": "t3", "reason": "r3"},
+         ]},
+    ],
+}
+
+
+@pytest.fixture()
+def acc_ctx(tmp_path, monkeypatch):
+    repo = AssistantRepository(tmp_path / "assistant.db")
+    repo.create_session(session_id="s1", provider="ollama")
+    monkeypatch.setattr(
+        "quodeq.assistant.tools._read_tools._fs_reports.get_accumulated",
+        lambda reports_dir, project, as_of: _ACC)
+    return ToolContext(
+        repository=repo, session_id="s1", run_dir=None, repo_root=None,
+        evaluators_dir=tmp_path / "evaluators", compiled_dir=tmp_path / "compiled",
+        dimensions_file=tmp_path / "dimensions.json",
+        project_id="p", reports_dir=tmp_path / "reports",
+    )
+
+
+def test_get_scores_accumulated(acc_ctx):
+    out = build_registry(acc_ctx).dispatch("get_scores", {})["result"]
+    # Each dimension carries its own source run — they can differ.
+    assert out["security"] == {"score": "9.6/10", "grade": "Exemplary", "fromRun": "runA"}
+    assert out["reliability"] == {"score": "9.0/10", "grade": "Exemplary", "fromRun": "runB"}
+
+
+def test_get_report_accumulated(acc_ctx):
+    out = build_registry(acc_ctx).dispatch("get_report", {"dimension": "security"})["result"]
+    assert out["overallGrade"] == "Exemplary"
+    assert out["fromRun"] == "runA"
+    assert out["principles"] == [{"principle": "S1", "grade": "A"}]
+    # practiceId is normalized to `principle`; snippet/context dropped.
+    assert {v["principle"] for v in out["violations"]} == {"S1", "S2"}
+    assert all("snippet" not in v and "context" not in v for v in out["violations"])
+
+
+def test_get_report_accumulated_unknown_dimension(acc_ctx):
+    out = build_registry(acc_ctx).dispatch("get_report", {"dimension": "nope"})
+    assert out["ok"] is False
+    assert "reliability" in out["error"] and "security" in out["error"]
+
+
+def test_get_violations_accumulated_for_dimension(acc_ctx):
+    res = build_registry(acc_ctx).dispatch("get_violations", {"dimension": "security"})["result"]
+    # Severity-sorted (critical first), practiceId normalized to principle.
+    assert [v["severity"] for v in res["violations"]] == ["critical", "minor"]
+    assert res["by_principle"] == {"S1": 1, "S2": 1}
+    assert res["dimension"] == "security"
+
+
+def test_get_violations_accumulated_aggregates_when_omitted(acc_ctx):
+    res = build_registry(acc_ctx).dispatch("get_violations", {})["result"]
+    assert res["count"] == 3
+    assert res["by_principle"] == {"S1": 1, "S2": 1, "R1": 1}
+
+
+def test_get_scores_no_scope_errors(tmp_path):
+    # No run AND no project scope → a clear error, not a crash.
+    repo = AssistantRepository(tmp_path / "assistant.db")
+    repo.create_session(session_id="s1", provider="ollama")
+    ctx = ToolContext(
+        repository=repo, session_id="s1", run_dir=None, repo_root=None,
+        evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
+        dimensions_file=tmp_path / "d.json", project_id=None, reports_dir=None,
+    )
+    out = build_registry(ctx).dispatch("get_scores", {})
+    assert out["ok"] is False

@@ -1,5 +1,4 @@
 import json
-import os
 import time
 
 import pytest
@@ -228,20 +227,7 @@ def test_create_session_resolves_run_from_project_and_run_id(client, app, monkey
     assert sess["project_id"] == "selectives"
 
 
-def test_create_session_without_run_binds_latest_run(client, app, monkeypatch, tmp_path):
-    # On the overview the UI sends a projectId but no runId. The session must
-    # still bind the project's LATEST run so detail tools work there (the
-    # overview shows accumulated data, which the latest run's headline backs).
-    evals = tmp_path / "evaluations"
-    proj = evals / "selectives"
-    (proj / "run-old" / "evaluation").mkdir(parents=True)
-    (proj / "run-new" / "evaluation").mkdir(parents=True)
-    # Make run-new unambiguously the most recent by mtime.
-    os.utime(proj / "run-old", (1_000, 1_000))
-    os.utime(proj / "run-new", (2_000, 2_000))
-    monkeypatch.setattr(
-        "quodeq.api._assistant_helpers.get_evaluations_dir", lambda: str(evals)
-    )
+def test_create_session_stores_project_id_without_run(client, app):
     resp = client.post("/api/assistant/sessions",
                        json={"provider": "ollama", "projectId": "selectives"})
     assert resp.status_code == 201
@@ -249,24 +235,8 @@ def test_create_session_without_run_binds_latest_run(client, app, monkeypatch, t
     from quodeq.data.sqlite.assistant_repository import AssistantRepository
     sess = AssistantRepository(app.config["ASSISTANT_DB_PATH"]).get_session(sid)
     assert sess["project_id"] == "selectives"
-    assert sess["run_id"] == str((proj / "run-new").resolve())
-
-
-def test_create_session_without_run_no_completed_runs(client, app, monkeypatch, tmp_path):
-    # A project with no completed run (no evaluation/ dir) stays unscoped:
-    # overview data is still reachable via project_id.
-    evals = tmp_path / "evaluations"
-    (evals / "selectives").mkdir(parents=True)  # project dir, but no runs
-    monkeypatch.setattr(
-        "quodeq.api._assistant_helpers.get_evaluations_dir", lambda: str(evals)
-    )
-    resp = client.post("/api/assistant/sessions",
-                       json={"provider": "ollama", "projectId": "selectives"})
-    assert resp.status_code == 201
-    sid = resp.get_json()["sessionId"]
-    from quodeq.data.sqlite.assistant_repository import AssistantRepository
-    sess = AssistantRepository(app.config["ASSISTANT_DB_PATH"]).get_session(sid)
-    assert sess["project_id"] == "selectives"
+    # No runId supplied → run stays unscoped. Detail tools read the accumulated
+    # (per-dimension-latest) composition via project_id, not a single run.
     assert sess["run_id"] is None
 
 
@@ -296,27 +266,6 @@ def test_resolve_run_location_rejects_path_traversal(monkeypatch, tmp_path):
     # Sanity: a legit project id still resolves inside the root.
     run_dir, _ = resolve_run_location("proj", "run-1")
     assert run_dir == str((evals / "proj" / "run-1").resolve())
-
-
-def test_resolve_run_location_falls_back_to_latest_run(monkeypatch, tmp_path):
-    # No runId → resolve the project's most recent completed run.
-    evals = tmp_path / "evaluations"
-    proj = evals / "proj"
-    (proj / "run-a" / "evaluation").mkdir(parents=True)
-    (proj / "run-b" / "evaluation").mkdir(parents=True)
-    (proj / "scaffold-no-eval").mkdir(parents=True)  # no evaluation/ → ineligible
-    os.utime(proj / "run-a", (1_000, 1_000))
-    os.utime(proj / "run-b", (2_000, 2_000))  # newest
-    os.utime(proj / "scaffold-no-eval", (3_000, 3_000))  # newest overall, but skipped
-    monkeypatch.setattr(
-        "quodeq.api._assistant_helpers.get_evaluations_dir", lambda: str(evals)
-    )
-    from quodeq.api._assistant_helpers import resolve_run_location
-    run_dir, _ = resolve_run_location("proj", None)
-    assert run_dir == str((proj / "run-b").resolve())
-    # A project with no completed run → unscoped.
-    (evals / "empty").mkdir()
-    assert resolve_run_location("empty", None) == (None, None)
 
 
 def test_apply_action_creates_standard(client, app):

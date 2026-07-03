@@ -36,15 +36,19 @@ it('includes view for the model even with no run selected', () => {
   expect(ctx.uiState.currentOverviewRun).toBeUndefined();
 });
 
-it('binds currentOverviewRun as runId on the overview when no run is explicitly selected', () => {
+it('does NOT bind runId on the overview: no explicit run → accumulated scope', () => {
+  // The session stays run-unscoped on the overview so the detail tools read
+  // the accumulated (per-dimension-latest) view. currentOverviewRun still
+  // rides along in uiState for "this run" resolution, but must not scope.
   const ctx = deriveAssistantContext(
     { activeTab: 'overview', selectedProject: 'selectives', selectedRun: '', currentOverviewRun: 'r9', projects: [] },
     { activeProvider: 'claude', model: 'sonnet' },
   );
-  expect(ctx.runId).toBe('r9');
+  expect(ctx.runId).toBeUndefined();
+  expect(ctx.uiState.currentOverviewRun).toBe('r9');
 });
 
-it('lets an explicitly selected run win over currentOverviewRun', () => {
+it('binds runId only when a run is explicitly selected', () => {
   const ctx = deriveAssistantContext(
     { activeTab: 'overview', selectedProject: 'selectives', selectedRun: 'rX', currentOverviewRun: 'r9', projects: [] },
     { activeProvider: 'claude', model: 'sonnet' },
