@@ -81,7 +81,13 @@ build-backend = "uv_build"
 # Note: src/quodeq/static is intentionally INCLUDED so the wheel ships a
 # pre-built UI. End users no longer need Node/npm at runtime. Build it
 # with `tools/build-dist.sh` (runs npm ci + vite build before uv build).
-wheel-exclude = ["src/quodeq/ui/node_modules"]
+# Help screenshots ship via static/ (Vite copies them there); excluding the
+# source copies keeps the wheel from carrying each image twice. They stay in
+# the source tarball because rebuilding the UI needs them.
+wheel-exclude = [
+    "src/quodeq/ui/node_modules",
+    "src/quodeq/ui/src/assets/help",
+]
 # Keep the installed JS dependency tree (~28MB / 11k files, reproducible from
 # package-lock.json) and local build cruft out of the published source tarball.
 source-exclude = [
