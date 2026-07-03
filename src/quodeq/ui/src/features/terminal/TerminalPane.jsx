@@ -65,7 +65,7 @@ export default function TerminalPane({ active }) {
       scrollback: 5000,
       fontFamily: 'var(--font-mono, monospace)',
       fontSize: 12,
-      lineHeight: 1.2,
+      lineHeight: 1.1,
       cursorBlink: true,
       cursorStyle: 'bar',     // sleeker than the default square block
       theme: themeFromCss(),
