@@ -24,6 +24,17 @@ def _gate_reason() -> str | None:
     )
 
 
+def _apply_control(manager, payload: str) -> None:
+    """Apply a control frame's resize; ignore malformed input (never raise)."""
+    try:
+        ctrl = json.loads(payload)
+        rs = ctrl.get("resize") if isinstance(ctrl, dict) else None
+        if rs:
+            manager.resize(int(rs["cols"]), int(rs["rows"]))
+    except (ValueError, KeyError, TypeError):
+        return
+
+
 def register_terminal_routes(app: Flask, manager: TerminalManager | None = None) -> None:
     sock = Sock(app)
     manager = manager or TerminalManager()
@@ -78,10 +89,7 @@ def register_terminal_routes(app: Flask, manager: TerminalManager | None = None)
                 if tag == "0":
                     manager.write(payload.encode("utf-8"))
                 elif tag == "1":
-                    ctrl = json.loads(payload)
-                    rs = ctrl.get("resize")
-                    if rs:
-                        manager.resize(int(rs["cols"]), int(rs["rows"]))
+                    _apply_control(manager, payload)
         except Exception:
             pass
         finally:

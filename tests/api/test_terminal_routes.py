@@ -1,9 +1,7 @@
-import json
-
 import pytest
 from flask import Flask
 
-from quodeq.api.terminal_routes import register_terminal_routes
+from quodeq.api.terminal_routes import _apply_control, register_terminal_routes
 
 
 class _FakeManager:
@@ -51,6 +49,33 @@ def test_kill_refused_when_gated(app):
 
 
 def test_kill_ok_on_loopback(app):
+    manager = app.extensions["terminal_manager"]
     c = app.test_client()
     r = c.post("/api/terminal/kill", headers={"Origin": "http://localhost"}, base_url="http://localhost")
     assert r.status_code == 200
+    assert manager.killed is True
+
+
+class _ResizeRecorder:
+    def __init__(self):
+        self.calls = []
+    def resize(self, cols, rows):
+        self.calls.append((cols, rows))
+
+
+def test_apply_control_valid_resize_calls_manager():
+    mgr = _ResizeRecorder()
+    _apply_control(mgr, '{"resize":{"cols":100,"rows":40}}')
+    assert mgr.calls == [(100, 40)]
+
+
+@pytest.mark.parametrize("payload", [
+    "not json",
+    "{}",
+    '{"resize":{"cols":"x"}}',
+    '{"resize":123}',
+])
+def test_apply_control_malformed_is_noop_and_never_raises(payload):
+    mgr = _ResizeRecorder()
+    _apply_control(mgr, payload)  # must not raise
+    assert mgr.calls == []

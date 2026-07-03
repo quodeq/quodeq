@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fcntl
 import os
+import select
 import struct
 import subprocess
 import sys
@@ -12,6 +13,7 @@ import termios
 from quodeq.shared._process_kill import kill_proc_tree
 
 _ALLOWED_SHELL_BASENAMES = frozenset({"zsh", "bash", "fish", "sh", "dash", "tcsh", "ksh"})
+_READ_TIMEOUT_S = 0.5
 
 
 def resolve_shell(env: dict[str, str] | None = None) -> list[str]:
@@ -51,6 +53,9 @@ class UnixPty:
         if self._master_fd is None:
             return b""
         try:
+            ready, _, _ = select.select([self._master_fd], [], [], _READ_TIMEOUT_S)
+            if not ready:
+                return b""  # no data yet (PTY alive) -> caller loops, can observe stop
             return os.read(self._master_fd, max_bytes)
         except OSError:
             return b""  # master closed / child exited

@@ -12,7 +12,11 @@ def _drain_until(pty, needle: bytes, timeout: float = 5.0) -> bytes:
     while time.monotonic() < deadline:
         chunk = pty.read(4096)
         if not chunk:
-            break
+            # read() is non-blocking: b"" means "nothing right now" (timeout tick)
+            # while the PTY is alive, or EOF once the child has exited.
+            if not pty.alive:
+                break
+            continue
         buf += chunk
         if needle in buf:
             return buf
@@ -31,6 +35,25 @@ def test_unix_pty_spawns_echoes_and_kills():
     pty.kill()
     time.sleep(0.2)
     assert not pty.alive
+
+
+def test_read_returns_empty_quickly_when_idle():
+    from quodeq.terminal._pty_unix import UnixPty
+    pty = UnixPty(argv=["/bin/sh"])
+    pty.spawn(cwd="/", cols=80, rows=24)
+    try:
+        # Drain the initial prompt/banner so the shell is quiescent.
+        _drain_until(pty, b"__no_such_needle__", timeout=1.0)
+        # The shell is idle but alive: read() must return b"" promptly (non-blocking)
+        # rather than parking in os.read forever.
+        start = time.monotonic()
+        chunk = pty.read(4096)
+        elapsed = time.monotonic() - start
+        assert chunk == b""
+        assert elapsed < 1.5
+        assert pty.alive
+    finally:
+        pty.kill()
 
 
 def test_resolve_shell_returns_login_interactive_argv():
