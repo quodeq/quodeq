@@ -75,6 +75,12 @@ def test_cli_provider_not_busy_gated(client, app, monkeypatch):
 
 
 def test_post_message_spawns_turn_and_streams(client, app, monkeypatch):
+    # The stream now stays open past a turn's `done` (so 2nd+ turns still
+    # reach the browser), so bound the idle backstop to keep this consuming
+    # test from blocking the full 600s window once the turn's frames drain.
+    monkeypatch.setattr("quodeq.api._assistant_helpers._POLL_SECONDS", 0.001)
+    monkeypatch.setattr("quodeq.api._assistant_helpers._IDLE_LIMIT", 30)
+
     def fake_run_turn(request, *, repository, tool_ctx, **kw):
         repository.add_message(request.session_id, "user", request.text)
         repository.append_event(request.session_id, {"type": "token", "text": "hi"})
@@ -90,6 +96,48 @@ def test_post_message_spawns_turn_and_streams(client, app, monkeypatch):
     body = stream.get_data(as_text=True)
     assert '"type": "token"' in body
     assert '"type": "done"' in body
+
+
+def test_event_frames_keeps_yielding_past_a_done_frame(app, monkeypatch):
+    # Regression for the 2nd-turn hang: event_frames must NOT terminate on a
+    # `done` frame. A turn's done is a marker, not the end of the stream — an
+    # event appended AFTER a done (i.e. the next turn) must still be yielded so
+    # one SSE connection serves the whole session.
+    monkeypatch.setattr("quodeq.api._assistant_helpers._POLL_SECONDS", 0.001)
+    monkeypatch.setattr("quodeq.api._assistant_helpers._IDLE_LIMIT", 40)
+    from quodeq.api._assistant_helpers import event_frames
+
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    # Turn 1: a token then a done marker.
+    repo.append_event("s1", {"type": "token", "text": "A"})
+    repo.append_event("s1", {"type": "done"})
+
+    gen = event_frames(repo, "s1", 0)
+    frames = []
+    # Drain turn 1 (skipping heartbeat sentinels), then append turn 2's frames
+    # and confirm the SAME generator delivers them — proving it did not stop
+    # on the first done.
+    appended_turn2 = False
+    for item in gen:
+        if item is None:
+            if not appended_turn2:
+                repo.append_event("s1", {"type": "token", "text": "B"})
+                repo.append_event("s1", {"type": "done"})
+                appended_turn2 = True
+            continue
+        _seq, frame = item
+        frames.append(frame)
+        # Stop once we've seen turn 2's content delivered past turn 1's done.
+        if frame.get("type") == "token" and frame.get("text") == "B":
+            break
+
+    types_texts = [(f.get("type"), f.get("text")) for f in frames]
+    assert ("token", "A") in types_texts
+    # A done was yielded (turn marker) but did NOT terminate the generator...
+    assert ("done", None) in types_texts
+    # ...because turn 2's token, appended AFTER that done, still arrived.
+    assert ("token", "B") in types_texts
 
 
 def test_events_stream_heartbeats_while_idle(client, monkeypatch):

@@ -13,12 +13,14 @@ from quodeq.shared._env import get_evaluations_dir
 
 _LOCAL_PROVIDERS = frozenset({"ollama", "llamacpp", "omlx"})
 _POLL_SECONDS = 0.25
-_IDLE_LIMIT = 2400  # 2400 * 0.25s = 600s safety cap for a turn that dies
-# without ever emitting a terminal done/error frame (e.g. a crashed daemon
-# thread). run_turn always writes done/error on completion, so event_frames
-# already terminates correctly then; this is just the outer guard for the
-# abnormal case, sized generously above the slowest legitimate turn (a
-# cold-loading local model or a CLI provider's ~500s read timeout).
+_IDLE_LIMIT = 2400  # 2400 * 0.25s = 600s idle backstop. The stream now stays
+# open across turns (done/error no longer end event_frames), so this bounds a
+# session that sits idle with NO new frames for the whole window — a turn that
+# dies without emitting a terminal frame (e.g. a crashed daemon thread), or a
+# session left open with no further turns. On the backstop the generator
+# closes and the client reconnects on its next turn. Sized generously above
+# the slowest legitimate gap (a cold-loading local model or a CLI provider's
+# ~500s read timeout) so it never truncates a live turn.
 
 
 def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str | None]:
@@ -95,11 +97,25 @@ def local_provider_busy(provider_id: str) -> bool:
 def event_frames(repository: AssistantRepository, session_id: str, after_seq: int):
     """Generator of (seq, frame) tuples or ``None`` heartbeats.
 
-    Replays stored events after ``after_seq``, then polls until a done/error
-    frame arrives or the idle limit is hit. Each idle tick with no new rows
-    yields ``None`` (a heartbeat sentinel the caller turns into an SSE
-    comment) instead of sleeping silently, so slow-starting local models and
-    long gaps between frames don't trip proxy/connection idle timeouts.
+    Replays stored events after ``after_seq``, then polls indefinitely,
+    yielding new events (and ``None`` heartbeat sentinels while idle) so a
+    SINGLE SSE connection serves EVERY turn in the session, not just the
+    first. ``done``/``error`` frames are still yielded — the client uses them
+    as turn markers to clear its spinner and start a fresh answer bubble — but
+    they no longer end the generator, so a second (or third) turn's frames,
+    appended after the first turn's ``done``, still reach the browser.
+
+    Each idle tick with no new rows yields ``None`` (a heartbeat sentinel the
+    caller turns into an SSE comment / data frame) instead of sleeping
+    silently, so slow-starting local models and long gaps between frames — or
+    between turns — don't trip proxy/connection idle timeouts. The idle
+    counter resets on ANY new event (including across turns), so only a
+    genuinely idle session (no new frames for the whole ``_IDLE_LIMIT``
+    window) hits the backstop and closes; the client then reconnects on its
+    next turn. Termination is therefore either that idle backstop or the
+    client disconnecting (the generator is GC'd → ``GeneratorExit``). The
+    traversal stays ordered by seq with ``last`` advancing so no frame is
+    missed or duplicated.
     """
     last, idle = after_seq, 0
     while idle < _IDLE_LIMIT:
@@ -113,5 +129,3 @@ def event_frames(repository: AssistantRepository, session_id: str, after_seq: in
         for seq, frame in rows:
             last = seq
             yield seq, frame
-            if frame.get("type") in ("done", "error"):
-                return

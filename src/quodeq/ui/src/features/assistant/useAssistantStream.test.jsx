@@ -41,14 +41,63 @@ it('records tool_call and action_draft frames', () => {
   expect(result.current.messages.some((m) => m.role === 'action' && m.actionId === 'a1')).toBe(true);
 });
 
-it('done ends streaming and calls onDone', () => {
+it('done ends the turn (streaming false, onDone) but keeps the stream OPEN', () => {
   const onDone = vi.fn();
   const { result } = renderHook(() => useAssistantStream('s1', { onDone }));
   const es = MockES.instances[0];
   act(() => { es.emit('done', { type: 'done' }); });
   expect(result.current.streaming).toBe(false);
   expect(onDone).toHaveBeenCalledTimes(1);
-  expect(es.closed).toBe(true);
+  // The connection must NOT close on a turn's done — it serves the next turn.
+  expect(es.closed).toBeFalsy();
+});
+
+it('two turns over ONE stream produce two separate assistant bubbles', () => {
+  const onDone = vi.fn();
+  const { result } = renderHook(() => useAssistantStream('s1', { onDone }));
+  const es = MockES.instances[0];
+
+  // Turn 1: token "A" then done.
+  act(() => { es.emit('message', { type: 'token', text: 'A' }); });
+  flush();
+  act(() => { es.emit('done', { type: 'done' }); });
+  let assistants = result.current.messages.filter((m) => m.role === 'assistant');
+  expect(assistants.map((m) => m.text)).toEqual(['A']);
+  expect(result.current.streaming).toBe(false);
+  expect(onDone).toHaveBeenCalledTimes(1);
+  expect(es.closed).toBeFalsy();
+
+  // Turn 2 over the SAME stream: token "B" then done.
+  act(() => { es.emit('message', { type: 'token', text: 'B' }); });
+  expect(result.current.streaming).toBe(true); // streaming re-arms for turn 2
+  flush();
+  act(() => { es.emit('done', { type: 'done' }); });
+  assistants = result.current.messages.filter((m) => m.role === 'assistant');
+  // Two distinct bubbles — turn 2 must NOT concatenate onto turn 1 ("AB").
+  expect(assistants.map((m) => m.text)).toEqual(['A', 'B']);
+  expect(result.current.streaming).toBe(false);
+  expect(onDone).toHaveBeenCalledTimes(2);
+  // The stream was never closed between the two turns.
+  expect(es.closed).toBeFalsy();
+  expect(MockES.instances.length).toBe(1);
+});
+
+it('an error frame keeps the stream open so a next turn still streams', () => {
+  const { result } = renderHook(() => useAssistantStream('s1'));
+  const es = MockES.instances[0];
+  act(() => { es.emit('message', { type: 'error', message: 'boom' }); });
+  expect(result.current.error).toBe('boom');
+  expect(result.current.streaming).toBe(false);
+  expect(es.closed).toBeFalsy();
+
+  // A subsequent turn's token is processed into a fresh bubble and clears the
+  // stale error.
+  act(() => { es.emit('message', { type: 'token', text: 'retry' }); });
+  flush();
+  const assistants = result.current.messages.filter((m) => m.role === 'assistant');
+  expect(assistants.map((m) => m.text)).toEqual(['retry']);
+  expect(result.current.error).toBe(null);
+  expect(result.current.streaming).toBe(true);
 });
 
 it('error frame surfaces error and stops streaming', () => {
