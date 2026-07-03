@@ -235,6 +235,31 @@ def test_local_provider_ignores_request_api_base(client, app, monkeypatch):
     assert captured["api_key"] is None
 
 
+def test_non_fixed_provider_also_ignores_request_api_base(client, app, monkeypatch):
+    # SSRF guard: even a genuinely caller-defined provider (custom/openrouter)
+    # must take api_base from the SERVER catalog, never the request body, so a
+    # request can't redirect the turn's HTTP at an internal host.
+    catalog = {"openrouter": {"type": "api", "api_base": "https://openrouter.ai/api/v1"}}
+    monkeypatch.setattr("quodeq.api.assistant_routes.get_provider_configs", lambda: catalog)
+    captured = {}
+
+    def fake_run_turn(request, *, repository, tool_ctx, **kw):
+        captured["api_base"] = request.api_base
+        repository.append_event(request.session_id, {"type": "done"})
+
+    monkeypatch.setattr("quodeq.api.assistant_routes.run_turn", fake_run_turn)
+    monkeypatch.setattr("quodeq.api._assistant_helpers.local_provider_busy", lambda p: False)
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "openrouter", "model": "m"}).get_json()["sessionId"]
+    resp = client.post(
+        f"/api/assistant/sessions/{sid}/messages",
+        json={"text": "hi", "apiBase": "http://169.254.169.254/latest/meta-data/"},
+    )
+    assert resp.status_code == 202
+    time.sleep(0.3)
+    assert captured["api_base"] == "https://openrouter.ai/api/v1"
+
+
 def test_create_session_resolves_run_from_project_and_run_id(client, app, monkeypatch, tmp_path):
     # a resolver stub standing in for the real services lookup
     run_dir = tmp_path / "proj-uuid" / "run-9"

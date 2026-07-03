@@ -103,17 +103,20 @@ def register_assistant_routes(app: Flask) -> None:
             if catalog_cfg is not None and catalog_cfg.get("type") == "cli":
                 api_base = ""
                 api_key = None
-            # Fixed-endpoint local providers (ollama/llamacpp/omlx) always talk to
-            # the server's catalog api_base; a caller-supplied apiBase would let a
-            # request redirect the turn (and its tool calls) at an arbitrary host.
-            # Only genuinely caller-defined providers (custom, openrouter) may
-            # override apiBase/apiKey from the request body.
+            # api_base is ALWAYS the server's catalog value, never the request
+            # body: a caller-supplied apiBase would redirect the turn (and its
+            # tool calls) at an arbitrary host (SSRF into internal services /
+            # cloud metadata). The UI never sends one — provider endpoints live
+            # in ai_providers.json. api_key may still come from the request for
+            # genuinely caller-defined providers (custom/openrouter) — it's a
+            # credential the caller supplies, not a fetch target — falling back
+            # to server config; fixed-endpoint local providers need none.
             elif session["provider"] in _FIXED_ENDPOINT_PROVIDERS:
                 api_base = provider_cfg.get("api_base", "")
                 api_key = None
             else:
-                api_base = body.get("apiBase") or provider_cfg.get("api_base", "")
-                api_key = body.get("apiKey")
+                api_base = provider_cfg.get("api_base", "")
+                api_key = body.get("apiKey") or provider_cfg.get("api_key")
             turn = TurnRequest(
                 session_id=sid, text=text, ui_state=body.get("uiState"),
                 api_base=api_base,
