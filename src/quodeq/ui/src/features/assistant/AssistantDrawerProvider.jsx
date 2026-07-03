@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { createAssistantSession, postAssistantMessage } from '../../api/assistant.js';
 import { useAssistantStream } from './useAssistantStream.js';
 
@@ -69,6 +69,18 @@ export function AssistantDrawerProvider({ children }) {
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
   const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === '`' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        setIsOpen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const setHeight = useCallback((px) => {
     const next = clampHeight(px);

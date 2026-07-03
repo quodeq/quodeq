@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import TopBar from './TopBar.jsx';
 import { SidePaneContext } from '../features/side-pane/SidePaneContext.jsx';
+import { AssistantDrawerProvider } from '../features/assistant/AssistantDrawerProvider.jsx';
 
 const sidePaneStub = {
   getRegisteredSpec: () => null,
@@ -13,9 +14,11 @@ const sidePaneStub = {
 
 function renderTopBar(props) {
   return render(
-    <SidePaneContext.Provider value={sidePaneStub}>
-      <TopBar {...props} />
-    </SidePaneContext.Provider>
+    <AssistantDrawerProvider>
+      <SidePaneContext.Provider value={sidePaneStub}>
+        <TopBar {...props} />
+      </SidePaneContext.Provider>
+    </AssistantDrawerProvider>
   );
 }
 
