@@ -4,6 +4,7 @@ import AboutSection from './AboutSection.jsx';
 import AppearanceSection from './AppearanceSection.jsx';
 import UpdatesSection from './UpdatesSection.jsx';
 import ProviderTabs from './ProviderTabs.jsx';
+import AssistantProviderTabs from './AssistantProviderTabs.jsx';
 import ServerSection from './ServerSection.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
@@ -36,26 +37,30 @@ export default function SettingsPage({ theme, onOpenGradeFormula }) {
       />
       <div className="settings-grid">
         <ProviderTabs providerConfigs={providerConfigs} />
-        <ServerSection />
-        <section className="panel settings-section">
-          <div className="panel-header">
-            <SectionLabel marker="▶">Grade formula</SectionLabel>
-          </div>
-          <div className="settings-row">
-            <div className="settings-row-label">
-              <span className="settings-label">Grade formula</span>
-              <span className="settings-description">
-                Tune how violations and compliance turn into grades. Changes rescore all runs.
-              </span>
+        <AssistantProviderTabs providerConfigs={providerConfigs} />
+
+        <div className="settings-grid-col">
+          <ServerSection />
+          <AppearanceSection themeMode={themeMode} themeFamily={themeFamily} onApplyMode={onApplyMode} onApplyFamily={onApplyFamily} />
+          <UpdatesSection />
+          <section className="panel settings-section">
+            <div className="panel-header">
+              <SectionLabel marker="▶">Grade formula</SectionLabel>
             </div>
-            <button type="button" className="settings-pill" onClick={onOpenGradeFormula}>
-              open editor
-            </button>
-          </div>
-        </section>
-        <AppearanceSection themeMode={themeMode} themeFamily={themeFamily} onApplyMode={onApplyMode} onApplyFamily={onApplyFamily} />
-        <UpdatesSection />
-        <AboutSection appVersion={appVersion} settingsPhrase={settingsPhrase} />
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-label">Grade formula</span>
+                <span className="settings-description">
+                  Tune how violations and compliance turn into grades. Changes rescore all runs.
+                </span>
+              </div>
+              <button type="button" className="settings-pill" onClick={onOpenGradeFormula}>
+                open editor
+              </button>
+            </div>
+          </section>
+          <AboutSection appVersion={appVersion} settingsPhrase={settingsPhrase} />
+        </div>
       </div>
     </div>
   );
