@@ -23,6 +23,7 @@ LAYER_RULES = {
     "analysis": {"core", "engine", "data", "services"},
     "dashboard": {"services", "api", "update"},
     "assistant": {"core", "data", "services", "llm_bridge"},
+    "terminal": {"core"},
 }
 CROSS_CUTTING = {"shared", "config"}
 IMPORT_RE = re.compile(
