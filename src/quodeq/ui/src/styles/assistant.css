@@ -87,13 +87,26 @@
   flex-direction: column;
   background: var(--color-console-bg);
   color: var(--color-console-text);
-  border-top: 1px solid var(--color-border);
-  border-left: 1px solid var(--color-border);
+  /* Border stays invisible until the drawer has focus (see :focus-within); the
+     drop shadow alone separates it from the content when unfocused. */
+  border-top: 1px solid transparent;
+  border-left: 1px solid transparent;
   box-shadow: 0 -8px 24px color-mix(in srgb, var(--color-text) 15%, transparent);
   font-family: var(--font-mono);
   /* Slide in sync with the sidebar's 200ms width transition (see the
-     hover-follow rule below) so the two never overlap. */
-  transition: left 200ms ease;
+     hover-follow rule below); fade the focus border/glow smoothly. */
+  transition: left 200ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+/* On focus (typing in the terminal / assistant) reveal a soft accent border
+   plus a diffuse (blurred) accent glow. */
+.assistant-drawer:focus-within,
+.bottom-drawer:focus-within {
+  border-top-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  border-left-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  box-shadow:
+    0 -8px 24px color-mix(in srgb, var(--color-text) 15%, transparent),
+    0 0 18px color-mix(in srgb, var(--color-accent) 22%, transparent);
 }
 
 /* Follow the sidebar when it expands on hover (desktop only — below 900px the
