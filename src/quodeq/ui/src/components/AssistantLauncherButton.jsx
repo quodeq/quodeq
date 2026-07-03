@@ -3,14 +3,16 @@ import useAssistantProvider from '../features/settings/hooks/useAssistantProvide
 import { SparkleIcon } from './CopyButton.jsx';
 
 export function AssistantLauncherButton() {
-  const { isOpen, activeTab, openTab } = useAssistantDrawer();
+  const { openPanels, toggleTopbar } = useAssistantDrawer();
   const { enabled } = useAssistantProvider();
 
   // The assistant is off by default; the launcher only appears once enabled
   // in Settings.
   if (!enabled) return null;
 
-  const on = isOpen && activeTab === 'assistant';
+  // Highlighted whenever the assistant panel is open/selected (both launchers
+  // can be highlighted at once when both panels are open).
+  const on = openPanels.includes('assistant');
   return (
     <button
       type="button"
@@ -18,7 +20,7 @@ export function AssistantLauncherButton() {
       aria-pressed={on}
       aria-label="Assistant (Ctrl+`)"
       title="Assistant (Ctrl+`)"
-      onClick={() => openTab('assistant')}
+      onClick={() => toggleTopbar('assistant')}
     >
       <SparkleIcon />
     </button>

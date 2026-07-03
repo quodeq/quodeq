@@ -2,18 +2,17 @@ import { it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
-const drawerState = { isOpen: false, activeTab: 'assistant' };
-const openTab = vi.fn();
+const drawerState = { openPanels: [] };
+const toggleTopbar = vi.fn();
 vi.mock('../features/assistant/AssistantDrawerProvider.jsx', () => ({
-  useAssistantDrawer: () => ({ isOpen: drawerState.isOpen, activeTab: drawerState.activeTab, openTab }),
+  useAssistantDrawer: () => ({ openPanels: drawerState.openPanels, toggleTopbar }),
 }));
 import { AssistantLauncherButton } from './AssistantLauncherButton.jsx';
 
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
-  drawerState.isOpen = false;
-  drawerState.activeTab = 'assistant';
+  drawerState.openPanels = [];
 });
 afterEach(() => localStorage.clear());
 
@@ -23,30 +22,35 @@ it('is hidden when the assistant is disabled (the default)', () => {
   expect(screen.queryByRole('button', { name: /assistant/i })).toBeNull();
 });
 
-it('is an icon-only labelled toggle when enabled', () => {
+it('is an icon-only labelled toggle when enabled; click toggles the panel', () => {
   localStorage.setItem('cc-assistant-enabled', 'true');
   render(<AssistantLauncherButton />);
   const btn = screen.getByRole('button', { name: /assistant/i });
   expect(btn).toHaveClass('topbar-btn', 'topbar-btn--icon');
   expect(btn).toHaveAttribute('aria-pressed', 'false');
   fireEvent.click(btn);
-  expect(openTab).toHaveBeenCalledWith('assistant');
+  expect(toggleTopbar).toHaveBeenCalledWith('assistant');
 });
 
-it('shows the active (highlighted) state when the drawer displays the assistant tab', () => {
+it('is highlighted (active) when the assistant panel is open', () => {
   localStorage.setItem('cc-assistant-enabled', 'true');
-  drawerState.isOpen = true;
-  drawerState.activeTab = 'assistant';
+  drawerState.openPanels = ['assistant'];
   render(<AssistantLauncherButton />);
   const btn = screen.getByRole('button', { name: /assistant/i });
   expect(btn).toHaveClass('topbar-btn--assistant--open');
   expect(btn).toHaveAttribute('aria-pressed', 'true');
 });
 
-it('is NOT active when the drawer is open on the terminal tab', () => {
+it('stays highlighted when BOTH panels are open (both launchers selected)', () => {
   localStorage.setItem('cc-assistant-enabled', 'true');
-  drawerState.isOpen = true;
-  drawerState.activeTab = 'terminal';
+  drawerState.openPanels = ['terminal', 'assistant'];
+  render(<AssistantLauncherButton />);
+  expect(screen.getByRole('button', { name: /assistant/i })).toHaveClass('topbar-btn--assistant--open');
+});
+
+it('is NOT highlighted when only the terminal panel is open', () => {
+  localStorage.setItem('cc-assistant-enabled', 'true');
+  drawerState.openPanels = ['terminal'];
   render(<AssistantLauncherButton />);
   const btn = screen.getByRole('button', { name: /assistant/i });
   expect(btn).not.toHaveClass('topbar-btn--assistant--open');

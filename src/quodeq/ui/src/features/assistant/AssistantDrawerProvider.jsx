@@ -5,11 +5,6 @@ import useTerminalSettings from '../settings/hooks/useTerminalSettings.js';
 import { useAssistantStream } from './useAssistantStream.js';
 
 const STORAGE_KEY = 'cc-assistant-drawer-height';
-const TAB_KEY = 'cc-drawer-last-tab';
-function readTab() {
-  try { return localStorage.getItem(TAB_KEY) === 'terminal' ? 'terminal' : 'assistant'; }
-  catch { return 'assistant'; }
-}
 const DEFAULT_HEIGHT = 320;
 const MIN_HEIGHT = 160;
 const MAX_HEIGHT = 640;
@@ -65,7 +60,16 @@ export function useAssistantDrawer() {
 }
 
 export function AssistantDrawerProvider({ children }) {
-  const [isOpen, setIsOpen] = useState(false);
+  // Each panel has an independent open/selected state. `openPanels` is the set
+  // of panels currently in the drawer (in selection order); the drawer is open
+  // iff it's non-empty, shows a tab per open panel, and `activeTab` is the one
+  // in front. The topbar launchers toggle a panel's membership; clicking a
+  // title-bar tab just changes which open panel is active.
+  const [openPanels, setOpenPanels] = useState([]);
+  const [activeTab, setActiveTab] = useState('assistant');
+  const activeTabRef = useRef('assistant');
+  activeTabRef.current = activeTab;
+  const isOpen = openPanels.length > 0;
   const [height, setHeightState] = useState(readStoredHeight);
   const [sessionId, setSessionId] = useState(null);
   const [sessionCtxKey, setSessionCtxKey] = useState(null);
@@ -97,13 +101,26 @@ export function AssistantDrawerProvider({ children }) {
 
   const { enabled: assistantEnabled } = useAssistantProvider();
   const { enabled: terminalEnabled } = useTerminalSettings();
-  const [activeTab, setActiveTab] = useState(readTab);
-  const activeTabRef = useRef(activeTab);
-  activeTabRef.current = activeTab;
+
+  // Activate a panel, opening it if it isn't already (in-drawer tab click /
+  // programmatic). Keeps any other open panel selected.
   const openTab = useCallback((tab) => {
     setActiveTab(tab);
-    try { localStorage.setItem(TAB_KEY, tab); } catch { /* noop */ }
-    setIsOpen((prev) => (prev && activeTabRef.current === tab ? false : true));
+    setOpenPanels((prev) => (prev.includes(tab) ? prev : [...prev, tab]));
+  }, []);
+  // In-drawer title-bar tab click: just change which open panel is active.
+  const selectTab = useCallback((tab) => setActiveTab(tab), []);
+  // Topbar launcher / chord toggle: open+activate the panel; if it's already
+  // the active one, pressing again removes it (closing that tab). Any other
+  // open panel stays selected.
+  const toggleTopbar = useCallback((tab) => {
+    setOpenPanels((prev) => {
+      if (!prev.includes(tab)) { setActiveTab(tab); return [...prev, tab]; }
+      if (activeTabRef.current !== tab) { setActiveTab(tab); return prev; }
+      const next = prev.filter((t) => t !== tab);
+      if (next.length) setActiveTab(next[next.length - 1]);
+      return next;
+    });
   }, []);
 
   // Maximized = grow the drawer to (near) full height; toggling restores the
@@ -111,32 +128,48 @@ export function AssistantDrawerProvider({ children }) {
   const [maximized, setMaximized] = useState(false);
   const toggleMaximized = useCallback(() => setMaximized((m) => !m), []);
 
-  const open = useCallback(() => setIsOpen(true), []);
-  const close = useCallback(() => { setIsOpen(false); setMaximized(false); }, []);
-  const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
+  const open = useCallback(() => setOpenPanels((prev) => (prev.length ? prev : [activeTabRef.current])), []);
+  const close = useCallback(() => setOpenPanels([]), []);          // close ALL panels
+  const toggle = useCallback(() => setOpenPanels((prev) => (prev.length ? [] : [activeTabRef.current])), []);
+  // Close just the ACTIVE tab: if another panel is still open the drawer stays
+  // open and switches to it; only the last one closing hides the drawer.
+  const closeActiveTab = useCallback(() => {
+    setOpenPanels((prev) => {
+      const next = prev.filter((t) => t !== activeTabRef.current);
+      if (next.length) setActiveTab(next[next.length - 1]);
+      return next;
+    });
+  }, []);
 
-  // If the currently-shown tab's feature is turned off, switch to the other
-  // enabled tab; close the drawer only when neither is available.
+  // A closed drawer is never "maximized".
+  useEffect(() => { if (openPanels.length === 0 && maximized) setMaximized(false); }, [openPanels.length, maximized]);
+
+  // Drop any panel whose feature was disabled in Settings; keep the rest.
   useEffect(() => {
-    const enabled = { assistant: assistantEnabled, terminal: terminalEnabled };
-    if (enabled[activeTab]) return;
-    const other = activeTab === 'assistant' ? 'terminal' : 'assistant';
-    if (enabled[other]) { setActiveTab(other); try { localStorage.setItem(TAB_KEY, other); } catch { /* noop */ } }
-    else setIsOpen(false);
-  }, [assistantEnabled, terminalEnabled, activeTab]);
+    setOpenPanels((prev) => {
+      const next = prev.filter((t) => (t === 'assistant' ? assistantEnabled : terminalEnabled));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [assistantEnabled, terminalEnabled]);
+  // If the active tab got closed/disabled, fall back to another open panel.
+  useEffect(() => {
+    if (openPanels.length && !openPanels.includes(activeTab)) {
+      setActiveTab(openPanels[openPanels.length - 1]);
+    }
+  }, [openPanels, activeTab]);
 
   useEffect(() => {
     if (!assistantEnabled && !terminalEnabled) return undefined;
     const handleKeyDown = (e) => {
       if (e.code !== 'Backquote' || !(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
-      if (e.shiftKey) { if (terminalEnabled) openTab('terminal'); return; }
-      setIsOpen((prev) => !prev);  // toggle at last tab
+      if (e.shiftKey) { if (terminalEnabled) toggleTopbar('terminal'); return; }
+      if (assistantEnabled) toggleTopbar('assistant');
+      else if (terminalEnabled) toggleTopbar('terminal');
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [assistantEnabled, terminalEnabled, openTab]);
+  }, [assistantEnabled, terminalEnabled, toggleTopbar]);
 
   const setHeight = useCallback((px) => {
     const next = clampHeight(px);
@@ -193,14 +226,14 @@ export function AssistantDrawerProvider({ children }) {
   );
 
   const value = useMemo(() => ({
-    isOpen, open, close, toggle,
-    activeTab, openTab, terminalEnabled,
+    isOpen, open, close, toggle, closeActiveTab,
+    openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled,
     height, setHeight, maximized, toggleMaximized, setMaximized,
     messages, streaming: turnActive, error: localError || stream.error,
     sessionReady: sessionId != null,
     provider: sessionMeta.provider, model: sessionMeta.model,
     startSession, sendMessage,
-  }), [isOpen, open, close, toggle, activeTab, openTab, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, startSession, sendMessage]);
+  }), [isOpen, open, close, toggle, closeActiveTab, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, startSession, sendMessage]);
 
   return (
     <AssistantDrawerContext.Provider value={value}>

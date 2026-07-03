@@ -1,24 +1,23 @@
 import React, { useCallback, useRef, lazy, Suspense } from 'react';
 import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';
-import useAssistantProvider from '../settings/hooks/useAssistantProvider.js';
-import useTerminalSettings from '../settings/hooks/useTerminalSettings.js';
 import { AssistantPane } from '../assistant/AssistantDrawer.jsx';
 import { ChevronUpIcon, ChevronDownIcon } from '../../components/CopyButton.jsx';
 
 const TerminalPane = lazy(() => import('../terminal/TerminalPane.jsx'));
 
+const TAB_LABELS = { assistant: '✦ Assistant', terminal: '❯_ Terminal' };
+
 /**
  * Shared bottom drawer host: a resizable full-width shell that hosts the
- * Assistant and Terminal panels. Only the ACTIVE (topbar-selected) panel is
- * shown; the inactive one is kept mounted and hidden with `display:none`
- * (never unmounted) so the terminal's xterm buffer and PTY-attached socket
- * survive a tab switch.
+ * open panels. The title bar shows a tab per OPEN panel (both only when both
+ * are selected on the topbar); clicking a tab activates it. The active panel
+ * is shown; any other open panel is kept mounted and hidden with
+ * `display:none` (never unmounted) so the terminal's xterm buffer and
+ * PTY-attached socket survive a tab switch.
  */
 export function BottomDrawer({ uiState }) {
-  const { isOpen, height, setHeight, close, activeTab,
+  const { isOpen, height, setHeight, closeActiveTab, openPanels, activeTab, selectTab,
           maximized, toggleMaximized, setMaximized } = useAssistantDrawer();
-  const { enabled: assistantEnabled } = useAssistantProvider();
-  const { enabled: terminalEnabled } = useTerminalSettings();
   const dragRef = useRef(null);
 
   const handleDragMove = useCallback((event) => {
@@ -45,8 +44,8 @@ export function BottomDrawer({ uiState }) {
   }, [height, maximized, setMaximized, handleDragMove, handleDragEnd]);
 
   if (!isOpen) return null;
-  const tab = (!assistantEnabled && terminalEnabled) ? 'terminal'
-            : (!terminalEnabled && assistantEnabled) ? 'assistant' : activeTab;
+  // Guard against a transient render where activeTab isn't (yet) an open panel.
+  const active = openPanels.includes(activeTab) ? activeTab : openPanels[openPanels.length - 1];
 
   return (
     <aside className={`bottom-drawer assistant-drawer${maximized ? ' bottom-drawer--maximized' : ''}`}
@@ -54,12 +53,16 @@ export function BottomDrawer({ uiState }) {
       <div className="assistant-drawer-drag" onPointerDown={handleDragStart}
         role="separator" aria-orientation="horizontal" aria-label="Resize drawer" />
       <header className="assistant-drawer-header">
-        {/* The drawer shows only the ACTIVE (topbar-selected) panel; the
-            header just labels it. Switching between Assistant/Terminal is done
-            with the topbar launcher buttons, which highlight the active one. */}
-        <span className="drawer-active-tab">
-          {tab === 'terminal' ? '❯_ Terminal' : '✦ Assistant'}
-        </span>
+        {/* One tab per OPEN panel (both only when both are selected on the
+            topbar). Clicking a tab activates it without deselecting the other;
+            the topbar launchers add/remove panels. */}
+        <div className="drawer-tabs" role="tablist">
+          {openPanels.map((t) => (
+            <button key={t} type="button" role="tab" aria-selected={t === active}
+              className={`drawer-tab${t === active ? ' drawer-tab--active' : ''}`}
+              onClick={() => selectTab(t)}>{TAB_LABELS[t]}</button>
+          ))}
+        </div>
         <div className="assistant-drawer-controls">
           <button type="button" className="assistant-drawer-btn" onClick={toggleMaximized}
             aria-label={maximized ? 'Restore drawer' : 'Maximize drawer'}
@@ -67,19 +70,19 @@ export function BottomDrawer({ uiState }) {
             title={maximized ? 'Restore' : 'Maximize'}>
             {maximized ? <ChevronDownIcon /> : <ChevronUpIcon />}
           </button>
-          <button type="button" className="assistant-drawer-btn" onClick={close}
-            aria-label="Close drawer" title="Close">&times;</button>
+          <button type="button" className="assistant-drawer-btn" onClick={closeActiveTab}
+            aria-label="Close tab" title="Close tab">&times;</button>
         </div>
       </header>
-      {assistantEnabled && (
-        <div className="drawer-panel" style={{ display: tab === 'assistant' ? 'flex' : 'none' }}>
+      {openPanels.includes('assistant') && (
+        <div className="drawer-panel" style={{ display: active === 'assistant' ? 'flex' : 'none' }}>
           <AssistantPane uiState={uiState} />
         </div>
       )}
-      {terminalEnabled && (
-        <div className="drawer-panel" style={{ display: tab === 'terminal' ? 'flex' : 'none' }}>
+      {openPanels.includes('terminal') && (
+        <div className="drawer-panel" style={{ display: active === 'terminal' ? 'flex' : 'none' }}>
           <Suspense fallback={<div className="tty-disabled">Loading terminal…</div>}>
-            <TerminalPane active={tab === 'terminal'} />
+            <TerminalPane active={active === 'terminal'} />
           </Suspense>
         </div>
       )}

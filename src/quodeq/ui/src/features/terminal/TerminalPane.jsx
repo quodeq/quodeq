@@ -61,6 +61,7 @@ export default function TerminalPane({ active }) {
     let disposed = false;
     let ro = null;
     let mo = null;
+    let fitTimer = null;
 
     const setup = () => {
       if (disposed || termRef.current || !rootRef.current) return;
@@ -85,10 +86,19 @@ export default function TerminalPane({ active }) {
       fit.fit();
       resize(term.cols, term.rows);
       termRef.current = term; fitRef.current = fit;
-      // Not implemented in JSDOM; guard so tests (and any environment lacking it) don't crash.
-      ro = typeof ResizeObserver !== 'undefined'
-        ? new ResizeObserver(() => { try { fit.fit(); resize(term.cols, term.rows); } catch { /* noop */ } })
-        : null;
+      // Debounce refits: during the sidebar-expand transition (and manual drag)
+      // the container resizes every frame; refitting each frame thrashes xterm
+      // and SIGWINCHes the PTY ~12x, so a running TUI redraws repeatedly and
+      // "scratches". Fit ONCE after the size settles. (ResizeObserver isn't in
+      // JSDOM; guard so tests and any lacking environment don't crash.)
+      const scheduleFit = () => {
+        if (fitTimer) clearTimeout(fitTimer);
+        fitTimer = setTimeout(() => {
+          fitTimer = null;
+          try { fit.fit(); resize(term.cols, term.rows); } catch { /* noop */ }
+        }, 150);
+      };
+      ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(scheduleFit) : null;
       ro?.observe(rootRef.current);
       const onTheme = () => { term.options.theme = themeFromCss(); };
       mo = typeof MutationObserver !== 'undefined' ? new MutationObserver(onTheme) : null;
@@ -101,6 +111,7 @@ export default function TerminalPane({ active }) {
 
     return () => {
       disposed = true;
+      if (fitTimer) clearTimeout(fitTimer);
       ro?.disconnect(); mo?.disconnect();
       if (termRef.current) { termRef.current.dispose(); }
       termRef.current = null; fitRef.current = null;

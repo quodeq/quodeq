@@ -2,30 +2,39 @@ import { it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
-const drawer = { isOpen: true, height: 320, setHeight: vi.fn(), close: vi.fn(),
-  activeTab: 'assistant', openTab: vi.fn(),
+const drawer = {
+  isOpen: true, height: 320, setHeight: vi.fn(), close: vi.fn(), closeActiveTab: vi.fn(),
+  openPanels: ['assistant', 'terminal'], activeTab: 'assistant', selectTab: vi.fn(),
   maximized: false, toggleMaximized: vi.fn(), setMaximized: vi.fn(),
-  provider: 'ollama', model: 'm', messages: [], streaming: false, error: null, sendMessage: vi.fn() };
+  provider: 'ollama', model: 'm', messages: [], streaming: false, error: null, sendMessage: vi.fn(),
+};
 vi.mock('../assistant/AssistantDrawerProvider.jsx', () => ({ useAssistantDrawer: () => drawer }));
-vi.mock('../settings/hooks/useAssistantProvider.js', () => ({ default: () => ({ enabled: true }) }));
-vi.mock('../settings/hooks/useTerminalSettings.js', () => ({ default: () => ({ enabled: true }) }));
 vi.mock('../terminal/TerminalPane.jsx', () => ({ default: () => <div data-testid="tty" /> }));
 import { BottomDrawer } from './BottomDrawer.jsx';
 
-it('shows only the active (assistant) tab label, not a strip of both tabs', () => {
+it('shows a tab for each OPEN panel (both, since both are open)', () => {
   render(<BottomDrawer uiState={{}} />);
-  expect(screen.getByText('✦ Assistant')).toBeInTheDocument();
-  // No dual-tab strip: the terminal tab is not offered in the drawer header
-  // (switching is via the topbar launcher).
-  expect(screen.queryByText('❯_ Terminal')).toBeNull();
+  expect(screen.getByRole('tab', { name: /Assistant/ })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: /Terminal/ })).toBeInTheDocument();
+});
+
+it('only shows a tab for the single open panel when only one is open', () => {
+  drawer.openPanels = ['assistant'];
+  render(<BottomDrawer uiState={{}} />);
+  expect(screen.getByRole('tab', { name: /Assistant/ })).toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: /Terminal/ })).toBeNull();
+  drawer.openPanels = ['assistant', 'terminal'];  // restore for other tests
+});
+
+it('clicking an inactive tab activates it (without deselecting the other)', () => {
+  render(<BottomDrawer uiState={{}} />);
+  fireEvent.click(screen.getByRole('tab', { name: /Terminal/ }));
+  expect(drawer.selectTab).toHaveBeenCalledWith('terminal');
 });
 
 it('keeps the terminal panel mounted but hidden while the assistant tab is active', async () => {
   render(<BottomDrawer uiState={{}} />);
-  // findBy* waits for the lazy TerminalPane to resolve through Suspense.
   const tty = await screen.findByTestId('tty');
-  expect(tty).toBeInTheDocument();
-  // Its panel is present but hidden (display:none), not unmounted.
   expect(tty.closest('.drawer-panel')).toHaveStyle({ display: 'none' });
 });
 
@@ -33,4 +42,11 @@ it('the maximize control toggles the maximized state', () => {
   render(<BottomDrawer uiState={{}} />);
   fireEvent.click(screen.getByRole('button', { name: /maximize/i }));
   expect(drawer.toggleMaximized).toHaveBeenCalled();
+});
+
+it('the close (×) button closes only the active tab, not the whole drawer', () => {
+  render(<BottomDrawer uiState={{}} />);
+  fireEvent.click(screen.getByRole('button', { name: /close tab/i }));
+  expect(drawer.closeActiveTab).toHaveBeenCalled();
+  expect(drawer.close).not.toHaveBeenCalled();
 });

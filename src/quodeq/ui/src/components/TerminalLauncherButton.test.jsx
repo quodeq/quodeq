@@ -2,18 +2,17 @@ import { it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
-const drawerState = { isOpen: false, activeTab: 'terminal' };
-const openTab = vi.fn();
+const drawerState = { openPanels: [] };
+const toggleTopbar = vi.fn();
 vi.mock('../features/assistant/AssistantDrawerProvider.jsx', () => ({
-  useAssistantDrawer: () => ({ isOpen: drawerState.isOpen, activeTab: drawerState.activeTab, openTab }),
+  useAssistantDrawer: () => ({ openPanels: drawerState.openPanels, toggleTopbar }),
 }));
 import { TerminalLauncherButton } from './TerminalLauncherButton.jsx';
 
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
-  drawerState.isOpen = false;
-  drawerState.activeTab = 'terminal';
+  drawerState.openPanels = [];
 });
 afterEach(() => localStorage.clear());
 
@@ -23,22 +22,28 @@ it('is hidden when the terminal is disabled (the default)', () => {
   expect(screen.queryByRole('button', { name: /terminal/i })).toBeNull();
 });
 
-it('renders and opens the terminal tab when enabled', () => {
+it('renders and toggles the terminal panel when enabled', () => {
   localStorage.setItem('cc-terminal-enabled', 'true');
   render(<TerminalLauncherButton />);
   const btn = screen.getByRole('button', { name: /terminal/i });
   expect(btn).toHaveClass('topbar-btn', 'topbar-btn--icon');
   expect(btn).toHaveAttribute('aria-pressed', 'false');
   fireEvent.click(btn);
-  expect(openTab).toHaveBeenCalledWith('terminal');
+  expect(toggleTopbar).toHaveBeenCalledWith('terminal');
 });
 
-it('shows the active (highlighted) state when the drawer displays the terminal tab', () => {
+it('is highlighted (active) when the terminal panel is open', () => {
   localStorage.setItem('cc-terminal-enabled', 'true');
-  drawerState.isOpen = true;
-  drawerState.activeTab = 'terminal';
+  drawerState.openPanels = ['terminal'];
   render(<TerminalLauncherButton />);
   const btn = screen.getByRole('button', { name: /terminal/i });
   expect(btn).toHaveClass('topbar-btn--terminal--open');
   expect(btn).toHaveAttribute('aria-pressed', 'true');
+});
+
+it('stays highlighted when BOTH panels are open', () => {
+  localStorage.setItem('cc-terminal-enabled', 'true');
+  drawerState.openPanels = ['assistant', 'terminal'];
+  render(<TerminalLauncherButton />);
+  expect(screen.getByRole('button', { name: /terminal/i })).toHaveClass('topbar-btn--terminal--open');
 });

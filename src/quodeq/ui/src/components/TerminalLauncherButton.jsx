@@ -3,15 +3,16 @@ import useTerminalSettings from '../features/settings/hooks/useTerminalSettings.
 import { TerminalIcon } from './CopyButton.jsx';
 
 export function TerminalLauncherButton() {
-  const { isOpen, activeTab, openTab } = useAssistantDrawer();
+  const { openPanels, toggleTopbar } = useAssistantDrawer();
   const { enabled } = useTerminalSettings();
   if (!enabled) return null;
-  const on = isOpen && activeTab === 'terminal';
+  // Highlighted whenever the terminal panel is open/selected.
+  const on = openPanels.includes('terminal');
   return (
     <button type="button"
       className={`topbar-btn topbar-btn--icon topbar-btn--terminal${on ? ' topbar-btn--terminal--open' : ''}`}
       aria-pressed={on} aria-label="Terminal (Ctrl+Shift+`)" title="Terminal (Ctrl+Shift+`)"
-      onClick={() => openTab('terminal')}>
+      onClick={() => toggleTopbar('terminal')}>
       <TerminalIcon />
     </button>
   );
