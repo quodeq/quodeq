@@ -87,26 +87,12 @@
   flex-direction: column;
   background: var(--color-console-bg);
   color: var(--color-console-text);
-  /* Border stays invisible until the drawer has focus (see :focus-within); the
-     drop shadow alone separates it from the content when unfocused. */
-  border-top: 1px solid transparent;
-  border-left: 1px solid transparent;
+  border-top: 1px solid var(--color-border);
+  border-left: 1px solid var(--color-border);
   box-shadow: 0 -8px 24px color-mix(in srgb, var(--color-text) 15%, transparent);
   font-family: var(--font-mono);
-  /* Slide in sync with the sidebar's 200ms width transition (see the
-     hover-follow rule below); fade the focus border/glow smoothly. */
-  transition: left 200ms ease, border-color 160ms ease, box-shadow 160ms ease;
-}
-
-/* On focus (typing in the terminal / assistant) reveal a soft accent border
-   plus a diffuse (blurred) accent glow. */
-.assistant-drawer:focus-within,
-.bottom-drawer:focus-within {
-  border-top-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
-  border-left-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
-  box-shadow:
-    0 -8px 24px color-mix(in srgb, var(--color-text) 15%, transparent),
-    0 0 18px color-mix(in srgb, var(--color-accent) 22%, transparent);
+  /* Slide in sync with the sidebar's 200ms width transition (hover-follow rule below). */
+  transition: left 200ms ease;
 }
 
 /* Follow the sidebar when it expands on hover (desktop only — below 900px the
@@ -422,7 +408,9 @@
    integrates the provider/model without a separate subtitle line. */
 .drawer-model-chip {
   align-self: center;
-  max-width: 45%;
+  max-width: 14rem;   /* px-based cap so short model names show in full (a %
+                         here resolves against the tiny content-sized controls
+                         box and ellipsizes even short names) */
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   line-height: 1.4;
