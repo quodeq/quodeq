@@ -25,7 +25,7 @@ export default function UpdateBanner() {
     <div className={`update-banner${status.is_security ? ' update-banner--security' : ''}`} role="status">
       <span className="update-banner-text">
         {status.is_security ? <strong>Security update: </strong> : null}
-        Quodeq {status.current} → {status.latest} is available.
+        Quodeq v{status.latest} is available.
         {status.action_command ? (
           <> Run <code className="update-banner-cmd">{status.action_command}</code></>
         ) : null}

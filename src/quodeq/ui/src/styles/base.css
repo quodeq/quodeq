@@ -2104,13 +2104,16 @@ fieldset.gf-tab-body:disabled .gf-boundary-divider { pointer-events: none; curso
   font-size: var(--text-sm);
 }
 .update-banner-text { min-width: 0; }
+/* Matches the inline-code idiom from .help-section code; the banner bg is
+   already surface-alt, so the chip drops to the page bg to stand out. */
 .update-banner-cmd {
   font-family: var(--font-mono);
-  font-size: 0.85em;
-  padding: 1px 6px;
-  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  font-size: 0.82em;
+  padding: 2px 7px;
+  background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
+  color: var(--color-accent);
   white-space: nowrap;
   user-select: all; /* one click selects the whole command for copy */
 }
