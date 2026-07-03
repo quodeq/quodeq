@@ -177,6 +177,14 @@ export function Providers() {
         <li>Under <em>Advanced</em> you can set a custom server address, an API key, and run the parallel-agent auto-detect, which recommends a sub-agent count based on your unified memory.</li>
       </ol>
 
+      <h3>llama.cpp (local, GGUF models)</h3>
+      <p>Points Quodeq at a llama-server instance you run yourself. It serves one GGUF model at a time, fixed at launch.</p>
+      <ol>
+        <li>Start the server with <code>llama-server -m model.gguf --port 8080</code>.</li>
+        <li>In <strong>Settings → llama.cpp</strong>, the loaded model appears automatically. To switch models, restart llama-server with a different GGUF.</li>
+        <li>Under <em>Advanced</em>, run the parallel-agent auto-detect, which tests the server and recommends a sub-agent count.</li>
+      </ol>
+
       <h3>Power tiers</h3>
       <p>Each provider exposes three power levels that map to model size:</p>
       <KeyTable rows={[

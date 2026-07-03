@@ -38,6 +38,12 @@ describe('HelpPage providers section', () => {
     fireEvent.click(screen.getByRole('button', { name: 'AI Providers' }));
     expect(screen.getByRole('heading', { level: 3, name: /omlx \(Apple Silicon only\)/ })).toBeInTheDocument();
   });
+
+  it('documents the llama.cpp provider', () => {
+    render(<HelpPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'AI Providers' }));
+    expect(screen.getByRole('heading', { level: 3, name: /llama\.cpp \(local, GGUF models\)/ })).toBeInTheDocument();
+  });
 });
 
 describe('HelpPage settings section', () => {
