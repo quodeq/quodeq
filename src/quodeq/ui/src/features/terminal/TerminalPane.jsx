@@ -45,8 +45,15 @@ export default function TerminalPane({ active }) {
   // Mount xterm once when we're allowed and active.
   useEffect(() => {
     if (!socketActive || termRef.current || !rootRef.current) return undefined;
-    const term = new Terminal({ scrollback: 5000, fontFamily: 'var(--font-mono, monospace)',
-      theme: themeFromCss(), cursorBlink: true });
+    const term = new Terminal({
+      scrollback: 5000,
+      fontFamily: 'var(--font-mono, monospace)',
+      fontSize: 13,
+      lineHeight: 1.25,       // more breathing room between lines
+      cursorBlink: true,
+      cursorStyle: 'bar',     // sleeker than the default square block
+      theme: themeFromCss(),
+    });
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(rootRef.current);
@@ -69,11 +76,16 @@ export default function TerminalPane({ active }) {
   // Refit when the tab becomes active again (drawer was on the other tab).
   useEffect(() => { if (active && fitRef.current) { try { fitRef.current.fit(); } catch { /* noop */ } } }, [active]);
 
+  // Bubble phase (NOT capture): xterm's textarea must receive the keydown
+  // first so special keys (Delete/Backspace/arrows/Enter) work; we then stop
+  // it bubbling to the window so the app's global handlers (Ctrl+[ history,
+  // Escape closes the side pane) don't fire on terminal input. Reserved drawer
+  // chords are left to bubble so Ctrl+` still toggles the drawer.
   const containerKeyDown = useCallback((e) => { if (!isReservedChord(e)) e.stopPropagation(); }, []);
 
   if (!checked) return null;
   if (reason) {
     return <div className="tty-disabled" data-testid="tty-disabled">{reason}</div>;
   }
-  return <div ref={rootRef} className="tty-root" data-testid="tty-root" onKeyDownCapture={containerKeyDown} />;
+  return <div ref={rootRef} className="tty-root" data-testid="tty-root" onKeyDown={containerKeyDown} />;
 }
