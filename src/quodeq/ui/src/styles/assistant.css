@@ -69,7 +69,7 @@
 }
 
 /* ── Drawer shell ─────────────────────────────────────── */
-.assistant-drawer {
+.assistant-drawer, .bottom-drawer {
   /* Follow the active theme instead of the always-dark console tokens: remap
      them to the surface/text tokens locally (same technique as the evaluation
      console in evaluation.css), so the drawer is light in light mode and dark
@@ -96,7 +96,7 @@
 /* Below the layout breakpoint the sidebar is no longer a left column
    (app-shell collapses to a single column), so the drawer spans full width. */
 @media (max-width: 900px) {
-  .assistant-drawer {
+  .assistant-drawer, .bottom-drawer {
     left: 0;
     border-left: none;
   }
@@ -352,3 +352,13 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* ── Tab strip + tab panels ───────────────────────────── */
+.drawer-tabs { display: flex; gap: 4px; }
+.drawer-tab {
+  background: transparent; border: none; color: var(--color-text-muted);
+  font-family: var(--font-mono); font-size: 0.8125rem; padding: 2px 8px; cursor: pointer; border-radius: 4px;
+}
+.drawer-tab--active { color: var(--color-text); background: color-mix(in srgb, var(--color-text) 10%, transparent); }
+.drawer-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.assistant-drawer-subtitle { font-size: 0.75rem; color: var(--color-text-muted); padding: 2px 8px 0; }

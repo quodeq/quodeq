@@ -1,9 +1,15 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createAssistantSession, postAssistantMessage } from '../../api/assistant.js';
 import useAssistantProvider from '../settings/hooks/useAssistantProvider.js';
+import useTerminalSettings from '../settings/hooks/useTerminalSettings.js';
 import { useAssistantStream } from './useAssistantStream.js';
 
 const STORAGE_KEY = 'cc-assistant-drawer-height';
+const TAB_KEY = 'cc-drawer-last-tab';
+function readTab() {
+  try { return localStorage.getItem(TAB_KEY) === 'terminal' ? 'terminal' : 'assistant'; }
+  catch { return 'assistant'; }
+}
 const DEFAULT_HEIGHT = 320;
 const MIN_HEIGHT = 160;
 const MAX_HEIGHT = 640;
@@ -90,29 +96,42 @@ export function AssistantDrawerProvider({ children }) {
   useEffect(() => { setTurnActive(false); }, [sessionId]);
 
   const { enabled: assistantEnabled } = useAssistantProvider();
+  const { enabled: terminalEnabled } = useTerminalSettings();
+  const [activeTab, setActiveTab] = useState(readTab);
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  const openTab = useCallback((tab) => {
+    setActiveTab(tab);
+    try { localStorage.setItem(TAB_KEY, tab); } catch { /* noop */ }
+    setIsOpen((prev) => (prev && activeTabRef.current === tab ? false : true));
+  }, []);
 
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
   const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
 
-  // When the assistant is disabled in Settings, force the drawer shut so a
-  // drawer left open can't linger after the feature is turned off.
+  // If the currently-shown tab's feature is turned off, switch to the other
+  // enabled tab; close the drawer only when neither is available.
   useEffect(() => {
-    if (!assistantEnabled) setIsOpen(false);
-  }, [assistantEnabled]);
+    const enabled = { assistant: assistantEnabled, terminal: terminalEnabled };
+    if (enabled[activeTab]) return;
+    const other = activeTab === 'assistant' ? 'terminal' : 'assistant';
+    if (enabled[other]) { setActiveTab(other); try { localStorage.setItem(TAB_KEY, other); } catch { /* noop */ } }
+    else setIsOpen(false);
+  }, [assistantEnabled, terminalEnabled, activeTab]);
 
   useEffect(() => {
-    if (!assistantEnabled) return undefined;
+    if (!assistantEnabled && !terminalEnabled) return undefined;
     const handleKeyDown = (e) => {
-      if (e.key === '`' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        setIsOpen((prev) => !prev);
-      }
+      if (e.code !== 'Backquote' || !(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      if (e.shiftKey) { if (terminalEnabled) openTab('terminal'); return; }
+      setIsOpen((prev) => !prev);  // toggle at last tab
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [assistantEnabled]);
+  }, [assistantEnabled, terminalEnabled, openTab]);
 
   const setHeight = useCallback((px) => {
     const next = clampHeight(px);
@@ -170,12 +189,13 @@ export function AssistantDrawerProvider({ children }) {
 
   const value = useMemo(() => ({
     isOpen, open, close, toggle,
+    activeTab, openTab, terminalEnabled,
     height, setHeight,
     messages, streaming: turnActive, error: localError || stream.error,
     sessionReady: sessionId != null,
     provider: sessionMeta.provider, model: sessionMeta.model,
     startSession, sendMessage,
-  }), [isOpen, open, close, toggle, height, setHeight, messages, turnActive, stream.error, localError, sessionId, sessionMeta, startSession, sendMessage]);
+  }), [isOpen, open, close, toggle, activeTab, openTab, terminalEnabled, height, setHeight, messages, turnActive, stream.error, localError, sessionId, sessionMeta, startSession, sendMessage]);
 
   return (
     <AssistantDrawerContext.Provider value={value}>

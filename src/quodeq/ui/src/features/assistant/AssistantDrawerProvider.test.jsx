@@ -58,6 +58,19 @@ it('toggle flips visibility', () => {
   expect(screen.getByTestId('open').textContent).toBe('true');
 });
 
+it('exposes activeTab defaulting to assistant; openTab switches the active tab', () => {
+  // Both features enabled so the per-tab disable-fallback effect doesn't
+  // reroute the initial tab.
+  localStorage.setItem('cc-assistant-enabled', 'true');
+  localStorage.setItem('cc-terminal-enabled', 'true');
+  let hookRef;
+  const Grab = () => { hookRef = useAssistantDrawer(); return null; };
+  render(<AssistantDrawerProvider><Grab /></AssistantDrawerProvider>);
+  expect(hookRef.activeTab).toBe('assistant');
+  act(() => hookRef.openTab('terminal'));
+  expect(hookRef.activeTab).toBe('terminal');
+});
+
 it('startSession creates a session; sendMessage posts to it', async () => {
   render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
   await act(async () => { screen.getByText('start').click(); });

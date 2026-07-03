@@ -2,9 +2,9 @@ import { it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
-const toggle = vi.fn();
+const openTab = vi.fn();
 vi.mock('../features/assistant/AssistantDrawerProvider.jsx', () => ({
-  useAssistantDrawer: () => ({ isOpen: false, toggle }),
+  useAssistantDrawer: () => ({ isOpen: false, activeTab: 'assistant', openTab }),
 }));
 import { AssistantLauncherButton } from './AssistantLauncherButton.jsx';
 
@@ -24,5 +24,5 @@ it('is an icon-only labelled toggle when enabled', () => {
   expect(btn).toHaveClass('topbar-btn', 'topbar-btn--icon');
   expect(btn).toHaveAttribute('aria-pressed', 'false');
   fireEvent.click(btn);
-  expect(toggle).toHaveBeenCalledTimes(1);
+  expect(openTab).toHaveBeenCalledWith('assistant');
 });
