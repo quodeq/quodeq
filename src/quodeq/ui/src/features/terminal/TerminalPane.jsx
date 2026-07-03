@@ -45,11 +45,13 @@ export default function TerminalPane({ active }) {
   // Mount xterm once when we're allowed and active.
   useEffect(() => {
     if (!socketActive || termRef.current || !rootRef.current) return undefined;
+    // Match the violations code panel (.finding-context in evaluation.css):
+    // same --font-mono family, font-size 0.76rem (~12px), line-height 1.6.
     const term = new Terminal({
       scrollback: 5000,
       fontFamily: 'var(--font-mono, monospace)',
-      fontSize: 13,
-      lineHeight: 1.25,       // more breathing room between lines
+      fontSize: 12,
+      lineHeight: 1.6,
       cursorBlink: true,
       cursorStyle: 'bar',     // sleeker than the default square block
       theme: themeFromCss(),
