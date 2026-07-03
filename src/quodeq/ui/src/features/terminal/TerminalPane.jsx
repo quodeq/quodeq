@@ -58,15 +58,14 @@ export default function TerminalPane({ active }) {
   // Mount xterm once when we're allowed and active.
   useEffect(() => {
     if (!socketActive || termRef.current || !rootRef.current) return undefined;
-    // Same --font-mono family + 12px as the violations code panel, but a
-    // tighter iTerm-like line height (1.6 read too airy for a terminal; the
-    // xterm default 1.0 was too cramped).
+    // Same --font-mono family + 12px as the violations code panel.
+    // (letterSpacing left at the default 0 — negative values clip glyphs in
+    // xterm's cell renderer.)
     const term = new Terminal({
       scrollback: 5000,
       fontFamily: 'var(--font-mono, monospace)',
       fontSize: 12,
-      lineHeight: 1.1,
-      letterSpacing: -0.5,    // JetBrains Mono is wide; tighten the cells (px)
+      lineHeight: 1.5,
       cursorBlink: true,
       cursorStyle: 'bar',     // sleeker than the default square block
       theme: themeFromCss(),
