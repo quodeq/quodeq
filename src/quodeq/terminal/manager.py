@@ -28,20 +28,23 @@ class TerminalManager:
             self._backend.spawn(cwd=cwd, cols=cols, rows=rows)
 
     def read(self, max_bytes: int = 65536) -> bytes:
-        if self._backend is None:
+        backend = self._backend
+        if backend is None:
             return b""
-        data = self._backend.read(max_bytes)
+        data = backend.read(max_bytes)
         if data:
             self._append_scrollback(data)
         return data
 
     def write(self, data: bytes) -> None:
-        if self._backend is not None:
-            self._backend.write(data)
+        backend = self._backend
+        if backend is not None:
+            backend.write(data)
 
     def resize(self, cols: int, rows: int) -> None:
-        if self._backend is not None:
-            self._backend.resize(cols, rows)
+        backend = self._backend
+        if backend is not None:
+            backend.resize(cols, rows)
 
     def scrollback(self) -> bytes:
         return b"".join(self._ring)

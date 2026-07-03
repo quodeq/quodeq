@@ -34,3 +34,27 @@ def test_scrollback_is_bounded():
     m.ensure_session(cwd="/", cols=80, rows=24)
     m._append_scrollback(b"x" * (TerminalManager.MAX_SCROLLBACK + 5000))
     assert len(m.scrollback()) <= TerminalManager.MAX_SCROLLBACK
+
+
+def test_read_after_kill_returns_empty_not_crash():
+    m = TerminalManager(backend_factory=_FakeBackend)
+    m.ensure_session(cwd="/home/u", cols=80, rows=24)
+    m.kill()
+    assert m.read() == b""
+    m.write(b"x")
+    m.resize(80, 24)
+
+
+def test_scrollback_evicts_oldest_small_chunks():
+    m = TerminalManager(backend_factory=_FakeBackend)
+    m.ensure_session(cwd="/", cols=80, rows=24)
+    chunk_size = 1024
+    num_chunks = (TerminalManager.MAX_SCROLLBACK // chunk_size) + 5
+    for i in range(num_chunks):
+        marker = f"chunk-{i:05d}-".encode()
+        padding = b"y" * (chunk_size - len(marker))
+        m._append_scrollback(marker + padding)
+    data = m.scrollback()
+    assert len(data) <= TerminalManager.MAX_SCROLLBACK
+    assert b"chunk-00000-" not in data
+    assert f"chunk-{num_chunks - 1:05d}-".encode() in data
