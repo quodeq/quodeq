@@ -7,6 +7,7 @@ import { ApiProvider } from './api/ApiContext.jsx';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './api/queryClient.js';
 import { SidePaneProvider } from './features/side-pane/index.js';
+import { AssistantDrawerProvider } from './features/assistant/AssistantDrawerProvider.jsx';
 
 const LS_THEME = 'cc-theme';
 const LS_THEME_MODE = 'cc-theme-mode';
@@ -97,7 +98,9 @@ createRoot(rootEl).render(
     <QueryClientProvider client={queryClient}>
       <ApiProvider>
         <SidePaneProvider>
-          <App />
+          <AssistantDrawerProvider>
+            <App />
+          </AssistantDrawerProvider>
         </SidePaneProvider>
       </ApiProvider>
     </QueryClientProvider>
