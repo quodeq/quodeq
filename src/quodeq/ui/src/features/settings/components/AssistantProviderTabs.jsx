@@ -1,15 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import useAssistantProvider from '../hooks/useAssistantProvider.js';
+import AssistantModelPicker from './AssistantModelPicker.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 
 const DEFAULT_PROVIDER_ORDER = 50;
+
+const MODE_OPTIONS = [
+  { value: 'default', label: 'Default' },
+  { value: 'custom', label: 'Custom' },
+];
 
 export default function AssistantProviderTabs({ providerConfigs }) {
   const { getAiClients } = useApi();
   const [clients, setClients] = useState([]);
   const [clientsError, setClientsError] = useState(null);
-  const { activeProvider, setActiveProvider, model, setModel, followsAnalysis } = useAssistantProvider();
+  const { mode, setMode, activeProvider, setActiveProvider, model, setModel } = useAssistantProvider();
 
   useEffect(() => {
     getAiClients().then((data) => {
@@ -32,55 +38,80 @@ export default function AssistantProviderTabs({ providerConfigs }) {
         <SectionLabel marker="▶">Assistant</SectionLabel>
       </div>
       {clientsError && <div className="settings-row"><span className="settings-error">{clientsError}</span></div>}
+
       <div className="settings-row">
         <div className="settings-row-label">
-          <span className="settings-label">AI Provider</span>
+          <span className="settings-label">Model source</span>
           <span className="settings-description">
-            Choose which AI powers the in-app assistant.
-            {followsAnalysis && <> Currently follows the Analysis provider.</>}
+            Default follows your Analysis provider and model. Choose Custom to pick a different one for the assistant.
           </span>
         </div>
         <div className="settings-pill-group" role="tablist">
-          {clients.map((c) => {
-            const installed = c.installed !== false;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                role="tab"
-                aria-selected={c.id === activeProvider}
-                aria-disabled={!installed}
-                title={installed ? undefined : `${c.label} isn’t installed yet`}
-                className={`settings-pill${c.id === activeProvider ? ' settings-pill--active' : ''}${installed ? '' : ' settings-pill--disabled'}`}
-                onClick={() => setActiveProvider(c.id)}
-              >
-                {c.label}
-              </button>
-            );
-          })}
+          {MODE_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={mode === value}
+              className={`settings-pill${mode === value ? ' settings-pill--active' : ''}`}
+              onClick={() => setMode(value)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
-      {active && (
+
+      {mode === 'default' && (
         <div className="settings-row settings-row--last">
-          <div className="settings-row-label">
-            <span className="settings-label">Model</span>
-            <span className="settings-description">
-              Override the model used by the assistant. Leave blank to use the Analysis model.
-            </span>
-          </div>
-          <input
-            type="text"
-            className="settings-model-input"
-            value={model}
-            placeholder="default"
-            onChange={(e) => setModel(e.target.value)}
-            aria-label="Assistant model override"
-            autoCapitalize="off"
-            autoCorrect="off"
-            autoComplete="off"
-            spellCheck={false}
-          />
+          <span className="settings-description">
+            Follows Analysis · {active?.label || activeProvider || 'none selected'} · {model || 'default'}
+          </span>
         </div>
+      )}
+
+      {mode === 'custom' && (
+        <>
+          <div className="settings-row">
+            <div className="settings-row-label">
+              <span className="settings-label">AI Provider</span>
+              <span className="settings-description">Choose which AI powers the in-app assistant.</span>
+            </div>
+            <div className="settings-pill-group" role="tablist">
+              {clients.map((c) => {
+                const installed = c.installed !== false;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={c.id === activeProvider}
+                    aria-disabled={!installed}
+                    title={installed ? undefined : `${c.label} isn’t installed yet`}
+                    className={`settings-pill${c.id === activeProvider ? ' settings-pill--active' : ''}${installed ? '' : ' settings-pill--disabled'}`}
+                    onClick={() => setActiveProvider(c.id)}
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {active && (
+            <div className="settings-row settings-row--last">
+              <div className="settings-row-label">
+                <span className="settings-label">Model</span>
+                <span className="settings-description">Pick the model the assistant should use.</span>
+              </div>
+              <AssistantModelPicker
+                provider={active}
+                providerConfig={providerConfigs?.[active.id] || {}}
+                value={model}
+                onChange={setModel}
+              />
+            </div>
+          )}
+        </>
       )}
     </section>
   );

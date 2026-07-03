@@ -2,28 +2,57 @@ import { useState, useCallback, useEffect } from 'react';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 
 export const ASSISTANT_ACTIVE_PROVIDER_KEY = 'cc-assistant-active-provider';
+export const ASSISTANT_MODE_KEY = 'cc-assistant-mode';
 
 // Broadcast so every useAssistantProvider() instance (Settings tab, drawer, ...)
 // re-reads storage and stays in sync when one instance changes the selection.
 const CHANGE_EVENT = 'assistant-provider-changed';
 
-function loadActiveProvider(storage) {
-  const explicit = storage.getItem(ASSISTANT_ACTIVE_PROVIDER_KEY);
-  if (explicit !== null) {
-    return { activeProvider: explicit, followsAnalysis: false };
-  }
-  return { activeProvider: storage.getItem(ACTIVE_PROVIDER_KEY) || '', followsAnalysis: true };
-}
+// Resolve the whole assistant gate from storage, fresh, every time.
+// - default mode: mirror the Analysis gate LIVE (read cc-active-provider +
+//   its model on every read, never snapshotted).
+// - custom mode: use the assistant-scoped provider/model, falling back to the
+//   analysis selection when the assistant keys are unset.
+function loadState(storage) {
+  const mode = storage.getItem(ASSISTANT_MODE_KEY) === 'custom' ? 'custom' : 'default';
+  const analysisActive = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
 
-function loadModel(providerId, storage) {
-  const explicit = storage.getItem(providerKey(providerId, 'model-assistant'));
-  if (explicit !== null) return explicit;
-  return storage.getItem(providerKey(providerId, 'model')) || '';
+  if (mode === 'default') {
+    const model = analysisActive
+      ? (storage.getItem(providerKey(analysisActive, 'model')) || '')
+      : '';
+    return { mode, activeProvider: analysisActive, model, followsAnalysis: true };
+  }
+
+  const explicitProvider = storage.getItem(ASSISTANT_ACTIVE_PROVIDER_KEY);
+  const activeProvider = explicitProvider !== null ? explicitProvider : analysisActive;
+  const explicitModel = activeProvider
+    ? storage.getItem(providerKey(activeProvider, 'model-assistant'))
+    : null;
+  const model = explicitModel !== null
+    ? explicitModel
+    : (activeProvider ? (storage.getItem(providerKey(activeProvider, 'model')) || '') : '');
+  return { mode, activeProvider, model, followsAnalysis: false };
 }
 
 export function useAssistantProvider({ storage = localStorage } = {}) {
-  const [{ activeProvider, followsAnalysis }, setProviderState] = useState(() => loadActiveProvider(storage));
-  const [model, setModelState] = useState(() => loadModel(activeProvider, storage));
+  const [state, setState] = useState(() => loadState(storage));
+
+  const broadcast = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(CHANGE_EVENT));
+    }
+  }, []);
+
+  const setMode = useCallback((mode) => {
+    try {
+      storage.setItem(ASSISTANT_MODE_KEY, mode === 'custom' ? 'custom' : 'default');
+    } catch (err) {
+      console.warn('[useAssistantProvider] Could not persist assistant mode:', err);
+    }
+    setState(loadState(storage));
+    broadcast();
+  }, [storage, broadcast]);
 
   const setActiveProvider = useCallback((id) => {
     try {
@@ -31,32 +60,24 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
     } catch (err) {
       console.warn('[useAssistantProvider] Could not persist active provider:', err);
     }
-    setProviderState({ activeProvider: id, followsAnalysis: false });
-    setModelState(loadModel(id, storage));
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new Event(CHANGE_EVENT));
-    }
-  }, [storage]);
+    setState(loadState(storage));
+    broadcast();
+  }, [storage, broadcast]);
 
   const setModel = useCallback((value) => {
+    const { activeProvider } = loadState(storage);
     try {
       storage.setItem(providerKey(activeProvider, 'model-assistant'), value);
     } catch (err) {
       console.warn('[useAssistantProvider] Could not persist assistant model:', err);
     }
-    setModelState(value);
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new Event(CHANGE_EVENT));
-    }
-  }, [activeProvider, storage]);
+    setState(loadState(storage));
+    broadcast();
+  }, [storage, broadcast]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
-    const handleChange = () => {
-      const st = loadActiveProvider(storage);
-      setProviderState(st);
-      setModelState(loadModel(st.activeProvider, storage));
-    };
+    const handleChange = () => setState(loadState(storage));
     window.addEventListener(CHANGE_EVENT, handleChange);
     window.addEventListener('storage', handleChange);
     return () => {
@@ -65,7 +86,15 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
     };
   }, [storage]);
 
-  return { activeProvider, setActiveProvider, model, setModel, followsAnalysis };
+  return {
+    mode: state.mode,
+    setMode,
+    activeProvider: state.activeProvider,
+    setActiveProvider,
+    model: state.model,
+    setModel,
+    followsAnalysis: state.followsAnalysis,
+  };
 }
 
 export default useAssistantProvider;
