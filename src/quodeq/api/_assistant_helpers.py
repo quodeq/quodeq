@@ -23,7 +23,30 @@ _IDLE_LIMIT = 2400  # 2400 * 0.25s = 600s idle backstop. The stream now stays
 # ~500s read timeout) so it never truncates a live turn.
 
 
-def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str | None]:
+def _latest_run_dir(project_dir: Path) -> Path | None:
+    """Newest run directory under ``project_dir`` that holds an evaluation.
+
+    The overview shows ACCUMULATED data across recent runs, so the UI often
+    has no single "selected run" to send. To still answer principle/violation
+    detail questions there, we bind the most recent run — the latest
+    evaluation on disk, which is what the dashboard's headline reflects.
+    "Newest" is by directory mtime; only dirs with an ``evaluation/`` subdir
+    (a real, completed run) are eligible so we never bind an empty scaffold.
+    """
+    if not project_dir.is_dir():
+        return None
+    candidates = [
+        d for d in project_dir.iterdir()
+        if d.is_dir() and not d.name.startswith(".") and (d / "evaluation").is_dir()
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda d: d.stat().st_mtime)
+
+
+def resolve_run_location(
+    project_id: str, run_id: str | None,
+) -> tuple[str | None, str | None]:
     """Resolve ``(run_dir, repo_root)`` from a ``{projectId, runId}`` pair.
 
     Reuses the same layout the run index and project routes already rely on
@@ -32,8 +55,12 @@ def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str 
     ``<evaluations_root>/<project_id>/<run_id>`` where ``project_id`` is the
     directory name under ``get_evaluations_dir()`` (Plan-1's "project_uuid"),
     and the repo root is ``repository_info.json``'s ``path`` field, read via
-    the existing ``get_project_info`` helper. Returns ``(None, None)`` when
-    the run directory does not exist on disk.
+    the existing ``get_project_info`` helper.
+
+    When ``run_id`` is falsy (the overview sends a project but no specific
+    run), fall back to the project's LATEST run so the run-scoped tools still
+    work. Returns ``(None, None)`` when the run directory does not exist on
+    disk (or the project has no completed run).
     """
     evaluations_root = Path(get_evaluations_dir())
     # Jail the run dir to the evaluations root: a crafted project_id/run_id
@@ -41,13 +68,24 @@ def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str 
     # guard in services/_fs_projects.get_project_info (is_relative_to check)
     # and routes_common.reports_dir. Store the RESOLVED path so the session
     # column can never carry ".." segments.
-    run_dir = (evaluations_root / project_id / run_id).resolve()
-    try:
-        run_dir.relative_to(evaluations_root.resolve())
-    except ValueError:
-        return None, None
-    if not run_dir.is_dir():
-        return None, None
+    if run_id:
+        run_dir = (evaluations_root / project_id / run_id).resolve()
+        try:
+            run_dir.relative_to(evaluations_root.resolve())
+        except ValueError:
+            return None, None
+        if not run_dir.is_dir():
+            return None, None
+    else:
+        project_dir = (evaluations_root / project_id).resolve()
+        try:
+            project_dir.relative_to(evaluations_root.resolve())
+        except ValueError:
+            return None, None
+        latest = _latest_run_dir(project_dir)
+        if latest is None:
+            return None, None
+        run_dir = latest
     info = get_project_info(str(evaluations_root), project_id)
     repo_root = info.get("path") if info else None
     return str(run_dir), repo_root

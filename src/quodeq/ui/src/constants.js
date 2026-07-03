@@ -19,6 +19,19 @@ export function providerKey(providerId, setting) {
   return `cc-${providerId}-${setting}`;
 }
 
+// Fired (same-tab) whenever any provider setting is written — the analysis
+// active-provider or a per-provider model. The assistant gate listens for it
+// so that in Default mode (which mirrors the analysis provider/model) the
+// displayed model updates live when the user changes it in Settings. The
+// native 'storage' event only fires cross-tab, so we need this in-tab signal.
+export const PROVIDER_SETTINGS_CHANGED_EVENT = 'cc-provider-settings-changed';
+
+export function notifyProviderSettingsChanged() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(PROVIDER_SETTINGS_CHANGED_EVENT));
+  }
+}
+
 export const VISIBLE_STANDARDS_STORAGE_KEY = 'quodeq-visible-standards';
 export const DEFAULT_VISIBLE_STANDARDS = [
   'security', 'reliability', 'maintainability', 'performance', 'usability', 'flexibility',

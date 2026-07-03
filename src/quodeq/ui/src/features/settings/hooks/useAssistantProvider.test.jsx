@@ -66,6 +66,32 @@ it('switching back to default follows analysis again, live', () => {
   expect(result.current.model).toBe('gemini-2.5-pro');
 });
 
+it('default mode updates live when the analysis gate fires the shared event', () => {
+  // Regression: changing the analysis model in Settings did not refresh the
+  // assistant's Default-mode display until the user toggled Custom↔Default.
+  // The analysis gate (useProviderSettings/ProviderTabs) now fires
+  // cc-provider-settings-changed; Default mode must re-read on it.
+  localStorage.setItem('cc-active-provider', 'ollama');
+  localStorage.setItem('cc-ollama-model', 'gemma4:26b');
+  const { result } = renderHook(() => useAssistantProvider());
+  expect(result.current.model).toBe('gemma4:26b');
+
+  act(() => {
+    localStorage.setItem('cc-ollama-model', 'llama3:70b');
+    window.dispatchEvent(new Event('cc-provider-settings-changed'));
+  });
+  expect(result.current.model).toBe('llama3:70b');
+
+  // Changing the analysis PROVIDER via the shared event also propagates.
+  act(() => {
+    localStorage.setItem('cc-active-provider', 'claude');
+    localStorage.setItem('cc-claude-model', 'sonnet');
+    window.dispatchEvent(new Event('cc-provider-settings-changed'));
+  });
+  expect(result.current.activeProvider).toBe('claude');
+  expect(result.current.model).toBe('sonnet');
+});
+
 it('syncs mode/provider changes across independent hook instances', () => {
   localStorage.setItem('cc-active-provider', 'ollama');
   const a = renderHook(() => useAssistantProvider());

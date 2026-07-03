@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
+import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_SETTINGS_CHANGED_EVENT } from '../../../constants.js';
 
 export const ASSISTANT_ACTIVE_PROVIDER_KEY = 'cc-assistant-active-provider';
 export const ASSISTANT_MODE_KEY = 'cc-assistant-mode';
@@ -79,9 +79,13 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
     if (typeof window === 'undefined') return undefined;
     const handleChange = () => setState(loadState(storage));
     window.addEventListener(CHANGE_EVENT, handleChange);
+    // Analysis-gate changes (provider/model) fire this shared event so Default
+    // mode, which mirrors the analysis selection, updates its display live.
+    window.addEventListener(PROVIDER_SETTINGS_CHANGED_EVENT, handleChange);
     window.addEventListener('storage', handleChange);
     return () => {
       window.removeEventListener(CHANGE_EVENT, handleChange);
+      window.removeEventListener(PROVIDER_SETTINGS_CHANGED_EVENT, handleChange);
       window.removeEventListener('storage', handleChange);
     };
   }, [storage]);
