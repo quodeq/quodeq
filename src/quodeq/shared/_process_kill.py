@@ -17,19 +17,24 @@ def kill_proc_tree(proc: Any) -> None:
     """Kill *proc* and its children. proc is a subprocess.Popen (or a test double
     exposing .pid/.kill()). Never raises for an already-dead or fake process."""
     pid = getattr(proc, "pid", None)
-    if sys.platform == "win32":
-        try:
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
-                           capture_output=True, timeout=10)
-            return
-        except (OSError, subprocess.SubprocessError, TypeError):
-            pass
-    else:
-        try:
-            os.killpg(os.getpgid(pid), signal.SIGKILL)
-            return
-        except (ProcessLookupError, PermissionError, OSError, TypeError, AttributeError):
-            pass
+    # Only attempt a real process-group/tree kill when we have a real pid. A
+    # test double or already-reaped proc (pid is None) must fall straight
+    # through to proc.kill(): on Windows `taskkill /PID None` RUNS (exits
+    # non-zero without raising) and would otherwise return before the fallback.
+    if pid is not None:
+        if sys.platform == "win32":
+            try:
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
+                               capture_output=True, timeout=10)
+                return
+            except (OSError, subprocess.SubprocessError, TypeError):
+                pass
+        else:
+            try:
+                os.killpg(os.getpgid(pid), signal.SIGKILL)
+                return
+            except (ProcessLookupError, PermissionError, OSError, TypeError, AttributeError):
+                pass
     try:
         proc.kill()
     except (ProcessLookupError, OSError, AttributeError):

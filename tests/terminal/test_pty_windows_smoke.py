@@ -12,7 +12,7 @@ def test_windows_pty_spawns_and_echoes():
     pty = WindowsPty(argv=["cmd.exe"])
     pty.spawn(cwd="C:\\", cols=80, rows=24)
     assert pty.alive
-    pty.write("echo hello-conpty\r\n")
+    pty.write(b"echo hello-conpty\r\n")  # write() takes bytes (matches the Unix backend contract)
     buf = ""
     deadline = time.monotonic() + 8
     while time.monotonic() < deadline:
