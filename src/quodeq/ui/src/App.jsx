@@ -33,7 +33,7 @@ import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
 import { syncNativeTitlebar } from './utils/nativeTitlebar.js';
 import { SidePane, useSidePane } from './features/side-pane/index.js';
-import { AssistantDrawer } from './features/assistant/AssistantDrawer.jsx';
+import { BottomDrawer } from './features/drawer/BottomDrawer.jsx';
 import { useAssistantDrawer } from './features/assistant/AssistantDrawerProvider.jsx';
 import { useAssistantProvider } from './features/settings/hooks/useAssistantProvider.js';
 import { deriveAssistantContext } from './features/assistant/useAssistantContext.js';
@@ -458,7 +458,7 @@ export default function App() {
   // active assistant provider/model.
   const assistantGate = useAssistantProvider();
   const assistantCtx = deriveAssistantContext(state, assistantGate);
-  const { isOpen: assistantOpen, startSession: startAssistantSession } = useAssistantDrawer();
+  const { isOpen: assistantOpen, activeTab: drawerTab, startSession: startAssistantSession } = useAssistantDrawer();
   const { provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId } = assistantCtx;
   // Start (or re-start) the assistant session when the drawer is open and on
   // any provider/model/project/run change while it stays open. startSession
@@ -467,9 +467,9 @@ export default function App() {
   // start a session while the drawer is closed — sends only originate from the
   // open drawer, so first-open is early enough and avoids needless sessions.
   useEffect(() => {
-    if (!assistantOpen) return;
+    if (!assistantOpen || drawerTab !== 'assistant') return;
     startAssistantSession({ provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId });
-  }, [assistantOpen, asstProvider, asstModel, asstProjectId, asstRunId, startAssistantSession]);
+  }, [assistantOpen, drawerTab, asstProvider, asstModel, asstProjectId, asstRunId, startAssistantSession]);
 
   // Sync the client-side grade-label thresholds with the server formula at
   // boot so every gauge/badge agrees with the applied Q² parameters. The
@@ -641,7 +641,7 @@ export default function App() {
           <OllamaLogProvider>
             <LlamaCppLogProvider>
               <AppShell
-          drawer={<AssistantDrawer uiState={assistantCtx.uiState} />}
+          drawer={<BottomDrawer uiState={assistantCtx.uiState} />}
           sidebar={
             <Sidebar
               activeTab={activeTab}

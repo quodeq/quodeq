@@ -13,6 +13,7 @@ import { useSidePane } from '../features/side-pane/index.js';
 import { FileTextIcon, SparkleIcon } from './CopyButton.jsx';
 import ServerStatusDot from './ServerStatusDot.jsx';
 import { AssistantLauncherButton } from './AssistantLauncherButton.jsx';
+import { TerminalLauncherButton } from './TerminalLauncherButton.jsx';
 
 function SidePaneSpecButton({ type, label, icon, modifier }) {
   const ctx = useSidePane();
@@ -162,6 +163,7 @@ export default function TopBar({
         )}
 
         <AssistantLauncherButton />
+        <TerminalLauncherButton />
 
         {(provider || model) && (
           onProviderClick ? (

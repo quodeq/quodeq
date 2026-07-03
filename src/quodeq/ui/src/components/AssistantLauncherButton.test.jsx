@@ -2,13 +2,18 @@ import { it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
-const toggle = vi.fn();
+const drawerState = { openPanels: [] };
+const toggleTopbar = vi.fn();
 vi.mock('../features/assistant/AssistantDrawerProvider.jsx', () => ({
-  useAssistantDrawer: () => ({ isOpen: false, toggle }),
+  useAssistantDrawer: () => ({ openPanels: drawerState.openPanels, toggleTopbar }),
 }));
 import { AssistantLauncherButton } from './AssistantLauncherButton.jsx';
 
-beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); });
+beforeEach(() => {
+  vi.clearAllMocks();
+  localStorage.clear();
+  drawerState.openPanels = [];
+});
 afterEach(() => localStorage.clear());
 
 it('is hidden when the assistant is disabled (the default)', () => {
@@ -17,12 +22,37 @@ it('is hidden when the assistant is disabled (the default)', () => {
   expect(screen.queryByRole('button', { name: /assistant/i })).toBeNull();
 });
 
-it('is an icon-only labelled toggle when enabled', () => {
+it('is an icon-only labelled toggle when enabled; click toggles the panel', () => {
   localStorage.setItem('cc-assistant-enabled', 'true');
   render(<AssistantLauncherButton />);
   const btn = screen.getByRole('button', { name: /assistant/i });
   expect(btn).toHaveClass('topbar-btn', 'topbar-btn--icon');
   expect(btn).toHaveAttribute('aria-pressed', 'false');
   fireEvent.click(btn);
-  expect(toggle).toHaveBeenCalledTimes(1);
+  expect(toggleTopbar).toHaveBeenCalledWith('assistant');
+});
+
+it('is highlighted (active) when the assistant panel is open', () => {
+  localStorage.setItem('cc-assistant-enabled', 'true');
+  drawerState.openPanels = ['assistant'];
+  render(<AssistantLauncherButton />);
+  const btn = screen.getByRole('button', { name: /assistant/i });
+  expect(btn).toHaveClass('topbar-btn--assistant--open');
+  expect(btn).toHaveAttribute('aria-pressed', 'true');
+});
+
+it('stays highlighted when BOTH panels are open (both launchers selected)', () => {
+  localStorage.setItem('cc-assistant-enabled', 'true');
+  drawerState.openPanels = ['terminal', 'assistant'];
+  render(<AssistantLauncherButton />);
+  expect(screen.getByRole('button', { name: /assistant/i })).toHaveClass('topbar-btn--assistant--open');
+});
+
+it('is NOT highlighted when only the terminal panel is open', () => {
+  localStorage.setItem('cc-assistant-enabled', 'true');
+  drawerState.openPanels = ['terminal'];
+  render(<AssistantLauncherButton />);
+  const btn = screen.getByRole('button', { name: /assistant/i });
+  expect(btn).not.toHaveClass('topbar-btn--assistant--open');
+  expect(btn).toHaveAttribute('aria-pressed', 'false');
 });
