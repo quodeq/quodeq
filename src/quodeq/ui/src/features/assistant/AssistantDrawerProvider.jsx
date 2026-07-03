@@ -34,7 +34,7 @@ function writeStoredHeight(px) {
 // order they actually happened: each user turn records how many stream
 // messages existed at the moment it was sent, so it's re-inserted at that
 // point on every render instead of always being appended at the end.
-function mergeMessages(userTurns, streamMessages) {
+export function mergeMessages(userTurns, streamMessages) {
   const merged = [];
   let ui = 0;
   for (let i = 0; i <= streamMessages.length; i += 1) {
