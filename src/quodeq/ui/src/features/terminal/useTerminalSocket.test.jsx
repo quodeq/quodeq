@@ -14,6 +14,18 @@ class MockWS {
 beforeEach(() => { MockWS.instances = []; globalThis.WebSocket = MockWS; });
 afterEach(() => vi.restoreAllMocks());
 
+it('reconnects (new socket) when restartKey changes', () => {
+  const { rerender } = renderHook(
+    ({ rk }) => useTerminalSocket({ active: true, onData: () => {}, restartKey: rk }),
+    { initialProps: { rk: 0 } },
+  );
+  expect(MockWS.instances.length).toBe(1);
+  const first = MockWS.instances[0];
+  act(() => rerender({ rk: 1 }));
+  expect(first.readyState).toBe(3);           // old socket torn down (CLOSED)
+  expect(MockWS.instances.length).toBe(2);    // fresh socket opened
+});
+
 it('connects when active, forwards data, sends tagged frames', () => {
   const got = [];
   const { result } = renderHook(() => useTerminalSocket({ active: true, onData: (s) => got.push(s) }));

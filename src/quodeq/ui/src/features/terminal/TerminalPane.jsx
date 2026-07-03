@@ -27,6 +27,8 @@ export default function TerminalPane({ active }) {
   const fitRef = useRef(null);
   const [reason, setReason] = useState(null);
   const [checked, setChecked] = useState(false);
+  // Bumped to reconnect the socket after a restart (kill → fresh PTY).
+  const [restartKey, setRestartKey] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -35,10 +37,22 @@ export default function TerminalPane({ active }) {
     return () => { alive = false; };
   }, []);
 
+  // "Restart terminal" (from Settings): clear the screen and reconnect. The
+  // server session was already killed, so the reconnect spawns a fresh PTY.
+  useEffect(() => {
+    const onRestart = () => {
+      try { termRef.current?.reset(); } catch { /* noop */ }
+      setRestartKey((k) => k + 1);
+    };
+    window.addEventListener('quodeq:terminal-restart', onRestart);
+    return () => window.removeEventListener('quodeq:terminal-restart', onRestart);
+  }, []);
+
   const socketActive = active && checked && reason === null;
 
   const { status, send, resize } = useTerminalSocket({
     active: socketActive,
+    restartKey,
     onData: (s) => termRef.current?.write(s),
   });
 
@@ -48,7 +62,8 @@ export default function TerminalPane({ active }) {
   // drawer size — so full-screen TUIs like `claude`/`vim` draw off-screen and
   // look clipped. Re-fit and re-sync when the socket opens (and on reconnect).
   useEffect(() => {
-    if (status !== 'open' || !fitRef.current || !termRef.current) return;
+    const el = rootRef.current;
+    if (status !== 'open' || !fitRef.current || !termRef.current || !el || el.offsetParent === null) return;
     try {
       fitRef.current.fit();
       resize(termRef.current.cols, termRef.current.rows);
@@ -72,8 +87,10 @@ export default function TerminalPane({ active }) {
       const term = new Terminal({
         scrollback: 5000,
         fontFamily: 'Menlo, Monaco, "SF Mono", "SFMono-Regular", Consolas, "DejaVu Sans Mono", monospace',
-        fontSize: 12,
-        lineHeight: 1.5,
+        fontSize: 13,
+        // iTerm-tight vertical rhythm. 1.5 read like a text editor (too airy);
+        // iTerm's default is ~1.0 — 1.1 keeps a hair of breathing room.
+        lineHeight: 1.1,
         cursorBlink: true,
         cursorStyle: 'bar',     // sleeker than the default square block
         theme: themeFromCss(),
@@ -95,6 +112,12 @@ export default function TerminalPane({ active }) {
         if (fitTimer) clearTimeout(fitTimer);
         fitTimer = setTimeout(() => {
           fitTimer = null;
+          // Never fit/resize while hidden. On an inactive tab / closed drawer
+          // the element is display:none (0x0); fitting to that drives the PTY
+          // to a bogus size, and the shell then floods the prompt with
+          // cursor-position query/replies (the "14;3R…" garbage).
+          const el = rootRef.current;
+          if (!el || el.offsetParent === null || el.clientWidth === 0 || el.clientHeight === 0) return;
           try { fit.fit(); resize(term.cols, term.rows); } catch { /* noop */ }
         }, 150);
       };
@@ -118,8 +141,14 @@ export default function TerminalPane({ active }) {
     };
   }, [socketActive, send, resize]);
 
-  // Refit when the tab becomes active again (drawer was on the other tab).
-  useEffect(() => { if (active && fitRef.current) { try { fitRef.current.fit(); } catch { /* noop */ } } }, [active]);
+  // Refit + re-sync the PTY when the tab becomes active again (it was hidden,
+  // where we deliberately skip fitting). Guard on visibility so a stray call
+  // while still hidden can't resize to 0.
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!active || !fitRef.current || !termRef.current || !el || el.offsetParent === null) return;
+    try { fitRef.current.fit(); resize(termRef.current.cols, termRef.current.rows); } catch { /* noop */ }
+  }, [active, resize]);
 
   // Bubble phase (NOT capture): xterm's textarea must receive the keydown
   // first so special keys (Delete/Backspace/arrows/Enter) work; we then stop

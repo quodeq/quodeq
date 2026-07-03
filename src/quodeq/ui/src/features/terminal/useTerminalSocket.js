@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { terminalSocketUrl } from '../../api/terminal.js';
 
-export function useTerminalSocket({ active, onData }) {
+export function useTerminalSocket({ active, onData, restartKey = 0 }) {
   const [status, setStatus] = useState('idle');
   const wsRef = useRef(null);
   const onDataRef = useRef(onData);
   onDataRef.current = onData;
 
+  // `restartKey` is a dependency so bumping it tears down the current socket
+  // and opens a fresh one (used to reconnect after the server session is killed
+  // → the reconnect spawns a brand-new PTY).
   useEffect(() => {
     if (!active) return undefined;
     const ws = new WebSocket(terminalSocketUrl());
@@ -20,7 +23,7 @@ export function useTerminalSocket({ active, onData }) {
     };
     return () => { ws.onopen = ws.onmessage = ws.onclose = null; try { ws.close(); } catch { /* noop */ }
       if (wsRef.current === ws) wsRef.current = null; };
-  }, [active]);
+  }, [active, restartKey]);
 
   const send = useCallback((data) => {
     const ws = wsRef.current;

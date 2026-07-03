@@ -4,6 +4,14 @@ import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 
 export default function TerminalSection() {
   const { enabled, setEnabled } = useTerminalSettings();
+  // Restart = kill the server shell, then signal the open terminal pane to
+  // clear its screen and reconnect (the reconnect spawns a fresh PTY). Killing
+  // first also handles the case where the terminal panel isn't currently open.
+  const restart = () => {
+    killTerminal().catch(() => {}).finally(() => {
+      window.dispatchEvent(new Event('quodeq:terminal-restart'));
+    });
+  };
   return (
     <section className="panel settings-section">
       <div className="panel-header"><SectionLabel marker="▶">Terminal</SectionLabel></div>
@@ -24,9 +32,11 @@ export default function TerminalSection() {
       </div>
       {enabled && (
         <div className="settings-row settings-row--last">
-          <span className="settings-description">One persistent shell, started in your home directory.</span>
-          <button type="button" className="settings-pill" onClick={() => killTerminal().catch(() => {})}>
-            Kill terminal session
+          <span className="settings-description">
+            One persistent shell, started in your home directory. Restart kills it and opens a fresh, empty shell.
+          </span>
+          <button type="button" className="settings-pill" onClick={restart}>
+            Restart terminal
           </button>
         </div>
       )}
