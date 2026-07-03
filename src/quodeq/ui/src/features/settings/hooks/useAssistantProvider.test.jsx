@@ -29,3 +29,27 @@ it('model defaults to the analysis model then decouples', () => {
   act(() => result.current.setModel('opus'));
   expect(localStorage.getItem('cc-claude-model-assistant')).toBe('opus');
 });
+
+it('syncs provider changes across independent hook instances', () => {
+  localStorage.setItem('cc-active-provider', 'ollama');
+  const a = renderHook(() => useAssistantProvider());
+  const b = renderHook(() => useAssistantProvider());
+
+  expect(b.result.current.activeProvider).toBe('ollama');
+
+  act(() => a.result.current.setActiveProvider('claude'));
+
+  expect(a.result.current.activeProvider).toBe('claude');
+  expect(b.result.current.activeProvider).toBe('claude');
+});
+
+it('syncs model changes across independent hook instances', () => {
+  localStorage.setItem('cc-active-provider', 'claude');
+  localStorage.setItem('cc-claude-model', 'sonnet');
+  const a = renderHook(() => useAssistantProvider());
+  const b = renderHook(() => useAssistantProvider());
+
+  act(() => a.result.current.setModel('opus'));
+
+  expect(b.result.current.model).toBe('opus');
+});

@@ -57,6 +57,38 @@ def test_streams_tokens_and_captures_session_id(tmp_path):
     assert repo.get_session("s1")["cli_session_id"] == "claude-uuid-1"
 
 
+def test_result_echo_of_streamed_text_is_not_emitted_twice(tmp_path):
+    repo = _repo(tmp_path)
+    lines = [
+        '{"type": "assistant", "message": {"content": [{"type": "text", "text": "Hello"}]}}',
+        '{"type": "result", "result": "Hello", "session_id": "claude-uuid-1"}',
+    ]
+    frames = []
+    text = run_cli_turn(
+        messages=[{"role": "user", "content": "hi"}],
+        config=_config(tmp_path), session_id="s1", prior_session_id=None,
+        repository=repo, emit=frames.append,
+        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+    assert text == "Hello"
+    token_frames = [f for f in frames if f == {"type": "token", "text": "Hello"}]
+    assert len(token_frames) == 1
+
+
+def test_result_only_text_is_still_emitted(tmp_path):
+    repo = _repo(tmp_path)
+    lines = [
+        '{"type": "result", "result": "Hi"}',
+    ]
+    frames = []
+    text = run_cli_turn(
+        messages=[{"role": "user", "content": "hi"}],
+        config=_config(tmp_path), session_id="s1", prior_session_id=None,
+        repository=repo, emit=frames.append,
+        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+    assert text == "Hi"
+    assert {"type": "token", "text": "Hi"} in frames
+
+
 def test_tool_use_emits_frame(tmp_path):
     repo = _repo(tmp_path)
     lines = [

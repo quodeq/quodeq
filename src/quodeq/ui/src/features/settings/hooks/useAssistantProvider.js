@@ -1,7 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 
 export const ASSISTANT_ACTIVE_PROVIDER_KEY = 'cc-assistant-active-provider';
+
+// Broadcast so every useAssistantProvider() instance (Settings tab, drawer, ...)
+// re-reads storage and stays in sync when one instance changes the selection.
+const CHANGE_EVENT = 'assistant-provider-changed';
 
 function loadActiveProvider(storage) {
   const explicit = storage.getItem(ASSISTANT_ACTIVE_PROVIDER_KEY);
@@ -29,6 +33,9 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
     }
     setProviderState({ activeProvider: id, followsAnalysis: false });
     setModelState(loadModel(id, storage));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(CHANGE_EVENT));
+    }
   }, [storage]);
 
   const setModel = useCallback((value) => {
@@ -38,7 +45,25 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
       console.warn('[useAssistantProvider] Could not persist assistant model:', err);
     }
     setModelState(value);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(CHANGE_EVENT));
+    }
   }, [activeProvider, storage]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handleChange = () => {
+      const st = loadActiveProvider(storage);
+      setProviderState(st);
+      setModelState(loadModel(st.activeProvider, storage));
+    };
+    window.addEventListener(CHANGE_EVENT, handleChange);
+    window.addEventListener('storage', handleChange);
+    return () => {
+      window.removeEventListener(CHANGE_EVENT, handleChange);
+      window.removeEventListener('storage', handleChange);
+    };
+  }, [storage]);
 
   return { activeProvider, setActiveProvider, model, setModel, followsAnalysis };
 }
