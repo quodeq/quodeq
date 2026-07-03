@@ -43,6 +43,24 @@ export function TerminalIcon() {
   );
 }
 
+// Chevron up = maximize (the bottom drawer grows upward); chevron down =
+// restore (it collapses back down).
+export function ChevronUpIcon() {
+  return (
+    <svg width={ICON_SIZE} height={ICON_SIZE} viewBox={ICON_VIEWBOX} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="6 15 12 9 18 15" />
+    </svg>
+  );
+}
+
+export function ChevronDownIcon() {
+  return (
+    <svg width={ICON_SIZE} height={ICON_SIZE} viewBox={ICON_VIEWBOX} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
 export default function CopyButton({ onClick, label, className, icon, 'aria-label': ariaLabel }) {
   const [copied, setCopied] = useState(false);
 

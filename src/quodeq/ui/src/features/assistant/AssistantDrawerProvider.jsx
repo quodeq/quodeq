@@ -106,8 +106,13 @@ export function AssistantDrawerProvider({ children }) {
     setIsOpen((prev) => (prev && activeTabRef.current === tab ? false : true));
   }, []);
 
+  // Maximized = grow the drawer to (near) full height; toggling restores the
+  // previous drag height. Ephemeral (not persisted); reset when the drawer closes.
+  const [maximized, setMaximized] = useState(false);
+  const toggleMaximized = useCallback(() => setMaximized((m) => !m), []);
+
   const open = useCallback(() => setIsOpen(true), []);
-  const close = useCallback(() => setIsOpen(false), []);
+  const close = useCallback(() => { setIsOpen(false); setMaximized(false); }, []);
   const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
 
   // If the currently-shown tab's feature is turned off, switch to the other
@@ -190,12 +195,12 @@ export function AssistantDrawerProvider({ children }) {
   const value = useMemo(() => ({
     isOpen, open, close, toggle,
     activeTab, openTab, terminalEnabled,
-    height, setHeight,
+    height, setHeight, maximized, toggleMaximized, setMaximized,
     messages, streaming: turnActive, error: localError || stream.error,
     sessionReady: sessionId != null,
     provider: sessionMeta.provider, model: sessionMeta.model,
     startSession, sendMessage,
-  }), [isOpen, open, close, toggle, activeTab, openTab, terminalEnabled, height, setHeight, messages, turnActive, stream.error, localError, sessionId, sessionMeta, startSession, sendMessage]);
+  }), [isOpen, open, close, toggle, activeTab, openTab, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, startSession, sendMessage]);
 
   return (
     <AssistantDrawerContext.Provider value={value}>
