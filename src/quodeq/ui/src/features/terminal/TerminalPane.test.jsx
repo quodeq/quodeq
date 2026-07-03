@@ -26,3 +26,15 @@ it('mounts an xterm terminal when active', async () => {
   expect(Terminal).toHaveBeenCalled();
   expect(fakeTerm.open).toHaveBeenCalled();
 });
+
+it('shows the gate reason and does not mount xterm when disabled', async () => {
+  const terminalApi = await import('../../api/terminal.js');
+  terminalApi.terminalStatus.mockResolvedValueOnce({ enabled: false, running: false, reason: 'localhost only' });
+  const { Terminal } = await import('@xterm/xterm');
+  Terminal.mockClear(); // clear calls from any prior test in this file
+  render(<TerminalPane active />);
+  const disabled = await screen.findByTestId('tty-disabled');
+  expect(disabled).toHaveTextContent('localhost only');
+  expect(screen.queryByTestId('tty-root')).toBeNull();
+  expect(Terminal).not.toHaveBeenCalled();
+});
