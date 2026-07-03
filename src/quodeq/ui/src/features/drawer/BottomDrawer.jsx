@@ -46,6 +46,10 @@ export function BottomDrawer({ uiState }) {
   if (!isOpen) return null;
   // Guard against a transient render where activeTab isn't (yet) an open panel.
   const active = openPanels.includes(activeTab) ? activeTab : openPanels[openPanels.length - 1];
+  // Header pill: "Provider · model" (provider capitalized for display, e.g.
+  // "Claude · sonnet"). Falls back to whichever half is present.
+  const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+  const modelLabel = [cap(provider), model].filter(Boolean).join(' · ');
 
   return (
     <aside className={`bottom-drawer assistant-drawer${maximized ? ' bottom-drawer--maximized' : ''}`}
@@ -64,9 +68,9 @@ export function BottomDrawer({ uiState }) {
           ))}
         </div>
         <div className="assistant-drawer-controls">
-          {active === 'assistant' && (model || provider) && (
-            <span className="drawer-model-chip" title={`${provider || ''}${model ? ` · ${model}` : ''}`}>
-              {model || provider}
+          {active === 'assistant' && modelLabel && (
+            <span className="drawer-model-chip" title={modelLabel}>
+              {modelLabel}
             </span>
           )}
           <button type="button" className="assistant-drawer-btn" onClick={toggleMaximized}
