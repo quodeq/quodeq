@@ -2,11 +2,8 @@
 from __future__ import annotations
 
 import logging
-import os
 import shutil
-import signal
 import subprocess
-import sys
 import tempfile
 import threading
 import uuid
@@ -21,37 +18,11 @@ from quodeq.assistant.adapters._cli_spawn import build_chat_env, scratch_cwd, sp
 from quodeq.assistant.adapters._linereader import iter_lines
 from quodeq.assistant.mcp import _config as mcp_config
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
+from quodeq.shared._process_kill import kill_proc_tree as _kill_proc_tree
 
 _logger = logging.getLogger(__name__)
 
 TURN_TIMEOUT_S = 300
-
-
-def _kill_proc_tree(proc) -> None:
-    # The proc is spawned with start_new_session=True (its own process group):
-    # killing only the leader can leave orphaned children (e.g. a spawned MCP
-    # server child) running. Kill the whole tree, cross-platform (mirrors
-    # analysis/_process.py). Fall back to killing just the leader when the pid
-    # isn't a real process (a scripted test double, or already reaped).
-    pid = getattr(proc, "pid", None)
-    if sys.platform == "win32":
-        # taskkill /T kills the entire process tree; /F forces it.
-        try:
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
-                           capture_output=True, timeout=10)
-            return
-        except (OSError, subprocess.SubprocessError, TypeError):
-            pass
-    else:
-        try:
-            os.killpg(os.getpgid(pid), signal.SIGKILL)
-            return
-        except (ProcessLookupError, PermissionError, OSError, TypeError, AttributeError):
-            pass
-    try:
-        proc.kill()
-    except (ProcessLookupError, OSError):
-        pass
 
 
 @dataclass(frozen=True)
