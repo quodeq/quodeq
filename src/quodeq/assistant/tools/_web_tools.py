@@ -8,6 +8,7 @@ from the orchestrator's API branch, gated on web_enabled + LOCAL_PROVIDERS.
 """
 from __future__ import annotations
 
+import time
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlparse
 
@@ -22,6 +23,8 @@ _USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
 _TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=10.0)
 _MAX_RESULTS = 8
 _MAX_FETCH_BYTES = 2 * 1024 * 1024
+_MAX_FETCH_SECONDS = 60.0  # total budget: read=30.0 is per-read-op, so a slow
+# drip (1 byte per 29s) would otherwise wedge the turn thread indefinitely
 _MAX_TEXT_CHARS = 12_000  # guard.py fences tool results at 16k; leave JSON headroom
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 
@@ -70,10 +73,14 @@ class _DdgResultParser(HTMLParser):
 
 
 def _search_web(query: str, max_results: int = 5) -> dict:
-    query = (query or "").strip()
+    query = str(query or "").strip()
     if not query:
         raise ToolError("query must not be empty")
-    max_results = max(1, min(int(max_results), _MAX_RESULTS))
+    try:
+        max_results = int(max_results)
+    except (TypeError, ValueError) as exc:
+        raise ToolError("max_results must be a number") from exc
+    max_results = max(1, min(max_results, _MAX_RESULTS))
     try:
         resp = httpx.get(_SEARCH_URL, params={"q": query},
                          headers={"User-Agent": _USER_AGENT}, timeout=_TIMEOUT)
@@ -84,8 +91,9 @@ def _search_web(query: str, max_results: int = 5) -> dict:
                         "try fetch_url with a known URL instead")
     parser = _DdgResultParser()
     parser.feed(resp.text)
-    results = [{"title": r["title"].strip(), "url": r["url"],
-                "snippet": " ".join(r["snippet"].split())}
+    parser.close()  # convert_charrefs buffers a trailing run near a bare &
+    results = [{"title": r["title"].strip()[:300], "url": r["url"],
+                "snippet": " ".join(r["snippet"].split())[:500]}
                for r in parser.results if r["url"].startswith("http")]
     if not results:
         raise ToolError("web search returned no results; the search service may be "
@@ -126,10 +134,13 @@ class _TextExtractor(HTMLParser):
 
 
 def _fetch_url(url: str) -> dict:
+    if not isinstance(url, str):
+        raise ToolError("url must be a string")
     try:
         validate_url_safe(url)
     except ValueError as exc:
         raise ToolError(str(exc)) from exc
+    hit_byte_cap = False
     try:
         with httpx.stream("GET", url, headers={"User-Agent": _USER_AGENT},
                           timeout=_TIMEOUT, follow_redirects=False) as resp:
@@ -140,13 +151,20 @@ def _fetch_url(url: str) -> dict:
                                 "redirect_to to follow it"}
             if resp.status_code != 200:
                 raise ToolError(f"could not fetch {url}: HTTP {resp.status_code}")
-            content_type = resp.headers.get("content-type", "")
-            body = b""
-            for chunk in resp.iter_bytes():
-                body += chunk
-                if len(body) >= _MAX_FETCH_BYTES:
-                    body = body[:_MAX_FETCH_BYTES]
+            content_type = resp.headers.get("content-type", "").lower()
+            deadline = time.monotonic() + _MAX_FETCH_SECONDS
+            parts: list[bytes] = []
+            received = 0
+            for chunk in resp.iter_bytes(chunk_size=65536):
+                if time.monotonic() > deadline:
+                    raise ToolError(f"could not fetch {url}: exceeded "
+                                    f"{int(_MAX_FETCH_SECONDS)}s time budget")
+                parts.append(chunk)
+                received += len(chunk)
+                if received >= _MAX_FETCH_BYTES:
+                    hit_byte_cap = True
                     break
+            body = b"".join(parts)[:_MAX_FETCH_BYTES]
             encoding = resp.encoding or "utf-8"
     except httpx.HTTPError as exc:
         raise ToolError(f"could not fetch {url}: {exc}") from exc
@@ -155,14 +173,20 @@ def _fetch_url(url: str) -> dict:
     if not is_texty:
         raise ToolError(f"unsupported content type {content_type!r}; only HTML, "
                         "text, JSON and XML pages can be fetched")
-    text = body.decode(encoding, errors="replace")
+    try:
+        text = body.decode(encoding, errors="replace")
+    except (LookupError, UnicodeError):
+        # hostile/unknown charset (e.g. zlib_codec -> LookupError, idna ->
+        # UnicodeError with errors="replace" unsupported): fall back to utf-8
+        text = body.decode("utf-8", errors="replace")
     if "html" in content_type:
         extractor = _TextExtractor()
         extractor.feed(text)
+        extractor.close()  # flush the trailing buffered text run
         text = extractor.text()
     return {"url": url, "status": 200, "content_type": content_type,
             "text": text[:_MAX_TEXT_CHARS],
-            "truncated": len(text) > _MAX_TEXT_CHARS}
+            "truncated": hit_byte_cap or len(text) > _MAX_TEXT_CHARS}
 
 
 def register_web_tools(registry: ToolRegistry) -> None:

@@ -60,6 +60,47 @@ def test_search_web_rejects_empty_query():
         _web_tools._search_web("  ")
 
 
+_MANY_RESULTS_HTML = "<html><body>" + "".join(
+    f'<div class="result"><h2 class="result__title">'
+    f'<a class="result__a" href="https://example.org/{i}">R{i}</a></h2>'
+    f'<a class="result__snippet" href="#">s{i}</a></div>'
+    for i in range(10)
+) + "</body></html>"
+
+
+def test_search_web_clamps_oversized_max_results(monkeypatch):
+    monkeypatch.setattr(httpx, "get", _fake_get(text=_MANY_RESULTS_HTML))
+    out = _web_tools._search_web("stuff", max_results=99)
+    assert len(out["results"]) == 8
+
+
+def test_search_web_non_numeric_max_results_is_tool_error(monkeypatch):
+    monkeypatch.setattr(httpx, "get", _fake_get())
+    with pytest.raises(ToolError, match="max_results"):
+        _web_tools._search_web("stuff", max_results="abc")
+
+
+_HOSTILE_DDG_HTML = """
+<html><body>
+<div class="result"><h2 class="result__title">
+  <a class="result__a" href="//duckduckgo.com/l/?uddg=javascript%3Aalert(1)&amp;rut=x">Evil</a>
+</h2><a class="result__snippet" href="#">bad</a></div>
+<div class="result"><h2 class="result__title">
+  <a class="result__a" href="/relative/path">Relative</a>
+</h2><a class="result__snippet" href="#">also bad</a></div>
+<div class="result"><h2 class="result__title">
+  <a class="result__a" href="https://good.example.com/">Good</a>
+</h2><a class="result__snippet" href="#">fine</a></div>
+</body></html>
+"""
+
+
+def test_search_web_filters_non_http_result_urls(monkeypatch):
+    monkeypatch.setattr(httpx, "get", _fake_get(text=_HOSTILE_DDG_HTML))
+    out = _web_tools._search_web("stuff")
+    assert [r["url"] for r in out["results"]] == ["https://good.example.com/"]
+
+
 class _FakeStreamResponse:
     def __init__(self, status=200, headers=None, body=b"", encoding="utf-8"):
         self.status_code = status
@@ -67,7 +108,7 @@ class _FakeStreamResponse:
         self._body = body
         self.encoding = encoding
 
-    def iter_bytes(self):
+    def iter_bytes(self, chunk_size=None):
         yield self._body
 
 
@@ -149,6 +190,59 @@ def test_fetch_url_rejects_binary_content(no_ssrf, monkeypatch):
     monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
     with pytest.raises(ToolError, match="content type"):
         _web_tools._fetch_url("https://example.com/logo.png")
+
+
+def test_fetch_url_survives_unknown_charset(no_ssrf, monkeypatch):
+    # charset=zlib_codec makes bytes.decode raise LookupError (not a text
+    # encoding); the tool must fall back to utf-8, not crash the turn
+    resp = _FakeStreamResponse(
+        headers={"content-type": "text/html; charset=zlib_codec"},
+        body=b"<p>hi</p>", encoding="zlib_codec")
+    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    out = _web_tools._fetch_url("https://example.com/a")
+    assert "hi" in out["text"]
+
+
+def test_fetch_url_content_type_case_insensitive(no_ssrf, monkeypatch):
+    # RFC 2045: MIME types are case-insensitive; real servers send Text/HTML
+    resp = _FakeStreamResponse(
+        headers={"content-type": "Text/HTML; charset=utf-8"},
+        body=b"<p>Hello <b>world</b></p>")
+    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    out = _web_tools._fetch_url("https://example.com/a")
+    assert "Hello world" in out["text"]
+
+
+def test_fetch_url_honors_declared_charset(no_ssrf, monkeypatch):
+    resp = _FakeStreamResponse(
+        headers={"content-type": "text/plain; charset=iso-8859-1"},
+        body=b"caf\xe9", encoding="iso-8859-1")
+    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    assert _web_tools._fetch_url("https://example.com/a")["text"] == "café"
+
+
+def test_fetch_url_redirect_without_location_header(no_ssrf, monkeypatch):
+    resp = _FakeStreamResponse(status=301, headers={})
+    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    out = _web_tools._fetch_url("https://example.com/a")
+    assert out["redirect_to"] == ""
+    assert "text" not in out
+
+
+def test_fetch_url_rejects_non_string_url():
+    with pytest.raises(ToolError, match="string"):
+        _web_tools._fetch_url(12345)
+
+
+def test_fetch_url_byte_cap_sets_truncated(no_ssrf, monkeypatch):
+    # 3 MB of markup whose extracted text is empty: the 2 MB byte cap was hit,
+    # so truncated must be True even though the text itself is short
+    body = b"<br>" * (3 * 1024 * 1024 // 4)
+    resp = _FakeStreamResponse(headers={"content-type": "text/html"}, body=body)
+    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    out = _web_tools._fetch_url("https://example.com/a")
+    assert out["truncated"] is True
+    assert len(out["text"]) <= _web_tools._MAX_TEXT_CHARS
 
 
 from pathlib import Path
