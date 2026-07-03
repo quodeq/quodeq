@@ -24,9 +24,11 @@ export default function UpdateBanner() {
   return (
     <div className={`update-banner${status.is_security ? ' update-banner--security' : ''}`} role="status">
       <span className="update-banner-text">
-        {status.is_security ? 'Security update: ' : ''}
+        {status.is_security ? <strong>Security update: </strong> : null}
         Quodeq {status.current} → {status.latest} is available.
-        {status.action_command ? ` Run: ${status.action_command}` : ''}
+        {status.action_command ? (
+          <> Run <code className="update-banner-cmd">{status.action_command}</code></>
+        ) : null}
       </span>
       <span className="update-banner-actions">
         <button type="button" className="settings-pill" onClick={() => openExternal(status.latest_url || status.download_url)}>
