@@ -3,16 +3,11 @@ import { buildFileTree, treeNodeToFileObj } from '../viz/index.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { listStandards } from '../../../api/standards.js';
 import { readCachedState, writeCachedState, resetCachedScope } from '../../../utils/pageStateCache.js';
+import { useThemeIsDark } from '../../../hooks/useThemeIsDark.js';
 
 const MAP_LABELS_KEY = 'quodeq-map-labels';
 const MAP_DARK_KEY = 'quodeq-map-dark';
 const MAX_TREE_DEPTH = 64;
-
-function isAppDark() {
-  const attr = document.documentElement.getAttribute('data-theme') || '';
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  return attr.includes('dark') || (!attr.includes('light') && prefersDark);
-}
 
 function findSubtree(root, path) {
   if (!path) return root;
@@ -99,19 +94,18 @@ export default function useMapPageState({ data, callbacks, tabKey = 0 }) {
   const setGalaxyMode = (v) => { writeCachedState('map', selectedProject, { galaxyMode: v }); _setGalaxyMode(v); };
   const [showLabels, _setShowLabels] = useState(() => { try { const v = localStorage.getItem(MAP_LABELS_KEY); return v === null ? true : v === '1'; } catch { return true; } });
   const setShowLabels = (v) => { _setShowLabels(v); try { localStorage.setItem(MAP_LABELS_KEY, v ? '1' : '0'); } catch {} };
+  const appIsDark = useThemeIsDark();
   const [darkMode, _setDarkMode] = useState(() => {
-    if (isAppDark()) return true;
+    if (appIsDark) return true;
     try { const v = localStorage.getItem(MAP_DARK_KEY); return v === null ? true : v === '1'; } catch { return true; }
   });
   const setDarkMode = (v) => { _setDarkMode(v); try { localStorage.setItem(MAP_DARK_KEY, v ? '1' : '0'); } catch {} };
+  // A dark app theme always forces dark viz; back on light, restore the
+  // user's stored viz preference.
   useEffect(() => {
-    const obs = new MutationObserver(() => {
-      if (isAppDark()) { _setDarkMode(true); }
-      else { try { const v = localStorage.getItem(MAP_DARK_KEY); _setDarkMode(v === null ? true : v === '1'); } catch { _setDarkMode(true); } }
-    });
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => obs.disconnect();
-  }, []);
+    if (appIsDark) { _setDarkMode(true); }
+    else { try { const v = localStorage.getItem(MAP_DARK_KEY); _setDarkMode(v === null ? true : v === '1'); } catch { _setDarkMode(true); } }
+  }, [appIsDark]);
   const [currentPath, _setCurrentPath] = useState(cached.currentPath);
   const setCurrentPath = (p) => { writeCachedState('map', selectedProject, { currentPath: p }); _setCurrentPath(p); };
 
