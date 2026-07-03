@@ -58,10 +58,12 @@ def register_assistant_routes(app: Flask) -> None:
             run_dir, repo_root = _assistant_helpers.resolve_run_location(
                 str(body["projectId"]), str(body["runId"]),
             )
+        project_id = body.get("projectId")
         get_repository(app).create_session(
             session_id=session_id, provider=body["provider"],
             model=body.get("model"), project_uuid=repo_root,
             run_id=run_dir,
+            project_id=str(project_id) if project_id else None,
         )
         return jsonify({"sessionId": session_id}), 201
 

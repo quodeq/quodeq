@@ -1,9 +1,9 @@
 """DDL for the assistant conversation store (~/.quodeq/assistant.db)."""
 
-ASSISTANT_SCHEMA_VERSION = 1
+ASSISTANT_SCHEMA_VERSION = 2
 
 ASSISTANT_DDL = """
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;
 
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     model TEXT,
     project_uuid TEXT,
     run_id TEXT,
+    project_id TEXT,
     cli_session_id TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -43,3 +44,12 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id, seq);
 """
+
+# Ordered forward migrations from an older on-disk schema. Each entry is
+# ``(target_version, sql)``; applied in order for any db whose user_version is
+# below ASSISTANT_SCHEMA_VERSION. Adding project_id via ALTER keeps existing
+# rows (they tolerate NULL project_id).
+ASSISTANT_MIGRATIONS: list[tuple[int, str]] = [
+    (2, "ALTER TABLE sessions ADD COLUMN project_id TEXT;\n"
+        "PRAGMA user_version = 2;"),
+]

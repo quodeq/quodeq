@@ -48,7 +48,7 @@ def ctx(tmp_path):
 def test_registry_registers_expected_tools(ctx):
     reg = build_registry(ctx)
     assert reg.names() == [
-        "draft_action", "get_report", "get_scores", "get_standard",
+        "draft_action", "get_overview", "get_report", "get_scores", "get_standard",
         "list_repo_dir", "list_standards", "read_repo_file", "search_findings",
     ]
 

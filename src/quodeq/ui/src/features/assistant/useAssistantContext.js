@@ -11,7 +11,10 @@ import { useAssistantProvider } from '../settings/hooks/useAssistantProvider.js'
  * @returns {{ provider: string, model: string, projectId: string|undefined, runId: string|undefined, uiState: { activeTab: string, selectedProject: string, selectedRun: string, dimension?: string } }}
  */
 export function deriveAssistantContext(appState, gate) {
-  const { activeTab, selectedProject, selectedRun, projects, dimension } = appState || {};
+  const {
+    activeTab, selectedProject, selectedRun, projects, dimension,
+    currentOverviewRun,
+  } = appState || {};
 
   // Resolve the selected project to its canonical id/name so the session key
   // and backend runDir lookup agree with the rest of the app (which keys on
@@ -23,7 +26,12 @@ export function deriveAssistantContext(appState, gate) {
   const projectId = found ? (found.id || found.name) : (selectedProject || undefined);
   const runId = selectedRun || undefined;
 
-  const uiState = { activeTab, selectedProject, selectedRun };
+  // `view` names the active tab so the model can pick the right data source:
+  // overview/history → accumulated (get_overview); a concrete run → run-scoped
+  // tools. `selectedRun`/`currentOverviewRun` carry the concrete run when one
+  // is shown so "this run" resolves correctly.
+  const uiState = { view: activeTab, activeTab, selectedProject, selectedRun };
+  if (currentOverviewRun) uiState.currentOverviewRun = currentOverviewRun;
   if (dimension) uiState.dimension = dimension;
 
   return {

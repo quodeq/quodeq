@@ -76,6 +76,8 @@ def build_tool_context(app: Flask, session: dict) -> ToolContext:
         evaluators_dir=Path(app.config["STANDARDS_EVALUATORS_DIR"]),
         compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
         dimensions_file=Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
+        project_id=session.get("project_id"),
+        reports_dir=Path(get_evaluations_dir()),
     )
 
 

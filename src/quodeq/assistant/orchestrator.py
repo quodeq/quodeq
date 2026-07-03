@@ -50,6 +50,10 @@ def _mcp_server_args(request: TurnRequest, tool_ctx: ToolContext) -> list[str]:
         args += ["--run-dir", str(tool_ctx.run_dir)]
     if tool_ctx.repo_root is not None:
         args += ["--repo-root", str(tool_ctx.repo_root)]
+    if tool_ctx.project_id is not None:
+        args += ["--project-id", str(tool_ctx.project_id)]
+    if tool_ctx.reports_dir is not None:
+        args += ["--reports-dir", str(tool_ctx.reports_dir)]
     return args
 
 

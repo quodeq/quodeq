@@ -7,7 +7,11 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
 
-from quodeq.data.sqlite._assistant_schema import ASSISTANT_DDL, ASSISTANT_SCHEMA_VERSION
+from quodeq.data.sqlite._assistant_schema import (
+    ASSISTANT_DDL,
+    ASSISTANT_MIGRATIONS,
+    ASSISTANT_SCHEMA_VERSION,
+)
 
 _BUSY_TIMEOUT_MS = 5000
 
@@ -40,6 +44,10 @@ class AssistantRepository:
                     f"assistant.db schema v{version} is newer than supported "
                     f"v{ASSISTANT_SCHEMA_VERSION}"
                 )
+            elif version < ASSISTANT_SCHEMA_VERSION:
+                for target, sql in ASSISTANT_MIGRATIONS:
+                    if version < target:
+                        conn.executescript(sql)
             conn.row_factory = _dict_row
             yield conn
             conn.commit()
@@ -48,12 +56,13 @@ class AssistantRepository:
 
     def create_session(self, *, session_id: str, provider: str,
                        model: str | None = None, project_uuid: str | None = None,
-                       run_id: str | None = None) -> dict:
+                       run_id: str | None = None,
+                       project_id: str | None = None) -> dict:
         with self._connect() as conn:
             conn.execute(
-                "INSERT INTO sessions (id, provider, model, project_uuid, run_id)"
-                " VALUES (?, ?, ?, ?, ?)",
-                (session_id, provider, model, project_uuid, run_id),
+                "INSERT INTO sessions (id, provider, model, project_uuid, run_id,"
+                " project_id) VALUES (?, ?, ?, ?, ?, ?)",
+                (session_id, provider, model, project_uuid, run_id, project_id),
             )
         return self.get_session(session_id)  # type: ignore[return-value]
 

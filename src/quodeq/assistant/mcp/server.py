@@ -60,6 +60,13 @@ def serve(registry: ToolRegistry, *, stdin: TextIO, stdout: TextIO, stderr: Text
 
 
 def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:
+    # reports_dir defaults to the evaluations root so get_overview works even
+    # when the caller didn't pass --reports-dir explicitly.
+    if ns.reports_dir:
+        reports_dir = Path(ns.reports_dir)
+    else:
+        from quodeq.shared._env import get_evaluations_dir  # noqa: PLC0415
+        reports_dir = Path(get_evaluations_dir())
     ctx = ToolContext(
         repository=AssistantRepository(Path(ns.db_path)),
         session_id=ns.session_id,
@@ -68,6 +75,8 @@ def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:
         evaluators_dir=Path(ns.evaluators_dir),
         compiled_dir=Path(ns.compiled_dir),
         dimensions_file=Path(ns.dimensions_file),
+        project_id=ns.project_id or None,
+        reports_dir=reports_dir,
     )
     return build_registry(ctx)
 
@@ -81,6 +90,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--evaluators-dir", required=True)
     parser.add_argument("--compiled-dir", required=True)
     parser.add_argument("--dimensions-file", required=True)
+    parser.add_argument("--project-id", default="")
+    parser.add_argument("--reports-dir", default="")
     ns = parser.parse_args(argv)
     serve(_build_registry_from_args(ns), stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
 

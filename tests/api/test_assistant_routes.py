@@ -176,6 +176,19 @@ def test_create_session_resolves_run_from_project_and_run_id(client, app, monkey
     sess = AssistantRepository(app.config["ASSISTANT_DB_PATH"]).get_session(sid)
     assert sess["run_id"] == str(run_dir)
     assert sess["project_uuid"] == "/src/selectives-android"
+    assert sess["project_id"] == "selectives"
+
+
+def test_create_session_stores_project_id_without_run(client, app):
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "projectId": "selectives"})
+    assert resp.status_code == 201
+    sid = resp.get_json()["sessionId"]
+    from quodeq.data.sqlite.assistant_repository import AssistantRepository
+    sess = AssistantRepository(app.config["ASSISTANT_DB_PATH"]).get_session(sid)
+    assert sess["project_id"] == "selectives"
+    # No runId supplied → run stays unscoped, but overview data is reachable.
+    assert sess["run_id"] is None
 
 
 def test_explicit_rundir_still_wins(client, monkeypatch):

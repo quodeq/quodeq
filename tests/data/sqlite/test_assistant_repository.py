@@ -20,6 +20,12 @@ def test_create_and_get_session(tmp_path):
     assert repo.get_session("missing") is None
 
 
+def test_create_session_stores_project_id(tmp_path):
+    repo = _repo(tmp_path)
+    repo.create_session(session_id="s1", provider="ollama", project_id="selectives")
+    assert repo.get_session("s1")["project_id"] == "selectives"
+
+
 def test_messages_roundtrip_in_order(tmp_path):
     repo = _repo(tmp_path)
     repo.create_session(session_id="s1", provider="ollama")

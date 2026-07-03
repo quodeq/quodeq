@@ -165,3 +165,23 @@ def test_mcp_server_args_omits_run_and_repo_when_unset(setup):
     args = _mcp_server_args(_request(), ctx)
     assert "--run-dir" not in args
     assert "--repo-root" not in args
+
+
+def test_mcp_server_args_includes_project_id_and_reports_dir(setup, tmp_path):
+    repo, _ctx = setup
+    ctx = ToolContext(
+        repository=repo, session_id="s1", run_dir=None, repo_root=None,
+        evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
+        dimensions_file=tmp_path / "d.json",
+        project_id="selectives", reports_dir=tmp_path / "reports",
+    )
+    args = _mcp_server_args(_request(), ctx)
+    assert args[args.index("--project-id") + 1] == "selectives"
+    assert args[args.index("--reports-dir") + 1] == str(tmp_path / "reports")
+
+
+def test_mcp_server_args_omits_project_scope_when_unset(setup):
+    repo, ctx = setup  # fixture ctx has project_id=None, reports_dir=None
+    args = _mcp_server_args(_request(), ctx)
+    assert "--project-id" not in args
+    assert "--reports-dir" not in args

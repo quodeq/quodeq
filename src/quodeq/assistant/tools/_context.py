@@ -16,3 +16,7 @@ class ToolContext:
     evaluators_dir: Path
     compiled_dir: Path
     dimensions_file: Path
+    # Accumulated/overview scope: the evaluations-dir project name and the
+    # evaluations root. Both optional so run-scoped-only sessions still work.
+    project_id: str | None = None
+    reports_dir: Path | None = None

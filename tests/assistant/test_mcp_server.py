@@ -5,6 +5,42 @@ from quodeq.assistant.mcp import server
 from quodeq.assistant.tools._registry import ToolRegistry, ToolSpec
 
 
+def test_build_registry_from_args_parses_project_scope(tmp_path):
+    args = [
+        "--db-path", str(tmp_path / "a.db"), "--session-id", "s1",
+        "--evaluators-dir", str(tmp_path / "e"),
+        "--compiled-dir", str(tmp_path / "c"),
+        "--dimensions-file", str(tmp_path / "d.json"),
+        "--project-id", "selectives", "--reports-dir", str(tmp_path / "reports"),
+    ]
+    parser = server.argparse.ArgumentParser()
+    for a in ("--db-path", "--session-id", "--run-dir", "--repo-root",
+              "--evaluators-dir", "--compiled-dir", "--dimensions-file",
+              "--project-id", "--reports-dir"):
+        parser.add_argument(a, default="")
+    ns = parser.parse_args(args)
+    registry = server._build_registry_from_args(ns)
+    assert "get_overview" in registry.names()
+
+
+def test_build_registry_defaults_reports_dir(monkeypatch, tmp_path):
+    monkeypatch.setattr("quodeq.shared._env.get_evaluations_dir",
+                        lambda: str(tmp_path / "evals"))
+    parser = server.argparse.ArgumentParser()
+    for a in ("--db-path", "--session-id", "--run-dir", "--repo-root",
+              "--evaluators-dir", "--compiled-dir", "--dimensions-file",
+              "--project-id", "--reports-dir"):
+        parser.add_argument(a, default="")
+    ns = parser.parse_args([
+        "--db-path", str(tmp_path / "a.db"), "--session-id", "s1",
+        "--evaluators-dir", str(tmp_path / "e"),
+        "--compiled-dir", str(tmp_path / "c"),
+        "--dimensions-file", str(tmp_path / "d.json"),
+    ])
+    # No --reports-dir → falls back to get_evaluations_dir(); must not raise.
+    assert server._build_registry_from_args(ns).names()
+
+
 def _registry():
     reg = ToolRegistry()
     reg.register(ToolSpec("get_scores", "scores", {"type": "object", "properties": {}},
