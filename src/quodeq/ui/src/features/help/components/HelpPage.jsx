@@ -9,6 +9,7 @@ import {
   Violations,
   CodeMap,
   History,
+  GradeFormula,
   Standards,
   Settings,
 } from './HelpSections.jsx';
@@ -25,6 +26,7 @@ const SECTIONS = [
   { id: 'violations', label: 'Violations & Fix Plans' },
   { id: 'map', label: 'Code Map' },
   { id: 'history', label: 'History & Trends' },
+  { id: 'grade-formula', label: 'Grade Formula' },
   { id: 'standards', label: 'Custom Standards' },
   { id: 'settings', label: 'Settings' },
 ];
@@ -39,6 +41,7 @@ const SECTION_COMPONENTS = {
   'violations': Violations,
   'map': CodeMap,
   'history': History,
+  'grade-formula': GradeFormula,
   'standards': Standards,
   'settings': Settings,
 };
