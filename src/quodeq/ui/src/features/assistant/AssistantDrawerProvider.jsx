@@ -81,6 +81,10 @@ export function AssistantDrawerProvider({ children }) {
   // session-start or message POST. Rendered by the drawer alongside (and
   // taking precedence over) the stream's own error frames.
   const [localError, setLocalError] = useState(null);
+  // Per-conversation web access. Default OFF and reset on every context
+  // switch: web access is opt-in per conversation, never sticky.
+  const [webEnabled, setWebEnabled] = useState(false);
+  const toggleWebEnabled = useCallback(() => setWebEnabled((prev) => !prev), []);
   // Tracks the most recently *requested* session context key, set
   // synchronously at startSession call time. Because startSession awaits a
   // network round-trip, a check-then-act guard on React state would let two
@@ -200,6 +204,7 @@ export function AssistantDrawerProvider({ children }) {
     if (latestKeyRef.current !== key) return;
     setLocalError(null);
     setUserTurns([]);
+    setWebEnabled(false);
     setSessionCtxKey(key);
     setSessionId(created.sessionId);
     setSessionMeta({ provider: ctx?.provider ?? null, model: ctx?.model ?? null });
@@ -211,14 +216,14 @@ export function AssistantDrawerProvider({ children }) {
     setUserTurns((prev) => [...prev, { role: 'user', text, atIndex: stream.messages.length }]);
     setTurnActive(true);  // turn is now in flight until the stream's done/error
     try {
-      await postAssistantMessage(sessionId, { text, uiState });
+      await postAssistantMessage(sessionId, { text, uiState, webEnabled });
     } catch (err) {
       // The optimistic user turn stays in the transcript; surface the failure
       // so the user knows the message didn't reach the assistant.
       setLocalError(`Couldn't send message: ${err?.message || err}`);
       setTurnActive(false);
     }
-  }, [sessionId, stream.messages.length]);
+  }, [sessionId, stream.messages.length, webEnabled]);
 
   const messages = useMemo(
     () => mergeMessages(userTurns, stream.messages),
@@ -232,8 +237,9 @@ export function AssistantDrawerProvider({ children }) {
     messages, streaming: turnActive, error: localError || stream.error,
     sessionReady: sessionId != null,
     provider: sessionMeta.provider, model: sessionMeta.model,
+    webEnabled, toggleWebEnabled,
     startSession, sendMessage,
-  }), [isOpen, open, close, toggle, closeActiveTab, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, startSession, sendMessage]);
+  }), [isOpen, open, close, toggle, closeActiveTab, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, startSession, sendMessage]);
 
   return (
     <AssistantDrawerContext.Provider value={value}>
