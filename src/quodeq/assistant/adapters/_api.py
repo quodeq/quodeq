@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
 from typing import Callable
 
@@ -19,6 +20,29 @@ from quodeq.assistant.tools._registry import ToolRegistry
 _logger = logging.getLogger(__name__)
 _TIMEOUT = httpx.Timeout(connect=10.0, read=500.0, write=30.0, pool=10.0)
 _CAP_NOTE = "\n\n*(stopped: tool iteration limit reached)*"
+_OPENAI_API_HOST = "api.openai.com"
+
+
+def _extra_body(config: "ApiTurnConfig") -> dict:
+    """Provider tuning that mirrors the analysis API runner so the assistant
+    behaves like the (working) evaluation path on the same local models.
+
+    Local reasoning models (Gemma, Qwen3) otherwise burn thousands of thinking
+    tokens before answering — a multi-minute streamed generation that is prone
+    to dropped connections ("Connection error"). Disabling chat-template
+    thinking keeps them fast. `num_ctx` is pinned from the same env the
+    analysis path reads, so Ollama doesn't evict/reload the model between an
+    analysis run and an assistant turn.
+    """
+    body: dict = {}
+    if _OPENAI_API_HOST in (config.api_base or ""):
+        body["reasoning_effort"] = "none"
+    else:
+        body["chat_template_kwargs"] = {"enable_thinking": False}
+    env_ctx = os.environ.get("QUODEQ_CONTEXT_SIZE", "").strip()
+    if env_ctx.isdigit() and int(env_ctx) > 0:
+        body["num_ctx"] = int(env_ctx)
+    return body
 
 
 @dataclass(frozen=True)
@@ -44,6 +68,9 @@ def _stream_once(client, config, messages, registry, emit):
     kwargs = {"model": config.model, "messages": messages, "stream": True}
     if config.native_tools:
         kwargs["tools"] = registry.openai_tools()
+    extra = _extra_body(config)
+    if extra:
+        kwargs["extra_body"] = extra
     text_parts: list[str] = []
     calls: dict[int, dict] = {}
     for chunk in client.chat.completions.create(**kwargs):

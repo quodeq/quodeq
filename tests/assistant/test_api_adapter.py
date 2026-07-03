@@ -107,3 +107,23 @@ def test_iteration_cap_ends_turn():
                         emit=lambda f: None, client_factory=lambda c: client)
     assert "tool iteration limit" in text
     assert len(client.calls) == 6  # MAX_TOOL_ITERATIONS
+
+
+def test_extra_body_disables_thinking_for_local_and_sets_ctx(monkeypatch):
+    from quodeq.assistant.adapters._api import ApiTurnConfig, _extra_body
+    monkeypatch.setenv("QUODEQ_CONTEXT_SIZE", "32768")
+    local = ApiTurnConfig(api_base="http://localhost:11434/v1", api_key=None, model="m", native_tools=True)
+    body = _extra_body(local)
+    assert body["chat_template_kwargs"] == {"enable_thinking": False}
+    assert body["num_ctx"] == 32768
+    assert "reasoning_effort" not in body
+
+
+def test_extra_body_openai_uses_reasoning_effort(monkeypatch):
+    from quodeq.assistant.adapters._api import ApiTurnConfig, _extra_body
+    monkeypatch.delenv("QUODEQ_CONTEXT_SIZE", raising=False)
+    cloud = ApiTurnConfig(api_base="https://api.openai.com/v1", api_key="k", model="gpt", native_tools=True)
+    body = _extra_body(cloud)
+    assert body["reasoning_effort"] == "none"
+    assert "chat_template_kwargs" not in body
+    assert "num_ctx" not in body
