@@ -10,8 +10,9 @@ from quodeq.assistant.adapters._api import ApiTurnConfig, run_api_turn
 from quodeq.assistant.adapters._capabilities import supports_native_tools
 from quodeq.assistant.adapters._cli import CliTurnConfig, run_cli_turn
 from quodeq.assistant.skills import load_skills
-from quodeq.assistant.tools import ToolContext, build_registry
+from quodeq.assistant.tools import ToolContext, build_registry, register_web_tools
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
+from quodeq.llm_bridge._providers import LOCAL_PROVIDERS
 
 _logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class TurnRequest:
     api_key: str | None
     provider: str
     model: str
+    web_enabled: bool = False
 
 
 def _split_skill(text: str):
@@ -75,7 +77,11 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
         user_content = build_turn_message(text, request.ui_state)
         repository.add_message(request.session_id, "user", user_content)
         history = repository.list_messages(request.session_id)
-        messages = [{"role": "system", "content": build_system_prompt(skill=skill)},
+        # In-process web tools are local-API-only: claude gets NATIVE web
+        # tools via argv, and cloud APIs (openrouter/custom) stay excluded.
+        web_tools_on = request.web_enabled and request.provider in LOCAL_PROVIDERS
+        messages = [{"role": "system",
+                     "content": build_system_prompt(skill=skill, web_enabled=web_tools_on)},
                     *({"role": m["role"], "content": m["content"]} for m in history)]
         if _provider_type(request.provider) == "cli":
             final = cli_turn_fn(
@@ -85,6 +91,7 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
                     scratch_base=tool_ctx.repository.db_path.parent,
                     mcp_server_args=_mcp_server_args(request, tool_ctx),
                     db_path=tool_ctx.repository.db_path,
+                    web_enabled=request.web_enabled,
                 ),
                 session_id=request.session_id,
                 prior_session_id=(repository.get_session(request.session_id) or {}).get("cli_session_id"),
@@ -97,8 +104,11 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
                 native_tools=capability_fn(request.provider, request.api_base,
                                            request.model),
             )
+            registry = build_registry(tool_ctx)
+            if web_tools_on:
+                register_web_tools(registry)
             final = turn_fn(messages=messages, config=config,
-                            registry=build_registry(tool_ctx), emit=emit)
+                            registry=registry, emit=emit)
         repository.add_message(request.session_id, "assistant", final)
         emit({"type": "done"})
     except Exception as exc:  # noqa: BLE001 - turn thread must never die silently
