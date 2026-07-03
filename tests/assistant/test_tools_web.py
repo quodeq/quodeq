@@ -149,3 +149,46 @@ def test_fetch_url_rejects_binary_content(no_ssrf, monkeypatch):
     monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
     with pytest.raises(ToolError, match="content type"):
         _web_tools._fetch_url("https://example.com/logo.png")
+
+
+from pathlib import Path
+
+from quodeq.assistant.tools import ToolContext, build_registry, register_web_tools
+from quodeq.data.sqlite.assistant_repository import AssistantRepository
+import quodeq.assistant.mcp.server as mcp_server
+
+
+@pytest.fixture()
+def ctx(tmp_path):
+    repo = AssistantRepository(tmp_path / "assistant.db")
+    repo.create_session(session_id="s1", provider="ollama")
+    return ToolContext(repository=repo, session_id="s1", run_dir=None, repo_root=None,
+                       evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
+                       dimensions_file=tmp_path / "d.json")
+
+
+def test_build_registry_never_includes_web_tools(ctx):
+    names = build_registry(ctx).names()
+    assert "search_web" not in names and "fetch_url" not in names
+
+
+def test_register_web_tools_adds_exactly_two(ctx):
+    registry = build_registry(ctx)
+    before = set(registry.names())
+    register_web_tools(registry)
+    assert set(registry.names()) - before == {"search_web", "fetch_url"}
+
+
+def test_registered_web_tools_dispatch_and_fail_readably(ctx):
+    registry = build_registry(ctx)
+    register_web_tools(registry)
+    out = registry.dispatch("fetch_url", {"url": "http://127.0.0.1/x"})
+    assert out["ok"] is False
+    assert "private" in out["error"]  # ToolError text, not "failed internally"
+
+
+def test_mcp_server_module_never_references_web_tools():
+    # THE invariant: web tools reaching the MCP server would give the claude
+    # CLI web access with the toggle OFF (blanket --allowedTools on the server).
+    source = Path(mcp_server.__file__).read_text(encoding="utf-8")
+    assert "register_web_tools" not in source and "_web_tools" not in source

@@ -163,3 +163,28 @@ def _fetch_url(url: str) -> dict:
     return {"url": url, "status": 200, "content_type": content_type,
             "text": text[:_MAX_TEXT_CHARS],
             "truncated": len(text) > _MAX_TEXT_CHARS}
+
+
+def register_web_tools(registry: ToolRegistry) -> None:
+    registry.register(ToolSpec(
+        "search_web",
+        "Search the public web (DuckDuckGo). Returns result titles, URLs and snippets.",
+        {"type": "object",
+         "properties": {
+             "query": {"type": "string", "description": "Search query."},
+             "max_results": {"type": "integer", "minimum": 1, "maximum": 8,
+                             "description": "How many results to return (default 5)."},
+         },
+         "required": ["query"]},
+        _search_web,
+    ))
+    registry.register(ToolSpec(
+        "fetch_url",
+        "Fetch one public http(s) page and return its text content. Redirects are "
+        "returned in redirect_to, not followed.",
+        {"type": "object",
+         "properties": {"url": {"type": "string",
+                                "description": "Absolute http(s) URL to fetch."}},
+         "required": ["url"]},
+        _fetch_url,
+    ))
