@@ -17,6 +17,12 @@ def get_provider_type(provider_id: str) -> str:
     return configs.get(provider_id, {}).get("type", "cli")
 
 
+# Fixed-endpoint local model servers. The assistant's in-process web tools
+# (search_web/fetch_url) are only ever registered for these providers; cloud
+# API providers (openrouter/custom) are excluded by design.
+LOCAL_PROVIDERS = frozenset({"ollama", "llamacpp", "omlx"})
+
+
 # Configurable via QUODEQ_LOCAL_API_MARKERS (comma-separated).
 # Default markers detect common local LLM server patterns.
 _LOCAL_API_MARKERS_DEFAULT = {"11434", "localhost", "127.0.0.1", "ollama"}

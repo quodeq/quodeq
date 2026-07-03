@@ -170,3 +170,37 @@ def test_empty_output_raises(tmp_path):
         run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
                      session_id="s1", prior_session_id=None, repository=repo,
                      emit=lambda f: None, spawn_fn=lambda argv, *, cwd, env: FakeProc([]))
+
+
+def test_web_enabled_reaches_spawned_argv(tmp_path):
+    repo = _repo(tmp_path)
+    base = _config(tmp_path)
+    config = CliTurnConfig(provider=base.provider, model=base.model,
+                           scratch_base=base.scratch_base,
+                           mcp_server_args=base.mcp_server_args,
+                           db_path=base.db_path, web_enabled=True)
+    captured = {}
+
+    def spawn(argv, *, cwd, env):
+        captured["argv"] = argv
+        return FakeProc(['{"type": "result", "result": "ok"}'])
+
+    run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=config,
+                 session_id="s1", prior_session_id=None, repository=repo,
+                 emit=lambda f: None, spawn_fn=spawn)
+    allowed = captured["argv"][captured["argv"].index("--allowedTools") + 1]
+    assert "WebSearch" in allowed and "WebFetch" in allowed
+
+
+def test_web_disabled_by_default_in_spawned_argv(tmp_path):
+    repo = _repo(tmp_path)
+    captured = {}
+
+    def spawn(argv, *, cwd, env):
+        captured["argv"] = argv
+        return FakeProc(['{"type": "result", "result": "ok"}'])
+
+    run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
+                 session_id="s1", prior_session_id=None, repository=repo,
+                 emit=lambda f: None, spawn_fn=spawn)
+    assert captured["argv"][captured["argv"].index("--allowedTools") + 1] == "mcp__quodeq-assistant"

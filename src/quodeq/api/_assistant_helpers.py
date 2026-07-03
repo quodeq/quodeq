@@ -8,10 +8,10 @@ from flask import Flask, current_app
 
 from quodeq.assistant import AssistantRepository
 from quodeq.assistant.tools import ToolContext
+from quodeq.assistant import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
 from quodeq.services._fs_projects import get_project_info
 from quodeq.shared._env import get_evaluations_dir
 
-_LOCAL_PROVIDERS = frozenset({"ollama", "llamacpp", "omlx"})
 _POLL_SECONDS = 0.25
 _IDLE_LIMIT = 2400  # 2400 * 0.25s = 600s idle backstop. The stream now stays
 # open across turns (done/error no longer end event_frames), so this bounds a

@@ -1,11 +1,17 @@
 import React, { useCallback, useRef, lazy, Suspense } from 'react';
 import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';
 import { AssistantPane } from '../assistant/AssistantDrawer.jsx';
-import { ChevronUpIcon, ChevronDownIcon } from '../../components/CopyButton.jsx';
+import { ChevronUpIcon, ChevronDownIcon, GlobeIcon } from '../../components/CopyButton.jsx';
 
 const TerminalPane = lazy(() => import('../terminal/TerminalPane.jsx'));
 
 const TAB_LABELS = { assistant: '✦ Assistant', terminal: '❯_ Terminal' };
+
+// Providers where the web toggle does something: claude flips its native
+// WebSearch/WebFetch; local providers get in-process search_web/fetch_url.
+// Mirrors the backend gate (LOCAL_PROVIDERS in llm_bridge/_providers.py plus
+// the claude argv path in adapters/_cli_command.py) — keep the two in sync.
+const WEB_PROVIDERS = new Set(['claude', 'ollama', 'omlx', 'llamacpp']);
 
 /**
  * Shared bottom drawer host: a resizable full-width shell that hosts the
@@ -17,7 +23,8 @@ const TAB_LABELS = { assistant: '✦ Assistant', terminal: '❯_ Terminal' };
  */
 export function BottomDrawer({ uiState }) {
   const { isOpen, height, setHeight, closeActiveTab, openPanels, activeTab, selectTab,
-          maximized, toggleMaximized, setMaximized, provider, model } = useAssistantDrawer();
+          maximized, toggleMaximized, setMaximized, provider, model,
+          streaming, webEnabled, toggleWebEnabled } = useAssistantDrawer();
   const dragRef = useRef(null);
 
   const handleDragMove = useCallback((event) => {
@@ -72,6 +79,16 @@ export function BottomDrawer({ uiState }) {
             <span className="drawer-model-chip" title={modelLabel}>
               {modelLabel}
             </span>
+          )}
+          {active === 'assistant' && WEB_PROVIDERS.has(provider) && (
+            <button type="button" className="assistant-drawer-btn assistant-drawer-web"
+              onClick={toggleWebEnabled}
+              aria-pressed={webEnabled}
+              aria-label="Allow web access for this conversation"
+              title="Allow web access for this conversation"
+              disabled={streaming}>
+              <GlobeIcon />
+            </button>
           )}
           <button type="button" className="assistant-drawer-btn" onClick={toggleMaximized}
             aria-label={maximized ? 'Restore drawer' : 'Maximize drawer'}

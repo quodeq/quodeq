@@ -32,6 +32,7 @@ class CliTurnConfig:
     scratch_base: Path
     mcp_server_args: list[str]
     db_path: Path
+    web_enabled: bool = False
 
 
 def _latest_user(messages: list[dict]) -> str:
@@ -65,7 +66,8 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
     try:
         spec = build_turn_argv(cli_cfg, prompt=prompt, model=cfg.model,
                                mcp_config_path=mcp_config_path,
-                               prior_session_id=prior_session_id, new_session_id=new_session_id)
+                               prior_session_id=prior_session_id, new_session_id=new_session_id,
+                               web_enabled=cfg.web_enabled)
         cwd = scratch_cwd(cfg.scratch_base)
         proc = spawn_fn(spec.argv, cwd=cwd, env=build_chat_env())
         # wall-clock guard: a hung/silent CLI can't wedge the turn slot forever

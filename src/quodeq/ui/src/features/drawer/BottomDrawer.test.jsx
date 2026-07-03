@@ -7,6 +7,7 @@ const drawer = {
   openPanels: ['assistant', 'terminal'], activeTab: 'assistant', selectTab: vi.fn(),
   maximized: false, toggleMaximized: vi.fn(), setMaximized: vi.fn(),
   provider: 'ollama', model: 'm', messages: [], streaming: false, error: null, sendMessage: vi.fn(),
+  webEnabled: false, toggleWebEnabled: vi.fn(),
 };
 vi.mock('../assistant/AssistantDrawerProvider.jsx', () => ({ useAssistantDrawer: () => drawer }));
 vi.mock('../terminal/TerminalPane.jsx', () => ({ default: () => <div data-testid="tty" /> }));
@@ -49,4 +50,33 @@ it('the close (×) button closes only the active tab, not the whole drawer', () 
   fireEvent.click(screen.getByRole('button', { name: /close tab/i }));
   expect(drawer.closeActiveTab).toHaveBeenCalled();
   expect(drawer.close).not.toHaveBeenCalled();
+});
+
+it('shows the web toggle for web-capable providers and toggles it', () => {
+  render(<BottomDrawer uiState={{}} />);
+  const globe = screen.getByRole('button', { name: /web access/i });
+  expect(globe).toHaveAttribute('aria-pressed', 'false');
+  fireEvent.click(globe);
+  expect(drawer.toggleWebEnabled).toHaveBeenCalled();
+});
+
+it('hides the web toggle for providers without web support', () => {
+  drawer.provider = 'gemini';
+  render(<BottomDrawer uiState={{}} />);
+  expect(screen.queryByRole('button', { name: /web access/i })).toBeNull();
+  drawer.provider = 'ollama';
+});
+
+it('hides the web toggle while the terminal tab is active', () => {
+  drawer.activeTab = 'terminal';
+  render(<BottomDrawer uiState={{}} />);
+  expect(screen.queryByRole('button', { name: /web access/i })).toBeNull();
+  drawer.activeTab = 'assistant';
+});
+
+it('disables the web toggle while a turn is streaming', () => {
+  drawer.streaming = true;
+  render(<BottomDrawer uiState={{}} />);
+  expect(screen.getByRole('button', { name: /web access/i })).toBeDisabled();
+  drawer.streaming = false;
 });

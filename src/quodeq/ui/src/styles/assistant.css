@@ -181,6 +181,23 @@
   color: var(--color-accent);
 }
 
+.assistant-drawer-btn:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+/* Web-access globe: accent when ON (scoped so the maximize button's
+   aria-pressed keeps its plain look). */
+.assistant-drawer-web[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.assistant-drawer-web:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ── Message transcript ──────────────────────────────── */
 .assistant-messages {
   flex: 1 1 auto;

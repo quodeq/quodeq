@@ -25,6 +25,8 @@ function Probe() {
       <span data-testid="provider">{String(d.provider)}</span>
       <span data-testid="model">{String(d.model)}</span>
       <span data-testid="error">{String(d.error)}</span>
+      <span data-testid="web">{String(d.webEnabled)}</span>
+      <button onClick={d.toggleWebEnabled}>web</button>
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'p', runId: 'r' })}>start</button>
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'pA', runId: 'r' })}>startA</button>
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'pB', runId: 'r' })}>startB</button>
@@ -76,7 +78,7 @@ it('startSession creates a session; sendMessage posts to it', async () => {
   await act(async () => { screen.getByText('start').click(); });
   expect(createAssistantSession).toHaveBeenCalledWith({ provider: 'claude', model: 'sonnet', projectId: 'p', runId: 'r' });
   await act(async () => { screen.getByText('send').click(); });
-  expect(postAssistantMessage).toHaveBeenCalledWith('s1', { text: 'hi', uiState: { activeTab: 'overview' } });
+  expect(postAssistantMessage).toHaveBeenCalledWith('s1', { text: 'hi', uiState: { activeTab: 'overview' }, webEnabled: false });
 });
 
 it('exposes the active session provider/model for the drawer header', async () => {
@@ -128,5 +130,22 @@ it('startSession race: the latest requested context wins even if it resolves fir
   // The stale pA resolution must be ignored — pB's session stays committed.
   expect(postAssistantMessage).not.toHaveBeenCalled();
   await act(async () => { hookRef.sendMessage('x', {}); });
-  expect(postAssistantMessage).toHaveBeenCalledWith('sess-pB', { text: 'x', uiState: {} });
+  expect(postAssistantMessage).toHaveBeenCalledWith('sess-pB', { text: 'x', uiState: {}, webEnabled: false });
+});
+
+it('webEnabled toggles, rides the POST body, and resets on a new session', async () => {
+  // the race test above swapped in a deferred implementation; clearAllMocks
+  // clears calls, not implementations, so restore the default here.
+  createAssistantSession.mockImplementation(async () => ({ sessionId: 's1' }));
+  render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+  await act(async () => { screen.getByText('start').click(); });
+  expect(screen.getByTestId('web').textContent).toBe('false');
+  act(() => { screen.getByText('web').click(); });
+  expect(screen.getByTestId('web').textContent).toBe('true');
+  await act(async () => { screen.getByText('send').click(); });
+  expect(postAssistantMessage).toHaveBeenCalledWith('s1',
+    { text: 'hi', uiState: { activeTab: 'overview' }, webEnabled: true });
+  // switching context (new session) resets the toggle to off
+  await act(async () => { screen.getByText('startA').click(); });
+  expect(screen.getByTestId('web').textContent).toBe('false');
 });

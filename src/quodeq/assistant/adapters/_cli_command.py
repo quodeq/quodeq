@@ -5,6 +5,29 @@ from dataclasses import dataclass
 
 from quodeq.assistant.adapters._cli_config import CliChatConfig
 
+_NATIVE_WEB_TOOLS = ("WebSearch", "WebFetch")
+
+
+def _with_web_access(args: list[str]) -> list[str]:
+    """Enable the provider's native web tools in an assistant_args list.
+
+    Claude encodes tool names as ONE space-separated value token after
+    --disallowedTools / --allowedTools. Providers without those flags
+    (codex, gemini) come back unchanged, so a web-enabled turn is inert
+    for them.
+    """
+    out = list(args)
+    # The value token following each flag comes only from the static bundled
+    # config (ai_providers.json), so degenerate/empty values need no handling.
+    for i, token in enumerate(out[:-1]):
+        if token == "--disallowedTools":
+            names = [n for n in out[i + 1].split() if n not in _NATIVE_WEB_TOOLS]
+            out[i + 1] = " ".join(names)
+        elif token == "--allowedTools":
+            names = out[i + 1].split()
+            out[i + 1] = " ".join(names + [n for n in _NATIVE_WEB_TOOLS if n not in names])
+    return out
+
 
 @dataclass(frozen=True)
 class CliTurnSpec:
@@ -30,7 +53,7 @@ def _resume_args(cfg: CliChatConfig, prior: str | None, new_id: str) -> tuple[li
 
 def build_turn_argv(cfg: CliChatConfig, *, prompt: str, model: str | None,
                     mcp_config_path: str | None, prior_session_id: str | None,
-                    new_session_id: str) -> CliTurnSpec:
+                    new_session_id: str, web_enabled: bool = False) -> CliTurnSpec:
     argv: list[str] = [cfg.cmd]
     if cfg.cmd_subcommand:
         argv.append(cfg.cmd_subcommand)
@@ -41,7 +64,7 @@ def build_turn_argv(cfg: CliChatConfig, *, prompt: str, model: str | None,
         argv.extend(resume_frag)
         resume_frag = []
 
-    argv.extend(cfg.assistant_args)
+    argv.extend(_with_web_access(cfg.assistant_args) if web_enabled else cfg.assistant_args)
     if resume_frag:
         argv.extend(resume_frag)
     if mcp_config_path and cfg.mcp_style == "config-file":

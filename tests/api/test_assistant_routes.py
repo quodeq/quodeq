@@ -372,6 +372,37 @@ def test_apply_unknown_action_404(client):
     assert client.post("/api/assistant/actions/missing/apply").status_code == 404
 
 
+def _wait_for(seen, key, timeout=2.0):
+    deadline = time.time() + timeout
+    while key not in seen and time.time() < deadline:
+        time.sleep(0.01)
+    return seen.get(key)
+
+
+def test_web_enabled_body_key_threads_to_turn_request(client, monkeypatch):
+    seen = {}
+    monkeypatch.setattr("quodeq.api.assistant_routes.run_turn",
+                        lambda turn, **kw: seen.setdefault("turn", turn))
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama"}).get_json()["sessionId"]
+    resp = client.post(f"/api/assistant/sessions/{sid}/messages",
+                       json={"text": "hi", "webEnabled": True})
+    assert resp.status_code == 202
+    turn = _wait_for(seen, "turn")
+    assert turn is not None and turn.web_enabled is True
+
+
+def test_web_enabled_defaults_false_when_absent(client, monkeypatch):
+    seen = {}
+    monkeypatch.setattr("quodeq.api.assistant_routes.run_turn",
+                        lambda turn, **kw: seen.setdefault("turn", turn))
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama"}).get_json()["sessionId"]
+    client.post(f"/api/assistant/sessions/{sid}/messages", json={"text": "hi"})
+    turn = _wait_for(seen, "turn")
+    assert turn is not None and turn.web_enabled is False
+
+
 def test_apply_invalid_payload_400(client, app):
     # A malformed stored draft (missing "principles") must yield a clean 400,
     # not a 500 — import_from_file raises ValueError on validation failure.
