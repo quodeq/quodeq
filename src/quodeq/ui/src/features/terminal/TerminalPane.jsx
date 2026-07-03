@@ -66,6 +66,7 @@ export default function TerminalPane({ active }) {
       fontFamily: 'var(--font-mono, monospace)',
       fontSize: 12,
       lineHeight: 1.1,
+      letterSpacing: -0.5,    // JetBrains Mono is wide; tighten the cells (px)
       cursorBlink: true,
       cursorStyle: 'bar',     // sleeker than the default square block
       theme: themeFromCss(),
