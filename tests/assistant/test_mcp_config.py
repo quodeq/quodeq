@@ -14,8 +14,10 @@ def test_write_mcp_config_shape(tmp_path):
     assert server["command"] == sys.executable
     assert server["args"][:2] == ["-m", "quodeq.assistant.mcp.server"]
     assert "--session-id" in server["args"]
-    # 0600 perms
-    assert (path.stat().st_mode & 0o777) == 0o600
+    # 0600 perms — POSIX only. os.chmod's mode bits are a no-op on Windows
+    # (st_mode reads 0o666), so only assert the hardening where it applies.
+    if sys.platform != "win32":
+        assert (path.stat().st_mode & 0o777) == 0o600
 
 
 def test_unregister_cli_mcp_acquires_lock_and_clears_key(monkeypatch):

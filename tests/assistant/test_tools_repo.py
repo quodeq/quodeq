@@ -8,7 +8,11 @@ from quodeq.data.sqlite.assistant_repository import AssistantRepository
 def ctx(tmp_path):
     repo_root = tmp_path / "project"
     (repo_root / "src").mkdir(parents=True)
-    (repo_root / "src" / "app.py").write_text("print('hi')\n")
+    # write_bytes (not write_text) so the on-disk newline is exactly "\n" on
+    # every platform -- write_text translates "\n" to "\r\n" on Windows, and
+    # the read tool returns the file's raw bytes decoded, so the assertion
+    # would otherwise see "\r\n" in CI.
+    (repo_root / "src" / "app.py").write_bytes(b"print('hi')\n")
     (repo_root / ".env").write_text("SECRET=x\n")
     (repo_root / "logo.bin").write_bytes(b"\x00\x01\x02")
     (repo_root / ".git").mkdir()
