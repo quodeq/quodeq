@@ -7,6 +7,7 @@ class _FakeBackend:
         self._alive = False
         self.written = []
         self.resized = None
+        self.killed = False
         self._queue = [b"welcome\n"]
     def spawn(self, *, cwd, cols, rows): self._alive = True; self.cwd = cwd
     def read(self, max_bytes=65536): return self._queue.pop(0) if self._queue else b""
@@ -14,7 +15,7 @@ class _FakeBackend:
     def resize(self, cols, rows): self.resized = (cols, rows)
     @property
     def alive(self): return self._alive
-    def kill(self): self._alive = False
+    def kill(self): self._alive = False; self.killed = True
 
 
 def test_manager_spawns_once_and_records_scrollback():
@@ -27,6 +28,17 @@ def test_manager_spawns_once_and_records_scrollback():
     assert m.scrollback() == b"welcome\n"
     m.write(b"ls\n"); m.resize(120, 40); m.kill()
     assert b1.written == [b"ls\n"] and b1.resized == (120, 40) and not m.alive
+
+
+def test_respawn_kills_stale_backend_and_replaces_it():
+    m = TerminalManager(backend_factory=_FakeBackend)
+    m.ensure_session(cwd="/home/u", cols=80, rows=24)
+    old = m._backend
+    old._alive = False  # shell exited on its own; nothing called kill()
+    m.ensure_session(cwd="/home/u", cols=80, rows=24)  # reconnect -> respawn
+    assert old.killed is True          # stale backend's fd was closed
+    assert m._backend is not old       # a fresh backend replaced it
+    assert m._backend.alive is True
 
 
 def test_scrollback_is_bounded():

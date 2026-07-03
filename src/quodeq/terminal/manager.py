@@ -22,6 +22,8 @@ class TerminalManager:
         with self._lock:
             if self._backend is not None and self._backend.alive:
                 return
+            if self._backend is not None:      # stale/dead backend -> close its fd first
+                self._backend.kill()
             self._ring.clear()
             self._ring_size = 0
             self._backend = self._factory()

@@ -1,7 +1,20 @@
+import contextlib
+import threading
+import time
+
 import pytest
 from flask import Flask
 
 from quodeq.api.terminal_routes import _apply_control, register_terminal_routes
+
+try:
+    import simple_websocket
+    from werkzeug.serving import make_server
+    _WS_OK = True
+except Exception:  # pragma: no cover - env without WS deps
+    _WS_OK = False
+
+_ws_test = pytest.mark.skipif(not _WS_OK, reason="simple_websocket/werkzeug unavailable")
 
 
 class _FakeManager:
@@ -79,3 +92,98 @@ def test_apply_control_malformed_is_noop_and_never_raises(payload):
     mgr = _ResizeRecorder()
     _apply_control(mgr, payload)  # must not raise
     assert mgr.calls == []
+
+
+@pytest.mark.parametrize("payload", [
+    '{"resize":{"cols":999999,"rows":40}}',   # > 65535 (struct.pack H overflow)
+    '{"resize":{"cols":-5,"rows":40}}',        # negative
+    '{"resize":{"cols":80,"rows":9999999}}',   # rows out of range
+])
+def test_apply_control_clamps_out_of_range_resize(payload):
+    mgr = _ResizeRecorder()
+    _apply_control(mgr, payload)  # must not raise (clamped, not dropped)
+    assert len(mgr.calls) == 1
+    cols, rows = mgr.calls[0]
+    assert 1 <= cols <= 65535
+    assert 1 <= rows <= 65535
+
+
+# --- WebSocket integration (single-connection guard + spawn-failure handling) ---
+
+class _LiveManager:
+    """Stays alive; scrollback is a sync beacon proving the handler holds the lock."""
+    def __init__(self):
+        self._alive = True
+    def ensure_session(self, *, cwd, cols, rows): self._alive = True
+    def scrollback(self): return b"ready\n"
+    def read(self, max_bytes=65536): time.sleep(0.05); return b""
+    def write(self, data): pass
+    def resize(self, cols, rows): pass
+    def kill(self): self._alive = False
+    @property
+    def alive(self): return self._alive
+
+
+class _FlakyManager(_LiveManager):
+    """Raises on the first ensure_session (spawn failure), succeeds afterwards."""
+    def __init__(self):
+        super().__init__()
+        self._calls = 0
+    def ensure_session(self, *, cwd, cols, rows):
+        self._calls += 1
+        if self._calls == 1:
+            raise RuntimeError("boom: shell spawn failed")
+        self._alive = True
+
+
+@contextlib.contextmanager
+def _serve(manager):
+    app = Flask(__name__)
+    app.config["QUODEQ_API_KEY"] = None
+    app.config["QUODEQ_BIND_HOST"] = "127.0.0.1"
+    register_terminal_routes(app, manager=manager)
+    srv = make_server("127.0.0.1", 0, app, threaded=True)
+    t = threading.Thread(target=srv.serve_forever, daemon=True)
+    t.start()
+    try:
+        yield srv.server_port
+    finally:
+        srv.shutdown()
+        t.join(timeout=2)
+
+
+@contextlib.contextmanager
+def _connect(port):
+    # werkzeug's WS handshake exposes request.host without the port, so the
+    # Origin must match that (browsers keep Host+Origin consistent for real).
+    c = simple_websocket.Client(
+        f"ws://127.0.0.1:{port}/api/terminal/ws",
+        headers={"Origin": "http://127.0.0.1"})
+    try:
+        yield c
+    finally:
+        with contextlib.suppress(Exception):  # already-closed socket -> ignore
+            c.close()
+
+
+@_ws_test
+def test_ws_single_active_connection_refuses_second():
+    with _serve(_LiveManager()) as port:
+        with _connect(port) as a:
+            assert a.receive(timeout=2) == "0ready\n"   # A acquired the conn lock
+            with _connect(port) as b:
+                msg = None
+                with contextlib.suppress(simple_websocket.ConnectionClosed):
+                    msg = b.receive(timeout=2)
+                assert msg is not None and "already open" in msg
+
+
+@_ws_test
+def test_ws_spawn_failure_closes_cleanly_and_frees_lock():
+    with _serve(_FlakyManager()) as port:
+        with _connect(port) as first:       # ensure_session raises -> clean close
+            with contextlib.suppress(simple_websocket.ConnectionClosed):
+                first.receive(timeout=2)    # must not hang / must not 500
+        # the conn lock's finally released even though spawn failed -> reattach works
+        with _connect(port) as second:
+            assert second.receive(timeout=2) == "0ready\n"
