@@ -6,15 +6,17 @@ import { useAssistantProvider } from '../settings/hooks/useAssistantProvider.js'
  * assistant provider gate. Kept side-effect-free so it can be unit-tested and
  * memoized without mounting the whole app.
  *
- * @param {Object} appState  from useAppState(): activeTab, selectedProject, selectedRun, projects, [dimension]
+ * @param {Object} appState  from useAppState(): activeTab, selectedProject, selectedRun, projects,
+ *                            currentOverviewRun, granularity, dailyRuns, overviewRunIndex, activePage
  * @param {Object} gate      from useAssistantProvider(): activeProvider, model
- * @returns {{ provider: string, model: string, projectId: string|undefined, runId: string|undefined, uiState: { activeTab: string, selectedProject: string, selectedRun: string, dimension?: string } }}
+ * @returns {{ provider: string, model: string, projectId: string|undefined, runId: string|undefined, uiState: { activeTab: string, selectedProject: string, selectedRun: string, dimension?: string, grouping?: string, overviewDate?: string } }}
  */
 export function deriveAssistantContext(appState, gate) {
   const {
-    activeTab, selectedProject, selectedRun, projects, dimension,
-    currentOverviewRun,
+    activeTab, selectedProject, selectedRun, projects,
+    currentOverviewRun, granularity, dailyRuns, overviewRunIndex, activePage,
   } = appState || {};
+  const dimension = activePage?.dimension;
 
   // Resolve the selected project to its canonical id/name so the session key
   // and backend runDir lookup agree with the rest of the app (which keys on
@@ -33,6 +35,9 @@ export function deriveAssistantContext(appState, gate) {
   const uiState = { view: activeTab, activeTab, selectedProject, selectedRun };
   if (currentOverviewRun) uiState.currentOverviewRun = currentOverviewRun;
   if (dimension) uiState.dimension = dimension;
+  if (granularity) uiState.grouping = granularity;
+  const overviewDate = Array.isArray(dailyRuns) ? dailyRuns[overviewRunIndex]?.dateLabel : undefined;
+  if (overviewDate) uiState.overviewDate = overviewDate;
 
   return {
     provider: gate?.activeProvider,

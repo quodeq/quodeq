@@ -42,3 +42,40 @@ it('handles no selection gracefully', () => {
   expect(ctx.runId).toBeUndefined();
   expect(ctx.provider).toBe('ollama');
 });
+
+it('includes grouping and overviewDate when the overview granularity/dailyRuns resolve them', () => {
+  const appState = {
+    activeTab: 'overview',
+    selectedProject: 'selectives',
+    projects: [],
+    granularity: 'week',
+    dailyRuns: [{ dateLabel: 'Week of Jun 23, 2026' }, { dateLabel: 'Week of Jun 16, 2026' }],
+    overviewRunIndex: 0,
+  };
+  const ctx = deriveAssistantContext(appState, { activeProvider: 'claude', model: 'sonnet' });
+  expect(ctx.uiState.grouping).toBe('week');
+  expect(ctx.uiState.overviewDate).toBe('Week of Jun 23, 2026');
+});
+
+it('includes dimension when the active page carries one', () => {
+  const appState = {
+    activeTab: 'violations',
+    selectedProject: 'selectives',
+    projects: [],
+    activePage: { page: 'explorer', dimension: 'Security' },
+  };
+  const ctx = deriveAssistantContext(appState, { activeProvider: 'claude', model: 'sonnet' });
+  expect(ctx.uiState.dimension).toBe('Security');
+});
+
+it('omits grouping, overviewDate and dimension when absent', () => {
+  const appState = {
+    activeTab: 'overview',
+    selectedProject: 'selectives',
+    projects: [],
+  };
+  const ctx = deriveAssistantContext(appState, { activeProvider: 'claude', model: 'sonnet' });
+  expect('grouping' in ctx.uiState).toBe(false);
+  expect('overviewDate' in ctx.uiState).toBe(false);
+  expect('dimension' in ctx.uiState).toBe(false);
+});
