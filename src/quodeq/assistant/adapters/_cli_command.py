@@ -17,6 +17,8 @@ def _with_web_access(args: list[str]) -> list[str]:
     for them.
     """
     out = list(args)
+    # The value token following each flag comes only from the static bundled
+    # config (ai_providers.json), so degenerate/empty values need no handling.
     for i, token in enumerate(out[:-1]):
         if token == "--disallowedTools":
             names = [n for n in out[i + 1].split() if n not in _NATIVE_WEB_TOOLS]

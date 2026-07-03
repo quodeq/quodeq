@@ -1,4 +1,4 @@
-from quodeq.assistant.adapters._cli_command import build_turn_argv
+from quodeq.assistant.adapters._cli_command import _with_web_access, build_turn_argv
 from quodeq.assistant.adapters._cli_config import load_cli_chat_config
 
 
@@ -92,3 +92,28 @@ def test_claude_web_disabled_keeps_hardened_defaults():
 def test_web_flag_is_inert_for_codex_and_gemini():
     assert _spec("codex", web_enabled=True).argv == _spec("codex").argv
     assert _spec("gemini", web_enabled=True).argv == _spec("gemini").argv
+
+
+def test_with_web_access_rewrites_all_occurrences():
+    args = ["--disallowedTools", "Bash WebFetch",
+            "--disallowedTools", "Edit WebSearch",
+            "--allowedTools", "a", "--allowedTools", "b"]
+    assert _with_web_access(args) == [
+        "--disallowedTools", "Bash",
+        "--disallowedTools", "Edit",
+        "--allowedTools", "a WebSearch WebFetch",
+        "--allowedTools", "b WebSearch WebFetch",
+    ]
+
+
+def test_with_web_access_flag_as_final_token_is_skipped():
+    args = ["--verbose", "--allowedTools"]
+    assert _with_web_access(args) == ["--verbose", "--allowedTools"]
+
+
+def test_with_web_access_pure_and_idempotent():
+    args = ["--disallowedTools", "Bash WebFetch WebSearch", "--allowedTools", "a"]
+    original = list(args)
+    once = _with_web_access(args)
+    assert args == original  # input not mutated
+    assert _with_web_access(once) == once  # applying twice equals applying once
