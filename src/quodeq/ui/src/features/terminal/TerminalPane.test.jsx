@@ -1,0 +1,28 @@
+import { it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+
+const fakeTerm = { open: vi.fn(), write: vi.fn(), dispose: vi.fn(), loadAddon: vi.fn(),
+  onData: vi.fn(), onResize: vi.fn(), focus: vi.fn(), attachCustomKeyEventHandler: vi.fn(),
+  cols: 80, rows: 24, options: {} };
+// Use `function` (not arrow) implementations so vi.fn() produces a constructible
+// mock: xterm's Terminal/FitAddon are always invoked with `new` in TerminalPane.
+vi.mock('@xterm/xterm', () => ({ Terminal: vi.fn(function Terminal() { return fakeTerm; }) }));
+vi.mock('@xterm/addon-fit', () => ({
+  FitAddon: vi.fn(function FitAddon() { return { fit: vi.fn(), proposeDimensions: () => ({ cols: 80, rows: 24 }) }; }),
+}));
+vi.mock('../../api/terminal.js', () => ({
+  terminalStatus: vi.fn(async () => ({ enabled: true, running: false, reason: null })),
+  killTerminal: vi.fn(async () => ({ ok: true })),
+  terminalSocketUrl: () => 'ws://localhost/api/terminal/ws',
+}));
+import TerminalPane from './TerminalPane.jsx';
+
+it('mounts an xterm terminal when active', async () => {
+  const { Terminal } = await import('@xterm/xterm');
+  render(<TerminalPane active />);
+  // allow the status effect to resolve
+  await screen.findByTestId('tty-root');
+  expect(Terminal).toHaveBeenCalled();
+  expect(fakeTerm.open).toHaveBeenCalled();
+});
