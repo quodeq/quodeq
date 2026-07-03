@@ -89,6 +89,23 @@ def test_result_only_text_is_still_emitted(tmp_path):
     assert {"type": "token", "text": "Hi"} in frames
 
 
+def test_result_with_differing_text_is_emitted(tmp_path):
+    repo = _repo(tmp_path)
+    lines = [
+        '{"type": "assistant", "message": {"content": [{"type": "text", "text": "Step 1 done"}]}}',
+        '{"type": "result", "result": "Final answer: X", "session_id": "claude-uuid-1"}',
+    ]
+    frames = []
+    text = run_cli_turn(
+        messages=[{"role": "user", "content": "hi"}],
+        config=_config(tmp_path), session_id="s1", prior_session_id=None,
+        repository=repo, emit=frames.append,
+        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+    token_texts = [f["text"] for f in frames if f["type"] == "token"]
+    assert token_texts == ["Step 1 done", "Final answer: X"]
+    assert text == "Final answer: X"
+
+
 def test_tool_use_emits_frame(tmp_path):
     repo = _repo(tmp_path)
     lines = [

@@ -68,7 +68,7 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
         timer = threading.Timer(TURN_TIMEOUT_S, proc.kill)
         timer.start()
         texts, parsed_sid = [], spec.session_id
-        emitted_assistant = False
+        last_emitted = None
         for line in iter_lines(proc.stdout):
             event = _stream.parse_line(line)
             if event is None:
@@ -78,13 +78,13 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
                 texts.append(t)
                 # the final `result` event echoes the full text already streamed
                 # via `assistant`/`item.completed` events; skip re-emitting it so
-                # the drawer doesn't show the answer twice. If ONLY a `result`
-                # event carries text (no prior assistant event), still emit it.
-                if etype == "result" and emitted_assistant:
+                # the drawer doesn't show the answer twice. Gate on content, not
+                # presence: a `result` whose text DIFFERS from what was streamed
+                # (or a result-only turn) must still be emitted.
+                if etype == "result" and t == last_emitted:
                     continue
                 emit({"type": "token", "text": t})
-                if etype in ("assistant", "item.completed"):
-                    emitted_assistant = True
+                last_emitted = t
             for name in _stream.tool_uses(event):
                 emit({"type": "tool_call", "name": name})
             sid = _stream.session_id(event)
