@@ -8,6 +8,7 @@ from pathlib import Path
 
 from flask import Flask, Response, current_app, jsonify, request
 
+from quodeq.api import _assistant_helpers
 from quodeq.api._assistant_helpers import (
     _LOCAL_PROVIDERS as _FIXED_ENDPOINT_PROVIDERS,
     build_tool_context,
@@ -49,10 +50,18 @@ def register_assistant_routes(app: Flask) -> None:
             return jsonify({"error": "unknown or unsupported provider"}), 400
         session_id = uuid.uuid4().hex
         # Plan 1 mapping: runDir → run_id column, repoRoot → project_uuid column.
+        # Plan 3: the UI may only know {projectId, runId}; resolve run_dir/repo_root
+        # server-side in that case. Explicit runDir/repoRoot always win.
+        run_dir = body.get("runDir")
+        repo_root = body.get("repoRoot")
+        if not run_dir and body.get("projectId") and body.get("runId"):
+            run_dir, repo_root = _assistant_helpers.resolve_run_location(
+                str(body["projectId"]), str(body["runId"]),
+            )
         get_repository(app).create_session(
             session_id=session_id, provider=body["provider"],
-            model=body.get("model"), project_uuid=body.get("repoRoot"),
-            run_id=body.get("runDir"),
+            model=body.get("model"), project_uuid=repo_root,
+            run_id=run_dir,
         )
         return jsonify({"sessionId": session_id}), 201
 

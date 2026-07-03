@@ -132,6 +132,32 @@ def test_local_provider_ignores_request_api_base(client, app, monkeypatch):
     assert captured["api_key"] is None
 
 
+def test_create_session_resolves_run_from_project_and_run_id(client, app, monkeypatch, tmp_path):
+    # a resolver stub standing in for the real services lookup
+    run_dir = tmp_path / "proj-uuid" / "run-9"
+    run_dir.mkdir(parents=True)
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.resolve_run_location",
+        lambda project_id, run_id: (str(run_dir), "/src/selectives-android"),
+    )
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "projectId": "selectives", "runId": "run-9"})
+    assert resp.status_code == 201
+    sid = resp.get_json()["sessionId"]
+    from quodeq.data.sqlite.assistant_repository import AssistantRepository
+    sess = AssistantRepository(app.config["ASSISTANT_DB_PATH"]).get_session(sid)
+    assert sess["run_id"] == str(run_dir)
+    assert sess["project_uuid"] == "/src/selectives-android"
+
+
+def test_explicit_rundir_still_wins(client, monkeypatch):
+    monkeypatch.setattr("quodeq.api._assistant_helpers.resolve_run_location",
+                        lambda *a: (_ for _ in ()).throw(AssertionError("should not resolve")))
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "runDir": "/explicit/run", "repoRoot": "/explicit/repo"})
+    assert resp.status_code == 201
+
+
 def test_apply_action_creates_standard(client, app):
     repo = _repo(app)
     repo.create_session(session_id="s1", provider="ollama")

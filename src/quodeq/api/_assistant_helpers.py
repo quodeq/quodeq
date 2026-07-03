@@ -8,10 +8,33 @@ from flask import Flask, current_app
 
 from quodeq.assistant import AssistantRepository
 from quodeq.assistant.tools import ToolContext
+from quodeq.services._fs_projects import get_project_info
+from quodeq.shared._env import get_evaluations_dir
 
 _LOCAL_PROVIDERS = frozenset({"ollama", "llamacpp", "omlx"})
 _POLL_SECONDS = 0.25
 _IDLE_LIMIT = 240  # 240 * 0.25s = 60s without frames → close stream
+
+
+def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str | None]:
+    """Resolve ``(run_dir, repo_root)`` from a ``{projectId, runId}`` pair.
+
+    Reuses the same layout the run index and project routes already rely on
+    (see ``services/run_index.py``'s ``_walk_run_dirs`` and
+    ``services/_fs_projects.get_project_info``): a run lives at
+    ``<evaluations_root>/<project_id>/<run_id>`` where ``project_id`` is the
+    directory name under ``get_evaluations_dir()`` (Plan-1's "project_uuid"),
+    and the repo root is ``repository_info.json``'s ``path`` field, read via
+    the existing ``get_project_info`` helper. Returns ``(None, None)`` when
+    the run directory does not exist on disk.
+    """
+    evaluations_root = Path(get_evaluations_dir())
+    run_dir = evaluations_root / project_id / run_id
+    if not run_dir.is_dir():
+        return None, None
+    info = get_project_info(str(evaluations_root), project_id)
+    repo_root = info.get("path") if info else None
+    return str(run_dir), repo_root
 
 
 def get_repository(app: Flask) -> AssistantRepository:
