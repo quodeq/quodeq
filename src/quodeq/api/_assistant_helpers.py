@@ -8,7 +8,7 @@ from flask import Flask, current_app
 
 from quodeq.assistant import AssistantRepository
 from quodeq.assistant.tools import ToolContext
-from quodeq.llm_bridge._providers import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
+from quodeq.assistant import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
 from quodeq.services._fs_projects import get_project_info
 from quodeq.shared._env import get_evaluations_dir
 

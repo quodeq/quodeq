@@ -12,7 +12,7 @@ from quodeq.assistant.adapters._cli import CliTurnConfig, run_cli_turn
 from quodeq.assistant.skills import load_skills
 from quodeq.assistant.tools import ToolContext, build_registry, register_web_tools
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
-from quodeq.llm_bridge._providers import LOCAL_PROVIDERS
+from quodeq.llm_bridge import LOCAL_PROVIDERS
 
 _logger = logging.getLogger(__name__)
 
