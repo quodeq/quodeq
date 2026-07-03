@@ -24,3 +24,10 @@ def test_turn_message_serializes_ui_state():
 
 def test_turn_message_without_ui_state():
     assert build_turn_message("hello", None) == "hello"
+
+
+def test_system_prompt_web_section_only_when_enabled():
+    assert "# Web access" not in build_system_prompt()
+    prompt = build_system_prompt(web_enabled=True)
+    assert "# Web access" in prompt
+    assert "search_web" in prompt and "fetch_url" in prompt
