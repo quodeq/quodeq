@@ -102,14 +102,29 @@ def test_search_web_filters_non_http_result_urls(monkeypatch):
 
 
 class _FakeStreamResponse:
-    def __init__(self, status=200, headers=None, body=b"", encoding="utf-8"):
+    def __init__(self, status=200, headers=None, body=b"", encoding="utf-8",
+                 chunks=None):
         self.status_code = status
         self.headers = headers or {}
         self._body = body
         self.encoding = encoding
+        self._chunks = chunks
 
     def iter_bytes(self, chunk_size=None):
-        yield self._body
+        chunks = self._chunks if self._chunks is not None else [self._body]
+        if chunk_size is None:
+            yield from chunks
+            return
+        # mirror httpx's ByteChunker: buffer until chunk_size bytes accumulate,
+        # so small network chunks do NOT reach the caller's loop individually
+        buf = b""
+        for chunk in chunks:
+            buf += chunk
+            while len(buf) >= chunk_size:
+                yield buf[:chunk_size]
+                buf = buf[chunk_size:]
+        if buf:
+            yield buf
 
 
 class _FakeStream:
@@ -243,6 +258,54 @@ def test_fetch_url_byte_cap_sets_truncated(no_ssrf, monkeypatch):
     out = _web_tools._fetch_url("https://example.com/a")
     assert out["truncated"] is True
     assert len(out["text"]) <= _web_tools._MAX_TEXT_CHARS
+
+
+class _FakeClock:
+    """monotonic() that jumps 30s per call: three loop checks blow a 60s budget."""
+
+    def __init__(self, step=30.0):
+        self._now = 0.0
+        self._step = step
+
+    def monotonic(self):
+        self._now += self._step
+        return self._now
+
+
+def test_fetch_url_deadline_fires_on_slow_drip(no_ssrf, monkeypatch):
+    # sub-64KB chunks must reach the loop individually so the deadline check
+    # runs per chunk; a chunk_size= arg routes through httpx's ByteChunker,
+    # which buffers them into one late chunk and lets a slow-drip server
+    # wedge the turn thread past the budget
+    resp = _FakeStreamResponse(headers={"content-type": "text/html"},
+                               chunks=[b"a", b"b", b"c"])
+    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    monkeypatch.setattr(_web_tools, "time", _FakeClock())
+    with pytest.raises(ToolError, match="time budget"):
+        _web_tools._fetch_url("https://example.com/slow")
+
+
+def test_fetch_url_keeps_trailing_text_near_bare_ampersand(no_ssrf, monkeypatch):
+    # without extractor.close(), convert_charrefs buffers the trailing run
+    # after a bare & and silently drops it
+    resp = _FakeStreamResponse(headers={"content-type": "text/html"},
+                               body=b"<p>Hello</p>ends with &am")
+    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    out = _web_tools._fetch_url("https://example.com/a")
+    assert "ends with" in out["text"]
+
+
+_LONG_TITLE_HTML = ('<html><body><div class="result"><h2 class="result__title">'
+                    '<a class="result__a" href="https://example.org/long">'
+                    + "T" * 400 +
+                    '</a></h2><a class="result__snippet" href="#">s</a></div>'
+                    '</body></html>')
+
+
+def test_search_web_caps_title_length(monkeypatch):
+    monkeypatch.setattr(httpx, "get", _fake_get(text=_LONG_TITLE_HTML))
+    out = _web_tools._search_web("stuff")
+    assert len(out["results"][0]["title"]) <= 300
 
 
 from pathlib import Path

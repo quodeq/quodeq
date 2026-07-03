@@ -155,7 +155,9 @@ def _fetch_url(url: str) -> dict:
             deadline = time.monotonic() + _MAX_FETCH_SECONDS
             parts: list[bytes] = []
             received = 0
-            for chunk in resp.iter_bytes(chunk_size=65536):
+            # no chunk_size: it would route through httpx's ByteChunker, which
+            # buffers sub-chunk_size drips and starves the deadline check below
+            for chunk in resp.iter_bytes():
                 if time.monotonic() > deadline:
                     raise ToolError(f"could not fetch {url}: exceeded "
                                     f"{int(_MAX_FETCH_SECONDS)}s time budget")
