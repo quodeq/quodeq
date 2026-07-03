@@ -91,3 +91,75 @@ def _search_web(query: str, max_results: int = 5) -> dict:
         raise ToolError("web search returned no results; the search service may be "
                         "rate limiting, try again later or use fetch_url with a known URL")
     return {"results": results[:max_results]}
+
+
+class _TextExtractor(HTMLParser):
+    """Strip tags to text: skip script/style noise, mark block boundaries."""
+
+    _SKIP = frozenset({"script", "style", "noscript", "template", "svg", "head"})
+    _BLOCK = frozenset({"p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4",
+                        "h5", "h6", "section", "article", "table", "ul", "ol"})
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._chunks: list[str] = []
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self._SKIP:
+            self._skip_depth += 1
+        elif tag in self._BLOCK:
+            self._chunks.append("\n")
+
+    def handle_endtag(self, tag):
+        if tag in self._SKIP and self._skip_depth:
+            self._skip_depth -= 1
+
+    def handle_data(self, data):
+        if not self._skip_depth:
+            self._chunks.append(data)
+
+    def text(self) -> str:
+        lines = ("".join(self._chunks)).splitlines()
+        collapsed = (" ".join(line.split()) for line in lines)
+        return "\n".join(line for line in collapsed if line)
+
+
+def _fetch_url(url: str) -> dict:
+    try:
+        validate_url_safe(url)
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
+    try:
+        with httpx.stream("GET", url, headers={"User-Agent": _USER_AGENT},
+                          timeout=_TIMEOUT, follow_redirects=False) as resp:
+            if resp.status_code in _REDIRECT_STATUSES:
+                return {"url": url, "status": resp.status_code,
+                        "redirect_to": resp.headers.get("location", ""),
+                        "note": "redirect not followed; call fetch_url with "
+                                "redirect_to to follow it"}
+            if resp.status_code != 200:
+                raise ToolError(f"could not fetch {url}: HTTP {resp.status_code}")
+            content_type = resp.headers.get("content-type", "")
+            body = b""
+            for chunk in resp.iter_bytes():
+                body += chunk
+                if len(body) >= _MAX_FETCH_BYTES:
+                    body = body[:_MAX_FETCH_BYTES]
+                    break
+            encoding = resp.encoding or "utf-8"
+    except httpx.HTTPError as exc:
+        raise ToolError(f"could not fetch {url}: {exc}") from exc
+    is_texty = ("text/" in content_type or "json" in content_type
+                or "xml" in content_type or content_type == "")
+    if not is_texty:
+        raise ToolError(f"unsupported content type {content_type!r}; only HTML, "
+                        "text, JSON and XML pages can be fetched")
+    text = body.decode(encoding, errors="replace")
+    if "html" in content_type:
+        extractor = _TextExtractor()
+        extractor.feed(text)
+        text = extractor.text()
+    return {"url": url, "status": 200, "content_type": content_type,
+            "text": text[:_MAX_TEXT_CHARS],
+            "truncated": len(text) > _MAX_TEXT_CHARS}
