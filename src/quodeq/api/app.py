@@ -119,6 +119,9 @@ def create_app(
         )
 
     configure_security(app, store, api_key)
+    app.config["QUODEQ_API_KEY"] = api_key
+    from quodeq.shared.utils import get_action_api_host as _gah
+    app.config["QUODEQ_BIND_HOST"] = _gah()
     log_buffer, verbose = _configure_logging(app)
     _register_health_route(app, verbose)
     register_all_routes(app, provider, eval_store, static_dist, log_buffer)

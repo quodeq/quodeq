@@ -116,14 +116,22 @@ def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: st
         # These are loopback addresses only — cross-site exfil to external
         # attackers is still blocked.
         _alt_port_origins = " ".join(
-            f"http://127.0.0.1:{p} http://localhost:{p}"
+            f"http://127.0.0.1:{p} http://localhost:{p} "
+            f"ws://127.0.0.1:{p} ws://localhost:{p}"
             for p in (4180, 4181, 4182, 4183)
         )
+        # The primary bind port isn't known here; add same-origin ws explicitly.
+        _self_ws = ""
+        try:
+            from flask import request as _req
+            _self_ws = f"ws://{_req.host} wss://{_req.host}"
+        except Exception:
+            _self_ws = ""
         is_webview = _WEBVIEW_UA_MARKER in request.headers.get("User-Agent", "")
         script_src = "script-src 'self' 'unsafe-eval'" if is_webview else "script-src 'self'"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            f"connect-src 'self' {_alt_port_origins}; "
+            f"connect-src 'self' {_alt_port_origins} {_self_ws}; "
             f"{script_src}; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
