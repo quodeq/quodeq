@@ -32,7 +32,11 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: process.env.VITE_API_TARGET || DEFAULT_API_TARGET,
-        changeOrigin: true
+        changeOrigin: true,
+        // changeOrigin rewrites Host but not the browser's Origin header,
+        // so the API's CSRF origin check 403s every state-changing request
+        // in dev. Send an Origin that matches the proxy target instead.
+        headers: { origin: process.env.VITE_API_TARGET || DEFAULT_API_TARGET }
       }
     }
   }
