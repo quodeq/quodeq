@@ -15,7 +15,7 @@ export default function AssistantProviderTabs({ providerConfigs }) {
   const { getAiClients } = useApi();
   const [clients, setClients] = useState([]);
   const [clientsError, setClientsError] = useState(null);
-  const { mode, setMode, activeProvider, setActiveProvider, model, setModel } = useAssistantProvider();
+  const { enabled, setEnabled, mode, setMode, activeProvider, setActiveProvider, model, setModel } = useAssistantProvider();
 
   useEffect(() => {
     getAiClients().then((data) => {
@@ -39,6 +39,30 @@ export default function AssistantProviderTabs({ providerConfigs }) {
       </div>
       {clientsError && <div className="settings-row"><span className="settings-error">{clientsError}</span></div>}
 
+      <div className={`settings-row${enabled ? '' : ' settings-row--last'}`}>
+        <div className="settings-row-label">
+          <span className="settings-label">Enable assistant</span>
+          <span className="settings-description">
+            Shows the assistant button (✦) in the toolbar and enables the Ctrl+` panel. Off by default.
+          </span>
+        </div>
+        <div className="settings-pill-group" role="tablist">
+          {[{ value: true, label: 'On' }, { value: false, label: 'Off' }].map(({ value, label }) => (
+            <button
+              key={label}
+              type="button"
+              role="tab"
+              aria-selected={enabled === value}
+              className={`settings-pill${enabled === value ? ' settings-pill--active' : ''}`}
+              onClick={() => setEnabled(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {enabled && (
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label">Model source</span>
@@ -61,8 +85,9 @@ export default function AssistantProviderTabs({ providerConfigs }) {
           ))}
         </div>
       </div>
+      )}
 
-      {mode === 'default' && (
+      {enabled && mode === 'default' && (
         <div className="settings-row settings-row--last">
           <span className="settings-description">
             Follows Analysis · {active?.label || activeProvider || 'none selected'} · {model || 'default'}
@@ -70,7 +95,7 @@ export default function AssistantProviderTabs({ providerConfigs }) {
         </div>
       )}
 
-      {mode === 'custom' && (
+      {enabled && mode === 'custom' && (
         <>
           <div className="settings-row">
             <div className="settings-row-label">

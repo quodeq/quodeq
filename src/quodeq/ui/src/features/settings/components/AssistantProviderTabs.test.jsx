@@ -51,16 +51,29 @@ describe('AssistantProviderTabs', () => {
     localStorage.clear();
     localStorage.setItem('cc-active-provider', 'claude');
     localStorage.setItem('cc-claude-model', 'sonnet');
+    // Enabled by default in these tests so the model-source rows render; the
+    // off-by-default behaviour has its own test below.
+    localStorage.setItem('cc-assistant-enabled', 'true');
     fakeApi.getAiClients.mockClear();
     fakeApi.getOllamaModels.mockClear();
   });
   afterEach(() => localStorage.clear());
 
+  it('when disabled (the default) only the Enable toggle shows, no model source', async () => {
+    localStorage.setItem('cc-assistant-enabled', 'false');
+    const { container, queryAllByRole, queryByText } = await renderPanel();
+    // Only the On/Off enable toggle is present — no Default/Custom, no note.
+    expect(queryAllByRole('tab').map((t) => t.textContent)).toEqual(['On', 'Off']);
+    expect(queryByText(/Follows Analysis/i)).toBeNull();
+    expect(container.querySelector('select')).toBeNull();
+  });
+
   it('default mode hides provider pills and shows the Follows Analysis note', async () => {
     const { container, findByText, queryAllByRole } = await renderPanel();
-    // The only tablist is the Default/Custom toggle (2 tabs); no provider pills.
-    await waitFor(() => expect(container.querySelectorAll('[role="tablist"]').length).toBe(1));
-    expect(queryAllByRole('tab').map((t) => t.textContent)).toEqual(['Default', 'Custom']);
+    // Two tablists now: the Enable (On/Off) toggle and the Default/Custom
+    // toggle. No provider pills in default mode.
+    await waitFor(() => expect(container.querySelectorAll('[role="tablist"]').length).toBe(2));
+    expect(queryAllByRole('tab').map((t) => t.textContent)).toEqual(['On', 'Off', 'Default', 'Custom']);
     expect(await findByText(/Follows Analysis/i)).toBeTruthy();
     expect(container.querySelector('select')).toBeNull();
   });

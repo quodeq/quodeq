@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
@@ -8,7 +8,17 @@ vi.mock('../features/assistant/AssistantDrawerProvider.jsx', () => ({
 }));
 import { AssistantLauncherButton } from './AssistantLauncherButton.jsx';
 
-it('is an icon-only labelled toggle', () => {
+beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); });
+afterEach(() => localStorage.clear());
+
+it('is hidden when the assistant is disabled (the default)', () => {
+  const { container } = render(<AssistantLauncherButton />);
+  expect(container).toBeEmptyDOMElement();
+  expect(screen.queryByRole('button', { name: /assistant/i })).toBeNull();
+});
+
+it('is an icon-only labelled toggle when enabled', () => {
+  localStorage.setItem('cc-assistant-enabled', 'true');
   render(<AssistantLauncherButton />);
   const btn = screen.getByRole('button', { name: /assistant/i });
   expect(btn).toHaveClass('topbar-btn', 'topbar-btn--icon');

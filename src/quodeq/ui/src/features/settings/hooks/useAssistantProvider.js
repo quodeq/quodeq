@@ -3,6 +3,9 @@ import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_SETTINGS_CHANGED_EVENT } fro
 
 export const ASSISTANT_ACTIVE_PROVIDER_KEY = 'cc-assistant-active-provider';
 export const ASSISTANT_MODE_KEY = 'cc-assistant-mode';
+// The assistant is OFF by default: the toolbar launcher only appears once the
+// user explicitly enables it in Settings.
+export const ASSISTANT_ENABLED_KEY = 'cc-assistant-enabled';
 
 // Broadcast so every useAssistantProvider() instance (Settings tab, drawer, ...)
 // re-reads storage and stays in sync when one instance changes the selection.
@@ -16,12 +19,14 @@ const CHANGE_EVENT = 'assistant-provider-changed';
 function loadState(storage) {
   const mode = storage.getItem(ASSISTANT_MODE_KEY) === 'custom' ? 'custom' : 'default';
   const analysisActive = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  // Default OFF: only 'true' enables it.
+  const enabled = storage.getItem(ASSISTANT_ENABLED_KEY) === 'true';
 
   if (mode === 'default') {
     const model = analysisActive
       ? (storage.getItem(providerKey(analysisActive, 'model')) || '')
       : '';
-    return { mode, activeProvider: analysisActive, model, followsAnalysis: true };
+    return { enabled, mode, activeProvider: analysisActive, model, followsAnalysis: true };
   }
 
   const explicitProvider = storage.getItem(ASSISTANT_ACTIVE_PROVIDER_KEY);
@@ -32,7 +37,7 @@ function loadState(storage) {
   const model = explicitModel !== null
     ? explicitModel
     : (activeProvider ? (storage.getItem(providerKey(activeProvider, 'model')) || '') : '');
-  return { mode, activeProvider, model, followsAnalysis: false };
+  return { enabled, mode, activeProvider, model, followsAnalysis: false };
 }
 
 export function useAssistantProvider({ storage = localStorage } = {}) {
@@ -43,6 +48,16 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
       window.dispatchEvent(new Event(CHANGE_EVENT));
     }
   }, []);
+
+  const setEnabled = useCallback((value) => {
+    try {
+      storage.setItem(ASSISTANT_ENABLED_KEY, value ? 'true' : 'false');
+    } catch (err) {
+      console.warn('[useAssistantProvider] Could not persist assistant enabled:', err);
+    }
+    setState(loadState(storage));
+    broadcast();
+  }, [storage, broadcast]);
 
   const setMode = useCallback((mode) => {
     try {
@@ -91,6 +106,8 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
   }, [storage]);
 
   return {
+    enabled: state.enabled,
+    setEnabled,
     mode: state.mode,
     setMode,
     activeProvider: state.activeProvider,

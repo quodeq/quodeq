@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createAssistantSession, postAssistantMessage } from '../../api/assistant.js';
+import useAssistantProvider from '../settings/hooks/useAssistantProvider.js';
 import { useAssistantStream } from './useAssistantStream.js';
 
 const STORAGE_KEY = 'cc-assistant-drawer-height';
@@ -88,11 +89,20 @@ export function AssistantDrawerProvider({ children }) {
   // A fresh session (open, project/run switch) has no turn in flight.
   useEffect(() => { setTurnActive(false); }, [sessionId]);
 
+  const { enabled: assistantEnabled } = useAssistantProvider();
+
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
   const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
 
+  // When the assistant is disabled in Settings, force the drawer shut so a
+  // drawer left open can't linger after the feature is turned off.
   useEffect(() => {
+    if (!assistantEnabled) setIsOpen(false);
+  }, [assistantEnabled]);
+
+  useEffect(() => {
+    if (!assistantEnabled) return undefined;
     const handleKeyDown = (e) => {
       if (e.key === '`' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
@@ -102,7 +112,7 @@ export function AssistantDrawerProvider({ children }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [assistantEnabled]);
 
   const setHeight = useCallback((px) => {
     const next = clampHeight(px);
