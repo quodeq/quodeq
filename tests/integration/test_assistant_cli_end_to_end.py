@@ -62,6 +62,12 @@ class FakeProc:
     def wait(self, timeout=None):
         return self.returncode
 
+    def poll(self):
+        return self.returncode  # scripted proc has already exited
+
+    def kill(self):
+        self.returncode = -9
+
 
 def _make_spawn_fn(app: Flask, holder: dict):
     """Fake CLI: dispatches `draft_action` for real (mirroring the MCP server's
