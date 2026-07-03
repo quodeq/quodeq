@@ -1,6 +1,6 @@
 import pytest
 
-from quodeq.assistant.orchestrator import TurnRequest, run_turn
+from quodeq.assistant.orchestrator import TurnRequest, _mcp_server_args, run_turn
 from quodeq.assistant.tools import ToolContext
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
@@ -143,3 +143,25 @@ def test_run_turn_cli_empty_output_emits_error(setup, monkeypatch):
     frames = [f for _, f in repo.events_after("s1", 0)]
     assert frames[-1]["type"] == "error"
     assert "no output" in frames[-1]["message"]
+
+
+def test_mcp_server_args_includes_run_and_repo(setup, tmp_path):
+    repo, _ctx = setup
+    ctx = ToolContext(
+        repository=repo, session_id="s1",
+        run_dir=tmp_path / "run", repo_root=tmp_path / "repo",
+        evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
+        dimensions_file=tmp_path / "d.json",
+    )
+    args = _mcp_server_args(_request(), ctx)
+    assert "--run-dir" in args
+    assert args[args.index("--run-dir") + 1] == str(tmp_path / "run")
+    assert "--repo-root" in args
+    assert args[args.index("--repo-root") + 1] == str(tmp_path / "repo")
+
+
+def test_mcp_server_args_omits_run_and_repo_when_unset(setup):
+    repo, ctx = setup  # fixture ctx has run_dir=None, repo_root=None
+    args = _mcp_server_args(_request(), ctx)
+    assert "--run-dir" not in args
+    assert "--repo-root" not in args

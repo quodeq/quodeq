@@ -39,13 +39,18 @@ def _provider_type(provider: str) -> str:
 
 
 def _mcp_server_args(request: TurnRequest, tool_ctx: ToolContext) -> list[str]:
-    return [
+    args = [
         "--db-path", str(tool_ctx.repository.db_path),
         "--session-id", request.session_id,
         "--evaluators-dir", str(tool_ctx.evaluators_dir),
         "--compiled-dir", str(tool_ctx.compiled_dir),
         "--dimensions-file", str(tool_ctx.dimensions_file),
     ]
+    if tool_ctx.run_dir is not None:
+        args += ["--run-dir", str(tool_ctx.run_dir)]
+    if tool_ctx.repo_root is not None:
+        args += ["--repo-root", str(tool_ctx.repo_root)]
+    return args
 
 
 def run_turn(request: TurnRequest, *, repository: AssistantRepository,

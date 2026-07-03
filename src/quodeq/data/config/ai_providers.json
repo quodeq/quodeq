@@ -37,7 +37,7 @@
       "assistant_args": ["--print", "--output-format", "stream-json", "--verbose",
                          "--include-partial-messages",
                          "--disallowedTools", "Bash Edit Write NotebookEdit WebFetch",
-                         "--permission-mode", "plan", "--strict-mcp-config"],
+                         "--allowedTools", "mcp__quodeq-assistant", "--strict-mcp-config"],
       "resume_style": "flag-resume",
       "session_id_source": "preassign"
     }

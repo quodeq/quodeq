@@ -7,9 +7,12 @@ def test_claude_chat_config():
     assert "--disallowedTools" in cfg.assistant_args
     # never the analysis bypass flag
     assert "bypassPermissions" not in cfg.assistant_args
-    assert "--permission-mode" in cfg.assistant_args
-    i = cfg.assistant_args.index("--permission-mode")
-    assert cfg.assistant_args[i + 1] == "plan"
+    # plan mode blocks all MCP tool calls; it must be gone
+    assert "--permission-mode" not in cfg.assistant_args
+    # the scoped read-only MCP server is auto-approved so its tools can run
+    assert "--allowedTools" in cfg.assistant_args
+    i = cfg.assistant_args.index("--allowedTools")
+    assert cfg.assistant_args[i + 1] == "mcp__quodeq-assistant"
     assert cfg.resume_style == "flag-resume"
     assert cfg.session_id_source == "preassign"
 
