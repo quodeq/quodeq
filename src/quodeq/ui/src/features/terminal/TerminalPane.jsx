@@ -64,10 +64,13 @@ export default function TerminalPane({ active }) {
 
     const setup = () => {
       if (disposed || termRef.current || !rootRef.current) return;
-      // Same --font-mono family + 12px as the violations code panel.
+      // A real terminal font (Menlo = macOS Terminal default, Monaco = iTerm's
+      // classic default), NOT the code-panel's JetBrains Mono. All system fonts
+      // — available synchronously, so xterm measures the cell correctly with no
+      // webfont race (JBM, a Google webfont, caused the extra-spacing bug).
       const term = new Terminal({
         scrollback: 5000,
-        fontFamily: 'var(--font-mono, monospace)',
+        fontFamily: 'Menlo, Monaco, "SF Mono", "SFMono-Regular", Consolas, "DejaVu Sans Mono", monospace',
         fontSize: 12,
         lineHeight: 1.5,
         cursorBlink: true,
@@ -92,18 +95,9 @@ export default function TerminalPane({ active }) {
       mo?.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     };
 
-    // JetBrains Mono is an async Google webfont (display=swap). xterm measures
-    // the character-cell width ONCE at open(); if that happens before the font
-    // loads it caches the fallback's cell, then JBM's glyphs render inside the
-    // wrong-width cells -> visible extra space between characters. Build the
-    // terminal only after the font is ready (falls back gracefully if it fails
-    // or the Font Loading API is absent, e.g. jsdom tests -> synchronous).
-    const fonts = typeof document !== 'undefined' ? document.fonts : null;
-    if (fonts && fonts.load) {
-      Promise.resolve(fonts.load('12px "JetBrains Mono"')).catch(() => {}).then(setup);
-    } else {
-      setup();
-    }
+    // System fonts are available synchronously, so there's no webfont-load race
+    // to wait for — build immediately.
+    setup();
 
     return () => {
       disposed = true;
