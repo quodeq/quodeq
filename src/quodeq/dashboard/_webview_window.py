@@ -140,7 +140,15 @@ class _WindowApi:
             _logger.warning("cancel-on-quit for job %s failed", job_id, exc_info=True)
 
     def open_browser(self, path: str = '/') -> None:
-        """Open a URL in the system default browser."""
+        """Open a dashboard path or an absolute web URL in the default browser.
+
+        Absolute http(s) URLs (e.g. the update banner's GitHub release link)
+        pass through untouched; anything else is treated as a path on the
+        local dashboard origin, which also neutralizes non-web schemes.
+        """
+        if path.startswith(('http://', 'https://')):
+            webbrowser.open(path)
+            return
         url = self._base_url + path if self._base_url else path
         webbrowser.open(url)
 
