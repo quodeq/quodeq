@@ -61,6 +61,15 @@ export function ChevronDownIcon() {
   );
 }
 
+export function GlobeIcon() {
+  return (
+    <svg width={ICON_SIZE} height={ICON_SIZE} viewBox={ICON_VIEWBOX} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+}
+
 export default function CopyButton({ onClick, label, className, icon, 'aria-label': ariaLabel }) {
   const [copied, setCopied] = useState(false);
 
