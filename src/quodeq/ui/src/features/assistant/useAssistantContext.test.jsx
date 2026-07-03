@@ -36,6 +36,22 @@ it('includes view for the model even with no run selected', () => {
   expect(ctx.uiState.currentOverviewRun).toBeUndefined();
 });
 
+it('binds currentOverviewRun as runId on the overview when no run is explicitly selected', () => {
+  const ctx = deriveAssistantContext(
+    { activeTab: 'overview', selectedProject: 'selectives', selectedRun: '', currentOverviewRun: 'r9', projects: [] },
+    { activeProvider: 'claude', model: 'sonnet' },
+  );
+  expect(ctx.runId).toBe('r9');
+});
+
+it('lets an explicitly selected run win over currentOverviewRun', () => {
+  const ctx = deriveAssistantContext(
+    { activeTab: 'overview', selectedProject: 'selectives', selectedRun: 'rX', currentOverviewRun: 'r9', projects: [] },
+    { activeProvider: 'claude', model: 'sonnet' },
+  );
+  expect(ctx.runId).toBe('rX');
+});
+
 it('handles no selection gracefully', () => {
   const ctx = deriveAssistantContext({ activeTab: 'projects', projects: [] }, { activeProvider: 'ollama' });
   expect(ctx.projectId).toBeUndefined();
