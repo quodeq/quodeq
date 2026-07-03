@@ -32,7 +32,15 @@
     "supports_turns": true,
     "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
     "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
-    "env_remove": ["CLAUDECODE"]
+    "env_remove": ["CLAUDECODE"],
+    "assistant": {
+      "assistant_args": ["--print", "--output-format", "stream-json", "--verbose",
+                         "--include-partial-messages",
+                         "--disallowedTools", "Bash Edit Write NotebookEdit WebFetch",
+                         "--allowedTools", "mcp__quodeq-assistant", "--strict-mcp-config"],
+      "resume_style": "flag-resume",
+      "session_id_source": "preassign"
+    }
   },
   "codex": {
     "type": "cli",
@@ -47,7 +55,12 @@
     "supports_turns": false,
     "mcp_permission_args": [],
     "env_set_if_missing": {},
-    "env_remove": []
+    "env_remove": [],
+    "assistant": {
+      "assistant_args": ["--json", "-s", "read-only", "-a", "never"],
+      "resume_style": "exec-resume",
+      "session_id_source": "parse-jsonl"
+    }
   },
   "gemini": {
     "type": "cli",
@@ -64,7 +77,13 @@
     "supports_budget": false,
     "supports_turns": false,
     "env_set_if_missing": {},
-    "env_remove": []
+    "env_remove": [],
+    "assistant": {
+      "assistant_args": ["--output-format", "stream-json", "--approval-mode", "plan",
+                         "--allowed-mcp-server-names", "quodeq-assistant"],
+      "resume_style": "gemini-resume",
+      "session_id_source": "preassign"
+    }
   },
   "openrouter": {
     "type": "api",

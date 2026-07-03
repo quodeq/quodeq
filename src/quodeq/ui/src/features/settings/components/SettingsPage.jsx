@@ -4,6 +4,7 @@ import AboutSection from './AboutSection.jsx';
 import AppearanceSection from './AppearanceSection.jsx';
 import UpdatesSection from './UpdatesSection.jsx';
 import ProviderTabs from './ProviderTabs.jsx';
+import AssistantProviderTabs from './AssistantProviderTabs.jsx';
 import ServerSection from './ServerSection.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
@@ -36,6 +37,7 @@ export default function SettingsPage({ theme, onOpenGradeFormula }) {
       />
       <div className="settings-grid">
         <ProviderTabs providerConfigs={providerConfigs} />
+        <AssistantProviderTabs providerConfigs={providerConfigs} />
         <ServerSection />
         <section className="panel settings-section">
           <div className="panel-header">

@@ -25,6 +25,10 @@ _ALLOWLIST: set[str] = {
     # os.killpg(os.getpgid(pid)) lives in the `else` of `if sys.platform ==
     # "win32"` (the win32 branch uses taskkill /F /T). POSIX-only by design.
     "analysis/_process.py:35",
+    # Same pattern: assistant CLI-turn process-group kill lives in the `else`
+    # of `if sys.platform == "win32"` (win32 uses taskkill /F /T), with a
+    # proc.kill() fallback. POSIX-only by design.
+    "assistant/adapters/_cli.py:47",
     # pgrep / ps are wrapped in `except (OSError, ...)` -> returns _UNKNOWN, so
     # on Windows (FileNotFoundError) resource sampling degrades gracefully.
     "shared/resource_sampler.py:41",

@@ -21,6 +21,7 @@ from quodeq.api.routes import (
     register_static_routes,
 )
 from quodeq.api.standards_routes import register_standards_routes
+from quodeq.api.assistant_routes import register_assistant_routes
 from quodeq.api.routes_findings import register_findings_routes
 from quodeq.api.llm_bridge_routes import register_llm_bridge_routes
 from quodeq.api.routes_rescore import register_rescore_routes
@@ -53,6 +54,7 @@ def register_all_routes(
     register_llamacpp_log_routes(app)
     register_discovery_routes(app, provider)
     register_standards_routes(app)
+    register_assistant_routes(app)
     register_findings_routes(app)
     register_rescore_routes(app)
     register_scores_routes(app)

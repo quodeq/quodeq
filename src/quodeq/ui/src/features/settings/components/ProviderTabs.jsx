@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { ACTIVE_PROVIDER_KEY, DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT_S } from '../../../constants.js';
+import { ACTIVE_PROVIDER_KEY, DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT_S, notifyProviderSettingsChanged } from '../../../constants.js';
 import useProviderSettings from '../hooks/useProviderSettings.js';
 import { classifyProvider } from './providerUtils.js';
 import OllamaTab from './OllamaTab.jsx';
@@ -132,6 +132,9 @@ export default function ProviderTabs({ providerConfigs }) {
   const selectTab = (id) => {
     setActiveTab(id);
     localStorage.setItem(ACTIVE_PROVIDER_KEY, id);
+    // The assistant's Default mode follows the analysis provider — tell it to
+    // re-read so its displayed provider/model updates live.
+    notifyProviderSettingsChanged();
   };
 
   const active = clients.find((c) => c.id === activeTab);

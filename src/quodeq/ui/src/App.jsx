@@ -33,6 +33,10 @@ import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
 import { syncNativeTitlebar } from './utils/nativeTitlebar.js';
 import { SidePane, useSidePane } from './features/side-pane/index.js';
+import { AssistantDrawer } from './features/assistant/AssistantDrawer.jsx';
+import { useAssistantDrawer } from './features/assistant/AssistantDrawerProvider.jsx';
+import { useAssistantProvider } from './features/settings/hooks/useAssistantProvider.js';
+import { deriveAssistantContext } from './features/assistant/useAssistantContext.js';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.jsx';
 import { ServerLogProvider } from './features/settings/server-log/ServerLogProvider.jsx';
@@ -406,7 +410,7 @@ function MainContent({ activePage, props }) {
  * @param {{ sidebar: JSX.Element, header: JSX.Element|null, content: JSX.Element }} props
  * @returns {JSX.Element}
  */
-function AppShell({ sidebar, header, content }) {
+function AppShell({ sidebar, header, content, drawer }) {
   return (
     <div className={`app-shell${header ? ' app-shell--with-topbar' : ''}`}>
       {header && <div className="app-shell__topbar">{header}</div>}
@@ -419,6 +423,7 @@ function AppShell({ sidebar, header, content }) {
           </main>
         </div>
         <SidePane />
+        {drawer}
       </div>
     </div>
   );
@@ -446,6 +451,25 @@ export default function App() {
   const autoOpenedRef = useRef(false);
 
   const { showToast } = useSidePane();
+
+  // Live assistant context: the pure derivation reuses the app-state object
+  // we already hold (calling useAssistantContext() would spin up a second
+  // useAppState and duplicate every dashboard query). The gate provides the
+  // active assistant provider/model.
+  const assistantGate = useAssistantProvider();
+  const assistantCtx = deriveAssistantContext(state, assistantGate);
+  const { isOpen: assistantOpen, startSession: startAssistantSession } = useAssistantDrawer();
+  const { provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId } = assistantCtx;
+  // Start (or re-start) the assistant session when the drawer is open and on
+  // any provider/model/project/run change while it stays open. startSession
+  // dedupes by context key, so re-runs with an unchanged context no-op; a
+  // real project/run switch produces a fresh session. We deliberately do NOT
+  // start a session while the drawer is closed — sends only originate from the
+  // open drawer, so first-open is early enough and avoids needless sessions.
+  useEffect(() => {
+    if (!assistantOpen) return;
+    startAssistantSession({ provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId });
+  }, [assistantOpen, asstProvider, asstModel, asstProjectId, asstRunId, startAssistantSession]);
 
   // Sync the client-side grade-label thresholds with the server formula at
   // boot so every gauge/badge agrees with the applied Q² parameters. The
@@ -617,6 +641,7 @@ export default function App() {
           <OllamaLogProvider>
             <LlamaCppLogProvider>
               <AppShell
+          drawer={<AssistantDrawer uiState={assistantCtx.uiState} />}
           sidebar={
             <Sidebar
               activeTab={activeTab}

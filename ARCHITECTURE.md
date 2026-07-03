@@ -8,7 +8,8 @@
 | `engine/` | Infrastructure and execution: pipeline orchestration, markers, runner utilities | core/, analysis/ |
 | `data/` | Data access: filesystem repositories, web API clients, report parsers | core/ |
 | `services/` | Business logic: dashboard, accumulated views, dismissals, standards CRUD | core/, data/ (via `services/ports.py`) |
-| `api/` | HTTP layer: Flask routes, security, rate limiting | core/, services/ |
+| `assistant/` | Embedded LLM assistant: sessions, tool registry, provider turn adapters, guard | core/, data/, services/, llm_bridge/ |
+| `api/` | HTTP layer: Flask routes, security, rate limiting | core/, services/, update/, assistant/ |
 | `analysis/` | Evaluation pipeline: AI orchestration, subagents, prompts, MCP | core/, engine/, data/, services/ |
 | `dashboard/` | Server/process management: build UI, start API, health checks | services/, api/ |
 | `shared/` | Cross-cutting utilities: config, logging, env helpers | None (stdlib only) |
@@ -21,7 +22,8 @@ core/          -> stdlib, core/ only
 engine/        -> stdlib, core/, analysis/
 data/          -> stdlib, core/
 services/      -> stdlib, core/, data/ (via services/ports.py)
-api/           -> stdlib, core/, services/
+assistant/     -> stdlib, core/, data/, services/, llm_bridge/
+api/           -> stdlib, core/, services/, update/, assistant/
 analysis/      -> stdlib, core/, engine/, data/, services/
 dashboard/     -> stdlib, services/, api/
 shared/        -> stdlib only
