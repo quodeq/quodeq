@@ -37,21 +37,35 @@ export default function TerminalPane({ active }) {
 
   const socketActive = active && checked && reason === null;
 
-  const { send, resize } = useTerminalSocket({
+  const { status, send, resize } = useTerminalSocket({
     active: socketActive,
     onData: (s) => termRef.current?.write(s),
   });
 
+  // The size must reach the PTY only once the socket is OPEN. The resize sent
+  // during mount is dropped (socket still connecting), which would leave the
+  // PTY at the backend's default 80x24 while xterm renders the real (smaller)
+  // drawer size — so full-screen TUIs like `claude`/`vim` draw off-screen and
+  // look clipped. Re-fit and re-sync when the socket opens (and on reconnect).
+  useEffect(() => {
+    if (status !== 'open' || !fitRef.current || !termRef.current) return;
+    try {
+      fitRef.current.fit();
+      resize(termRef.current.cols, termRef.current.rows);
+    } catch { /* noop */ }
+  }, [status, resize]);
+
   // Mount xterm once when we're allowed and active.
   useEffect(() => {
     if (!socketActive || termRef.current || !rootRef.current) return undefined;
-    // Match the violations code panel (.finding-context in evaluation.css):
-    // same --font-mono family, font-size 0.76rem (~12px), line-height 1.6.
+    // Same --font-mono family + 12px as the violations code panel, but a
+    // tighter iTerm-like line height (1.6 read too airy for a terminal; the
+    // xterm default 1.0 was too cramped).
     const term = new Terminal({
       scrollback: 5000,
       fontFamily: 'var(--font-mono, monospace)',
       fontSize: 12,
-      lineHeight: 1.6,
+      lineHeight: 1.2,
       cursorBlink: true,
       cursorStyle: 'bar',     // sleeker than the default square block
       theme: themeFromCss(),
