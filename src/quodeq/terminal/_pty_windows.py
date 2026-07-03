@@ -3,8 +3,16 @@ from __future__ import annotations
 
 import os
 import shutil
+import time
 
 from winpty import PtyProcess  # type: ignore[import-untyped]
+
+# When no output is buffered, pywinpty's read returns immediately with an empty
+# string. Sleep briefly on empty so the reader thread doesn't hot-spin the CPU
+# while an idle shell waits — mirrors the Unix backend's select() timeout, and
+# keeps the read promptly stoppable (the reader loop re-checks its stop flag
+# each cycle instead of parking).
+_EMPTY_READ_SLEEP_S = 0.05
 
 
 def resolve_shell(env: dict[str, str] | None = None) -> str:
@@ -32,9 +40,13 @@ class WindowsPty:
         if self._proc is None or not self._proc.isalive():
             return b""
         try:
-            return self._proc.read(max_bytes).encode("utf-8", "replace")
+            data = self._proc.read(max_bytes)
         except EOFError:
             return b""
+        if not data:
+            time.sleep(_EMPTY_READ_SLEEP_S)
+            return b""
+        return data.encode("utf-8", "replace")
 
     def write(self, data: bytes) -> None:
         if self._proc is not None:

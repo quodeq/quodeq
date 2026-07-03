@@ -7,10 +7,13 @@ export default function TerminalSection() {
   // Restart = kill the server shell, then signal the open terminal pane to
   // clear its screen and reconnect (the reconnect spawns a fresh PTY). Killing
   // first also handles the case where the terminal panel isn't currently open.
+  // Only dispatch on kill SUCCESS: on failure the server keeps the live PTY and
+  // a reconnect would reattach to the same shell — a fake restart — so we skip
+  // the clear+reconnect and surface the failure instead.
   const restart = () => {
-    killTerminal().catch(() => {}).finally(() => {
-      window.dispatchEvent(new Event('quodeq:terminal-restart'));
-    });
+    killTerminal()
+      .then(() => window.dispatchEvent(new Event('quodeq:terminal-restart')))
+      .catch((err) => { console.warn('Terminal restart: kill failed, not reconnecting', err); });
   };
   return (
     <section className="panel settings-section">

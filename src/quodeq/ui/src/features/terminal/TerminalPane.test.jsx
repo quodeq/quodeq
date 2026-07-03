@@ -27,6 +27,17 @@ it('mounts an xterm terminal when active', async () => {
   expect(fakeTerm.open).toHaveBeenCalled();
 });
 
+it('mounts xterm even when backgrounded (active=false) so the PTY survives a tab switch', async () => {
+  const { Terminal } = await import('@xterm/xterm');
+  Terminal.mockClear();
+  // active=false means "not the frontmost tab" — the panel is still open, so
+  // the terminal must still mount (lifecycle follows panel-open, not active).
+  render(<TerminalPane active={false} />);
+  await screen.findByTestId('tty-root');
+  expect(Terminal).toHaveBeenCalled();
+  expect(fakeTerm.open).toHaveBeenCalled();
+});
+
 it('shows the gate reason and does not mount xterm when disabled', async () => {
   const terminalApi = await import('../../api/terminal.js');
   terminalApi.terminalStatus.mockResolvedValueOnce({ enabled: false, running: false, reason: 'localhost only' });

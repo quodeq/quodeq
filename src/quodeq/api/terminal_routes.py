@@ -140,5 +140,11 @@ def register_terminal_routes(app: Flask, manager: TerminalManager | None = None)
                 pass
             finally:
                 stop.set()
+                # Join the reader BEFORE releasing the conn lock: a reader still
+                # draining the shared PTY when the next client acquires the lock
+                # would race the new reader (garbled/lost output). Both backends'
+                # read() is time-bounded (Unix select timeout, Windows empty-read
+                # sleep), so this returns promptly; bound it regardless.
+                reader.join(timeout=2)
         finally:
             _conn_lock.release()

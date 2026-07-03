@@ -11,6 +11,14 @@ function isReservedChord(e) {
   return e.code === 'Backquote' && (e.ctrlKey || e.metaKey);
 }
 
+// True when the element isn't laid out (display:none / zero-size). Fitting xterm
+// to a hidden box measures a 0x0 cell and drives the PTY to a bogus size, so the
+// shell floods the prompt with cursor-position queries ("14;3R…"). Every fit
+// path guards on this.
+function isHidden(el) {
+  return !el || el.offsetParent === null || el.clientWidth === 0 || el.clientHeight === 0;
+}
+
 function themeFromCss() {
   const s = getComputedStyle(document.documentElement);
   const v = (name, fb) => (s.getPropertyValue(name).trim() || fb);
@@ -48,10 +56,15 @@ export default function TerminalPane({ active }) {
     return () => window.removeEventListener('quodeq:terminal-restart', onRestart);
   }, []);
 
-  const socketActive = active && checked && reason === null;
+  // The socket + xterm live as long as the terminal PANEL is open — NOT only
+  // while it's the frontmost tab. Gating this on `active` would dispose the
+  // terminal and drop the PTY socket on every tab switch (a backgrounded pane
+  // is display:none, never unmounted), losing scrollback and the running shell.
+  // `active` is used ONLY to gate fitting (the fit effects below).
+  const paneLive = checked && reason === null;
 
   const { status, send, resize } = useTerminalSocket({
-    active: socketActive,
+    active: paneLive,
     restartKey,
     onData: (s) => termRef.current?.write(s),
   });
@@ -63,16 +76,17 @@ export default function TerminalPane({ active }) {
   // look clipped. Re-fit and re-sync when the socket opens (and on reconnect).
   useEffect(() => {
     const el = rootRef.current;
-    if (status !== 'open' || !fitRef.current || !termRef.current || !el || el.offsetParent === null) return;
+    if (status !== 'open' || !fitRef.current || !termRef.current || isHidden(el)) return;
     try {
       fitRef.current.fit();
       resize(termRef.current.cols, termRef.current.rows);
     } catch { /* noop */ }
   }, [status, resize]);
 
-  // Mount xterm once when we're allowed and active.
+  // Mount xterm once the terminal panel is live (open + enabled). It stays
+  // mounted across tab switches (the pane is only hidden, never unmounted).
   useEffect(() => {
-    if (!socketActive || termRef.current || !rootRef.current) return undefined;
+    if (!paneLive || termRef.current || !rootRef.current) return undefined;
     let disposed = false;
     let ro = null;
     let mo = null;
@@ -100,9 +114,13 @@ export default function TerminalPane({ active }) {
       term.open(rootRef.current);
       term.attachCustomKeyEventHandler((e) => !isReservedChord(e));
       term.onData((d) => send(d));
-      fit.fit();
-      resize(term.cols, term.rows);
       termRef.current = term; fitRef.current = fit;
+      // Fit only when visible. If the pane mounts on a hidden/background tab,
+      // fitting measures a 0x0 box (bogus PTY size); the status-open and
+      // tab-activation effects both fit once the pane is actually shown.
+      if (!isHidden(rootRef.current)) {
+        try { fit.fit(); resize(term.cols, term.rows); } catch { /* noop */ }
+      }
       // Debounce refits: during the sidebar-expand transition (and manual drag)
       // the container resizes every frame; refitting each frame thrashes xterm
       // and SIGWINCHes the PTY ~12x, so a running TUI redraws repeatedly and
@@ -112,12 +130,10 @@ export default function TerminalPane({ active }) {
         if (fitTimer) clearTimeout(fitTimer);
         fitTimer = setTimeout(() => {
           fitTimer = null;
-          // Never fit/resize while hidden. On an inactive tab / closed drawer
-          // the element is display:none (0x0); fitting to that drives the PTY
-          // to a bogus size, and the shell then floods the prompt with
-          // cursor-position query/replies (the "14;3R…" garbage).
-          const el = rootRef.current;
-          if (!el || el.offsetParent === null || el.clientWidth === 0 || el.clientHeight === 0) return;
+          // Never fit/resize while hidden (inactive tab / closed drawer): see
+          // isHidden — a 0x0 fit drives the PTY to a bogus size and the shell
+          // floods the prompt with cursor-position replies (the "14;3R…" garbage).
+          if (isHidden(rootRef.current)) return;
           try { fit.fit(); resize(term.cols, term.rows); } catch { /* noop */ }
         }, 150);
       };
@@ -139,14 +155,14 @@ export default function TerminalPane({ active }) {
       if (termRef.current) { termRef.current.dispose(); }
       termRef.current = null; fitRef.current = null;
     };
-  }, [socketActive, send, resize]);
+  }, [paneLive, send, resize]);
 
   // Refit + re-sync the PTY when the tab becomes active again (it was hidden,
   // where we deliberately skip fitting). Guard on visibility so a stray call
   // while still hidden can't resize to 0.
   useEffect(() => {
     const el = rootRef.current;
-    if (!active || !fitRef.current || !termRef.current || !el || el.offsetParent === null) return;
+    if (!active || !fitRef.current || !termRef.current || isHidden(el)) return;
     try { fitRef.current.fit(); resize(termRef.current.cols, termRef.current.rows); } catch { /* noop */ }
   }, [active, resize]);
 
