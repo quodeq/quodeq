@@ -13,7 +13,12 @@ from quodeq.shared._env import get_evaluations_dir
 
 _LOCAL_PROVIDERS = frozenset({"ollama", "llamacpp", "omlx"})
 _POLL_SECONDS = 0.25
-_IDLE_LIMIT = 240  # 240 * 0.25s = 60s without frames → close stream
+_IDLE_LIMIT = 2400  # 2400 * 0.25s = 600s safety cap for a turn that dies
+# without ever emitting a terminal done/error frame (e.g. a crashed daemon
+# thread). run_turn always writes done/error on completion, so event_frames
+# already terminates correctly then; this is just the outer guard for the
+# abnormal case, sized generously above the slowest legitimate turn (a
+# cold-loading local model or a CLI provider's ~500s read timeout).
 
 
 def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str | None]:

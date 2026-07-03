@@ -54,6 +54,7 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
       else if (frame.type === 'warning') { flushTokens(); append({ role: 'warning', message: frame.message }); }
       else if (frame.type === 'error') { flushTokens(); setError(frame.message || 'error'); finish(); }
       else if (frame.type === 'done') { finish(); }
+      else if (frame.type === 'heartbeat') { /* liveness only: resetInactivity() already ran above */ }
     };
     es.addEventListener('done', finish);
     es.onerror = () => { if (es.readyState === 2) { setStreaming(false); setError((p) => p || 'disconnected'); } };

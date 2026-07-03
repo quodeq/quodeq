@@ -131,11 +131,24 @@ def register_assistant_routes(app: Flask) -> None:
             after = 0
 
         def _generate():
+            # SSE comments (":keepalive") are invisible to EventSource — only
+            # DATA frames fire onmessage and reset the browser's inactivity
+            # timer. So on sustained idle (e.g. a slow local model still
+            # cold-loading) we must periodically emit a real heartbeat DATA
+            # frame, not just comments. Throttled to ~every 20th idle tick
+            # (20 * _POLL_SECONDS == ~5s) so we don't spam a data frame every
+            # 0.25s; cheap ":keepalive" comments fill the gaps in between.
             yield ":keepalive\n\n"
+            idle_ticks = 0
             for item in event_frames(repo, sid, after):
                 if item is None:
-                    yield ":keepalive\n\n"
+                    idle_ticks += 1
+                    if idle_ticks % 20 == 0:
+                        yield sse_line(json.dumps({"type": "heartbeat"}))
+                    else:
+                        yield ":keepalive\n\n"
                 else:
+                    idle_ticks = 0
                     seq, frame = item
                     yield sse_line(json.dumps(frame, ensure_ascii=False), event_id=seq)
 

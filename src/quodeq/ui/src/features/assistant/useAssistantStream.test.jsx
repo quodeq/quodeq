@@ -63,3 +63,34 @@ it('null sessionId opens no stream', () => {
   renderHook(() => useAssistantStream(null));
   expect(MockES.instances.length).toBe(0);
 });
+
+it('60s with no data frames at all times out (no heartbeat to save it)', () => {
+  const { result } = renderHook(() => useAssistantStream('s1'));
+  act(() => { vi.advanceTimersByTime(61000); });
+  expect(result.current.error).toBe('stream timed out');
+  expect(result.current.streaming).toBe(false);
+});
+
+it('a heartbeat data frame resets inactivity so a slow model does not time out', () => {
+  // Simulates a slow local model (e.g. a cold-loading ~26B ollama model)
+  // that produces no token/tool_call frames for a long stretch. The backend
+  // now emits a real {"type":"heartbeat"} DATA frame every ~5s, which fires
+  // EventSource's onmessage and resets the client's inactivity timer -
+  // unlike ":keepalive" SSE comments, which EventSource ignores entirely.
+  const { result } = renderHook(() => useAssistantStream('s1'));
+  const es = MockES.instances[0];
+
+  // ~40s of silence, then a heartbeat arrives - well before the 60s limit.
+  act(() => { vi.advanceTimersByTime(40000); });
+  act(() => { es.emit('message', { type: 'heartbeat' }); });
+
+  // Advance to ~90s total elapsed: without the heartbeat's reset at ~40s,
+  // this would exceed the 60s inactivity window and time out.
+  act(() => { vi.advanceTimersByTime(50000); });
+
+  expect(result.current.error).not.toBe('stream timed out');
+  expect(result.current.streaming).toBe(true);
+  // Heartbeats are liveness-only: they must never show up as a message.
+  expect(result.current.messages.some((m) => m.role === 'heartbeat')).toBe(false);
+  expect(result.current.messages.length).toBe(0);
+});
