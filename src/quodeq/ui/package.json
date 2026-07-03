@@ -9,7 +9,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "node --test 'src/**/!(terminal).test.js'",
+    "test": "node --test 'src/**/*.test.js'",
     "test:ui": "vitest run",
     "test:all": "npm run test && npm run test:ui",
     "build": "vite build",
