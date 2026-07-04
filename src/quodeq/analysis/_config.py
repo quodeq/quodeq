@@ -1,11 +1,11 @@
 """Analysis configuration dataclasses and type aliases."""
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
+from quodeq.shared._env import _env_int
 from quodeq.shared.constants import _DEFAULT_TIME_LIMIT
 
 if TYPE_CHECKING:
@@ -15,8 +15,8 @@ HeartbeatCallback = Callable[[int, dict], None]
 
 _DEFAULT_MAX_FILES_PER_AGENT = 30
 
-_DEFAULT_MAX_TURNS = int(os.environ.get("QUODEQ_DEFAULT_MAX_TURNS", "200"))
-_DEFAULT_MAX_DURATION = int(os.environ.get("QUODEQ_DEFAULT_MAX_DURATION", "1800"))  # 30 minutes
+_DEFAULT_MAX_TURNS = _env_int("QUODEQ_DEFAULT_MAX_TURNS", 200)
+_DEFAULT_MAX_DURATION = _env_int("QUODEQ_DEFAULT_MAX_DURATION", 1800)  # 30 minutes
 _MCP_TOOL_REPORT_FINDING = "mcp__findings__report_finding"
 _MCP_TOOL_GET_NEXT_FILES = "mcp__findings__get_next_files"
 _MCP_TOOL_MARK_FILE_DONE = "mcp__findings__mark_file_done"
