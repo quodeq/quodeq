@@ -52,6 +52,13 @@ it('the close (×) button closes only the active tab, not the whole drawer', () 
   expect(drawer.close).not.toHaveBeenCalled();
 });
 
+it('the model chip sits with the tabs on the left, not in the right controls', () => {
+  render(<BottomDrawer uiState={{}} />);
+  const chip = screen.getByTitle('Ollama · m');
+  expect(chip.closest('.assistant-drawer-controls')).toBeNull();
+  expect(chip.previousElementSibling).toHaveClass('drawer-tabs');
+});
+
 it('shows the web toggle for web-capable providers and toggles it', () => {
   render(<BottomDrawer uiState={{}} />);
   const globe = screen.getByRole('button', { name: /web access/i });
