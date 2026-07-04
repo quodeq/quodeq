@@ -325,3 +325,52 @@ test('computeOverallProgress: full scan aggregates with zero cached', () => {
   assert.equal(r.coveredFiles, 12);
   assert.equal(r.coveredPct, 20);
 });
+
+test('computeOverallProgress: covered files clamp to project total on overshoot', () => {
+  // filesCached/filesProjectTotal are frozen at estimate time while
+  // files.taken comes from the live queue — files changing on disk in
+  // between can push cached+taken past the frozen total. Never render
+  // "105 / 100".
+  const progress = {
+    projectFiles: 100,
+    dimensions: [
+      { id: 'security', state: 'running', files: { taken: 30, total: 30 },
+        filesCached: 80, filesProjectTotal: 100 },
+    ],
+  };
+  const r = computeOverallProgress(progress);
+  assert.equal(r.coveredFiles, 100);
+  assert.equal(r.coveredPct, 100);
+});
+
+test('computeOverallProgress: completed incremental run reads full coverage', () => {
+  const progress = {
+    projectFiles: 100,
+    dimensions: [
+      { id: 'security', state: 'done', files: { taken: 20, total: 20 },
+        filesCached: 80, filesProjectTotal: 100 },
+    ],
+  };
+  const r = computeOverallProgress(progress);
+  assert.equal(r.coveredFiles, 100);
+  assert.equal(r.coveredPct, 100);
+});
+
+test('computeOverallProgress: fully-cached re-scan keeps coverage despite empty queues', () => {
+  // Nothing changed since the last run: every dim is done with a zero
+  // queue. The run-relative sum is empty, but coverage data is still
+  // present — the whole project is covered by cache.
+  const progress = {
+    projectFiles: 100,
+    dimensions: [
+      { id: 'security', state: 'done', files: { taken: 0, total: 0 },
+        filesCached: 100, filesProjectTotal: 100 },
+    ],
+  };
+  const r = computeOverallProgress(progress);
+  assert.equal(r.totalFiles, 0);
+  assert.equal(r.projectTotal, 100);
+  assert.equal(r.cachedFiles, 100);
+  assert.equal(r.coveredFiles, 100);
+  assert.equal(r.coveredPct, 100);
+});

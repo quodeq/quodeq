@@ -80,7 +80,9 @@ export function computeOverallProgress(progress) {
     ? {
         projectTotal,
         cachedFiles,
-        coveredFiles: cachedFiles + takenFiles,
+        // Estimate-time totals vs live queue counts can drift when files
+        // change on disk mid-run; clamp so we never render "105 / 100".
+        coveredFiles: Math.min(cachedFiles + takenFiles, projectTotal),
         coveredPct: pct(cachedFiles + takenFiles, projectTotal),
       }
     : NO_COVERAGE;
