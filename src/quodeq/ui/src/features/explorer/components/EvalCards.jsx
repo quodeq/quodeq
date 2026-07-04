@@ -6,7 +6,7 @@ import ContextBlock from '../../../components/ContextBlock.jsx';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import usePretextHeight from '../../../hooks/usePretextHeight.js';
 import { useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
-import { useVerifiedFindings } from '../../violations/components/verifiedFindingsContext.jsx';
+import { VerifiedChip } from '../../violations/components/VerifiedChip.jsx';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
@@ -83,9 +83,6 @@ function ViolationDetail({ item }) {
 export function EvalViolationCard({ v, principle, index, onDismiss }) {
   const { addWindow } = useSidePane();
   const { filename, ref, display } = useFileInfo(v.file, v.line, v.endLine);
-  const verifiedCtx = useVerifiedFindings();
-  const verifiedKey = `${v.req || ''}|${v.file || ''}|${v.line || 0}`;
-  const isVerified = Boolean(verifiedCtx?.keys?.has(verifiedKey));
   return (
     <div
       className={`vdetail-row vdetail-row--terminal vdetail-row--${v.severity}`}
@@ -93,16 +90,7 @@ export function EvalViolationCard({ v, principle, index, onDismiss }) {
     >
       <div className="vdetail-row-main">
         <SevBadge level={v.severity} format="long" />
-        {isVerified && (
-          <button
-            type="button"
-            className="verified-chip"
-            title={`${verifiedCtx.noteFor(verifiedKey) || 'Verified by the assistant'}. Click to remove the badge.`}
-            onClick={(e) => { e.stopPropagation(); verifiedCtx.unverify(v); }}
-          >
-            verified
-          </button>
-        )}
+        <VerifiedChip v={v} />
         <span className="vrow-label">[{v.principle || principle}]</span>
         {filename && <FileCopyBtn display={display} copyText={ref} />}
         <button
