@@ -83,3 +83,11 @@ it('slash-prefixed skill names still go to the server', () => {
   fireEvent.keyDown(input, { key: 'Enter' });
   expect(state.sendMessage).toHaveBeenCalledWith('/explain-score security', { view: 'overview' });
 });
+
+it('shows the welcome panel when the transcript is empty', () => {
+  const prev = state.messages;
+  state.messages = [];
+  render(<AssistantPane uiState={{ view: 'overview' }} />);
+  expect(screen.getByText(/explain scores/i)).toBeInTheDocument();
+  state.messages = prev;
+});
