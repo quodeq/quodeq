@@ -39,12 +39,7 @@ _NON_TEXT_OPEN = (
 
 # Sites that legitimately cannot pin encoding (document the reason).
 # Format: "src-relative/path.py:LINE"
-_ALLOWLIST: set[str] = {
-    # write_text() opener on its own line; encoding="utf-8" is passed on the
-    # following continuation line. The call IS UTF-8-safe; the line-based
-    # scanner just can't see a kwarg that lives on a different physical line.
-    "analysis/_dim_estimates.py:70",
-}
+_ALLOWLIST: set[str] = set()
 
 
 def _offenders() -> list[str]:

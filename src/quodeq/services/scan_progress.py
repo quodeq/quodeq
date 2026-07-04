@@ -6,7 +6,7 @@ the in-memory JobManager state.
 
 Sources:
 - ``status.json``                 — phase, current_dimension, started_at, dimensions
-- ``dim_estimates.json``          — per-dim file count predicted before any dim runs
+- ``dim_estimates.json``          — per-dim file count predicted before any dim runs, plus total/cached coverage
 - ``scan.json``                   — total_files (project-wide fallback for pending dims)
 - ``<dim>_queue.json``            — taken / pending counts (precise once dim has started)
 - ``<dim>_evidence.jsonl``        — unique violation / compliance / duplicate counts (in-memory dedup)
@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.analysis.subagents.jsonl_utils import tally_unique_findings
+from quodeq.shared.dim_estimates_io import read_dim_estimates
 from quodeq.shared.dimensions_state import read_dimensions
 
 _AGENT_ACTIVE_WINDOW_S = 30
@@ -39,6 +40,8 @@ class _DimProgress:
     active_agents: int = 0
     estimate_reason: str | None = None  # see _dim_estimates module docstring
     exit_reason: str | None = None
+    files_cached: int | None = None        # files already analyzed in previous runs
+    files_project_total: int | None = None  # all source files for this dim
 
 
 @dataclass
@@ -67,23 +70,6 @@ def _project_total_files(run_dir: Path) -> int:
         return 0
     raw = scan.get("total_files")
     return int(raw) if isinstance(raw, int) else 0
-
-
-def _read_dim_estimates(run_dir: Path) -> dict[str, dict]:
-    """Per-dim file estimates written before any dim ran. Returns {} when absent.
-
-    Each value is ``{"count": int, "reason": str}`` (see _dim_estimates module).
-    """
-    raw = _read_json(run_dir / "dim_estimates.json") or {}
-    if not isinstance(raw, dict):
-        return {}
-    out: dict[str, dict] = {}
-    for k, v in raw.items():
-        if isinstance(v, dict) and isinstance(v.get("count"), int):
-            out[k] = {"count": v["count"], "reason": str(v.get("reason", ""))}
-        elif isinstance(v, int):
-            out[k] = {"count": v, "reason": ""}
-    return out
 
 
 def _active_agents(evidence_dir: Path, dim_id: str) -> int:
@@ -214,7 +200,7 @@ def build_scan_progress(
         total_elapsed_s = None
 
     project_files = _project_total_files(run_dir)
-    dim_estimates = _read_dim_estimates(run_dir)
+    dim_estimates = read_dim_estimates(run_dir)
     dim_records = read_dimensions(run_dir).get("dimensions") or {}
     dim_ids = list(status.get("dimensions") or [])
     if not dim_ids:
@@ -270,6 +256,8 @@ def build_scan_progress(
 
         estimate_meta = dim_estimates.get(dim_id)
         estimate_reason = estimate_meta["reason"] if estimate_meta else None
+        files_cached = estimate_meta["cached"] if estimate_meta else None
+        files_project_total = estimate_meta["total"] if estimate_meta else None
 
         tally = tally_unique_findings(evidence_dir / f"{dim_id}_evidence.jsonl")
         elapsed = _dim_elapsed_s(dim_id, run_dir, d_state)
@@ -288,6 +276,8 @@ def build_scan_progress(
             active_agents=active,
             estimate_reason=estimate_reason,
             exit_reason=exit_reason,
+            files_cached=files_cached,
+            files_project_total=files_project_total,
         ))
 
     return _ScanProgress(

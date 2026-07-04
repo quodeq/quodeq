@@ -54,25 +54,50 @@ def _build_req_to_principle_map(dimension: str, evaluators_dir: Path | None = No
         return {}
 
 
+def _resolve_req_to_principle_map(
+    dimension: str,
+    evaluators_dir: Path | None = None,
+    compiled_dir: Path | None = None,
+) -> dict[str, str]:
+    """Resolve the requirement-to-principle map for *dimension*.
+
+    A custom evaluator standard (evaluators_dir) is authoritative when it
+    defines the dimension; otherwise fall back to the compiled built-in
+    standard (compiled_dir). On real installs the evaluators dir exists but
+    is empty for built-in dimensions, so without the fallback the map is
+    empty and standard-validation callers silently go permissive.
+    """
+    mapping = _build_req_to_principle_map(dimension, evaluators_dir)
+    if not mapping:
+        mapping = _build_req_to_principle_map(dimension, compiled_dir)
+    return mapping
+
+
 def principle_names_for_dimension(
     dimension: str, evaluators_dir: Path | None = None,
+    compiled_dir: Path | None = None,
 ) -> set[str]:
     """Return the principle names defined by *dimension*'s standard.
 
-    Empty when the standard is unavailable, so callers stay permissive (no
-    standard to validate against) rather than dropping everything. The
-    *evaluators_dir* must be supplied by the caller; the core layer does not
-    resolve paths itself.
+    Empty when no standard is available from either source, so callers stay
+    permissive (no standard to validate against) rather than dropping
+    everything. The directories must be supplied by the caller; the core
+    layer does not resolve paths itself.
     """
-    return {p for p in _build_req_to_principle_map(dimension, evaluators_dir).values() if p}
+    mapping = _resolve_req_to_principle_map(dimension, evaluators_dir, compiled_dir)
+    return {p for p in mapping.values() if p}
 
 
 def _group_judgments(
     judgments: list[Judgment],
     dimension: str = "",
     evaluators_dir: Path | None = None,
+    compiled_dir: Path | None = None,
 ) -> _GroupedJudgments:
-    req_to_principle = _build_req_to_principle_map(dimension, evaluators_dir) if dimension else {}
+    req_to_principle = (
+        _resolve_req_to_principle_map(dimension, evaluators_dir, compiled_dir)
+        if dimension else {}
+    )
     canonical = {p for p in req_to_principle.values() if p}
     sc_violations: dict[str, list[Judgment]] = {}
     sc_compliance: dict[str, list[Judgment]] = {}
