@@ -168,6 +168,8 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   const showCoverage = projectTotal > 0 && cachedFiles > 0;
   // coveredFiles is clamped to projectTotal upstream, so these widths can
   // never sum past 100 even when live queue counts drift from the estimate.
+  // cachedPctWidth alone also can't exceed 100: the producer (_dim_estimates.py)
+  // guarantees per-dim cached <= total, so summed cachedFiles <= projectTotal.
   const cachedPctWidth = showCoverage ? (cachedFiles / projectTotal) * 100 : 0;
   const runPctWidth = showCoverage ? ((coveredFiles - cachedFiles) / projectTotal) * 100 : 0;
   const inlineLabel = progress?.currentDimension
@@ -218,7 +220,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
           <div className="scan-progress__meta">
             <span>
               {showCoverage ? (
-                <><strong>{coveredFiles} / {projectTotal}</strong> files · {coveredPct}% total · this run {takenFiles} / {totalFiles}</>
+                <><strong>{coveredFiles} / {projectTotal}</strong> files · {coveredPct}% total{totalFiles > 0 ? <> · this run {takenFiles} / {totalFiles}</> : <> · nothing new this run</>}</>
               ) : totalFiles > 0 ? (
                 <><strong>{takenFiles} / {totalFiles}</strong> checks · {overallPct}%</>
               ) : <strong>preparing…</strong>}

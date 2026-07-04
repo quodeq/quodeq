@@ -142,6 +142,8 @@ describe('ScanProgress total coverage (incremental runs)', () => {
     expect(cached.style.width).toBe('80%');
     const fills = container.querySelectorAll('.scan-progress__bar-wrap .scan-progress__bar-fill:not(.scan-progress__bar-fill--cached)');
     expect(fills[0].style.width).toBe('8%');
+    expect(container.querySelector('.scan-progress__bar-wrap .scan-progress__bar'))
+      .toHaveAttribute('title', '80 files analyzed in previous runs');
   });
 
   it('collapses to the run-only display when there is no cached portion', async () => {
@@ -158,6 +160,8 @@ describe('ScanProgress total coverage (incremental runs)', () => {
     expect(screen.getByText(/checks · 20%/)).toBeInTheDocument();
     expect(screen.queryByText(/this run/)).toBeNull();
     expect(container.querySelector('.scan-progress__bar-fill--cached')).toBeNull();
+    expect(container.querySelector('.scan-progress__bar-wrap .scan-progress__bar'))
+      .not.toHaveAttribute('title');
   });
 
   it('collapses to the run-only display on legacy payloads without coverage fields', async () => {
@@ -186,6 +190,8 @@ describe('ScanProgress total coverage (incremental runs)', () => {
     withEvalLog(<ScanProgress job={baseJob} />, ctx);
     expect(await screen.findByText('100 / 100')).toBeInTheDocument();
     expect(screen.getByText(/100% total/)).toBeInTheDocument();
+    expect(screen.getByText(/nothing new this run/)).toBeInTheDocument();
+    expect(screen.queryByText(/this run 0 \/ 0/)).toBeNull();
     expect(screen.queryByText('preparing…')).toBeNull();
   });
 });
