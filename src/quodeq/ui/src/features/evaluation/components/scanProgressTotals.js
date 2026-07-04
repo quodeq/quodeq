@@ -11,6 +11,10 @@
  * rather than printing a misleading partial sum. This covers the brief
  * window between status.json (state=running) and dim_estimates.json
  * landing on disk.
+ *
+ * The header additionally sums whole-project coverage (`filesCached` /
+ * `filesProjectTotal` per dim) when every dim carries it; otherwise the
+ * coverage fields are null and the UI falls back to the run-only display.
  */
 
 export function pct(taken, total) {
@@ -33,10 +37,12 @@ export function dimFileEstimate(progress) {
   return progress?.projectFiles ?? 0;
 }
 
+const NO_COVERAGE = { projectTotal: null, cachedFiles: null, coveredFiles: null, coveredPct: null };
+
 export function computeOverallProgress(progress) {
   const dims = progress?.dimensions || [];
   if (dims.length === 0) {
-    return { totalFiles: 0, takenFiles: 0, overallPct: 0 };
+    return { totalFiles: 0, takenFiles: 0, overallPct: 0, ...NO_COVERAGE };
   }
 
   // "preparing…" only when *nothing* is known yet — i.e. no dim has
@@ -46,7 +52,7 @@ export function computeOverallProgress(progress) {
   const anyDimStarted = dims.some((d) => d?.state === 'running' || d?.state === 'done');
   const anyTotalKnown = dims.some((d) => (d?.files?.total ?? 0) > 0);
   if (!anyDimStarted && !anyTotalKnown) {
-    return { totalFiles: 0, takenFiles: 0, overallPct: 0 };
+    return { totalFiles: 0, takenFiles: 0, overallPct: 0, ...NO_COVERAGE };
   }
 
   // Sum across dims using whatever total each one carries. Pending dims
@@ -54,10 +60,30 @@ export function computeOverallProgress(progress) {
   // header sum once their estimate or queue lands.
   let takenFiles = 0;
   let totalFiles = 0;
+  // Whole-project coverage (incremental runs): every dim must carry the
+  // fields — a single legacy dim would make the sum lie, so it nulls out.
+  let hasCoverage = true;
+  let cachedFiles = 0;
+  let projectTotal = 0;
   for (const d of dims) {
     takenFiles += d?.files?.taken ?? 0;
     totalFiles += d?.files?.total ?? 0;
+    if (Number.isFinite(d?.filesCached) && Number.isFinite(d?.filesProjectTotal)) {
+      cachedFiles += d.filesCached;
+      projectTotal += d.filesProjectTotal;
+    } else {
+      hasCoverage = false;
+    }
   }
 
-  return { totalFiles, takenFiles, overallPct: pct(takenFiles, totalFiles) };
+  const coverage = hasCoverage
+    ? {
+        projectTotal,
+        cachedFiles,
+        coveredFiles: cachedFiles + takenFiles,
+        coveredPct: pct(cachedFiles + takenFiles, projectTotal),
+      }
+    : NO_COVERAGE;
+
+  return { totalFiles, takenFiles, overallPct: pct(takenFiles, totalFiles), ...coverage };
 }

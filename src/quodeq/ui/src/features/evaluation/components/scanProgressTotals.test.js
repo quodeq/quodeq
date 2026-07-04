@@ -65,7 +65,10 @@ test('dimFileEstimate: returns 0 when nothing is known', () => {
 
 test('computeOverallProgress: returns zeros when progress is null', () => {
   const r = computeOverallProgress(null);
-  assert.deepEqual(r, { totalFiles: 0, takenFiles: 0, overallPct: 0 });
+  assert.deepEqual(r, {
+    totalFiles: 0, takenFiles: 0, overallPct: 0,
+    projectTotal: null, cachedFiles: null, coveredFiles: null, coveredPct: null,
+  });
 });
 
 test('computeOverallProgress: returns zeros when dimensions array is empty', () => {
@@ -263,4 +266,62 @@ test('computeOverallProgress: completed run with no pending dims still sums', ()
   assert.equal(r.totalFiles, 50);
   assert.equal(r.takenFiles, 50);
   assert.equal(r.overallPct, 100);
+});
+
+// ---------------------------------------------------------------------------
+// computeOverallProgress — total project coverage (incremental runs)
+// ---------------------------------------------------------------------------
+
+test('computeOverallProgress: aggregates coverage when all dims carry the fields', () => {
+  // 100-file project per dim, 80 cached, this run 20; 8 taken so far.
+  const progress = {
+    projectFiles: 100,
+    dimensions: [
+      { id: 'security',    state: 'running', files: { taken: 8, total: 20 },
+        filesCached: 80, filesProjectTotal: 100 },
+      { id: 'reliability', state: 'pending', files: { taken: 0, total: 10 },
+        filesCached: 90, filesProjectTotal: 100 },
+    ],
+  };
+  const r = computeOverallProgress(progress);
+  assert.equal(r.totalFiles, 30);
+  assert.equal(r.takenFiles, 8);
+  assert.equal(r.projectTotal, 200);
+  assert.equal(r.cachedFiles, 170);
+  assert.equal(r.coveredFiles, 178);
+  assert.equal(r.coveredPct, pct(178, 200));
+});
+
+test('computeOverallProgress: coverage is null when any dim lacks the fields (legacy run)', () => {
+  const progress = {
+    projectFiles: 100,
+    dimensions: [
+      { id: 'security',    state: 'running', files: { taken: 8, total: 20 },
+        filesCached: 80, filesProjectTotal: 100 },
+      { id: 'reliability', state: 'pending', files: { taken: 0, total: 10 } },
+    ],
+  };
+  const r = computeOverallProgress(progress);
+  assert.equal(r.projectTotal, null);
+  assert.equal(r.cachedFiles, null);
+  assert.equal(r.coveredFiles, null);
+  assert.equal(r.coveredPct, null);
+  // Run-relative aggregation untouched.
+  assert.equal(r.totalFiles, 30);
+  assert.equal(r.takenFiles, 8);
+});
+
+test('computeOverallProgress: full scan aggregates with zero cached', () => {
+  const progress = {
+    projectFiles: 60,
+    dimensions: [
+      { id: 'security', state: 'running', files: { taken: 12, total: 60 },
+        filesCached: 0, filesProjectTotal: 60 },
+    ],
+  };
+  const r = computeOverallProgress(progress);
+  assert.equal(r.projectTotal, 60);
+  assert.equal(r.cachedFiles, 0);
+  assert.equal(r.coveredFiles, 12);
+  assert.equal(r.coveredPct, 20);
 });
