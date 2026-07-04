@@ -13,6 +13,11 @@ counts that aren't really "this much code" but the cache being cold:
   - "diff"        — diff filter active; estimate = filter intersection
   - "incremental" — incremental run; estimate = cache-miss count
   - "first-run"   — cold cache for this dim; everything is a miss
+
+Each estimate also carries ``total`` (all source files for the dim) and
+``cached`` (files already analyzed in previous runs) so the dashboard can
+render total project coverage, not just this run's queue. Non-incremental
+modes set ``total = count`` and ``cached = 0``.
 """
 from __future__ import annotations
 
@@ -32,9 +37,10 @@ def compute_dim_estimates(
 ) -> dict[str, dict[str, Any]]:
     """Estimate per-dim file count + reason, before any dim runs.
 
-    Returns ``{dim_id: {"count": int, "reason": str}}``. The estimate is
-    the number of cache misses per dimension — exactly what V2 will
-    dispatch on this run.
+    Returns ``{dim_id: {"count": int, "reason": str, "total": int, "cached": int}}``.
+    ``count`` is the number of cache misses per dimension — exactly what V2
+    will dispatch on this run. ``total`` and ``cached`` describe overall
+    project coverage (see module docstring).
     """
     estimates: dict[str, dict[str, Any]] = {}
     file_filter = config.options.incremental_file_filter
@@ -42,7 +48,7 @@ def compute_dim_estimates(
     for dim_id in dimensions:
         files, _ext = _list_source_files(config, dim_id, ignore_file_filter=True)
         if not files:
-            estimates[dim_id] = {"count": 0, "reason": "empty"}
+            estimates[dim_id] = {"count": 0, "reason": "empty", "total": 0, "cached": 0}
             continue
         if config.options.incremental:
             classify = classify_files_via_cache(config, dim_id, files, cache)
@@ -52,12 +58,15 @@ def compute_dim_estimates(
                 reason = "first-run"
             else:
                 reason = "incremental"
-            estimates[dim_id] = {"count": miss_count, "reason": reason}
+            estimates[dim_id] = {
+                "count": miss_count, "reason": reason,
+                "total": len(files), "cached": len(files) - miss_count,
+            }
         elif file_filter is not None:
             count = sum(1 for f in files if f in file_filter)
-            estimates[dim_id] = {"count": count, "reason": "diff"}
+            estimates[dim_id] = {"count": count, "reason": "diff", "total": count, "cached": 0}
         else:
-            estimates[dim_id] = {"count": len(files), "reason": "full"}
+            estimates[dim_id] = {"count": len(files), "reason": "full", "total": len(files), "cached": 0}
     return estimates
 
 
@@ -77,7 +86,8 @@ def write_dim_estimates(
 def read_dim_estimates(run_dir: Path) -> dict[str, dict[str, Any]]:
     """Return per-dim estimates from disk, or {} if missing/corrupt.
 
-    Each value is normalised to ``{"count": int, "reason": str}``.
+    Each value is normalised to
+    ``{"count": int, "reason": str, "total": int, "cached": int}``.
     """
     path = run_dir / DIM_ESTIMATES_FILENAME
     try:
@@ -92,10 +102,16 @@ def read_dim_estimates(run_dir: Path) -> dict[str, dict[str, Any]]:
         return {}
     out: dict[str, dict[str, Any]] = {}
     for k, v in data.items():
-        # Current format: {"count": int, "reason": str}.
+        # Current format: {"count": int, "reason": str, "total": int, "cached": int}.
         if isinstance(v, dict) and isinstance(v.get("count"), int):
-            out[k] = {"count": v["count"], "reason": str(v.get("reason", ""))}
+            count = v["count"]
+            out[k] = {
+                "count": count,
+                "reason": str(v.get("reason", "")),
+                "total": v["total"] if isinstance(v.get("total"), int) else count,
+                "cached": v["cached"] if isinstance(v.get("cached"), int) else 0,
+            }
         # Legacy format: a bare int. Older runs predate the reason tag.
         elif isinstance(v, int):
-            out[k] = {"count": v, "reason": ""}
+            out[k] = {"count": v, "reason": "", "total": v, "cached": 0}
     return out

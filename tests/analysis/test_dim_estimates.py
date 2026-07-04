@@ -64,7 +64,7 @@ class TestComputeDimEstimates:
         config = _make_config(src, ["a.py", "b.py", "c.py"], incremental=False)
 
         result = compute_dim_estimates(config, ["security"])
-        assert result["security"] == {"count": 3, "reason": "full"}
+        assert result["security"] == {"count": 3, "reason": "full", "total": 3, "cached": 0}
 
     def test_diff_mode_intersects_filter(self, tmp_path: Path):
         src = tmp_path / "src"
@@ -75,7 +75,7 @@ class TestComputeDimEstimates:
         )
 
         result = compute_dim_estimates(config, ["security"])
-        assert result["security"] == {"count": 2, "reason": "diff"}
+        assert result["security"] == {"count": 2, "reason": "diff", "total": 2, "cached": 0}
 
     def test_empty_dim_returns_zero_with_empty_reason(self, tmp_path: Path):
         src = tmp_path / "src"
@@ -85,6 +85,8 @@ class TestComputeDimEstimates:
         result = compute_dim_estimates(config, ["security"])
         assert result["security"]["count"] == 0
         assert result["security"]["reason"] == "empty"
+        assert result["security"]["total"] == 0
+        assert result["security"]["cached"] == 0
 
     def test_incremental_first_run_all_misses(self, tmp_path: Path):
         src = tmp_path / "src"
@@ -96,7 +98,7 @@ class TestComputeDimEstimates:
             return_value=LocalFileBackend(root=tmp_path / "fresh-cache"),
         ):
             result = compute_dim_estimates(config, ["security"])
-        assert result["security"] == {"count": 2, "reason": "first-run"}
+        assert result["security"] == {"count": 2, "reason": "first-run", "total": 2, "cached": 0}
 
     def test_incremental_partial_cache_marks_incremental(self, tmp_path: Path):
         src = tmp_path / "src"
@@ -110,7 +112,7 @@ class TestComputeDimEstimates:
             return_value=cache,
         ):
             result = compute_dim_estimates(config, ["security"])
-        assert result["security"] == {"count": 1, "reason": "incremental"}
+        assert result["security"] == {"count": 1, "reason": "incremental", "total": 3, "cached": 2}
 
     def test_incremental_full_cache_returns_zero(self, tmp_path: Path):
         src = tmp_path / "src"
@@ -126,14 +128,16 @@ class TestComputeDimEstimates:
             result = compute_dim_estimates(config, ["security"])
         assert result["security"]["count"] == 0
         assert result["security"]["reason"] == "incremental"
+        assert result["security"]["total"] == 1
+        assert result["security"]["cached"] == 1
 
 
 class TestPersistence:
     def test_write_and_read_round_trip(self, tmp_path: Path):
         run_dir = tmp_path / "run"
         estimates = {
-            "security": {"count": 3, "reason": "incremental"},
-            "reliability": {"count": 0, "reason": "empty"},
+            "security": {"count": 3, "reason": "incremental", "total": 10, "cached": 7},
+            "reliability": {"count": 0, "reason": "empty", "total": 0, "cached": 0},
         }
         write_dim_estimates(run_dir, estimates)
         loaded = read_dim_estimates(run_dir)
@@ -153,7 +157,18 @@ class TestPersistence:
         run_dir.mkdir()
         (run_dir / DIM_ESTIMATES_FILENAME).write_text(json.dumps({"security": 5}))
         loaded = read_dim_estimates(run_dir)
-        assert loaded == {"security": {"count": 5, "reason": ""}}
+        assert loaded == {"security": {"count": 5, "reason": "", "total": 5, "cached": 0}}
+
+    def test_read_legacy_dict_without_coverage_fields_normalises(self, tmp_path: Path):
+        # Runs from before the total/cached fields: total falls back to count,
+        # cached to 0 — the UI then has no cached segment to draw.
+        run_dir = tmp_path / "run"
+        run_dir.mkdir()
+        (run_dir / DIM_ESTIMATES_FILENAME).write_text(
+            json.dumps({"security": {"count": 5, "reason": "incremental"}})
+        )
+        loaded = read_dim_estimates(run_dir)
+        assert loaded == {"security": {"count": 5, "reason": "incremental", "total": 5, "cached": 0}}
 
 
 class TestFreshRunSafety:
