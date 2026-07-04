@@ -444,13 +444,21 @@ export default function App() {
   // fetched once on mount.
   const [dismissRefreshKey, setDismissRefreshKey] = useState(0);
   const bumpDismissRefresh = () => setDismissRefreshKey((k) => k + 1);
+  const { refreshDashboard: refreshDashboardForApply } = state;
   useEffect(() => {
     const handler = (event) => {
-      if (event.detail?.actionType === 'dismiss_finding') bumpDismissRefresh();
+      if (event.detail?.actionType === 'dismiss_finding') {
+        bumpDismissRefresh();
+        // Assistant-applied dismissals mutate the same payloads manual ones
+        // do; invalidate the project queries so frozen run views (staleTime
+        // Infinity) refetch on their next mount instead of showing the
+        // pre-dismiss counts forever.
+        refreshDashboardForApply?.();
+      }
     };
     window.addEventListener('quodeq:assistant-action-applied', handler);
     return () => window.removeEventListener('quodeq:assistant-action-applied', handler);
-  }, []);
+  }, [refreshDashboardForApply]);
   // Auto-open is a once-per-session decision. Without this guard, closing the
   // wizard sets wizardEntry → null, which re-fires this effect and re-opens
   // the wizard immediately because projects.length is still 0. The user's

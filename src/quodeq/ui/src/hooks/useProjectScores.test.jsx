@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
+import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useProjectScores } from "./useProjectScores";
 import { withQueryClient } from "../test-utils/withQueryClient.jsx";
 import { getProjectScores } from "../api/index.js";
+import { projectKeys } from "../api/queryKeys.js";
 
 vi.mock("../api/index.js", () => ({
   getProjectScores: vi.fn(async (project, asOf) => {
@@ -121,6 +124,32 @@ describe("useProjectScores", () => {
     });
     const asOfArgs = getProjectScores.mock.calls.map((c) => c[1]);
     expect(asOfArgs).toContain("r_old");
+  });
+
+  // As-of scores for a completed run are immutable apart from explicit
+  // mutations (which invalidate the project subtree), so a cached entry
+  // must be served without a background refetch — no dim flash on re-entry.
+  it("serves cached as-of scores for a completed run without refetching", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 60_000 } },
+    });
+    client.setQueryData(
+      projectKeys.scores("p1", null),
+      { accumulated: { score: 90 }, trend: [], availableRuns: [{ runId: "r1", status: "complete" }] },
+      { updatedAt: Date.now() },
+    );
+    client.setQueryData(
+      projectKeys.scores("p1", "r1"),
+      { accumulated: { score: 80 }, trend: [] },
+      { updatedAt: Date.now() - 120_000 }, // well past the old 60s staleTime
+    );
+    const { result } = renderHook(
+      () => useProjectScores({ selectedProject: "p1", selectedRun: "r1", keepPlaceholder: false }),
+      { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> },
+    );
+    await waitFor(() => expect(result.current.scores?.accumulated?.score).toBe(80));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(getProjectScores).not.toHaveBeenCalled();
   });
 
 });
