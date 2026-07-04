@@ -161,7 +161,15 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   if (!jobId) return null;
 
   const dims = progress?.dimensions || [];
-  const { totalFiles, takenFiles, overallPct } = computeOverallProgress(progress);
+  const { totalFiles, takenFiles, overallPct, projectTotal, cachedFiles, coveredFiles, coveredPct } =
+    computeOverallProgress(progress);
+  // Segmented coverage view only when there is actually a cached portion to
+  // show — full scans and legacy runs keep the familiar run-only display.
+  const showCoverage = projectTotal > 0 && cachedFiles > 0;
+  // coveredFiles is clamped to projectTotal upstream, so these widths can
+  // never sum past 100 even when live queue counts drift from the estimate.
+  const cachedPctWidth = showCoverage ? (cachedFiles / projectTotal) * 100 : 0;
+  const runPctWidth = showCoverage ? ((coveredFiles - cachedFiles) / projectTotal) * 100 : 0;
   const inlineLabel = progress?.currentDimension
     ? <>running <span className="scan-progress__dim-active">{progress.currentDimension}</span></>
     : progress?.phase
@@ -192,12 +200,28 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
       {errorBanner}
       <div className="scan-progress__row">
         <div className="scan-progress__bar-wrap">
-          <div className="scan-progress__bar">
-            <div className="scan-progress__bar-fill" style={{ width: `${overallPct}%` }} />
+          <div
+            className="scan-progress__bar"
+            title={showCoverage ? `${cachedFiles} files analyzed in previous runs` : undefined}
+          >
+            {showCoverage && (
+              <div
+                className="scan-progress__bar-fill scan-progress__bar-fill--cached"
+                style={{ width: `${cachedPctWidth}%` }}
+              />
+            )}
+            <div
+              className="scan-progress__bar-fill"
+              style={{ width: showCoverage ? `${runPctWidth}%` : `${overallPct}%` }}
+            />
           </div>
           <div className="scan-progress__meta">
             <span>
-              {totalFiles > 0 ? <><strong>{takenFiles} / {totalFiles}</strong> checks · {overallPct}%</> : <strong>preparing…</strong>}
+              {showCoverage ? (
+                <><strong>{coveredFiles} / {projectTotal}</strong> files · {coveredPct}% total · this run {takenFiles} / {totalFiles}</>
+              ) : totalFiles > 0 ? (
+                <><strong>{takenFiles} / {totalFiles}</strong> checks · {overallPct}%</>
+              ) : <strong>preparing…</strong>}
               {isRunning && inlineLabel && <> · {inlineLabel}</>}
             </span>
             {progress?.totalElapsedS != null && (
