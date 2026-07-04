@@ -21,18 +21,22 @@ export function usePrefetchRun(selectedProject) {
   return useCallback(
     (runId) => {
       if (!selectedProject || !runId) return;
+      // Historical runs are immutable (see useDashboard), so a cached entry
+      // is good until a mutation invalidates it — and prefetchQuery refetches
+      // invalidated entries regardless of staleTime.
+      const staleTime = runId !== "latest" ? Infinity : STALE_TIME_MS;
       // Dashboard payload (the main render).
       queryClient.prefetchQuery({
         queryKey: projectKeys.dashboard(selectedProject, runId),
         queryFn: () => getDashboard(selectedProject, runId),
-        staleTime: STALE_TIME_MS,
+        staleTime,
       });
       // Scores payload (drives accumulated + trend).
       const asOf = runId !== "latest" ? runId : null;
       queryClient.prefetchQuery({
         queryKey: projectKeys.scores(selectedProject, asOf),
         queryFn: () => getProjectScores(selectedProject, asOf),
-        staleTime: STALE_TIME_MS,
+        staleTime,
       });
     },
     [queryClient, getDashboard, selectedProject],

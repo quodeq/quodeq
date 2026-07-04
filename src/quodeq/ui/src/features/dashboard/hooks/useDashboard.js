@@ -25,18 +25,6 @@ export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = t
   const { getDashboard } = useApi();
   const queryClient = useQueryClient();
 
-  const dashboardQuery = useQuery({
-    queryKey: projectKeys.dashboard(selectedProject || "_none_", selectedRun),
-    queryFn: () => getDashboard(selectedProject, selectedRun),
-    enabled: !!selectedProject,
-    staleTime: 60_000,
-    // Keep showing the previous run's data while a new run loads — instant
-    // perceived navigation. isFetching toggles true during the background
-    // fetch, which the page reads to show a subtle indicator.
-    // Disabled when keepPlaceholder=false (History run details).
-    placeholderData: keepPlaceholder ? (prev) => prev : undefined,
-  });
-
   const {
     scores,
     latestScores,
@@ -44,6 +32,30 @@ export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = t
     error: scoresError,
     availableRuns,
   } = useProjectScores({ selectedProject, selectedRun, keepPlaceholder });
+
+  // A completed historical run is immutable on disk: its payload only changes
+  // through explicit user actions (dismiss, delete, verify, grade formula,
+  // run deletion), and every one of those invalidates the project query
+  // subtree — which forces a refetch regardless of staleTime. Freezing the
+  // query here removes the routine time-based background refetch (and the
+  // dashboard-refreshing dim flash) on re-entering a run view. Unknown
+  // status counts as frozen: by the time a run detail is opened the runs
+  // list is already cached, and treating the brief unknown window as frozen
+  // avoids a spurious mount refetch.
+  const runStatus = (availableRuns || []).find((r) => r.runId === selectedRun)?.status;
+  const isFrozenRun = !!selectedRun && selectedRun !== "latest" && runStatus !== "in_progress";
+
+  const dashboardQuery = useQuery({
+    queryKey: projectKeys.dashboard(selectedProject || "_none_", selectedRun),
+    queryFn: () => getDashboard(selectedProject, selectedRun),
+    enabled: !!selectedProject,
+    staleTime: isFrozenRun ? Infinity : 60_000,
+    // Keep showing the previous run's data while a new run loads — instant
+    // perceived navigation. isFetching toggles true during the background
+    // fetch, which the page reads to show a subtle indicator.
+    // Disabled when keepPlaceholder=false (History run details).
+    placeholderData: keepPlaceholder ? (prev) => prev : undefined,
+  });
 
   const dashboardWithTrend = useMemo(() => {
     if (!dashboardQuery.data) return null;

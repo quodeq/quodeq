@@ -57,7 +57,12 @@ export function useProjectScores({ selectedProject, selectedRun, keepPlaceholder
     // otherwise we'd briefly call with the raw selectedRun and only later
     // correct it, leaking a stale-asOf request.
     enabled: !!selectedProject && (isLatestSelection || latestQuery.isSuccess),
-    staleTime: 60_000,
+    // A non-null asOf always names a completed run (in-progress falls back
+    // to null above), and as-of scores for a completed run only change via
+    // explicit actions (dismiss/delete/formula) — all of which invalidate
+    // the project subtree and force a refetch regardless of staleTime.
+    // Freeze to skip the routine background refetch on re-entry.
+    staleTime: asOf ? Infinity : 60_000,
     // Keep prior scores visible while switching runs — see useDashboard for rationale.
     placeholderData: keepPlaceholder ? (prev) => prev : undefined,
   });
