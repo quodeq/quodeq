@@ -85,7 +85,8 @@ def parse_jsonl_to_evidence_by_dimension(
         return {}
     return {
         dim: _build_evidence(context, _build_principles(
-            _group_judgments(dj, dimension=dim, evaluators_dir=evaluators_dir),
+            _group_judgments(dj, dimension=dim, evaluators_dir=evaluators_dir,
+                             compiled_dir=compiled_dir),
             dim, context.source_file_count))
         for dim, dj in by_dim.items()
     }
@@ -102,5 +103,6 @@ def parse_jsonl_to_evidence(
     # parse_jsonl_to_evidence_by_dimension which groups incrementally.
     judgments = read_judgments(jsonl_file, compiled_dir)
     dim = judgments[0].dimension if judgments else ""
-    grouped = _group_judgments(judgments, dimension=dim, evaluators_dir=evaluators_dir)
+    grouped = _group_judgments(judgments, dimension=dim, evaluators_dir=evaluators_dir,
+                               compiled_dir=compiled_dir)
     return _build_evidence(context, _build_principles(grouped, dim, context.source_file_count))
