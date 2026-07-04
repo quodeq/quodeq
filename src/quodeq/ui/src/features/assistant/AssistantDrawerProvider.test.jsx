@@ -6,6 +6,7 @@ vi.mock('../../api/assistant.js', () => ({
   createAssistantSession: vi.fn(async () => ({ sessionId: 's1' })),
   postAssistantMessage: vi.fn(async () => ({ accepted: true })),
   assistantEventsUrl: (id, a) => `/api/assistant/sessions/${id}/events?after=${a}`,
+  fetchAssistantCatalog: vi.fn(async () => ({ commands: [], skills: [], actions: [] })),
 }));
 const _streamHooks = { onDone: null };
 vi.mock('./useAssistantStream.js', () => ({
@@ -14,7 +15,7 @@ vi.mock('./useAssistantStream.js', () => ({
     return { messages: [], streaming: false, error: null, reset: vi.fn() };
   },
 }));
-import { createAssistantSession, postAssistantMessage } from '../../api/assistant.js';
+import { createAssistantSession, postAssistantMessage, fetchAssistantCatalog } from '../../api/assistant.js';
 
 function Probe() {
   const d = useAssistantDrawer();
@@ -26,13 +27,17 @@ function Probe() {
       <span data-testid="model">{String(d.model)}</span>
       <span data-testid="error">{String(d.error)}</span>
       <span data-testid="web">{String(d.webEnabled)}</span>
+      <span data-testid="catalog">{JSON.stringify(d.catalog)}</span>
+      <span data-testid="messages">{JSON.stringify(d.messages)}</span>
       <button onClick={d.toggleWebEnabled}>web</button>
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'p', runId: 'r' })}>start</button>
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'pA', runId: 'r' })}>startA</button>
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'pB', runId: 'r' })}>startB</button>
       <button onClick={d.toggle}>toggle</button>
+      <button onClick={() => d.openTab('assistant')}>openAssistant</button>
       <button onClick={() => d.sendMessage('hi', { activeTab: 'overview' })}>send</button>
       <button onClick={d.resetConversation}>reset</button>
+      <button onClick={() => d.addLocalExchange?.('/help', 'HELP TEXT')}>localExchange</button>
     </div>
   );
 }
@@ -176,4 +181,42 @@ it('resetConversation is a no-op while a turn is in flight or before any session
   await act(async () => { screen.getByText('send').click(); });   // turn in flight
   await act(async () => { screen.getByText('reset').click(); });
   expect(createAssistantSession).toHaveBeenCalledTimes(1);
+});
+
+it('fetches the catalog once when the drawer opens, cached across open/close/open', async () => {
+  fetchAssistantCatalog.mockResolvedValue({ commands: [], skills: [], actions: [] });
+  render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+
+  // Drawer is closed; catalog should be null and fetch should not have been called.
+  expect(screen.getByTestId('catalog').textContent).toBe('null');
+  expect(fetchAssistantCatalog).not.toHaveBeenCalled();
+
+  // Open the assistant panel.
+  await act(async () => { screen.getByText('openAssistant').click(); });
+  expect(fetchAssistantCatalog).toHaveBeenCalledTimes(1);
+  expect(screen.getByTestId('catalog').textContent).toBe(
+    JSON.stringify({ commands: [], skills: [], actions: [] }),
+  );
+
+  // Close and reopen: still only 1 call (catalog is cached).
+  act(() => screen.getByText('toggle').click()); // close
+  await act(async () => { screen.getByText('openAssistant').click(); }); // reopen
+  expect(fetchAssistantCatalog).toHaveBeenCalledTimes(1);
+});
+
+it('addLocalExchange appends a user and a local message', async () => {
+  let hookRef;
+  const Grab = () => { hookRef = useAssistantDrawer(); return null; };
+  render(<AssistantDrawerProvider><Probe /><Grab /></AssistantDrawerProvider>);
+
+  // Capture initial messages count (should be empty).
+  expect(hookRef.messages).toHaveLength(0);
+
+  // Invoke addLocalExchange.
+  act(() => { hookRef.addLocalExchange('/help', 'HELP TEXT'); });
+
+  // Two messages appended: user turn then local response.
+  expect(hookRef.messages).toHaveLength(2);
+  expect(hookRef.messages[0]).toMatchObject({ role: 'user', text: '/help', atIndex: 0 });
+  expect(hookRef.messages[1]).toMatchObject({ role: 'local', text: 'HELP TEXT', atIndex: 0 });
 });

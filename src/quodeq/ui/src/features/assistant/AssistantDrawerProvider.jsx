@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { createAssistantSession, postAssistantMessage } from '../../api/assistant.js';
+import { createAssistantSession, fetchAssistantCatalog, postAssistantMessage } from '../../api/assistant.js';
 import useAssistantProvider from '../settings/hooks/useAssistantProvider.js';
 import useTerminalSettings from '../settings/hooks/useTerminalSettings.js';
 import { useAssistantStream } from './useAssistantStream.js';
@@ -81,6 +81,19 @@ export function AssistantDrawerProvider({ children }) {
   // session-start or message POST. Rendered by the drawer alongside (and
   // taking precedence over) the stream's own error frames.
   const [localError, setLocalError] = useState(null);
+  // Command/skill catalog for the welcome panel, autocomplete, and
+  // meta-commands. Fetched once per app session on first drawer open;
+  // failures leave it null and the UI degrades to the built-in commands.
+  const [catalog, setCatalog] = useState(null);
+  useEffect(() => {
+    if (!isOpen || catalog !== null) return undefined;
+    let cancelled = false;
+    fetchAssistantCatalog()
+      .then((c) => { if (!cancelled) setCatalog(c); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isOpen, catalog]);
+
   // Per-conversation web access. Default OFF and reset on every context
   // switch: web access is opt-in per conversation, never sticky.
   const [webEnabled, setWebEnabled] = useState(false);
@@ -245,6 +258,15 @@ export function AssistantDrawerProvider({ children }) {
     }
   }, [sessionId, stream.messages.length, webEnabled]);
 
+  // Client-answered meta-commands (/help, /skills, /actions): show the user
+  // turn and the local response in the transcript without any server call.
+  const addLocalExchange = useCallback((userText, responseText) => {
+    setUserTurns((prev) => [...prev,
+      { role: 'user', text: userText, atIndex: stream.messages.length },
+      { role: 'local', text: responseText, atIndex: stream.messages.length },
+    ]);
+  }, [stream.messages.length]);
+
   const messages = useMemo(
     () => mergeMessages(userTurns, stream.messages),
     [userTurns, stream.messages],
@@ -258,8 +280,9 @@ export function AssistantDrawerProvider({ children }) {
     sessionReady: sessionId != null,
     provider: sessionMeta.provider, model: sessionMeta.model,
     webEnabled, toggleWebEnabled,
+    catalog, addLocalExchange,
     startSession, sendMessage, resetConversation,
-  }), [isOpen, open, close, toggle, closeActiveTab, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, startSession, sendMessage, resetConversation]);
+  }), [isOpen, open, close, toggle, closeActiveTab, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, catalog, addLocalExchange, startSession, sendMessage, resetConversation]);
 
   return (
     <AssistantDrawerContext.Provider value={value}>
