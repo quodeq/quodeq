@@ -9,8 +9,11 @@ const state = {
     { role: 'tool', name: 'get_scores' },
     { role: 'assistant', text: '**Security** is graded C.' },
     { role: 'action', actionId: 'a1', actionType: 'create_standard', summary: { id: 'x', name: 'X', principleCount: 1 } },
+    { role: 'local', text: '**Commands** listed' },
+    { role: 'tool', name: 'get_report', argsSummary: '{"dimension":"security"}' },
   ],
   streaming: false, error: null, sendMessage: vi.fn(),
+  catalog: null, addLocalExchange: vi.fn(), resetConversation: vi.fn(),
 };
 vi.mock('./AssistantDrawerProvider.jsx', () => ({ useAssistantDrawer: () => state }));
 vi.mock('./ActionPreviewCard.jsx', () => ({ ActionPreviewCard: ({ action }) => <div>card:{action.actionId}</div> }));
@@ -22,6 +25,8 @@ it('renders messages, markdown, tool marker, and action card', () => {
   expect(screen.getByText(/used get_scores/i)).toBeInTheDocument();
   expect(screen.getByText('Security').tagName).toBe('STRONG'); // markdown rendered
   expect(screen.getByText('card:a1')).toBeInTheDocument();
+  expect(screen.getByText('Commands').tagName).toBe('STRONG'); // local renders markdown
+  expect(screen.getByText(/get_report · \{"dimension":"security"\}/)).toBeInTheDocument();
 });
 
 it('renders the prompt input', () => {

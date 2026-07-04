@@ -72,7 +72,7 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
       resetInactivity();
       let frame; try { frame = JSON.parse(e.data); } catch { return; }
       if (frame.type === 'token') { beginContent(); pending.current += frame.text || ''; scheduleFlush(); }
-      else if (frame.type === 'tool_call') { beginContent(); flushTokens(); append({ role: 'tool', name: frame.name }); }
+      else if (frame.type === 'tool_call') { beginContent(); flushTokens(); append({ role: 'tool', name: frame.name, argsSummary: frame.argsSummary }); }
       else if (frame.type === 'action_draft') { beginContent(); flushTokens();
         append({ role: 'action', actionId: frame.actionId, actionType: frame.actionType, summary: frame.summary }); }
       else if (frame.type === 'warning') { beginContent(); flushTokens(); append({ role: 'warning', message: frame.message }); }

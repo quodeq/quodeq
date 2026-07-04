@@ -25,7 +25,19 @@ function MessageItem({ message }) {
         </div>
       );
     case 'tool':
-      return <div className="assistant-msg assistant-msg-tool">↳ used {message.name}</div>;
+      return (
+        <div className="assistant-msg assistant-msg-tool">
+          ↳ used {message.name}{message.argsSummary ? ` · ${message.argsSummary}` : ''}
+        </div>
+      );
+    case 'local':
+      return (
+        <div className="assistant-msg assistant-msg-local assistant-md">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+            {message.text}
+          </ReactMarkdown>
+        </div>
+      );
     case 'action':
       return (
         <div className="assistant-msg assistant-msg-action">
