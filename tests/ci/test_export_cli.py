@@ -43,7 +43,10 @@ def test_handle_export_writes_valid_sarif(tmp_path):
 
 
 def test_handle_export_expands_user_path(tmp_path, monkeypatch):
+    # `~` resolves via HOME on POSIX and USERPROFILE on Windows; set both so
+    # Path.expanduser() lands inside tmp_path on every platform.
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
     monkeypatch.chdir(tmp_path)
     eval_dir = tmp_path / "evaluation"
     _write_report(eval_dir, "reliability", [
