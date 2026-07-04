@@ -38,7 +38,7 @@ def _handle_sarif(args: argparse.Namespace) -> int:
         include_snippets=getattr(args, "with_snippets", False),
     )
 
-    out_path = Path(args.output)
+    out_path = Path(args.output).expanduser().resolve()
     try:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(json.dumps(doc, indent=2), encoding="utf-8")

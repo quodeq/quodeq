@@ -27,7 +27,7 @@ class TestRegisterCliMcp:
         jsonl = tmp_path / "findings.jsonl"
         config = AnalysisConfig(jsonl_file=jsonl)
         with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
-             patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {}}):
+             patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {"type": "cli"}}):
             mock_run.return_value = MagicMock(returncode=0)
             name = _register_cli_mcp("mycli", config)
         assert name == "quodeq-findings"
@@ -36,7 +36,7 @@ class TestRegisterCliMcp:
         jsonl = tmp_path / "findings.jsonl"
         config = AnalysisConfig(jsonl_file=jsonl)
         with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
-             patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {}}):
+             patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {"type": "cli"}}):
             mock_run.return_value = MagicMock(returncode=0)
             _register_cli_mcp("mycli", config)
             _register_cli_mcp("mycli", config)
@@ -48,7 +48,7 @@ class TestRegisterCliMcp:
         jsonl = tmp_path / "findings.jsonl"
         config = AnalysisConfig(jsonl_file=jsonl)
         with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
-             patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {}}):
+             patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {"type": "cli"}}):
             mock_run.side_effect = [MagicMock(), subprocess.CalledProcessError(1, "mycli")]
             name = _register_cli_mcp("mycli", config)
         assert name is None
@@ -57,7 +57,7 @@ class TestRegisterCliMcp:
         jsonl = tmp_path / "findings.jsonl"
         config = AnalysisConfig(jsonl_file=jsonl)
         with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
-             patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {}}):
+             patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {"type": "cli"}}):
             mock_run.side_effect = [MagicMock(), subprocess.TimeoutExpired("mycli", 10)]
             name = _register_cli_mcp("mycli", config)
         assert name is None
@@ -66,7 +66,7 @@ class TestRegisterCliMcp:
         jsonl = tmp_path / "findings.jsonl"
         config = AnalysisConfig(jsonl_file=jsonl)
         with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
-             patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {}}):
+             patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {"type": "cli"}}):
             mock_run.side_effect = [MagicMock(), FileNotFoundError("mycli")]
             name = _register_cli_mcp("mycli", config)
         assert name is None
@@ -74,7 +74,7 @@ class TestRegisterCliMcp:
     def test_no_separator_when_configured(self, tmp_path):
         jsonl = tmp_path / "findings.jsonl"
         config = AnalysisConfig(jsonl_file=jsonl)
-        provider = {"gemini": {"mcp_add_separator": False}}
+        provider = {"gemini": {"mcp_add_separator": False, "type": "cli"}}
         with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
              patch("quodeq.analysis._command._get_provider_configs", return_value=provider):
             mock_run.return_value = MagicMock(returncode=0)
@@ -86,7 +86,8 @@ class TestRegisterCliMcp:
 
 class TestUnregisterCliMcp:
     def test_unregister_runs_command(self):
-        with patch("quodeq.analysis._command.subprocess.run") as mock_run:
+        with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
+             patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {"type": "cli"}}):
             mock_run.return_value = MagicMock()
             _unregister_cli_mcp("mycli", "quodeq-findings")
             mock_run.assert_called_once()
@@ -94,12 +95,14 @@ class TestUnregisterCliMcp:
             assert cmd == ["mycli", "mcp", "remove", "quodeq-findings"]
 
     def test_unregister_handles_timeout(self):
-        with patch("quodeq.analysis._command.subprocess.run") as mock_run:
+        with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
+             patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {"type": "cli"}}):
             mock_run.side_effect = subprocess.TimeoutExpired("mycli", 10)
             # Should not raise
             _unregister_cli_mcp("mycli", "quodeq-findings")
 
     def test_unregister_handles_file_not_found(self):
-        with patch("quodeq.analysis._command.subprocess.run") as mock_run:
+        with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
+             patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {"type": "cli"}}):
             mock_run.side_effect = FileNotFoundError("mycli")
             _unregister_cli_mcp("mycli", "quodeq-findings")
