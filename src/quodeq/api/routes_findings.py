@@ -19,6 +19,7 @@ from flask import Flask, Response, abort, jsonify, request
 
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services.dismissed import dismiss_finding, load_dismissed, restore_finding, restore_all_findings
+from quodeq.services.verified import unverify_finding, verified_entries
 from quodeq.shared.utils import get_evaluations_dir
 from quodeq.shared.validation import validate_path_segment
 
@@ -275,3 +276,22 @@ def register_findings_routes(app: Flask) -> None:
         count = delete_all_dismissed(_project_dir(_eval_dir(), project))
         scores = _scores_with_fallback(project, run_id)
         return jsonify({"ok": True, "deleted": count, "scores": scores}), 200
+
+    @app.get("/api/findings/verified")
+    def list_verified() -> Response:
+        project = request.args.get("project", "")
+        if not project:
+            return jsonify([])
+        return jsonify(verified_entries(_project_dir(_eval_dir(), project)))
+
+    @app.post("/api/findings/unverify")
+    def unverify() -> tuple[Response, int]:
+        body = request.get_json(silent=True) or {}
+        project = body.get("project", "")
+        req = body.get("req", "")
+        file = body.get("file", "")
+        line = body.get("line")
+        if not project or not req or not file or line is None:
+            return jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400
+        unverify_finding(_project_dir(_eval_dir(), project), body)
+        return jsonify({"ok": True}), 200
