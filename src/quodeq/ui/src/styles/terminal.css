@@ -139,8 +139,12 @@
 /* Clickable variant — a Stat doubles as a navigation affordance. The card stays
    a <div>; an inner `.term-stat__hitbox` button is the actual click target so
    the hint (which may hold its own interactive badges) is a sibling of the
-   button, never nested inside it. Nesting <button> in <button> is invalid HTML. */
+   button, never nested inside it. Nesting <button> in <button> is invalid HTML.
+   The button's `::after` stretches over the whole card so hover, highlight and
+   click cover the full square; interactive hint children (severity badges) are
+   raised above the overlay and stay independent click targets. */
 .term-stat--clickable {
+  position: relative;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 .term-stat__hitbox {
@@ -158,12 +162,30 @@
   gap: var(--term-space-1);
   width: 100%;
 }
-.term-stat__hitbox:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+.term-stat__hitbox::after {
+  content: '';
+  position: absolute;
+  inset: 0;
   border-radius: var(--term-radius);
 }
-/* Whole-card hover highlight, driven by the inner hitbox — not the sibling
+.term-stat__hitbox:focus-visible {
+  outline: none;
+}
+.term-stat--clickable:has(.term-stat__hitbox:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+/* Non-interactive hint text lets hover/click fall through to the stretched
+   hitbox; buttons inside the hint (severity badges) opt back in. */
+.term-stat--clickable .term-stat__hint {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+.term-stat--clickable .term-stat__hint :is(button, a) {
+  pointer-events: auto;
+}
+/* Whole-card hover highlight, driven by the stretched hitbox — not the sibling
    severity badges, which are their own independent click targets. */
 .term-stat--clickable:has(.term-stat__hitbox:hover) {
   border-color: var(--color-accent);
