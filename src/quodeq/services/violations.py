@@ -58,12 +58,19 @@ def _dismissed_key_for_violation(v: dict) -> tuple:
     return (req, raw_file, 0)
 
 
-def _deleted_key_for_violation(v: dict, dimension: str) -> tuple:
-    """Build a (dimension, principle, file) suppression key from a violation dict."""
+def _deleted_key_for_violation(v: dict, dimension: str, principle: str | None = None) -> tuple:
+    """Build a (dimension, principle, file) suppression key from a violation dict.
+
+    Parsed eval violations are camelCase (``practiceId``); ``principle`` is
+    kept as a fallback for pre-camelCase dicts. Principle-group entries carry
+    no principle field at all, so callers pass the group name as *principle*.
+    """
     raw_file = v.get("file", "")
     if v.get("line") is None and ":" in raw_file:
         raw_file = raw_file.rsplit(":", 1)[0]
-    return (dimension or "", v.get("principle", "") or "", raw_file)
+    if principle is None:
+        principle = v.get("practiceId") or v.get("principle") or ""
+    return (dimension or "", principle or "", raw_file)
 
 
 def _filter_dismissed_from_result(
@@ -84,10 +91,11 @@ def _filter_dismissed_from_result(
             ]
         for p in result.get("principles", []):
             if "violations" in p:
+                group_principle = p.get("name", "") or ""
                 p["violations"] = [
                     v for v in p["violations"]
                     if _dismissed_key_for_violation(v) not in dkeys
-                    and (not delkeys or _deleted_key_for_violation(v, dimension) not in delkeys)
+                    and (not delkeys or _deleted_key_for_violation(v, dimension, group_principle) not in delkeys)
                 ]
     return result
 
