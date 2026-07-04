@@ -26,6 +26,8 @@
   color: var(--color-text-muted);
 }
 
+.assistant-card-note { color: var(--color-text-muted); font-size: 12px; margin-top: 2px; }
+
 .assistant-card-actions {
   display: flex;
   gap: 0.5rem;

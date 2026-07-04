@@ -33,3 +33,18 @@ it('reject calls the endpoint and shows rejected', async () => {
   await waitFor(() => expect(rejectAssistantAction).toHaveBeenCalledWith('a1'));
   expect(await screen.findByText(/rejected/i)).toBeInTheDocument();
 });
+
+it('renders a dismiss_finding summary', () => {
+  render(<ActionPreviewCard action={{ actionId: 'a1', actionType: 'dismiss_finding',
+    summary: { req: 'r1', file: 'a.py', line: 3, reason: 'guarded above' } }} />);
+  expect(screen.getByText('Dismiss finding')).toBeInTheDocument();
+  expect(screen.getByText(/r1 · a\.py:3/)).toBeInTheDocument();
+  expect(screen.getByText('guarded above')).toBeInTheDocument();
+});
+
+it('renders a verify_finding summary', () => {
+  render(<ActionPreviewCard action={{ actionId: 'a2', actionType: 'verify_finding',
+    summary: { req: 'r1', file: 'a.py', line: 3, note: 'real, unsanitized input' } }} />);
+  expect(screen.getByText('Mark finding as verified')).toBeInTheDocument();
+  expect(screen.getByText('real, unsanitized input')).toBeInTheDocument();
+});
