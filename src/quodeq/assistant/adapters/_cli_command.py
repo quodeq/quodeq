@@ -53,7 +53,8 @@ def _resume_args(cfg: CliChatConfig, prior: str | None, new_id: str) -> tuple[li
 
 def build_turn_argv(cfg: CliChatConfig, *, prompt: str, model: str | None,
                     mcp_config_path: str | None, prior_session_id: str | None,
-                    new_session_id: str, web_enabled: bool = False) -> CliTurnSpec:
+                    new_session_id: str, web_enabled: bool = False,
+                    system_prompt: str = "") -> CliTurnSpec:
     argv: list[str] = [cfg.cmd]
     if cfg.cmd_subcommand:
         argv.append(cfg.cmd_subcommand)
@@ -71,6 +72,8 @@ def build_turn_argv(cfg: CliChatConfig, *, prompt: str, model: str | None,
         argv.extend(["--mcp-config", mcp_config_path])
     if model:
         argv.extend(["--model", model])
+    if system_prompt and cfg.system_prompt_style == "argv-append":
+        argv.extend(["--append-system-prompt", system_prompt])
 
     if cfg.prompt_style == "positional":
         argv.append(prompt)
