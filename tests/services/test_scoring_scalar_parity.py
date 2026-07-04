@@ -30,7 +30,9 @@ def test_trend_identical_between_fast_and_heavy_paths(tmp_path: Path, monkeypatc
     import quodeq.services.scoring as scoring
     monkeypatch.setattr(
         scoring, "_make_trend_fetcher",
-        lambda rr, p, params=scoring.DEFAULT_PARAMS: scoring._make_rescoring_fetcher(rr, p, params=params),
+        lambda rr, p, params=scoring.DEFAULT_PARAMS, cacheable_run_ids=None: (
+            scoring._make_rescoring_fetcher(rr, p, params=params)
+        ),
     )
     heavy = get_project_scores(reports, "proj")
 

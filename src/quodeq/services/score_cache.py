@@ -22,6 +22,13 @@ from quodeq.shared._env import get_score_cache_path, score_cache_disabled
 
 _logger = logging.getLogger(__name__)
 _BUSY_TIMEOUT_MS = 5000
+# Bumped when the cache *writer* semantics change in a way that could have
+# produced bad rows, to invalidate everything written by the prior writer.
+# "2": earlier writers persisted in-progress runs' partial scalar sets (e.g. 1
+# of 6 dims), which the content-hash version could never invalidate; the
+# write-guard now persists only completed runs, and this bump rebuilds the
+# stranded partial rows once.
+_CACHE_WRITER_EPOCH = "2"
 _SCHEMA = (
     "CREATE TABLE IF NOT EXISTS run_scalars ("
     " project TEXT NOT NULL, run_id TEXT NOT NULL, version TEXT NOT NULL,"
@@ -177,6 +184,7 @@ def score_cache_version(project_dir: Path, params: ScoringParams) -> str:
     rows without a write-path hook.
     """
     payload = json.dumps({
+        "epoch": _CACHE_WRITER_EPOCH,
         "dismissed": sorted(str(k) for k in dismissed_keys(project_dir)),
         "deleted": sorted(str(k) for k in deleted_keys(project_dir)),
         "params": _params_fingerprint(params),
@@ -230,6 +238,7 @@ def cached_accumulated(
 def make_cache_backed_fetcher(
     project: str, version: str,
     base_fetcher: Callable[[str], list[DimensionResult]],
+    is_cacheable: Callable[[str], bool] | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
     """Wrap *base_fetcher* (returns rescored dims) with the read-through cache.
 
@@ -238,6 +247,16 @@ def make_cache_backed_fetcher(
     them back, and returns the scalars. Returns scalar-only DimensionResults
     (dimension/overall_score/overall_grade). If the kill switch is set, returns
     *base_fetcher* unchanged.
+
+    ``is_cacheable`` gates *persistence* per run. The version hash covers only
+    dismissals/deletions/params, so it can't tell that an in-progress run's
+    scalar set grows as dimensions finish. Without a guard, opening History
+    mid-scan persists the run's partial set (e.g. only ``security`` of six) and
+    the run completing never invalidates it -- so the trend shows one dimension
+    forever while run-detail shows all six. Callers pass a predicate that is
+    True only for terminal (complete) runs; non-cacheable runs compute-through
+    and are served for the current build but never written to disk. Defaults to
+    "always cacheable" for backward compatibility.
     """
     if score_cache_disabled():
         return base_fetcher
@@ -264,11 +283,12 @@ def make_cache_backed_fetcher(
                                    overall_grade=d.overall_grade)
                    for d in dims if d.dimension]
         by_run[run_id] = scalars
-        try:
-            with open_score_cache() as conn:
-                write_cached_rows(conn, project, run_id, version, scalars)
-        except sqlite3.Error:
-            pass
+        if is_cacheable is None or is_cacheable(run_id):
+            try:
+                with open_score_cache() as conn:
+                    write_cached_rows(conn, project, run_id, version, scalars)
+            except sqlite3.Error:
+                pass
         return scalars
 
     return fetch

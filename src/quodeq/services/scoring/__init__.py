@@ -351,6 +351,7 @@ def _make_rescoring_fetcher(
 def _make_trend_fetcher(
     reports_root: Path, project: str,
     params: ScoringParams = DEFAULT_PARAMS,
+    cacheable_run_ids: set[str] | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return the dimension fetcher for the trend chart.
 
@@ -363,6 +364,13 @@ def _make_trend_fetcher(
     rescoring fetcher with the read-through score cache. The cache version is a
     content-hash of the project's dismissals/deletions/params, so any change
     auto-invalidates without a write-path hook.
+
+    ``cacheable_run_ids`` restricts which runs the heavy-path cache may
+    *persist*: a run still scoring (in-progress) grows its dimension set as
+    dims finish, but the version hash can't see that, so persisting its partial
+    set would strand a stale row (fixed forever until dismissals/params change).
+    Only completed runs are safe to persist; when ``None`` every run is
+    cacheable (used by the fast path, which persists nothing anyway).
     """
     project_dir = reports_root / project
     if dismissed_keys(project_dir) or deleted_keys(project_dir):
@@ -373,7 +381,11 @@ def _make_trend_fetcher(
         # and in score_cache_version -- three reads total, each ~0.01s, acceptable.
         base = _make_rescoring_fetcher(reports_root, project, params=params)
         version = score_cache_version(project_dir, params)
-        return make_cache_backed_fetcher(project, version, base)
+        is_cacheable = (
+            None if cacheable_run_ids is None
+            else (lambda rid: rid in cacheable_run_ids)
+        )
+        return make_cache_backed_fetcher(project, version, base, is_cacheable=is_cacheable)
     cache, lock = create_dimension_cache()
     return make_lru_dimension_fetcher(
         reports_root, project, cache, lock,
@@ -513,7 +525,14 @@ def get_project_scores(
     # when the user asks for them explicitly.
     scoreable_runs = [r for r in all_runs if r.status not in ("cancelled", "failed")]
     history_runs = scoreable_runs[:_max_history_runs()]
-    trend_fetcher = _make_trend_fetcher(reports_root, project, params=params)
+    # Only completed runs may be persisted to the score cache: an in-progress
+    # run's scalar set is still growing, and the cache version can't see that,
+    # so caching its partial set would strand a stale row (e.g. 1 of 6 dims)
+    # served forever after the run finishes.
+    cacheable_run_ids = {r.run_id for r in history_runs if r.status == "complete"}
+    trend_fetcher = _make_trend_fetcher(
+        reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
+    )
     trend = build_accumulated_trend(history_runs, trend_fetcher, params=params)
 
     # Build available runs list
