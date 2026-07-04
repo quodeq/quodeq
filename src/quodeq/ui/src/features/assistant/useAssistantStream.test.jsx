@@ -150,3 +150,12 @@ it('a heartbeat data frame resets inactivity so a slow model does not time out',
   expect(result.current.messages.some((m) => m.role === 'heartbeat')).toBe(false);
   expect(result.current.messages.length).toBe(0);
 });
+
+it('a null JSON payload frame is ignored instead of crashing', () => {
+  // A `null` payload parses to `null`; accessing `frame.type` on it would throw.
+  const { result } = renderHook(() => useAssistantStream('s1'));
+  const es = MockES.instances[0];
+  expect(() => { act(() => { es.emit('message', null); }); }).not.toThrow();
+  expect(result.current.messages.length).toBe(0);
+  expect(result.current.error).toBe(null);
+});

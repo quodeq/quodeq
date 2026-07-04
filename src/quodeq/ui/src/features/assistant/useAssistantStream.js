@@ -71,6 +71,7 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
     es.onmessage = (e) => {
       resetInactivity();
       let frame; try { frame = JSON.parse(e.data); } catch { return; }
+      if (!frame || typeof frame !== 'object') return;
       if (frame.type === 'token') { beginContent(); pending.current += frame.text || ''; scheduleFlush(); }
       else if (frame.type === 'tool_call') { beginContent(); flushTokens(); append({ role: 'tool', name: frame.name, argsSummary: frame.argsSummary }); }
       else if (frame.type === 'action_draft') { beginContent(); flushTokens();
