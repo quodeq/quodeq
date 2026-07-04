@@ -325,3 +325,5 @@ class TestVerifiedEndpoints:
     def test_unverify_requires_key_fields(self, client):
         resp = client.post("/api/findings/unverify", json={"project": "p"})
         assert resp.status_code == 400
+        data = resp.get_json()
+        assert data["code"] == "MISSING_PARAM"
