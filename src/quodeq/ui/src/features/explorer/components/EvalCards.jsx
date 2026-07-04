@@ -90,9 +90,9 @@ export function EvalViolationCard({ v, principle, index, onDismiss }) {
     >
       <div className="vdetail-row-main">
         <SevBadge level={v.severity} format="long" />
-        <VerifiedChip v={v} />
         <span className="vrow-label">[{v.principle || principle}]</span>
         {filename && <FileCopyBtn display={display} copyText={ref} />}
+        <VerifiedChip v={v} />
         <button
           type="button"
           className="fix-plan-btn"

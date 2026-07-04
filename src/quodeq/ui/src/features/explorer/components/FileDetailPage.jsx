@@ -30,7 +30,6 @@ const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
     <div className={`vdetail-row vdetail-row--${v.severity}`}>
       <div className="vdetail-row-main">
         <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
-        <VerifiedChip v={v} />
         {v.provenanceDowngrade && (
           <span
             className="provenance-downgrade-tag"
@@ -44,6 +43,7 @@ const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
         {filename && (
           <FileCopyBtn display={display} copyText={ref} />
         )}
+        <VerifiedChip v={v} />
         <button
           type="button"
           className="fix-plan-btn"
