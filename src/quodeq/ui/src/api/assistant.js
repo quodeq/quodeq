@@ -20,3 +20,7 @@ export function rejectAssistantAction(actionId) {
 export function assistantEventsUrl(sessionId, afterSeq = 0) {
   return `${BASE}/assistant/sessions/${encodeURIComponent(sessionId)}/events?after=${afterSeq}`;
 }
+
+export function fetchAssistantCatalog() {
+  return request('/assistant/skills');
+}
