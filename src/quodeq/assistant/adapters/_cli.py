@@ -97,8 +97,11 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
                     continue
                 emit({"type": "token", "text": t})
                 last_emitted = t
-            for name in _stream.tool_uses(event):
-                emit({"type": "tool_call", "name": name})
+            for tu in _stream.tool_use_details(event):
+                frame = {"type": "tool_call", "name": tu["name"]}
+                if tu["args_summary"]:
+                    frame["argsSummary"] = tu["args_summary"]
+                emit(frame)
             sid = _stream.session_id(event)
             if sid:
                 parsed_sid = sid
