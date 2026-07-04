@@ -45,8 +45,9 @@ export function Stat({ label, value, hint, trailing, tone = 'default', onClick, 
     // The card itself stays a plain <div> so the hint — which may hold its own
     // interactive elements (e.g. clickable SevBadges) — sits beside the button
     // rather than inside it. Nesting a <button> in a <button> is invalid HTML,
-    // breaks hydration, and is an accessibility trap. The label+value act as the
-    // primary click target; severity badges remain independent siblings.
+    // breaks hydration, and is an accessibility trap. The button's ::after is
+    // stretched over the whole card in CSS so the full square is the click
+    // target; severity badges remain independent siblings raised above it.
     return (
       <div className={className}>
         <button type="button" className="term-stat__hitbox" onClick={onClick} aria-label={ariaLabel || label}>
