@@ -32,6 +32,7 @@ function Probe() {
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'pB', runId: 'r' })}>startB</button>
       <button onClick={d.toggle}>toggle</button>
       <button onClick={() => d.sendMessage('hi', { activeTab: 'overview' })}>send</button>
+      <button onClick={d.resetConversation}>reset</button>
     </div>
   );
 }
@@ -148,4 +149,31 @@ it('webEnabled toggles, rides the POST body, and resets on a new session', async
   // switching context (new session) resets the toggle to off
   await act(async () => { screen.getByText('startA').click(); });
   expect(screen.getByTestId('web').textContent).toBe('false');
+});
+
+it('resetConversation mints a fresh session for the same context and clears state', async () => {
+  let n = 0;
+  createAssistantSession.mockImplementation(async () => ({ sessionId: `s-${++n}` }));
+  render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+  await act(async () => { screen.getByText('start').click(); });
+  act(() => { screen.getByText('web').click(); });  // dirty the toggle
+  await act(async () => { screen.getByText('reset').click(); });
+  expect(createAssistantSession).toHaveBeenCalledTimes(2);
+  expect(createAssistantSession).toHaveBeenLastCalledWith(
+    { provider: 'claude', model: 'sonnet', projectId: 'p', runId: 'r' });
+  expect(screen.getByTestId('web').textContent).toBe('false');       // toggle reset
+  expect(screen.getByTestId('provider').textContent).toBe('claude'); // meta kept
+  await act(async () => { screen.getByText('send').click(); });
+  expect(postAssistantMessage).toHaveBeenCalledWith('s-2', expect.objectContaining({ text: 'hi' }));
+});
+
+it('resetConversation is a no-op while a turn is in flight or before any session', async () => {
+  createAssistantSession.mockImplementation(async () => ({ sessionId: 's1' }));
+  render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+  await act(async () => { screen.getByText('reset').click(); });  // no session yet
+  expect(createAssistantSession).not.toHaveBeenCalled();
+  await act(async () => { screen.getByText('start').click(); });
+  await act(async () => { screen.getByText('send').click(); });   // turn in flight
+  await act(async () => { screen.getByText('reset').click(); });
+  expect(createAssistantSession).toHaveBeenCalledTimes(1);
 });

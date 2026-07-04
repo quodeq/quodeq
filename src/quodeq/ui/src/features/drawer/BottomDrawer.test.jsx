@@ -8,6 +8,7 @@ const drawer = {
   maximized: false, toggleMaximized: vi.fn(), setMaximized: vi.fn(),
   provider: 'ollama', model: 'm', messages: [], streaming: false, error: null, sendMessage: vi.fn(),
   webEnabled: false, toggleWebEnabled: vi.fn(),
+  sessionReady: true, resetConversation: vi.fn(),
 };
 vi.mock('../assistant/AssistantDrawerProvider.jsx', () => ({ useAssistantDrawer: () => drawer }));
 vi.mock('../terminal/TerminalPane.jsx', () => ({ default: () => <div data-testid="tty" /> }));
@@ -86,4 +87,29 @@ it('disables the web toggle while a turn is streaming', () => {
   render(<BottomDrawer uiState={{}} />);
   expect(screen.getByRole('button', { name: /web access/i })).toBeDisabled();
   drawer.streaming = false;
+});
+
+it('the new-conversation control resets the conversation', () => {
+  render(<BottomDrawer uiState={{}} />);
+  fireEvent.click(screen.getByRole('button', { name: /new conversation/i }));
+  expect(drawer.resetConversation).toHaveBeenCalled();
+});
+
+it('disables the new-conversation control while streaming and before a session exists', () => {
+  drawer.streaming = true;
+  const { unmount } = render(<BottomDrawer uiState={{}} />);
+  expect(screen.getByRole('button', { name: /new conversation/i })).toBeDisabled();
+  drawer.streaming = false;
+  unmount();
+  drawer.sessionReady = false;
+  render(<BottomDrawer uiState={{}} />);
+  expect(screen.getByRole('button', { name: /new conversation/i })).toBeDisabled();
+  drawer.sessionReady = true;
+});
+
+it('hides the new-conversation control while the terminal tab is active', () => {
+  drawer.activeTab = 'terminal';
+  render(<BottomDrawer uiState={{}} />);
+  expect(screen.queryByRole('button', { name: /new conversation/i })).toBeNull();
+  drawer.activeTab = 'assistant';
 });

@@ -181,9 +181,11 @@ export function AssistantDrawerProvider({ children }) {
     writeStoredHeight(next);
   }, []);
 
-  const startSession = useCallback(async (ctx) => {
-    const key = `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}`;
-    if (key === sessionCtxKey && sessionId) return;
+  // The last committed session context, kept so resetConversation can mint a
+  // fresh session for the SAME project/run/provider.
+  const lastCtxRef = useRef(null);
+
+  const commitSession = useCallback(async (ctx, key) => {
     // Record this as the latest requested context synchronously, before the
     // await, so a later call can invalidate this one's resolution.
     latestKeyRef.current = key;
@@ -198,8 +200,8 @@ export function AssistantDrawerProvider({ children }) {
       }
       return;
     }
-    // Ignore a stale resolution: a newer startSession for a different context
-    // has since been requested, so committing this (older) one would let the
+    // Ignore a stale resolution: a newer request for a different context has
+    // since been made, so committing this (older) one would let the
     // last-resolving response win regardless of request order.
     if (latestKeyRef.current !== key) return;
     setLocalError(null);
@@ -208,7 +210,25 @@ export function AssistantDrawerProvider({ children }) {
     setSessionCtxKey(key);
     setSessionId(created.sessionId);
     setSessionMeta({ provider: ctx?.provider ?? null, model: ctx?.model ?? null });
-  }, [sessionCtxKey, sessionId]);
+    lastCtxRef.current = ctx;
+  }, []);
+
+  const startSession = useCallback(async (ctx) => {
+    const key = `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}`;
+    if (key === sessionCtxKey && sessionId) return;
+    await commitSession(ctx, key);
+  }, [sessionCtxKey, sessionId, commitSession]);
+
+  // Fresh session for the SAME context: each turn replays only its own
+  // session's messages server-side, so a new session id gives the model a
+  // clean history and the stream hook an empty transcript. No-op while a
+  // turn is in flight or before any session exists.
+  const resetConversation = useCallback(async () => {
+    const ctx = lastCtxRef.current;
+    if (!ctx || turnActive) return;
+    const key = `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}`;
+    await commitSession(ctx, key);
+  }, [turnActive, commitSession]);
 
   const sendMessage = useCallback(async (text, uiState) => {
     if (!sessionId) return;
@@ -238,8 +258,8 @@ export function AssistantDrawerProvider({ children }) {
     sessionReady: sessionId != null,
     provider: sessionMeta.provider, model: sessionMeta.model,
     webEnabled, toggleWebEnabled,
-    startSession, sendMessage,
-  }), [isOpen, open, close, toggle, closeActiveTab, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, startSession, sendMessage]);
+    startSession, sendMessage, resetConversation,
+  }), [isOpen, open, close, toggle, closeActiveTab, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, startSession, sendMessage, resetConversation]);
 
   return (
     <AssistantDrawerContext.Provider value={value}>
