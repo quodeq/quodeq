@@ -15,12 +15,23 @@ _SKILLS_DIR = Path(
     )
 )
 
+# Names the client answers locally; a skill file may never shadow them.
+RESERVED_COMMANDS: tuple[tuple[str, str], ...] = (
+    ("help", "Show what the assistant can do here"),
+    ("skills", "List available skill commands"),
+    ("actions", "List actions the assistant can draft"),
+    ("clear", "Start a new conversation"),
+)
+_RESERVED_NAMES = frozenset(name for name, _ in RESERVED_COMMANDS)
+
 
 @dataclass(frozen=True)
 class Skill:
     name: str
     description: str
     instructions: str
+    argument_hint: str = ""
+    views: tuple[str, ...] = ()
 
 
 def _parse(text: str) -> Skill | None:
@@ -36,7 +47,9 @@ def _parse(text: str) -> Skill | None:
         meta[key.strip()] = value.strip()
     if not meta.get("name") or not meta.get("description"):
         return None
-    return Skill(meta["name"], meta["description"], body.strip())
+    views = tuple(v.strip() for v in meta.get("views", "").split(",") if v.strip())
+    return Skill(meta["name"], meta["description"], body.strip(),
+                 argument_hint=meta.get("argument_hint", ""), views=views)
 
 
 def load_skills(skills_dir: Path | None = None) -> dict[str, Skill]:
@@ -48,6 +61,10 @@ def load_skills(skills_dir: Path | None = None) -> dict[str, Skill]:
         skill = _parse(path.read_text(encoding="utf-8"))
         if skill is None:
             _logger.warning("skipping malformed skill file: %s", path)
+            continue
+        if skill.name in _RESERVED_NAMES:
+            _logger.warning("skill name %r is a reserved command; skipping %s",
+                            skill.name, path)
             continue
         skills[skill.name] = skill
     return skills

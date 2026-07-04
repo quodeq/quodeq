@@ -110,7 +110,10 @@ def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
                     return text
                 name, arguments = prompted
                 result = registry.dispatch(name, arguments)
-                emit({"type": "tool_call", "name": name, "ok": result["ok"]})
+                frame = {"type": "tool_call", "name": name, "ok": result["ok"]}
+                if _args_summary(arguments):
+                    frame["argsSummary"] = _args_summary(arguments)
+                emit(frame)
                 fenced, warnings = guard_tool_result(result, name)
                 _emit_warnings(emit, warnings)
                 convo.append({"role": "assistant", "content": text})
@@ -127,12 +130,19 @@ def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
             for call in tool_calls:
                 arguments = _parse_args(call["arguments"])
                 result = registry.dispatch(call["name"], arguments)
-                emit({"type": "tool_call", "name": call["name"], "ok": result["ok"]})
+                frame = {"type": "tool_call", "name": call["name"], "ok": result["ok"]}
+                if _args_summary(arguments):
+                    frame["argsSummary"] = _args_summary(arguments)
+                emit(frame)
                 fenced, warnings = guard_tool_result(result, call["name"])
                 _emit_warnings(emit, warnings)
                 convo.append({"role": "tool", "tool_call_id": call["id"],
                               "content": fenced})
     return text + _CAP_NOTE
+
+
+def _args_summary(arguments: dict) -> str:
+    return json.dumps(arguments, ensure_ascii=False)[:80] if arguments else ""
 
 
 def _parse_args(raw: str) -> dict:

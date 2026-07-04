@@ -1,44 +1,85 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useAssistantDrawer } from './AssistantDrawerProvider.jsx';
 import { MessageList } from './MessageList.jsx';
+import { CommandMenu } from './CommandMenu.jsx';
+import { AssistantWelcome } from './AssistantWelcome.jsx';
+import { buildMetaResponse, matchCommands, parseMetaCommand } from './commands.js';
 
 /**
  * Residual assistant content rendered inside the shared BottomDrawer host.
  * The shell (aside, drag-resize, header controls, isOpen gating) lives in
- * `features/drawer/BottomDrawer.jsx`; this component owns only the title
- * label, the scrollable conversation (MessageList), the error banner, and
- * the monospace prompt input.
+ * `features/drawer/BottomDrawer.jsx`; this component owns the conversation
+ * area (welcome panel or MessageList), the error banner, the slash-command
+ * menu, and the prompt input.
  *
  * `uiState` is passed in as a prop (current app view context, e.g. active
  * tab) and forwarded verbatim to `sendMessage` on every send.
  */
 export function AssistantPane({ uiState }) {
-  // provider/model are shown as a pill in the drawer header (BottomDrawer),
-  // not here — keeps the pane's content area clean.
-  const { messages, streaming, error, sendMessage } = useAssistantDrawer();
+  const {
+    messages, streaming, error, sendMessage,
+    catalog, addLocalExchange, resetConversation,
+  } = useAssistantDrawer();
   const [draft, setDraft] = useState('');
+  const [menuIndex, setMenuIndex] = useState(0);
+  const [menuDismissed, setMenuDismissed] = useState(false);
+
+  const suggestions = useMemo(
+    () => (streaming ? [] : matchCommands(catalog, draft)),
+    [catalog, draft, streaming],
+  );
+  const menuVisible = suggestions.length > 0 && !menuDismissed;
+
+  const acceptSuggestion = useCallback((cmd) => {
+    setDraft(`/${cmd.name} `);
+    setMenuIndex(0);
+  }, []);
 
   const handleSend = useCallback(() => {
     const text = draft.trim();
     if (!text || streaming) return;
+    const meta = parseMetaCommand(text);
+    if (meta === 'clear') { resetConversation(); setDraft(''); return; }
+    if (meta) { addLocalExchange(text, buildMetaResponse(meta, catalog)); setDraft(''); return; }
     sendMessage(text, uiState);
     setDraft('');
-  }, [draft, streaming, sendMessage, uiState]);
+  }, [draft, streaming, sendMessage, uiState, catalog, addLocalExchange, resetConversation]);
 
   const handleKeyDown = useCallback((event) => {
+    if (menuVisible) {
+      if (event.key === 'ArrowDown') { event.preventDefault(); setMenuIndex((i) => (i + 1) % suggestions.length); return; }
+      if (event.key === 'ArrowUp') { event.preventDefault(); setMenuIndex((i) => (i - 1 + suggestions.length) % suggestions.length); return; }
+      if (event.key === 'Escape') { event.preventDefault(); setMenuDismissed(true); return; }
+      if (event.key === 'Tab') { event.preventDefault(); acceptSuggestion(suggestions[menuIndex]); return; }
+      // Enter completes a partial prefix; once the draft IS the command it sends.
+      if (event.key === 'Enter' && !event.shiftKey && draft.trim() !== `/${suggestions[menuIndex].name}`) {
+        event.preventDefault(); acceptSuggestion(suggestions[menuIndex]); return;
+      }
+    }
     if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); handleSend(); }
-  }, [handleSend]);
+  }, [menuVisible, suggestions, menuIndex, draft, acceptSuggestion, handleSend]);
+
+  const handleChange = useCallback((event) => {
+    setDraft(event.target.value);
+    setMenuDismissed(false);
+    setMenuIndex(0);
+  }, []);
 
   return (
     <>
-      <MessageList messages={messages} streaming={streaming} />
+      {messages.length === 0
+        ? <AssistantWelcome catalog={catalog} view={uiState?.view} onPick={setDraft} />
+        : <MessageList messages={messages} streaming={streaming} />}
       {error && <div className="assistant-drawer-error" role="alert">{error}</div>}
       <div className="assistant-drawer-input-row">
+        {menuVisible && (
+          <CommandMenu suggestions={suggestions} selectedIndex={menuIndex} onPick={acceptSuggestion} />
+        )}
         <textarea
           className="assistant-drawer-input"
           placeholder="Ask the assistant…"
           value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
           disabled={streaming}
           rows={1}

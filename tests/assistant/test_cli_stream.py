@@ -1,3 +1,4 @@
+from quodeq.assistant.adapters import _stream
 from quodeq.assistant.adapters._stream import (
     assistant_text, parse_line, session_id, tool_uses,
 )
@@ -50,3 +51,18 @@ def test_session_id_from_system_and_result():
     assert session_id({"type": "result", "session_id": "uuid-2"}) == "uuid-2"
     assert session_id({"type": "assistant", "message": {"content": []}}) is None
     assert session_id({"type": "session.created", "thread_id": "th-9"}) == "th-9"
+
+
+def test_tool_use_details_includes_args_summary():
+    event = {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "get_report",
+         "input": {"dimension": "security"}}]}}
+    assert _stream.tool_use_details(event) == [
+        {"name": "get_report", "args_summary": '{"dimension": "security"}'}]
+
+
+def test_tool_use_details_empty_input_gives_empty_summary():
+    event = {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "get_scores", "input": {}}]}}
+    assert _stream.tool_use_details(event) == [
+        {"name": "get_scores", "args_summary": ""}]

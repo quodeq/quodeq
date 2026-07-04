@@ -249,3 +249,36 @@ def test_web_enabled_threads_to_cli_config(setup, monkeypatch):
                       web_enabled=True)
     run_turn(req, repository=repo, tool_ctx=ctx)
     assert seen["config"].web_enabled is True
+
+
+def test_cli_config_carries_system_prompt_and_skill_block(setup):
+    repo, ctx = setup
+    captured = {}
+
+    def fake_cli(*, messages, config, session_id, prior_session_id, repository, emit):
+        captured["config"] = config
+        return "answer"
+
+    request = TurnRequest(session_id="s1", text="/explain-score security",
+                          ui_state=None, api_base="", api_key=None,
+                          provider="claude", model="sonnet")
+    run_turn(request, repository=repo, tool_ctx=ctx, cli_turn_fn=fake_cli)
+    cfg = captured["config"]
+    assert "# Active skill: explain-score" in cfg.system_prompt
+    assert cfg.skill_block.startswith("[skill:explain-score]\n")
+
+
+def test_cli_config_skill_block_empty_without_skill(setup):
+    repo, ctx = setup
+    captured = {}
+
+    def fake_cli(*, messages, config, session_id, prior_session_id, repository, emit):
+        captured["config"] = config
+        return "answer"
+
+    request = TurnRequest(session_id="s1", text="hello",
+                          ui_state=None, api_base="", api_key=None,
+                          provider="claude", model="sonnet")
+    run_turn(request, repository=repo, tool_ctx=ctx, cli_turn_fn=fake_cli)
+    assert captured["config"].skill_block == ""
+    assert captured["config"].system_prompt  # context always present

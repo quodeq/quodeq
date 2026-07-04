@@ -416,3 +416,17 @@ def test_apply_invalid_payload_400(client, app):
     assert resp.status_code == 400
     assert resp.get_json()["error"]
     assert repo.get_action("a-bad")["status"] == "drafted"
+
+
+def test_assistant_catalog(client):
+    resp = client.get("/api/assistant/skills")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert [c["name"] for c in body["commands"]] == ["help", "skills", "actions", "clear"]
+    names = {s["name"] for s in body["skills"]}
+    assert {"create-standard", "explain-finding", "explain-score"} <= names
+    one = next(s for s in body["skills"] if s["name"] == "explain-score")
+    assert one["argumentHint"] and isinstance(one["views"], list)
+    assert body["actions"] == [
+        {"type": "create_standard",
+         "description": "Draft a new custom standard. Applied only after you approve the preview card."}]

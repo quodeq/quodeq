@@ -1,6 +1,8 @@
 ---
 name: explain-finding
 description: Explain a finding in depth, with code context
+argument_hint: [file:line or search terms]
+views: violations
 ---
 The user wants to understand one finding (usually the one selected in
 `[ui-state]`). Use `search_findings` to fetch it, then `read_repo_file` on the

@@ -117,3 +117,19 @@ def test_with_web_access_pure_and_idempotent():
     once = _with_web_access(args)
     assert args == original  # input not mutated
     assert _with_web_access(once) == once  # applying twice equals applying once
+
+
+def test_claude_appends_system_prompt():
+    spec = _spec("claude", system_prompt="CTX RULES")
+    i = spec.argv.index("--append-system-prompt")
+    assert spec.argv[i + 1] == "CTX RULES"
+    assert spec.argv[-2:] == ["-p", "hi"]  # prompt stays last
+
+
+def test_claude_no_append_flag_without_system_prompt():
+    assert "--append-system-prompt" not in _spec("claude").argv
+
+
+def test_message_prefix_providers_never_get_append_flag():
+    assert "--append-system-prompt" not in _spec("codex", system_prompt="CTX").argv
+    assert "--append-system-prompt" not in _spec("gemini", system_prompt="CTX").argv

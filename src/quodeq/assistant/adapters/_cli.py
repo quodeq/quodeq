@@ -33,6 +33,8 @@ class CliTurnConfig:
     mcp_server_args: list[str]
     db_path: Path
     web_enabled: bool = False
+    system_prompt: str = ""
+    skill_block: str = ""
 
 
 def _latest_user(messages: list[dict]) -> str:
@@ -64,10 +66,14 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
     timer = None
     cwd = None
     try:
+        # argv-append providers get the system prompt every run; on the
+        # rebuild-replay path the transcript also carries a [system] block,
+        # a rare accepted duplication.
         spec = build_turn_argv(cli_cfg, prompt=prompt, model=cfg.model,
                                mcp_config_path=mcp_config_path,
                                prior_session_id=prior_session_id, new_session_id=new_session_id,
-                               web_enabled=cfg.web_enabled)
+                               web_enabled=cfg.web_enabled,
+                               system_prompt=cfg.system_prompt)
         cwd = scratch_cwd(cfg.scratch_base)
         proc = spawn_fn(spec.argv, cwd=cwd, env=build_chat_env())
         # wall-clock guard: a hung/silent CLI can't wedge the turn slot forever
@@ -91,8 +97,11 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
                     continue
                 emit({"type": "token", "text": t})
                 last_emitted = t
-            for name in _stream.tool_uses(event):
-                emit({"type": "tool_call", "name": name})
+            for tu in _stream.tool_use_details(event):
+                frame = {"type": "tool_call", "name": tu["name"]}
+                if tu["args_summary"]:
+                    frame["argsSummary"] = tu["args_summary"]
+                emit(frame)
             sid = _stream.session_id(event)
             if sid:
                 parsed_sid = sid
@@ -123,8 +132,14 @@ def run_cli_turn(*, messages: list[dict], config: CliTurnConfig, session_id: str
                  emit: Callable[[dict], None], spawn_fn=None) -> str:
     spawn_fn = spawn_fn or spawn_turn
     cli_cfg = load_cli_chat_config(config.provider)
+    prompt = _latest_user(messages)
+    if config.skill_block and cli_cfg.system_prompt_style == "message-prefix":
+        # argv-append providers carry the skill inside --append-system-prompt;
+        # message-prefix providers get it inline because normal turns send
+        # only the latest user message.
+        prompt = f"{config.skill_block}\n\n{prompt}"
     final, _sid, _rc = _run_once(
-        config, cli_cfg, prompt=_latest_user(messages), session_id=session_id,
+        config, cli_cfg, prompt=prompt, session_id=session_id,
         prior_session_id=prior_session_id, new_session_id=str(uuid.uuid4()),
         repository=repository, emit=emit, spawn_fn=spawn_fn)
     # replay only on a genuinely empty result; a non-empty answer is success

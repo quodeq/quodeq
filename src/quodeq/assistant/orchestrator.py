@@ -84,6 +84,8 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
                      "content": build_system_prompt(skill=skill, web_enabled=web_tools_on)},
                     *({"role": m["role"], "content": m["content"]} for m in history)]
         if _provider_type(request.provider) == "cli":
+            skill_block = (f"[skill:{skill.name}]\n{skill.instructions}"
+                           if skill is not None else "")
             final = cli_turn_fn(
                 messages=messages,
                 config=CliTurnConfig(
@@ -92,6 +94,8 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
                     mcp_server_args=_mcp_server_args(request, tool_ctx),
                     db_path=tool_ctx.repository.db_path,
                     web_enabled=request.web_enabled,
+                    system_prompt=messages[0]["content"],
+                    skill_block=skill_block,
                 ),
                 session_id=request.session_id,
                 prior_session_id=(repository.get_session(request.session_id) or {}).get("cli_session_id"),

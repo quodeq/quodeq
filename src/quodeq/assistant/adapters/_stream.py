@@ -45,7 +45,8 @@ def assistant_text(event: dict) -> list[str]:
     return []
 
 
-def tool_uses(event: dict) -> list[str]:
+def tool_use_details(event: dict) -> list[dict]:
+    """tool_use blocks as {name, args_summary}; args JSON truncated for display."""
     if event.get("type") == "assistant":
         msg = event.get("message")
         blocks = msg.get("content") if isinstance(msg, dict) else None
@@ -54,12 +55,19 @@ def tool_uses(event: dict) -> list[str]:
         blocks = item.get("content") if isinstance(item, dict) else None
     else:
         blocks = None
-    names = []
+    details = []
     if isinstance(blocks, list):
         for b in blocks:
             if isinstance(b, dict) and b.get("type") == "tool_use" and isinstance(b.get("name"), str):
-                names.append(b["name"])
-    return names
+                args = b.get("input")
+                summary = (json.dumps(args, ensure_ascii=False)[:80]
+                           if isinstance(args, dict) and args else "")
+                details.append({"name": b["name"], "args_summary": summary})
+    return details
+
+
+def tool_uses(event: dict) -> list[str]:
+    return [d["name"] for d in tool_use_details(event)]
 
 
 def session_id(event: dict) -> str | None:

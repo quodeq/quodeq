@@ -96,6 +96,19 @@ def test_fallback_mode_uses_prompted_json_and_no_tools_param():
     assert "tool_call" in client.calls[0]["messages"][0]["content"]  # contract in system
 
 
+def test_tool_call_frame_carries_args_summary():
+    turn1 = [_delta('{"tool_call": {"name": "get_scores", "arguments": {"dimension": "security"}}}'),
+             _delta(finish="stop")]
+    turn2 = [_delta("C grade"), _delta(finish="stop")]
+    client = FakeClient([turn1, turn2])
+    frames = []
+    run_api_turn(messages=[{"role": "user", "content": "score?"}],
+                 config=_config(native=False), registry=_registry(),
+                 emit=frames.append, client_factory=lambda c: client)
+    tool_frames = [f for f in frames if f["type"] == "tool_call"]
+    assert tool_frames and tool_frames[0]["argsSummary"].startswith('{"')
+
+
 def test_iteration_cap_ends_turn():
     looping = [
         _delta(tool_calls=[_tool_call_delta(0, "c1", "get_scores", "{}")]),

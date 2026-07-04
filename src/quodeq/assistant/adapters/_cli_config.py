@@ -19,6 +19,7 @@ class CliChatConfig:
     resume_style: str
     session_id_source: str
     supports_tools: bool
+    system_prompt_style: str
 
 
 def load_cli_chat_config(provider_id: str) -> CliChatConfig:
@@ -39,4 +40,5 @@ def load_cli_chat_config(provider_id: str) -> CliChatConfig:
         resume_style=assistant.get("resume_style", "flag-resume"),
         session_id_source=assistant.get("session_id_source", "preassign"),
         supports_tools=cfg.get("supports_tools", True),
+        system_prompt_style=assistant.get("system_prompt_style", "message-prefix"),
     )

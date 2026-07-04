@@ -11,6 +11,10 @@ from quodeq.services.import_validator import validate_import
 
 ACTION_TYPES = frozenset({"create_standard"})
 
+ACTION_DESCRIPTIONS = {
+    "create_standard": "Draft a new custom standard. Applied only after you approve the preview card.",
+}
+
 
 def _draft_action(ctx: ToolContext, action_type: str, payload: dict) -> dict:
     if action_type not in ACTION_TYPES:
