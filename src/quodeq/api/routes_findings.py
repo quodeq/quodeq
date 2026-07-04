@@ -170,6 +170,8 @@ def rescore_with_fallback(
         lock = _get_projection_lock(project)
 
         def _bg_project() -> None:
+            # Non-blocking acquire on purpose: skip rather than queue.
+            # An in-flight projection already covers the latest actions.
             if not lock.acquire(blocking=False):
                 return
             try:

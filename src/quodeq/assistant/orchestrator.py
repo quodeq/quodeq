@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from quodeq.assistant import get_provider_configs
 from quodeq.assistant._context import build_system_prompt, build_turn_message
 from quodeq.assistant.adapters._api import ApiTurnConfig, run_api_turn
-from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS
 from quodeq.assistant.adapters._capabilities import supports_native_tools
 from quodeq.assistant.adapters._cli import CliTurnConfig, run_cli_turn
+from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS
 from quodeq.assistant.skills import load_skills
 from quodeq.assistant.tools import ToolContext, build_registry, register_web_tools
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
