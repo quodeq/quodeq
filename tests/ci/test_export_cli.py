@@ -42,6 +42,21 @@ def test_handle_export_writes_valid_sarif(tmp_path):
     assert len(doc["runs"][0]["results"]) == 1
 
 
+def test_handle_export_expands_user_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    eval_dir = tmp_path / "evaluation"
+    _write_report(eval_dir, "reliability", [
+        {"principle": "Fault Tolerance", "file": "app.py", "line": 1, "severity": "major",
+         "title": "t", "reason": "r", "req": "R-FT-1", "req_refs": []},
+    ])
+
+    code = handle_export(_args(evaluation_dir=str(eval_dir), output="~/out/report.sarif"))
+
+    assert code == 0
+    assert (tmp_path / "out" / "report.sarif").exists()
+
+
 def test_handle_export_missing_dir_returns_error(tmp_path, capsys):
     out = tmp_path / "out.sarif"
     code = handle_export(_args(evaluation_dir=str(tmp_path / "nope"), output=str(out)))
