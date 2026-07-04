@@ -51,6 +51,8 @@ def verified_entries(project_dir: Path) -> list[dict]:
             key = (str(p.req or ""), str(p.file or ""), int(p.line or 0))
             entries[key] = {
                 "req": key[0], "file": key[1], "line": key[2],
+                # note is always a string in entries; absent notes normalize
+                # to "" so JSON and UI consumers never see null.
                 "note": p.note or "",
                 "verifiedAt": event.timestamp.isoformat(),
             }

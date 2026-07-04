@@ -27,6 +27,11 @@ def test_verified_and_dismissed_coexist_in_one_log(tmp_path):
     assert [e["req"] for e in verified_entries(tmp_path)] == ["r1"]
 
 
+def test_verify_without_note_yields_empty_string(tmp_path):
+    verify_finding(tmp_path, {"req": "r1", "file": "a.py", "line": 3})
+    assert verified_entries(tmp_path)[0]["note"] == ""
+
+
 def test_reader_skips_unknown_event_types(tmp_path):
     verify_finding(tmp_path, {"req": "r1", "file": "a.py", "line": 3, "note": "n"})
     log = tmp_path / "actions.jsonl"
