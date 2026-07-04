@@ -6,9 +6,14 @@
 export const META_COMMANDS = [
   { name: 'help', description: 'Show what the assistant can do here' },
   { name: 'skills', description: 'List available skill commands' },
-  { name: 'actions', description: 'List actions the assistant can draft' },
+  // Still answered locally if typed, but hidden from the welcome list,
+  // /help, and autocomplete until the Phase 2 action registry gives it
+  // more than one entry. The name stays reserved server-side.
+  { name: 'actions', description: 'List actions the assistant can draft', hidden: true },
   { name: 'clear', description: 'Start a new conversation' },
 ];
+
+export const VISIBLE_META_COMMANDS = META_COMMANDS.filter((c) => !c.hidden);
 
 export function parseMetaCommand(text) {
   const first = text.trim().split(/\s+/)[0];
@@ -23,14 +28,14 @@ export function matchCommands(catalog, draft) {
   const skills = (catalog?.skills ?? []).map((s) => ({
     name: s.name, description: s.description, argumentHint: s.argumentHint || '',
   }));
-  return [...META_COMMANDS.map((c) => ({ ...c, argumentHint: '' })), ...skills]
+  return [...VISIBLE_META_COMMANDS.map((c) => ({ ...c, argumentHint: '' })), ...skills]
     .filter((c) => c.name.startsWith(prefix));
 }
 
 function commandLines(catalog) {
   const skills = catalog?.skills ?? [];
   return [
-    ...META_COMMANDS.map((c) => `- \`/${c.name}\` ${c.description}`),
+    ...VISIBLE_META_COMMANDS.map((c) => `- \`/${c.name}\` ${c.description}`),
     ...skills.map((s) => `- \`/${s.name}${s.argumentHint ? ` ${s.argumentHint}` : ''}\` ${s.description}`),
   ].join('\n');
 }
@@ -51,8 +56,12 @@ export function buildMetaResponse(kind, catalog) {
 
 export function pillsForView(catalog, view) {
   if (!view) return [];
-  return (catalog?.skills ?? [])
-    .filter((s) => (s.views ?? []).includes(view))
+  const skills = catalog?.skills ?? [];
+  // View-relevant skills lead; the rest follow so any view with context
+  // offers every skill as a pill (skills appear only here, not as text).
+  const matching = skills.filter((s) => (s.views ?? []).includes(view));
+  const rest = skills.filter((s) => !(s.views ?? []).includes(view));
+  return [...matching, ...rest]
     .slice(0, 4)
     .map((s) => ({
       label: s.name.replace(/-/g, ' ').replace(/^./, (ch) => ch.toUpperCase()),
