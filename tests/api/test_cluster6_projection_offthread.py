@@ -13,7 +13,8 @@ from unittest.mock import patch, MagicMock
 import pytest
 from flask import Flask
 
-from quodeq.api.routes_findings import register_findings_routes, _projection_locks
+from quodeq.api.routes_findings import register_findings_routes
+from quodeq.services.mutation_rescore import _projection_locks
 
 
 @pytest.fixture()
@@ -42,7 +43,7 @@ def test_dismiss_returns_without_waiting_for_projection(client, tmp_path):
         projection_may_finish.wait(timeout=5)
 
     with patch(
-        "quodeq.api.routes_findings._project_all_runs",
+        "quodeq.services.mutation_rescore._project_all_runs",
         side_effect=_slow_project,
     ):
         resp = client.post("/api/findings/dismiss", json={
@@ -95,7 +96,7 @@ def test_concurrent_dismisses_same_project_call_project_all_runs_once(
         projection_first_may_finish.wait(timeout=5)
 
     with patch(
-        "quodeq.api.routes_findings._project_all_runs",
+        "quodeq.services.mutation_rescore._project_all_runs",
         side_effect=_blocking_project,
     ):
         # Fire first request and wait until projection has started (lock held).

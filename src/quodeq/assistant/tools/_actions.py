@@ -91,7 +91,7 @@ def _summarize_dismiss_finding(canonical: dict) -> dict:
 
 
 def _apply_dismiss_finding(payload: dict, app: Flask) -> dict:
-    from quodeq.api.routes_findings import rescore_with_fallback  # noqa: PLC0415
+    from quodeq.services.mutation_rescore import rescore_with_fallback  # noqa: PLC0415
     from quodeq.services.dismissed import dismiss_finding  # noqa: PLC0415
     from quodeq.shared._env import get_evaluations_dir  # noqa: PLC0415
 
