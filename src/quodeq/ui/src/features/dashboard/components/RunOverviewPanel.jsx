@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import DimensionGaugeCard from './DimensionGaugeCard.jsx';
+import RunOverviewSkeleton from './RunOverviewSkeleton.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations, buildProjectRootFile } from '../../../utils/explorerUtils.js';
@@ -190,26 +190,21 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, projectName
   }, [dashboard]);
 
   const isLoading = !dashboard || !dashboard.dimensions;
+  if (isLoading) return <RunOverviewSkeleton dateLabel={runDateLabel} />;
   const dimCount = (dashboard?.dimensions || []).length;
 
   return (
-    <div className={`run-overview-fade ${isLoading ? 'run-overview-loading' : 'run-overview-ready'}`}>
-      {isLoading ? (
-        <div className="run-overview-spinner"><LoadingScreen /></div>
-      ) : (
-        <>
-          <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} runSummary={runSummary} onCardNavigate={onCardNavigate} />
-          <section className="quality-dimensions" aria-label="Quality dimensions">
-            <div className="quality-dimensions__head">
-              <SectionLabel>quality_dimensions · {dimCount}</SectionLabel>
-            </div>
-            <div className="dimensions-panel">
-              <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} trendDeltas={trendDeltas} />
-            </div>
-          </section>
-          <RunFileViolations runTopFiles={runTopFiles} onFileClick={onFileClick} />
-        </>
-      )}
+    <div className="run-overview-fade run-overview-ready">
+      <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} runSummary={runSummary} onCardNavigate={onCardNavigate} />
+      <section className="quality-dimensions" aria-label="Quality dimensions">
+        <div className="quality-dimensions__head">
+          <SectionLabel>quality_dimensions · {dimCount}</SectionLabel>
+        </div>
+        <div className="dimensions-panel">
+          <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} trendDeltas={trendDeltas} />
+        </div>
+      </section>
+      <RunFileViolations runTopFiles={runTopFiles} onFileClick={onFileClick} />
     </div>
   );
 }

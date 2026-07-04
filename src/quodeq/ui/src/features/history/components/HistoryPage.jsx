@@ -9,6 +9,7 @@ const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
 
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
 import { useRunNavigator } from '../../../hooks/useRunNavigator.js';
+import { usePrefetchRun } from '../../dashboard/hooks/usePrefetchRun.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards } from '../../../utils/scoreFiltering.js';
 import { TermHeader } from '../../../components/terminal/index.js';
@@ -130,7 +131,7 @@ function NotReadyToast({ message, onDismiss }) {
  *
  *   [ DATE ][ TIME ][ GRADE ][ SCORE ][ Δ ][ DIMENSIONS (flex) ]
  */
-function HistoryRow({ className = '', onClick, cells, onDelete, title }) {
+function HistoryRow({ className = '', onClick, onHover, cells, onDelete, title }) {
   const common = `history-row ${className}`.trim();
   const isHeader = className.includes('history-row--header');
   function handleDeleteClick(e) {
@@ -138,7 +139,7 @@ function HistoryRow({ className = '', onClick, cells, onDelete, title }) {
     onDelete?.();
   }
   return (
-    <div className={common} onClick={onClick} role={onClick ? 'button' : 'row'} tabIndex={onClick ? 0 : undefined} title={title}>
+    <div className={common} onClick={onClick} onMouseEnter={onHover} onFocus={onHover} role={onClick ? 'button' : 'row'} tabIndex={onClick ? 0 : undefined} title={title}>
       <div className="history-row__col history-row__col--date">{cells.date}</div>
       <div className="history-row__col history-row__col--time">{cells.time}</div>
       <div className="history-row__col history-row__col--grade">{cells.grade}</div>
@@ -209,7 +210,7 @@ function InProgressHistoryRow({ entry, onClick, onNotReadyClick }) {
   );
 }
 
-function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRunClick, onDeleteRun, onNotReadyClick }) {
+function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRunClick, onRunHover, onDeleteRun, onNotReadyClick }) {
   return (
     <section className="history-evaluations panel">
       <div className="history-evaluations__header">
@@ -249,6 +250,7 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
               key={entry.runId}
               className={`${isSelected ? 'history-row--selected' : ''}${isPartial ? ' history-row--partial' : ''}`.trim()}
               onClick={() => onRunClick(entry.runId, entry.dateLabel)}
+              onHover={onRunHover ? () => onRunHover(entry.runId) : undefined}
               onDelete={onDeleteRun ? () => onDeleteRun(entry.runId, entry.dateLabel || date) : undefined}
               cells={{
                 date,
@@ -284,7 +286,7 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
 
 function HistoryContent({ data, callbacks, runNav, languageSub }) {
   const { trend, selectedRunId, availableRuns } = data;
-  const { onRunClick, onRunChange, onDeleteRun } = callbacks;
+  const { onRunClick, onRunHover, onRunChange, onDeleteRun } = callbacks;
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
   const inProgressStubs = useMemo(() => buildInProgressStubs(availableRuns, trend), [availableRuns, trend]);
   // Toast state for clicks on running runs that have no scored dimensions yet.
@@ -344,6 +346,7 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
         deltas={deltas}
         statusByRunId={statusByRunId}
         onRunClick={onRunClick}
+        onRunHover={onRunHover}
         onDeleteRun={onDeleteRun}
         onNotReadyClick={handleNotReadyClick}
       />
@@ -367,6 +370,8 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   // to "complete" without the user manually reloading. Scoped to this
   // page only — other tabs don't poll.
   useRunningRunsRefresh({ selectedProject, availableRuns });
+  // Warm the run-detail cache on row hover so clicking through is instant.
+  const prefetchRun = usePrefetchRun(selectedProject);
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
   const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet), [rawTrend, visibleSet]);
 
@@ -459,7 +464,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   return (
     <HistoryContent
       data={{ trend, selectedRunId, availableRuns }}
-      callbacks={{ onRunClick, onRunChange, onDeleteRun: handleDeleteRun }}
+      callbacks={{ onRunClick, onRunHover: prefetchRun, onRunChange, onDeleteRun: handleDeleteRun }}
       runNav={{ runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest }}
       languageSub={languageSub}
     />
