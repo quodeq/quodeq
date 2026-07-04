@@ -503,3 +503,16 @@ def test_assistant_catalog(client):
     assert body["actions"] == [
         {"type": "create_standard",
          "description": "Draft a new custom standard. Applied only after you approve the preview card."}]
+
+
+def test_reject_after_apply_conflicts(client, app):
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(action_id="a1", session_id="s1",
+                       action_type="create_standard", payload=_VALID_STANDARD,
+                       content_hash="h")
+    assert client.post("/api/assistant/actions/a1/apply").status_code == 200
+    resp = client.post("/api/assistant/actions/a1/reject")
+    assert resp.status_code == 409
+    sess = repo.get_action("a1")
+    assert sess["status"] == "applied"  # apply outcome survives the replay
