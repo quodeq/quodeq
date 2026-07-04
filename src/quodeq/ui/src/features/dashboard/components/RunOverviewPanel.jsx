@@ -53,13 +53,14 @@ function SeverityBadgeRow({ severity, onSeverityClick }) {
   );
 }
 
-function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNavigate }) {
+export function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNavigate }) {
   const dateLabel = dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId);
   const scoreNum = parseFloat(runSummary.numericAverage);
   const scoreDisplay = isNaN(scoreNum) ? '—' : scoreNum.toFixed(1);
   const grade = runSummary.overallGrade;
   const violations = runSummary.totalViolations || 0;
   const compliance = runSummary.totalCompliance || 0;
+  const dismissed = runSummary.dismissed || 0;
   const totalChecks = violations + compliance;
   const ratio = complianceRatio(violations, compliance);
 
@@ -81,7 +82,14 @@ function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNavigate }
         <Stat
           label="VIOLATIONS"
           value={violations}
-          hint={<SeverityBadgeRow severity={runSummary.severity} onSeverityClick={handleSeverity} />}
+          hint={
+            <>
+              <SeverityBadgeRow severity={runSummary.severity} onSeverityClick={handleSeverity} />
+              {dismissed > 0 && (
+                <span className="term-stat__dismissed-note">{dismissed} dismissed hidden</span>
+              )}
+            </>
+          }
           onClick={handleViolations}
           ariaLabel={violations > 0 ? 'Show all violations for this run' : undefined}
         />

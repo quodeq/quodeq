@@ -493,6 +493,18 @@ button.term-sev-badge--clickable:focus-visible {
   gap: var(--term-space-1);
   align-items: center;
 }
+/* Quiet meta note beside the severity badges: how many re-found findings the
+   project-level dismissed filter hid from this run view. */
+.term-stat__dismissed-note {
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.acc-eval-sev-row + .term-stat__dismissed-note {
+  margin-left: var(--term-space-2);
+}
 
 /* ------------------------------------------------------------
    Violations (migrated) — terminal-style flag row & sev row

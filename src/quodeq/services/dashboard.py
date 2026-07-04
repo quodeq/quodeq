@@ -22,7 +22,9 @@ from quodeq.services.ports import (
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services._dashboard_trend import build_accumulated_trend
+from quodeq.services.deleted import filter_deleted_from_dimensions
 from quodeq.services.dim_resolution import is_eligible_for_default_view
+from quodeq.services.dismissed import filter_dismissed_from_dimensions
 
 _logger = logging.getLogger(__name__)
 
@@ -285,6 +287,22 @@ def _attach_exit_reason_to_dim(
     return out
 
 
+def _attach_dismissed_count_to_dim(
+    dim_dict: dict[str, Any], dismissed_counts: dict[str, int],
+) -> dict[str, Any]:
+    """Add ``dismissedCount`` to a serialized dimension dict when > 0.
+
+    The count says how many of the scan's re-found violations were hidden by
+    the project-level dismissed filter, so the UI can explain the gap between
+    "what the scan found" and "what the view shows". Omitted when nothing was
+    filtered, mirroring the exitReason convention.
+    """
+    count = dismissed_counts.get(dim_dict.get("dimension") or "", 0)
+    if count <= 0:
+        return dim_dict
+    return {**dim_dict, "dismissedCount": count}
+
+
 def _build_dashboard_result(
     project: str,
     runs: list[RunInfo],
@@ -292,10 +310,14 @@ def _build_dashboard_result(
     payload: _DashboardPayload,
     *,
     exit_reason: str | None = None,
+    dismissed_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Assemble the final dashboard response dict from pre-computed parts."""
     dim_dicts = [
-        _attach_exit_reason_to_dim(to_camel_dict(d), exit_reason)
+        _attach_dismissed_count_to_dim(
+            _attach_exit_reason_to_dim(to_camel_dict(d), exit_reason),
+            dismissed_counts or {},
+        )
         for d in payload.dimensions_with_trend
     ]
     return {
@@ -453,10 +475,22 @@ def build_dashboard(
 
     selected_run, selected_index = _resolve_selected_run(runs, run)
     # read_run_data overlays the SQL grade tables for event-log runs, so the
-    # selected run's dims (and the summary derived from them) already reflect
-    # dismisses and any applied grade formula. Passing *params* keeps the
-    # aggregate threshold labels and dimension weights in sync.
+    # selected run's GRADES already reflect dismissals and any applied grade
+    # formula. The violations/totals, however, come verbatim from the frozen
+    # eval JSON, which by design keeps everything the scan found - including
+    # findings the user dismissed in an earlier run. Apply the same read-time
+    # dismissed/deleted filters as the dimension detail and the accumulated
+    # overview, or a long-dismissed critical resurfaces in the history run
+    # view with counts that contradict its own grade.
     selected_dims = read_run_data(reports_root, project, selected_run.run_id)
+    project_dir = reports_root / project
+    pre_filter_counts = {d.dimension: len(d.violations) for d in selected_dims}
+    selected_dims = filter_dismissed_from_dimensions(selected_dims, project_dir)
+    dismissed_counts = {
+        (d.dimension or ""): pre_filter_counts.get(d.dimension, 0) - len(d.violations)
+        for d in selected_dims
+    }
+    selected_dims = filter_deleted_from_dimensions(selected_dims, project_dir)
     ctx = _SelectedRunContext(
         run=selected_run,
         index=selected_index,
@@ -466,5 +500,6 @@ def build_dashboard(
     payload = _compute_dashboard_payload(reports_root, project, runs, ctx, cc, params)
     exit_reason = _read_run_exit_reason(reports_root, project, selected_run.run_id)
     return _build_dashboard_result(
-        project, runs, selected_run, payload, exit_reason=exit_reason,
+        project, runs, selected_run, payload,
+        exit_reason=exit_reason, dismissed_counts=dismissed_counts,
     )

@@ -693,3 +693,99 @@ class TestDashboardSqlOverlayAfterConfidenceFix:
         sec = result["dimensions"][0]
         assert sec["overallScore"] == "7.7/10"
         assert sec["overallGrade"] == "Good"
+
+
+class TestBuildDashboardDismissedFiltering:
+    """The run-level dashboard payload must not resurface findings the user
+    dismissed or deleted at project level.
+
+    Regression for the 2026-07-04 report: run 03c99d26 showed "1 critical"
+    in the history run view for a finding dismissed on 2026-06-20, while the
+    dimension detail (which applies the dismissed-keys filter) correctly hid
+    it. The run view, the dimension detail, and the accumulated overview must
+    all read through the same dismissal semantics.
+    """
+
+    def _write_run(self, reports, project="proj", run_id="20260101T000000"):
+        """A legacy-style on-disk run with two violations in one dimension."""
+        import json as _json
+
+        run_dir = reports / project / run_id
+        eval_dir = run_dir / "evaluation"
+        eval_dir.mkdir(parents=True)
+        violations = [
+            {
+                "principle": "N/A", "req": "N/A",
+                "file": "src/a.py", "line": 73,
+                "title": "Arbitrary file read", "severity": "critical",
+            },
+            {
+                "principle": "Modularity", "req": "M-MOD-1",
+                "file": "src/b.py", "line": 5,
+                "title": "Oversized function", "severity": "major",
+            },
+        ]
+        (eval_dir / "maintainability.json").write_text(_json.dumps({
+            "dimension": "maintainability",
+            "overallScore": "6.0/10", "overallGrade": "Fair",
+            "principles": [], "violations": violations, "compliance": [],
+            "totals": {
+                "violationCount": 2, "complianceCount": 0,
+                "severity": {"critical": 1, "major": 1, "minor": 0},
+            },
+        }), encoding="utf-8")
+        evidence_dir = run_dir / "evidence"
+        evidence_dir.mkdir(parents=True)
+        (evidence_dir / "manifest.json").write_text('{"language_stats": {}}', encoding="utf-8")
+        return run_dir
+
+    def test_dismissed_finding_excluded_and_totals_recounted(self, tmp_path):
+        from quodeq.services.dismissed import dismiss_finding
+
+        self._write_run(tmp_path)
+        dismiss_finding(tmp_path / "proj", {"req": "N/A", "file": "src/a.py", "line": 73})
+
+        result = build_dashboard(str(tmp_path), "proj", "latest")
+
+        dim = result["dimensions"][0]
+        assert [v["file"] for v in dim["violations"]] == ["src/b.py"]
+        assert dim["totals"]["violationCount"] == 1
+        assert dim["totals"]["severity"]["critical"] == 0
+        assert dim["totals"]["severity"]["major"] == 1
+
+    def test_dismissed_count_attached_to_dimension(self, tmp_path):
+        from quodeq.services.dismissed import dismiss_finding
+
+        self._write_run(tmp_path)
+        dismiss_finding(tmp_path / "proj", {"req": "N/A", "file": "src/a.py", "line": 73})
+
+        result = build_dashboard(str(tmp_path), "proj", "latest")
+
+        assert result["dimensions"][0]["dismissedCount"] == 1
+
+    def test_no_dismissals_leaves_payload_unchanged(self, tmp_path):
+        self._write_run(tmp_path)
+
+        result = build_dashboard(str(tmp_path), "proj", "latest")
+
+        dim = result["dimensions"][0]
+        assert len(dim["violations"]) == 2
+        assert dim["totals"]["violationCount"] == 2
+        assert dim["totals"]["severity"]["critical"] == 1
+        assert "dismissedCount" not in dim
+
+    def test_deleted_finding_excluded_without_dismissed_count(self, tmp_path):
+        from quodeq.services.deleted import delete_finding
+
+        self._write_run(tmp_path)
+        delete_finding(tmp_path / "proj", {
+            "dimension": "maintainability", "principle": "Modularity", "file": "src/b.py",
+        })
+
+        result = build_dashboard(str(tmp_path), "proj", "latest")
+
+        dim = result["dimensions"][0]
+        assert [v["file"] for v in dim["violations"]] == ["src/a.py"]
+        assert dim["totals"]["violationCount"] == 1
+        # Deleted findings are suppressed, not "dismissed": no count is shown.
+        assert "dismissedCount" not in dim
