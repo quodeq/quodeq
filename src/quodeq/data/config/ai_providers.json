@@ -39,7 +39,8 @@
                          "--disallowedTools", "Bash Edit Write NotebookEdit WebFetch WebSearch",
                          "--allowedTools", "mcp__quodeq-assistant", "--strict-mcp-config"],
       "resume_style": "flag-resume",
-      "session_id_source": "preassign"
+      "session_id_source": "preassign",
+      "system_prompt_style": "argv-append"
     }
   },
   "codex": {
@@ -59,7 +60,8 @@
     "assistant": {
       "assistant_args": ["--json", "-s", "read-only", "-a", "never"],
       "resume_style": "exec-resume",
-      "session_id_source": "parse-jsonl"
+      "session_id_source": "parse-jsonl",
+      "system_prompt_style": "message-prefix"
     }
   },
   "gemini": {
@@ -82,7 +84,8 @@
       "assistant_args": ["--output-format", "stream-json", "--approval-mode", "plan",
                          "--allowed-mcp-server-names", "quodeq-assistant"],
       "resume_style": "gemini-resume",
-      "session_id_source": "preassign"
+      "session_id_source": "preassign",
+      "system_prompt_style": "message-prefix"
     }
   },
   "openrouter": {

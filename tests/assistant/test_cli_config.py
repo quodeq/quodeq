@@ -40,3 +40,12 @@ def test_unknown_provider_raises():
     import pytest
     with pytest.raises(KeyError):
         load_cli_chat_config("nope")
+
+
+def test_claude_system_prompt_style_is_argv_append():
+    assert load_cli_chat_config("claude").system_prompt_style == "argv-append"
+
+
+def test_codex_and_gemini_use_message_prefix():
+    assert load_cli_chat_config("codex").system_prompt_style == "message-prefix"
+    assert load_cli_chat_config("gemini").system_prompt_style == "message-prefix"
