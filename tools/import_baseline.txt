@@ -16,7 +16,6 @@ src/quodeq/api/import_project.py:30:data
 src/quodeq/api/import_project.py:31:data
 src/quodeq/api/import_project.py:32:data
 src/quodeq/api/llm_bridge_routes.py:8:llm_bridge
-src/quodeq/api/routes_findings.py:107:data
 src/quodeq/data/fs/project_resolver.py:17:services
 src/quodeq/data/fs/repo_clone.py:19:context
 src/quodeq/data/fs/report_parser/runs.py:190:services

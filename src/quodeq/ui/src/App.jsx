@@ -33,6 +33,7 @@ import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
 import { syncNativeTitlebar } from './utils/nativeTitlebar.js';
 import { SidePane, useSidePane } from './features/side-pane/index.js';
+import { VerifiedFindingsProvider } from './features/violations/components/verifiedFindingsContext.jsx';
 import { BottomDrawer } from './features/drawer/BottomDrawer.jsx';
 import { useAssistantDrawer } from './features/assistant/AssistantDrawerProvider.jsx';
 import { useAssistantProvider } from './features/settings/hooks/useAssistantProvider.js';
@@ -443,6 +444,13 @@ export default function App() {
   // fetched once on mount.
   const [dismissRefreshKey, setDismissRefreshKey] = useState(0);
   const bumpDismissRefresh = () => setDismissRefreshKey((k) => k + 1);
+  useEffect(() => {
+    const handler = (event) => {
+      if (event.detail?.actionType === 'dismiss_finding') bumpDismissRefresh();
+    };
+    window.addEventListener('quodeq:assistant-action-applied', handler);
+    return () => window.removeEventListener('quodeq:assistant-action-applied', handler);
+  }, []);
   // Auto-open is a once-per-session decision. Without this guard, closing the
   // wizard sets wizardEntry → null, which re-fires this effect and re-opens
   // the wizard immediately because projects.length is still 0. The user's
@@ -640,6 +648,7 @@ export default function App() {
         <ServerLogProvider>
           <OllamaLogProvider>
             <LlamaCppLogProvider>
+              <VerifiedFindingsProvider project={state.selectedProject}>
               <AppShell
           drawer={<BottomDrawer uiState={assistantCtx.uiState} />}
           sidebar={
@@ -721,6 +730,7 @@ export default function App() {
             </Suspense>
           }
             />
+              </VerifiedFindingsProvider>
             </LlamaCppLogProvider>
           </OllamaLogProvider>
         </ServerLogProvider>

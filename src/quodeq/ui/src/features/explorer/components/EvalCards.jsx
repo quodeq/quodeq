@@ -6,6 +6,7 @@ import ContextBlock from '../../../components/ContextBlock.jsx';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import usePretextHeight from '../../../hooks/usePretextHeight.js';
 import { useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
+import { VerifiedChip } from '../../violations/components/VerifiedChip.jsx';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
@@ -89,6 +90,7 @@ export function EvalViolationCard({ v, principle, index, onDismiss }) {
     >
       <div className="vdetail-row-main">
         <SevBadge level={v.severity} format="long" />
+        <VerifiedChip v={v} />
         <span className="vrow-label">[{v.principle || principle}]</span>
         {filename && <FileCopyBtn display={display} copyText={ref} />}
         <button

@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 import threading
 import uuid
-from pathlib import Path
 
 from flask import Flask, Response, current_app, jsonify, request
 
@@ -20,8 +19,7 @@ from quodeq.api._sse_log_helpers import sse_line
 from quodeq.assistant import get_provider_configs
 from quodeq.assistant.orchestrator import TurnRequest, run_turn
 from quodeq.assistant.skills import RESERVED_COMMANDS, load_skills
-from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES
-from quodeq.services.standards import StandardsService
+from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES, ACTIONS, ActionConflict
 
 _running_turns: set[str] = set()
 _running_lock = threading.Lock()
@@ -209,27 +207,27 @@ def register_assistant_routes(app: Flask) -> None:
             return jsonify({"error": "unknown action"}), 404
         if action["status"] != "drafted":
             return jsonify({"error": f"action already {action['status']}"}), 409
-        service = StandardsService(
-            Path(current_app.config["STANDARDS_EVALUATORS_DIR"]),
-            Path(current_app.config["STANDARDS_COMPILED_DIR"]),
-            Path(current_app.config["STANDARDS_DIMENSIONS_FILE"]),
-        )
-        # StandardsService.import_from_file returns {"status": "conflict"|"imported", ...}
-        # (see src/quodeq/services/_standards_crud.py:86-105) — not a boolean "conflict"
-        # key the original plan assumed.
+        spec = ACTIONS.get(action["action_type"])
+        if spec is None:
+            return jsonify({"error": "unsupported action type"}), 400
         try:
-            result = service.import_from_file(action["payload"], force=False)
+            result = spec.apply(action["payload"], current_app)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
-        if result.get("status") == "conflict":
-            return jsonify({"error": "standard id already exists"}), 409
+        except ActionConflict as exc:
+            return jsonify({"error": str(exc)}), 409
         repo.set_action_status(action_id, "applied")
         return jsonify({"applied": True, "result": result}), 200
 
     @app.post("/api/assistant/actions/<action_id>/reject")
     def reject_assistant_action(action_id: str):
         repo = get_repository(app)
-        if repo.get_action(action_id) is None:
+        action = repo.get_action(action_id)
+        if action is None:
             return jsonify({"error": "unknown action"}), 404
+        # Same replay guard as apply: an applied action must not flip to
+        # rejected on a stale card click or SSE replay.
+        if action["status"] != "drafted":
+            return jsonify({"error": f"action already {action['status']}"}), 409
         repo.set_action_status(action_id, "rejected")
         return jsonify({"status": "rejected"}), 200

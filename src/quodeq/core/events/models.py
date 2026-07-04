@@ -22,6 +22,8 @@ class EventType(str, Enum):
     DIMENSION_FAILED = "DIMENSION_FAILED"
     FINDING_DISMISSED = "FINDING_DISMISSED"
     FINDING_UNDISMISSED = "FINDING_UNDISMISSED"
+    FINDING_VERIFIED = "FINDING_VERIFIED"
+    FINDING_UNVERIFIED = "FINDING_UNVERIFIED"
 
 
 class BaseEvent(BaseModel, Generic[T]):
@@ -137,10 +139,39 @@ class FindingUndismissedEvent(BaseEvent[FindingUndismissed]):
     event_type: EventType = EventType.FINDING_UNDISMISSED
 
 
+class FindingVerified(BaseModel):
+    """User confirmed a finding is a real defect, identified by (req, file, line)."""
+    model_config = ConfigDict(frozen=True)
+
+    req: str
+    file: str
+    line: int
+    note: Optional[str] = None
+
+
+class FindingUnverified(BaseModel):
+    """User cleared a previously verified badge."""
+    model_config = ConfigDict(frozen=True)
+
+    req: str
+    file: str
+    line: int
+
+
+class FindingVerifiedEvent(BaseEvent[FindingVerified]):
+    event_type: EventType = EventType.FINDING_VERIFIED
+
+
+class FindingUnverifiedEvent(BaseEvent[FindingUnverified]):
+    event_type: EventType = EventType.FINDING_UNVERIFIED
+
+
 # Mapping to allow the Reader to resolve the correct model for validation
 # This is crucial for correct payload parsing
 EVENT_MODEL_MAP: Dict[EventType, type[BaseEvent]] = {
     EventType.JUDGMENT_CREATED: JudgmentCreatedEvent,
     EventType.FINDING_DISMISSED: FindingDismissedEvent,
     EventType.FINDING_UNDISMISSED: FindingUndismissedEvent,
+    EventType.FINDING_VERIFIED: FindingVerifiedEvent,
+    EventType.FINDING_UNVERIFIED: FindingUnverifiedEvent,
 }

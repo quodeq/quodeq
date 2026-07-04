@@ -303,3 +303,27 @@ class TestListDismissedEndpoint:
         resp = client.get("/api/findings/dismissed?project=nonexistent")
         assert resp.status_code == 200
         assert resp.get_json() == []
+
+
+class TestVerifiedEndpoints:
+    def test_verified_list_and_unverify(self, client, tmp_path):
+        from quodeq.services.verified import verify_finding
+        project_dir = tmp_path / "my-project"
+        project_dir.mkdir()
+        verify_finding(project_dir, {"req": "r1", "file": "a.py", "line": 3, "note": "n"})
+
+        resp = client.get("/api/findings/verified?project=my-project")
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert [(e["req"], e["file"], e["line"], e["note"]) for e in body] == [("r1", "a.py", 3, "n")]
+
+        resp = client.post("/api/findings/unverify",
+                           json={"project": "my-project", "req": "r1", "file": "a.py", "line": 3})
+        assert resp.status_code == 200
+        assert client.get("/api/findings/verified?project=my-project").get_json() == []
+
+    def test_unverify_requires_key_fields(self, client):
+        resp = client.post("/api/findings/unverify", json={"project": "p"})
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data["code"] == "MISSING_PARAM"

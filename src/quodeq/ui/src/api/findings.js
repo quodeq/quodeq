@@ -97,3 +97,27 @@ export async function deleteAllFindings(projectId) {
     body: JSON.stringify({ project: projectId }),
   });
 }
+
+/**
+ * List verified-badge entries for a project.
+ * @param {string} projectId - Project identifier
+ * @returns {Promise<Array>} Entries: { req, file, line, note, verifiedAt }
+ */
+export async function listVerifiedFindings(projectId) {
+  return request(`/findings/verified?project=${encodeURIComponent(projectId)}`);
+}
+
+/**
+ * Clear a verified badge.
+ * @param {string} projectId - Project identifier
+ * @param {object} finding - Finding key: { req, file, line }
+ * @returns {Promise<object>} Server response
+ */
+export async function unverifyFinding(projectId, finding) {
+  return request('/findings/unverify', {
+    method: 'POST',
+    body: JSON.stringify({
+      project: projectId, req: finding.req, file: finding.file, line: finding.line,
+    }),
+  });
+}

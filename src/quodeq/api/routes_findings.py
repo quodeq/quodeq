@@ -11,7 +11,6 @@ sessions that ended in PRs #525-#528.)
 from __future__ import annotations
 
 import logging
-import threading
 from pathlib import Path
 from typing import Any
 
@@ -19,33 +18,13 @@ from flask import Flask, Response, abort, jsonify, request
 
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services.dismissed import dismiss_finding, load_dismissed, restore_finding, restore_all_findings
+from quodeq.services.mutation_rescore import rescore_with_fallback
+from quodeq.services.verified import unverify_finding, verified_entries
 from quodeq.shared.utils import get_evaluations_dir
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 _MAX_DISMISSED_LIMIT = 5000
-
-# Per-project locks for background projection.  A module-level guard lock
-# protects creation of per-project entries; after creation each project's Lock
-# is accessed without the guard.
-#
-# Intentionally unbounded: one tiny Lock object per distinct project name that
-# has ever triggered a background projection on this host.  In practice this
-# mirrors the number of projects on disk, which is small and naturally bounded
-# by real usage.  Contrast with _scored_jobs (bounded LRU) — scored jobs can
-# accumulate many run-ids per project, so a size cap there is meaningful;
-# here there is one entry per project, not per run.
-_projection_locks: dict[str, threading.Lock] = {}
-_projection_locks_guard = threading.Lock()
-
-
-def _get_projection_lock(project: str) -> threading.Lock:
-    """Return (and lazily create) the Lock for *project*."""
-    with _projection_locks_guard:
-        if project not in _projection_locks:
-            _projection_locks[project] = threading.Lock()
-        return _projection_locks[project]
-
 
 def _project_dir(evaluations_dir: str, project: str) -> Path:
     validate_path_segment(project)
@@ -54,105 +33,6 @@ def _project_dir(evaluations_dir: str, project: str) -> Path:
     if not resolved.is_relative_to(base):
         abort(400, description="Invalid project path")
     return resolved
-
-
-def _slim_scores(scores: dict[str, Any]) -> dict[str, Any]:
-    """Drop violation/compliance arrays from the rescored payload.
-
-    The UI's dismiss handlers (PrincipleDetail, FileDetail, FindingDetail)
-    only need the per-dimension and per-principle ``score`` / ``grade``
-    fields to update local state. Returning the full payload meant 300+ KB
-    on large projects (quodeq: 322 KB → 543 B after slimming, a 600× cut),
-    which was the bulk of the perceived dismiss latency: parse + transfer +
-    re-render against violations the page already has from its initial fetch.
-    """
-    if not scores:
-        return scores
-    slim_dims = []
-    for dim in scores.get("dimensions", []) or []:
-        slim_principles = [
-            {
-                "principle": p.get("principle"),
-                "score": p.get("score"),
-                "grade": p.get("grade"),
-            }
-            for p in (dim.get("principles") or [])
-        ]
-        slim_dims.append({
-            "dimension": dim.get("dimension"),
-            "overallScore": dim.get("overallScore"),
-            "overallGrade": dim.get("overallGrade"),
-            "principles": slim_principles,
-        })
-    return {"dimensions": slim_dims, "summary": scores.get("summary", {})}
-
-
-def _project_all_runs(project_dir: Path) -> None:
-    """Trigger projection across every run dir of the project.
-
-    Used as a safety net when the dismiss POST didn't carry a usable
-    ``run_id`` (callers from the Violations / Map pages don't always have
-    one in hand). Without this, the action lands in ``actions.jsonl`` but
-    no run's SQL ``findings`` table is updated, so the dismissed-tab list
-    — which reads ``WHERE verdict = 'dismissed'`` from each run's
-    evaluation.db — stays empty until the user navigates somewhere that
-    happens to trigger projection for the right run.
-
-    Projection is incremental (gated by checkpoint + log-size), so this is
-    cheap in steady state; the first call after a fresh dismiss replays only
-    the actions-log delta.
-    """
-    if not project_dir.is_dir():
-        return
-    from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
-
-    for run_dir in project_dir.iterdir():
-        if not run_dir.is_dir():
-            continue
-        if not (run_dir / "events.jsonl").is_file():
-            continue
-        try:
-            SqliteFindingsRepository(run_dir)._ensure_fresh()  # noqa: SLF001
-        except Exception:
-            _logger.warning("Projection after mutation failed for %s", run_dir, exc_info=True)
-
-
-def _rescore_run(
-    evaluations_dir: str, project: str, run_id: str | None,
-) -> dict[str, Any] | None:
-    """Compute the slim rescored payload for the run referenced in a mutation body.
-
-    Returns ``None`` when ``run_id`` is missing or the run directory cannot
-    be resolved. When it returns ``None``, the caller also calls
-    ``_project_all_runs`` so the action still lands in SQL — otherwise the
-    dismissed-tab list (which reads ``WHERE verdict='dismissed'`` from each
-    run's evaluation.db) wouldn't see the entry until the user happened to
-    trigger projection some other way.
-
-    The payload omits per-finding arrays since dismiss handlers only need
-    score/grade fields — see ``_slim_scores`` for the rationale. Callers
-    fold the result into the response body so the UI can apply the new
-    scores without a follow-up GET.
-    """
-    if not run_id:
-        return None
-    try:
-        validate_path_segment(run_id)
-    except ValueError:
-        return None
-    from quodeq.services.scoring import get_scores_raw  # noqa: PLC0415
-
-    reports_root = Path(evaluations_dir).resolve()
-    try:
-        return _slim_scores(get_scores_raw(reports_root, project, run_id))
-    except FileNotFoundError:
-        return None
-    except Exception:
-        # Never let a rescore failure break the mutation — the dismiss is
-        # already persisted in actions.jsonl. Log and return None so the
-        # client falls back to a refetch.
-        _logger.warning("Rescore after mutation failed for %s/%s", project, run_id, exc_info=True)
-        return None
 
 
 def register_findings_routes(app: Flask) -> None:
@@ -164,36 +44,7 @@ def register_findings_routes(app: Flask) -> None:
     def _scores_with_fallback(
         project: str, run_id: str | None,
     ) -> dict[str, Any] | None:
-        """Rescore the requested run, falling back to a project-wide projection.
-
-        When the caller can't supply a usable ``run_id`` (Violations / Map
-        nav paths don't carry one today), ``_rescore_run`` returns ``None`` —
-        but the action *must* still propagate to SQL or the dismissed-tab
-        list won't see it. Project every run in the background as the
-        fallback so the entry becomes visible without blocking the response.
-
-        A per-project non-blocking lock prevents duplicate concurrent
-        projections for the same project: if one projection is already
-        running, the second caller skips rather than queueing behind it
-        (the in-flight run will already cover the latest actions).
-        """
-        evaluations_dir = _eval_dir()
-        scores = _rescore_run(evaluations_dir, project, run_id)
-        if scores is None:
-            proj_dir = _project_dir(evaluations_dir, project)
-            lock = _get_projection_lock(project)
-
-            def _bg_project() -> None:
-                if not lock.acquire(blocking=False):
-                    # Another projection for this project is already running.
-                    return
-                try:
-                    _project_all_runs(proj_dir)
-                finally:
-                    lock.release()
-
-            threading.Thread(target=_bg_project, daemon=True).start()
-        return scores
+        return rescore_with_fallback(_eval_dir(), project, run_id)
 
     @app.get("/api/findings/dismissed")
     def list_dismissed() -> Response:
@@ -275,3 +126,22 @@ def register_findings_routes(app: Flask) -> None:
         count = delete_all_dismissed(_project_dir(_eval_dir(), project))
         scores = _scores_with_fallback(project, run_id)
         return jsonify({"ok": True, "deleted": count, "scores": scores}), 200
+
+    @app.get("/api/findings/verified")
+    def list_verified() -> Response:
+        project = request.args.get("project", "")
+        if not project:
+            return jsonify([])
+        return jsonify(verified_entries(_project_dir(_eval_dir(), project)))
+
+    @app.post("/api/findings/unverify")
+    def unverify() -> tuple[Response, int]:
+        body = request.get_json(silent=True) or {}
+        project = body.get("project", "")
+        req = body.get("req", "")
+        file = body.get("file", "")
+        line = body.get("line")
+        if not project or not req or not file or line is None:
+            return jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400
+        unverify_finding(_project_dir(_eval_dir(), project), body)
+        return jsonify({"ok": True}), 200

@@ -122,6 +122,20 @@ def test_iteration_cap_ends_turn():
     assert len(client.calls) == 6  # MAX_TOOL_ITERATIONS
 
 
+def test_iteration_cap_is_config_driven():
+    looping = [
+        _delta(tool_calls=[_tool_call_delta(0, "c1", "get_scores", "{}")]),
+        _delta(finish="tool_calls"),
+    ]
+    client = FakeClient([list(looping) for _ in range(10)])
+    config = ApiTurnConfig(api_base="http://x", api_key=None, model="m",
+                           native_tools=True, max_tool_iterations=2)
+    run_api_turn(messages=[{"role": "user", "content": "x"}],
+                 config=config, registry=_registry(),
+                 emit=lambda f: None, client_factory=lambda c: client)
+    assert len(client.calls) == 2
+
+
 def test_extra_body_disables_thinking_for_local_and_sets_ctx(monkeypatch):
     from quodeq.assistant.adapters._api import ApiTurnConfig, _extra_body
     monkeypatch.setenv("QUODEQ_CONTEXT_SIZE", "32768")

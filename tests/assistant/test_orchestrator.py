@@ -282,3 +282,24 @@ def test_cli_config_skill_block_empty_without_skill(setup):
     run_turn(request, repository=repo, tool_ctx=ctx, cli_turn_fn=fake_cli)
     assert captured["config"].skill_block == ""
     assert captured["config"].system_prompt  # context always present
+
+
+def test_skill_turns_get_extra_iterations(setup):
+    repo, ctx = setup
+    captured = {}
+
+    def fake_api(*, messages, config, registry, emit):
+        captured["config"] = config
+        return "ok"
+
+    request = TurnRequest(session_id="s1", text="/explain-score security",
+                          ui_state=None, api_base="http://x", api_key=None,
+                          provider="ollama", model="m")
+    run_turn(request, repository=repo, tool_ctx=ctx, turn_fn=fake_api)
+    assert captured["config"].max_tool_iterations == 12
+
+    request = TurnRequest(session_id="s1", text="hello", ui_state=None,
+                          api_base="http://x", api_key=None,
+                          provider="ollama", model="m")
+    run_turn(request, repository=repo, tool_ctx=ctx, turn_fn=fake_api)
+    assert captured["config"].max_tool_iterations == 6

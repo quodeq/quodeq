@@ -51,6 +51,7 @@ class ApiTurnConfig:
     api_key: str | None
     model: str
     native_tools: bool
+    max_tool_iterations: int = MAX_TOOL_ITERATIONS
 
 
 def _default_client(config: ApiTurnConfig):
@@ -102,7 +103,7 @@ def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
     factory = client_factory or _default_client
     text = ""
     with factory(config) as client:
-        for _ in range(MAX_TOOL_ITERATIONS):
+        for _ in range(config.max_tool_iterations):
             text, tool_calls = _stream_once(client, config, convo, registry, emit)
             if not config.native_tools:
                 prompted = extract_prompted_tool_call(text)

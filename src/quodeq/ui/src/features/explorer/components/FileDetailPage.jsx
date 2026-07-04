@@ -9,6 +9,7 @@ import ContextBlock from '../../../components/ContextBlock.jsx';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { ComplianceCard } from './EvalCards.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge } from '../../../components/terminal/index.js';
+import { VerifiedChip } from '../../violations/components/VerifiedChip.jsx';
 import { useRegisterWindowSpec, ReportContent, useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
 import { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
 
@@ -29,6 +30,7 @@ const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
     <div className={`vdetail-row vdetail-row--${v.severity}`}>
       <div className="vdetail-row-main">
         <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
+        <VerifiedChip v={v} />
         {v.provenanceDowngrade && (
           <span
             className="provenance-downgrade-tag"
