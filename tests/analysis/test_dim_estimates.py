@@ -152,6 +152,14 @@ class TestPersistence:
         (run_dir / DIM_ESTIMATES_FILENAME).write_text("{not json")
         assert read_dim_estimates(run_dir) == {}
 
+    def test_read_non_utf8_returns_empty(self, tmp_path: Path):
+        # A sidecar with invalid UTF-8 must not raise out of the reader —
+        # it feeds the polled progress endpoint, which would 500 otherwise.
+        run_dir = tmp_path / "run"
+        run_dir.mkdir()
+        (run_dir / DIM_ESTIMATES_FILENAME).write_bytes(b"\xff\xfe\x00garbage")
+        assert read_dim_estimates(run_dir) == {}
+
     def test_read_legacy_int_format_normalises(self, tmp_path: Path):
         run_dir = tmp_path / "run"
         run_dir.mkdir()

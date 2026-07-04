@@ -92,7 +92,7 @@ def read_dim_estimates(run_dir: Path) -> dict[str, dict[str, Any]]:
     path = run_dir / DIM_ESTIMATES_FILENAME
     try:
         raw = path.read_text(encoding="utf-8")
-    except (OSError, FileNotFoundError):
+    except (OSError, UnicodeDecodeError):
         return {}
     try:
         data = json.loads(raw)

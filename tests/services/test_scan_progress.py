@@ -132,7 +132,24 @@ class TestPendingDimTotals:
         progress = build_scan_progress("j1", run_dir)
         assert progress is not None
         # Corrupt estimates → empty dict → pending dim reports 0 (preparing…).
-        assert progress.dimensions[0].files["total"] == 0
+        dim = progress.dimensions[0]
+        assert dim.files["total"] == 0
+        assert dim.files_cached is None
+        assert dim.files_project_total is None
+
+    def test_non_utf8_dim_estimates_does_not_break_reader(self, tmp_path: Path) -> None:
+        # Invalid UTF-8 in the sidecar must not raise out of the reader — the
+        # polled progress endpoint would 500 on every request otherwise.
+        run_dir = _make_run(tmp_path)
+        _write_status(run_dir, dimensions=["security"])
+        (run_dir / "dim_estimates.json").write_bytes(b"\xff\xfe\x00garbage")
+
+        progress = build_scan_progress("j1", run_dir)
+        assert progress is not None
+        dim = progress.dimensions[0]
+        assert dim.files["total"] == 0
+        assert dim.files_cached is None
+        assert dim.files_project_total is None
 
 
 def _write_dimensions_json(run_dir: Path, states: dict[str, str]) -> None:
