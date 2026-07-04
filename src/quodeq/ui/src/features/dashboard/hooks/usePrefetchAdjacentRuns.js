@@ -9,36 +9,10 @@
  * The hook is no-op when the project or runs list is empty.
  */
 import { useCallback } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useApi } from "../../../api/ApiContext.jsx";
-import { getProjectScores } from "../../../api/index.js";
-import { projectKeys } from "../../../api/queryKeys.js";
-
-const STALE_TIME_MS = 60_000;
+import { usePrefetchRun } from "./usePrefetchRun.js";
 
 export function usePrefetchAdjacentRuns({ selectedProject, availableRuns, overviewRunIndex }) {
-  const queryClient = useQueryClient();
-  const { getDashboard } = useApi();
-
-  const prefetchRun = useCallback(
-    (runId) => {
-      if (!selectedProject || !runId) return;
-      // Dashboard payload (the main render).
-      queryClient.prefetchQuery({
-        queryKey: projectKeys.dashboard(selectedProject, runId),
-        queryFn: () => getDashboard(selectedProject, runId),
-        staleTime: STALE_TIME_MS,
-      });
-      // Scores payload (drives accumulated + trend).
-      const asOf = runId !== "latest" ? runId : null;
-      queryClient.prefetchQuery({
-        queryKey: projectKeys.scores(selectedProject, asOf),
-        queryFn: () => getProjectScores(selectedProject, asOf),
-        staleTime: STALE_TIME_MS,
-      });
-    },
-    [queryClient, getDashboard, selectedProject],
-  );
+  const prefetchRun = usePrefetchRun(selectedProject);
 
   const onPrevHover = useCallback(() => {
     const idx = Math.min(overviewRunIndex + 1, availableRuns.length - 1);
