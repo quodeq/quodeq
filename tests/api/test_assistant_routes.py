@@ -331,6 +331,79 @@ def test_resolve_run_location_rejects_path_traversal(monkeypatch, tmp_path):
     assert run_dir == str((evals / "proj" / "run-1").resolve())
 
 
+def test_resolve_repo_root_returns_local_working_copy(monkeypatch, tmp_path):
+    evals = tmp_path / "evaluations"
+    (evals / "proj").mkdir(parents=True)
+    repo_dir = tmp_path / "src" / "client-app"
+    repo_dir.mkdir(parents=True)
+    (evals / "proj" / "repository_info.json").write_text(
+        json.dumps({"path": str(repo_dir)}), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.get_evaluations_dir", lambda: str(evals)
+    )
+    from quodeq.api._assistant_helpers import resolve_repo_root
+    assert resolve_repo_root("proj") == str(repo_dir)
+
+
+def test_resolve_repo_root_rejects_urls_and_missing_dirs(monkeypatch, tmp_path):
+    # Online projects record a URL as their path; moved repos record a dir
+    # that no longer exists. Neither is a readable working copy, so the
+    # session must stay detached rather than carry a bogus repo root.
+    evals = tmp_path / "evaluations"
+    for name, path in (
+        ("online", "https://github.com/acme/app"),
+        ("ssh", "git@github.com:acme/app.git"),
+        ("moved", str(tmp_path / "gone")),
+    ):
+        (evals / name).mkdir(parents=True)
+        (evals / name / "repository_info.json").write_text(
+            json.dumps({"path": path}), encoding="utf-8"
+        )
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.get_evaluations_dir", lambda: str(evals)
+    )
+    from quodeq.api._assistant_helpers import resolve_repo_root
+    assert resolve_repo_root("online") is None
+    assert resolve_repo_root("ssh") is None
+    assert resolve_repo_root("moved") is None
+    assert resolve_repo_root("nonexistent") is None
+
+
+def test_resolve_run_location_detaches_unreadable_repo_root(monkeypatch, tmp_path):
+    # Run-scoped resolution applies the same working-copy guard: an online
+    # project's URL path must not ride along as a bogus repo root.
+    evals = tmp_path / "evaluations"
+    (evals / "proj" / "run-1").mkdir(parents=True)
+    (evals / "proj" / "repository_info.json").write_text(
+        json.dumps({"path": "https://github.com/acme/app"}), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.get_evaluations_dir", lambda: str(evals)
+    )
+    from quodeq.api._assistant_helpers import resolve_run_location
+    run_dir, repo_root = resolve_run_location("proj", "run-1")
+    assert run_dir == str((evals / "proj" / "run-1").resolve())
+    assert repo_root is None
+
+
+def test_create_session_attaches_repo_root_without_run(client, app, monkeypatch):
+    # Overview/accumulated views send projectId with no runId. The repo root
+    # is a project-level fact, so it must attach anyway; otherwise repo tools
+    # fail with "no analyzed repository attached" in the app's default state.
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.resolve_repo_root",
+        lambda project_id: "/src/selectives-android",
+    )
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "projectId": "selectives"})
+    assert resp.status_code == 201
+    sid = resp.get_json()["sessionId"]
+    sess = AssistantRepository(app.config["ASSISTANT_DB_PATH"]).get_session(sid)
+    assert sess["project_uuid"] == "/src/selectives-android"
+    assert sess["run_id"] is None  # run scope untouched: still accumulated
+
+
 def test_apply_action_creates_standard(client, app):
     repo = _repo(app)
     repo.create_session(session_id="s1", provider="ollama")

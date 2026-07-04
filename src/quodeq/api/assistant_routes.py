@@ -66,6 +66,10 @@ def register_assistant_routes(app: Flask) -> None:
             run_dir, repo_root = _assistant_helpers.resolve_run_location(
                 str(body["projectId"]), str(body["runId"]),
             )
+        elif body.get("projectId"):
+            # The repo root is a project-level fact; without it, run-unscoped
+            # sessions (the app's default state) cannot read code at all.
+            repo_root = _assistant_helpers.resolve_repo_root(str(body["projectId"]))
         project_id = body.get("projectId")
         get_repository(app).create_session(
             session_id=session_id, provider=body["provider"],

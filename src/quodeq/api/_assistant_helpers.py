@@ -55,9 +55,26 @@ def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str 
         return None, None
     if not run_dir.is_dir():
         return None, None
-    info = get_project_info(str(evaluations_root), project_id)
-    repo_root = info.get("path") if info else None
-    return str(run_dir), repo_root
+    return str(run_dir), resolve_repo_root(project_id)
+
+
+def resolve_repo_root(project_id: str) -> str | None:
+    """Resolve the project's local working copy from ``project_id`` alone.
+
+    The repo root is a PROJECT-level fact (``repository_info.json``'s
+    ``path``), independent of any run: overview/accumulated sessions carry no
+    ``runId`` yet still need repo access for the code-reading tools. Returns
+    the path only when it is an existing local directory, so online projects
+    (whose ``path`` is a URL) and moved/deleted working copies stay detached
+    instead of carrying a bogus root. ``get_project_info`` jails the lookup
+    to the evaluations root; the stored ``path`` itself is server-side data
+    written at analysis time, never client input.
+    """
+    info = get_project_info(get_evaluations_dir(), project_id)
+    path = (info or {}).get("path")
+    if not path or not isinstance(path, str) or not Path(path).is_dir():
+        return None
+    return path
 
 
 def get_repository(app: Flask) -> AssistantRepository:
