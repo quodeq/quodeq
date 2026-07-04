@@ -10,6 +10,13 @@
  *      on a cadence so the running row flips to "complete" without a
  *      manual reload. When all runs are terminal, the interval clears.
  *
+ * Both refreshes are scoped to what History actually renders: the trend and
+ * run list (latest scores payload), the latest dashboard, and the dashboard
+ * payloads of runs that are still in progress. Completed historical runs are
+ * immutable and their caches deliberately frozen (see useDashboard) — a
+ * subtree-wide invalidation here would mark every cached run detail stale
+ * and reintroduce the background-refetch dim on every pass through History.
+ *
  * Mounted from the History page only — we deliberately don't poll on
  * Overview / Standards / etc. The History list is the one place where the
  * user is actively watching for the running row to terminate.
@@ -21,6 +28,16 @@ import { pollIntervalForRuns } from '../utils/runPolling.js';
 
 const SSE_ENABLED = () => import.meta.env?.VITE_USE_SSE_EVENTS === 'true';
 
+function invalidateHistoryScope(queryClient, selectedProject, availableRuns) {
+  queryClient.invalidateQueries({ queryKey: projectKeys.scores(selectedProject, null) });
+  queryClient.invalidateQueries({ queryKey: projectKeys.dashboard(selectedProject, null) });
+  for (const r of availableRuns || []) {
+    if (r?.status === 'in_progress' && r.runId) {
+      queryClient.invalidateQueries({ queryKey: projectKeys.dashboard(selectedProject, r.runId) });
+    }
+  }
+}
+
 export function useRunningRunsRefresh({ selectedProject, availableRuns }) {
   const queryClient = useQueryClient();
   const interval = pollIntervalForRuns(availableRuns);
@@ -30,10 +47,10 @@ export function useRunningRunsRefresh({ selectedProject, availableRuns }) {
   // signal that they want fresh data; don't wait for the polling tick.
   useEffect(() => {
     if (!selectedProject) return;
-    queryClient.invalidateQueries({
-      queryKey: projectKeys.project(selectedProject),
-    });
-  }, [queryClient, selectedProject]);
+    invalidateHistoryScope(queryClient, selectedProject, availableRuns);
+    // availableRuns is intentionally not a dependency: this refresh fires on
+    // navigation (mount) and project switch, not on every runs-list update.
+  }, [queryClient, selectedProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // (2) Background polling: only while in_progress runs exist AND SSE is off.
   // With SSE on, terminal-status events drive the running -> terminal flip
@@ -42,10 +59,8 @@ export function useRunningRunsRefresh({ selectedProject, availableRuns }) {
     if (!selectedProject || !interval) return undefined;
     if (SSE_ENABLED()) return undefined;
     const id = setInterval(() => {
-      queryClient.invalidateQueries({
-        queryKey: projectKeys.project(selectedProject),
-      });
+      invalidateHistoryScope(queryClient, selectedProject, availableRuns);
     }, interval);
     return () => clearInterval(id);
-  }, [queryClient, selectedProject, interval]);
+  }, [queryClient, selectedProject, interval, availableRuns]);
 }

@@ -16,6 +16,19 @@ function makeWrapper() {
   return { Wrapper, invalidateSpy };
 }
 
+// Keys invalidated so far, as plain arrays for deep comparison.
+function keysCalled(invalidateSpy) {
+  return invalidateSpy.mock.calls.map((c) => c[0].queryKey);
+}
+
+// One refresh = one invalidation of the latest-scores key. Counting those
+// counts refreshes without coupling the tests to how many scoped keys each
+// refresh touches.
+function refreshCount(invalidateSpy, project = 'p1') {
+  const latestKey = JSON.stringify(projectKeys.scores(project, null));
+  return keysCalled(invalidateSpy).filter((k) => JSON.stringify(k) === latestKey).length;
+}
+
 describe('useRunningRunsRefresh', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -25,7 +38,7 @@ describe('useRunningRunsRefresh', () => {
     vi.useRealTimers();
   });
 
-  it('invalidates once on mount even when every run is terminal', () => {
+  it('refreshes once on mount even when every run is terminal', () => {
     // Mount-time refresh fires regardless of polling state -- the user just
     // navigated to History and wants the latest data right now, not on the
     // next poll tick (which never comes when nothing is in_progress).
@@ -38,7 +51,7 @@ describe('useRunningRunsRefresh', () => {
         }),
       { wrapper: Wrapper },
     );
-    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(refreshCount(invalidateSpy)).toBe(1);
     invalidateSpy.mockClear();
     // No further invalidations after mount -- nothing is in_progress, so
     // the polling interval doesn't run.
@@ -48,7 +61,48 @@ describe('useRunningRunsRefresh', () => {
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
 
-  it('invalidates on mount AND on each tick while a run is in_progress', () => {
+  it('scopes the refresh to latest keys, never the whole project subtree', () => {
+    // Completed historical runs are immutable and their caches deliberately
+    // frozen (see useDashboard). A subtree-wide invalidation here would mark
+    // every cached run detail stale and reintroduce the background-refetch
+    // dim on every pass through History.
+    const { Wrapper, invalidateSpy } = makeWrapper();
+    renderHook(
+      () =>
+        useRunningRunsRefresh({
+          selectedProject: 'p1',
+          availableRuns: [{ runId: 'r1', status: 'complete' }],
+        }),
+      { wrapper: Wrapper },
+    );
+    const keys = keysCalled(invalidateSpy);
+    expect(keys).toContainEqual(projectKeys.scores('p1', null));
+    expect(keys).toContainEqual(projectKeys.dashboard('p1', null));
+    // Neither the bare subtree nor the completed run's own caches.
+    expect(keys).not.toContainEqual(projectKeys.project('p1'));
+    expect(keys).not.toContainEqual(projectKeys.dashboard('p1', 'r1'));
+    expect(keys).not.toContainEqual(projectKeys.scores('p1', 'r1'));
+  });
+
+  it('keeps an in-progress run\'s own dashboard fresh while it lives', () => {
+    const { Wrapper, invalidateSpy } = makeWrapper();
+    renderHook(
+      () =>
+        useRunningRunsRefresh({
+          selectedProject: 'p1',
+          availableRuns: [
+            { runId: 'r_live', status: 'in_progress' },
+            { runId: 'r_done', status: 'complete' },
+          ],
+        }),
+      { wrapper: Wrapper },
+    );
+    const keys = keysCalled(invalidateSpy);
+    expect(keys).toContainEqual(projectKeys.dashboard('p1', 'r_live'));
+    expect(keys).not.toContainEqual(projectKeys.dashboard('p1', 'r_done'));
+  });
+
+  it('refreshes on mount AND on each tick while a run is in_progress', () => {
     const { Wrapper, invalidateSpy } = makeWrapper();
     renderHook(
       () =>
@@ -62,16 +116,13 @@ describe('useRunningRunsRefresh', () => {
       { wrapper: Wrapper },
     );
     // Mount-time refresh fires immediately.
-    expect(invalidateSpy).toHaveBeenCalledTimes(1);
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: projectKeys.project('p1'),
-    });
+    expect(refreshCount(invalidateSpy)).toBe(1);
     invalidateSpy.mockClear();
     // Then polling: 2 ticks within the advanced window.
     act(() => {
       vi.advanceTimersByTime(IN_PROGRESS_POLL_MS * 2 + 50);
     });
-    expect(invalidateSpy).toHaveBeenCalledTimes(2);
+    expect(refreshCount(invalidateSpy)).toBe(2);
   });
 
   it('stops polling once all runs become terminal (mount-refresh aside)', () => {
@@ -86,11 +137,11 @@ describe('useRunningRunsRefresh', () => {
         },
       },
     );
-    // Mount-time invalidate (1) + first poll tick (1) = 2 within the window.
+    // Mount-time refresh (1) + first poll tick (1) = 2 within the window.
     act(() => {
       vi.advanceTimersByTime(IN_PROGRESS_POLL_MS + 50);
     });
-    expect(invalidateSpy).toHaveBeenCalledTimes(2);
+    expect(refreshCount(invalidateSpy)).toBe(2);
     invalidateSpy.mockClear();
     // Run terminates. Polling stops; selectedProject didn't change so the
     // mount-effect doesn't re-fire.
@@ -101,7 +152,7 @@ describe('useRunningRunsRefresh', () => {
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
 
-  it('re-invalidates when the user switches to a different project', () => {
+  it('re-refreshes when the user switches to a different project', () => {
     // Navigating between projects (or back to History after viewing a
     // different one) should re-trigger the mount-time refresh so the new
     // project's data is current.
@@ -117,16 +168,11 @@ describe('useRunningRunsRefresh', () => {
         initialProps: { project: 'p1' },
       },
     );
-    expect(invalidateSpy).toHaveBeenCalledTimes(1);
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: projectKeys.project('p1'),
-    });
+    expect(refreshCount(invalidateSpy, 'p1')).toBe(1);
     invalidateSpy.mockClear();
     rerender({ project: 'p2' });
-    expect(invalidateSpy).toHaveBeenCalledTimes(1);
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: projectKeys.project('p2'),
-    });
+    expect(refreshCount(invalidateSpy, 'p2')).toBe(1);
+    expect(keysCalled(invalidateSpy)).toContainEqual(projectKeys.dashboard('p2', null));
   });
 
   it('does nothing without a selected project', () => {
@@ -156,10 +202,7 @@ describe('useRunningRunsRefresh', () => {
         }),
       { wrapper: Wrapper },
     );
-    expect(invalidateSpy).toHaveBeenCalledTimes(1);
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: projectKeys.project('p1'),
-    });
+    expect(refreshCount(invalidateSpy)).toBe(1);
   });
 
   it('suppresses recurring poll when VITE_USE_SSE_EVENTS=true', () => {
@@ -195,6 +238,6 @@ describe('useRunningRunsRefresh', () => {
     act(() => {
       vi.advanceTimersByTime(IN_PROGRESS_POLL_MS * 2 + 50);
     });
-    expect(invalidateSpy).toHaveBeenCalledTimes(2);
+    expect(refreshCount(invalidateSpy)).toBe(2);
   });
 });

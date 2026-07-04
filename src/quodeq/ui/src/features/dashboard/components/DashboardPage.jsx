@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import DimensionCard from './DimensionCard.jsx';
 import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
-import RunOverviewSkeleton from './RunOverviewSkeleton.jsx';
 import IncompleteSetupCard from './IncompleteSetupCard.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
@@ -107,7 +106,7 @@ function useDashboardHandlers(onNavigate, dashboard) {
   }), [onNavigate, dashboard]);
 }
 
-export default function DashboardPage({ data = {}, callbacks = {}, runMode = false, pendingDateLabel = null }) {
+export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
   const { selectedProject, selectedRun, projects = [], dashboard, accumulated, loading, isFetching, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange } = data;
   const projectInfo = projects.find((p) => (p.id || p.name) === selectedProject) || null;
   const { onNavigate, onRunSelect, onProjectsReload } = callbacks;
@@ -177,15 +176,11 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   // The page dims itself slightly so the user sees "still working" without
   // the jarring full-screen LoadingScreen.
   const isRefreshing = isFetching && !!dashboard && !isLoading;
-  // Run mode renders a structural skeleton while loading, so the page keeps
-  // its own loading affordance and the wrapper skips the dimmed state.
-  const showSkeleton = isLoading && runMode;
-
   return (
-    <div className={`dashboard-page dashboard-fade ${isLoading && !showSkeleton ? 'dashboard-loading' : 'dashboard-ready'}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
+    <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : 'dashboard-ready'}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
       <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
       {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
-      {isLoading && (showSkeleton ? <RunOverviewSkeleton dateLabel={pendingDateLabel} /> : <LoadingScreen />)}
+      {isLoading && <LoadingScreen />}
       {dashboard && (
         <DashboardContent
           runMode={runMode}
