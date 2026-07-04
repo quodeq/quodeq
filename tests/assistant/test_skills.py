@@ -42,3 +42,12 @@ def test_extras_default_empty(tmp_path):
 def test_reserved_command_name_skipped(tmp_path):
     (tmp_path / "help.md").write_text("---\nname: help\ndescription: D\n---\nBody.\n")
     assert load_skills(skills_dir=tmp_path) == {}
+
+
+def test_builtin_skills_have_views_and_hints():
+    skills = load_skills()
+    for name in ("create-standard", "explain-finding", "explain-score"):
+        assert skills[name].views, f"{name} missing views frontmatter"
+    assert "overview" in skills["explain-score"].views
+    assert "violations" in skills["explain-finding"].views
+    assert "standards" in skills["create-standard"].views
