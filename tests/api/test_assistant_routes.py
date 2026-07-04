@@ -548,3 +548,23 @@ def test_apply_verify_finding_writes_badge(client, app, tmp_path, monkeypatch):
     assert client.post("/api/assistant/actions/a1/apply").status_code == 200
     from quodeq.services.verified import verified_entries
     assert [e["note"] for e in verified_entries(evals / "proj")] == ["real: unsanitized input"]
+
+
+def test_apply_verify_finding_traversal_payload_400(client, app, tmp_path, monkeypatch):
+    """A drafted verify_finding whose stored payload has a traversal project must return 400
+    and must NOT create any actions.jsonl outside the evaluations root."""
+    evals = tmp_path / "evals"
+    evals.mkdir(parents=True)
+    monkeypatch.setitem(app.config, "EVALUATIONS_DIR", str(evals))
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(action_id="a-traverse", session_id="s1",
+                       action_type="verify_finding",
+                       payload={"project": "../escape", "req": "r1", "file": "a.py",
+                                "line": 3, "note": "would escape"},
+                       content_hash="h")
+    resp = client.post("/api/assistant/actions/a-traverse/apply")
+    assert resp.status_code == 400
+    # The traversal target directory must not have been created.
+    escape_dir = tmp_path / "escape"
+    assert not escape_dir.exists()

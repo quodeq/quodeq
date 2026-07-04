@@ -13,6 +13,7 @@ from flask import Flask
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.services.import_validator import validate_import
+from quodeq.shared.validation import validate_path_segment
 
 
 class ActionConflict(Exception):
@@ -60,10 +61,14 @@ def _canonical_finding_key(payload: dict, ctx: ToolContext) -> dict:
     req = str(payload.get("req") or "").strip()
     file = str(payload.get("file") or "").strip()
     line = payload.get("line")
-    if not req or not file or not isinstance(line, int) or line < 0:
+    if not req or not file or not isinstance(line, int) or isinstance(line, bool) or line < 0:
         raise ToolError("req, file, and a non-negative integer line are required")
     if not ctx.project_id:
         raise ToolError("no project attached to this session")
+    try:
+        validate_path_segment(ctx.project_id)
+    except ValueError:
+        raise ToolError("invalid project attached to this session")
     # The project always comes from the session, never from the model.
     canonical = {"project": ctx.project_id, "req": req, "file": file, "line": line}
     if ctx.run_dir is not None:
@@ -90,6 +95,7 @@ def _apply_dismiss_finding(payload: dict, app: Flask) -> dict:
     from quodeq.services.dismissed import dismiss_finding  # noqa: PLC0415
     from quodeq.shared._env import get_evaluations_dir  # noqa: PLC0415
 
+    validate_path_segment(payload["project"])
     evaluations_dir = app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()
     project_dir = Path(evaluations_dir) / payload["project"]
     dismiss_finding(project_dir, {
@@ -118,6 +124,7 @@ def _apply_verify_finding(payload: dict, app: Flask) -> dict:
     from quodeq.services.verified import verify_finding  # noqa: PLC0415
     from quodeq.shared._env import get_evaluations_dir  # noqa: PLC0415
 
+    validate_path_segment(payload["project"])
     evaluations_dir = app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()
     verify_finding(Path(evaluations_dir) / payload["project"], payload)
     return {"verified": True}

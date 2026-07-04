@@ -108,3 +108,35 @@ def test_draft_verify_requires_note_and_project(ctx, project_ctx):
         "payload": {"req": "r1", "file": "a.py", "line": 3, "note": "n"},
     })
     assert out["ok"] is False  # ctx has no project_id -> actionable error
+
+
+@pytest.fixture()
+def evil_project_ctx(tmp_path):
+    store = AssistantRepository(tmp_path / "assistant_evil.db")
+    store.create_session(session_id="s1", provider="ollama")
+    return ToolContext(
+        repository=store, session_id="s1", run_dir=None, repo_root=None,
+        evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
+        dimensions_file=tmp_path / "d.json",
+        project_id="../evil",
+        reports_dir=tmp_path / "evals",
+    )
+
+
+def test_draft_dismiss_rejects_evil_project_id(evil_project_ctx):
+    """draft_action for dismiss_finding must fail when project_id is a traversal path."""
+    out = build_registry(evil_project_ctx).dispatch("draft_action", {
+        "action_type": "dismiss_finding",
+        "payload": {"req": "r1", "file": "a.py", "line": 3, "reason": "fp"},
+    })
+    assert out["ok"] is False
+    assert "invalid project" in out["error"].lower()
+
+
+def test_draft_dismiss_rejects_bool_line(project_ctx):
+    """line=True must be rejected (isinstance check tightened to exclude booleans)."""
+    out = build_registry(project_ctx).dispatch("draft_action", {
+        "action_type": "dismiss_finding",
+        "payload": {"req": "r1", "file": "a.py", "line": True, "reason": "fp"},
+    })
+    assert out["ok"] is False
