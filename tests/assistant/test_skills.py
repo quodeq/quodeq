@@ -51,3 +51,18 @@ def test_builtin_skills_have_views_and_hints():
     assert "overview" in skills["explain-score"].views
     assert "violations" in skills["explain-finding"].views
     assert "standards" in skills["create-standard"].views
+
+
+def test_verify_finding_skill_loads():
+    skill = load_skills()["verify-finding"]
+    assert skill.views == ("violations",)
+    assert skill.argument_hint
+
+
+def test_verify_finding_skill_is_card_gated():
+    body = load_skills()["verify-finding"].instructions
+    assert "FALSE POSITIVE" in body
+    assert "dismiss_finding" in body and "verify_finding" in body
+    # pinned: the skill must never claim or instruct direct application
+    assert "auto-apply" not in body.lower()
+    assert "never claim the action was applied" in body
