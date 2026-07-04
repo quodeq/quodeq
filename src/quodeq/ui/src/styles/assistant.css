@@ -449,7 +449,7 @@
 .assistant-welcome-commands { list-style: none; margin: 0 0 12px; padding: 0; font-size: 12px; }
 .assistant-welcome-commands li { margin: 3px 0; color: var(--color-text-muted); }
 .assistant-welcome-commands code { font-family: var(--font-mono); color: var(--color-text); margin-right: 6px; }
-.assistant-welcome-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.assistant-welcome-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
 .assistant-pill { border: 1px solid var(--color-border); background: var(--color-surface-alt); color: var(--color-text); border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
 .assistant-pill:hover { border-color: var(--color-accent); }
 
