@@ -18,18 +18,31 @@ Each estimate also carries ``total`` (all source files for the dim) and
 ``cached`` (files already analyzed in previous runs) so the dashboard can
 render total project coverage, not just this run's queue. Non-incremental
 modes set ``total = count`` and ``cached = 0``.
+
+The on-disk format, IO, and normalisation live in
+``quodeq.shared.dim_estimates_io`` (re-exported below), since the reader is
+also used by ``quodeq.services.scan_progress``, which may not import
+analysis.
 """
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
 
 from quodeq.analysis._types import RunConfig
 from quodeq.analysis.cache import LocalFileBackend, classify_files_via_cache
 from quodeq.analysis.subagents._source_files import _list_source_files
+from quodeq.shared.dim_estimates_io import (
+    DIM_ESTIMATES_FILENAME,
+    read_dim_estimates,
+    write_dim_estimates,
+)
 
-DIM_ESTIMATES_FILENAME = "dim_estimates.json"
+__all__ = [
+    "DIM_ESTIMATES_FILENAME",
+    "compute_dim_estimates",
+    "read_dim_estimates",
+    "write_dim_estimates",
+]
 
 
 def compute_dim_estimates(
@@ -68,50 +81,3 @@ def compute_dim_estimates(
         else:
             estimates[dim_id] = {"count": len(files), "reason": "full", "total": len(files), "cached": 0}
     return estimates
-
-
-def write_dim_estimates(
-    run_dir: Path, estimates: dict[str, dict[str, Any]],
-) -> None:
-    """Persist per-dim estimates next to status.json. Best-effort."""
-    try:
-        run_dir.mkdir(parents=True, exist_ok=True)
-        (run_dir / DIM_ESTIMATES_FILENAME).write_text(
-            json.dumps(estimates, indent=2), encoding="utf-8",
-        )
-    except OSError:
-        pass
-
-
-def read_dim_estimates(run_dir: Path) -> dict[str, dict[str, Any]]:
-    """Return per-dim estimates from disk, or {} if missing/corrupt.
-
-    Each value is normalised to
-    ``{"count": int, "reason": str, "total": int, "cached": int}``.
-    """
-    path = run_dir / DIM_ESTIMATES_FILENAME
-    try:
-        raw = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return {}
-    try:
-        data = json.loads(raw)
-    except (json.JSONDecodeError, ValueError):
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    out: dict[str, dict[str, Any]] = {}
-    for k, v in data.items():
-        # Current format: {"count": int, "reason": str, "total": int, "cached": int}.
-        if isinstance(v, dict) and isinstance(v.get("count"), int):
-            count = v["count"]
-            out[k] = {
-                "count": count,
-                "reason": str(v.get("reason", "")),
-                "total": v["total"] if isinstance(v.get("total"), int) else count,
-                "cached": v["cached"] if isinstance(v.get("cached"), int) else 0,
-            }
-        # Legacy format: a bare int. Older runs predate the reason tag.
-        elif isinstance(v, int):
-            out[k] = {"count": v, "reason": "", "total": v, "cached": 0}
-    return out

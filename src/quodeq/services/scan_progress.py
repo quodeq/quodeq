@@ -20,8 +20,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from quodeq.analysis._dim_estimates import read_dim_estimates
 from quodeq.analysis.subagents.jsonl_utils import tally_unique_findings
+from quodeq.shared.dim_estimates_io import read_dim_estimates
 from quodeq.shared.dimensions_state import read_dimensions
 
 _AGENT_ACTIVE_WINDOW_S = 30
