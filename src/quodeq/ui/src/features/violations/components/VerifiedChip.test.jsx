@@ -20,13 +20,17 @@ it('renders nothing without a provider', () => {
   expect(container.firstChild).toBeNull();
 });
 
-it('renders the chip inside a provider when the key matches', async () => {
+it('renders an icon-only chip inside a provider when the key matches', async () => {
   render(
     <VerifiedFindingsProvider project="proj">
       <VerifiedChip v={{ req: 'r1', file: 'a.py', line: 3 }} />
     </VerifiedFindingsProvider>,
   );
-  await waitFor(() => expect(screen.getByRole('button', { name: /verified/i })).toBeInTheDocument());
+  const btn = await screen.findByRole('button', { name: /verified/i });
+  // Icon-only: named via aria-label (note included), no visible text, an svg check.
+  expect(btn).toHaveAccessibleName(/confirmed real/i);
+  expect(btn.textContent).toBe('');
+  expect(btn.querySelector('svg')).toBeInTheDocument();
 });
 
 it('renders nothing for an unmatched key', async () => {

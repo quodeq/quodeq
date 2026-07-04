@@ -3095,9 +3095,11 @@ button.eval-provider-badge--clickable:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.verified-chip { border: 1px solid var(--color-accent); color: var(--color-accent); background: transparent; border-radius: 6px; padding: 1px 7px; font-size: 11px; font-family: var(--font-mono); cursor: pointer; }
-/* The chip sits on the right, against the Fix plan button: it takes over the
-   row's auto margin, and the button (which normally carries it) yields so the
-   container gap spaces the pair. Rows without a badge keep today's layout. */
-.vdetail-row-main .verified-chip { margin-left: auto; }
-.vdetail-row-main .verified-chip + .fix-plan-btn { margin-left: 0; }
+.verified-chip { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; border: none; border-radius: 50%; background: var(--color-accent); color: var(--color-on-accent); cursor: pointer; flex-shrink: 0; }
+.verified-chip:hover { opacity: 0.85; }
+/* Right-aligned action cluster: the verified chip (when present), fix plan,
+   and dismiss stay together and wrap as one unit. The group carries the auto
+   margin, so the inner fix plan yields its own. Rows keep today's layout when
+   the chip is absent. */
+.vdetail-row-main .vrow-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+.vdetail-row-main .vrow-actions .fix-plan-btn { margin-left: 0; }
