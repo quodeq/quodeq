@@ -42,14 +42,20 @@ function JobIdLine({ jobId, aiProvider, aiModel }) {
   return (
     <div className="evaluate-job-id-line">
       <span className="evaluate-job-id-line__label">job</span>
-      <code>{jobId}</code>
-      <CopyButton aria-label="Copy job ID" onClick={() => copyToClipboard(jobId)} />
+      <span className="evaluate-job-id-line__value">
+        <code>{jobId}</code>
+        <CopyButton aria-label="Copy job ID" onClick={() => copyToClipboard(jobId)} />
+      </span>
       {aiProvider && aiModel && (
-        <span data-testid="job-runtime-chip">
-          {aiProvider}
-          <span className="eval-provider-sep" aria-hidden="true"> · </span>
-          {aiModel}
-        </span>
+        <>
+          {/* empty first-column cell so the chip lands under the id */}
+          <span aria-hidden="true" />
+          <span data-testid="job-runtime-chip" className="evaluate-job-id-line__model">
+            {aiProvider}
+            <span className="eval-provider-sep" aria-hidden="true"> · </span>
+            {aiModel}
+          </span>
+        </>
       )}
     </div>
   );
