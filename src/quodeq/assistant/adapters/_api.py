@@ -14,7 +14,7 @@ from quodeq.assistant.adapters._fallback import (
     FALLBACK_CONTRACT,
     extract_prompted_tool_call,
 )
-from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, guard_tool_result
+from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, guard_tool_result
 from quodeq.assistant.tools._registry import ToolRegistry
 
 _logger = logging.getLogger(__name__)
@@ -51,6 +51,7 @@ class ApiTurnConfig:
     api_key: str | None
     model: str
     native_tools: bool
+    max_tool_iterations: int = MAX_TOOL_ITERATIONS
 
 
 def _default_client(config: ApiTurnConfig):
@@ -102,7 +103,7 @@ def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
     factory = client_factory or _default_client
     text = ""
     with factory(config) as client:
-        for _ in range(MAX_TOOL_ITERATIONS):
+        for _ in range(config.max_tool_iterations):
             text, tool_calls = _stream_once(client, config, convo, registry, emit)
             if not config.native_tools:
                 prompted = extract_prompted_tool_call(text)

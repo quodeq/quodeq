@@ -7,6 +7,9 @@ import secrets
 from quodeq.services.import_validator import scan_text
 
 MAX_TOOL_ITERATIONS = 6
+# Skill turns legitimately chain search -> standard -> code -> draft; give
+# them headroom without raising the default for free-form turns.
+SKILL_MAX_TOOL_ITERATIONS = 12
 MAX_TOOL_RESULT_CHARS = 16_000
 
 _PREAMBLE = (
