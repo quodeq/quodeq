@@ -56,6 +56,9 @@ function useGalaxyHandlers({ canvasRef, navRef, animRef, camRef, hoveredRef, mou
 }
 
 export default function GalaxyView({ dimensions, onNavigate, showLabels = true, setShowLabels, darkMode, resetKey = 0, projectName = '', standardTypes = {} }) {
+  // Guard against an omitted or null `dimensions` prop: normalize to an empty
+  // array so the memos below don't crash on `.map()`/`.length`.
+  const safeDimensions = dimensions ?? [];
   const canvasRef = useRef(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const savedNavRef = useRef(null);
@@ -63,16 +66,16 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
 
   useEffect(() => { invalidateThemeColors(); }, [darkMode]);
 
-  const dimKey = useMemo(() => dimensions.map(d => d.dimension).sort().join('|'), [dimensions]);
+  const dimKey = useMemo(() => safeDimensions.map(d => d.dimension).sort().join('|'), [safeDimensions]);
   const typesKey = useMemo(() => Object.keys(standardTypes).sort().join('|'), [standardTypes]);
   const scene = useMemo(() => {
-    if (dimensions.length === 0) return null;
-    return buildScene(dimensions, 800, 600, standardTypes);
+    if (safeDimensions.length === 0) return null;
+    return buildScene(safeDimensions, 800, 600, standardTypes);
   }, [dimKey, typesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useMemo(() => {
-    if (scene && dimensions.length > 0) updateSceneLiveData(scene, dimensions);
-  }, [dimensions, scene]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (scene && safeDimensions.length > 0) updateSceneLiveData(scene, safeDimensions);
+  }, [safeDimensions, scene]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = canvasRef.current?.parentElement;
