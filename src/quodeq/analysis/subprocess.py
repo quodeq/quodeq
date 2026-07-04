@@ -67,9 +67,9 @@ def _run_cli_analysis(
 ) -> None:
     """Run analysis via CLI subprocess."""
     ai_cmd = cfg.ai_cmd or get_ai_cmd()
-    # ai_cmd comes from provider config (not user input) and is executed via
-    # subprocess list (no shell injection). The command may not be on PATH in
-    # test/CI environments, so we skip shutil.which validation here.
+    # ai_cmd comes from the AI_CMD/AI_PROVIDER env var and is gated to known
+    # providers in _register_cli_mcp before any subprocess call; it runs via a
+    # subprocess list (no shell injection). Skipping shutil.which for CI/PATH.
     configs = get_provider_configs()
     provider_cfg = configs.get(ai_cmd, {})
     mcp_style = provider_cfg.get("mcp_style", "config-file")

@@ -243,6 +243,19 @@ def _resolve_language(config: AnalysisConfig) -> str:
     return ""
 
 
+def _is_known_cli_provider(cmd: str) -> bool:
+    """Return True only if *cmd* matches a registered provider of type 'cli'.
+
+    ``cmd`` ultimately comes from the user-controlled AI_CMD/AI_PROVIDER env
+    var (see ``quodeq.shared._env.get_ai_cmd``) with no prior validation. Gate
+    subprocess execution to the known provider registry so a typo'd or
+    unexpected value fails closed instead of shelling out to an arbitrary
+    program. Only ``type == "cli"`` providers reach this CLI-register path;
+    API-type providers (ollama, omlx, custom, ...) never do.
+    """
+    return _get_provider_configs().get(cmd, {}).get("type") == "cli"
+
+
 def _register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = None) -> str | None:
     """Register the findings MCP server via `<cmd> mcp add`.
 
@@ -250,6 +263,9 @@ def _register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = 
     the cached name immediately.  Removes any stale registration first.
     Returns the server name on success, None on failure.
     """
+    if not _is_known_cli_provider(cmd):
+        _log.warning("Refusing to register MCP server: unknown CLI provider %r", cmd)
+        return None
     name = _mcp_server_name(config)
     key = f"{cmd}:{name}"
     with _cli_mcp_lock:
@@ -278,6 +294,8 @@ def _register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = 
 
 def _unregister_cli_mcp(cmd: str, name: str) -> None:
     """Remove the findings MCP server via `<cmd> mcp remove`."""
+    if not _is_known_cli_provider(cmd):
+        return
     try:
         subprocess.run(
             [cmd, "mcp", "remove", name],
