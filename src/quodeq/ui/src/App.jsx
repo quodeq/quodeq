@@ -33,6 +33,7 @@ import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
 import { syncNativeTitlebar } from './utils/nativeTitlebar.js';
 import { SidePane, useSidePane } from './features/side-pane/index.js';
+import { VerifiedFindingsProvider } from './features/violations/components/verifiedFindingsContext.jsx';
 import { BottomDrawer } from './features/drawer/BottomDrawer.jsx';
 import { useAssistantDrawer } from './features/assistant/AssistantDrawerProvider.jsx';
 import { useAssistantProvider } from './features/settings/hooks/useAssistantProvider.js';
@@ -640,6 +641,7 @@ export default function App() {
         <ServerLogProvider>
           <OllamaLogProvider>
             <LlamaCppLogProvider>
+              <VerifiedFindingsProvider project={state.selectedProject}>
               <AppShell
           drawer={<BottomDrawer uiState={assistantCtx.uiState} />}
           sidebar={
@@ -721,6 +723,7 @@ export default function App() {
             </Suspense>
           }
             />
+              </VerifiedFindingsProvider>
             </LlamaCppLogProvider>
           </OllamaLogProvider>
         </ServerLogProvider>

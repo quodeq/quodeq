@@ -3079,3 +3079,5 @@ button.eval-provider-badge--clickable:focus-visible {
   padding: 0;
   font-family: var(--term-font-mono);
 }
+
+.verified-chip { border: 1px solid var(--color-accent); color: var(--color-accent); background: transparent; border-radius: 6px; padding: 1px 7px; font-size: 11px; font-family: var(--font-mono); cursor: pointer; }
