@@ -204,3 +204,48 @@ def test_web_disabled_by_default_in_spawned_argv(tmp_path):
                  session_id="s1", prior_session_id=None, repository=repo,
                  emit=lambda f: None, spawn_fn=spawn)
     assert captured["argv"][captured["argv"].index("--allowedTools") + 1] == "mcp__quodeq-assistant"
+
+
+import dataclasses
+
+from quodeq.assistant.adapters import _cli as _cli_mod
+
+
+def _capture_spawn(captured, lines):
+    def spawn(argv, cwd=None, env=None):
+        captured["argv"] = argv
+        return FakeProc(lines)
+    return spawn
+
+
+def test_claude_system_prompt_reaches_argv(tmp_path):
+    repo = _repo(tmp_path)
+    captured = {}
+    cfg = dataclasses.replace(_config(tmp_path), system_prompt="CTX", skill_block="")
+    run_cli_turn(
+        messages=[{"role": "system", "content": "CTX"},
+                  {"role": "user", "content": "hi"}],
+        config=cfg, session_id="s1", prior_session_id=None, repository=repo,
+        emit=lambda f: None,
+        spawn_fn=_capture_spawn(captured, ['{"type": "result", "result": "ok"}']))
+    i = captured["argv"].index("--append-system-prompt")
+    assert captured["argv"][i + 1] == "CTX"
+    assert captured["argv"][-1] == "hi"  # skill never prefixes argv-append prompts
+
+
+def test_message_prefix_provider_gets_skill_block(tmp_path, monkeypatch):
+    repo = _repo(tmp_path)
+    captured = {}
+    base = _cli_mod.load_cli_chat_config("claude")
+    monkeypatch.setattr(_cli_mod, "load_cli_chat_config",
+                        lambda p: dataclasses.replace(base, system_prompt_style="message-prefix"))
+    cfg = dataclasses.replace(_config(tmp_path), system_prompt="CTX",
+                              skill_block="[skill:x]\nDo X")
+    run_cli_turn(
+        messages=[{"role": "system", "content": "CTX"},
+                  {"role": "user", "content": "hi"}],
+        config=cfg, session_id="s1", prior_session_id=None, repository=repo,
+        emit=lambda f: None,
+        spawn_fn=_capture_spawn(captured, ['{"type": "result", "result": "ok"}']))
+    assert captured["argv"][-1] == "[skill:x]\nDo X\n\nhi"
+    assert "--append-system-prompt" not in captured["argv"]
