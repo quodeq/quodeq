@@ -3055,20 +3055,23 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 
 /* ------------------------------------------------------------
-   evaluate-job-id-line — minimal mono row showing just the job
-   ID with a copy button. Replaces the old `term-meta-grid`
-   block that surfaced project / provider / repo redundantly.
+   evaluate-job-id-line — minimal mono grid showing the job ID
+   with a copy button on the first row, and the provider · model
+   chip beneath the id on a second row. Replaces the old
+   `term-meta-grid` block that surfaced project / provider / repo
+   redundantly.
    ------------------------------------------------------------ */
 .evaluate-job-id-line {
-  display: flex;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: var(--term-space-2);
+  row-gap: 2px;
   align-items: center;
-  gap: var(--term-space-2);
   padding: var(--term-space-1) 0;
   margin-bottom: var(--term-space-2);
   font-family: var(--term-font-mono);
   font-size: 11px;
   color: var(--color-text-muted);
-  flex-wrap: wrap;
 }
 .evaluate-job-id-line__label {
   text-transform: uppercase;
@@ -3080,4 +3083,14 @@ button.eval-provider-badge--clickable:focus-visible {
   background: transparent;
   padding: 0;
   font-family: var(--term-font-mono);
+}
+.evaluate-job-id-line__value {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--term-space-2);
+  min-width: 0;
+}
+.evaluate-job-id-line__model {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }

@@ -49,6 +49,18 @@ describe('JobIdLine', () => {
     );
     expect(screen.queryByTestId('job-runtime-chip')).toBeNull();
   });
+
+  it('renders the model chip on its own grid row below the job id', () => {
+    renderWithClient(
+      <EvaluationStatus
+        job={{ ...baseJob, aiProvider: 'llamacpp', aiModel: 'qwen3.6-27b' }}
+      />,
+    );
+    const chip = screen.getByTestId('job-runtime-chip');
+    expect(chip).toHaveClass('evaluate-job-id-line__model');
+    // The chip is a direct grid child, not nested inside the id row.
+    expect(chip.parentElement).toHaveClass('evaluate-job-id-line');
+  });
 });
 
 describe('project label', () => {
