@@ -61,6 +61,16 @@ export function ChevronDownIcon() {
   );
 }
 
+// Counter-clockwise restart arrow: "new conversation" in the drawer header.
+export function RotateCcwIcon() {
+  return (
+    <svg width={ICON_SIZE} height={ICON_SIZE} viewBox={ICON_VIEWBOX} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="1 4 1 10 7 10" />
+      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+    </svg>
+  );
+}
+
 export function GlobeIcon() {
   return (
     <svg width={ICON_SIZE} height={ICON_SIZE} viewBox={ICON_VIEWBOX} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

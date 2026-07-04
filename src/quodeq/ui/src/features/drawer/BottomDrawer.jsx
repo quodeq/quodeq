@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, lazy, Suspense } from 'react';
 import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';
 import { AssistantPane } from '../assistant/AssistantDrawer.jsx';
-import { ChevronUpIcon, ChevronDownIcon, GlobeIcon } from '../../components/CopyButton.jsx';
+import { ChevronUpIcon, ChevronDownIcon, GlobeIcon, RotateCcwIcon } from '../../components/CopyButton.jsx';
 
 const TerminalPane = lazy(() => import('../terminal/TerminalPane.jsx'));
 
@@ -24,7 +24,8 @@ const WEB_PROVIDERS = new Set(['claude', 'ollama', 'omlx', 'llamacpp']);
 export function BottomDrawer({ uiState }) {
   const { isOpen, height, setHeight, closeActiveTab, openPanels, activeTab, selectTab,
           maximized, toggleMaximized, setMaximized, provider, model,
-          streaming, webEnabled, toggleWebEnabled } = useAssistantDrawer();
+          streaming, webEnabled, toggleWebEnabled,
+          sessionReady, resetConversation } = useAssistantDrawer();
   const dragRef = useRef(null);
 
   const handleDragMove = useCallback((event) => {
@@ -80,6 +81,15 @@ export function BottomDrawer({ uiState }) {
           </span>
         )}
         <div className="assistant-drawer-controls">
+          {active === 'assistant' && (
+            <button type="button" className="assistant-drawer-btn"
+              onClick={resetConversation}
+              aria-label="New conversation"
+              title="New conversation (clears the model context)"
+              disabled={streaming || !sessionReady}>
+              <RotateCcwIcon />
+            </button>
+          )}
           {active === 'assistant' && WEB_PROVIDERS.has(provider) && (
             <button type="button" className="assistant-drawer-btn assistant-drawer-web"
               onClick={toggleWebEnabled}
