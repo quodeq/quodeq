@@ -19,6 +19,8 @@ from quodeq.api._assistant_helpers import (
 from quodeq.api._sse_log_helpers import sse_line
 from quodeq.assistant import get_provider_configs
 from quodeq.assistant.orchestrator import TurnRequest, run_turn
+from quodeq.assistant.skills import RESERVED_COMMANDS, load_skills
+from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES
 from quodeq.services.standards import StandardsService
 
 _running_turns: set[str] = set()
@@ -72,6 +74,23 @@ def register_assistant_routes(app: Flask) -> None:
             project_id=str(project_id) if project_id else None,
         )
         return jsonify({"sessionId": session_id}), 201
+
+    @app.get("/api/assistant/skills")
+    def get_assistant_catalog():
+        # Static catalog for the drawer's welcome panel, autocomplete, and
+        # /help /skills /actions meta-commands. Read-only, no session needed.
+        return jsonify({
+            "commands": [{"name": n, "description": d} for n, d in RESERVED_COMMANDS],
+            "skills": [
+                {"name": s.name, "description": s.description,
+                 "argumentHint": s.argument_hint, "views": list(s.views)}
+                for s in load_skills().values()
+            ],
+            "actions": [
+                {"type": t, "description": ACTION_DESCRIPTIONS.get(t, "")}
+                for t in sorted(ACTION_TYPES)
+            ],
+        })
 
     @app.post("/api/assistant/sessions/<sid>/messages")
     def post_assistant_message(sid: str):
