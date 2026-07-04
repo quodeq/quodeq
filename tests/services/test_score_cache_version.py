@@ -25,6 +25,22 @@ def test_changes_when_dismissals_change(tmp_path, monkeypatch):
     assert v1 != v2
 
 
+def test_changes_when_writer_epoch_changes(tmp_path, monkeypatch):
+    """The writer epoch participates in the version.
+
+    Bumping it invalidates every row written by a prior writer -- the one-time
+    repair for runs whose partial (in-progress) scalar set was persisted before
+    the write-guard existed. They miss on the next build and are rebuilt fresh.
+    """
+    pd = tmp_path / "proj"; pd.mkdir()
+    monkeypatch.setattr("quodeq.services.score_cache.dismissed_keys", lambda _p: set())
+    monkeypatch.setattr("quodeq.services.score_cache.deleted_keys", lambda _p: set())
+    v1 = score_cache_version(pd, DEFAULT_PARAMS)
+    monkeypatch.setattr("quodeq.services.score_cache._CACHE_WRITER_EPOCH", "different-epoch")
+    v2 = score_cache_version(pd, DEFAULT_PARAMS)
+    assert v1 != v2
+
+
 def test_changes_when_params_change(tmp_path, monkeypatch):
     pd = tmp_path / "proj"; pd.mkdir()
     monkeypatch.setattr("quodeq.services.score_cache.dismissed_keys", lambda _p: set())
