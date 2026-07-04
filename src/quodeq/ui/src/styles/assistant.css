@@ -143,7 +143,6 @@
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.5rem;
   padding: 0.375rem 1rem;
   border-bottom: 1px solid var(--color-border);
@@ -160,6 +159,7 @@
 .assistant-drawer-controls {
   display: flex;
   gap: 0.25rem;
+  margin-left: auto;  /* chip sits left with the tabs; controls stay right */
 }
 
 .assistant-drawer-btn {
@@ -421,20 +421,20 @@
   background: color-mix(in srgb, var(--color-accent) 10%, transparent);
 }
 .drawer-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-/* Model pill in the drawer header (Assistant tab): a compact accent chip that
-   integrates the provider/model without a separate subtitle line. */
+/* Model tag in the drawer header (Assistant tab): a compact squared accent
+   tag next to the tabs, integrating the provider/model without a subtitle. */
 .drawer-model-chip {
   align-self: center;
   max-width: 14rem;   /* px-based cap so short model names show in full (a %
-                         here resolves against the tiny content-sized controls
-                         box and ellipsizes even short names) */
+                         would resolve against a content-sized flex box and
+                         ellipsize even short names) */
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   line-height: 1.4;
   color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
-  border-radius: 999px;
+  border-radius: 4px;
   padding: 1px 8px;
   white-space: nowrap;
   overflow: hidden;

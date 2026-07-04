@@ -74,12 +74,12 @@ export function BottomDrawer({ uiState }) {
               onClick={() => selectTab(t)}>{TAB_LABELS[t]}</button>
           ))}
         </div>
+        {active === 'assistant' && modelLabel && (
+          <span className="drawer-model-chip" title={modelLabel}>
+            {modelLabel}
+          </span>
+        )}
         <div className="assistant-drawer-controls">
-          {active === 'assistant' && modelLabel && (
-            <span className="drawer-model-chip" title={modelLabel}>
-              {modelLabel}
-            </span>
-          )}
           {active === 'assistant' && WEB_PROVIDERS.has(provider) && (
             <button type="button" className="assistant-drawer-btn assistant-drawer-web"
               onClick={toggleWebEnabled}
