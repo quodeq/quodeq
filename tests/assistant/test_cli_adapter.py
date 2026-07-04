@@ -1,8 +1,10 @@
+import dataclasses
 import io
 from pathlib import Path
 
 import pytest
 
+from quodeq.assistant.adapters import _cli as _cli_mod
 from quodeq.assistant.adapters._cli import CliTurnConfig, run_cli_turn
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
@@ -204,11 +206,6 @@ def test_web_disabled_by_default_in_spawned_argv(tmp_path):
                  session_id="s1", prior_session_id=None, repository=repo,
                  emit=lambda f: None, spawn_fn=spawn)
     assert captured["argv"][captured["argv"].index("--allowedTools") + 1] == "mcp__quodeq-assistant"
-
-
-import dataclasses
-
-from quodeq.assistant.adapters import _cli as _cli_mod
 
 
 def _capture_spawn(captured, lines):
