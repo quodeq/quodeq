@@ -25,6 +25,14 @@ export function VerifiedFindingsProvider({ project, children }) {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  useEffect(() => {
+    const handler = (event) => {
+      if (event.detail?.actionType === 'verify_finding') refresh();
+    };
+    window.addEventListener('quodeq:assistant-action-applied', handler);
+    return () => window.removeEventListener('quodeq:assistant-action-applied', handler);
+  }, [refresh]);
+
   const value = useMemo(() => {
     const notes = new Map(entries.map((e) => [keyOf(e), e.note || '']));
     return {

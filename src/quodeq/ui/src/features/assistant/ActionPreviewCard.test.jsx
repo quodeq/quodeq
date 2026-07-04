@@ -48,3 +48,17 @@ it('renders a verify_finding summary', () => {
   expect(screen.getByText('Mark finding as verified')).toBeInTheDocument();
   expect(screen.getByText('real, unsanitized input')).toBeInTheDocument();
 });
+
+it('dispatches quodeq:assistant-action-applied on successful apply', async () => {
+  const events = [];
+  const handler = (e) => events.push(e);
+  window.addEventListener('quodeq:assistant-action-applied', handler);
+  const dismissAction = { actionId: 'a3', actionType: 'dismiss_finding',
+    summary: { req: 'r1', file: 'a.py', line: 3, reason: 'fp' } };
+  render(<ActionPreviewCard action={dismissAction} />);
+  fireEvent.click(screen.getByRole('button', { name: /apply/i }));
+  await waitFor(() => expect(applyAssistantAction).toHaveBeenCalledWith('a3'));
+  await waitFor(() => expect(events.length).toBe(1));
+  expect(events[0].detail.actionType).toBe('dismiss_finding');
+  window.removeEventListener('quodeq:assistant-action-applied', handler);
+});

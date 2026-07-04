@@ -43,6 +43,7 @@ export function ActionPreviewCard({ action }) {
     setStatus('pending');
     try {
       await applyAssistantAction(actionId);
+      window.dispatchEvent(new CustomEvent('quodeq:assistant-action-applied', { detail: { actionType } }));
       setStatus('applied');
     } catch {
       setStatus('error');

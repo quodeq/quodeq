@@ -444,6 +444,13 @@ export default function App() {
   // fetched once on mount.
   const [dismissRefreshKey, setDismissRefreshKey] = useState(0);
   const bumpDismissRefresh = () => setDismissRefreshKey((k) => k + 1);
+  useEffect(() => {
+    const handler = (event) => {
+      if (event.detail?.actionType === 'dismiss_finding') bumpDismissRefresh();
+    };
+    window.addEventListener('quodeq:assistant-action-applied', handler);
+    return () => window.removeEventListener('quodeq:assistant-action-applied', handler);
+  }, []);
   // Auto-open is a once-per-session decision. Without this guard, closing the
   // wizard sets wizardEntry → null, which re-fires this effect and re-opens
   // the wizard immediately because projects.length is still 0. The user's

@@ -1,6 +1,6 @@
 import React from 'react';
-import { it, expect, vi } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
 vi.mock('../../../api/findings.js', () => ({
@@ -11,6 +11,8 @@ vi.mock('../../../api/findings.js', () => ({
 }));
 import { listVerifiedFindings, unverifyFinding } from '../../../api/findings.js';
 import { VerifiedFindingsProvider, useVerifiedFindings } from './verifiedFindingsContext.jsx';
+
+beforeEach(() => vi.clearAllMocks());
 
 function Probe({ v }) {
   const ctx = useVerifiedFindings();
@@ -46,4 +48,25 @@ it('unverify removes the key locally', async () => {
 it('returns null without a provider', () => {
   render(<Probe v={{ req: 'r1', file: 'a.py', line: 3 }} />);
   expect(screen.getByText('not verified')).toBeInTheDocument();
+});
+
+it('refetches when quodeq:assistant-action-applied fires with verify_finding', async () => {
+  listVerifiedFindings.mockResolvedValueOnce([])
+    .mockResolvedValueOnce([{ req: 'r1', file: 'a.py', line: 3, note: 'checked', verifiedAt: 't' }]);
+  render(
+    <VerifiedFindingsProvider project="proj">
+      <Probe v={{ req: 'r1', file: 'a.py', line: 3 }} />
+    </VerifiedFindingsProvider>,
+  );
+  // initial fetch returned empty list
+  await waitFor(() => expect(listVerifiedFindings).toHaveBeenCalledTimes(1));
+  expect(screen.getByText('not verified')).toBeInTheDocument();
+  // fire the window event
+  await act(async () => {
+    window.dispatchEvent(new CustomEvent('quodeq:assistant-action-applied', {
+      detail: { actionType: 'verify_finding' },
+    }));
+  });
+  await waitFor(() => expect(listVerifiedFindings).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(screen.getByText('checked')).toBeInTheDocument());
 });
