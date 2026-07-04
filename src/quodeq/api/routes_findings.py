@@ -156,6 +156,31 @@ def _rescore_run(
         return None
 
 
+def rescore_with_fallback(
+    evaluations_dir: str, project: str, run_id: str | None,
+) -> dict[str, Any] | None:
+    """Rescore the requested run, falling back to a project-wide projection.
+
+    Shared by the findings mutation routes and the assistant's
+    dismiss_finding action apply. See _rescore_run for the slim payload.
+    """
+    scores = _rescore_run(evaluations_dir, project, run_id)
+    if scores is None:
+        proj_dir = _project_dir(evaluations_dir, project)
+        lock = _get_projection_lock(project)
+
+        def _bg_project() -> None:
+            if not lock.acquire(blocking=False):
+                return
+            try:
+                _project_all_runs(proj_dir)
+            finally:
+                lock.release()
+
+        threading.Thread(target=_bg_project, daemon=True).start()
+    return scores
+
+
 def register_findings_routes(app: Flask) -> None:
     """Register /api/findings/* routes."""
 
@@ -165,36 +190,7 @@ def register_findings_routes(app: Flask) -> None:
     def _scores_with_fallback(
         project: str, run_id: str | None,
     ) -> dict[str, Any] | None:
-        """Rescore the requested run, falling back to a project-wide projection.
-
-        When the caller can't supply a usable ``run_id`` (Violations / Map
-        nav paths don't carry one today), ``_rescore_run`` returns ``None`` —
-        but the action *must* still propagate to SQL or the dismissed-tab
-        list won't see it. Project every run in the background as the
-        fallback so the entry becomes visible without blocking the response.
-
-        A per-project non-blocking lock prevents duplicate concurrent
-        projections for the same project: if one projection is already
-        running, the second caller skips rather than queueing behind it
-        (the in-flight run will already cover the latest actions).
-        """
-        evaluations_dir = _eval_dir()
-        scores = _rescore_run(evaluations_dir, project, run_id)
-        if scores is None:
-            proj_dir = _project_dir(evaluations_dir, project)
-            lock = _get_projection_lock(project)
-
-            def _bg_project() -> None:
-                if not lock.acquire(blocking=False):
-                    # Another projection for this project is already running.
-                    return
-                try:
-                    _project_all_runs(proj_dir)
-                finally:
-                    lock.release()
-
-            threading.Thread(target=_bg_project, daemon=True).start()
-        return scores
+        return rescore_with_fallback(_eval_dir(), project, run_id)
 
     @app.get("/api/findings/dismissed")
     def list_dismissed() -> Response:

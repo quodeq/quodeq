@@ -500,9 +500,8 @@ def test_assistant_catalog(client):
     assert {"create-standard", "explain-finding", "explain-score"} <= names
     one = next(s for s in body["skills"] if s["name"] == "explain-score")
     assert one["argumentHint"] and isinstance(one["views"], list)
-    assert body["actions"] == [
-        {"type": "create_standard",
-         "description": "Draft a new custom standard. Applied only after you approve the preview card."}]
+    assert [a["type"] for a in body["actions"]] == ["create_standard", "dismiss_finding", "verify_finding"]
+    assert all(a["description"] for a in body["actions"])
 
 
 def test_reject_after_apply_conflicts(client, app):
@@ -516,3 +515,36 @@ def test_reject_after_apply_conflicts(client, app):
     assert resp.status_code == 409
     sess = repo.get_action("a1")
     assert sess["status"] == "applied"  # apply outcome survives the replay
+
+
+def test_apply_dismiss_finding_writes_action_log(client, app, tmp_path, monkeypatch):
+    evals = tmp_path / "evals"
+    (evals / "proj").mkdir(parents=True)
+    monkeypatch.setitem(app.config, "EVALUATIONS_DIR", str(evals))
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(action_id="a1", session_id="s1",
+                       action_type="dismiss_finding",
+                       payload={"project": "proj", "req": "r1", "file": "a.py",
+                                "line": 3, "reason": "false positive: guarded"},
+                       content_hash="h")
+    resp = client.post("/api/assistant/actions/a1/apply")
+    assert resp.status_code == 200
+    from quodeq.services.dismissed import dismissed_keys
+    assert dismissed_keys(evals / "proj") == {("r1", "a.py", 3)}
+
+
+def test_apply_verify_finding_writes_badge(client, app, tmp_path, monkeypatch):
+    evals = tmp_path / "evals"
+    (evals / "proj").mkdir(parents=True)
+    monkeypatch.setitem(app.config, "EVALUATIONS_DIR", str(evals))
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(action_id="a1", session_id="s1",
+                       action_type="verify_finding",
+                       payload={"project": "proj", "req": "r1", "file": "a.py",
+                                "line": 3, "note": "real: unsanitized input"},
+                       content_hash="h")
+    assert client.post("/api/assistant/actions/a1/apply").status_code == 200
+    from quodeq.services.verified import verified_entries
+    assert [e["note"] for e in verified_entries(evals / "proj")] == ["real: unsanitized input"]

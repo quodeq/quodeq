@@ -56,6 +56,73 @@ def _apply_create_standard(payload: dict, app: Flask) -> dict:
     return result
 
 
+def _canonical_finding_key(payload: dict, ctx: ToolContext) -> dict:
+    req = str(payload.get("req") or "").strip()
+    file = str(payload.get("file") or "").strip()
+    line = payload.get("line")
+    if not req or not file or not isinstance(line, int) or line < 0:
+        raise ToolError("req, file, and a non-negative integer line are required")
+    if not ctx.project_id:
+        raise ToolError("no project attached to this session")
+    # The project always comes from the session, never from the model.
+    canonical = {"project": ctx.project_id, "req": req, "file": file, "line": line}
+    if ctx.run_dir is not None:
+        canonical["runId"] = ctx.run_dir.name
+    return canonical
+
+
+def _validate_dismiss_finding(payload: dict, ctx: ToolContext) -> dict:
+    canonical = _canonical_finding_key(payload, ctx)
+    reason = str(payload.get("reason") or "").strip()
+    if not reason:
+        raise ToolError("a dismissal reason is required")
+    canonical["reason"] = reason
+    return canonical
+
+
+def _summarize_dismiss_finding(canonical: dict) -> dict:
+    return {"req": canonical["req"], "file": canonical["file"],
+            "line": canonical["line"], "reason": canonical["reason"]}
+
+
+def _apply_dismiss_finding(payload: dict, app: Flask) -> dict:
+    from quodeq.api.routes_findings import rescore_with_fallback  # noqa: PLC0415
+    from quodeq.services.dismissed import dismiss_finding  # noqa: PLC0415
+    from quodeq.shared._env import get_evaluations_dir  # noqa: PLC0415
+
+    evaluations_dir = app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()
+    project_dir = Path(evaluations_dir) / payload["project"]
+    dismiss_finding(project_dir, {
+        "req": payload["req"], "file": payload["file"], "line": payload["line"],
+        "dismissReason": payload["reason"],
+    })
+    scores = rescore_with_fallback(evaluations_dir, payload["project"], payload.get("runId"))
+    return {"dismissed": True, "scores": scores}
+
+
+def _validate_verify_finding(payload: dict, ctx: ToolContext) -> dict:
+    canonical = _canonical_finding_key(payload, ctx)
+    note = str(payload.get("note") or "").strip()
+    if not note:
+        raise ToolError("a one-line note explaining why the finding is real is required")
+    canonical["note"] = note
+    return canonical
+
+
+def _summarize_verify_finding(canonical: dict) -> dict:
+    return {"req": canonical["req"], "file": canonical["file"],
+            "line": canonical["line"], "note": canonical["note"]}
+
+
+def _apply_verify_finding(payload: dict, app: Flask) -> dict:
+    from quodeq.services.verified import verify_finding  # noqa: PLC0415
+    from quodeq.shared._env import get_evaluations_dir  # noqa: PLC0415
+
+    evaluations_dir = app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()
+    verify_finding(Path(evaluations_dir) / payload["project"], payload)
+    return {"verified": True}
+
+
 ACTIONS: dict[str, ActionSpec] = {
     "create_standard": ActionSpec(
         action_type="create_standard",
@@ -63,6 +130,20 @@ ACTIONS: dict[str, ActionSpec] = {
         validate=_validate_create_standard,
         summarize=_summarize_create_standard,
         apply=_apply_create_standard,
+    ),
+    "dismiss_finding": ActionSpec(
+        action_type="dismiss_finding",
+        description="Dismiss a finding as a false positive, with a reason. Applied only after you approve the preview card; scores are recomputed.",
+        validate=_validate_dismiss_finding,
+        summarize=_summarize_dismiss_finding,
+        apply=_apply_dismiss_finding,
+    ),
+    "verify_finding": ActionSpec(
+        action_type="verify_finding",
+        description="Mark a finding as human-verified real, with a short note. Adds a badge on the violations screen; scores are unchanged.",
+        validate=_validate_verify_finding,
+        summarize=_summarize_verify_finding,
+        apply=_apply_verify_finding,
     ),
 }
 
@@ -96,7 +177,9 @@ def register_action_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
         "draft_action",
         "Draft an action for the user to review and apply. The draft is shown "
         "to the user as a preview card; nothing is written until they approve. "
-        "Payloads by type: create_standard takes a full standard JSON.",
+        "Payloads by type: create_standard takes a full standard JSON; "
+        "dismiss_finding takes {req, file, line, reason}; "
+        "verify_finding takes {req, file, line, note}.",
         {"type": "object", "properties": {
             "action_type": {"type": "string", "enum": sorted(ACTION_TYPES)},
             "payload": {"type": "object"},

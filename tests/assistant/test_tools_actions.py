@@ -56,3 +56,55 @@ def test_actions_registry_covers_types(ctx):
     assert set(ACTIONS) == set(ACTION_TYPES)
     for spec in ACTIONS.values():
         assert callable(spec.validate) and callable(spec.summarize) and callable(spec.apply)
+
+
+@pytest.fixture()
+def project_ctx(tmp_path):
+    store = AssistantRepository(tmp_path / "assistant_p.db")
+    store.create_session(session_id="s1", provider="ollama")
+    return ToolContext(
+        repository=store, session_id="s1", run_dir=None, repo_root=None,
+        evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
+        dimensions_file=tmp_path / "d.json",
+        project_id="proj", reports_dir=tmp_path / "evals",
+    )
+
+
+def test_draft_dismiss_requires_reason(project_ctx):
+    out = build_registry(project_ctx).dispatch("draft_action", {
+        "action_type": "dismiss_finding",
+        "payload": {"req": "r1", "file": "a.py", "line": 3},
+    })
+    assert out["ok"] is False
+    assert "reason" in out["error"]
+
+
+def test_draft_dismiss_canonicalizes_from_session(project_ctx):
+    out = build_registry(project_ctx).dispatch("draft_action", {
+        "action_type": "dismiss_finding",
+        "payload": {"req": "r1", "file": "a.py", "line": 3,
+                    "reason": "guarded two lines above",
+                    "project": "spoofed-by-model"},
+    })
+    assert out["ok"] is True
+    stored = project_ctx.repository.get_action(out["result"]["action_id"])
+    assert stored["payload"]["project"] == "proj"  # session wins over model payload
+    assert stored["payload"]["reason"] == "guarded two lines above"
+    frames = [f for _, f in project_ctx.repository.events_after("s1", 0)]
+    draft = next(f for f in frames if f["type"] == "action_draft")
+    assert draft["summary"] == {"req": "r1", "file": "a.py", "line": 3,
+                                "reason": "guarded two lines above"}
+
+
+def test_draft_verify_requires_note_and_project(ctx, project_ctx):
+    reg = build_registry(project_ctx)
+    out = reg.dispatch("draft_action", {
+        "action_type": "verify_finding",
+        "payload": {"req": "r1", "file": "a.py", "line": 3},
+    })
+    assert out["ok"] is False and "note" in out["error"]
+    out = build_registry(ctx).dispatch("draft_action", {
+        "action_type": "verify_finding",
+        "payload": {"req": "r1", "file": "a.py", "line": 3, "note": "n"},
+    })
+    assert out["ok"] is False  # ctx has no project_id -> actionable error
