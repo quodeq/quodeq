@@ -208,6 +208,74 @@ describe("useDashboard frozen historical runs", () => {
     );
     await waitFor(() => expect(fakeApi.getDashboard).toHaveBeenCalledWith("p1", "r1"));
   });
+
+  // Run-detail flicker guard. The dashboard payload carries its OWN
+  // cache-backed, dismiss-adjusted trend (post-#738, byte-identical to
+  // scores.trend — see tests/services/test_scoring_parity.py). The scoped
+  // scores query resolves a beat AFTER the dashboard query; folding scores.trend
+  // in then would mint a new `dashboard` object identity. RunOverviewPanel
+  // memoizes every derived value on the whole dashboard object and has a fade
+  // animation, so a new identity re-renders the panel and replays the fade —
+  // the visible "flicker". The hook must therefore keep the dashboard object
+  // identity stable when the scores query resolves.
+  it("keeps a stable dashboard identity when the scores query resolves (no run-detail flicker)", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 60_000 }, mutations: { retry: false } },
+    });
+    const dashTrend = [
+      { runId: "r1", dimensionDetails: [{ dimension: "security", delta: 0.2, score: 7 }] },
+    ];
+    // Fresh + completed => frozen (staleTime Infinity), so no background
+    // refetch swaps the object out from under us.
+    client.setQueryData(
+      projectKeys.dashboard("p1", "r1"),
+      {
+        marker: "dash",
+        trend: dashTrend,
+        dimensions: [{ dimension: "Security", overallScore: "7.0/10", violations: [], compliance: [] }],
+        selectedRun: { runId: "r1", dateLabel: "2026-05-01" },
+      },
+      { updatedAt: Date.now() },
+    );
+    // Latest scores resolve first (its own distinct trend array) so the scoped
+    // asOf can resolve to the completed r1.
+    client.setQueryData(
+      projectKeys.scores("p1", null),
+      {
+        accumulated: { score: 90 },
+        trend: [{ runId: "r1", dimensionDetails: [{ dimension: "security", delta: 0.2, score: 7 }] }],
+        availableRuns: [{ runId: "r1", status: "complete" }],
+      },
+      { updatedAt: Date.now() },
+    );
+
+    const { result } = renderHook(
+      () => useDashboard({ selectedProject: "p1", selectedRun: "r1", keepPlaceholder: false }),
+      { wrapper: wrapWith(client) },
+    );
+
+    await waitFor(() => expect(result.current.dashboard?.marker).toBe("dash"));
+    const before = result.current.dashboard;
+    // Uses the dashboard payload's OWN trend, not the scores query's.
+    expect(before.trend).toBe(dashTrend);
+
+    // The scoped scores query resolves a beat later with its OWN trend array —
+    // a different reference, identical values. Must not mint a new dashboard.
+    await act(async () => {
+      client.setQueryData(
+        projectKeys.scores("p1", "r1"),
+        {
+          accumulated: { score: 90 },
+          trend: [{ runId: "r1", dimensionDetails: [{ dimension: "security", delta: 0.2, score: 7 }] }],
+        },
+        { updatedAt: Date.now() },
+      );
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(result.current.dashboard).toBe(before); // identity stable => no flicker
+    expect(result.current.dashboard.trend).toBe(dashTrend);
+  });
 });
 
 // Note: live grade SSE merging used to live here. It was deleted in the
