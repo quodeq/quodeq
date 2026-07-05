@@ -170,7 +170,15 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     );
   }
 
-  const isLoading = loading && !dashboard;
+  // Run detail only needs the dashboard payload, so it can show as soon as that
+  // resolves (`&& !dashboard`). The Overview additionally needs the
+  // scores-derived `accumulated` block — DashboardContent returns a
+  // LoadingScreen without it — so it must stay in the loading state until the
+  // scores query resolves too. `loading` (dashboardQuery.isLoading ||
+  // scoresLoading) is already true until every required query has data; gating
+  // the Overview on it avoids fading to "ready" while still showing a spinner
+  // and then popping the real content in a beat later (the first-load flicker).
+  const isLoading = runMode ? (loading && !dashboard) : loading;
   // True while a *background* fetch is running but we're already showing
   // data (placeholderData kept the previous run on screen during a switch).
   // The page dims itself slightly so the user sees "still working" without
