@@ -91,7 +91,7 @@ function useNativeTitlebarSync(effectiveDark) {
 }
 
 /**
- * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string, projects: Array, onGoToProjects: Function, onGoToSettings: Function, preselectDims: string[] }} props
+ * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string, projects: Array, onGoToProjects: Function, onGoToSettings: Function, preselectDims: string[]|undefined }} props
  * @returns {JSX.Element}
  */
 function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onGoToProjects, onGoToSettings, preselectDims }) {
