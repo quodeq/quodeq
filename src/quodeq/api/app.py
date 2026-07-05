@@ -119,6 +119,8 @@ def create_app(
         )
 
     configure_security(app, store, api_key)
+    from quodeq.api._compression import configure_compression
+    configure_compression(app)
     app.config["QUODEQ_API_KEY"] = api_key
     from quodeq.shared.utils import get_action_api_host as _gah
     app.config["QUODEQ_BIND_HOST"] = _gah()

@@ -325,6 +325,31 @@ def get_scores_raw(
     return _build_response_from_eval_files(reports_root, project, run_id, params=params)
 
 
+def get_scores_slim(
+    reports_root: Path, project: str, run_id: str,
+) -> dict:
+    """``get_scores_raw`` with finding bodies stripped for the run-scores route.
+
+    The Explorer (the endpoint's only consumer) uses the response to overlay
+    dismissal-aware scores onto the eval payload it fetched separately: it
+    reads per-dimension/per-principle score + grade + totals, and uses each
+    violation solely as a ``req|file|line`` identity key to filter dismissed
+    findings out of the eval data. Returning full bodies made the response
+    7+ MB on finding-heavy runs; the slim form carries the same information
+    the merge needs at a fraction of the size. Compliance bodies are never
+    read from this payload, so the list is emptied (counts live in totals).
+    """
+    raw = get_scores_raw(reports_root, project, run_id)
+    slim_dims = []
+    for dim in raw.get("dimensions", []) or []:
+        slim_violations = [
+            {"req": v.get("req"), "file": v.get("file"), "line": v.get("line")}
+            for v in (dim.get("violations") or [])
+        ]
+        slim_dims.append({**dim, "violations": slim_violations, "compliance": []})
+    return {**raw, "dimensions": slim_dims}
+
+
 def _make_rescoring_fetcher(
     reports_root: Path, project: str,
     params: ScoringParams = DEFAULT_PARAMS,
@@ -550,5 +575,6 @@ def get_project_scores(
 
 __all__ = [
     "get_scores_raw",
+    "get_scores_slim",
     "get_project_scores",
 ]

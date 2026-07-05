@@ -13,7 +13,7 @@ from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
 from quodeq.core.events.writer import EventLogWriter
 from quodeq.data.projection.projector import Projector
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
-from quodeq.services.scoring import get_scores_raw
+from quodeq.services.scoring import get_scores_raw, get_scores_slim
 
 
 # ---------------------------------------------------------------------------
@@ -318,3 +318,44 @@ def test_get_scores_raw_summary_has_required_fields(tmp_path: Path) -> None:
     assert "dimensionsCount" in summary
     assert summary["dimensionsCount"] == 1
     assert "overallGrade" in summary
+
+
+# ---------------------------------------------------------------------------
+# Slim variant (GET /scores/<runId> payload diet)
+# ---------------------------------------------------------------------------
+
+def test_get_scores_slim_reduces_violations_to_identity_keys(tmp_path: Path) -> None:
+    """The run-scores route serves ``get_scores_slim``: each violation keeps
+    only the ``req``/``file``/``line`` fields the Explorer's rescore merge
+    uses as identity keys — heavy fields (reason, snippet, context) are gone.
+    """
+    _seed_run(tmp_path, "myproject", "r1", violations=_scorable_violations())
+
+    result = get_scores_slim(tmp_path, "myproject", "r1")
+
+    dim = next(d for d in result["dimensions"] if d["dimension"] == "Security")
+    assert dim["violations"], "slim payload must still carry violation keys"
+    for v in dim["violations"]:
+        assert set(v.keys()) == {"req", "file", "line"}
+        assert v["file"] and v["line"] is not None
+
+
+def test_get_scores_slim_drops_compliance_but_keeps_scores(tmp_path: Path) -> None:
+    """Compliance bodies are never read from this payload — the list is
+    emptied while grades, principles, totals, and summary stay identical to
+    the raw payload.
+    """
+    _seed_run(tmp_path, "myproject", "r1", violations=_scorable_violations())
+
+    raw = get_scores_raw(tmp_path, "myproject", "r1")
+    slim = get_scores_slim(tmp_path, "myproject", "r1")
+
+    assert slim["summary"] == raw["summary"]
+    for raw_dim, slim_dim in zip(raw["dimensions"], slim["dimensions"]):
+        assert slim_dim["compliance"] == []
+        assert slim_dim["dimension"] == raw_dim["dimension"]
+        assert slim_dim["overallScore"] == raw_dim["overallScore"]
+        assert slim_dim["overallGrade"] == raw_dim["overallGrade"]
+        assert slim_dim["principles"] == raw_dim["principles"]
+        assert slim_dim["totals"] == raw_dim["totals"]
+        assert len(slim_dim["violations"]) == len(raw_dim["violations"])

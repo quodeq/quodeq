@@ -303,6 +303,21 @@ def _attach_dismissed_count_to_dim(
     return {**dim_dict, "dismissedCount": count}
 
 
+def _slim_history_dim(dim: DimensionResult) -> dict[str, Any]:
+    """Serialize a history-context dimension without its finding bodies.
+
+    The previousByDimension / stalePreviousByDimension / staleDimensions keys
+    exist to carry scores, grades, and provenance (run id, dates) for trend
+    context; the UI reads only the scalar fields inlined on each selected-run
+    dimension (previousScore, trend, stale, fromRunId). No consumer reads the
+    violations/compliance arrays from these keys, yet on large projects they
+    dominated the payload: for a 201-run project, an old run's dashboard was
+    19.9 MB of which these three keys carried 18.6 MB of finding bodies.
+    Totals keep the counts; only the bodies are dropped.
+    """
+    return to_camel_dict(replace(dim, violations=[], compliance=[]))
+
+
 def _build_dashboard_result(
     project: str,
     runs: list[RunInfo],
@@ -339,9 +354,9 @@ def _build_dashboard_result(
         },
         "trend": payload.trend,
         "dimensions": dim_dicts,
-        "previousByDimension": {k: to_camel_dict(v) for k, v in payload.previous_by_dimension.items()},
-        "stalePreviousByDimension": {k: to_camel_dict(v) for k, v in payload.stale_previous_by_dimension.items()},
-        "staleDimensions": [to_camel_dict(d) for d in payload.stale_dimensions],
+        "previousByDimension": {k: _slim_history_dim(v) for k, v in payload.previous_by_dimension.items()},
+        "stalePreviousByDimension": {k: _slim_history_dim(v) for k, v in payload.stale_previous_by_dimension.items()},
+        "staleDimensions": [_slim_history_dim(d) for d in payload.stale_dimensions],
     }
 
 

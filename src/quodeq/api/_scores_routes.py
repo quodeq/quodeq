@@ -16,7 +16,7 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import error_response
 from quodeq.api.routes_common import reports_dir
-from quodeq.services.scoring import get_project_scores, get_scores_raw
+from quodeq.services.scoring import get_project_scores, get_scores_slim
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ def register_scores_routes(app: Flask) -> None:
             return err
         eval_dir = reports_dir()
         try:
-            result = get_scores_raw(Path(eval_dir), project, run_id)
+            result = get_scores_slim(Path(eval_dir), project, run_id)
         except FileNotFoundError:
             body, status = error_response("Run not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
