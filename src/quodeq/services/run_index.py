@@ -243,6 +243,22 @@ def list_runs(db: sqlite3.Connection, *, limit: int = 0) -> list[RunRow]:
     return [_row_to_runrow(r) for r in db.execute(sql).fetchall()]
 
 
+def list_runs_for_project(
+    db: sqlite3.Connection, project_uuid: str, *, limit: int = 0,
+) -> list[RunRow]:
+    """Return one project's runs ordered by started_at DESC. limit=0 = no limit.
+
+    Native indexed query — the replacement for walking the project's run dirs.
+    """
+    sql = (
+        f"SELECT {_LIST_COLS} FROM runs WHERE project_uuid = ? "
+        "ORDER BY started_at DESC"
+    )
+    if limit > 0:
+        sql += f" LIMIT {int(limit)}"
+    return [_row_to_runrow(r) for r in db.execute(sql, (project_uuid,)).fetchall()]
+
+
 def get_run(db: sqlite3.Connection, job_id: str) -> RunRow | None:
     row = db.execute(
         f"SELECT {_LIST_COLS} FROM runs WHERE job_id = ?", (job_id,),
