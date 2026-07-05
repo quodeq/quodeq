@@ -43,6 +43,20 @@ describe('DashboardPage first-load loading gate', () => {
   // must not sit on a blank full-screen spinner that whole time (reads as "the
   // project won't open"). Once the dashboard payload is in and a short grace
   // has elapsed, fall back to the partial page so a slow load shows progress.
+  // Rules-of-Hooks guard. On first load `projectsLoaded` is false, which hits
+  // an early return; a beat later it flips true and the page renders fully. If
+  // any hook (e.g. the grace state) lives BELOW the early returns, the hook
+  // count changes between those two renders and React throws #310 — a blank
+  // crash on load. This reproduces that transition.
+  it('does not change hook count across the projectsLoaded false -> true transition', () => {
+    const { rerender } = render(
+      <DashboardPage data={{ projectsLoaded: false }} callbacks={{}} runMode={false} />,
+    );
+    expect(() => {
+      rerender(<DashboardPage data={overviewLoading} callbacks={{}} runMode={false} />);
+    }).not.toThrow();
+  });
+
   it('falls back to the partial page after a grace period if scores stays slow', () => {
     vi.useFakeTimers();
     try {
