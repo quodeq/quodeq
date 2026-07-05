@@ -223,8 +223,15 @@ describe('useNavStack navTab params', () => {
     };
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('folds extra params into the single reset entry', () => {
-    const { result } = renderHook(() => useNavStack({ historyAdapter }));
+    const { result } = renderHook(
+      () => useNavStack({ historyAdapter }),
+      { wrapper: strictWrapper },
+    );
 
     act(() => { result.current.navTab('evaluate', { preselectDims: ['security'] }); });
 
@@ -234,7 +241,10 @@ describe('useNavStack navTab params', () => {
   });
 
   it('still works with no params (backward compatible)', () => {
-    const { result } = renderHook(() => useNavStack({ historyAdapter }));
+    const { result } = renderHook(
+      () => useNavStack({ historyAdapter }),
+      { wrapper: strictWrapper },
+    );
 
     act(() => { result.current.navTab('projects'); });
 
