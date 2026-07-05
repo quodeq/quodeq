@@ -11,6 +11,7 @@ from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.core.types import DimensionResult, to_camel_dict
 from quodeq.services._cache import make_lru_dimension_fetcher
+from quodeq.services._run_dimensions import configured_dimensions
 from quodeq.services.deleted import filter_deleted_from_dimensions
 from quodeq.services.dim_resolution import is_eligible_for_default_view
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
@@ -188,6 +189,22 @@ def _compute_result(
     return _build_accumulated_for_runs(reports_root, project, eligible_run_infos, cache_config, params)
 
 
+def _scope_to_configured(
+    all_dims: list[DimensionResult], configured: set[str],
+) -> list[DimensionResult]:
+    """Drop dimensions not in *configured*, the latest run's current standard.
+
+    Removes stale dimensions (e.g. ``clean-architecture``) that a project
+    no longer evaluates but that linger in old runs / ``evaluation.db``
+    drift. Fail-open: an empty *configured* set (unreadable dimensions.json
+    / status.json) means "unknown", so nothing is dropped — never return an
+    empty grade because a config file went missing.
+    """
+    if not configured:
+        return all_dims
+    return [d for d in all_dims if d.dimension in configured]
+
+
 def _build_accumulated_for_runs(
     reports_root: Path, project: str, run_infos: list[RunInfo],
     cache_config: AccumulatedCacheConfig | None,
@@ -203,6 +220,12 @@ def _build_accumulated_for_runs(
     project_dir = reports_root / project
     all_dims = filter_dismissed_from_dimensions(list(latest_by_dim.values()), project_dir)
     all_dims = filter_deleted_from_dimensions(all_dims, project_dir)
+    # Scope to the dimensions the latest eligible run actually configured,
+    # dropping stale dims (e.g. clean-architecture) that only survive via
+    # old runs / evaluation.db drift. run_infos arrive newest-first, so
+    # runs[0] is the latest. Fail-open when its config can't be read.
+    if runs:
+        all_dims = _scope_to_configured(all_dims, configured_dimensions(project_dir / runs[0]))
     dims_with_trend = _compute_accumulated_trends(all_dims, prev_occurrence)
     severity = _aggregate_severity_counts(all_dims)
     avg, prev_avg = _compute_accumulated_scores(all_dims, prev_run_latest, params)

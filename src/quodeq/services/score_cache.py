@@ -28,7 +28,11 @@ _BUSY_TIMEOUT_MS = 5000
 # of 6 dims), which the content-hash version could never invalidate; the
 # write-guard now persists only completed runs, and this bump rebuilds the
 # stranded partial rows once.
-_CACHE_WRITER_EPOCH = "2"
+# "3": accumulated / project-summary payloads written before configured-dim
+# scoping carried stale dimensions (e.g. clean-architecture) that the project
+# no longer evaluates; the run-fingerprint could never invalidate them, so this
+# bump rebuilds them once against the latest run's configured-dimension set.
+_CACHE_WRITER_EPOCH = "3"
 _SCHEMA = (
     "CREATE TABLE IF NOT EXISTS run_scalars ("
     " project TEXT NOT NULL, run_id TEXT NOT NULL, version TEXT NOT NULL,"

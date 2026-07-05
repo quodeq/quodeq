@@ -93,6 +93,16 @@ def _read_accumulated_summary(
                     if files_count is None and d.source_file_count:
                         files_count = d.source_file_count
             acc_dims = list(latest_by_dim.values())
+            # Scope the card summary to the dimensions the latest eligible run
+            # actually configured, dropping stale dims (e.g. clean-architecture)
+            # that linger via old runs / evaluation.db drift. ``runs`` arrive
+            # newest-first, so runs[0] is the latest. Fail-open when its config
+            # can't be read (empty set -> _scope_to_configured keeps everything).
+            if runs:
+                from quodeq.services._run_dimensions import configured_dimensions  # noqa: PLC0415
+                from quodeq.services.accumulated import _scope_to_configured  # noqa: PLC0415
+                configured = configured_dimensions(project_dir / runs[0].run_id)
+                acc_dims = _scope_to_configured(acc_dims, configured)
             if not acc_dims:
                 return {"grade": None, "score": None, "files": files_count}
             summary = summarize_dimensions(acc_dims, params)
