@@ -208,6 +208,12 @@ def accumulated_cache_version(
     independence.
     """
     payload = json.dumps({
+        # Bump when the accumulated / project-card computation changes, so
+        # existing cache entries recompute on deploy instead of serving a stale
+        # value until the next scan/dismiss/delete. v2: the project-card summary
+        # now applies the dismiss/delete rescore (was raw read_run_data, which
+        # ignored deletions).
+        "algo": 2,
         "base": score_cache_version(project_dir, params),
         "runs": sorted(list(t) for t in run_fingerprint),
         "as_of": as_of or "",
