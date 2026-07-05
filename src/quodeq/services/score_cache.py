@@ -40,6 +40,8 @@ _SCHEMA = (
     " project TEXT NOT NULL, version TEXT NOT NULL, payload TEXT NOT NULL,"
     " updated_at TEXT NOT NULL DEFAULT (datetime('now')),"
     " PRIMARY KEY (project, version));"
+    "CREATE TABLE IF NOT EXISTS project_summary_cache ("
+    " project TEXT PRIMARY KEY, version TEXT NOT NULL, payload TEXT NOT NULL);"
 )
 
 
@@ -230,6 +232,66 @@ def cached_accumulated(
     try:
         with open_score_cache() as conn:
             write_cached_accumulated(conn, project, version, result)
+    except sqlite3.Error:
+        pass
+    return result
+
+
+def read_cached_project_summary(
+    conn: sqlite3.Connection, project: str, version: str,
+) -> dict | None:
+    """Return the cached project-card summary for (project, version), or None."""
+    try:
+        row = conn.execute(
+            "SELECT payload FROM project_summary_cache WHERE project=? AND version=?",
+            (project, version),
+        ).fetchone()
+    except sqlite3.Error:
+        return None
+    if row is None:
+        return None
+    try:
+        return json.loads(row[0])
+    except (ValueError, TypeError):
+        return None
+
+
+def write_cached_project_summary(
+    conn: sqlite3.Connection, project: str, version: str, payload: dict,
+) -> None:
+    """Single-slot-per-project write for the project-card summary."""
+    try:
+        blob = json.dumps(payload)
+    except (TypeError, ValueError):
+        return
+    try:
+        conn.execute("DELETE FROM project_summary_cache WHERE project=?", (project,))
+        conn.execute(
+            "INSERT OR REPLACE INTO project_summary_cache (project, version, payload) VALUES (?, ?, ?)",
+            (project, version, blob),
+        )
+        conn.commit()
+    except sqlite3.Error:
+        _logger.warning("project summary cache write failed for %s", project, exc_info=True)
+
+
+def cached_project_summary(
+    project: str, version: str, compute: Callable[[], dict],
+) -> dict:
+    """Read-through cache for the project-card summary (mirrors cached_accumulated)."""
+    if score_cache_disabled():
+        return compute()
+    try:
+        with open_score_cache() as conn:
+            hit = read_cached_project_summary(conn, project, version)
+        if hit is not None:
+            return hit
+    except sqlite3.Error:
+        return compute()
+    result = compute()
+    try:
+        with open_score_cache() as conn:
+            write_cached_project_summary(conn, project, version, result)
     except sqlite3.Error:
         pass
     return result
