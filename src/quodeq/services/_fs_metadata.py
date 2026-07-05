@@ -67,8 +67,9 @@ def _read_accumulated_summary(
 ) -> tuple[str | None, float | None, int | None]:
     """Compute accumulated grade and score across all runs. Returns (grade, score, files).
 
-    ``read_run_data`` overlays the SQL grade tables for event-log runs, so the
-    project-card summary reflects dismisses and any applied grade formula.
+    The card summary applies the same project-wide dismiss/delete rescore as
+    every other read path (see the ``_rescore_dimension`` step below), so the
+    repositories-screen grade agrees with the Overview / explorer / trend.
     *params* (loaded from the saved formula when None) keeps the aggregate
     threshold labels and dimension weights consistent with the dashboard.
     """
@@ -93,6 +94,25 @@ def _read_accumulated_summary(
                     if files_count is None and d.source_file_count:
                         files_count = d.source_file_count
             acc_dims = list(latest_by_dim.values())
+            # Apply the project-wide dismiss/delete rescore so the card agrees
+            # with every other read path (detail/explorer/dashboard/trend all
+            # route through ``scored_run_dimensions``, i.e. read_run_data +
+            # ``_rescore_dimension``). ``read_run_data`` returns the raw scan;
+            # its SQL grade overlay reflects dismisses only when the run is
+            # freshly projected, and NEVER reflects deletions. Without this the
+            # project-card grade kept a stale, too-low value for any project
+            # with deletions (or dismissals on a not-yet-reprojected run) —
+            # diverging from the score shown everywhere else.
+            from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
+            from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
+            from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
+            dismissed = dismissed_keys(project_dir)
+            deleted = deleted_keys(project_dir)
+            if dismissed or deleted:
+                acc_dims = [
+                    _rescore_dimension(d, dismissed, deleted, params=params)
+                    for d in acc_dims
+                ]
             # Scope the card summary to the project's current dimension standard
             # — the union of dimensions configured by the last few ELIGIBLE runs
             # — dropping stale dims (e.g. clean-architecture) that linger via old
