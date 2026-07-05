@@ -28,3 +28,39 @@ def test_row_to_run_entry_shape_is_camel_and_score_placeholders():
     assert entry["overallGrade"] is None
     assert entry["dimensionScores"] == {}
     assert not any("_" in k for k in entry)
+
+
+from quodeq.services import _runs_unit as ru
+
+class _Dim:
+    def __init__(self, dimension, overall_score, overall_grade):
+        self.dimension = dimension
+        self.overall_score = overall_score
+        self.overall_grade = overall_grade
+
+def test_fill_scores_averages_dimensions(monkeypatch, tmp_path):
+    monkeypatch.setattr(ru, "read_run_scalars",
+        lambda root, proj, rid: [_Dim("security", "6.0/10", "GOOD"), _Dim("performance", "8.0/10", "GOOD")])
+    entry = ru._row_to_run_entry(_row(run_id="r1", state="done"))
+    ru._fill_scores(entry, tmp_path, "P", "r1")
+    assert entry["dimensionScores"] == {"security": 6.0, "performance": 8.0}
+    assert entry["overallScore"] == 7.0
+    assert entry["overallGrade"] is not None
+
+def test_fill_scores_skips_in_progress(monkeypatch, tmp_path):
+    called = False
+    def _boom(*a, **k):
+        nonlocal called
+        called = True
+        return []
+    monkeypatch.setattr(ru, "read_run_scalars", _boom)
+    entry = ru._row_to_run_entry(_row(run_id="r1", state="running"))
+    ru._fill_scores(entry, tmp_path, "P", "r1")
+    assert called is False
+    assert entry["overallScore"] is None
+
+def test_fill_scores_tolerates_read_error(monkeypatch, tmp_path):
+    monkeypatch.setattr(ru, "read_run_scalars", lambda *a, **k: (_ for _ in ()).throw(OSError("gone")))
+    entry = ru._row_to_run_entry(_row(run_id="r1", state="done"))
+    ru._fill_scores(entry, tmp_path, "P", "r1")
+    assert entry["overallScore"] is None
