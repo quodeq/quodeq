@@ -789,3 +789,80 @@ class TestBuildDashboardDismissedFiltering:
         assert dim["totals"]["violationCount"] == 1
         # Deleted findings are suppressed, not "dismissed": no count is shown.
         assert "dismissedCount" not in dim
+
+
+class TestHistoryContextSlimming:
+    """previousByDimension / stalePreviousByDimension / staleDimensions must
+    carry scores + provenance only. No consumer reads finding bodies from
+    these keys, and on large projects the bodies dominated the payload
+    (~18.6 MB of a 19.9 MB old-run dashboard on a 201-run project)."""
+
+    def _finding(self, i: int, verdict: str = "violation"):
+        from quodeq.core.types.finding import Finding
+        return Finding(
+            practice_id="P1", verdict=verdict, file=f"f{i}.py", line=i,
+            reason="a long explanation", snippet="offending()", context="ctx",
+            req=f"R{i}",
+        )
+
+    def test_history_keys_drop_finding_bodies_but_keep_scores(self, tmp_path):
+        from quodeq.core.types.finding import Totals
+        runs = [
+            RunInfo(run_id="r-new", date_iso="2024-02-01", date_label="2024-02-01", status="complete"),
+            RunInfo(run_id="r-old", date_iso="2024-01-01", date_label="2024-01-01", status="complete"),
+        ]
+        selected_dims = [DimensionResult(
+            dimension="security", overall_grade="B", overall_score="7.0/10",
+            violations=[self._finding(1)], compliance=[self._finding(2, "compliance")],
+        )]
+        old_dims = [
+            DimensionResult(
+                dimension="security", overall_grade="C", overall_score="6.0/10",
+                violations=[self._finding(3)],
+                totals=Totals(violation_count=1, compliance_count=0),
+            ),
+            DimensionResult(
+                dimension="perf", overall_grade="C", overall_score="5.0/10",
+                violations=[self._finding(4)], compliance=[self._finding(5, "compliance")],
+                totals=Totals(violation_count=1, compliance_count=1),
+            ),
+        ]
+        summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
+
+        def read_by_run(_root, _project, run_id):
+            return selected_dims if run_id == "r-new" else old_dims
+
+        from quodeq.services.dashboard import _SHARED_RUN_DIM_CACHE
+        _SHARED_RUN_DIM_CACHE.clear()
+        with (
+            patch("quodeq.services.dashboard.list_runs", return_value=runs),
+            patch("quodeq.services.dashboard.read_run_data", side_effect=read_by_run),
+            patch("quodeq.services._cache.read_run_data", side_effect=read_by_run),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), "proj-slim-history", "r-new")
+
+        # The selected run's own dimensions keep their full finding bodies.
+        assert result["dimensions"][0]["violations"][0]["reason"] == "a long explanation"
+        assert result["dimensions"][0]["compliance"]
+
+        # previousByDimension: scores/grades/totals survive, bodies do not.
+        prev = result["previousByDimension"]["security"]
+        assert prev["overallGrade"] == "C"
+        assert prev["overallScore"] == "6.0/10"
+        assert prev["totals"]["violationCount"] == 1
+        assert prev["violations"] == []
+        assert prev["compliance"] == []
+
+        # staleDimensions (perf is missing from the selected run): same rule.
+        stale = [d for d in result["staleDimensions"] if d["dimension"] == "perf"]
+        assert stale, f"expected perf in staleDimensions, got {result['staleDimensions']}"
+        assert stale[0]["overallScore"] == "5.0/10"
+        assert stale[0]["totals"]["complianceCount"] == 1
+        assert stale[0]["violations"] == []
+        assert stale[0]["compliance"] == []
+
+        # stalePreviousByDimension follows the same serialization path.
+        for dim in result["stalePreviousByDimension"].values():
+            assert dim["violations"] == []
+            assert dim["compliance"] == []
