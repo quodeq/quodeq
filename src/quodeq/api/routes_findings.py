@@ -18,7 +18,7 @@ from flask import Flask, Response, abort, jsonify, request
 
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services.dismissed import dismiss_finding, load_dismissed, restore_finding, restore_all_findings
-from quodeq.services.mutation_rescore import rescore_with_fallback
+from quodeq.services.mutation_rescore import dismiss_delta, rescore_with_fallback
 from quodeq.services.verified import unverify_finding, verified_entries
 from quodeq.shared.utils import get_evaluations_dir
 from quodeq.shared.validation import validate_path_segment
@@ -75,7 +75,10 @@ def register_findings_routes(app: Flask) -> None:
             return jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400
         dismiss_finding(_project_dir(_eval_dir(), project), body)
         scores = _scores_with_fallback(project, run_id)
-        return jsonify({"scores": scores}), 200
+        delta = dismiss_delta(
+            _eval_dir(), project, run_id, {"req": req, "file": file, "line": line},
+        )
+        return jsonify({"scores": scores, "delta": delta}), 200
 
     @app.post("/api/findings/restore")
     def restore() -> tuple[Response, int]:

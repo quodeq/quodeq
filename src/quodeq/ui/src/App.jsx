@@ -19,7 +19,9 @@ const HelpPage = lazy(() => import('./features/help/components/HelpPage.jsx'));
 const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
 import EmptyStateWithTour from './features/onboarding/components/EmptyStateWithTour.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
+import { useQueryClient } from '@tanstack/react-query';
 import { useApi } from './api/ApiContext.jsx';
+import { applyMutationDelta } from './api/applyMutationDelta.js';
 import { getGradeFormula } from './api/index.js';
 import { setGradeThresholds } from './utils/gradeThresholds.js';
 import LoadingScreen from './components/LoadingScreen.jsx';
@@ -170,6 +172,7 @@ function renderEvalPrincipleDetail(params, props) {
         // accumulated (cross-run) rollup separately.
         const payload = { ...buildDismissPayload(v, evalPrincipal.dimension), run_id: evalPrincipal.runId };
         const result = await props.dismissFinding(selectedProject, payload);
+        props.applyDelta?.(selectedProject, result?.scores, result?.delta);
         props.refreshDashboard?.();
         props.bumpDismissRefresh?.();
         return result;
@@ -354,6 +357,7 @@ const ROUTE_RENDERERS = {
       onDismiss={async (v) => {
         const payload = { ...buildDismissPayload(v), run_id: params.runId };
         const result = await props.dismissFinding(props.navigation.selectedProject, payload);
+        props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
         props.refreshDashboard?.();
         props.bumpDismissRefresh?.();
         return result;
@@ -370,6 +374,7 @@ const ROUTE_RENDERERS = {
       onDismiss={async (v) => {
         const payload = { ...buildDismissPayload(v, params.dimension), run_id: params.runId };
         const result = await props.dismissFinding(props.navigation.selectedProject, payload);
+        props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
         props.refreshDashboard?.();
         props.bumpDismissRefresh?.();
         return result;
@@ -432,6 +437,7 @@ function AppShell({ sidebar, header, content, drawer }) {
 
 export default function App() {
   const { dismissFinding } = useApi();
+  const queryClient = useQueryClient();
   const state = useAppState();
   const APP_VERSION = state.serverVersion;
   const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
@@ -635,6 +641,12 @@ export default function App() {
     settings: state.settings,
     refreshDashboard: state.refreshDashboard,
     dismissFinding,
+    // Patch the dashboard/scores caches from the dismiss response delta so the
+    // Overview updates instantly. Additive — the refreshDashboard /
+    // bumpDismissRefresh mechanisms below still run. The delta carries only the
+    // mutation shape; the caller folds in the rescored dims from result.scores.
+    applyDelta: (project, scores, delta) =>
+      applyMutationDelta(queryClient, project, delta && { ...delta, dimensions: scores?.dimensions }),
     bumpDismissRefresh,
     dismissRefreshKey,
   };
