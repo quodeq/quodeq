@@ -59,7 +59,19 @@ export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = t
 
   const dashboardWithTrend = useMemo(() => {
     if (!dashboardQuery.data) return null;
-    const trend = scores?.trend || latestScores?.trend || dashboardQuery.data.trend || [];
+    // The dashboard payload carries its OWN cache-backed, dismiss-adjusted
+    // trend that is byte-identical to scores.trend (tests/services/
+    // test_scoring_parity.py pins every read path to the same per-run score).
+    // Return the payload UNCHANGED when it has one: the scoped scores query
+    // resolves a beat AFTER the dashboard query, and folding scores.trend in
+    // then would mint a new `dashboard` object identity. RunOverviewPanel
+    // memoizes every derived value on the whole dashboard object and has a fade
+    // animation, so a new identity re-renders the panel and replays the fade —
+    // the run-detail entry "flicker". Fall back to the scores trend only when
+    // the payload lacks one (older cached payloads / the grade-formula
+    // early-return path).
+    if (dashboardQuery.data.trend?.length) return dashboardQuery.data;
+    const trend = scores?.trend || latestScores?.trend || [];
     return { ...dashboardQuery.data, trend };
   }, [dashboardQuery.data, scores, latestScores]);
 
