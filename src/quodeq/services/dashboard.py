@@ -22,6 +22,7 @@ from quodeq.services.ports import (
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services._dashboard_trend import build_accumulated_trend
+from quodeq.services._trend_fetcher import make_trend_fetcher
 from quodeq.services.dim_resolution import is_eligible_for_default_view
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
 
@@ -184,33 +185,6 @@ def _rescore_run_dimensions(
     if not dismissed and not deleted:
         return dims
     return [_rescore_dimension(d, dismissed, deleted, params=params) for d in dims]
-
-
-def _wrap_fetcher_with_rescore(
-    fetcher: Callable[[str], list[DimensionResult]],
-    reports_root: Path,
-    project: str,
-    params: ScoringParams,
-) -> Callable[[str], list[DimensionResult]]:
-    """Decorate a run-dimension fetcher with the project-wide dismiss/delete rescore.
-
-    Returns *fetcher* unchanged when the project has no active dismissals or
-    deletions (the common case, so the trend fast-path cost is unchanged).
-    Otherwise each fetched run's dimensions are rescored so the trend /
-    previous-score / stale computations show the dismiss-adjusted score rather
-    than the raw scan value.
-    """
-    from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
-    from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
-
-    project_dir = reports_root / project
-    if not dismissed_keys(project_dir) and not deleted_keys(project_dir):
-        return fetcher
-
-    def rescoring(run_id: str) -> list[DimensionResult]:
-        return _rescore_run_dimensions(fetcher(run_id), reports_root, project, params)
-
-    return rescoring
 
 
 def _count_eval_files(reports_root: Path, project: str, run_id: str) -> int:
@@ -484,20 +458,28 @@ def _compute_dashboard_payload(
     else:
         history_runs = scoreable_runs[:max(max_history, selected_in_scoreable + 1)]
         history_index = selected_in_scoreable
-    # Status-aware fetcher: bypass cache for in_progress runs whose on-disk
-    # evaluation/*.json set grows as dims finish mid-run. Without this,
-    # the History page renders the partial dim set from the first read
-    # forever -- new dims that complete later never surface.
-    get_run_dimensions = _make_status_aware_fetcher(
-        reports_root, project, history_runs,
-        cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
-    )
-    # Rescore each historical run's dims with the project-wide dismiss/delete
-    # set before they feed the trend / previous-score / stale computations, so
-    # the History chart and the previous-run deltas agree with the selected
-    # run's dismiss-adjusted score instead of showing the raw scan value.
-    get_run_dimensions = _wrap_fetcher_with_rescore(
-        get_run_dimensions, reports_root, project, params,
+    # History fetcher: cache-backed, dismiss-adjusted, SCALAR-only -- the same
+    # fetcher the /scores endpoint uses. The three consumers below
+    # (_collect_previous_scores, collect_stale_dimensions, build_accumulated_trend)
+    # read only per-run scalars (dimension + overallScore + overallGrade), not
+    # the full violations. Reading + rescoring FULL data for every history run
+    # (up to _max_history_runs()) was the ~2s cost this replaces.
+    #
+    # In-progress freshness is preserved: the fast path re-reads each request
+    # (fresh per-call cache), and the heavy path's cacheable_run_ids guard makes
+    # in-progress runs compute-through without persisting a partial set. Stale-
+    # partial detection is preserved inside read_run_scalars, which falls back to
+    # full read_run_data whenever the SQL scalar projection disagrees with the
+    # on-disk evaluation/*.json count -- the same self-heal the old status-aware
+    # fetcher did via _count_eval_files. The dismiss-adjustment (Bug B) stays;
+    # it is now cached rather than recomputed on every request.
+    cacheable_run_ids = {r.run_id for r in history_runs if r.status == "complete"}
+    get_run_dimensions = make_trend_fetcher(
+        reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
+        max_history=max_history,
+        base_fetcher_factory=lambda rr, proj: _make_run_dimension_fetcher(
+            rr, proj, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
+        ),
     )
     previous_by_dimension = _collect_previous_scores(
         history_runs, history_index, selected_dim_names, get_run_dimensions,
