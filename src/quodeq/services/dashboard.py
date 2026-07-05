@@ -22,7 +22,6 @@ from quodeq.services.ports import (
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services._dashboard_trend import build_accumulated_trend
-from quodeq.services.deleted import filter_deleted_from_dimensions
 from quodeq.services.dim_resolution import is_eligible_for_default_view
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
 
@@ -160,6 +159,58 @@ def _make_run_dimension_fetcher(
         lock if lock is not None else _SHARED_RUN_DIM_LOCK,
         max_size if max_size is not None else _run_dim_cache_max(),
     )
+
+
+def _rescore_run_dimensions(
+    dims: list[DimensionResult],
+    reports_root: Path,
+    project: str,
+    params: ScoringParams,
+) -> list[DimensionResult]:
+    """Apply the project-wide dismiss/delete rescore to a run's dimensions.
+
+    Identity when the project has no active dismissals/deletions. Otherwise each
+    dimension passes through the same ``_rescore_dimension`` transform the
+    accumulated view and the per-run explorer use, so every read path reports
+    the identical dismiss-adjusted score/grade.
+    """
+    from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
+    from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
+    from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
+
+    project_dir = reports_root / project
+    dismissed = dismissed_keys(project_dir)
+    deleted = deleted_keys(project_dir)
+    if not dismissed and not deleted:
+        return dims
+    return [_rescore_dimension(d, dismissed, deleted, params=params) for d in dims]
+
+
+def _wrap_fetcher_with_rescore(
+    fetcher: Callable[[str], list[DimensionResult]],
+    reports_root: Path,
+    project: str,
+    params: ScoringParams,
+) -> Callable[[str], list[DimensionResult]]:
+    """Decorate a run-dimension fetcher with the project-wide dismiss/delete rescore.
+
+    Returns *fetcher* unchanged when the project has no active dismissals or
+    deletions (the common case, so the trend fast-path cost is unchanged).
+    Otherwise each fetched run's dimensions are rescored so the trend /
+    previous-score / stale computations show the dismiss-adjusted score rather
+    than the raw scan value.
+    """
+    from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
+    from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
+
+    project_dir = reports_root / project
+    if not dismissed_keys(project_dir) and not deleted_keys(project_dir):
+        return fetcher
+
+    def rescoring(run_id: str) -> list[DimensionResult]:
+        return _rescore_run_dimensions(fetcher(run_id), reports_root, project, params)
+
+    return rescoring
 
 
 def _count_eval_files(reports_root: Path, project: str, run_id: str) -> int:
@@ -441,6 +492,13 @@ def _compute_dashboard_payload(
         reports_root, project, history_runs,
         cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
     )
+    # Rescore each historical run's dims with the project-wide dismiss/delete
+    # set before they feed the trend / previous-score / stale computations, so
+    # the History chart and the previous-run deltas agree with the selected
+    # run's dismiss-adjusted score instead of showing the raw scan value.
+    get_run_dimensions = _wrap_fetcher_with_rescore(
+        get_run_dimensions, reports_root, project, params,
+    )
     previous_by_dimension = _collect_previous_scores(
         history_runs, history_index, selected_dim_names, get_run_dimensions,
     )
@@ -489,23 +547,27 @@ def build_dashboard(
         }
 
     selected_run, selected_index = _resolve_selected_run(runs, run)
-    # read_run_data overlays the SQL grade tables for event-log runs, so the
-    # selected run's GRADES already reflect dismissals and any applied grade
-    # formula. The violations/totals, however, come verbatim from the frozen
-    # eval JSON, which by design keeps everything the scan found - including
-    # findings the user dismissed in an earlier run. Apply the same read-time
-    # dismissed/deleted filters as the dimension detail and the accumulated
-    # overview, or a long-dismissed critical resurfaces in the history run
-    # view with counts that contradict its own grade.
-    selected_dims = read_run_data(reports_root, project, selected_run.run_id)
+    # ``read_run_data`` overlays the run's SQL grade tables, but those grades
+    # only reflect dismissals projected into THIS run and NOT project-wide
+    # dismissals/deletions that accrued later -- so the raw selected-run score
+    # can disagree with the accumulated overview. Rescore the selected run's
+    # dimensions with the SAME project-wide ``_rescore_dimension`` transform the
+    # accumulated view and the per-run explorer use, so every path reports the
+    # identical dismiss-adjusted score/grade AND drops the dismissed + deleted
+    # violations from the counts. ``read_run_data`` stays the dimension source
+    # here (a stable seam other callers and tests inject through).
     project_dir = reports_root / project
-    pre_filter_counts = {d.dimension: len(d.violations) for d in selected_dims}
-    selected_dims = filter_dismissed_from_dimensions(selected_dims, project_dir)
+    raw_dims = read_run_data(reports_root, project, selected_run.run_id)
+    # ``dismissedCount`` reports how many of the scan's re-found violations were
+    # hidden by the *dismissed* filter specifically (deletions are a separate,
+    # permanent suppression), so measure it against the dismissed-only filter.
+    pre_filter_counts = {d.dimension: len(d.violations) for d in raw_dims}
+    dismissed_only = filter_dismissed_from_dimensions(raw_dims, project_dir)
     dismissed_counts = {
         (d.dimension or ""): pre_filter_counts.get(d.dimension, 0) - len(d.violations)
-        for d in selected_dims
+        for d in dismissed_only
     }
-    selected_dims = filter_deleted_from_dimensions(selected_dims, project_dir)
+    selected_dims = _rescore_run_dimensions(raw_dims, reports_root, project, params)
     ctx = _SelectedRunContext(
         run=selected_run,
         index=selected_index,

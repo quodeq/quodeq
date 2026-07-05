@@ -50,8 +50,9 @@ from quodeq.services.score_cache import (
     make_cache_backed_fetcher,
     score_cache_version,
 )
-from quodeq.services.ports import RunInfo, list_runs, read_run_scalars
+from quodeq.services.ports import RunInfo, list_runs, read_run_data, read_run_scalars
 from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
+from quodeq.shared.validation import validate_path_segment
 from quodeq.services.scoring._summary import recompute_summary
 
 
@@ -299,10 +300,29 @@ def get_scores_raw(
     from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
     from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
 
+    # The SQL grade tables are frozen per run and, on a stale projection,
+    # reflect only the dismissals already projected into THIS run's own findings
+    # table -- NOT project-wide dismissals/deletions that accrued later. So when
+    # the project has active dismissals/deletions AND this run has eval JSON to
+    # rescore from, defer to the eval-file path, which applies the project-wide
+    # dismiss set authoritatively via ``rescore_dimensions`` -- the SAME
+    # transform the accumulated view uses, so every per-run read agrees on the
+    # dismiss-adjusted score. Event-log-only runs (no eval JSON) can't be
+    # rescored that way; they keep the SQL path, whose ``_ensure_fresh``
+    # re-projection applies the dismissals directly to the findings table.
+    project_dir = reports_root / project
+    has_project_wide_filters = bool(dismissed_keys(project_dir) or deleted_keys(project_dir))
+    eval_dir = run_dir / "evaluation"
+    prefer_eval_rescore = (
+        has_project_wide_filters
+        and eval_dir.is_dir()
+        and any(p.suffix == ".json" for p in eval_dir.iterdir())
+    )
+
     # SQL path is meaningful only when events.jsonl exists. For older runs
     # without one, skip straight to the JSON-file fallback so we don't have
     # to wait on a no-op projection that will leave the grade tables empty.
-    if (run_dir / "events.jsonl").is_file():
+    if not prefer_eval_rescore and (run_dir / "events.jsonl").is_file():
         import sqlite3  # noqa: PLC0415
         try:
             repo = SqliteFindingsRepository(run_dir)
@@ -348,6 +368,37 @@ def get_scores_slim(
         ]
         slim_dims.append({**dim, "violations": slim_violations, "compliance": []})
     return {**raw, "dimensions": slim_dims}
+
+
+def scored_run_dimensions(
+    reports_root: Path, project: str, run_id: str,
+    params: ScoringParams | None = None,
+) -> list[DimensionResult]:
+    """Return a run's dimensions with the project-wide dismiss/delete rescore applied.
+
+    This is the single seam every per-run read path routes through so the SAME
+    run+dimension reports the SAME score everywhere. It is
+    ``read_run_data`` (raw, dismissals NOT applied) composed with the same
+    project-wide ``_rescore_dimension`` the accumulated view already runs, and
+    returns ``DimensionResult`` objects (not camelCase dicts).
+
+    Rescore is deliberately kept *out* of ``read_run_data`` itself: that
+    function is foundational and feeds exports and other callers that must see
+    the raw scan. Callers that want the dismiss-adjusted view ask for it here.
+
+    When *params* is None the saved grade-formula params are loaded, matching
+    ``get_scores_raw`` / ``build_dashboard``.
+    """
+    validate_path_segment(project, run_id)
+    if params is None:
+        params = load_params()
+    project_dir = reports_root / project
+    dismissed = dismissed_keys(project_dir)
+    deleted = deleted_keys(project_dir)
+    dims = read_run_data(reports_root, project, run_id)
+    if not dismissed and not deleted:
+        return dims
+    return [_rescore_dimension(d, dismissed, deleted, params=params) for d in dims]
 
 
 def _make_rescoring_fetcher(
@@ -577,4 +628,5 @@ __all__ = [
     "get_scores_raw",
     "get_scores_slim",
     "get_project_scores",
+    "scored_run_dimensions",
 ]
