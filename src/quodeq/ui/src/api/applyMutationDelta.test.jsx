@@ -262,3 +262,160 @@ describe("applyMutationDelta", () => {
     expect(next.dimensions[1]).toBe(prevDims[1]);
   });
 });
+
+// Slice 2: restore / delete / restore_all / delete_all all patch dim SCORES
+// (like dismiss) but, because the client can't cheaply reconstruct the
+// violation-list change, INVALIDATE the run-detail violation source instead of
+// splicing. dismiss must keep splicing (regression).
+describe("applyMutationDelta — restore/delete/bulk kinds (slice 2)", () => {
+  function invalidatedNoRefetch(invalidateQueries, key) {
+    return invalidateQueries.mock.calls.some(
+      ([arg]) =>
+        JSON.stringify(arg?.queryKey) === JSON.stringify(key) &&
+        arg?.refetchType === "none",
+    );
+  }
+
+  for (const kind of ["restore", "delete", "restore_all", "delete_all"]) {
+    it(`${kind}: patches dashboard dim score`, () => {
+      const { client, store } = makeClient();
+      const key = projectKeys.dashboard(PROJECT, RUN);
+      seedDashboard(store, key, [securityDim(), maintainabilityDim()]);
+
+      applyMutationDelta(client, PROJECT, {
+        kind,
+        runId: RUN,
+        isLatest: false,
+        accumulated: null,
+        dimensions: [{ dimension: "security", overallScore: "6.5", overallGrade: "B" }],
+      });
+
+      const sec = store
+        .get(JSON.stringify(key))
+        .dimensions.find((d) => d.dimension === "security");
+      expect(sec.overallScore).toBe("6.5");
+      expect(sec.overallGrade).toBe("B");
+    });
+
+    it(`${kind}: patches per-run scores dim score`, () => {
+      const { client, store } = makeClient();
+      const scoresKey = projectKeys.scores(PROJECT, RUN);
+      store.set(JSON.stringify(scoresKey), {
+        dimensions: [{ dimension: "security", overallScore: "5.0", overallGrade: "C" }],
+        summary: {},
+      });
+
+      applyMutationDelta(client, PROJECT, {
+        kind,
+        runId: RUN,
+        isLatest: false,
+        accumulated: null,
+        dimensions: [{ dimension: "security", overallScore: "6.5", overallGrade: "B" }],
+      });
+
+      const dim = store.get(JSON.stringify(scoresKey)).dimensions[0];
+      expect(dim.overallScore).toBe("6.5");
+      expect(dim.overallGrade).toBe("B");
+    });
+
+    it(`${kind}: INVALIDATES the run-detail violation source (does not splice)`, () => {
+      const { client, store, invalidateQueries } = makeClient();
+      const dashKey = projectKeys.dashboard(PROJECT, RUN);
+      const scoresKey = projectKeys.scores(PROJECT, RUN);
+      seedDashboard(store, dashKey, [securityDim()]);
+      store.set(JSON.stringify(scoresKey), {
+        dimensions: [{ dimension: "security", overallScore: "5.0", overallGrade: "C" }],
+        summary: {},
+      });
+
+      applyMutationDelta(client, PROJECT, {
+        kind,
+        runId: RUN,
+        isLatest: false,
+        accumulated: null,
+        dimensions: [],
+      });
+
+      // Both the dashboard and per-run scores violation sources are invalidated
+      // with refetchType:"none" so lists refetch on next view.
+      expect(invalidatedNoRefetch(invalidateQueries, dashKey)).toBe(true);
+      expect(invalidatedNoRefetch(invalidateQueries, scoresKey)).toBe(true);
+
+      // The dashboard violation list is NOT spliced in place — both violations
+      // remain until the refetch replaces them.
+      const sec = store.get(JSON.stringify(dashKey)).dimensions[0];
+      expect(sec.violations).toHaveLength(2);
+    });
+
+    it(`${kind}: patches accumulated when isLatest`, () => {
+      const { client, store, invalidateQueries } = makeClient();
+      const accKey = projectKeys.scores(PROJECT, null);
+      store.set(JSON.stringify(accKey), { accumulated: { dimensions: [], summary: {} } });
+
+      const newAccumulated = {
+        dimensions: [{ dimension: "security" }],
+        summary: { overallGrade: "B" },
+      };
+      applyMutationDelta(client, PROJECT, {
+        kind,
+        runId: RUN,
+        isLatest: true,
+        accumulated: newAccumulated,
+        dimensions: [],
+      });
+
+      expect(store.get(JSON.stringify(accKey)).accumulated).toBe(newAccumulated);
+      const accInvalidated = invalidateQueries.mock.calls.some(
+        ([arg]) => JSON.stringify(arg?.queryKey) === JSON.stringify(accKey),
+      );
+      expect(accInvalidated).toBe(false);
+    });
+
+    it(`${kind}: untouched dimension keeps referential identity in score-patch`, () => {
+      const { client, store } = makeClient();
+      const scoresKey = projectKeys.scores(PROJECT, RUN);
+      const prevDims = [
+        { dimension: "security", overallScore: "5.0", overallGrade: "C" },
+        { dimension: "maintainability", overallScore: "7.0", overallGrade: "B" },
+      ];
+      store.set(JSON.stringify(scoresKey), { dimensions: prevDims, summary: {} });
+
+      applyMutationDelta(client, PROJECT, {
+        kind,
+        runId: RUN,
+        isLatest: false,
+        accumulated: null,
+        dimensions: [{ dimension: "security", overallScore: "6.5", overallGrade: "B" }],
+      });
+
+      const next = store.get(JSON.stringify(scoresKey));
+      // maintainability was not rescored → same object reference.
+      expect(next.dimensions[1]).toBe(prevDims[1]);
+    });
+  }
+
+  it("dismiss still SPLICES the violation (regression, not invalidate)", () => {
+    const { client, store, invalidateQueries } = makeClient();
+    const dashKey = projectKeys.dashboard(PROJECT, RUN);
+    seedDashboard(store, dashKey, [securityDim()]);
+
+    applyMutationDelta(client, PROJECT, {
+      kind: "dismiss",
+      runId: RUN,
+      isLatest: false,
+      dismissed: { req: "R1", file: "a.py", line: 10 },
+      accumulated: null,
+      dimensions: [],
+    });
+
+    const sec = store.get(JSON.stringify(dashKey)).dimensions[0];
+    // Spliced in place, not left for a refetch.
+    expect(sec.violations.map((v) => v.req)).toEqual(["R2"]);
+    expect(sec.totals.violationCount).toBe(1);
+    // dismiss must NOT invalidate the dashboard violation source.
+    const dashInvalidated = invalidateQueries.mock.calls.some(
+      ([arg]) => JSON.stringify(arg?.queryKey) === JSON.stringify(dashKey),
+    );
+    expect(dashInvalidated).toBe(false);
+  });
+});
