@@ -153,3 +153,15 @@ def test_current_standard_dimensions_empty_when_no_eligible_runs(tmp_path: Path)
     _make_run(reports_root, project, "r1", _FULL)
     run_infos = [_info("r0", status="in_progress"), _info("r1", status="failed")]
     assert current_standard_dimensions(reports_root, project, run_infos) == set()
+
+
+def test_current_standard_dimensions_rejects_traversal_segments(tmp_path: Path) -> None:
+    """A project/run_id with path-traversal is skipped (defense-in-depth, fail-open)."""
+    reports_root = tmp_path / "evaluations"
+    # A traversal project name must not build a path outside reports_root; the
+    # run is skipped and the result is the fail-open empty set.
+    assert current_standard_dimensions(reports_root, "../../etc", [_info("r0")]) == set()
+    # A traversal run_id is likewise skipped, so a well-formed sibling still counts.
+    _make_run(reports_root, "proj", "good", _FULL)
+    run_infos = [_info("../evil"), _info("good")]
+    assert current_standard_dimensions(reports_root, "proj", run_infos) == set(_FULL)

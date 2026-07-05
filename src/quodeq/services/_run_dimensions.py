@@ -85,9 +85,19 @@ def current_standard_dimensions(
     fail-open signal callers must treat as "don't filter".
     """
     from quodeq.services.dim_resolution import is_eligible_for_default_view  # noqa: PLC0415
+    from quodeq.shared.validation import validate_path_segment  # noqa: PLC0415
 
     eligible = [r for r in run_infos if is_eligible_for_default_view(r.status)]
     standard: set[str] = set()
     for run in eligible[:window]:
+        # Defense-in-depth: reject traversal in the path segments before
+        # building the run dir (mirrors read_run_data / parse_run_date). These
+        # segments are validated upstream and enumerated from disk, so a failure
+        # here is not expected — skip that run rather than crash the grade,
+        # honouring this module's fail-open contract.
+        try:
+            validate_path_segment(project, run.run_id)
+        except ValueError:
+            continue
         standard |= configured_dimensions(reports_root / project / run.run_id)
     return standard
