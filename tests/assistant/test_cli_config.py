@@ -23,6 +23,9 @@ def test_codex_chat_config_is_read_only():
     assert "exec" not in cfg.assistant_args
     assert "--json" in cfg.assistant_args
     assert "-s" in cfg.assistant_args and cfg.assistant_args[cfg.assistant_args.index("-s") + 1] == "read-only"
+    assert "--skip-git-repo-check" in cfg.assistant_args
+    assert "-a" not in cfg.assistant_args
+    assert "--approval-mode" not in cfg.assistant_args
     assert "--dangerously-bypass-approvals-and-sandbox" not in cfg.assistant_args
     assert cfg.resume_style == "exec-resume"
     assert cfg.session_id_source == "parse-jsonl"

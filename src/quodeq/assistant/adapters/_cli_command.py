@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
 from quodeq.assistant.adapters._cli_config import CliChatConfig
 
@@ -51,6 +52,15 @@ def _resume_args(cfg: CliChatConfig, prior: str | None, new_id: str) -> tuple[li
     return ["--resume", prior], prior, False
 
 
+def _model_arg(cfg: CliChatConfig, model: str | None) -> str | None:
+    if not model:
+        return None
+    value = model.strip()
+    if cfg.cmd == "codex" and re.fullmatch(r"\d+(?:\.\d+)*(?:-[A-Za-z0-9_.-]+)?", value):
+        return f"gpt-{value}"
+    return value
+
+
 def build_turn_argv(cfg: CliChatConfig, *, prompt: str, model: str | None,
                     mcp_config_path: str | None, prior_session_id: str | None,
                     new_session_id: str, web_enabled: bool = False,
@@ -70,8 +80,9 @@ def build_turn_argv(cfg: CliChatConfig, *, prompt: str, model: str | None,
         argv.extend(resume_frag)
     if mcp_config_path and cfg.mcp_style == "config-file":
         argv.extend(["--mcp-config", mcp_config_path])
-    if model:
-        argv.extend(["--model", model])
+    normalized_model = _model_arg(cfg, model)
+    if normalized_model:
+        argv.extend(["--model", normalized_model])
     if system_prompt and cfg.system_prompt_style == "argv-append":
         argv.extend(["--append-system-prompt", system_prompt])
 

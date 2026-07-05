@@ -23,6 +23,10 @@ from quodeq.shared._process_kill import kill_proc_tree as _kill_proc_tree
 _logger = logging.getLogger(__name__)
 
 TURN_TIMEOUT_S = 300
+_BENIGN_RAW_LINES = (
+    "Reading additional input from stdin",
+    "WARNING: proceeding, even though we could not create PATH aliases",
+)
 
 
 @dataclass(frozen=True)
@@ -49,10 +53,19 @@ def _full_transcript(messages: list[dict]) -> str:
     return "\n\n".join(f"[{m['role']}]\n{m['content']}" for m in messages)
 
 
+def _raw_error_line(line: str) -> str | None:
+    text = line.strip()
+    if not text:
+        return None
+    if any(text.startswith(prefix) for prefix in _BENIGN_RAW_LINES):
+        return None
+    return text
+
+
 def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
               prior_session_id: str | None, new_session_id: str,
               repository: AssistantRepository, emit: Callable[[dict], None],
-              spawn_fn) -> tuple[str, str | None, int]:
+              spawn_fn) -> tuple[str, str | None, int, str | None]:
     mcp_config_path = None
     if cli_cfg.mcp_style == "config-file":
         tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
@@ -79,13 +92,19 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
         # wall-clock guard: a hung/silent CLI can't wedge the turn slot forever
         timer = threading.Timer(TURN_TIMEOUT_S, lambda: _kill_proc_tree(proc))
         timer.start()
-        texts, parsed_sid = [], spec.session_id
+        texts, errors, raw_errors, parsed_sid = [], [], [], spec.session_id
         last_emitted = None
         for line in iter_lines(proc.stdout):
             event = _stream.parse_line(line)
             if event is None:
+                raw = _raw_error_line(line)
+                if raw:
+                    raw_errors.append(raw)
                 continue
             etype = event.get("type")
+            err = _stream.error_message(event)
+            if err:
+                errors.append(err)
             for t in _stream.assistant_text(event):
                 texts.append(t)
                 # the final `result` event echoes the full text already streamed
@@ -113,7 +132,7 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
         final = texts[-1] if texts else ""
         if parsed_sid:
             repository.set_cli_session_id(session_id, parsed_sid)
-        return final, parsed_sid, returncode
+        return final, parsed_sid, returncode, errors[0] if errors else (raw_errors[0] if raw_errors else None)
     finally:
         if timer is not None:
             timer.cancel()
@@ -138,7 +157,7 @@ def run_cli_turn(*, messages: list[dict], config: CliTurnConfig, session_id: str
         # message-prefix providers get it inline because normal turns send
         # only the latest user message.
         prompt = f"{config.skill_block}\n\n{prompt}"
-    final, _sid, _rc = _run_once(
+    final, _sid, _rc, error_message = _run_once(
         config, cli_cfg, prompt=prompt, session_id=session_id,
         prior_session_id=prior_session_id, new_session_id=str(uuid.uuid4()),
         repository=repository, emit=emit, spawn_fn=spawn_fn)
@@ -146,10 +165,12 @@ def run_cli_turn(*, messages: list[dict], config: CliTurnConfig, session_id: str
     # regardless of the exit code (some CLIs exit non-zero on benign warnings).
     if prior_session_id is not None and final == "":
         emit({"type": "warning", "message": "session rebuilt"})
-        final, _sid, _rc = _run_once(
+        final, _sid, _rc, error_message = _run_once(
             config, cli_cfg, prompt=_full_transcript(messages), session_id=session_id,
             prior_session_id=None, new_session_id=str(uuid.uuid4()),
             repository=repository, emit=emit, spawn_fn=spawn_fn)
     if final == "":
+        if error_message:
+            raise RuntimeError(error_message)
         raise RuntimeError("CLI produced no output")
     return final

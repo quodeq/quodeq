@@ -55,7 +55,7 @@ def test_codex_turnN_exec_resume():
 def test_codex_turn1_full_argv():
     spec = _spec("codex")
     assert spec.argv == [
-        "codex", "exec", "--json", "-s", "read-only", "-a", "never",
+        "codex", "exec", "--json", "-s", "read-only", "--skip-git-repo-check",
         "--model", "m", "hi",
     ]
 
@@ -64,8 +64,18 @@ def test_codex_turnN_full_argv():
     spec = _spec("codex", prior_session_id="th-1")
     assert spec.argv == [
         "codex", "exec", "resume", "th-1", "--json", "-s", "read-only",
-        "-a", "never", "--model", "m", "hi",
+        "--skip-git-repo-check", "--model", "m", "hi",
     ]
+
+
+def test_codex_numeric_model_shorthand_is_prefixed():
+    spec = _spec("codex", model="5.4")
+    assert spec.argv[spec.argv.index("--model") + 1] == "gpt-5.4"
+
+
+def test_codex_full_model_id_is_unchanged():
+    spec = _spec("codex", model="gpt-5.4")
+    assert spec.argv[spec.argv.index("--model") + 1] == "gpt-5.4"
 
 
 def test_gemini_turn1_preassign_and_resume():

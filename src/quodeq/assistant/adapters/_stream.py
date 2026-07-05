@@ -70,6 +70,30 @@ def tool_uses(event: dict) -> list[str]:
     return [d["name"] for d in tool_use_details(event)]
 
 
+def _nested_error_message(value) -> str | None:
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return value if value else None
+        return _nested_error_message(parsed) or value
+    if not isinstance(value, dict):
+        return None
+    err = value.get("error")
+    if isinstance(err, dict) and isinstance(err.get("message"), str):
+        return err["message"]
+    msg = value.get("message")
+    return msg if isinstance(msg, str) and msg else None
+
+
+def error_message(event: dict) -> str | None:
+    if event.get("type") == "error":
+        return _nested_error_message(event.get("message")) or _nested_error_message(event)
+    if event.get("type") == "turn.failed":
+        return _nested_error_message(event.get("error")) or _nested_error_message(event)
+    return None
+
+
 def session_id(event: dict) -> str | None:
     sid = event.get("session_id") or event.get("thread_id")
     return sid if isinstance(sid, str) else None

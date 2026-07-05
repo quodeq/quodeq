@@ -86,7 +86,7 @@ def test_scratch_cwd_each_call_is_fresh_and_empty(tmp_path):
     assert Path(tmp_path) in cwd2.parents
 
 
-def test_spawn_turn_discards_stderr(tmp_path, monkeypatch):
+def test_spawn_turn_merges_stderr_into_stdout(tmp_path, monkeypatch):
     captured = {}
 
     class _P:
@@ -96,7 +96,7 @@ def test_spawn_turn_discards_stderr(tmp_path, monkeypatch):
 
     monkeypatch.setattr(subprocess, "Popen", _P)
     spawn_turn(["claude", "-p", "hi"], cwd=scratch_cwd(tmp_path), env={})
-    assert captured["stderr"] is subprocess.DEVNULL
+    assert captured["stderr"] is subprocess.STDOUT
 
 
 def test_spawn_turn_streams_stdout(tmp_path):

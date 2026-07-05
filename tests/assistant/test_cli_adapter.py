@@ -246,3 +246,27 @@ def test_message_prefix_provider_gets_skill_block(tmp_path, monkeypatch):
         spawn_fn=_capture_spawn(captured, ['{"type": "result", "result": "ok"}']))
     assert captured["argv"][-1] == "[skill:x]\nDo X\n\nhi"
     assert "--append-system-prompt" not in captured["argv"]
+
+
+def test_json_error_event_raises_message(tmp_path):
+    repo = _repo(tmp_path)
+    lines = [
+        '{"type": "error", "message": "{\\"type\\":\\"error\\",\\"status\\":400,\\"error\\":{\\"message\\":\\"model not supported\\"}}"}',
+        '{"type": "turn.failed", "error": {"message": "turn failed"}}',
+    ]
+    with pytest.raises(RuntimeError, match="model not supported"):
+        run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
+                     session_id="s1", prior_session_id=None, repository=repo,
+                     emit=lambda f: None, spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+
+
+def test_non_json_cli_error_line_raises_message(tmp_path):
+    repo = _repo(tmp_path)
+    lines = [
+        "Reading additional input from stdin...",
+        "Not inside a trusted directory and --skip-git-repo-check was not specified.",
+    ]
+    with pytest.raises(RuntimeError, match="Not inside a trusted directory"):
+        run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
+                     session_id="s1", prior_session_id=None, repository=repo,
+                     emit=lambda f: None, spawn_fn=lambda argv, *, cwd, env: FakeProc(lines, returncode=1))
