@@ -210,3 +210,46 @@ describe('useNavStack navTab purity (#363 follow-up)', () => {
     expect(historyAdapter.go).not.toHaveBeenCalled();
   });
 });
+
+describe('useNavStack navTab params', () => {
+  let historyAdapter;
+
+  beforeEach(() => {
+    historyAdapter = {
+      pushState: vi.fn(),
+      replaceState: vi.fn(),
+      back: vi.fn(),
+      go: vi.fn(),
+    };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('folds extra params into the single reset entry', () => {
+    const { result } = renderHook(
+      () => useNavStack({ historyAdapter }),
+      { wrapper: strictWrapper },
+    );
+
+    act(() => { result.current.navTab('evaluate', { preselectDims: ['security'] }); });
+
+    expect(result.current.navStack).toHaveLength(1);
+    expect(result.current.navStack[0].page).toBe('evaluate');
+    expect(result.current.navStack[0].preselectDims).toEqual(['security']);
+  });
+
+  it('still works with no params (backward compatible)', () => {
+    const { result } = renderHook(
+      () => useNavStack({ historyAdapter }),
+      { wrapper: strictWrapper },
+    );
+
+    act(() => { result.current.navTab('projects'); });
+
+    expect(result.current.navStack).toHaveLength(1);
+    expect(result.current.navStack[0].page).toBe('projects');
+    expect(result.current.navStack[0].preselectDims).toBeUndefined();
+  });
+});

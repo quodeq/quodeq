@@ -24,6 +24,7 @@ import { useApi } from './api/ApiContext.jsx';
 import { applyMutationDelta } from './api/applyMutationDelta.js';
 import { getGradeFormula } from './api/index.js';
 import { setGradeThresholds } from './utils/gradeThresholds.js';
+import { deriveEvaluatePreselect } from './utils/evaluatePreselect.js';
 import LoadingScreen from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import TopBar from './components/TopBar.jsx';
@@ -90,10 +91,10 @@ function useNativeTitlebarSync(effectiveDark) {
 }
 
 /**
- * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string }} props
+ * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string, projects: Array, onGoToProjects: Function, onGoToSettings: Function, preselectDims: string[]|undefined }} props
  * @returns {JSX.Element}
  */
-function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onGoToProjects, onGoToSettings }) {
+function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onGoToProjects, onGoToSettings, preselectDims }) {
   const { connected, setConnected } = serverHealth;
   const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
   const projectInfo = projects?.find(p => (p.id || p.name) === selectedProject) || null;
@@ -108,7 +109,7 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onG
       {!connected && <ServerDisconnectedOverlay onReconnect={() => setConnected(true)} />}
       <EvaluateScreen
         evaluation={{ job, jobError, liveViolations }}
-        context={{ selectedProject, projectInfo, jobProjectInfo }}
+        context={{ selectedProject, projectInfo, jobProjectInfo, preselectDims }}
         actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation, onGoToProjects, onGoToSettings }}
       />
     </>
@@ -347,7 +348,7 @@ const ROUTE_RENDERERS = {
       trend={props.dashboardData.dashboard?.trend || []}
     />
   ),
-  evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />,
+  evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} preselectDims={params.preselectDims} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />,
   file: (params, props) => (
     <FileDetailPage
       file={params.file}
@@ -697,7 +698,7 @@ export default function App() {
               serverUrl={typeof window !== 'undefined' ? window.location.origin : null}
               provider={sidebarProvider}
               model={sidebarModel}
-              onEvaluate={state.projects?.length > 0 ? (() => navTab('evaluate')) : null}
+              onEvaluate={state.projects?.length > 0 ? (() => navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) })) : null}
               evaluating={state.evalLifecycle?.job?.status === 'running'}
               onProviderClick={() => navTab('settings')}
               onMenuToggle={() => setSidebarPinned((v) => !v)}
