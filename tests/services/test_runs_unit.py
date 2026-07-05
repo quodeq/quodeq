@@ -64,3 +64,23 @@ def test_fill_scores_tolerates_read_error(monkeypatch, tmp_path):
     entry = ru._row_to_run_entry(_row(run_id="r1", state="done"))
     ru._fill_scores(entry, tmp_path, "P", "r1")
     assert entry["overallScore"] is None
+
+
+from quodeq.services.run_index import open_index
+
+def test_build_runs_unit_end_to_end(monkeypatch, tmp_path):
+    db_path = tmp_path / "index.db"
+    db = open_index(db_path)
+    with db:
+        db.execute(
+            "INSERT INTO runs (job_id, project_uuid, run_id, run_dir, state, "
+            "started_at, updated_at, status_mtime) VALUES "
+            "('ext-a','P','a','/x/a','done','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z',0),"
+            "('ext-b','P','b','/x/b','done','2026-02-01T00:00:00Z','2026-02-01T00:00:00Z',0)"
+        )
+    db.close()
+    monkeypatch.setattr(ru, "read_run_scalars", lambda root, proj, rid: [_Dim("security", "5.0/10", "ADEQUATE")])
+    rows = ru.build_runs_unit(tmp_path, db_path, "P")
+    assert [r["runId"] for r in rows] == ["b", "a"]
+    assert rows[0]["overallScore"] == 5.0
+    assert rows[0]["dimensionScores"] == {"security": 5.0}
