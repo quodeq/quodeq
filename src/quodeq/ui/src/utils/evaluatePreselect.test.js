@@ -34,3 +34,11 @@ test('missing fields are guarded', () => {
   assert.deepEqual(deriveEvaluatePreselect(null), []);
   assert.deepEqual(deriveEvaluatePreselect(undefined), []);
 });
+
+test('empty-string dimension is treated as no context', () => {
+  // buildEvalPrincipal (App.jsx) normalizes a missing dimension to '', and the
+  // explorer nav entry does the same, so the empty-string case is what
+  // production actually sends when there is no real dimension.
+  assert.deepEqual(deriveEvaluatePreselect({ page: 'explorer', dimension: '' }), []);
+  assert.deepEqual(deriveEvaluatePreselect({ page: 'evalprinciple', evalPrincipal: { dimension: '' } }), []);
+});
