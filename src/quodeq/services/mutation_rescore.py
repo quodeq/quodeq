@@ -199,17 +199,19 @@ def _accumulated_payload(evaluations_dir: str, project: str) -> dict[str, Any] |
     return payload.get("accumulated")
 
 
-def dismiss_delta(
-    evaluations_dir: str, project: str, run_id: str | None, dismissed: dict[str, Any],
+def _mutation_envelope(
+    evaluations_dir: str, project: str, run_id: str | None, kind: str,
 ) -> dict[str, Any]:
-    """Describe a dismiss mutation so the client can patch its caches.
+    """Shared delta scaffold: kind/runId/isLatest/accumulated.
 
     ``isLatest`` is True when ``run_id`` is the run the Overview lands on by
     default — the exact ``_resolve_default_run_id`` rule shared with the
     dashboard. ``accumulated`` carries the (cache-backed) cross-run rollup so
     the Overview's accumulated view updates without a refetch; it is None when
     no ``run_id`` was supplied (the caller has no run to anchor the rollup to)
-    or when the fetch fails.
+    or when the fetch fails. Per-kind finding fields (``dismissed`` /
+    ``restored`` / ``deleted``) are folded in by the caller — bulk kinds
+    (``restore_all`` / ``delete_all``) carry none.
     """
     is_latest = False
     accumulated: dict[str, Any] | None = None
@@ -217,16 +219,78 @@ def dismiss_delta(
         is_latest = run_id == _resolve_default_run_id(evaluations_dir, project)
         accumulated = _accumulated_payload(evaluations_dir, project)
     return {
-        "kind": "dismiss",
+        "kind": kind,
         "runId": run_id,
         "isLatest": is_latest,
-        "dismissed": {
-            "req": dismissed.get("req"),
-            "file": dismissed.get("file"),
-            "line": dismissed.get("line"),
-        },
         "accumulated": accumulated,
     }
+
+
+def dismiss_delta(
+    evaluations_dir: str, project: str, run_id: str | None, dismissed: dict[str, Any],
+) -> dict[str, Any]:
+    """Describe a dismiss mutation so the client can patch its caches.
+
+    The client splices the dismissed finding out of the run-detail violation
+    list locally (it has the full key) and patches scores + accumulated.
+    """
+    envelope = _mutation_envelope(evaluations_dir, project, run_id, "dismiss")
+    envelope["dismissed"] = {
+        "req": dismissed.get("req"),
+        "file": dismissed.get("file"),
+        "line": dismissed.get("line"),
+    }
+    return envelope
+
+
+def restore_delta(
+    evaluations_dir: str, project: str, run_id: str | None, restored: dict[str, Any],
+) -> dict[str, Any]:
+    """Describe a restore mutation so the client can patch its caches.
+
+    Unlike dismiss, the client can't reconstruct the restored violation body,
+    so it patches scores + accumulated and INVALIDATES the run-detail violation
+    source (refetch on next view). ``restored`` carries the finding key.
+    """
+    envelope = _mutation_envelope(evaluations_dir, project, run_id, "restore")
+    envelope["restored"] = {
+        "req": restored.get("req"),
+        "file": restored.get("file"),
+        "line": restored.get("line"),
+    }
+    return envelope
+
+
+def delete_delta(
+    evaluations_dir: str, project: str, run_id: str | None, deleted: dict[str, Any],
+) -> dict[str, Any]:
+    """Describe a delete mutation so the client can patch its caches.
+
+    Delete sweeps every finding sharing (dimension, principle, file), so the
+    client can't cheaply mirror the batch removal — it patches scores +
+    accumulated and INVALIDATES the run-detail violation source.
+    """
+    envelope = _mutation_envelope(evaluations_dir, project, run_id, "delete")
+    envelope["deleted"] = {
+        "dimension": deleted.get("dimension"),
+        "principle": deleted.get("principle"),
+        "file": deleted.get("file"),
+    }
+    return envelope
+
+
+def restore_all_delta(
+    evaluations_dir: str, project: str, run_id: str | None,
+) -> dict[str, Any]:
+    """Describe a bulk restore-all mutation (no single finding key)."""
+    return _mutation_envelope(evaluations_dir, project, run_id, "restore_all")
+
+
+def delete_all_delta(
+    evaluations_dir: str, project: str, run_id: str | None,
+) -> dict[str, Any]:
+    """Describe a bulk delete-all mutation (no single finding key)."""
+    return _mutation_envelope(evaluations_dir, project, run_id, "delete_all")
 
 
 def rescore_with_fallback(

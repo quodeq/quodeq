@@ -183,7 +183,46 @@ class TestRestoreEndpoint:
             "req": "M-MOD-4", "file": "foo.js", "line": 4,
         })
         assert resp.status_code == 200
-        assert resp.get_json() == {"scores": None}
+        body = resp.get_json()
+        assert body["scores"] is None
+        assert "delta" in body
+
+    def test_restore_with_run_id_returns_delta_envelope(self, client, tmp_path):
+        """The restore response carries a ``delta`` (kind=restore) with the
+        restored finding key + accumulated rollup so the client patches scores
+        instantly and invalidates the run-detail violation source.
+        """
+        from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+        from quodeq.core.events.writer import EventLogWriter
+        from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
+
+        run_dir = tmp_path / "my-project" / "run-1"
+        run_dir.mkdir(parents=True)
+        (run_dir / "evidence").mkdir()
+        (run_dir / "evidence" / "manifest.json").write_text("{}")
+        EventLogWriter(run_dir / "events.jsonl").emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+            practice_id="Integrity", verdict="violation", dimension="security",
+            file="a.py", line=10, reason="r", req="R1", severity="critical",
+        )))
+        SqliteFindingsRepository(run_dir).list_by_dimension("security")
+
+        client.post("/api/findings/dismiss", json={
+            "project": "my-project", "req": "R1", "file": "a.py", "line": 10,
+            "dimension": "security", "severity": "critical", "run_id": "run-1",
+        })
+        resp = client.post("/api/findings/restore", json={
+            "project": "my-project", "req": "R1", "file": "a.py", "line": 10,
+            "run_id": "run-1",
+        })
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert "scores" in body
+        delta = body["delta"]
+        assert delta["kind"] == "restore"
+        assert delta["runId"] == "run-1"
+        assert delta["restored"] == {"req": "R1", "file": "a.py", "line": 10}
+        assert "isLatest" in delta
+        assert delta["accumulated"] is not None
 
     def test_restore_appends_undismiss_event(self, client, tmp_path):
         project_dir = tmp_path / "my-project"
@@ -201,6 +240,81 @@ class TestRestoreEndpoint:
         assert "FINDING_DISMISSED" in text
         assert "FINDING_UNDISMISSED" in text
         assert not (project_dir / "dismissed.json").exists()
+
+
+class TestRestoreAllEndpoint:
+    def test_restore_all_returns_delta_envelope(self, client, tmp_path):
+        project_dir = tmp_path / "my-project"
+        project_dir.mkdir()
+        resp = client.post("/api/findings/restore-all", json={
+            "project": "my-project", "run_id": "run-1",
+        })
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body["ok"] is True
+        assert "restored" in body
+        assert "scores" in body
+        delta = body["delta"]
+        assert delta["kind"] == "restore_all"
+        assert delta["runId"] == "run-1"
+        assert "isLatest" in delta
+        assert "accumulated" in delta
+
+    def test_restore_all_missing_project_returns_400(self, client):
+        resp = client.post("/api/findings/restore-all", json={})
+        assert resp.status_code == 400
+
+
+class TestDeleteEndpoint:
+    def test_delete_returns_delta_envelope(self, client, tmp_path):
+        project_dir = tmp_path / "my-project"
+        project_dir.mkdir()
+        resp = client.post("/api/findings/delete", json={
+            "project": "my-project",
+            "dimension": "security", "principle": "Integrity", "file": "a.py",
+            "run_id": "run-1",
+        })
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body["ok"] is True
+        assert "swept" in body
+        assert "scores" in body
+        delta = body["delta"]
+        assert delta["kind"] == "delete"
+        assert delta["runId"] == "run-1"
+        assert delta["deleted"] == {
+            "dimension": "security", "principle": "Integrity", "file": "a.py",
+        }
+        assert "isLatest" in delta
+        assert "accumulated" in delta
+
+    def test_delete_missing_fields_returns_400(self, client):
+        resp = client.post("/api/findings/delete", json={"project": "x"})
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "MISSING_PARAM"
+
+
+class TestDeleteAllEndpoint:
+    def test_delete_all_returns_delta_envelope(self, client, tmp_path):
+        project_dir = tmp_path / "my-project"
+        project_dir.mkdir()
+        resp = client.post("/api/findings/delete-all", json={
+            "project": "my-project", "run_id": "run-1",
+        })
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body["ok"] is True
+        assert "deleted" in body
+        assert "scores" in body
+        delta = body["delta"]
+        assert delta["kind"] == "delete_all"
+        assert delta["runId"] == "run-1"
+        assert "isLatest" in delta
+        assert "accumulated" in delta
+
+    def test_delete_all_missing_project_returns_400(self, client):
+        resp = client.post("/api/findings/delete-all", json={})
+        assert resp.status_code == 400
 
 
 class TestListDismissedEndpoint:

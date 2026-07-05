@@ -18,7 +18,14 @@ from flask import Flask, Response, abort, jsonify, request
 
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services.dismissed import dismiss_finding, load_dismissed, restore_finding, restore_all_findings
-from quodeq.services.mutation_rescore import dismiss_delta, rescore_with_fallback
+from quodeq.services.mutation_rescore import (
+    delete_all_delta,
+    delete_delta,
+    dismiss_delta,
+    rescore_with_fallback,
+    restore_all_delta,
+    restore_delta,
+)
 from quodeq.services.verified import unverify_finding, verified_entries
 from quodeq.shared.utils import get_evaluations_dir
 from quodeq.shared.validation import validate_path_segment
@@ -92,7 +99,10 @@ def register_findings_routes(app: Flask) -> None:
             return jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400
         restore_finding(_project_dir(_eval_dir(), project), body)
         scores = _scores_with_fallback(project, run_id)
-        return jsonify({"scores": scores}), 200
+        delta = restore_delta(
+            _eval_dir(), project, run_id, {"req": req, "file": file, "line": line},
+        )
+        return jsonify({"scores": scores, "delta": delta}), 200
 
     @app.post("/api/findings/restore-all")
     def restore_all() -> tuple[Response, int]:
@@ -103,7 +113,8 @@ def register_findings_routes(app: Flask) -> None:
             return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
         count = restore_all_findings(_project_dir(_eval_dir(), project))
         scores = _scores_with_fallback(project, run_id)
-        return jsonify({"ok": True, "restored": count, "scores": scores}), 200
+        delta = restore_all_delta(_eval_dir(), project, run_id)
+        return jsonify({"ok": True, "restored": count, "scores": scores, "delta": delta}), 200
 
     @app.post("/api/findings/delete")
     def delete() -> tuple[Response, int]:
@@ -117,7 +128,11 @@ def register_findings_routes(app: Flask) -> None:
             return jsonify({"error": "project, dimension, principle, and file are required", "code": "MISSING_PARAM"}), 400
         swept = delete_finding(_project_dir(_eval_dir(), project), body)
         scores = _scores_with_fallback(project, run_id)
-        return jsonify({"ok": True, "swept": swept, "scores": scores}), 200
+        delta = delete_delta(
+            _eval_dir(), project, run_id,
+            {"dimension": dimension, "principle": principle, "file": file},
+        )
+        return jsonify({"ok": True, "swept": swept, "scores": scores, "delta": delta}), 200
 
     @app.post("/api/findings/delete-all")
     def delete_all() -> tuple[Response, int]:
@@ -128,7 +143,8 @@ def register_findings_routes(app: Flask) -> None:
             return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
         count = delete_all_dismissed(_project_dir(_eval_dir(), project))
         scores = _scores_with_fallback(project, run_id)
-        return jsonify({"ok": True, "deleted": count, "scores": scores}), 200
+        delta = delete_all_delta(_eval_dir(), project, run_id)
+        return jsonify({"ok": True, "deleted": count, "scores": scores, "delta": delta}), 200
 
     @app.get("/api/findings/verified")
     def list_verified() -> Response:

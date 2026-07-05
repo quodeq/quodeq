@@ -69,16 +69,28 @@ function patchDimScore(dim, scoreByDim) {
   };
 }
 
+// Kinds this writer understands. dismiss splices the violation locally; the
+// rest (restore/delete and their -all bulk forms) can't cheaply/correctly
+// reconstruct the violation-list change, so they invalidate the run-detail
+// violation source and let it refetch on next view.
+const KNOWN_KINDS = new Set(["dismiss", "restore", "delete", "restore_all", "delete_all"]);
+
 export function applyMutationDelta(queryClient, projectId, delta) {
   if (!queryClient || !projectId || !delta) return;
-  if (delta.kind !== "dismiss") return;
+  if (!KNOWN_KINDS.has(delta.kind)) return;
 
   const dims = Array.isArray(delta.dimensions) ? delta.dimensions : [];
   const scoreByDim = new Map(dims.map((d) => [d.dimension, d]));
   const dismissed = delta.dismissed || {};
+  // Only dismiss can splice locally — it carries the full violation key and is
+  // a single-finding removal. Every other kind invalidates instead.
+  const splices = delta.kind === "dismiss";
 
-  // Dashboard cache: patch score + splice the dismissed violation from totals.
-  const patchDashboard = (key) => {
+  // Patch dim score/grade in place, preserving referential identity for
+  // untouched dims. ``spliceDismissed`` additionally removes the dismissed
+  // violation from the dashboard cache (which carries full violation arrays);
+  // the per-run scores cache is slim so it never splices.
+  const patchScores = (key, { spliceDismissed = false } = {}) => {
     const prev = queryClient.getQueryData(key);
     if (!prev || !Array.isArray(prev.dimensions)) {
       queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
@@ -86,22 +98,10 @@ export function applyMutationDelta(queryClient, projectId, delta) {
     }
     queryClient.setQueryData(key, (old) => ({
       ...old,
-      dimensions: old.dimensions.map((dim) =>
-        removeDismissed(patchDimScore(dim, scoreByDim), dismissed),
-      ),
-    }));
-  };
-
-  // Per-run scores cache: slim violations, so just refresh the dim score/grade.
-  const patchRunScores = (key) => {
-    const prev = queryClient.getQueryData(key);
-    if (!prev || !Array.isArray(prev.dimensions)) {
-      queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
-      return;
-    }
-    queryClient.setQueryData(key, (old) => ({
-      ...old,
-      dimensions: old.dimensions.map((dim) => patchDimScore(dim, scoreByDim)),
+      dimensions: old.dimensions.map((dim) => {
+        const scored = patchDimScore(dim, scoreByDim);
+        return spliceDismissed ? removeDismissed(scored, dismissed) : scored;
+      }),
     }));
   };
 
@@ -117,14 +117,31 @@ export function applyMutationDelta(queryClient, projectId, delta) {
     queryClient.setQueryData(key, (old) => ({ ...old, accumulated }));
   };
 
+  // Invalidate the run-detail violation source so lists refetch on next view.
+  // refetchType:"none" keeps it lazy — no eager network churn while scores
+  // already updated instantly via the score-patch above.
+  const invalidateViolations = (key) => {
+    queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
+  };
+
   const runId = delta.runId;
   if (runId) {
-    patchDashboard(projectKeys.dashboard(projectId, runId));
-    patchRunScores(projectKeys.scores(projectId, runId));
+    const dashKey = projectKeys.dashboard(projectId, runId);
+    const scoresKey = projectKeys.scores(projectId, runId);
+    // Score-patch is shared across all kinds; dashboard additionally splices
+    // for dismiss.
+    patchScores(dashKey, { spliceDismissed: splices });
+    patchScores(scoresKey);
+    // Non-dismiss kinds can't mirror the violation-list change locally →
+    // invalidate the run-detail sources so they refetch (scores already patched).
+    if (!splices) {
+      invalidateViolations(dashKey);
+      invalidateViolations(scoresKey);
+    }
   }
 
   if (delta.isLatest) {
-    patchDashboard(projectKeys.dashboard(projectId, "latest"));
+    patchScores(projectKeys.dashboard(projectId, "latest"), { spliceDismissed: splices });
     patchAccumulated(projectKeys.scores(projectId, null), delta.accumulated);
   }
 }

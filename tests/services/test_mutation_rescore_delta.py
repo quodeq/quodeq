@@ -8,9 +8,17 @@ which picks the first ``complete`` run in newest-first ``list_runs`` order).
 import os
 from pathlib import Path
 
-from quodeq.services.mutation_rescore import dismiss_delta
+from quodeq.services.mutation_rescore import (
+    delete_all_delta,
+    delete_delta,
+    dismiss_delta,
+    restore_all_delta,
+    restore_delta,
+)
 
 _DISMISSED = {"req": "R1", "file": "a.py", "line": 10}
+_RESTORED = {"req": "R1", "file": "a.py", "line": 10}
+_DELETED = {"dimension": "security", "principle": "Integrity", "file": "a.py"}
 
 
 def _make_run(root: Path, project: str, run_id: str, *, in_progress: bool = False) -> Path:
@@ -72,3 +80,108 @@ class TestDismissDeltaIsLatest:
         _make_run(tmp_path, "proj", "run-3", in_progress=True)
         assert dismiss_delta(str(tmp_path), "proj", "run-2", dict(_DISMISSED))["isLatest"] is True
         assert dismiss_delta(str(tmp_path), "proj", "run-3", dict(_DISMISSED))["isLatest"] is False
+
+
+class TestRestoreDeltaEnvelope:
+    def test_envelope_shape_with_run_id(self, tmp_path):
+        _make_run(tmp_path, "proj", "run-1")
+        delta = restore_delta(str(tmp_path), "proj", "run-1", dict(_RESTORED))
+        assert delta["kind"] == "restore"
+        assert delta["runId"] == "run-1"
+        assert delta["restored"] == {"req": "R1", "file": "a.py", "line": 10}
+        assert "isLatest" in delta
+        assert "accumulated" in delta
+
+    def test_accumulated_present_when_run_id(self, tmp_path):
+        _make_run(tmp_path, "proj", "run-1")
+        delta = restore_delta(str(tmp_path), "proj", "run-1", dict(_RESTORED))
+        assert delta["accumulated"] is not None
+        assert "dimensions" in delta["accumulated"]
+        assert "summary" in delta["accumulated"]
+
+    def test_without_run_id_accumulated_is_none(self, tmp_path):
+        _make_run(tmp_path, "proj", "run-1")
+        delta = restore_delta(str(tmp_path), "proj", None, dict(_RESTORED))
+        assert delta["runId"] is None
+        assert delta["accumulated"] is None
+        assert delta["isLatest"] is False
+        assert delta["restored"] == {"req": "R1", "file": "a.py", "line": 10}
+
+    def test_is_latest_true_on_latest_run(self, tmp_path):
+        _make_run(tmp_path, "proj", "run-1")
+        _make_run(tmp_path, "proj", "run-2")
+        assert restore_delta(str(tmp_path), "proj", "run-2", dict(_RESTORED))["isLatest"] is True
+        assert restore_delta(str(tmp_path), "proj", "run-1", dict(_RESTORED))["isLatest"] is False
+
+
+class TestDeleteDeltaEnvelope:
+    def test_envelope_shape_with_run_id(self, tmp_path):
+        _make_run(tmp_path, "proj", "run-1")
+        delta = delete_delta(str(tmp_path), "proj", "run-1", dict(_DELETED))
+        assert delta["kind"] == "delete"
+        assert delta["runId"] == "run-1"
+        assert delta["deleted"] == {
+            "dimension": "security", "principle": "Integrity", "file": "a.py",
+        }
+        assert "isLatest" in delta
+        assert "accumulated" in delta
+
+    def test_accumulated_present_when_run_id(self, tmp_path):
+        _make_run(tmp_path, "proj", "run-1")
+        delta = delete_delta(str(tmp_path), "proj", "run-1", dict(_DELETED))
+        assert delta["accumulated"] is not None
+        assert "dimensions" in delta["accumulated"]
+        assert "summary" in delta["accumulated"]
+
+    def test_without_run_id_accumulated_is_none(self, tmp_path):
+        _make_run(tmp_path, "proj", "run-1")
+        delta = delete_delta(str(tmp_path), "proj", None, dict(_DELETED))
+        assert delta["runId"] is None
+        assert delta["accumulated"] is None
+        assert delta["isLatest"] is False
+        assert delta["deleted"] == {
+            "dimension": "security", "principle": "Integrity", "file": "a.py",
+        }
+
+    def test_is_latest_true_on_latest_run(self, tmp_path):
+        _make_run(tmp_path, "proj", "run-1")
+        _make_run(tmp_path, "proj", "run-2")
+        assert delete_delta(str(tmp_path), "proj", "run-2", dict(_DELETED))["isLatest"] is True
+        assert delete_delta(str(tmp_path), "proj", "run-1", dict(_DELETED))["isLatest"] is False
+
+
+class TestBulkDeltaEnvelopes:
+    """restore_all / delete_all carry no single finding — just kind/run/isLatest/accumulated."""
+
+    def test_restore_all_envelope_shape(self, tmp_path):
+        _make_run(tmp_path, "proj", "run-1")
+        delta = restore_all_delta(str(tmp_path), "proj", "run-1")
+        assert delta["kind"] == "restore_all"
+        assert delta["runId"] == "run-1"
+        assert "isLatest" in delta
+        assert delta["accumulated"] is not None
+        assert "dimensions" in delta["accumulated"]
+        assert "restored" not in delta
+        assert "deleted" not in delta
+
+    def test_delete_all_envelope_shape(self, tmp_path):
+        _make_run(tmp_path, "proj", "run-1")
+        delta = delete_all_delta(str(tmp_path), "proj", "run-1")
+        assert delta["kind"] == "delete_all"
+        assert delta["runId"] == "run-1"
+        assert "isLatest" in delta
+        assert delta["accumulated"] is not None
+        assert "dimensions" in delta["accumulated"]
+
+    def test_bulk_without_run_id_accumulated_is_none(self, tmp_path):
+        _make_run(tmp_path, "proj", "run-1")
+        r = restore_all_delta(str(tmp_path), "proj", None)
+        d = delete_all_delta(str(tmp_path), "proj", None)
+        assert r["runId"] is None and r["accumulated"] is None and r["isLatest"] is False
+        assert d["runId"] is None and d["accumulated"] is None and d["isLatest"] is False
+
+    def test_bulk_is_latest_true_on_latest_run(self, tmp_path):
+        _make_run(tmp_path, "proj", "run-1")
+        _make_run(tmp_path, "proj", "run-2")
+        assert restore_all_delta(str(tmp_path), "proj", "run-2")["isLatest"] is True
+        assert delete_all_delta(str(tmp_path), "proj", "run-1")["isLatest"] is False
