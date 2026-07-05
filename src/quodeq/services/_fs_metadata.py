@@ -93,6 +93,17 @@ def _read_accumulated_summary(
                     if files_count is None and d.source_file_count:
                         files_count = d.source_file_count
             acc_dims = list(latest_by_dim.values())
+            # Scope the card summary to the project's current dimension standard
+            # — the union of dimensions configured by the last few ELIGIBLE runs
+            # — dropping stale dims (e.g. clean-architecture) that linger via old
+            # runs / evaluation.db drift. ``runs`` here are NOT eligibility-
+            # filtered (runs[0] may be in_progress), so the helper's internal
+            # eligible filter keeps this symmetric with the accumulated path.
+            # Fail-open: an empty standard set keeps every dim.
+            from quodeq.services._run_dimensions import current_standard_dimensions  # noqa: PLC0415
+            from quodeq.services.accumulated import _scope_to_configured  # noqa: PLC0415
+            standard = current_standard_dimensions(reports_root, entry_name, runs)
+            acc_dims = _scope_to_configured(acc_dims, standard)
             if not acc_dims:
                 return {"grade": None, "score": None, "files": files_count}
             summary = summarize_dimensions(acc_dims, params)
