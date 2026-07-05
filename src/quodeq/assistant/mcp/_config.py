@@ -26,6 +26,22 @@ def write_mcp_config(server_args: list[str], path: Path) -> None:
     os.chmod(path, 0o600)
 
 
+def codex_mcp_config_arg(server_args: list[str]) -> str:
+    """A `codex exec -c <value>` override that defines the assistant MCP server
+    inline as TOML, scoping it to this single invocation.
+
+    This replaces `codex mcp add`, which mutates the user's global
+    ~/.codex/config.toml under a name-only key: concurrent assistant sessions
+    would clobber each other's per-session args and a finished turn would remove
+    the server out from under a still-running one. JSON string encoding is a
+    valid TOML basic string, so paths with spaces/backslashes round-trip.
+    """
+    args = [*_SERVER_MODULE, *server_args]
+    command = json.dumps(sys.executable)
+    args_toml = "[" + ", ".join(json.dumps(a) for a in args) + "]"
+    return f"mcp_servers.{_SERVER_NAME}={{command = {command}, args = {args_toml}}}"
+
+
 def register_cli_mcp(cmd: str, server_args: list[str], *, separator: bool = True) -> None:
     key = f"{cmd}:{_SERVER_NAME}"
     with _lock:

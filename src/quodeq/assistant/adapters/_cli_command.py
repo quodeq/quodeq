@@ -64,7 +64,7 @@ def _model_arg(cfg: CliChatConfig, model: str | None) -> str | None:
 def build_turn_argv(cfg: CliChatConfig, *, prompt: str, model: str | None,
                     mcp_config_path: str | None, prior_session_id: str | None,
                     new_session_id: str, web_enabled: bool = False,
-                    system_prompt: str = "") -> CliTurnSpec:
+                    system_prompt: str = "", mcp_config_arg: str | None = None) -> CliTurnSpec:
     argv: list[str] = [cfg.cmd]
     if cfg.cmd_subcommand:
         argv.append(cfg.cmd_subcommand)
@@ -80,6 +80,8 @@ def build_turn_argv(cfg: CliChatConfig, *, prompt: str, model: str | None,
         argv.extend(resume_frag)
     if mcp_config_path and cfg.mcp_style == "config-file":
         argv.extend(["--mcp-config", mcp_config_path])
+    if mcp_config_arg and cfg.mcp_style == "config-arg":
+        argv.extend(["-c", mcp_config_arg])
     normalized_model = _model_arg(cfg, model)
     if normalized_model:
         argv.extend(["--model", normalized_model])

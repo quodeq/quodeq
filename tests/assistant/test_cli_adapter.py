@@ -121,6 +121,54 @@ def test_tool_use_emits_frame(tmp_path):
     assert any(f["type"] == "tool_call" and f["name"] == "get_scores" for f in frames)
 
 
+def test_codex_multiple_agent_messages_are_joined(tmp_path):
+    # Codex emits several agent_message items and no `result` echo, so the answer
+    # is the concatenation of the chunks, not just the last one.
+    repo = _repo(tmp_path)
+    lines = [
+        '{"type": "item.completed", "item": {"type": "agent_message", "text": "First part."}}',
+        '{"type": "item.completed", "item": {"type": "agent_message", "text": "Second part."}}',
+        '{"type": "turn.completed", "usage": {}}',
+    ]
+    frames = []
+    text = run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
+                        session_id="s1", prior_session_id=None, repository=repo,
+                        emit=frames.append, spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+    assert text == "First part.\n\nSecond part."
+    assert [f["text"] for f in frames if f["type"] == "token"] == ["First part.", "Second part."]
+
+
+def test_codex_partial_text_then_turn_failed_raises(tmp_path):
+    # A turn that streams a partial answer then fails must surface the failure,
+    # not return the truncated partial as if it were the final answer.
+    repo = _repo(tmp_path)
+    lines = [
+        '{"type": "item.completed", "item": {"type": "agent_message", "text": "Here is a partial"}}',
+        '{"type": "turn.failed", "error": {"message": "token limit exceeded"}}',
+    ]
+    with pytest.raises(RuntimeError, match="token limit exceeded"):
+        run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
+                     session_id="s1", prior_session_id=None, repository=repo,
+                     emit=lambda f: None, spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+
+
+def test_codex_mcp_tool_call_emits_single_frame(tmp_path):
+    repo = _repo(tmp_path)
+    lines = [
+        '{"type": "item.started", "item": {"type": "mcp_tool_call", "server": "quodeq-assistant", "tool": "get_context", "arguments": {}, "status": "in_progress"}}',
+        '{"type": "item.completed", "item": {"type": "mcp_tool_call", "tool": "get_context", "arguments": {}, "status": "completed"}}',
+        '{"type": "item.completed", "item": {"type": "agent_message", "text": "The scope is X."}}',
+        '{"type": "turn.completed", "usage": {}}',
+    ]
+    frames = []
+    text = run_cli_turn(messages=[{"role": "user", "content": "scope?"}], config=_config(tmp_path),
+                        session_id="s1", prior_session_id=None, repository=repo,
+                        emit=frames.append, spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+    assert text == "The scope is X."
+    assert [f for f in frames if f["type"] == "tool_call"] == [
+        {"type": "tool_call", "name": "get_context"}]
+
+
 def test_resume_failure_triggers_replay_fallback(tmp_path):
     repo = _repo(tmp_path)
     repo.set_cli_session_id("s1", "old-uuid")
@@ -230,12 +278,46 @@ def test_claude_system_prompt_reaches_argv(tmp_path):
     assert captured["argv"][-1] == "hi"  # skill never prefixes argv-append prompts
 
 
-def test_message_prefix_provider_gets_skill_block(tmp_path, monkeypatch):
-    repo = _repo(tmp_path)
-    captured = {}
+def _message_prefix(monkeypatch):
     base = _cli_mod.load_cli_chat_config("claude")
     monkeypatch.setattr(_cli_mod, "load_cli_chat_config",
                         lambda p: dataclasses.replace(base, system_prompt_style="message-prefix"))
+
+
+def test_message_prefix_provider_gets_system_prompt_on_fresh_session(tmp_path, monkeypatch):
+    repo = _repo(tmp_path)
+    captured = {}
+    _message_prefix(monkeypatch)
+    cfg = dataclasses.replace(_config(tmp_path), system_prompt="QUODEQ CTX", skill_block="")
+    run_cli_turn(
+        messages=[{"role": "system", "content": "QUODEQ CTX"},
+                  {"role": "user", "content": "hi"}],
+        config=cfg, session_id="s1", prior_session_id=None, repository=repo,
+        emit=lambda f: None,
+        spawn_fn=_capture_spawn(captured, ['{"type": "result", "result": "ok"}']))
+    assert captured["argv"][-1] == "QUODEQ CTX\n\nhi"
+    assert "--append-system-prompt" not in captured["argv"]
+
+
+def test_message_prefix_provider_omits_system_prompt_on_resume(tmp_path, monkeypatch):
+    # A resumed session already carries the system prompt from its first turn,
+    # so re-sending it every turn would bloat the message needlessly.
+    repo = _repo(tmp_path)
+    captured = {}
+    _message_prefix(monkeypatch)
+    cfg = dataclasses.replace(_config(tmp_path), system_prompt="QUODEQ CTX", skill_block="")
+    run_cli_turn(
+        messages=[{"role": "user", "content": "hi"}],
+        config=cfg, session_id="s1", prior_session_id="th-1", repository=repo,
+        emit=lambda f: None,
+        spawn_fn=_capture_spawn(captured, ['{"type": "result", "result": "ok"}']))
+    assert captured["argv"][-1] == "hi"
+
+
+def test_message_prefix_provider_prepends_system_prompt_then_skill(tmp_path, monkeypatch):
+    repo = _repo(tmp_path)
+    captured = {}
+    _message_prefix(monkeypatch)
     cfg = dataclasses.replace(_config(tmp_path), system_prompt="CTX",
                               skill_block="[skill:x]\nDo X")
     run_cli_turn(
@@ -244,8 +326,38 @@ def test_message_prefix_provider_gets_skill_block(tmp_path, monkeypatch):
         config=cfg, session_id="s1", prior_session_id=None, repository=repo,
         emit=lambda f: None,
         spawn_fn=_capture_spawn(captured, ['{"type": "result", "result": "ok"}']))
-    assert captured["argv"][-1] == "[skill:x]\nDo X\n\nhi"
+    assert captured["argv"][-1] == "CTX\n\n[skill:x]\nDo X\n\nhi"
     assert "--append-system-prompt" not in captured["argv"]
+
+
+def test_codex_turn_is_wrapped_in_external_os_sandbox(tmp_path, monkeypatch):
+    import quodeq.assistant.adapters._cli_spawn as sb
+    monkeypatch.setattr(sb.platform, "system", lambda: "Darwin")  # force sandbox-exec path
+    repo = _repo(tmp_path)
+    cfg = dataclasses.replace(_config(tmp_path), provider="codex", model="5",
+                              system_prompt="CTX")
+    captured = {}
+
+    def spawn(argv, *, cwd, env):
+        captured["argv"] = argv
+        captured["profile_exists_at_spawn"] = Path(argv[2]).exists()
+        return FakeProc(['{"type": "thread.started", "thread_id": "th-1"}',
+                         '{"type": "item.completed", "item": {"type": "agent_message", "text": "ok"}}'])
+
+    text = run_cli_turn(
+        messages=[{"role": "system", "content": "CTX"}, {"role": "user", "content": "hi"}],
+        config=cfg, session_id="s1", prior_session_id=None, repository=repo,
+        emit=lambda f: None, spawn_fn=spawn)
+    argv = captured["argv"]
+    assert text == "ok"
+    assert argv[0] == "sandbox-exec" and argv[1] == "-f"
+    assert "codex" in argv and "exec" in argv
+    assert "--dangerously-bypass-approvals-and-sandbox" in argv
+    di = argv.index("--disable")
+    assert argv[di + 1] == "shell_tool"
+    assert captured["profile_exists_at_spawn"] is True
+    # the temp Seatbelt profile is cleaned up after the turn
+    assert not Path(argv[2]).exists()
 
 
 def test_json_error_event_raises_message(tmp_path):

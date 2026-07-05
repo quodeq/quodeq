@@ -20,6 +20,25 @@ def test_write_mcp_config_shape(tmp_path):
         assert (path.stat().st_mode & 0o777) == 0o600
 
 
+def test_codex_mcp_config_arg_is_valid_toml():
+    import tomllib
+    arg = _config.codex_mcp_config_arg(["--db-path", "/x/a.db", "--session-id", "s1"])
+    assert arg.startswith("mcp_servers.quodeq-assistant=")
+    server = tomllib.loads(arg)["mcp_servers"]["quodeq-assistant"]
+    assert server["command"] == sys.executable
+    assert server["args"][:2] == ["-m", "quodeq.assistant.mcp.server"]
+    assert "--db-path" in server["args"] and "/x/a.db" in server["args"]
+    assert "--session-id" in server["args"] and "s1" in server["args"]
+
+
+def test_codex_mcp_config_arg_escapes_special_chars():
+    import tomllib
+    # a path with a space and a backslash must survive the TOML round-trip
+    arg = _config.codex_mcp_config_arg(["--db-path", "/x y/a\\b.db"])
+    server = tomllib.loads(arg)["mcp_servers"]["quodeq-assistant"]
+    assert "/x y/a\\b.db" in server["args"]
+
+
 def test_unregister_cli_mcp_acquires_lock_and_clears_key(monkeypatch):
     """Public unregister must serialize under _lock and drop the registered key."""
     calls = []
