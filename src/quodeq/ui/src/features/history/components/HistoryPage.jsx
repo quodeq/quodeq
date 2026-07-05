@@ -210,13 +210,15 @@ function InProgressHistoryRow({ entry, onClick, onNotReadyClick }) {
   );
 }
 
-function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRunClick, onRunHover, onDeleteRun, onNotReadyClick }) {
+function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRunClick, onRunHover, onRunHoverEnd, onDeleteRun, onNotReadyClick }) {
   return (
     <section className="history-evaluations panel">
       <div className="history-evaluations__header">
         <span className="term-section-label__text">EVALUATIONS</span>
       </div>
-      <div className="history-table">
+      {/* Row-to-row movement resets the dwell timer inside usePrefetchRun;
+          leaving the table entirely must drop the pending prefetch too. */}
+      <div className="history-table" onMouseLeave={onRunHoverEnd} onBlur={onRunHoverEnd}>
         <HistoryRow
           className="history-row--header"
           cells={{
@@ -286,7 +288,7 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
 
 function HistoryContent({ data, callbacks, runNav, languageSub }) {
   const { trend, selectedRunId, availableRuns } = data;
-  const { onRunClick, onRunHover, onRunChange, onDeleteRun } = callbacks;
+  const { onRunClick, onRunHover, onRunHoverEnd, onRunChange, onDeleteRun } = callbacks;
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
   const inProgressStubs = useMemo(() => buildInProgressStubs(availableRuns, trend), [availableRuns, trend]);
   // Toast state for clicks on running runs that have no scored dimensions yet.
@@ -347,6 +349,7 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
         statusByRunId={statusByRunId}
         onRunClick={onRunClick}
         onRunHover={onRunHover}
+        onRunHoverEnd={onRunHoverEnd}
         onDeleteRun={onDeleteRun}
         onNotReadyClick={handleNotReadyClick}
       />
@@ -371,7 +374,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   // page only — other tabs don't poll.
   useRunningRunsRefresh({ selectedProject, availableRuns });
   // Warm the run-detail cache on row hover so clicking through is instant.
-  const prefetchRun = usePrefetchRun(selectedProject);
+  const { prefetchRun, cancelPrefetch } = usePrefetchRun(selectedProject);
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
   const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet), [rawTrend, visibleSet]);
 
@@ -464,7 +467,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   return (
     <HistoryContent
       data={{ trend, selectedRunId, availableRuns }}
-      callbacks={{ onRunClick, onRunHover: prefetchRun, onRunChange, onDeleteRun: handleDeleteRun }}
+      callbacks={{ onRunClick, onRunHover: prefetchRun, onRunHoverEnd: cancelPrefetch, onRunChange, onDeleteRun: handleDeleteRun }}
       runNav={{ runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest }}
       languageSub={languageSub}
     />
