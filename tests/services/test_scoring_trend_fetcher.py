@@ -41,13 +41,15 @@ def test_active_dismissal_uses_heavy_path(tmp_path: Path, monkeypatch) -> None:
 
     rescoring_calls: list[str] = []
 
-    def fake_rescoring_fetcher(rr, p, params=None):
+    def fake_rescoring_fetcher(rr, p, params=None, *, base_fetcher=None, **_kw):
         def fetch(run_id: str) -> list[DimensionResult]:
             rescoring_calls.append(run_id)
             return [DimensionResult(dimension="security", overall_score="7.0/10", overall_grade="Fair")]
         return fetch
 
-    monkeypatch.setattr("quodeq.services.scoring._make_rescoring_fetcher", fake_rescoring_fetcher)
+    # The heavy-path rescoring fetcher is built by the shared _trend_fetcher
+    # factory (scoring._make_trend_fetcher delegates to it).
+    monkeypatch.setattr("quodeq.services._trend_fetcher.make_rescoring_fetcher", fake_rescoring_fetcher)
 
     def boom(*_a):
         raise AssertionError("scalar reader used despite active dismissals")
@@ -70,13 +72,13 @@ def test_active_deletion_uses_heavy_path(tmp_path: Path, monkeypatch) -> None:
 
     rescoring_calls: list[str] = []
 
-    def fake_rescoring_fetcher(rr, p, params=None):
+    def fake_rescoring_fetcher(rr, p, params=None, *, base_fetcher=None, **_kw):
         def fetch(run_id: str) -> list[DimensionResult]:
             rescoring_calls.append(run_id)
             return [DimensionResult(dimension="security", overall_score="6.0/10", overall_grade="Fair")]
         return fetch
 
-    monkeypatch.setattr("quodeq.services.scoring._make_rescoring_fetcher", fake_rescoring_fetcher)
+    monkeypatch.setattr("quodeq.services._trend_fetcher.make_rescoring_fetcher", fake_rescoring_fetcher)
 
     def boom(*_a):
         raise AssertionError("scalar reader used despite active deletions")

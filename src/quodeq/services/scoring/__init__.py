@@ -32,14 +32,10 @@ from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.types.dimension import DimensionResult, DimensionSummary, GradeBreakdown
-from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_trend import build_accumulated_trend
+from quodeq.services._trend_fetcher import make_rescoring_fetcher, make_trend_fetcher
 from quodeq.services.accumulated import compute_accumulated
-from quodeq.services.dashboard import (
-    DashboardCacheConfig,
-    _make_run_dimension_fetcher,
-    create_dimension_cache,
-)
+from quodeq.services.dashboard import _make_run_dimension_fetcher
 from quodeq.services.grade_formula import load_params
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
@@ -47,8 +43,6 @@ from quodeq.services._fs_projects import find_children
 from quodeq.services.score_cache import (
     accumulated_cache_version,
     cached_accumulated,
-    make_cache_backed_fetcher,
-    score_cache_version,
 )
 from quodeq.services.ports import RunInfo, list_runs, read_run_data, read_run_scalars
 from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
@@ -407,21 +401,15 @@ def _make_rescoring_fetcher(
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a dimension fetcher that applies rescore (dismissals) to results.
 
-    Wraps the standard cached fetcher so that build_accumulated_trend
-    automatically gets rescored data.
+    Thin seam over the shared :func:`make_rescoring_fetcher` factory. Passes the
+    scoring module's own ``dismissed_keys`` / ``deleted_keys`` references so
+    monkeypatch-based tests keep working, and the full-data base fetcher.
     """
-    base_fetcher = _make_run_dimension_fetcher(reports_root, project)
-    project_dir = reports_root / project
-    dismissed = dismissed_keys(project_dir)
-    deleted = deleted_keys(project_dir)
-    if not dismissed and not deleted:
-        return base_fetcher
-
-    def rescoring_fetcher(run_id: str) -> list[DimensionResult]:
-        dims = base_fetcher(run_id)
-        return [_rescore_dimension(d, dismissed, deleted, params=params) for d in dims]
-
-    return rescoring_fetcher
+    return make_rescoring_fetcher(
+        reports_root, project, params=params,
+        base_fetcher=_make_run_dimension_fetcher(reports_root, project),
+        dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
+    )
 
 
 def _make_trend_fetcher(
@@ -431,41 +419,18 @@ def _make_trend_fetcher(
 ) -> Callable[[str], list[DimensionResult]]:
     """Return the dimension fetcher for the trend chart.
 
-    Fast path: when the project has no active dismissals/deletions, read only
-    the per-run scalar grades (``read_run_scalars``) -- the trend needs nothing
-    else. Uses a fresh per-call LRU cache so scalar (findings-less) results
-    never collide with the shared full-data cache used elsewhere.
-
-    Heavy path: when dismissals/deletions are active, wrap the findings-based
-    rescoring fetcher with the read-through score cache. The cache version is a
-    content-hash of the project's dismissals/deletions/params, so any change
-    auto-invalidates without a write-path hook.
-
-    ``cacheable_run_ids`` restricts which runs the heavy-path cache may
-    *persist*: a run still scoring (in-progress) grows its dimension set as
-    dims finish, but the version hash can't see that, so persisting its partial
-    set would strand a stale row (fixed forever until dismissals/params change).
-    Only completed runs are safe to persist; when ``None`` every run is
-    cacheable (used by the fast path, which persists nothing anyway).
+    Thin seam over the shared :func:`make_trend_fetcher` factory, passing the
+    scoring module's own ``read_run_scalars`` / ``dismissed_keys`` /
+    ``deleted_keys`` references (so this module's monkeypatch-based tests keep
+    working) and the shared full-data base-fetcher factory. See
+    :func:`make_trend_fetcher` for the fast/heavy path and caching semantics.
     """
-    project_dir = reports_root / project
-    if dismissed_keys(project_dir) or deleted_keys(project_dir):
-        # Heavy path: wrap the findings-based rescoring fetcher with the
-        # read-through score cache. Version is a content hash of the project's
-        # dismissals/deletions/params, so any change auto-invalidates.
-        # dismissed/deleted are read here (branch test), in _make_rescoring_fetcher,
-        # and in score_cache_version -- three reads total, each ~0.01s, acceptable.
-        base = _make_rescoring_fetcher(reports_root, project, params=params)
-        version = score_cache_version(project_dir, params)
-        is_cacheable = (
-            None if cacheable_run_ids is None
-            else (lambda rid: rid in cacheable_run_ids)
-        )
-        return make_cache_backed_fetcher(project, version, base, is_cacheable=is_cacheable)
-    cache, lock = create_dimension_cache()
-    return make_lru_dimension_fetcher(
-        reports_root, project, cache, lock,
-        _max_history_runs(), reader=read_run_scalars,
+    return make_trend_fetcher(
+        reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
+        max_history=_max_history_runs(),
+        base_fetcher_factory=_make_run_dimension_fetcher,
+        read_run_scalars=read_run_scalars,
+        dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
     )
 
 
