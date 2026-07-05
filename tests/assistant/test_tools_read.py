@@ -65,9 +65,9 @@ def ctx(tmp_path):
 def test_registry_registers_expected_tools(ctx):
     reg = build_registry(ctx)
     assert reg.names() == [
-        "draft_action", "get_overview", "get_report", "get_scores", "get_standard",
-        "get_violations", "list_repo_dir", "list_standards", "read_repo_file",
-        "search_findings",
+        "draft_action", "get_context", "get_overview", "get_report", "get_scores",
+        "get_standard", "get_violations", "list_repo_dir", "list_standards",
+        "read_repo_file", "search_findings",
     ]
 
 
@@ -94,7 +94,8 @@ def test_search_findings_without_run(ctx):
     no_run = replace(ctx, run_dir=None)
     out = build_registry(no_run).dispatch("search_findings", {"query": "x"})
     assert out["ok"] is False
-    assert "no run" in out["error"]
+    assert "get_context" in out["error"]
+    assert "get_violations" in out["error"]
 
 
 def test_get_scores_and_report(ctx):
@@ -170,7 +171,7 @@ def test_get_violations_without_run(ctx):
     no_run = replace(ctx, run_dir=None)
     out = build_registry(no_run).dispatch("get_violations", {"dimension": "security"})
     assert out["ok"] is False
-    assert "get_overview" in out["error"]
+    assert "get_context" in out["error"]
 
 
 # --- Accumulated (per-dimension-latest) scope: no specific run selected. ------
@@ -268,3 +269,4 @@ def test_get_scores_no_scope_errors(tmp_path):
     )
     out = build_registry(ctx).dispatch("get_scores", {})
     assert out["ok"] is False
+    assert "get_context" in out["error"]

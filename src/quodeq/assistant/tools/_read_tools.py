@@ -12,7 +12,10 @@ from quodeq.services.standards import StandardsService
 
 def _require_run(ctx: ToolContext):
     if ctx.run_dir is None or not ctx.run_dir.exists():
-        raise ToolError("no run selected for this session")
+        raise ToolError(
+            "no run selected for this session. Call get_context to confirm "
+            "scope. For project overview sessions, use get_violations or "
+            "get_report instead of search_findings.")
     return ctx.run_dir
 
 
@@ -39,8 +42,8 @@ def _accumulated_dims(ctx: ToolContext) -> list[dict] | None:
 
 def _no_scope_error() -> ToolError:
     return ToolError(
-        "no project or run scope for this session — open a project's overview "
-        "or select a run first.")
+        "no project or run scope for this session. Call get_context to confirm "
+        "scope, then ask the user to open a project overview or select a run.")
 
 
 # Trimmed violation shape shared by get_report and get_violations. We keep only
@@ -199,9 +202,7 @@ def _violations_from_run(ctx: ToolContext, dimension: str | None):
 def _violations_from_accumulated(ctx: ToolContext, dimension: str | None):
     dims = _accumulated_dims(ctx)
     if dims is None:
-        raise ToolError(
-            "no project or run scope for this session. Try get_overview, or "
-            "open a project's overview first.")
+        raise _no_scope_error()
     if dimension:
         entry = next((d for d in dims if d.get("dimension") == dimension), None)
         if entry is None:
@@ -235,7 +236,10 @@ def _get_standard(ctx: ToolContext, standard_id: str) -> dict:
 
 def register_read_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
     registry.register(ToolSpec(
-        "search_findings", "Full-text search the selected run's findings.",
+        "search_findings",
+        "Full-text search the selected run's findings. Requires a selected run; "
+        "call get_context first if unsure. In overview scope, use get_violations "
+        "or get_report instead.",
         {"type": "object", "properties": {
             "query": {"type": "string"},
             "limit": {"type": "integer", "minimum": 1, "maximum": 50},

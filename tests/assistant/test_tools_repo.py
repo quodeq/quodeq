@@ -72,4 +72,6 @@ def test_repo_tools_without_repo_root(ctx):
     from dataclasses import replace
 
     reg = build_registry(replace(ctx, repo_root=None))
-    assert reg.dispatch("read_repo_file", {"path": "x"})["ok"] is False
+    out = reg.dispatch("read_repo_file", {"path": "x"})
+    assert out["ok"] is False
+    assert "get_context" in out["error"]

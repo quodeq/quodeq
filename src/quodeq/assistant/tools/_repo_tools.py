@@ -14,7 +14,10 @@ _DENY_SUFFIXES = (".pem", ".key", ".p12", ".pfx", ".keystore")
 
 def _jail(ctx: ToolContext, rel_path: str) -> Path:
     if ctx.repo_root is None:
-        raise ToolError("no analyzed repository attached to this session")
+        raise ToolError(
+            "no analyzed repository attached to this session. Call get_context "
+            "to confirm scope; if repoAttached is false, use dashboard tools "
+            "such as get_overview/get_violations instead of read_repo_file.")
     root = ctx.repo_root.resolve()
     target = (root / rel_path).resolve()
     if target != root and root not in target.parents:
@@ -52,11 +55,15 @@ def _list_repo_dir(ctx: ToolContext, path: str = ".") -> dict:
 
 def register_repo_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
     registry.register(ToolSpec(
-        "read_repo_file", "Read one file from the analyzed repository (read-only).",
+        "read_repo_file",
+        "Read one file from the analyzed repository (read-only). Use get_context "
+        "first when unsure whether repoAttached is true.",
         {"type": "object", "properties": {"path": {"type": "string"}},
          "required": ["path"]},
         lambda **kw: _read_repo_file(ctx, **kw)))
     registry.register(ToolSpec(
-        "list_repo_dir", "List entries of a directory in the analyzed repository.",
+        "list_repo_dir",
+        "List entries of a directory in the analyzed repository. Use get_context "
+        "first when unsure whether repoAttached is true.",
         {"type": "object", "properties": {"path": {"type": "string"}}},
         lambda **kw: _list_repo_dir(ctx, **kw)))
