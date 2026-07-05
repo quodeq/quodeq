@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
+import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import DimensionGaugeCard from './DimensionGaugeCard.jsx';
-import RunOverviewSkeleton from './RunOverviewSkeleton.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations, buildProjectRootFile } from '../../../utils/explorerUtils.js';
@@ -190,7 +190,13 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, projectName
   }, [dashboard]);
 
   const isLoading = !dashboard || !dashboard.dimensions;
-  if (isLoading) return <RunOverviewSkeleton dateLabel={runDateLabel} />;
+  if (isLoading) {
+    return (
+      <div className="run-overview-fade run-overview-loading">
+        <div className="run-overview-spinner"><LoadingScreen /></div>
+      </div>
+    );
+  }
   const dimCount = (dashboard?.dimensions || []).length;
 
   return (
