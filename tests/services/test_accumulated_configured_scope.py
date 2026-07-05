@@ -81,25 +81,53 @@ def _setup_run(run_dir: Path, dims: list[tuple[str, str, str]], configured: list
 
 
 def test_accumulated_excludes_stale_dimension(tmp_path: Path) -> None:
-    """Latest run configures {A,B}; an older run had C. C must be excluded."""
+    """C was retired more than a window ago. It must be excluded even though it
+    still has findings in the old run."""
     project = "proj"
     reports_root = tmp_path / "evaluations"
-    latest = reports_root / project / "run-new"
+    run_infos = []
+    # 5 recent eligible runs configure only {A,B}; the 6th (oldest, outside the
+    # window of 5) still configured C and carries a C finding.
+    for i in range(5):
+        rd = reports_root / project / f"run-{i}"
+        _setup_run(rd, [("A", "8.0", "A"), ("B", "6.0", "C")], configured=["A", "B"])
+        run_infos.append(RunInfo(
+            run_id=f"run-{i}", date_iso=f"2026-07-{20 - i:02d}",
+            date_label="d", status="complete",
+        ))
     old = reports_root / project / "run-old"
-    # Latest run: only A and B configured.
-    _setup_run(latest, [("A", "8.0", "A"), ("B", "6.0", "C")], configured=["A", "B"])
-    # Old run: A, B, and the now-retired C.
     _setup_run(old, [("A", "8.0", "A"), ("B", "6.0", "C"), ("C", "9.0", "A")],
                configured=["A", "B", "C"])
+    run_infos.append(RunInfo(
+        run_id="run-old", date_iso="2026-07-01", date_label="d", status="complete",
+    ))
 
-    # run_infos arrive newest-first.
+    result = _build_accumulated_for_runs(reports_root, project, run_infos, None)
+    dims = sorted(d.dimension for d in result.all_dimensions)
+    assert dims == ["A", "B"], f"retired dim C should be dropped, got {dims}"
+
+
+def test_accumulated_subset_rerun_does_not_collapse(tmp_path: Path) -> None:
+    """The latest eligible run is a targeted subset re-run configuring only {A}.
+    The full standard {A,B,C} must survive because prior eligible runs configured
+    it — the accumulated grade must NOT collapse to a single dimension."""
+    project = "proj"
+    reports_root = tmp_path / "evaluations"
+    # Newest run: subset re-run, only A.
+    subset = reports_root / project / "run-subset"
+    _setup_run(subset, [("A", "8.0", "A")], configured=["A"])
+    # Prior eligible runs configured the full {A,B,C}, with findings for each.
+    prior = reports_root / project / "run-full"
+    _setup_run(prior, [("A", "8.0", "A"), ("B", "6.0", "C"), ("C", "7.0", "B")],
+               configured=["A", "B", "C"])
+
     run_infos = [
-        RunInfo(run_id="run-new", date_iso="2026-07-05", date_label="Jul 5", status="complete"),
-        RunInfo(run_id="run-old", date_iso="2026-07-01", date_label="Jul 1", status="complete"),
+        RunInfo(run_id="run-subset", date_iso="2026-07-05", date_label="d", status="complete"),
+        RunInfo(run_id="run-full", date_iso="2026-07-01", date_label="d", status="complete"),
     ]
     result = _build_accumulated_for_runs(reports_root, project, run_infos, None)
     dims = sorted(d.dimension for d in result.all_dimensions)
-    assert dims == ["A", "B"], f"stale dim C should be dropped, got {dims}"
+    assert dims == ["A", "B", "C"], f"subset re-run must not collapse standard, got {dims}"
 
 
 def test_accumulated_fails_open_without_config(tmp_path: Path) -> None:
