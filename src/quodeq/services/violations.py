@@ -126,6 +126,51 @@ def _try_evidence_formats(
     return None
 
 
+def _apply_rescored_grades(
+    result: "dict[str, Any] | None", base: Path, project: str, run_id: str, dimension: str,
+) -> "dict[str, Any] | None":
+    """Overlay the project-wide dismiss-adjusted score/grade onto a parsed eval dict.
+
+    ``parse_eval_from_json`` carries the frozen eval-time overall + principle
+    grades (in ``principleGrades`` / ``principles``). After dismissed and
+    deleted violations are filtered from the lists, those grades are stale --
+    they still describe the pre-dismiss scan. Recompute them with the SAME
+    ``scored_run_dimensions`` transform the accumulated overview, the per-run
+    explorer, and the dashboard selected run use, then substitute the
+    dimension's overall score/grade (the ``isOverall`` entry) and its
+    per-principle score/grade so the dimension detail agrees with every other
+    view. A no-op when there are no active dismissals/deletions.
+    """
+    if not isinstance(result, dict):
+        return result
+    # No active project-wide filters -> the eval-time grades are already correct;
+    # skip the extra run read. base.parent is the project dir.
+    if not _dismissed_keys(base.parent) and not _deleted_keys(base.parent):
+        return result
+    from quodeq.services.scoring import scored_run_dimensions  # noqa: PLC0415
+
+    reports_root = base.parent.parent
+    try:
+        rescored = scored_run_dimensions(reports_root, project, run_id)
+    except (ValueError, FileNotFoundError, OSError):
+        return result
+    dim = next((d for d in rescored if (d.dimension or "") == dimension), None)
+    if dim is None:
+        return result
+
+    principle_grade = {p.principle: (p.score, p.grade) for p in dim.principles}
+    for pg in result.get("principleGrades", []):
+        if pg.get("isOverall") or pg.get("principle") == "Overall":
+            pg["score"] = dim.overall_score
+            pg["grade"] = dim.overall_grade
+        elif pg.get("principle") in principle_grade:
+            pg["score"], pg["grade"] = principle_grade[pg["principle"]]
+    for p in result.get("principles", []):
+        if p.get("name") in principle_grade:
+            p["score"], p["grade"] = principle_grade[p["name"]]
+    return result
+
+
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
     options: _ResolveOptions | None = None,
@@ -144,10 +189,11 @@ def resolve_dimension_eval(
 
     eval_path = base / "evaluation" / f"{dimension}.json"
     if _exists(eval_path):
-        return _filter_dismissed_from_result(
+        filtered = _filter_dismissed_from_result(
             parse_eval_from_json(eval_path, project, run_id, dimension, compiled_dir=compiled_dir),
             dkeys, delkeys, dimension,
         )
+        return _apply_rescored_grades(filtered, base, project, run_id, dimension)
 
     markdown_path = base / "evaluation" / f"{dimension}_eval.md"
     if _exists(markdown_path):
