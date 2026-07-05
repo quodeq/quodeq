@@ -82,7 +82,7 @@ const stubSidePane = {
   registerWindowSpec: vi.fn(),
 };
 
-function renderCard({ project, projectInfo, api, onStart = vi.fn(), disabled = false } = {}) {
+function renderCard({ project, projectInfo, api, onStart = vi.fn(), disabled = false, preselectDims = [] } = {}) {
   const QueryWrapper = withQueryClient();
   return render(
     <QueryWrapper>
@@ -93,6 +93,7 @@ function renderCard({ project, projectInfo, api, onStart = vi.fn(), disabled = f
             projectInfo={projectInfo}
             onStart={onStart}
             disabled={disabled}
+            preselectDims={preselectDims}
           />
         </SidePaneContext.Provider>
       </ApiProvider>
@@ -155,5 +156,38 @@ describe('ReEvaluateCard ephemeral gating', () => {
     // Scan button is not disabled
     const button = screen.getByRole('button', { name: /^▸\s*scan$|^scan$|running\.\.\./i });
     expect(button).not.toBeDisabled();
+  });
+});
+
+describe('ReEvaluateCard preselection seeding', () => {
+  beforeEach(() => { invalidateDimensionCache(); });
+
+  const localInfo = { name: 'demo', path: '/repos/myproj', location: 'local', ephemeral: false, evaluable: true };
+  const apiWithDims = () => makeFakeApi({
+    getProjectInfo: vi.fn().mockResolvedValue(localInfo),
+    listPlugins: vi.fn().mockResolvedValue([{ dimensions: [
+      { id: 'security', label: 'Security' },
+      { id: 'maintainability', label: 'Maintainability' },
+    ] }]),
+  });
+
+  it('preselects the matching chip from preselectDims (case-insensitive)', async () => {
+    renderCard({ project: 'p1', projectInfo: localInfo, api: apiWithDims(), preselectDims: ['Security'] });
+    await waitFor(() => expect(screen.getByRole('button', { name: /security/i })).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /security/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /maintainability/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('ignores ids with no matching chip and leaves selection empty', async () => {
+    renderCard({ project: 'p2', projectInfo: localInfo, api: apiWithDims(), preselectDims: ['nonexistent'] });
+    await waitFor(() => expect(screen.getByRole('button', { name: /security/i })).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /security/i })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /maintainability/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('leaves selection empty when preselectDims is empty (plain launch)', async () => {
+    renderCard({ project: 'p3', projectInfo: localInfo, api: apiWithDims(), preselectDims: [] });
+    await waitFor(() => expect(screen.getByRole('button', { name: /security/i })).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /security/i })).toHaveAttribute('aria-pressed', 'false');
   });
 });

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
 import { useScanData } from '../hooks/useScanData.js';
@@ -73,9 +73,30 @@ function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }
   return { info, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore };
 }
 
-function useDimensionSelection(allDimensions, info, branch, scopePath, onStart, onValidationFail) {
+function useDimensionSelection(allDimensions, info, branch, scopePath, onStart, onValidationFail, preselectDims = []) {
   const [selectedDims, setSelectedDims] = useState(new Set());
   const [cleanScan, setCleanScan] = useState('off');
+
+  // Seed the selection once from the navigation context (e.g. arriving from a
+  // dimension or principle detail). Runs in an effect rather than the useState
+  // initializer because the chips (allDimensions) load asynchronously. The ref
+  // guards it to a single seed per mount so later re-renders never clobber the
+  // user's own toggles. Ids are matched case-insensitively and only kept when
+  // they map to a real (visible) chip.
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (seededRef.current) return;
+    if (!preselectDims || preselectDims.length === 0) return;
+    if (allDimensions.length === 0) return;
+    const byLowerId = new Map(allDimensions.map((d) => [String(d.id).toLowerCase(), d.id]));
+    const seed = new Set();
+    for (const id of preselectDims) {
+      const match = byLowerId.get(String(id).toLowerCase());
+      if (match) seed.add(match);
+    }
+    seededRef.current = true;
+    if (seed.size > 0) setSelectedDims(seed);
+  }, [allDimensions, preselectDims]);
 
   const toggleDim = (id) => {
     setSelectedDims((prev) => {
@@ -99,7 +120,7 @@ function useDimensionSelection(allDimensions, info, branch, scopePath, onStart, 
   return { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan };
 }
 
-function useReEvaluateCard(project, onStart, projectInfo) {
+function useReEvaluateCard(project, onStart, projectInfo, preselectDims) {
   const api = useApi();
   const { getProjectInfo, relocateProject } = api;
   const { info, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo, { getProjectInfo, relocateProject });
@@ -114,7 +135,7 @@ function useReEvaluateCard(project, onStart, projectInfo) {
   const { scanData } = useScanData(isLocal ? project : null);
 
   const { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan } =
-    useDimensionSelection(allDimensions, info, branch, scopePath, onStart, showToast);
+    useDimensionSelection(allDimensions, info, branch, scopePath, onStart, showToast, preselectDims);
 
   return {
     info, error, allDimensions, selectedDims,
@@ -244,13 +265,13 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
   );
 }
 
-export default function ReEvaluateCard({ project, projectInfo, onStart, disabled }) {
+export default function ReEvaluateCard({ project, projectInfo, onStart, disabled, preselectDims }) {
   const {
     info, error, allDimensions, selectedDims,
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
     isLocal, scanData, branch, setBranch, scopePath, setScopePath,
-  } = useReEvaluateCard(project, onStart, projectInfo);
+  } = useReEvaluateCard(project, onStart, projectInfo, preselectDims);
 
   if (error) return null;
   if (!info) return (
