@@ -170,15 +170,26 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     );
   }
 
-  // Run detail only needs the dashboard payload, so it can show as soon as that
-  // resolves (`&& !dashboard`). The Overview additionally needs the
-  // scores-derived `accumulated` block — DashboardContent returns a
-  // LoadingScreen without it — so it must stay in the loading state until the
-  // scores query resolves too. `loading` (dashboardQuery.isLoading ||
-  // scoresLoading) is already true until every required query has data; gating
-  // the Overview on it avoids fading to "ready" while still showing a spinner
-  // and then popping the real content in a beat later (the first-load flicker).
-  const isLoading = runMode ? (loading && !dashboard) : loading;
+  // What each view needs before it can render real content: run detail only
+  // needs the dashboard payload; the Overview also needs the scores-derived
+  // `accumulated` block (DashboardContent returns a LoadingScreen without it).
+  const contentReady = runMode ? !!dashboard : (!!dashboard && !!accumulated);
+  // Hold the full LoadingScreen until the content is ready, so we don't fade in
+  // a half-drawn page and then pop the real content in a beat later (the
+  // first-load flicker). BUT a cold score cache can take several seconds to
+  // rebuild (e.g. right after a dismiss/restore/formula change invalidates it);
+  // sitting on a blank spinner that whole time reads as "not opening". So once
+  // the dashboard payload is in and a short grace has elapsed, fall back to the
+  // partial page (frame + a content spinner) so a slow load shows progress
+  // instead of a hang. The grace comfortably exceeds a warm load (both queries
+  // resolve in well under it), so the fast path still gets one clean transition.
+  const [graceElapsed, setGraceElapsed] = useState(false);
+  useEffect(() => {
+    if (contentReady || !dashboard) { setGraceElapsed(false); return undefined; }
+    const timer = setTimeout(() => setGraceElapsed(true), 700);
+    return () => clearTimeout(timer);
+  }, [contentReady, dashboard]);
+  const isLoading = loading && !contentReady && !(dashboard && graceElapsed);
   // True while a *background* fetch is running but we're already showing
   // data (placeholderData kept the previous run on screen during a switch).
   // The page dims itself slightly so the user sees "still working" without

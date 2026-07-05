@@ -1,5 +1,5 @@
-import { render } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { render, act } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import DashboardPage from './DashboardPage.jsx';
 
 // First-load flicker guard. On a fresh (uncached) load the dashboard query
@@ -37,5 +37,23 @@ describe('DashboardPage first-load loading gate', () => {
     // Must NOT flip to the ready fade before the data needed to render is present.
     expect(page.className).toContain('dashboard-loading');
     expect(page.className).not.toContain('dashboard-ready');
+  });
+
+  // The flip side: a cold score cache can take several seconds to rebuild. We
+  // must not sit on a blank full-screen spinner that whole time (reads as "the
+  // project won't open"). Once the dashboard payload is in and a short grace
+  // has elapsed, fall back to the partial page so a slow load shows progress.
+  it('falls back to the partial page after a grace period if scores stays slow', () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(<DashboardPage data={overviewLoading} callbacks={{}} runMode={false} />);
+      // Before the grace: still the full loading screen.
+      expect(container.querySelector('.dashboard-page').className).toContain('dashboard-loading');
+      // After the grace elapses with scores still pending: drop to the partial page.
+      act(() => { vi.advanceTimersByTime(800); });
+      expect(container.querySelector('.dashboard-page').className).toContain('dashboard-ready');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
