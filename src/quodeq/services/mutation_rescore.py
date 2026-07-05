@@ -153,6 +153,82 @@ def _rescore_run(
         return None
 
 
+def _resolve_default_run_id(evaluations_dir: str, project: str) -> str | None:
+    """Return the run_id the Overview lands on by default, or None.
+
+    Reuses the EXACT "latest completed run" rule the dashboard uses: pick the
+    first run in newest-first ``list_runs`` order whose status is eligible for
+    the default view (``complete`` only), falling back to the newest run when
+    none is complete. This mirrors ``dashboard._resolve_selected_run("latest")``
+    so ``isLatest`` matches what the Overview actually shows.
+    """
+    from quodeq.services.dim_resolution import is_eligible_for_default_view  # noqa: PLC0415
+    from quodeq.services.ports import list_runs  # noqa: PLC0415
+
+    reports_root = Path(evaluations_dir).resolve()
+    try:
+        runs = list_runs(reports_root, project)
+    except Exception:
+        return None
+    if not runs:
+        return None
+    selected = next(
+        (r for r in runs if is_eligible_for_default_view(r.status)),
+        runs[0],
+    )
+    return selected.run_id
+
+
+def _accumulated_payload(evaluations_dir: str, project: str) -> dict[str, Any] | None:
+    """Return the cache-backed accumulated payload, or None on any failure.
+
+    ``get_project_scores(reports_root, project, None)`` returns a dict with an
+    ``accumulated`` key ({dimensions, summary}); we surface just that so the
+    client can patch the accumulated (cross-run) scores cache.
+    """
+    from quodeq.services.scoring import get_project_scores  # noqa: PLC0415
+
+    reports_root = Path(evaluations_dir).resolve()
+    try:
+        payload = get_project_scores(reports_root, project, None)
+    except Exception:
+        _logger.warning("Accumulated fetch for delta failed for %s", project, exc_info=True)
+        return None
+    if not payload:
+        return None
+    return payload.get("accumulated")
+
+
+def dismiss_delta(
+    evaluations_dir: str, project: str, run_id: str | None, dismissed: dict[str, Any],
+) -> dict[str, Any]:
+    """Describe a dismiss mutation so the client can patch its caches.
+
+    ``isLatest`` is True when ``run_id`` is the run the Overview lands on by
+    default — the exact ``_resolve_default_run_id`` rule shared with the
+    dashboard. ``accumulated`` carries the (cache-backed) cross-run rollup so
+    the Overview's accumulated view updates without a refetch; it is None when
+    no ``run_id`` was supplied (the caller has no run to anchor the rollup to)
+    or when the fetch fails.
+    """
+    is_latest = False
+    accumulated: dict[str, Any] | None = None
+    if run_id:
+        is_latest = run_id == _resolve_default_run_id(evaluations_dir, project)
+        accumulated = _accumulated_payload(evaluations_dir, project)
+    return {
+        "kind": "dismiss",
+        "runId": run_id,
+        "isLatest": is_latest,
+        "dismissed": {
+            "req": dismissed.get("req"),
+            "file": dismissed.get("file"),
+            "line": dismissed.get("line"),
+        },
+        "accumulated": accumulated,
+    }
+
+
 def rescore_with_fallback(
     evaluations_dir: str, project: str, run_id: str | None,
 ) -> dict[str, Any] | None:
