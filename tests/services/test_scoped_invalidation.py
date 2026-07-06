@@ -3,6 +3,7 @@ import pytest
 
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.services.dashboard import clear_shared_dimension_cache
+from quodeq.services.deleted import delete_finding
 from quodeq.services.dismissed import dismiss_finding
 from quodeq.services.score_cache import open_score_cache
 from quodeq.services.scoring import get_project_scores
@@ -56,5 +57,35 @@ def test_dismiss_only_reversions_the_touched_run(tmp_path):
 
     changed_runs = {r for (r, v) in after - before}
     # The touched run (run 1) re-versions; the untouched run (run 2) keeps its version.
+    assert "20260101T000000" in changed_runs
+    assert "20260102T000000" not in changed_runs
+
+
+def test_delete_only_reversions_the_touched_run(tmp_path):
+    """A delete keyed (dimension, principle, file) must re-version exactly the runs
+    whose findings carry that class. Guards the delete-key identity
+    (read_run_key_sets uses practice_id == _principle_of) for delete-heavy projects.
+    """
+    reports = tmp_path / "evaluations"
+    r1 = build_projected_run(reports, "proj", "20260101T000000", {"security": (7.0, "Fair")})
+    build_projected_run(reports, "proj", "20260102T000000", {"security": (8.0, "Good")})
+    # Run 1 has a finding whose class key is (security, P1, a.py); run 2 has none.
+    _insert_finding(
+        r1, requirement="R1", file="a.py", line=1,
+        dimension="security", practice_id="P1", dedup_key="k1",
+    )
+
+    # Activate the heavy path + populate run_scalars for both runs (seed a
+    # non-intersecting dismissal so both runs' versions are recorded first).
+    dismiss_finding(reports / "proj", {"req": "SEED", "file": "seed.py", "line": 0})
+    get_project_scores(reports, "proj")
+    before = _versions("proj")
+
+    # Delete the (security, P1, a.py) class -> matches only run 1's key set.
+    delete_finding(reports / "proj", {"dimension": "security", "principle": "P1", "file": "a.py"})
+    get_project_scores(reports, "proj")
+    after = _versions("proj")
+
+    changed_runs = {r for (r, v) in after - before}
     assert "20260101T000000" in changed_runs
     assert "20260102T000000" not in changed_runs
