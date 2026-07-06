@@ -490,7 +490,7 @@ class TestStaleCacheSelfHeal:
         # bug: cache was populated when only 1 dim was on disk, even though
         # disk now has 3).
         cache = OrderedDict()
-        cache[(tmp_path, "proj", "r-stale")] = [_dim("security", "F", "2.0")]
+        cache[(tmp_path, "proj", "r-stale", "")] = [_dim("security", "F", "2.0")]
 
         # Fresh disk read should return all 3 dims.
         read_calls = []
@@ -543,7 +543,7 @@ class TestStaleCacheSelfHeal:
         ]
 
         cache = OrderedDict()
-        cache[(tmp_path, "proj", "r-fresh")] = [_dim("security", "B", "7.0")]
+        cache[(tmp_path, "proj", "r-fresh", "")] = [_dim("security", "B", "7.0")]
 
         read_calls = []
         def fake_read(reports_root, project, run_id):

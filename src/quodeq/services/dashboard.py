@@ -146,12 +146,14 @@ def _make_run_dimension_fetcher(
     cache: OrderedDict[tuple, list[DimensionResult]] | None = None,
     lock: threading.Lock | None = None,
     max_size: int | None = None,
+    version: str = "",
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a cached fetcher for run dimension data (LRU, bounded).
 
     Defaults to the module-level shared cache so reads of the same run's
-    dimensions across requests reuse work. Tests pass explicit cache/lock to
-    isolate state.
+    dimensions across requests reuse work. *version* scopes the cache key to the
+    project's suppression state so a dismiss/delete invalidates it. Tests pass
+    explicit cache/lock to isolate state.
     """
     return make_lru_dimension_fetcher(
         reports_root,
@@ -159,6 +161,7 @@ def _make_run_dimension_fetcher(
         cache if cache is not None else _SHARED_RUN_DIM_CACHE,
         lock if lock is not None else _SHARED_RUN_DIM_LOCK,
         max_size if max_size is not None else _run_dim_cache_max(),
+        version=version,
     )
 
 
@@ -210,6 +213,7 @@ def _make_status_aware_fetcher(
     cache: OrderedDict[tuple, list[DimensionResult]] | None = None,
     lock: threading.Lock | None = None,
     max_size: int | None = None,
+    version: str = "",
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a fetcher with two self-healing properties on top of the LRU cache.
 
@@ -230,7 +234,7 @@ def _make_status_aware_fetcher(
     resolved_lock = lock if lock is not None else _SHARED_RUN_DIM_LOCK
     cached = _make_run_dimension_fetcher(
         reports_root, project,
-        cache=resolved_cache, lock=resolved_lock, max_size=max_size,
+        cache=resolved_cache, lock=resolved_lock, max_size=max_size, version=version,
     )
     status_by_id = {r.run_id: r.status for r in runs}
 
@@ -243,7 +247,7 @@ def _make_status_aware_fetcher(
         # validate when an actual evaluation/ directory exists on disk:
         # without that anchor we'd evict every test stub that pre-seeds
         # the cache without creating disk state.
-        key = (reports_root, project, run_id)
+        key = (reports_root, project, run_id, version)
         if key in resolved_cache:
             eval_dir = reports_root / project / run_id / "evaluation"
             if eval_dir.is_dir():
