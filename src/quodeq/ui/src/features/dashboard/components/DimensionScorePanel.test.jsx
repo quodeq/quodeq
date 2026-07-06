@@ -16,6 +16,11 @@ describe('DimensionScorePanel', () => {
     expect(screen.queryByText('+6.0')).not.toBeInTheDocument();
   });
 
+  it('falls back to overallScore - previousScore when dimTrends is absent', () => {
+    render(<DimensionScorePanel dimensions={DIMS} />);
+    expect(screen.getByText('+6.0')).toBeInTheDocument();
+  });
+
   it('renders one sparkline bar per period score', () => {
     const dimTrends = { maintainability: { delta: 0.5, scores: [7.0, 7.5, 8.0] } };
     const { container } = render(<DimensionScorePanel dimensions={DIMS} dimTrends={dimTrends} />);

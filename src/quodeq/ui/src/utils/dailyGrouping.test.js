@@ -316,6 +316,21 @@ test('extractDimensionPeriodSeries: carries dateISO/dateLabel/grade/overallGrade
   assert.equal(last.overallGrade, 'Good');
 });
 
+test('extractDimensionPeriodSeries: runs with missing/invalid dateISO collapse into one bucket, newest scored kept', () => {
+  // All falsy dates bucket to the empty key "", so these three runs form a
+  // single bucket. e1 is newest but did not score maintainability (skipped
+  // without consuming the bucket); e2 is the newest run that did; e3 is older.
+  const trend = [
+    { runId: 'e1', dateISO: null,      dimensionDetails: [{ dimension: 'security', score: 9 }] },
+    { runId: 'e2', dateISO: '',        dimensionDetails: [{ dimension: 'maintainability', score: 8.0 }] },
+    { runId: 'e3', dateISO: undefined, dimensionDetails: [{ dimension: 'maintainability', score: 4.0 }] },
+  ];
+  const s = extractDimensionPeriodSeries(trend, 'maintainability', 'day');
+  assert.equal(s.length, 1);
+  assert.equal(s[0].runId, 'e2');
+  assert.equal(s[0].score, 8.0);
+});
+
 test('extractDimensionPeriodSeries: empty/invalid inputs return []', () => {
   assert.deepEqual(extractDimensionPeriodSeries([], 'maintainability', 'day'), []);
   assert.deepEqual(extractDimensionPeriodSeries(null, 'maintainability', 'day'), []);

@@ -1,13 +1,6 @@
 import { useMemo } from 'react';
 import DimensionGaugeCard from './DimensionGaugeCard.jsx';
-
-// Fallback delta when the parent did not supply a period-aware entry for this
-// dimension (defensive; the accumulated overview always supplies dimTrends).
-function fallbackDelta(item) {
-  const curr = parseFloat(item.overallScore);
-  const prev = parseFloat(item.previousScore);
-  return !Number.isNaN(curr) && !Number.isNaN(prev) ? curr - prev : null;
-}
+import { fallbackDelta } from '../../../utils/dimensionUtils.js';
 
 export default function DimensionCardsGrid({ sortedDimensions, onDimensionClick, selectedDayDimNames, dimTrends }) {
   const dimNameSet = selectedDayDimNames instanceof Set ? selectedDayDimNames : new Set();
