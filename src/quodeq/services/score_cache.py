@@ -198,6 +198,28 @@ def score_cache_version(project_dir: Path, params: ScoringParams) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def run_scoped_version(
+    params: ScoringParams,
+    run_dismiss_keys: set[tuple],
+    run_class_keys: set[tuple],
+    dismissed_all: set[tuple],
+    deleted_all: set[tuple],
+) -> str:
+    """Version hash for a single run: params + only the suppressions that touch it.
+
+    A run's rescored score depends solely on dismissals whose (req,file,line) is
+    in *run_dismiss_keys* and deletions whose (dim,principle,file) is in
+    *run_class_keys*, so intersecting keeps unaffected runs' versions stable.
+    """
+    payload = json.dumps({
+        "epoch": _CACHE_WRITER_EPOCH,
+        "dismissed": sorted(str(k) for k in (dismissed_all & run_dismiss_keys)),
+        "deleted": sorted(str(k) for k in (deleted_all & run_class_keys)),
+        "params": _params_fingerprint(params),
+    }, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def accumulated_cache_version(
     project_dir: Path, params: ScoringParams,
     run_fingerprint: list[tuple[str, str]], as_of: str | None,
