@@ -478,11 +478,18 @@ def _compute_dashboard_payload(
     # fetcher did via _count_eval_files. The dismiss-adjustment (Bug B) stays;
     # it is now cached rather than recomputed on every request.
     cacheable_run_ids = {r.run_id for r in history_runs if r.status == "complete"}
+    # Key the in-memory dimension cache by the project's suppression state so a
+    # dismiss/delete (or a formula change) invalidates warmed entries and no
+    # read path can serve a pre-dismiss score. ``score_cache_version`` already
+    # hashes dismissed + deleted keys + params.
+    from quodeq.services.score_cache import score_cache_version  # noqa: PLC0415
+    dim_cache_version = score_cache_version(reports_root / project, params)
     get_run_dimensions = make_trend_fetcher(
         reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
         max_history=max_history,
         base_fetcher_factory=lambda rr, proj: _make_run_dimension_fetcher(
             rr, proj, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
+            version=dim_cache_version,
         ),
     )
     previous_by_dimension = _collect_previous_scores(
