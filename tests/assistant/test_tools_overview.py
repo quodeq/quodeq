@@ -69,7 +69,7 @@ def test_get_overview_passes_as_of(tmp_path, monkeypatch):
 
 
 def test_get_overview_requires_project_and_reports_dir(tmp_path):
-    with pytest.raises(ToolError):
+    with pytest.raises(ToolError, match="get_context"):
         _get_overview(_ctx(tmp_path, project_id=None))
 
 

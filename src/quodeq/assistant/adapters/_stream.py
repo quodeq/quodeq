@@ -45,12 +45,41 @@ def assistant_text(event: dict) -> list[str]:
     return []
 
 
+def _args_summary(args) -> str:
+    return (json.dumps(args, ensure_ascii=False)[:80]
+            if isinstance(args, dict) and args else "")
+
+
+def _codex_tool_detail(item: dict) -> dict | None:
+    """Map a codex `item` (mcp_tool_call / command_execution) to a tool frame."""
+    itype = item.get("type")
+    if itype == "mcp_tool_call":
+        name = item.get("tool")
+        name = name if isinstance(name, str) and name else "mcp_tool_call"
+        return {"name": name, "args_summary": _args_summary(item.get("arguments"))}
+    if itype == "command_execution":
+        cmd = item.get("command")
+        return {"name": "shell", "args_summary": cmd[:80] if isinstance(cmd, str) else ""}
+    return None
+
+
 def tool_use_details(event: dict) -> list[dict]:
-    """tool_use blocks as {name, args_summary}; args JSON truncated for display."""
-    if event.get("type") == "assistant":
+    """tool_use blocks as {name, args_summary}; args JSON truncated for display.
+
+    Claude carries tool calls as `tool_use` blocks inside `assistant` messages.
+    Codex emits each tool call as its own event: `item.started` when the call
+    begins (surfaced here, once) and `item.completed` when it finishes (ignored
+    to avoid a duplicate frame).
+    """
+    etype = event.get("type")
+    if etype == "item.started":
+        item = event.get("item")
+        detail = _codex_tool_detail(item) if isinstance(item, dict) else None
+        return [detail] if detail else []
+    if etype == "assistant":
         msg = event.get("message")
         blocks = msg.get("content") if isinstance(msg, dict) else None
-    elif event.get("type") == "item.completed":
+    elif etype == "item.completed":
         item = event.get("item")
         blocks = item.get("content") if isinstance(item, dict) else None
     else:
@@ -59,15 +88,36 @@ def tool_use_details(event: dict) -> list[dict]:
     if isinstance(blocks, list):
         for b in blocks:
             if isinstance(b, dict) and b.get("type") == "tool_use" and isinstance(b.get("name"), str):
-                args = b.get("input")
-                summary = (json.dumps(args, ensure_ascii=False)[:80]
-                           if isinstance(args, dict) and args else "")
-                details.append({"name": b["name"], "args_summary": summary})
+                details.append({"name": b["name"], "args_summary": _args_summary(b.get("input"))})
     return details
 
 
 def tool_uses(event: dict) -> list[str]:
     return [d["name"] for d in tool_use_details(event)]
+
+
+def _nested_error_message(value) -> str | None:
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return value if value else None
+        return _nested_error_message(parsed) or value
+    if not isinstance(value, dict):
+        return None
+    err = value.get("error")
+    if isinstance(err, dict) and isinstance(err.get("message"), str):
+        return err["message"]
+    msg = value.get("message")
+    return msg if isinstance(msg, str) and msg else None
+
+
+def error_message(event: dict) -> str | None:
+    if event.get("type") == "error":
+        return _nested_error_message(event.get("message")) or _nested_error_message(event)
+    if event.get("type") == "turn.failed":
+        return _nested_error_message(event.get("error")) or _nested_error_message(event)
+    return None
 
 
 def session_id(event: dict) -> str | None:

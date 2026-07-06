@@ -53,19 +53,33 @@ def test_codex_turnN_exec_resume():
 
 
 def test_codex_turn1_full_argv():
+    # build_turn_argv does not add the OS-sandbox wrapper (that is applied in
+    # _run_once); it produces the inner codex argv with the bypass + lockdown args.
     spec = _spec("codex")
     assert spec.argv == [
-        "codex", "exec", "--json", "-s", "read-only", "-a", "never",
-        "--model", "m", "hi",
+        "codex", "exec", "--json", "--dangerously-bypass-approvals-and-sandbox",
+        "--disable", "shell_tool", "-c", "tools.web_search=false",
+        "--skip-git-repo-check", "--model", "m", "hi",
     ]
 
 
 def test_codex_turnN_full_argv():
     spec = _spec("codex", prior_session_id="th-1")
     assert spec.argv == [
-        "codex", "exec", "resume", "th-1", "--json", "-s", "read-only",
-        "-a", "never", "--model", "m", "hi",
+        "codex", "exec", "resume", "th-1", "--json",
+        "--dangerously-bypass-approvals-and-sandbox", "--disable", "shell_tool",
+        "-c", "tools.web_search=false", "--skip-git-repo-check", "--model", "m", "hi",
     ]
+
+
+def test_codex_numeric_model_shorthand_is_prefixed():
+    spec = _spec("codex", model="5.4")
+    assert spec.argv[spec.argv.index("--model") + 1] == "gpt-5.4"
+
+
+def test_codex_full_model_id_is_unchanged():
+    spec = _spec("codex", model="gpt-5.4")
+    assert spec.argv[spec.argv.index("--model") + 1] == "gpt-5.4"
 
 
 def test_gemini_turn1_preassign_and_resume():
@@ -133,3 +147,26 @@ def test_claude_no_append_flag_without_system_prompt():
 def test_message_prefix_providers_never_get_append_flag():
     assert "--append-system-prompt" not in _spec("codex", system_prompt="CTX").argv
     assert "--append-system-prompt" not in _spec("gemini", system_prompt="CTX").argv
+
+
+def test_codex_mcp_config_arg_wired_as_dash_c():
+    # note: codex assistant_args already carry a `-c tools.web_search=false`, so
+    # the mcp override is a SEPARATE `-c <toml>` pair; target it by value.
+    toml = 'mcp_servers.quodeq-assistant={command = "py", args = []}'
+    spec = _spec("codex", mcp_config_arg=toml)
+    assert toml in spec.argv
+    assert spec.argv[spec.argv.index(toml) - 1] == "-c"
+    assert spec.argv[-1] == "hi"  # prompt stays last
+
+
+def test_codex_mcp_config_arg_precedes_prompt_on_resume():
+    toml = 'mcp_servers.quodeq-assistant={command = "py", args = []}'
+    spec = _spec("codex", prior_session_id="th-1", mcp_config_arg=toml)
+    assert spec.argv[:3] == ["codex", "exec", "resume"]
+    assert toml in spec.argv and spec.argv.index(toml) < len(spec.argv) - 1
+    assert spec.argv[-1] == "hi"
+
+
+def test_no_mcp_servers_override_without_mcp_config_arg():
+    argv = _spec("codex").argv
+    assert not any(str(a).startswith("mcp_servers.") for a in argv)

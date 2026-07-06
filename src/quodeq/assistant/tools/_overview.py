@@ -16,7 +16,9 @@ from quodeq.services import _fs_reports
 def _get_overview(ctx: ToolContext, as_of: str | None = None) -> dict:
     if ctx.reports_dir is None or ctx.project_id is None:
         raise ToolError(
-            "no project selected for this session; overview data unavailable"
+            "no project selected for this session; overview data unavailable. "
+            "Call get_context to confirm scope, then ask the user to open a "
+            "project overview."
         )
     payload = _fs_reports.get_accumulated(str(ctx.reports_dir), ctx.project_id, as_of)
     if payload is None:
@@ -49,7 +51,8 @@ def register_overview_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
         "get_overview",
         "Get accumulated dimension scores and grades aggregated across the "
         "project's recent runs (the overview/dashboard view). Use this when no "
-        "specific run is selected. Optional 'as_of' is a run id: accumulate "
+        "specific run is selected. Call get_context first if unsure whether "
+        "overviewAvailable is true. Optional 'as_of' is a run id: accumulate "
         "only that run and older ones.",
         {"type": "object", "properties": {
             "as_of": {"type": "string"},

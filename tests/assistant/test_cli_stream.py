@@ -66,3 +66,49 @@ def test_tool_use_details_empty_input_gives_empty_summary():
         {"type": "tool_use", "name": "get_scores", "input": {}}]}}
     assert _stream.tool_use_details(event) == [
         {"name": "get_scores", "args_summary": ""}]
+
+
+def test_codex_mcp_tool_call_surfaces_with_tool_name():
+    # Real codex shape: item.started with type mcp_tool_call.
+    event = {"type": "item.started", "item": {
+        "id": "item_2", "type": "mcp_tool_call", "server": "quodeq-assistant",
+        "tool": "get_context", "arguments": {}, "result": None,
+        "error": None, "status": "in_progress"}}
+    assert _stream.tool_use_details(event) == [
+        {"name": "get_context", "args_summary": ""}]
+
+
+def test_codex_mcp_tool_call_includes_args_summary():
+    event = {"type": "item.started", "item": {
+        "type": "mcp_tool_call", "server": "quodeq-assistant",
+        "tool": "search_findings", "arguments": {"query": "auth"},
+        "status": "in_progress"}}
+    assert _stream.tool_use_details(event) == [
+        {"name": "search_findings", "args_summary": '{"query": "auth"}'}]
+
+
+def test_codex_command_execution_surfaces_as_shell():
+    event = {"type": "item.started", "item": {
+        "id": "item_1", "type": "command_execution",
+        "command": "/bin/zsh -lc 'echo hi'", "aggregated_output": "",
+        "exit_code": None, "status": "in_progress"}}
+    assert _stream.tool_use_details(event) == [
+        {"name": "shell", "args_summary": "/bin/zsh -lc 'echo hi'"}]
+
+
+def test_codex_tool_item_not_double_counted_on_completed():
+    # We emit the tool_call on item.started; item.completed for the same tool
+    # must NOT produce a second frame.
+    completed = {"type": "item.completed", "item": {
+        "type": "command_execution", "command": "/bin/zsh -lc 'echo hi'",
+        "aggregated_output": "hi\n", "exit_code": 0, "status": "completed"}}
+    assert _stream.tool_use_details(completed) == []
+    mcp_completed = {"type": "item.completed", "item": {
+        "type": "mcp_tool_call", "tool": "get_context", "arguments": {},
+        "status": "completed"}}
+    assert _stream.tool_use_details(mcp_completed) == []
+
+
+def test_codex_agent_message_completed_is_not_a_tool_call():
+    event = {"type": "item.completed", "item": {"type": "agent_message", "text": "hi"}}
+    assert _stream.tool_use_details(event) == []

@@ -15,7 +15,7 @@ const MODEL_HINTS = {
   ),
   codex: (
     <>
-      Type the model id you want to use, like <code>gpt-5-mini</code> or <code>gpt-5</code>. The full list lives in OpenAI&apos;s docs.
+      Leave this blank to use the Codex CLI default, or type a model id that your Codex account supports.
     </>
   ),
   gemini: (
@@ -33,7 +33,7 @@ const ANALYSIS_MODEL_HINTS = {
   ),
   codex: (
     <>
-      Want a different model for different tasks? Pick one per tier (Fast, Balanced, Thorough). For example, <code>gpt-5-mini</code> for Fast and <code>gpt-5</code> for Thorough. Anything you leave blank just uses the model you chose above.
+      Want a different model for different tasks? Pick one per tier (Fast, Balanced, Thorough). Anything you leave blank uses the model above, and a blank model uses the Codex CLI default.
     </>
   ),
   gemini: (

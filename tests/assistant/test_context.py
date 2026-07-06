@@ -31,3 +31,11 @@ def test_system_prompt_web_section_only_when_enabled():
     prompt = build_system_prompt(web_enabled=True)
     assert "# Web access" in prompt
     assert "search_web" in prompt and "fetch_url" in prompt
+
+
+def test_system_prompt_guides_cli_agents_to_quodeq_context_tools():
+    prompt = build_system_prompt()
+    assert "scratch working directory is not the analyzed repository" in prompt
+    assert "Call get_context first" in prompt
+    assert "retry once" in prompt
+    assert "read_repo_file" in prompt

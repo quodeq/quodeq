@@ -20,6 +20,7 @@ class CliChatConfig:
     session_id_source: str
     supports_tools: bool
     system_prompt_style: str
+    requires_external_sandbox: bool
 
 
 def load_cli_chat_config(provider_id: str) -> CliChatConfig:
@@ -41,4 +42,5 @@ def load_cli_chat_config(provider_id: str) -> CliChatConfig:
         session_id_source=assistant.get("session_id_source", "preassign"),
         supports_tools=cfg.get("supports_tools", True),
         system_prompt_style=assistant.get("system_prompt_style", "message-prefix"),
+        requires_external_sandbox=cfg.get("requires_external_sandbox", False),
     )
