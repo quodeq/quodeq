@@ -1,5 +1,6 @@
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import DimensionSparkline from '../../../components/DimensionSparkline.jsx';
+import { fallbackDelta } from '../../../utils/dimensionUtils.js';
 
 function violationCount(dim) {
   if (typeof dim.totalViolations === 'number') return dim.totalViolations;
@@ -29,14 +30,6 @@ function DimensionRow({ dim, onBarClick, delta, scores }) {
       <span className="dim-score-viol">{violations}v</span>
     </div>
   );
-}
-
-// Fallback delta when the parent did not supply a period-aware entry for this
-// dimension (defensive; the accumulated overview always supplies dimTrends).
-function fallbackDelta(dim) {
-  const curr = parseFloat(dim.overallScore);
-  const prev = parseFloat(dim.previousScore);
-  return !Number.isNaN(curr) && !Number.isNaN(prev) ? curr - prev : null;
 }
 
 export default function DimensionScorePanel({ dimensions = [], onBarClick, dimTrends }) {
