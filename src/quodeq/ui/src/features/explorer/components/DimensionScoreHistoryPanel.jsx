@@ -11,8 +11,9 @@ import {
   Cell,
   ReferenceLine,
 } from 'recharts';
-import { SectionLabel } from '../../../components/terminal/index.js';
-import { gradeLetter } from '../../../utils/formatters.js';
+import { SectionLabel, PeriodSelect } from '../../../components/terminal/index.js';
+import { gradeLetter, formatPeriodLabel } from '../../../utils/formatters.js';
+import { extractDimensionPeriodSeries } from '../../../utils/dailyGrouping.js';
 import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
 import {
   cssVar,
@@ -27,31 +28,21 @@ import {
 
 const MAX = 16;
 const CHART_HEIGHT = 160;
+const GRANULARITY_SUFFIX = { day: 'd', week: 'w', month: 'mo' };
 
 /**
- * Build chart data points for a single dimension's history.
- * Walks the trend (newest-first) and emits one point per run that
- * scored this dimension, oldest-first to read left-to-right.
+ * Build chart points for a single dimension, collapsed to one point per
+ * period bucket (day/week/month) using the newest run in each bucket that
+ * scored the dimension. Oldest-first to read left-to-right.
  */
-function buildDimensionData(trend, dimensionName, limit) {
-  if (!Array.isArray(trend) || !dimensionName) return [];
-  const want = String(dimensionName).toLowerCase();
-  const points = [];
-  for (const entry of trend) {
-    const details = entry?.dimensionDetails;
-    if (!Array.isArray(details)) continue;
-    const match = details.find((d) => (d.dimension || '').toLowerCase() === want);
-    const score = match ? parseFloat(match.score) : NaN;
-    if (!Number.isFinite(score)) continue;
-    points.push({
-      runId: entry.runId,
-      dateLabel: entry.dateLabel,
-      numericAverage: score,
-      overallGrade: match.grade ?? entry.overallGrade,
-    });
-    if (points.length >= limit) break;
-  }
-  return points.reverse();
+function buildDimensionData(trend, dimensionName, granularity, limit) {
+  return extractDimensionPeriodSeries(trend, dimensionName, granularity, limit).map((entry) => ({
+    runId: entry.runId,
+    dateLabel: entry.dateLabel,
+    periodLabel: formatPeriodLabel(entry, granularity),
+    numericAverage: entry.score,
+    overallGrade: entry.grade ?? entry.overallGrade,
+  }));
 }
 
 function DimensionTooltip({ active, payload }) {
@@ -62,7 +53,7 @@ function DimensionTooltip({ active, payload }) {
   const grade = gradeLetter(entry.overallGrade);
   return (
     <div className="run-history-tooltip">
-      <span className="rht-date">{entry.dateLabel}</span>
+      <span className="rht-date">{entry.periodLabel || entry.dateLabel}</span>
       <span className="rht-score">{score} - {grade}</span>
     </div>
   );
@@ -131,9 +122,9 @@ function DimensionHistoryChart({ data, selectedRunId, hoveredIndex, setHoveredIn
   );
 }
 
-export default function DimensionScoreHistoryPanel({ trend = [], dimension, selectedRunId = null, onBarClick }) {
+export default function DimensionScoreHistoryPanel({ trend = [], dimension, selectedRunId = null, onBarClick, granularity = 'day', onGranularityChange }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
-  const data = useMemo(() => buildDimensionData(trend, dimension, MAX), [trend, dimension]);
+  const data = useMemo(() => buildDimensionData(trend, dimension, granularity, MAX), [trend, dimension, granularity]);
 
   const stats = useMemo(() => {
     const scores = data.map((d) => d.numericAverage).filter(Number.isFinite);
@@ -145,15 +136,20 @@ export default function DimensionScoreHistoryPanel({ trend = [], dimension, sele
     };
   }, [data]);
 
+  const suffix = GRANULARITY_SUFFIX[granularity] || 'd';
+
   return (
     <section className="run-history-panel run-history-panel--terminal panel" aria-label={`${dimension} score history`}>
       <div className="run-history-panel__header">
-        <SectionLabel>score_history · {data.length}d</SectionLabel>
-        {stats && (
-          <span className="run-history-panel__stats">
-            MIN {stats.min.toFixed(1)} / MAX {stats.max.toFixed(1)} / AVG {stats.avg.toFixed(1)}
-          </span>
-        )}
+        <SectionLabel>score_history · {data.length}{suffix}</SectionLabel>
+        <span className="run-history-panel__controls">
+          {onGranularityChange && <PeriodSelect value={granularity} onChange={onGranularityChange} />}
+          {stats && (
+            <span className="run-history-panel__stats">
+              MIN {stats.min.toFixed(1)} / MAX {stats.max.toFixed(1)} / AVG {stats.avg.toFixed(1)}
+            </span>
+          )}
+        </span>
       </div>
       {data.length === 0 ? (
         <div className="qd-history-empty">no history yet for this dimension</div>
