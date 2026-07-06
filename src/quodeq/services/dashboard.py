@@ -77,8 +77,9 @@ def _run_dim_cache_max(override: int | None = None, env: dict[str, str] | None =
 # / _collect_previous_scores / build_accumulated_trend all walk) cost ~750ms
 # per request even on warm calls. The shared cache eliminates the cross-request
 # I/O without compromising the per-request consistency guarantees (the cache
-# is keyed by (reports_root, project, run_id) and runs are immutable once
-# finalized).
+# is keyed by (reports_root, project, run_id, suppression_version) so a
+# dismiss/delete produces a new key and never serves a pre-suppression score,
+# and runs are immutable once finalized).
 #
 # Tests that need isolation can pass an explicit DashboardCacheConfig.
 _SHARED_RUN_DIM_CACHE, _SHARED_RUN_DIM_LOCK = OrderedDict(), threading.Lock()
@@ -146,12 +147,14 @@ def _make_run_dimension_fetcher(
     cache: OrderedDict[tuple, list[DimensionResult]] | None = None,
     lock: threading.Lock | None = None,
     max_size: int | None = None,
+    version: str = "",
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a cached fetcher for run dimension data (LRU, bounded).
 
     Defaults to the module-level shared cache so reads of the same run's
-    dimensions across requests reuse work. Tests pass explicit cache/lock to
-    isolate state.
+    dimensions across requests reuse work. *version* scopes the cache key to the
+    project's suppression state so a dismiss/delete invalidates it. Tests pass
+    explicit cache/lock to isolate state.
     """
     return make_lru_dimension_fetcher(
         reports_root,
@@ -159,6 +162,7 @@ def _make_run_dimension_fetcher(
         cache if cache is not None else _SHARED_RUN_DIM_CACHE,
         lock if lock is not None else _SHARED_RUN_DIM_LOCK,
         max_size if max_size is not None else _run_dim_cache_max(),
+        version=version,
     )
 
 
@@ -210,6 +214,7 @@ def _make_status_aware_fetcher(
     cache: OrderedDict[tuple, list[DimensionResult]] | None = None,
     lock: threading.Lock | None = None,
     max_size: int | None = None,
+    version: str = "",
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a fetcher with two self-healing properties on top of the LRU cache.
 
@@ -230,7 +235,7 @@ def _make_status_aware_fetcher(
     resolved_lock = lock if lock is not None else _SHARED_RUN_DIM_LOCK
     cached = _make_run_dimension_fetcher(
         reports_root, project,
-        cache=resolved_cache, lock=resolved_lock, max_size=max_size,
+        cache=resolved_cache, lock=resolved_lock, max_size=max_size, version=version,
     )
     status_by_id = {r.run_id: r.status for r in runs}
 
@@ -243,7 +248,7 @@ def _make_status_aware_fetcher(
         # validate when an actual evaluation/ directory exists on disk:
         # without that anchor we'd evict every test stub that pre-seeds
         # the cache without creating disk state.
-        key = (reports_root, project, run_id)
+        key = (reports_root, project, run_id, version)
         if key in resolved_cache:
             eval_dir = reports_root / project / run_id / "evaluation"
             if eval_dir.is_dir():
@@ -474,11 +479,18 @@ def _compute_dashboard_payload(
     # fetcher did via _count_eval_files. The dismiss-adjustment (Bug B) stays;
     # it is now cached rather than recomputed on every request.
     cacheable_run_ids = {r.run_id for r in history_runs if r.status == "complete"}
+    # Key the in-memory dimension cache by the project's suppression state so a
+    # dismiss/delete (or a formula change) invalidates warmed entries and no
+    # read path can serve a pre-dismiss score. ``score_cache_version`` already
+    # hashes dismissed + deleted keys + params.
+    from quodeq.services.score_cache import score_cache_version  # noqa: PLC0415
+    dim_cache_version = score_cache_version(reports_root / project, params)
     get_run_dimensions = make_trend_fetcher(
         reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
         max_history=max_history,
         base_fetcher_factory=lambda rr, proj: _make_run_dimension_fetcher(
             rr, proj, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
+            version=dim_cache_version,
         ),
     )
     previous_by_dimension = _collect_previous_scores(
