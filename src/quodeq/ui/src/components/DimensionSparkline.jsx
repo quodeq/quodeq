@@ -18,32 +18,6 @@ const MAX_SCORE = 10;
 const VISIBLE_MIN_SCORE = 4;
 
 /**
- * Extract the last `limit` scores for a dimension from a trend array.
- * Input `trend` is newest-first; output is oldest-first so the sparkline
- * reads left-to-right chronologically.
- *
- * @param {Array} trend - Trend entries (newest-first).
- * @param {string} dimensionName - Case-insensitive match.
- * @param {number} [limit=10]
- * @returns {number[]}
- */
-export function extractDimensionHistory(trend, dimensionName, limit = 10) {
-  if (!Array.isArray(trend) || !dimensionName) return [];
-  const want = String(dimensionName).toLowerCase();
-  const scores = [];
-  for (const entry of trend) {
-    const details = entry?.dimensionDetails;
-    if (!Array.isArray(details)) continue;
-    const match = details.find((d) => (d.dimension || '').toLowerCase() === want);
-    if (match && match.score != null && !Number.isNaN(parseFloat(match.score))) {
-      scores.push(parseFloat(match.score));
-      if (scores.length >= limit) break;
-    }
-  }
-  return scores.reverse();
-}
-
-/**
  * Responsive sparkline. The SVG fills 100% of its container width and uses
  * `preserveAspectRatio="none"` so the bars stretch horizontally — the caller
  * controls the final width via CSS on the wrapping element (`.dim-score-spark`).
