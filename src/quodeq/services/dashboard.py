@@ -77,8 +77,9 @@ def _run_dim_cache_max(override: int | None = None, env: dict[str, str] | None =
 # / _collect_previous_scores / build_accumulated_trend all walk) cost ~750ms
 # per request even on warm calls. The shared cache eliminates the cross-request
 # I/O without compromising the per-request consistency guarantees (the cache
-# is keyed by (reports_root, project, run_id) and runs are immutable once
-# finalized).
+# is keyed by (reports_root, project, run_id, suppression_version) so a
+# dismiss/delete produces a new key and never serves a pre-suppression score,
+# and runs are immutable once finalized).
 #
 # Tests that need isolation can pass an explicit DashboardCacheConfig.
 _SHARED_RUN_DIM_CACHE, _SHARED_RUN_DIM_LOCK = OrderedDict(), threading.Lock()
