@@ -32,7 +32,11 @@ _BUSY_TIMEOUT_MS = 5000
 # scoping carried stale dimensions (e.g. clean-architecture) that the project
 # no longer evaluates; the run-fingerprint could never invalidate them, so this
 # bump rebuilds them once against the latest run's configured-dimension set.
-_CACHE_WRITER_EPOCH = "3"
+# "4": earlier writers persisted in-progress runs' PARTIAL run_keys sets (the
+# per-run version path had no completeness gate), which load_run_keys froze
+# forever; the gate now persists only terminal runs, and this bump purges the
+# non-version-keyed run_keys table once so stranded partial snapshots rebuild.
+_CACHE_WRITER_EPOCH = "4"
 _SCHEMA = (
     "CREATE TABLE IF NOT EXISTS run_scalars ("
     " project TEXT NOT NULL, run_id TEXT NOT NULL, version TEXT NOT NULL,"
@@ -50,7 +54,32 @@ _SCHEMA = (
     " project TEXT NOT NULL, run_id TEXT NOT NULL,"
     " dismiss_keys TEXT NOT NULL, class_keys TEXT NOT NULL,"
     " PRIMARY KEY (project, run_id));"
+    "CREATE TABLE IF NOT EXISTS cache_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);"
 )
+
+
+def _purge_run_keys_on_epoch_change(conn: sqlite3.Connection) -> None:
+    """One-time purge of the non-version-keyed run_keys table on epoch bump.
+
+    ``run_scalars`` / ``accumulated_cache`` / ``project_summary_cache`` embed the
+    epoch in their version hash and self-invalidate, but ``run_keys`` rows are not
+    version-keyed, so a partial snapshot persisted by a prior writer would survive
+    a bump and stay frozen. Clearing the table once forces a fresh read.
+    """
+    try:
+        row = conn.execute(
+            "SELECT value FROM cache_meta WHERE key='writer_epoch'"
+        ).fetchone()
+        if row is not None and row[0] == _CACHE_WRITER_EPOCH:
+            return
+        conn.execute("DELETE FROM run_keys")
+        conn.execute(
+            "INSERT OR REPLACE INTO cache_meta (key, value) VALUES ('writer_epoch', ?)",
+            (_CACHE_WRITER_EPOCH,),
+        )
+        conn.commit()
+    except sqlite3.Error:
+        _logger.warning("run_keys epoch purge failed", exc_info=True)
 
 
 def _init(path: Path) -> sqlite3.Connection:
@@ -60,6 +89,7 @@ def _init(path: Path) -> sqlite3.Connection:
         conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
         conn.executescript(_SCHEMA)
         conn.commit()
+        _purge_run_keys_on_epoch_change(conn)
     except sqlite3.DatabaseError:
         # Close before re-raising so the caller's rebuild path can unlink the
         # file with no open handle (Windows raises PermissionError otherwise).
@@ -265,20 +295,28 @@ def load_run_keys(
 
 def accumulated_cache_version(
     project_dir: Path, params: ScoringParams,
-    run_versions: list[tuple[str, str]], as_of: str | None,
+    run_versions: list[tuple], as_of: str | None,
 ) -> str:
-    """Version for the accumulated cache: params + the per-run scoped versions +
-    *as_of*. Composing per-run versions means a dismiss/delete on one run
+    """Version for the accumulated cache: params + the per-run fingerprints +
+    *as_of*. Composing per-run fingerprints means a dismiss/delete on one run
     invalidates the accumulated payload only when that run's contribution
     actually changed (its scoped version changed).
+
+    Each fingerprint tuple carries the run's *status* alongside its scoped
+    version (see :func:`per_run_versions`) so a status transition (e.g.
+    ``in_progress -> complete``, ``complete -> cancelled``) changes the hash and
+    invalidates the cache. The scoped version is status-independent — it hashes
+    params + intersecting suppressions — so without status folded in, a run
+    completing mid-poll would recompute the same version and serve a stale
+    payload that omitted the just-finished (now eligible) run.
     """
     payload = json.dumps({
         # Bump when the accumulated / project-card computation changes, so
         # existing cache entries recompute on deploy instead of serving a stale
-        # value until the next scan/dismiss/delete. v3: composed from per-run
-        # scoped versions (was base-hash + raw (run_id, status) fingerprint), so
-        # a suppression change only invalidates the runs it actually touched.
-        "algo": 3,
+        # value until the next scan/dismiss/delete. v4: fold each run's status
+        # back into its fingerprint so a status flip re-invalidates (v3 composed
+        # only status-independent scoped versions and lost that guard).
+        "algo": 4,
         "params": _params_fingerprint(params),
         "runs": sorted(list(t) for t in run_versions),
         "as_of": as_of or "",
@@ -287,9 +325,24 @@ def accumulated_cache_version(
 
 
 def per_run_versions(
-    project_dir: Path, project: str, params: ScoringParams, run_ids: list[str],
-) -> list[tuple[str, str]]:
-    """(run_id, scoped_version) for each run, using persisted/lazy run_keys."""
+    project_dir: Path, project: str, params: ScoringParams,
+    runs: list[tuple[str, str]],
+) -> list[tuple[str, str, str]]:
+    """``(run_id, status, scoped_version)`` per run, from persisted/lazy run_keys.
+
+    *runs* is a list of ``(run_id, status)`` pairs. The returned ``status`` is
+    folded into the accumulated version so a status transition invalidates the
+    cache (see :func:`accumulated_cache_version`).
+
+    Only TERMINAL runs persist their key sets: an in-progress run's findings
+    table is still being written as dimensions finish, so its key set is partial.
+    Persisting that partial snapshot would freeze it (``load_run_keys`` short-
+    circuits any re-read), so a suppression targeting a key that appears only
+    after the run is first observed mid-scan would not intersect the frozen set
+    and would silently under-invalidate. Non-terminal runs therefore compute
+    their scoped version from a fresh ``read_run_key_sets`` each call and never
+    write it back, mirroring ``_trend_fetcher.version_for``.
+    """
     from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
     from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
     from quodeq.services.run_keys import read_run_key_sets  # noqa: PLC0415
@@ -299,17 +352,20 @@ def per_run_versions(
             cached = load_run_keys(conn, project)
     except sqlite3.Error:
         cached = {}
-    out: list[tuple[str, str]] = []
-    for rid in run_ids:
-        keys = cached.get(rid)
+    out: list[tuple[str, str, str]] = []
+    for rid, status in runs:
+        terminal = status == "complete"
+        keys = cached.get(rid) if terminal else None
         if keys is None:
             keys = read_run_key_sets(project_dir / rid)
-            try:
-                with open_score_cache() as conn:
-                    store_run_keys(conn, project, rid, keys[0], keys[1])
-            except sqlite3.Error:
-                pass
-        out.append((rid, run_scoped_version(params, keys[0], keys[1], dismissed, deleted)))
+            if terminal:
+                try:
+                    with open_score_cache() as conn:
+                        store_run_keys(conn, project, rid, keys[0], keys[1])
+                except sqlite3.Error:
+                    pass
+        out.append(
+            (rid, status, run_scoped_version(params, keys[0], keys[1], dismissed, deleted)))
     return out
 
 

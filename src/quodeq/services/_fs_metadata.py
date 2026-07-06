@@ -81,7 +81,8 @@ def _read_accumulated_summary(
         accumulated_cache_version, cached_project_summary, per_run_versions,
     )
     project_dir = reports_root / entry_name
-    run_versions = per_run_versions(project_dir, entry_name, params, [r.run_id for r in runs])
+    run_versions = per_run_versions(
+        project_dir, entry_name, params, [(r.run_id, r.status) for r in runs])
     version = accumulated_cache_version(project_dir, params, run_versions, as_of=None)
 
     def _compute() -> dict:

@@ -557,7 +557,7 @@ def get_project_scores(
         acc_version = accumulated_cache_version(
             reports_root / project, params,
             per_run_versions(reports_root / project, project, params,
-                             [r.run_id for r in all_runs]),
+                             [(r.run_id, r.status) for r in all_runs]),
             as_of,
         )
         accumulated = cached_accumulated(project, acc_version, _compute_accumulated_payload)
