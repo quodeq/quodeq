@@ -3,6 +3,8 @@ import { useApi } from '../api/ApiContext.jsx';
 
 const STORAGE_KEY = 'quodeq_selected_project';
 const DEFAULT_RUN = 'latest';
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_RETRY_DELAY_MS = 400;
 
 function persistProject(setter, name, storage = localStorage) {
   setter(name);
@@ -37,14 +39,26 @@ function resolveInitialProject(list, currentProject, onChangeProject, onNoProjec
  *   setSelectedRun: Function, loadProjects: Function, handleProjectChange: Function,
  *   handleRunChange: Function, selectProjectAndRun: Function }}
  */
-export function useProjectState({ onNoProjects, storage = localStorage }) {
+export function useProjectState({
+  onNoProjects,
+  storage = localStorage,
+  maxRetries = DEFAULT_MAX_RETRIES,
+  retryDelayMs = DEFAULT_RETRY_DELAY_MS,
+}) {
   const { listProjects } = useApi();
   const [projects, setProjects] = useState([]);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [selectedProject, setSelectedProject] = useState(() => readStoredProject(storage));
   const [selectedRun, setSelectedRun] = useState(DEFAULT_RUN);
 
-  const loadProjects = useCallback(() => {
+  // Resilient loader. A *transient* fetch failure (e.g. an aborted request
+  // during a startup/reload race) must NOT be mistaken for "no projects" —
+  // that used to strand the user in the onboarding wizard even though their
+  // projects were fine. Retry a few times; on genuine exhaustion return null
+  // so the caller skips onboarding and the app keeps its loading state (which
+  // recovers on the next successful load / reconnect). A successful fetch that
+  // returns an empty array is still a real "fresh user" -> onboarding.
+  const loadProjects = useCallback(function load(attempt = 0) {
     return listProjects()
       .then((data) => {
         const list = Array.isArray(data) ? data : (data?.projects || []);
@@ -52,11 +66,22 @@ export function useProjectState({ onNoProjects, storage = localStorage }) {
         setProjectsLoaded(true);
         return list;
       })
-      .catch((err) => { console.warn('Failed to load projects:', err); setProjectsLoaded(true); return []; });
-  }, []);
+      .catch((err) => {
+        if (attempt < maxRetries) {
+          return new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+            .then(() => load(attempt + 1));
+        }
+        console.warn('Failed to load projects after retries:', err);
+        return null;
+      });
+  }, [listProjects, maxRetries, retryDelayMs]);
 
   useEffect(() => {
-    loadProjects().then((list) => resolveInitialProject(list, selectedProject, handleProjectChange, onNoProjects, storage));
+    loadProjects().then((list) => {
+      // Array (possibly empty -> onboarding) on success; null when the load
+      // failed after retries -> do NOT force onboarding on a transient error.
+      if (list) resolveInitialProject(list, selectedProject, handleProjectChange, onNoProjects, storage);
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleProjectChange(name) {
