@@ -32,7 +32,11 @@ _BUSY_TIMEOUT_MS = 5000
 # scoping carried stale dimensions (e.g. clean-architecture) that the project
 # no longer evaluates; the run-fingerprint could never invalidate them, so this
 # bump rebuilds them once against the latest run's configured-dimension set.
-_CACHE_WRITER_EPOCH = "3"
+# "4": earlier writers persisted in-progress runs' PARTIAL run_keys sets (the
+# per-run version path had no completeness gate), which load_run_keys froze
+# forever; the gate now persists only terminal runs, and this bump purges the
+# non-version-keyed run_keys table once so stranded partial snapshots rebuild.
+_CACHE_WRITER_EPOCH = "4"
 _SCHEMA = (
     "CREATE TABLE IF NOT EXISTS run_scalars ("
     " project TEXT NOT NULL, run_id TEXT NOT NULL, version TEXT NOT NULL,"
@@ -46,7 +50,36 @@ _SCHEMA = (
     " PRIMARY KEY (project, version));"
     "CREATE TABLE IF NOT EXISTS project_summary_cache ("
     " project TEXT PRIMARY KEY, version TEXT NOT NULL, payload TEXT NOT NULL);"
+    "CREATE TABLE IF NOT EXISTS run_keys ("
+    " project TEXT NOT NULL, run_id TEXT NOT NULL,"
+    " dismiss_keys TEXT NOT NULL, class_keys TEXT NOT NULL,"
+    " PRIMARY KEY (project, run_id));"
+    "CREATE TABLE IF NOT EXISTS cache_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);"
 )
+
+
+def _purge_run_keys_on_epoch_change(conn: sqlite3.Connection) -> None:
+    """One-time purge of the non-version-keyed run_keys table on epoch bump.
+
+    ``run_scalars`` / ``accumulated_cache`` / ``project_summary_cache`` embed the
+    epoch in their version hash and self-invalidate, but ``run_keys`` rows are not
+    version-keyed, so a partial snapshot persisted by a prior writer would survive
+    a bump and stay frozen. Clearing the table once forces a fresh read.
+    """
+    try:
+        row = conn.execute(
+            "SELECT value FROM cache_meta WHERE key='writer_epoch'"
+        ).fetchone()
+        if row is not None and row[0] == _CACHE_WRITER_EPOCH:
+            return
+        conn.execute("DELETE FROM run_keys")
+        conn.execute(
+            "INSERT OR REPLACE INTO cache_meta (key, value) VALUES ('writer_epoch', ?)",
+            (_CACHE_WRITER_EPOCH,),
+        )
+        conn.commit()
+    except sqlite3.Error:
+        _logger.warning("run_keys epoch purge failed", exc_info=True)
 
 
 def _init(path: Path) -> sqlite3.Connection:
@@ -56,6 +89,7 @@ def _init(path: Path) -> sqlite3.Connection:
         conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
         conn.executescript(_SCHEMA)
         conn.commit()
+        _purge_run_keys_on_epoch_change(conn)
     except sqlite3.DatabaseError:
         # Close before re-raising so the caller's rebuild path can unlink the
         # file with no open handle (Windows raises PermissionError otherwise).
@@ -198,27 +232,141 @@ def score_cache_version(project_dir: Path, params: ScoringParams) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def run_scoped_version(
+    params: ScoringParams,
+    run_dismiss_keys: set[tuple],
+    run_class_keys: set[tuple],
+    dismissed_all: set[tuple],
+    deleted_all: set[tuple],
+) -> str:
+    """Version hash for a single run: params + only the suppressions that touch it.
+
+    A run's rescored score depends solely on dismissals whose (req,file,line) is
+    in *run_dismiss_keys* and deletions whose (dim,principle,file) is in
+    *run_class_keys*, so intersecting keeps unaffected runs' versions stable.
+    """
+    payload = json.dumps({
+        "epoch": _CACHE_WRITER_EPOCH,
+        "dismissed": sorted(str(k) for k in (dismissed_all & run_dismiss_keys)),
+        "deleted": sorted(str(k) for k in (deleted_all & run_class_keys)),
+        "params": _params_fingerprint(params),
+    }, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def store_run_keys(
+    conn: sqlite3.Connection, project: str, run_id: str,
+    dismiss_keys: set[tuple], class_keys: set[tuple],
+) -> None:
+    """Persist a run's key sets (best-effort)."""
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO run_keys (project, run_id, dismiss_keys, class_keys) "
+            "VALUES (?, ?, ?, ?)",
+            (project, run_id,
+             json.dumps(sorted(list(k) for k in dismiss_keys)),
+             json.dumps(sorted(list(k) for k in class_keys))),
+        )
+        conn.commit()
+    except sqlite3.Error:
+        _logger.warning("run_keys write failed for %s/%s", project, run_id, exc_info=True)
+
+
+def load_run_keys(
+    conn: sqlite3.Connection, project: str,
+) -> dict[str, tuple[set[tuple], set[tuple]]]:
+    """Return ``{run_id: (dismiss_keys, class_keys)}`` for *project* (empty on error)."""
+    out: dict[str, tuple[set[tuple], set[tuple]]] = {}
+    try:
+        rows = conn.execute(
+            "SELECT run_id, dismiss_keys, class_keys FROM run_keys WHERE project=?",
+            (project,),
+        ).fetchall()
+    except sqlite3.Error:
+        return {}
+    for run_id, dj, cj in rows:
+        try:
+            out[run_id] = ({tuple(k) for k in json.loads(dj)},
+                           {tuple(k) for k in json.loads(cj)})
+        except (ValueError, TypeError):
+            continue
+    return out
+
+
 def accumulated_cache_version(
     project_dir: Path, params: ScoringParams,
-    run_fingerprint: list[tuple[str, str]], as_of: str | None,
+    run_versions: list[tuple], as_of: str | None,
 ) -> str:
-    """Version for the accumulated cache: the base dismissals/deletions/params
-    hash plus the run-set (run_id, status) and *as_of*, so a new scan, a status
-    change, or a historical view all invalidate. Run-set is sorted for order
-    independence.
+    """Version for the accumulated cache: params + the per-run fingerprints +
+    *as_of*. Composing per-run fingerprints means a dismiss/delete on one run
+    invalidates the accumulated payload only when that run's contribution
+    actually changed (its scoped version changed).
+
+    Each fingerprint tuple carries the run's *status* alongside its scoped
+    version (see :func:`per_run_versions`) so a status transition (e.g.
+    ``in_progress -> complete``, ``complete -> cancelled``) changes the hash and
+    invalidates the cache. The scoped version is status-independent — it hashes
+    params + intersecting suppressions — so without status folded in, a run
+    completing mid-poll would recompute the same version and serve a stale
+    payload that omitted the just-finished (now eligible) run.
     """
     payload = json.dumps({
         # Bump when the accumulated / project-card computation changes, so
         # existing cache entries recompute on deploy instead of serving a stale
-        # value until the next scan/dismiss/delete. v2: the project-card summary
-        # now applies the dismiss/delete rescore (was raw read_run_data, which
-        # ignored deletions).
-        "algo": 2,
-        "base": score_cache_version(project_dir, params),
-        "runs": sorted(list(t) for t in run_fingerprint),
+        # value until the next scan/dismiss/delete. v4: fold each run's status
+        # back into its fingerprint so a status flip re-invalidates (v3 composed
+        # only status-independent scoped versions and lost that guard).
+        "algo": 4,
+        "params": _params_fingerprint(params),
+        "runs": sorted(list(t) for t in run_versions),
         "as_of": as_of or "",
     }, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def per_run_versions(
+    project_dir: Path, project: str, params: ScoringParams,
+    runs: list[tuple[str, str]],
+) -> list[tuple[str, str, str]]:
+    """``(run_id, status, scoped_version)`` per run, from persisted/lazy run_keys.
+
+    *runs* is a list of ``(run_id, status)`` pairs. The returned ``status`` is
+    folded into the accumulated version so a status transition invalidates the
+    cache (see :func:`accumulated_cache_version`).
+
+    Only TERMINAL runs persist their key sets: an in-progress run's findings
+    table is still being written as dimensions finish, so its key set is partial.
+    Persisting that partial snapshot would freeze it (``load_run_keys`` short-
+    circuits any re-read), so a suppression targeting a key that appears only
+    after the run is first observed mid-scan would not intersect the frozen set
+    and would silently under-invalidate. Non-terminal runs therefore compute
+    their scoped version from a fresh ``read_run_key_sets`` each call and never
+    write it back, mirroring ``_trend_fetcher.version_for``.
+    """
+    from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
+    from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
+    from quodeq.services.run_keys import read_run_key_sets  # noqa: PLC0415
+    dismissed, deleted = dismissed_keys(project_dir), deleted_keys(project_dir)
+    try:
+        with open_score_cache() as conn:
+            cached = load_run_keys(conn, project)
+    except sqlite3.Error:
+        cached = {}
+    out: list[tuple[str, str, str]] = []
+    for rid, status in runs:
+        terminal = status == "complete"
+        keys = cached.get(rid) if terminal else None
+        if keys is None:
+            keys = read_run_key_sets(project_dir / rid)
+            if terminal:
+                try:
+                    with open_score_cache() as conn:
+                        store_run_keys(conn, project, rid, keys[0], keys[1])
+                except sqlite3.Error:
+                    pass
+        out.append(
+            (rid, status, run_scoped_version(params, keys[0], keys[1], dismissed, deleted)))
+    return out
 
 
 def cached_accumulated(
@@ -308,53 +456,53 @@ def cached_project_summary(
 
 
 def make_cache_backed_fetcher(
-    project: str, version: str,
+    project: str, version_for: Callable[[str], str],
     base_fetcher: Callable[[str], list[DimensionResult]],
     is_cacheable: Callable[[str], bool] | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
-    """Wrap *base_fetcher* (returns rescored dims) with the read-through cache.
+    """Wrap *base_fetcher* with the read-through cache, versioned PER RUN.
 
-    Bulk-loads all cached runs for (project, version) once, serves hits from
-    memory, and on a miss computes via *base_fetcher*, extracts scalars, writes
-    them back, and returns the scalars. Returns scalar-only DimensionResults
-    (dimension/overall_score/overall_grade). If the kill switch is set, returns
-    *base_fetcher* unchanged.
+    *version_for(run_id)* returns that run's scoped version (params + the
+    suppressions touching it). Bulk-loads every cached row for *project* keyed by
+    (run_id, version); a hit requires the row's version to equal the run's
+    current version, so a dismiss/delete only misses the runs it touches. Misses
+    compute via *base_fetcher*, cache scalars at the run's version (only when
+    ``is_cacheable``), and return them. Kill switch -> *base_fetcher* unchanged.
 
-    ``is_cacheable`` gates *persistence* per run. The version hash covers only
-    dismissals/deletions/params, so it can't tell that an in-progress run's
-    scalar set grows as dimensions finish. Without a guard, opening History
-    mid-scan persists the run's partial set (e.g. only ``security`` of six) and
-    the run completing never invalidates it -- so the trend shows one dimension
-    forever while run-detail shows all six. Callers pass a predicate that is
-    True only for terminal (complete) runs; non-cacheable runs compute-through
-    and are served for the current build but never written to disk. Defaults to
-    "always cacheable" for backward compatibility.
+    ``is_cacheable`` gates *persistence* per run: only terminal (complete) runs
+    are safe. An in-progress run's scalar set grows as dimensions finish, and the
+    version hash can't see that, so persisting its partial set would strand a
+    stale row -- so opening History mid-scan would leave the trend showing one
+    dimension forever while run-detail shows all six. Non-cacheable runs
+    compute-through and are served for the current build but never written to
+    disk. Defaults to "always cacheable" for backward compatibility.
     """
     if score_cache_disabled():
         return base_fetcher
 
-    by_run: dict[str, list[DimensionResult]] = {}
+    by_run_version: dict[tuple[str, str], list[DimensionResult]] = {}
     try:
         with open_score_cache() as conn:
-            for rid, dim, score, grade in conn.execute(
-                "SELECT run_id, dimension, overall_score, overall_grade FROM run_scalars "
-                "WHERE project=? AND version=? ORDER BY run_id, dimension",
-                (project, version),
+            for rid, ver, dim, score, grade in conn.execute(
+                "SELECT run_id, version, dimension, overall_score, overall_grade "
+                "FROM run_scalars WHERE project=? ORDER BY run_id, dimension",
+                (project,),
             ):
-                by_run.setdefault(rid, []).append(
+                by_run_version.setdefault((rid, ver), []).append(
                     DimensionResult(dimension=dim, overall_score=score, overall_grade=grade))
     except sqlite3.Error:
-        by_run = {}
+        by_run_version = {}
 
     def fetch(run_id: str) -> list[DimensionResult]:
-        hit = by_run.get(run_id)
+        version = version_for(run_id)
+        hit = by_run_version.get((run_id, version))
         if hit is not None:
             return hit
         dims = base_fetcher(run_id)
         scalars = [DimensionResult(dimension=d.dimension, overall_score=d.overall_score,
                                    overall_grade=d.overall_grade)
                    for d in dims if d.dimension]
-        by_run[run_id] = scalars
+        by_run_version[(run_id, version)] = scalars
         if is_cacheable is None or is_cacheable(run_id):
             try:
                 with open_score_cache() as conn:

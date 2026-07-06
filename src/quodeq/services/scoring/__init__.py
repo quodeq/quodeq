@@ -43,6 +43,7 @@ from quodeq.services._fs_projects import find_children
 from quodeq.services.score_cache import (
     accumulated_cache_version,
     cached_accumulated,
+    per_run_versions,
 )
 from quodeq.services.ports import RunInfo, list_runs, read_run_data, read_run_scalars
 from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
@@ -555,7 +556,9 @@ def get_project_scores(
     else:
         acc_version = accumulated_cache_version(
             reports_root / project, params,
-            [(r.run_id, r.status) for r in all_runs], as_of,
+            per_run_versions(reports_root / project, project, params,
+                             [(r.run_id, r.status) for r in all_runs]),
+            as_of,
         )
         accumulated = cached_accumulated(project, acc_version, _compute_accumulated_payload)
 

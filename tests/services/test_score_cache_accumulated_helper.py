@@ -1,7 +1,13 @@
 from pathlib import Path
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS
-from quodeq.services.score_cache import accumulated_cache_version, cached_accumulated
+from quodeq.services.score_cache import (
+    accumulated_cache_version,
+    cached_accumulated,
+    load_run_keys,
+    open_score_cache,
+    per_run_versions,
+)
 
 
 def _patch_keys(monkeypatch, dismissed=frozenset(), deleted=frozenset()):
@@ -43,6 +49,48 @@ def test_cached_accumulated_miss_then_hit(tmp_path, monkeypatch):
     r2 = cached_accumulated("proj", "v1", lambda: (_ for _ in ()).throw(AssertionError("recomputed on hit")))
     assert r1 == r2 == {"dimensions": [], "summary": {"x": 1}}
     assert calls == [1]
+
+
+def test_per_run_versions_status_flip_reinvalidates(tmp_path, monkeypatch):
+    """A run flipping in_progress -> complete must change the accumulated version.
+
+    Regression: the scoped version hashes only params + intersecting suppressions
+    (status-independent) and run_keys are frozen on first read, so without status
+    folded into the accumulated fingerprint a run completing mid-poll would
+    recompute the SAME version and serve a stale payload omitting that run.
+    """
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    _patch_keys(monkeypatch)
+    pd = tmp_path / "proj"; pd.mkdir()
+
+    in_progress = per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "in_progress")])
+    complete = per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "complete")])
+    assert in_progress != complete  # status carried in the tuple
+
+    v_ip = accumulated_cache_version(pd, DEFAULT_PARAMS, in_progress, None)
+    v_c = accumulated_cache_version(pd, DEFAULT_PARAMS, complete, None)
+    assert v_ip != v_c
+
+
+def test_per_run_versions_does_not_persist_in_progress_keys(tmp_path, monkeypatch):
+    """Non-terminal runs must not freeze a partial run_keys snapshot.
+
+    Persisting an in-progress run's partial findings set would freeze it
+    (load_run_keys short-circuits any re-read), so a suppression targeting a key
+    that appears only after the run is observed mid-scan would silently
+    under-invalidate.
+    """
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    _patch_keys(monkeypatch)
+    pd = tmp_path / "proj"; pd.mkdir()
+
+    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "in_progress")])
+    with open_score_cache() as conn:
+        assert load_run_keys(conn, "proj") == {}  # nothing persisted
+
+    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r2", "complete")])
+    with open_score_cache() as conn:
+        assert "r2" in load_run_keys(conn, "proj")  # terminal run persisted
 
 
 def test_cached_accumulated_kill_switch(tmp_path, monkeypatch):

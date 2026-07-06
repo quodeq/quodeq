@@ -29,7 +29,7 @@ from quodeq.services.deleted import deleted_keys as _default_deleted_keys
 from quodeq.services.dismissed import dismissed_keys as _default_dismissed_keys
 from quodeq.services.ports import read_run_scalars as _default_read_run_scalars
 from quodeq.services.rescore import _rescore_dimension
-from quodeq.services.score_cache import make_cache_backed_fetcher, score_cache_version
+from quodeq.services.score_cache import make_cache_backed_fetcher
 
 _Fetcher = Callable[[str], list[DimensionResult]]
 
@@ -105,12 +105,36 @@ def make_trend_fetcher(
             base_fetcher=base_fetcher_factory(reports_root, project),
             dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
         )
-        version = score_cache_version(project_dir, params)
+        from quodeq.services.run_keys import read_run_key_sets  # noqa: PLC0415
+        from quodeq.services.score_cache import (  # noqa: PLC0415
+            load_run_keys, open_score_cache, run_scoped_version, store_run_keys,
+        )
+        dismissed = dismissed_keys(project_dir)
+        deleted = deleted_keys(project_dir)
+        try:
+            with open_score_cache() as _conn:
+                _keys = load_run_keys(_conn, project)
+        except Exception:
+            _keys = {}
+
+        def version_for(run_id: str) -> str:
+            keys = _keys.get(run_id)
+            if keys is None:
+                keys = read_run_key_sets(project_dir / run_id)
+                _keys[run_id] = keys
+                if cacheable_run_ids is None or run_id in cacheable_run_ids:
+                    try:
+                        with open_score_cache() as _c:
+                            store_run_keys(_c, project, run_id, keys[0], keys[1])
+                    except Exception:
+                        pass
+            return run_scoped_version(params, keys[0], keys[1], dismissed, deleted)
+
         is_cacheable = (
             None if cacheable_run_ids is None
             else (lambda rid: rid in cacheable_run_ids)
         )
-        return make_cache_backed_fetcher(project, version, base, is_cacheable=is_cacheable)
+        return make_cache_backed_fetcher(project, version_for, base, is_cacheable=is_cacheable)
 
     cache: OrderedDict = OrderedDict()
     return make_lru_dimension_fetcher(

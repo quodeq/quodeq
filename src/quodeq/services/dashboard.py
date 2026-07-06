@@ -482,7 +482,11 @@ def _compute_dashboard_payload(
     # Key the in-memory dimension cache by the project's suppression state so a
     # dismiss/delete (or a formula change) invalidates warmed entries and no
     # read path can serve a pre-dismiss score. ``score_cache_version`` already
-    # hashes dismissed + deleted keys + params.
+    # hashes dismissed + deleted keys + params. This fetcher is SHARED across the
+    # whole history window (previous-scores, stale-dimensions, and the trend all
+    # iterate many runs through it), so we keep the global project-scoped version
+    # here rather than a per-run scoped one -- per-run scoping only makes sense
+    # when a single run is in play, which this path is not.
     from quodeq.services.score_cache import score_cache_version  # noqa: PLC0415
     dim_cache_version = score_cache_version(reports_root / project, params)
     get_run_dimensions = make_trend_fetcher(
