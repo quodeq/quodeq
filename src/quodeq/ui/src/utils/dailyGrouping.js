@@ -103,6 +103,49 @@ export function buildPeriodRuns(availableRuns, trend, granularity = 'day') {
   return byBucket;
 }
 
+/**
+ * Per-dimension score series collapsed to one entry per period bucket.
+ *
+ * Walks the trend newest-first; for each bucket keeps the newest run that
+ * actually scored `dimensionName` (so a bucket whose newest run skipped the
+ * dimension still surfaces the newest run in that bucket that did score it).
+ * Buckets are keyed by bucketKey(dateISO, granularity); entries without a
+ * usable date share the empty-key bucket. Returns oldest-first so callers read
+ * left-to-right chronologically.
+ *
+ * @param {Array} trend            Trend entries, newest-first.
+ * @param {string} dimensionName   Case-insensitive match.
+ * @param {'day'|'week'|'month'} [granularity='day']
+ * @param {number} [limit=Infinity] Max buckets to keep (newest buckets win).
+ * @returns {Array<{runId:string, dateISO:string, dateLabel:string, score:number, grade:*, overallGrade:*}>}
+ */
+export function extractDimensionPeriodSeries(trend, dimensionName, granularity = 'day', limit = Infinity) {
+  if (!Array.isArray(trend) || !dimensionName) return [];
+  const want = String(dimensionName).toLowerCase();
+  const seen = new Set();
+  const out = [];
+  for (const entry of trend) {
+    const key = bucketKey(entry?.dateISO, granularity);
+    if (seen.has(key)) continue;
+    const details = entry?.dimensionDetails;
+    if (!Array.isArray(details)) continue;
+    const match = details.find((d) => (d.dimension || '').toLowerCase() === want);
+    const score = match ? parseFloat(match.score) : NaN;
+    if (!Number.isFinite(score)) continue;
+    seen.add(key);
+    out.push({
+      runId: entry.runId,
+      dateISO: entry.dateISO,
+      dateLabel: entry.dateLabel,
+      score,
+      grade: match.grade,
+      overallGrade: entry.overallGrade,
+    });
+    if (out.length >= limit) break;
+  }
+  return out.reverse();
+}
+
 // ── Day-named wrappers (preserve existing call sites and tests) ─────────────
 /**
  * Collapse trend entries (newest-first) into one entry per calendar day.

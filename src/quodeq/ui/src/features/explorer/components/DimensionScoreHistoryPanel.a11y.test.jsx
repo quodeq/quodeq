@@ -4,8 +4,8 @@ import '@testing-library/jest-dom/vitest';
 import DimensionScoreHistoryPanel from './DimensionScoreHistoryPanel.jsx';
 
 const TREND = [
-  { runId: 'r2', dateLabel: 'Apr 5', dimensionDetails: [{ dimension: 'maintainability', score: 5.7 }] },
-  { runId: 'r1', dateLabel: 'Apr 3', dimensionDetails: [{ dimension: 'maintainability', score: 5.2 }] },
+  { runId: 'r2', dateISO: '2026-04-05T10:00:00', dateLabel: 'Apr 5', dimensionDetails: [{ dimension: 'maintainability', score: 5.7 }] },
+  { runId: 'r1', dateISO: '2026-04-03T10:00:00', dateLabel: 'Apr 3', dimensionDetails: [{ dimension: 'maintainability', score: 5.2 }] },
 ];
 
 // #1800: the old keyboard handler only ever activated the LAST data point, so

@@ -1,7 +1,5 @@
 import TrendBadge from '../../../components/TrendBadge.jsx';
-import DimensionSparkline, { extractDimensionHistory } from '../../../components/DimensionSparkline.jsx';
-
-const SPARKLINE_LIMIT = 10;
+import DimensionSparkline from '../../../components/DimensionSparkline.jsx';
 
 function violationCount(dim) {
   if (typeof dim.totalViolations === 'number') return dim.totalViolations;
@@ -9,10 +7,8 @@ function violationCount(dim) {
   return 0;
 }
 
-function DimensionRow({ dim, onBarClick, history }) {
+function DimensionRow({ dim, onBarClick, delta, scores }) {
   const curr = parseFloat(dim.overallScore);
-  const prev = parseFloat(dim.previousScore);
-  const delta = !Number.isNaN(curr) && !Number.isNaN(prev) ? curr - prev : null;
   const score = Number.isNaN(curr) ? 0 : curr;
   const violations = violationCount(dim);
 
@@ -26,7 +22,7 @@ function DimensionRow({ dim, onBarClick, history }) {
     >
       <span className="dim-score-label">{String(dim.dimension || '').toLowerCase()}</span>
       <span className="dim-score-spark">
-        <DimensionSparkline scores={history} />
+        <DimensionSparkline scores={scores} />
       </span>
       <span className="dim-score-value">{score.toFixed(1)}</span>
       <span className="dim-score-trend"><TrendBadge delta={delta} /></span>
@@ -35,7 +31,15 @@ function DimensionRow({ dim, onBarClick, history }) {
   );
 }
 
-export default function DimensionScorePanel({ dimensions = [], onBarClick, trend = [] }) {
+// Fallback delta when the parent did not supply a period-aware entry for this
+// dimension (defensive; the accumulated overview always supplies dimTrends).
+function fallbackDelta(dim) {
+  const curr = parseFloat(dim.overallScore);
+  const prev = parseFloat(dim.previousScore);
+  return !Number.isNaN(curr) && !Number.isNaN(prev) ? curr - prev : null;
+}
+
+export default function DimensionScorePanel({ dimensions = [], onBarClick, dimTrends }) {
   if (!dimensions || dimensions.length === 0) return null;
 
   const sorted = [...dimensions].sort((a, b) => a.dimension.localeCompare(b.dimension));
@@ -44,14 +48,20 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, trend
     <section className="dim-score-panel dim-score-panel--terminal panel" aria-label="Dimension scores">
       <header className="dim-score-panel__header">DIMENSIONS</header>
       <div className="dim-score-rows">
-        {sorted.map((dim) => (
-          <DimensionRow
-            key={dim.dimension}
-            dim={dim}
-            onBarClick={onBarClick}
-            history={extractDimensionHistory(trend, dim.dimension, SPARKLINE_LIMIT)}
-          />
-        ))}
+        {sorted.map((dim) => {
+          const entry = dimTrends?.[(dim.dimension || '').toLowerCase()];
+          const delta = entry ? entry.delta : fallbackDelta(dim);
+          const scores = entry ? entry.scores : [];
+          return (
+            <DimensionRow
+              key={dim.dimension}
+              dim={dim}
+              onBarClick={onBarClick}
+              delta={delta}
+              scores={scores}
+            />
+          );
+        })}
       </div>
     </section>
   );

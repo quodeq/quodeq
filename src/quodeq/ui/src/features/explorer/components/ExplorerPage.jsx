@@ -65,6 +65,8 @@ export default function ExplorerPage({
   onNavigate,
   refreshSignal,
   trend = [],
+  granularity = 'day',
+  onGranularityChange,
 }) {
   // Local run/date state lets the score-history bar click swap which run
   // is shown without pushing a new entry onto the nav stack (avoids the
@@ -194,6 +196,8 @@ export default function ExplorerPage({
             trend={trend}
             dimension={d.evalData.dimension}
             selectedRunId={activeRunId}
+            granularity={granularity}
+            onGranularityChange={onGranularityChange}
             onBarClick={(point) => {
               setActiveRunId(point.runId);
               setActiveDateLabel(point.dateLabel);
