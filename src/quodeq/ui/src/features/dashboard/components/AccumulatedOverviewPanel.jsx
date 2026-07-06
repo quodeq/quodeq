@@ -20,8 +20,12 @@ import { buildOverviewReport } from '../../../utils/reportBuilder.js';
 // Accumulated overview panel helpers
 // ---------------------------------------------------------------------------
 
-function computeAccumulatedStats(accumulated, accumulatedDimensions, dailyTrend, selectedRunId) {
-  const curr = parseFloat(accumulated?.summary?.numericAverage);
+// The "vs previous" delta compares two accumulated numericAverage points from the
+// trend (this run vs the prior run). With fewer than two trend entries there is no
+// comparable previous point, so the delta stays null rather than falling back to
+// summary.previousNumericAverage: that value is the prior run's own-dimension average,
+// not comparable to the accumulated numericAverage (an apples-to-oranges subtraction).
+export function computeAccumulatedStats(accumulatedDimensions, dailyTrend, selectedRunId) {
   let scoreDelta = null;
   if (dailyTrend && dailyTrend.length >= 2) {
     const selectedIdx = selectedRunId ? dailyTrend.findIndex((t) => t.runId === selectedRunId) : 0;
@@ -29,10 +33,6 @@ function computeAccumulatedStats(accumulated, accumulatedDimensions, dailyTrend,
     const current = parseFloat(dailyTrend[idx]?.numericAverage);
     const previous = idx + 1 < dailyTrend.length ? parseFloat(dailyTrend[idx + 1]?.numericAverage) : NaN;
     if (!Number.isNaN(current) && !Number.isNaN(previous)) scoreDelta = (current - previous).toFixed(1);
-  }
-  if (scoreDelta === null) {
-    const prev = parseFloat(accumulated?.summary?.previousNumericAverage);
-    scoreDelta = (Number.isNaN(curr) || Number.isNaN(prev)) ? null : (curr - prev).toFixed(1);
   }
 
   const withDates = accumulatedDimensions
@@ -186,7 +186,7 @@ function useAccumulatedComputations(data) {
   const filteredTrend = useMemo(() => filterTrendByVisibleStandards(trend, visibleSet), [trend, visibleSet]);
   const filteredDimensions = useMemo(() => accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase())), [accumulatedDimensions, visibleIds]);
   const filteredAccumulated = useMemo(() => filterAccumulatedByVisibleStandards(accumulated, visibleSet, filteredPeriodTrend, currentOverviewRun), [accumulated, visibleSet, filteredPeriodTrend, currentOverviewRun]);
-  const filteredStats = useMemo(() => computeAccumulatedStats(filteredAccumulated, filteredDimensions, filteredPeriodTrend, currentOverviewRun), [filteredAccumulated, filteredDimensions, filteredPeriodTrend, currentOverviewRun]);
+  const filteredStats = useMemo(() => computeAccumulatedStats(filteredDimensions, filteredPeriodTrend, currentOverviewRun), [filteredDimensions, filteredPeriodTrend, currentOverviewRun]);
 
   // Preserve today's "panel appears iff ≥2 days of data" behavior, regardless
   // of the chosen grouping — so the selector never disappears on collapse.
