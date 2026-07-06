@@ -373,53 +373,53 @@ def cached_project_summary(
 
 
 def make_cache_backed_fetcher(
-    project: str, version: str,
+    project: str, version_for: Callable[[str], str],
     base_fetcher: Callable[[str], list[DimensionResult]],
     is_cacheable: Callable[[str], bool] | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
-    """Wrap *base_fetcher* (returns rescored dims) with the read-through cache.
+    """Wrap *base_fetcher* with the read-through cache, versioned PER RUN.
 
-    Bulk-loads all cached runs for (project, version) once, serves hits from
-    memory, and on a miss computes via *base_fetcher*, extracts scalars, writes
-    them back, and returns the scalars. Returns scalar-only DimensionResults
-    (dimension/overall_score/overall_grade). If the kill switch is set, returns
-    *base_fetcher* unchanged.
+    *version_for(run_id)* returns that run's scoped version (params + the
+    suppressions touching it). Bulk-loads every cached row for *project* keyed by
+    (run_id, version); a hit requires the row's version to equal the run's
+    current version, so a dismiss/delete only misses the runs it touches. Misses
+    compute via *base_fetcher*, cache scalars at the run's version (only when
+    ``is_cacheable``), and return them. Kill switch -> *base_fetcher* unchanged.
 
-    ``is_cacheable`` gates *persistence* per run. The version hash covers only
-    dismissals/deletions/params, so it can't tell that an in-progress run's
-    scalar set grows as dimensions finish. Without a guard, opening History
-    mid-scan persists the run's partial set (e.g. only ``security`` of six) and
-    the run completing never invalidates it -- so the trend shows one dimension
-    forever while run-detail shows all six. Callers pass a predicate that is
-    True only for terminal (complete) runs; non-cacheable runs compute-through
-    and are served for the current build but never written to disk. Defaults to
-    "always cacheable" for backward compatibility.
+    ``is_cacheable`` gates *persistence* per run: only terminal (complete) runs
+    are safe. An in-progress run's scalar set grows as dimensions finish, and the
+    version hash can't see that, so persisting its partial set would strand a
+    stale row -- so opening History mid-scan would leave the trend showing one
+    dimension forever while run-detail shows all six. Non-cacheable runs
+    compute-through and are served for the current build but never written to
+    disk. Defaults to "always cacheable" for backward compatibility.
     """
     if score_cache_disabled():
         return base_fetcher
 
-    by_run: dict[str, list[DimensionResult]] = {}
+    by_run_version: dict[tuple[str, str], list[DimensionResult]] = {}
     try:
         with open_score_cache() as conn:
-            for rid, dim, score, grade in conn.execute(
-                "SELECT run_id, dimension, overall_score, overall_grade FROM run_scalars "
-                "WHERE project=? AND version=? ORDER BY run_id, dimension",
-                (project, version),
+            for rid, ver, dim, score, grade in conn.execute(
+                "SELECT run_id, version, dimension, overall_score, overall_grade "
+                "FROM run_scalars WHERE project=? ORDER BY run_id, dimension",
+                (project,),
             ):
-                by_run.setdefault(rid, []).append(
+                by_run_version.setdefault((rid, ver), []).append(
                     DimensionResult(dimension=dim, overall_score=score, overall_grade=grade))
     except sqlite3.Error:
-        by_run = {}
+        by_run_version = {}
 
     def fetch(run_id: str) -> list[DimensionResult]:
-        hit = by_run.get(run_id)
+        version = version_for(run_id)
+        hit = by_run_version.get((run_id, version))
         if hit is not None:
             return hit
         dims = base_fetcher(run_id)
         scalars = [DimensionResult(dimension=d.dimension, overall_score=d.overall_score,
                                    overall_grade=d.overall_grade)
                    for d in dims if d.dimension]
-        by_run[run_id] = scalars
+        by_run_version[(run_id, version)] = scalars
         if is_cacheable is None or is_cacheable(run_id):
             try:
                 with open_score_cache() as conn:

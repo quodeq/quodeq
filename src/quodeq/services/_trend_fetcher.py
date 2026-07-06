@@ -110,7 +110,8 @@ def make_trend_fetcher(
             None if cacheable_run_ids is None
             else (lambda rid: rid in cacheable_run_ids)
         )
-        return make_cache_backed_fetcher(project, version, base, is_cacheable=is_cacheable)
+        return make_cache_backed_fetcher(
+            project, lambda _rid: version, base, is_cacheable=is_cacheable)
 
     cache: OrderedDict = OrderedDict()
     return make_lru_dimension_fetcher(
