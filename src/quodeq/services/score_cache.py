@@ -46,6 +46,10 @@ _SCHEMA = (
     " PRIMARY KEY (project, version));"
     "CREATE TABLE IF NOT EXISTS project_summary_cache ("
     " project TEXT PRIMARY KEY, version TEXT NOT NULL, payload TEXT NOT NULL);"
+    "CREATE TABLE IF NOT EXISTS run_keys ("
+    " project TEXT NOT NULL, run_id TEXT NOT NULL,"
+    " dismiss_keys TEXT NOT NULL, class_keys TEXT NOT NULL,"
+    " PRIMARY KEY (project, run_id));"
 )
 
 
@@ -218,6 +222,45 @@ def run_scoped_version(
         "params": _params_fingerprint(params),
     }, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def store_run_keys(
+    conn: sqlite3.Connection, project: str, run_id: str,
+    dismiss_keys: set[tuple], class_keys: set[tuple],
+) -> None:
+    """Persist a run's key sets (best-effort)."""
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO run_keys (project, run_id, dismiss_keys, class_keys) "
+            "VALUES (?, ?, ?, ?)",
+            (project, run_id,
+             json.dumps(sorted(list(k) for k in dismiss_keys)),
+             json.dumps(sorted(list(k) for k in class_keys))),
+        )
+        conn.commit()
+    except sqlite3.Error:
+        _logger.warning("run_keys write failed for %s/%s", project, run_id, exc_info=True)
+
+
+def load_run_keys(
+    conn: sqlite3.Connection, project: str,
+) -> dict[str, tuple[set[tuple], set[tuple]]]:
+    """Return ``{run_id: (dismiss_keys, class_keys)}`` for *project* (empty on error)."""
+    out: dict[str, tuple[set[tuple], set[tuple]]] = {}
+    try:
+        rows = conn.execute(
+            "SELECT run_id, dismiss_keys, class_keys FROM run_keys WHERE project=?",
+            (project,),
+        ).fetchall()
+    except sqlite3.Error:
+        return {}
+    for run_id, dj, cj in rows:
+        try:
+            out[run_id] = ({tuple(k) for k in json.loads(dj)},
+                           {tuple(k) for k in json.loads(cj)})
+        except (ValueError, TypeError):
+            continue
+    return out
 
 
 def accumulated_cache_version(
