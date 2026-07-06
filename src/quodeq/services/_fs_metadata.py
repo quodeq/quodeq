@@ -77,10 +77,12 @@ def _read_accumulated_summary(
         from quodeq.services import grade_formula  # noqa: PLC0415
         params = grade_formula.load_params()
 
-    from quodeq.services.score_cache import accumulated_cache_version, cached_project_summary  # noqa: PLC0415
+    from quodeq.services.score_cache import (  # noqa: PLC0415
+        accumulated_cache_version, cached_project_summary, per_run_versions,
+    )
     project_dir = reports_root / entry_name
-    run_fingerprint = [(r.run_id, r.status) for r in runs]
-    version = accumulated_cache_version(project_dir, params, run_fingerprint, as_of=None)
+    run_versions = per_run_versions(project_dir, entry_name, params, [r.run_id for r in runs])
+    version = accumulated_cache_version(project_dir, params, run_versions, as_of=None)
 
     def _compute() -> dict:
         try:

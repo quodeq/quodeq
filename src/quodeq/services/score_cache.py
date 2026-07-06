@@ -265,25 +265,52 @@ def load_run_keys(
 
 def accumulated_cache_version(
     project_dir: Path, params: ScoringParams,
-    run_fingerprint: list[tuple[str, str]], as_of: str | None,
+    run_versions: list[tuple[str, str]], as_of: str | None,
 ) -> str:
-    """Version for the accumulated cache: the base dismissals/deletions/params
-    hash plus the run-set (run_id, status) and *as_of*, so a new scan, a status
-    change, or a historical view all invalidate. Run-set is sorted for order
-    independence.
+    """Version for the accumulated cache: params + the per-run scoped versions +
+    *as_of*. Composing per-run versions means a dismiss/delete on one run
+    invalidates the accumulated payload only when that run's contribution
+    actually changed (its scoped version changed).
     """
     payload = json.dumps({
         # Bump when the accumulated / project-card computation changes, so
         # existing cache entries recompute on deploy instead of serving a stale
-        # value until the next scan/dismiss/delete. v2: the project-card summary
-        # now applies the dismiss/delete rescore (was raw read_run_data, which
-        # ignored deletions).
-        "algo": 2,
-        "base": score_cache_version(project_dir, params),
-        "runs": sorted(list(t) for t in run_fingerprint),
+        # value until the next scan/dismiss/delete. v3: composed from per-run
+        # scoped versions (was base-hash + raw (run_id, status) fingerprint), so
+        # a suppression change only invalidates the runs it actually touched.
+        "algo": 3,
+        "params": _params_fingerprint(params),
+        "runs": sorted(list(t) for t in run_versions),
         "as_of": as_of or "",
     }, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def per_run_versions(
+    project_dir: Path, project: str, params: ScoringParams, run_ids: list[str],
+) -> list[tuple[str, str]]:
+    """(run_id, scoped_version) for each run, using persisted/lazy run_keys."""
+    from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
+    from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
+    from quodeq.services.run_keys import read_run_key_sets  # noqa: PLC0415
+    dismissed, deleted = dismissed_keys(project_dir), deleted_keys(project_dir)
+    try:
+        with open_score_cache() as conn:
+            cached = load_run_keys(conn, project)
+    except sqlite3.Error:
+        cached = {}
+    out: list[tuple[str, str]] = []
+    for rid in run_ids:
+        keys = cached.get(rid)
+        if keys is None:
+            keys = read_run_key_sets(project_dir / rid)
+            try:
+                with open_score_cache() as conn:
+                    store_run_keys(conn, project, rid, keys[0], keys[1])
+            except sqlite3.Error:
+                pass
+        out.append((rid, run_scoped_version(params, keys[0], keys[1], dismissed, deleted)))
+    return out
 
 
 def cached_accumulated(
