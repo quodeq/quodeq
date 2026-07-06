@@ -6,6 +6,14 @@ index already stores each run's ``started_at`` (which equals the displayed
 date), so this returns a ``{run_id: (date_iso, date_label)}`` map from the index,
 refreshing it with a cheap mtime-gated per-project sync first. Best-effort: any
 index error yields ``{}`` and the caller falls back to ``parse_run_date``.
+
+Precedence note: for a run that has a ``status.json``, this uses ``started_at``
+as the date, which intentionally supersedes ``parse_run_date``'s evidence/eval
+``date``-field-first ordering. In practice the two are captured seconds apart in
+the same run, so the displayed label is identical; ``started_at`` is the
+canonical run timestamp and does not drift if an evidence file is later
+rewritten. Runs without a usable ``started_at`` are omitted so the caller falls
+back to ``parse_run_date``.
 """
 from __future__ import annotations
 
