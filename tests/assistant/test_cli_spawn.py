@@ -54,6 +54,13 @@ def test_seatbelt_profile_denies_writes_except_allowed():
     assert "(allow default)" in prof  # reads allowed
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="sandbox-exec is macOS-only; on Windows the real tmp_path embeds "
+           "backslashes that the seatbelt profile escapes (C:\\\\... vs C:\\...), "
+           "so the raw-path substring check fails on a scenario that never "
+           "occurs in production.",
+)
 def test_external_sandbox_prefix_macos(monkeypatch, tmp_path):
     monkeypatch.setattr(_cli_spawn.platform, "system", lambda: "Darwin")
     prefix, cleanup = external_sandbox_prefix(
