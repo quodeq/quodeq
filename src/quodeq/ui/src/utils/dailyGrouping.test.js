@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   collapseByDay, collectDayDimensions, buildDailyRuns,
   bucketKey, isoWeekKey, collapseByPeriod, collectPeriodDimensions, buildPeriodRuns,
-  extractDimensionPeriodSeries,
+  extractDimensionPeriodSeries, sliceTrendAtRun,
 } from './dailyGrouping.js';
 
 // ---------------------------------------------------------------------------
@@ -335,4 +335,28 @@ test('extractDimensionPeriodSeries: empty/invalid inputs return []', () => {
   assert.deepEqual(extractDimensionPeriodSeries([], 'maintainability', 'day'), []);
   assert.deepEqual(extractDimensionPeriodSeries(null, 'maintainability', 'day'), []);
   assert.deepEqual(extractDimensionPeriodSeries(DIM_TREND, '', 'day'), []);
+});
+
+// ---------------------------------------------------------------------------
+// sliceTrendAtRun
+// ---------------------------------------------------------------------------
+
+test('sliceTrendAtRun: drops entries newer than the selected run, keeps it and older', () => {
+  const sliced = sliceTrendAtRun(TREND, 'r3');
+  assert.deepEqual(sliced.map((t) => t.runId), ['r3', 'r4', 'r5']);
+});
+
+test('sliceTrendAtRun: selecting the newest run returns the full trend', () => {
+  assert.deepEqual(sliceTrendAtRun(TREND, 'r1').map((t) => t.runId), ['r1', 'r2', 'r3', 'r4', 'r5']);
+});
+
+test('sliceTrendAtRun: unknown or absent runId fails open to the full trend', () => {
+  assert.equal(sliceTrendAtRun(TREND, 'nope').length, TREND.length);
+  assert.equal(sliceTrendAtRun(TREND, null).length, TREND.length);
+  assert.equal(sliceTrendAtRun(TREND, 'latest').length, TREND.length);
+});
+
+test('sliceTrendAtRun: empty/invalid trend returns []', () => {
+  assert.deepEqual(sliceTrendAtRun([], 'r1'), []);
+  assert.deepEqual(sliceTrendAtRun(null, 'r1'), []);
 });

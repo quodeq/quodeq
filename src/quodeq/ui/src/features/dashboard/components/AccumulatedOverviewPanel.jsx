@@ -2,7 +2,7 @@ import React, { useMemo, lazy, Suspense } from 'react';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import DimensionCardsGrid from './DimensionCardsGrid.jsx';
 import { formatRunId, gradeLetter, complianceRatio, extDisplayName } from '../../../utils/formatters.js';
-import { collapseByPeriod, collectPeriodDimensions, bucketKey, extractDimensionPeriodSeries } from '../../../utils/dailyGrouping.js';
+import { collapseByPeriod, collectPeriodDimensions, bucketKey, extractDimensionPeriodSeries, sliceTrendAtRun } from '../../../utils/dailyGrouping.js';
 const RunHistoryPanel = lazy(() => import('./RunHistoryPanel.jsx'));
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
@@ -157,7 +157,7 @@ function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, sele
 // Accumulated overview panel
 // ---------------------------------------------------------------------------
 
-function useAccumulatedComputations(data) {
+export function useAccumulatedComputations(data) {
   const { accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, trend, selectedRunId, granularity = 'day' } = data;
   const dayRuns = dailyRuns || availableRuns;
   const dayTrend = useMemo(() => collapseByPeriod(trend, 'day'), [trend]);
@@ -195,17 +195,26 @@ function useAccumulatedComputations(data) {
   // { delta, scores }, bucketed by the selected granularity from the raw
   // (visible-filtered, per-run) trend. Feeds both the dimension cards and
   // the DIMENSIONS panel so their deltas/sparklines match the Overview chart.
+  // The trend is sliced at the selected overview run first, so navigating to
+  // a previous period truncates the series at that point in time — arrows
+  // and sparklines then agree with the as-of scores on the cards. The delta
+  // compares the last two buckets in which the dimension has data (carry-over
+  // semantics, same as the dimmed cards).
+  const asOfTrend = useMemo(
+    () => sliceTrendAtRun(filteredTrend, currentOverviewRun),
+    [filteredTrend, currentOverviewRun]
+  );
   const dimTrends = useMemo(() => {
     const map = {};
     for (const dim of filteredDimensions) {
       const name = dim.dimension || '';
-      const series = extractDimensionPeriodSeries(filteredTrend, name, granularity, DIM_SPARKLINE_LIMIT);
+      const series = extractDimensionPeriodSeries(asOfTrend, name, granularity, DIM_SPARKLINE_LIMIT);
       const scores = series.map((s) => s.score);
       const delta = scores.length >= 2 ? scores[scores.length - 1] - scores[scores.length - 2] : null;
       map[name.toLowerCase()] = { delta, scores };
     }
     return map;
-  }, [filteredDimensions, filteredTrend, granularity]);
+  }, [filteredDimensions, asOfTrend, granularity]);
   const filteredAccumulated = useMemo(() => filterAccumulatedByVisibleStandards(accumulated, visibleSet, filteredPeriodTrend, currentOverviewRun), [accumulated, visibleSet, filteredPeriodTrend, currentOverviewRun]);
   const filteredStats = useMemo(() => computeAccumulatedStats(filteredDimensions, filteredPeriodTrend, currentOverviewRun), [filteredDimensions, filteredPeriodTrend, currentOverviewRun]);
 
