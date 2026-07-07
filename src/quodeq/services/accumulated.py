@@ -11,7 +11,6 @@ from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.core.types import DimensionResult, to_camel_dict
 from quodeq.services._cache import make_lru_dimension_fetcher
-from quodeq.services._run_dimensions import current_standard_dimensions
 from quodeq.services.deleted import filter_deleted_from_dimensions
 from quodeq.services.dim_resolution import is_eligible_for_default_view
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
@@ -220,14 +219,6 @@ def _build_accumulated_for_runs(
     project_dir = reports_root / project
     all_dims = filter_dismissed_from_dimensions(list(latest_by_dim.values()), project_dir)
     all_dims = filter_deleted_from_dimensions(all_dims, project_dir)
-    # Scope to the project's current dimension standard — the union of the
-    # dimensions configured by the last few eligible runs — dropping stale
-    # dims (e.g. clean-architecture) that only survive via old runs /
-    # evaluation.db drift. Unioning over a window keeps a targeted subset
-    # re-run from collapsing the standard to its one dimension. Fail-open
-    # when no eligible config can be read.
-    standard = current_standard_dimensions(reports_root, project, run_infos)
-    all_dims = _scope_to_configured(all_dims, standard)
     dims_with_trend = _compute_accumulated_trends(all_dims, prev_occurrence)
     severity = _aggregate_severity_counts(all_dims)
     avg, prev_avg = _compute_accumulated_scores(all_dims, prev_run_latest, params)
