@@ -171,11 +171,11 @@ class TestReadAccumulatedSummary:
 
     @patch("quodeq.services._fs_metadata.summarize_dimensions")
     @patch("quodeq.services._fs_metadata.read_run_data")
-    def test_card_summary_scoped_to_latest_configured_dims(
+    def test_card_summary_keeps_dims_not_in_latest_config(
         self, mock_read, mock_summarize, tmp_path, monkeypatch,
     ):
-        """A stale dim (clean-architecture) not configured by the latest run
-        is dropped before summarize_dimensions sees it."""
+        """Dims absent from the latest run's config are KEPT (show all,
+        count all) so the card grade matches the accumulated overview."""
         from quodeq.core.types import DimensionResult
         from quodeq.services.ports import RunInfo
 
@@ -206,10 +206,11 @@ class TestReadAccumulatedSummary:
         runs = [RunInfo(run_id="run-new", date_iso="2026-01-02", date_label="Jan 02")]
         _read_accumulated_summary(reports_root, project, runs)
 
-        # summarize_dimensions must be called WITHOUT clean-architecture.
+        # summarize_dimensions must see ALL dims, including the one missing
+        # from the latest config.
         called_dims = mock_summarize.call_args[0][0]
         names = sorted(d.dimension for d in called_dims)
-        assert names == ["reliability", "security"], names
+        assert names == ["clean-architecture", "reliability", "security"], names
 
     def test_project_card_reflects_overlaid_sql_grades_and_loaded_params(
         self, tmp_path, monkeypatch,
