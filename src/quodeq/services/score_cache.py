@@ -315,8 +315,11 @@ def accumulated_cache_version(
         # existing cache entries recompute on deploy instead of serving a stale
         # value until the next scan/dismiss/delete. v4: fold each run's status
         # back into its fingerprint so a status flip re-invalidates (v3 composed
-        # only status-independent scoped versions and lost that guard).
-        "algo": 4,
+        # only status-independent scoped versions and lost that guard). v5:
+        # dimensions are no longer scoped to the last-5-runs configured
+        # standard; payloads written with scoping omit dimensions whose last
+        # valid run is older and must rebuild.
+        "algo": 5,
         "params": _params_fingerprint(params),
         "runs": sorted(list(t) for t in run_versions),
         "as_of": as_of or "",
