@@ -74,7 +74,7 @@ def _run_cli_analysis(
     provider_cfg = configs.get(ai_cmd, {})
     mcp_style = provider_cfg.get("mcp_style", "config-file")
 
-    # For cli-register providers (e.g. Codex), register MCP server before the run.
+    # For cli-register providers (e.g. Gemini), register MCP server before the run.
     # Registration is shared across all parallel agents — the first agent registers,
     # and we never unregister during the run (cleanup happens at pool level).
     cli_mcp_registered = False

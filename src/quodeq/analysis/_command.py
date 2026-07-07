@@ -15,7 +15,7 @@ from quodeq.analysis._config import (
     _MCP_TOOL_MARK_FILE_DONE,
     _MCP_TOOL_REPORT_FINDING,
 )
-from quodeq.analysis._mcp_config import _create_mcp_config
+from quodeq.analysis._mcp_config import _codex_mcp_config_arg, _create_mcp_config
 from quodeq.analysis._provider_cache import get_provider_configs as _get_provider_configs
 from quodeq.shared.utils import get_ai_cmd, get_ai_model
 
@@ -75,7 +75,7 @@ def _build_mcp_args(
     if config.jsonl_file is None:
         return [], None
     mcp_style = provider_cfg.get("mcp_style", "config-file")
-    if mcp_style != "config-file":
+    if mcp_style not in {"config-file", "config-arg"}:
         return [], None
 
     agent_params = _AgentParams(
@@ -89,6 +89,14 @@ def _build_mcp_args(
         model_id=_resolve_model_id(config),
         language=_resolve_language(config),
     )
+    if mcp_style == "config-arg":
+        return [
+            "-c",
+            _codex_mcp_config_arg(
+                config.jsonl_file, config.compiled_dir, config.dimension, agent_params,
+            ),
+        ], None
+
     mcp_config_path = _create_mcp_config(
         config.jsonl_file, config.compiled_dir, config.dimension, agent_params,
     )

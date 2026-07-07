@@ -8,6 +8,10 @@ import tempfile
 from pathlib import Path
 
 from quodeq.analysis._config import _AgentParams
+from quodeq.shared._mcp import codex_mcp_override
+
+_SERVER_NAME = "findings"
+_SERVER_MODULE = ["-m", "quodeq.analysis.mcp.findings_server"]
 
 
 def _default_cache_root():
@@ -65,3 +69,28 @@ def _create_mcp_config(
     finally:
         tmp.close()
     return Path(tmp.name)
+
+
+def _codex_mcp_config_arg(
+    jsonl_file: Path,
+    compiled_dir: Path | None = None,
+    dimension: str | None = None,
+    agent_params: _AgentParams | None = None,
+) -> str:
+    """Return a Codex ``-c`` TOML override for the findings MCP server."""
+    ap = agent_params or _AgentParams()
+    args = [*_SERVER_MODULE, str(jsonl_file.resolve())]
+    if compiled_dir and dimension:
+        args.extend(["--compiled-dir", str(compiled_dir.resolve()), "--dimension", dimension])
+    if ap.queue_path:
+        args.extend(["--queue", str(ap.queue_path.resolve())])
+    if ap.agent_id:
+        args.extend(["--agent-id", ap.agent_id])
+    if ap.work_dir:
+        args.extend(["--work-dir", str(ap.work_dir.resolve())])
+    args.extend([
+        "--cache-root", str(_default_cache_root()),
+        "--model-id", ap.model_id or "unknown",
+        "--language", ap.language or "",
+    ])
+    return codex_mcp_override(_SERVER_NAME, args)

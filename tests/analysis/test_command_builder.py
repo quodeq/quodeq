@@ -36,7 +36,7 @@ _CODEX_CFG = {
         "cmd_subcommand": "exec",
         "base_args": "--json --dangerously-bypass-approvals-and-sandbox",
         "prompt_style": "positional",
-        "mcp_style": "cli-register",
+        "mcp_style": "config-arg",
         "supports_tools": False,
         "supports_budget": False,
         "supports_turns": False,
@@ -128,14 +128,30 @@ class TestBuildAiCmdCodex:
         idx = args.index("--model")
         assert args[idx + 1] == "gpt-5.4"
 
-    def test_skips_mcp_even_with_jsonl(self, tmp_path):
+    def test_inlines_codex_mcp_config_arg_with_jsonl(self, tmp_path):
+        import sys
+        import tomllib
+
         jsonl = tmp_path / "findings.jsonl"
         jsonl.touch()
+        queue = tmp_path / "queue.json"
         config = AnalysisConfig(
             ai_cmd="codex", ai_model="gpt-5.4",
             jsonl_file=jsonl, compiled_dir=tmp_path, dimension="security",
+            queue_path=queue, agent_id="agent-0",
         )
         with _patch_providers(_CODEX_CFG):
             args, mcp_path = _build_ai_cmd("Analyze", config)
-        assert "--mcp-config" not in args
+
         assert mcp_path is None
+        assert "--mcp-config" not in args
+        assert args[-1] == "Analyze"
+
+        mcp_arg = next(a for a in args if str(a).startswith("mcp_servers.findings="))
+        assert args[args.index(mcp_arg) - 1] == "-c"
+        server = tomllib.loads(mcp_arg)["mcp_servers"]["findings"]
+        assert server["command"] == sys.executable
+        assert "quodeq.analysis.mcp.findings_server" in server["args"]
+        assert str(jsonl.resolve()) in server["args"]
+        assert "--queue" in server["args"] and str(queue.resolve()) in server["args"]
+        assert "--agent-id" in server["args"] and "agent-0" in server["args"]
