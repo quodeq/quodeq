@@ -8,6 +8,8 @@ import sys
 import threading
 from pathlib import Path
 
+from quodeq.shared._mcp import codex_mcp_override
+
 _SERVER_NAME = "quodeq-assistant"
 _SERVER_MODULE = ["-m", "quodeq.assistant.mcp.server"]
 _REGISTER_TIMEOUT_S = 10
@@ -33,13 +35,9 @@ def codex_mcp_config_arg(server_args: list[str]) -> str:
     This replaces `codex mcp add`, which mutates the user's global
     ~/.codex/config.toml under a name-only key: concurrent assistant sessions
     would clobber each other's per-session args and a finished turn would remove
-    the server out from under a still-running one. JSON string encoding is a
-    valid TOML basic string, so paths with spaces/backslashes round-trip.
+    the server out from under a still-running one.
     """
-    args = [*_SERVER_MODULE, *server_args]
-    command = json.dumps(sys.executable)
-    args_toml = "[" + ", ".join(json.dumps(a) for a in args) + "]"
-    return f"mcp_servers.{_SERVER_NAME}={{command = {command}, args = {args_toml}}}"
+    return codex_mcp_override(_SERVER_NAME, [*_SERVER_MODULE, *server_args])
 
 
 def register_cli_mcp(cmd: str, server_args: list[str], *, separator: bool = True) -> None:

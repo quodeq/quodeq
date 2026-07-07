@@ -32,7 +32,7 @@ _PROVIDER_CONFIGS_FALLBACK: dict[str, dict] = {
         "cmd_subcommand": "exec",
         "base_args": "--json --dangerously-bypass-approvals-and-sandbox",
         "prompt_style": "positional",
-        "mcp_style": "cli-register",
+        "mcp_style": "config-arg",
         "supports_tools": False,
         "supports_budget": False,
         "supports_turns": False,
