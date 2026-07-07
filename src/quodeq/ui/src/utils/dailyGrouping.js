@@ -146,6 +146,26 @@ export function extractDimensionPeriodSeries(trend, dimensionName, granularity =
   return out.reverse();
 }
 
+/**
+ * Slice a newest-first trend so it ends at the selected run: entries newer
+ * than `runId` are dropped; the selected entry and everything older stay.
+ *
+ * Feeds the as-of view of per-dimension deltas and sparklines: when the user
+ * selects a previous period, the series must stop at that point in time so
+ * arrows and bars agree with the as-of scores shown on the cards. Fails open
+ * to the full trend for an absent/unknown runId (the default "latest" view).
+ *
+ * @param {Array} trend    Trend entries, newest-first.
+ * @param {string} runId   Selected run id.
+ * @returns {Array}
+ */
+export function sliceTrendAtRun(trend, runId) {
+  if (!Array.isArray(trend)) return [];
+  if (!trend.length || !runId) return trend;
+  const idx = trend.findIndex((t) => t.runId === runId);
+  return idx <= 0 ? trend : trend.slice(idx);
+}
+
 // ── Day-named wrappers (preserve existing call sites and tests) ─────────────
 /**
  * Collapse trend entries (newest-first) into one entry per calendar day.
