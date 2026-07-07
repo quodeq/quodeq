@@ -20,4 +20,23 @@ describe('DimensionCardsGrid', () => {
     render(<DimensionCardsGrid sortedDimensions={DIMS} />);
     expect(screen.getByText('+6.0')).toBeInTheDocument();
   });
+
+  it('keeps card positions fixed (incoming order) regardless of the selected period', () => {
+    const dims = [
+      { dimension: 'flexibility', overallScore: '7.9', totals: { severity: {} } },
+      { dimension: 'reliability', overallScore: '9.7', totals: { severity: {} } },
+      { dimension: 'security', overallScore: '9.3', totals: { severity: {} } },
+    ];
+    // Only reliability was evaluated in the selected bucket. It must NOT jump
+    // to the front: changing the selected day/week/month should never reorder
+    // the cards, only re-dim them.
+    render(
+      <DimensionCardsGrid
+        sortedDimensions={dims}
+        selectedDayDimNames={new Set(['reliability'])}
+      />
+    );
+    const names = [...document.querySelectorAll('.dim-gauge-card__name')].map((el) => el.textContent);
+    expect(names).toEqual(['flexibility', 'reliability', 'security']);
+  });
 });
