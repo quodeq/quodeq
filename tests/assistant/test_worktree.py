@@ -124,6 +124,27 @@ def test_apply_binary_change(manager, repo):
     assert (repo / "logo.bin").read_bytes() == b"\x00\x01\x02\xff"
 
 
+def test_apply_propagates_deletion(manager, repo):
+    (manager.path / "app.py").unlink()
+    manager.apply_to_repo()
+    assert not (repo / "app.py").exists()
+
+
+def test_diff_text_shows_deletion(manager):
+    (manager.path / "app.py").unlink()
+    text = diff_text(manager.path)
+    assert "-print('hi')" in text
+    assert diff_stats(manager.path)[0]["file"] == "app.py"
+
+
+def test_apply_leaves_no_patch_artifacts_in_worktree(manager, repo):
+    (manager.path / "app.py").write_bytes(b"print('bye')\n")
+    manager.apply_to_repo()
+    assert not list(manager.path.glob("*.patch"))
+    text = diff_text(manager.path)
+    assert ".patch" not in text
+
+
 def test_create_pr_fail_soft_without_gh(manager, monkeypatch):
     (manager.path / "app.py").write_bytes(b"print('bye')\n")
     monkeypatch.setattr("quodeq.assistant.worktree.shutil.which", lambda _: None)

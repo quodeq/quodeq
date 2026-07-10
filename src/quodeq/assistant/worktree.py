@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -42,14 +43,17 @@ def _run(argv: list[str], *, cwd: Path | None = None) -> str:
 
 
 def diff_text(worktree: Path) -> str:
-    """Unified diff of the worktree, including untracked files (intent-to-add)."""
+    """Unified diff of the worktree, including untracked files (intent-to-add).
+
+    Diffs against HEAD, not the index: `git add -N .` records a tracked file's
+    deletion in the index, so a plain worktree-vs-index diff would hide it."""
     _run(["git", "-C", str(worktree), "add", "-N", "."])
-    return _run(["git", "-C", str(worktree), "diff"])
+    return _run(["git", "-C", str(worktree), "diff", "HEAD"])
 
 
 def diff_stats(worktree: Path) -> list[dict]:
     _run(["git", "-C", str(worktree), "add", "-N", "."])
-    out = _run(["git", "-C", str(worktree), "diff", "--numstat"])
+    out = _run(["git", "-C", str(worktree), "diff", "HEAD", "--numstat"])
     stats = []
     for line in out.splitlines():
         parts = line.split("\t")
@@ -131,16 +135,22 @@ class WorktreeManager:
         """Apply the worktree diff onto the user's working tree, uncommitted.
 
         git apply --check runs first so a conflict applies NOTHING. The patch
-        is generated with --binary and written as raw bytes so binary and
-        non-UTF-8 changes survive the roundtrip."""
+        is generated against HEAD with --binary and written as raw bytes so
+        deletions, binary and non-UTF-8 changes survive the roundtrip. The
+        patch file lives OUTSIDE the worktree so a failed cleanup can never
+        leak it into a later diff or apply."""
         _run(["git", "-C", str(self.path), "add", "-N", "."])
-        patch = _run_bytes(["git", "-C", str(self.path), "diff", "--binary"])
+        patch = _run_bytes(["git", "-C", str(self.path), "diff", "HEAD",
+                            "--binary"])
         if not patch.strip():
             raise WorktreeError("no changes to apply")
         stats = diff_stats(self.path)
-        patch_file = self.path / ".quodeq-apply.patch"
-        patch_file.write_bytes(patch)
+        fd, patch_name = tempfile.mkstemp(prefix="quodeq-apply-",
+                                          suffix=".patch")
+        patch_file = Path(patch_name)
         try:
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(patch)
             _run(["git", "-C", str(self.repo_root), "apply", "--check",
                   str(patch_file)])
             _run(["git", "-C", str(self.repo_root), "apply", str(patch_file)])
