@@ -113,9 +113,13 @@ def validate_overrides(raw: object, declared: dict[str, dict]) -> tuple[dict, li
             if spec is None:
                 errors.append(f"{req_id}.{name}: unknown parameter")
             elif not _is_valid(value, spec):
-                errors.append(
-                    f"{req_id}.{name}: must be an integer between "
-                    f"{spec['min']} and {spec['max']}")
+                lo = spec.get("min")
+                hi = spec.get("max")
+                if lo is not None and hi is not None:
+                    errors.append(
+                        f"{req_id}.{name}: must be an integer between {lo} and {hi}")
+                else:
+                    errors.append(f"{req_id}.{name}: must be a valid integer")
             else:
                 clean_params[name] = value
         if clean_params:

@@ -72,7 +72,13 @@ def register_overrides_routes(app: Flask) -> None:
                 'Body must be {"overrides": {...}}', HTTPStatus.BAD_REQUEST, "bad_request"
             )
         compiled_dir = Path(app.config["STANDARDS_COMPILED_DIR"])
-        clean, errors = validate_overrides(raw, collect_declared_params(compiled_dir))
+        evaluators_dir = Path(app.config["STANDARDS_EVALUATORS_DIR"])
+        # Merge compiled (managed) params with custom-standards params.
+        # Duplicated custom standards keep the original requirement IDs, so both
+        # dirs may declare the same req-id with identical specs — merging is safe;
+        # compiled declarations win on collision (dict-update order: evaluators first).
+        declared = {**collect_declared_params(evaluators_dir), **collect_declared_params(compiled_dir)}
+        clean, errors = validate_overrides(raw, declared)
         if errors:
             resp = jsonify({"error": "Invalid overrides", "code": "invalid_overrides", "details": errors})
             resp.status_code = HTTPStatus.BAD_REQUEST
