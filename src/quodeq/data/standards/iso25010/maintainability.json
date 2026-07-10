@@ -9,10 +9,12 @@
       "requirements": [
         {
           "id": "M-MOD-1",
-          "text": "Cyclomatic complexity MUST be ≤10 per function",
+          "text": "Cyclomatic complexity MUST be ≤{max_complexity} per function",
           "cwe": [
             1121
-          ]
+          ],
+          "params": {"max_complexity": {"label": "Max cyclomatic complexity", "type": "int",
+                                        "default": 10, "min": 1, "max": 100}}
         },
         {
           "id": "M-MOD-2",
@@ -30,10 +32,12 @@
         },
         {
           "id": "M-MOD-4",
-          "text": "Functions MUST have ≤5 parameters; use an options object for more",
+          "text": "Functions MUST have ≤{max_params} parameters; use an options object for more",
           "cwe": [
             1064
-          ]
+          ],
+          "params": {"max_params": {"label": "Max function parameters", "type": "int",
+                                    "default": 5, "min": 1, "max": 30}}
         },
         {
           "id": "M-MOD-6",
@@ -185,17 +189,21 @@
         },
         {
           "id": "M-ANA-2",
-          "text": "Functions MUST NOT exceed 50 lines",
+          "text": "Functions MUST NOT exceed {max_lines} lines",
           "cwe": [
             1080
-          ]
+          ],
+          "params": {"max_lines": {"label": "Max function lines", "type": "int",
+                                   "default": 50, "min": 10, "max": 500}}
         },
         {
           "id": "M-ANA-3",
-          "text": "Nesting depth MUST NOT exceed 4 levels",
+          "text": "Nesting depth MUST NOT exceed {max_depth} levels",
           "cwe": [
             1121
-          ]
+          ],
+          "params": {"max_depth": {"label": "Max nesting depth", "type": "int",
+                                   "default": 4, "min": 1, "max": 20}}
         },
         {
           "id": "M-ANA-4",
