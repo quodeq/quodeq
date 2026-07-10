@@ -54,6 +54,7 @@ def test_workspace_status_and_diff(app, client, repo):
     sid, _, _ = _session_with_worktree(app, client, repo)
     ws = client.get(f"/api/assistant/sessions/{sid}/workspace").get_json()
     assert ws["worktree"]["filesChanged"] == 1
+    assert ws["worktree"]["createdAt"]  # per-worktree key for the diff window id
     diff = client.get(f"/api/assistant/sessions/{sid}/workspace/diff").get_json()
     assert "+x = 2" in diff["diff"]
 

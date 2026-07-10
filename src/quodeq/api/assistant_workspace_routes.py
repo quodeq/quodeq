@@ -53,7 +53,8 @@ def register_assistant_workspace_routes(app: Flask) -> None:
                 except WorktreeError:
                     stats = []
             worktree = {"branch": row["branch"], "status": row["status"],
-                        "filesChanged": len(stats), "stats": stats}
+                        "filesChanged": len(stats), "stats": stats,
+                        "createdAt": row["created_at"]}
         return jsonify({"worktree": worktree, "pending": pending})
 
     @app.get("/api/assistant/sessions/<sid>/workspace/diff")

@@ -92,7 +92,7 @@ export function BottomDrawer({ uiState }) {
         )}
         {active === 'assistant' && workspace?.filesChanged > 0 && (
           <button type="button" className="drawer-changes-chip"
-            onClick={() => addWindow(workspaceDiffSpec({ sessionId, onChanged: refreshWorkspace }))}
+            onClick={() => addWindow(workspaceDiffSpec({ sessionId, key: workspace.createdAt, onChanged: refreshWorkspace }))}
             title="Review pending changes">
             {workspace.filesChanged} file{workspace.filesChanged === 1 ? '' : 's'} changed
           </button>
