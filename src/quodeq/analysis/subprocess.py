@@ -269,6 +269,14 @@ def _resolve_provider_config(cfg: AnalysisConfig) -> tuple[str, str, str]:
             f"No API base URL configured for provider '{ai_cmd}'. "
             f"Go to Settings in the dashboard to configure it, or set the URL in ai_providers.json."
         )
+    if not api_key and provider_cfg.get("api_key_required"):
+        # Defense in depth for entry points that skip check_evaluate_prereqs:
+        # fail with a clear message instead of 401s on every request mid-run.
+        raise AnalysisError(
+            f"No API key found for provider '{ai_cmd}'. "
+            f"Set the {api_key_env or 'API key'} environment variable, "
+            f"or configure the key in the dashboard Settings."
+        )
     return model, api_base, api_key
 
 

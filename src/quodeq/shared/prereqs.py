@@ -135,8 +135,9 @@ def _check_cli_provider(provider: str) -> None:
 
 
 def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> None:
-    """Check that an API provider has basic connectivity (Ollama: server running)."""
-    _env = env or os.environ
+    """Check that an API provider has basic connectivity (Ollama: server running)
+    and that cloud providers have their required API key set."""
+    _env = os.environ if env is None else env
     if provider == "ollama":
         try:
             _ollama_base = _env.get("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -163,6 +164,21 @@ def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> 
                 "  llama-server -m path/to/target.gguf -md path/to/drafter.gguf --port 8080\n\n"
                 "Install llama.cpp from https://github.com/ggml-org/llama.cpp"
             ) from exc
+    else:
+        # Cloud API providers (openrouter, ...): fail fast on a missing key
+        # instead of surfacing 401s mid-evaluation.
+        provider_cfg = get_provider_configs().get(provider, {})
+        key_env = provider_cfg.get("api_key_env", "")
+        if provider_cfg.get("api_key_required") and key_env and not _env.get(key_env):
+            browse_url = provider_cfg.get("browse_url", "")
+            url_hint = f"  {browse_url}\n\n" if browse_url else ""
+            raise RuntimeError(
+                f"'{provider}' is configured as your AI provider but the "
+                f"{key_env} environment variable is not set.\n\n"
+                f"Create an API key and export it:\n"
+                f"  export {key_env}=<your-key>\n\n"
+                f"{url_hint}{_SETTINGS_HINT}"
+            )
 
 
 def _collect_tool_issue(cmd: list[str], tool_name: str, min_major: int) -> str | None:

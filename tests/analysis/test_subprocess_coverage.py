@@ -297,6 +297,17 @@ class TestResolveProviderConfig:
             _, _, key = _resolve_provider_config(cfg)
         assert key == "secret"
 
+    def test_required_api_key_missing_raises(self, monkeypatch):
+        provider = {"openrouter": {
+            "type": "api", "model": "m", "api_base": "https://openrouter.ai/api/v1",
+            "api_key_env": "OPENROUTER_API_KEY", "api_key_required": True,
+        }}
+        monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+        cfg = AnalysisConfig(ai_cmd="openrouter", ai_model="m")
+        with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
+            with pytest.raises(Exception, match="OPENROUTER_API_KEY"):
+                _resolve_provider_config(cfg)
+
     def test_omlx_falls_back_to_read_omlx_api_key(self):
         provider = {"omlx": {"type": "api", "model": "m", "api_base": "http://localhost:8000/v1"}}
         cfg = AnalysisConfig(ai_cmd="omlx", ai_model="m")

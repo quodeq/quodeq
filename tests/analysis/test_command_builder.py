@@ -220,3 +220,17 @@ class TestBuildAiCmdGemini:
         assert "--yolo" in args
         pidx = args.index("-p")
         assert args[pidx + 1] == "Analyze this"
+
+
+class TestBuildAnalysisEnv:
+    def test_provider_api_key_survives_env_filtering(self):
+        # API providers read their key from the environment at analysis time
+        # (see _resolve_provider_config); the sensitive-key filter must never
+        # grow to swallow provider api_key_env variables.
+        from quodeq.analysis._command import _build_analysis_env
+
+        env = {"OPENROUTER_API_KEY": "sk-or-x", "QUODEQ_API_KEY": "internal", "PATH": "/usr/bin"}
+        with _patch_providers({"openrouter": {"type": "api"}}):
+            out = _build_analysis_env("openrouter", env=env)
+        assert out.get("OPENROUTER_API_KEY") == "sk-or-x"
+        assert "QUODEQ_API_KEY" not in out
