@@ -49,7 +49,12 @@ def _run(args: argparse.Namespace) -> int:
             truth = load_truth(case_dir)
             try:
                 if args.replay_root:
-                    findings = replay_case(Path(args.replay_root) / case_dir.name)
+                    replay_dir = Path(args.replay_root) / case_dir.name
+                    if not any(replay_dir.glob("*_evidence.jsonl")):
+                        raise RunError(
+                            f"{case_dir.name}: no recorded evidence under {replay_dir}"
+                        )
+                    findings = replay_case(replay_dir)
                 else:
                     with tempfile.TemporaryDirectory() as tmp:
                         findings = run_case(case_dir, cfg, Path(tmp))
@@ -86,7 +91,7 @@ def _compare(args: argparse.Namespace) -> int:
     regressions = compare_reports(baseline, candidate, args.threshold)
     for r in regressions:
         print(f"REGRESSION {r.dimension}.{r.metric}: "
-              f"{r.baseline} -> {r.candidate}", file=sys.stderr)
+              f"{r.baseline} -> {r.candidate}")
     return 1 if regressions else 0
 
 
