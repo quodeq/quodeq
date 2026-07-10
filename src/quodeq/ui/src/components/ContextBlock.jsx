@@ -14,6 +14,7 @@
  */
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { measureWidth, cssFontFromElement } from '../utils/pretext.js';
+import { isHighlightedLine, stripHighlightMarker } from '../utils/codeMarker.js';
 
 const MAX_HIGHLIGHTED_COLLAPSED = 10;
 const CONTEXT_PADDING = 5;
@@ -22,7 +23,7 @@ const CODE_PRE_VPAD = 16;    // matches .term-code / .scope-bar-code vertical pa
 const DEFAULT_CODE_FONT = '12px "JetBrains Mono", ui-monospace, monospace';
 
 function renderLine(raw, lineNum, isHighlighted) {
-  const display = isHighlighted ? raw.slice(3) : raw;
+  const display = isHighlighted ? stripHighlightMarker(raw) : raw;
   return (
     <div key={lineNum} className={`ctx-line${isHighlighted ? ' ctx-line--hl' : ''}`}>
       <span className="ctx-gutter">{lineNum}</span>
@@ -44,8 +45,8 @@ function renderSnippetLine(text, lineNum) {
  * CodeBlockPre — the `<pre>` wrapper that pre-computes dimensions with pretext.
  *
  * `renderedLines` is an array of React children. `codeLines` is the raw string
- * array we use to measure natural widths (stripping the `>>>` highlight marker
- * so width reflects what the user actually sees).
+ * array we use to measure natural widths (stripping the highlight marker so
+ * width reflects what the user actually sees).
  */
 function CodeBlockPre({ renderedLines, codeLines }) {
   const preRef = useRef(null);
@@ -58,7 +59,7 @@ function CodeBlockPre({ renderedLines, codeLines }) {
     let max = 0;
     for (let i = 0; i < codeLines.length; i++) {
       const raw = codeLines[i] || '';
-      const text = raw.startsWith('>>>') ? raw.slice(3) : raw;
+      const text = stripHighlightMarker(raw);
       const w = measureWidth(text, font);
       if (w > max) max = w;
     }
@@ -106,7 +107,7 @@ function useCodeLayout(raw) {
     if (!raw) return { lines: [], highlightedIdx: -1 };
     const normalized = raw.replace(/\\n/g, '\n');
     const lines = normalized.split('\n');
-    const highlightedIdx = lines.findIndex((l) => l.startsWith('>>>'));
+    const highlightedIdx = lines.findIndex(isHighlightedLine);
     return { lines, highlightedIdx };
   }, [raw]);
 }
@@ -136,7 +137,7 @@ export default function ContextBlock({ context, snippet, scope, line, endLine })
     const after = [];
     let pastHighlighted = false;
     for (let i = 0; i < ctxLines.length; i++) {
-      const isHl = ctxLines[i].startsWith('>>>');
+      const isHl = isHighlightedLine(ctxLines[i]);
       const entry = { raw: ctxLines[i], lineNum: startLineNum + i };
       if (isHl) { pastHighlighted = true; highlighted.push(entry); }
       else if (!pastHighlighted) before.push(entry);
