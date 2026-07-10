@@ -42,7 +42,10 @@ def _legacy_tempdir_clone(repo_input: str) -> str:
     Used when the online cache is disabled or when the cache helper
     couldn't produce a working copy (e.g. the cache directory is read-only).
     """
-    repo_name = repo_input.split("/")[-1].replace(".git", "")
+    # rstrip("/") + fallback: a trailing-slash URL yields an empty basename,
+    # which would make dest the mkdtemp dir itself — and cleanup_cloned_repo
+    # removes dest's *parent*, i.e. the system temp root.
+    repo_name = repo_input.rstrip("/").split("/")[-1].removesuffix(".git") or "repo"
     tmp_dir = tempfile.mkdtemp()
     dest = Path(tmp_dir) / repo_name
     env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
@@ -89,10 +92,22 @@ def cleanup_cloned_repo(repo_path: str) -> None:
     """
     if is_inside_cache(repo_path):
         return
-    parent = str(Path(repo_path).resolve().parent)
+    temp_root = Path(tempfile.gettempdir()).resolve()
+    resolved = Path(repo_path).resolve()
+    target = resolved.parent
+    if target == temp_root or not target.is_relative_to(temp_root):
+        # Defense-in-depth: never remove the system temp root or anything
+        # outside it. When dest sits directly inside the temp root (e.g. an
+        # empty repo name made dest the mkdtemp dir itself), fall back to
+        # removing just the clone.
+        if resolved != temp_root and resolved.is_relative_to(temp_root):
+            target = resolved
+        else:
+            _logger.warning("Refusing to clean up %s: not inside the temp dir", repo_path)
+            return
     try:
         # No ignore_errors=True: it would swallow the OSError and make the
         # warning below unreachable. Let rmtree raise so the failure is logged.
-        shutil.rmtree(parent)
+        shutil.rmtree(str(target))
     except OSError as exc:
-        _logger.warning("Failed to clean up temp repo dir %s: %s", parent, exc)
+        _logger.warning("Failed to clean up temp repo dir %s: %s", target, exc)
