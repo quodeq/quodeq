@@ -90,7 +90,7 @@ function RequirementNode({ req, position, selectedNode, actions, confirmFn = win
   const { ri, pi } = position;
   const { onSelectNode, onRemoveRequirement, editable } = actions;
   const isReqSelected = selectedNode?.type === 'requirement' && selectedNode.principleIndex === pi && selectedNode.reqIndex === ri;
-  const isCustomized = customizedIds?.has(req.id);
+  const isCustomized = customizedIds.has(req.id);
   const hasContent = req.text || req.description || (req.refs && req.refs.length > 0);
   const handleRemoveReq = () => {
     if (hasContent) {
@@ -146,7 +146,7 @@ export default function StandardTree({ standard, selectedNode, actions, confirmF
   if (!standard) return null;
 
   const treeActions = { onSelectNode, onAddRequirement, onRemovePrinciple, onRemoveRequirement, editable };
-  const customizedIds = overrides && Object.keys(overrides).length > 0 ? new Set(Object.keys(overrides)) : null;
+  const customizedIds = new Set(overrides ? Object.keys(overrides) : []);
 
   return (
     <div className="standard-tree">

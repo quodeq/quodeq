@@ -138,9 +138,12 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
   const overrides = draftOverrides ?? savedOverrides;
   const overridesDirty = draftOverrides !== null;
 
+  const savedOverridesRef = useRef(savedOverrides);
+  useEffect(() => { savedOverridesRef.current = savedOverrides; }, [savedOverrides]);
+
   const handleChangeParam = useCallback((reqId, paramName, value) => {
     setDraftOverrides((prev) => {
-      const base = structuredClone(prev ?? savedOverrides);
+      const base = structuredClone(prev ?? savedOverridesRef.current);
       const reqOverrides = { ...(base[reqId] || {}) };
       if (value === null) delete reqOverrides[paramName];
       else reqOverrides[paramName] = value;
@@ -148,7 +151,7 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
       else base[reqId] = reqOverrides;
       return base;
     });
-  }, [savedOverrides]);
+  }, []);
 
   const customizedCount = useMemo(() => {
     const reqIds = new Set(
