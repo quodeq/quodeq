@@ -27,5 +27,6 @@ def _build_subagent_prompt(
             target=config.target,
             work_dir=config.work_dir or config.src,
             previous_findings=inline_findings or [],
+            project_root=config.src,
         ),
     )

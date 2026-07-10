@@ -33,6 +33,7 @@ def _build_dimension_prompt(
             manifest=config.manifest,
             target=config.target,
             work_dir=config.work_dir or config.src,
+            project_root=config.src,
         ),
     )
 
