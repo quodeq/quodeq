@@ -24,6 +24,13 @@ line = {
 (evidence / "security_evidence.jsonl").write_text(json.dumps(line) + "\\n")
 """
 
+_FAKE_QUODEQ_WITH_ERROR = _FAKE_QUODEQ.replace(
+    '(evidence / "security_evidence.jsonl").write_text(json.dumps(line) + "\\n")',
+    '(evidence / "security_evidence.jsonl").write_text('
+    'json.dumps(line) + "\\n" + json.dumps('
+    '{"_marker": "file_done", "file": "config.py", "status": "error"}) + "\\n")',
+)
+
 
 def _make_fake_quodeq(tmp_path: Path, body: str) -> tuple[str, ...]:
     script = tmp_path / "fake_quodeq.py"
@@ -67,6 +74,16 @@ def test_run_case_raises_when_no_evidence(tmp_path: Path) -> None:
     )
     with pytest.raises(RunError, match="evidence"):
         run_case(_make_case(tmp_path), cfg, tmp_path / "work")
+
+
+def test_run_case_warns_on_errored_files(tmp_path: Path, capsys) -> None:
+    cfg = RunConfig(
+        provider="claude", model="test-model",
+        quodeq_cmd=_make_fake_quodeq(tmp_path, _FAKE_QUODEQ_WITH_ERROR),
+    )
+    findings = run_case(_make_case(tmp_path), cfg, tmp_path / "work")
+    assert len(findings) == 1
+    assert "failed to analyze 1 file(s)" in capsys.readouterr().err
 
 
 def test_replay_case(tmp_path: Path) -> None:

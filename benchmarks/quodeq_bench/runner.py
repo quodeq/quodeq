@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -61,7 +62,13 @@ def run_case(case_dir: Path, cfg: RunConfig, workdir: Path) -> list[Finding]:
     evidence = find_evidence_dir(out)
     if evidence is None:
         raise RunError(f"{case_dir.name}: no evidence directory produced")
-    findings, _errored = load_findings(evidence)
+    findings, errored = load_findings(evidence)
+    if errored:
+        print(
+            f"WARNING {case_dir.name}: quodeq failed to analyze "
+            f"{len(errored)} file(s): {', '.join(errored)}",
+            file=sys.stderr,
+        )
     return findings
 
 
