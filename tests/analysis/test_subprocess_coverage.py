@@ -90,6 +90,81 @@ class TestRenderStandardsGrouped:
         parsed = json.loads(result)
         assert parsed[0]["principle"] == "Unknown"
 
+    def test_resolves_default_params_when_no_overrides(self):
+        """With no override file, placeholders must be replaced by defaults — no raw templates in output."""
+        data = {
+            "principles": [{
+                "name": "Analyzability",
+                "requirements": [{
+                    "id": "M-ANA-2",
+                    "text": "Functions MUST NOT exceed {max_lines} lines",
+                    "params": {"max_lines": {"label": "Max function lines", "type": "int",
+                                            "default": 50, "min": 10, "max": 500}},
+                }],
+            }],
+        }
+        result = _render_standards_grouped(data, overrides=None)
+        parsed = json.loads(result)
+        rule = parsed[0]["requirements"][0]["rule"]
+        assert "{max_lines}" not in rule, f"raw placeholder still present: {rule!r}"
+        assert "50" in rule
+
+    def test_resolves_overridden_value(self):
+        """With an override, the tuned value appears in the emitted text."""
+        data = {
+            "principles": [{
+                "name": "Analyzability",
+                "requirements": [{
+                    "id": "M-ANA-2",
+                    "text": "Functions MUST NOT exceed {max_lines} lines",
+                    "params": {"max_lines": {"label": "Max function lines", "type": "int",
+                                            "default": 50, "min": 10, "max": 500}},
+                }],
+            }],
+        }
+        result = _render_standards_grouped(data, overrides={"M-ANA-2": {"max_lines": 80}})
+        parsed = json.loads(result)
+        rule = parsed[0]["requirements"][0]["rule"]
+        assert "80" in rule
+        assert "{max_lines}" not in rule
+
+
+# ---------------------------------------------------------------------------
+# _load_standards_text (override threading)
+# ---------------------------------------------------------------------------
+
+class TestLoadStandardsTextOverrides:
+    _DIM = {
+        "principles": [{
+            "name": "Analyzability",
+            "requirements": [{
+                "id": "M-ANA-2",
+                "text": "Functions MUST NOT exceed {max_lines} lines",
+                "params": {"max_lines": {"label": "Max function lines", "type": "int",
+                                         "default": 50, "min": 10, "max": 500}},
+            }],
+        }],
+    }
+
+    def test_no_override_file_uses_default(self, tmp_path):
+        """No placeholder braces in output when analyzed repo has no override file."""
+        (tmp_path / "compiled").mkdir()
+        (tmp_path / "compiled" / "maintainability.json").write_text(json.dumps(self._DIM))
+        result = _load_standards_text(tmp_path / "compiled", "maintainability", overrides=None)
+        assert "{max_lines}" not in result
+        assert "50" in result
+
+    def test_override_value_appears_in_text(self, tmp_path):
+        """When an override is supplied, the overridden value appears in the emitted text."""
+        (tmp_path / "compiled").mkdir()
+        (tmp_path / "compiled" / "maintainability.json").write_text(json.dumps(self._DIM))
+        result = _load_standards_text(
+            tmp_path / "compiled", "maintainability",
+            overrides={"M-ANA-2": {"max_lines": 75}},
+        )
+        assert "75" in result
+        assert "{max_lines}" not in result
+
 
 # ---------------------------------------------------------------------------
 # _load_standards_text
