@@ -1530,3 +1530,22 @@
   color: var(--color-accent);
   cursor: pointer;
 }
+
+/* ── Per-project threshold overrides indicators ──────────── */
+
+.standards-customized-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: var(--term-radius);
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  text-transform: lowercase;
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  color: var(--color-accent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+
+.tree-node-label--customized::after {
+  content: ' •';
+  color: var(--color-accent);
+}

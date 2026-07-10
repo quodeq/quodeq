@@ -1,5 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useStandardDetail } from '../hooks/useStandardDetail.js';
+import { useStandardsOverrides } from '../hooks/useStandardsOverrides.js';
+import { useAppState } from '../../../hooks/useAppState.js';
 import StandardTree from './StandardTree.jsx';
 import StandardDetail from './StandardDetail.jsx';
 import { STANDARD_TYPES } from '../hooks/useStandards.js';
@@ -62,21 +64,26 @@ function buildSubLine({ standard, dirty }) {
   return `${principles} principle${principles === 1 ? '' : 's'} · ${requirements} requirement${requirements === 1 ? '' : 's'} · ${type}${dirtyMark}`;
 }
 
-function EditorToolbar({ meta, dirty, editable, onBack, onSave }) {
+function EditorToolbar({ meta, dirty, editable, overridesDirty, customizedCount, onBack, onSave }) {
   const { isNew, standard, standardId } = meta;
   const title = isNew ? 'new standard' : (standard?.name || standardId || 'standard').toLowerCase();
   const sub = buildSubLine({ standard, dirty });
+  const showSave = editable || overridesDirty;
+  const saveDirty = dirty || overridesDirty;
   return (
     <div className="standard-editor-toolbar">
       <TermHeader name={title} sub={sub} />
       <div className="standard-editor-actions">
+        {customizedCount > 0 && (
+          <span className="standards-customized-badge">{customizedCount} thresholds customized</span>
+        )}
         <button type="button" className="settings-pill" onClick={onBack}>← back</button>
-        {editable && (
+        {showSave && (
           <button
             type="button"
-            className={`settings-pill${dirty ? ' settings-pill--active' : ''}`}
+            className={`settings-pill${saveDirty ? ' settings-pill--active' : ''}`}
             onClick={onSave}
-            disabled={!dirty}
+            disabled={!saveDirty}
           >save</button>
         )}
       </div>
@@ -85,16 +92,16 @@ function EditorToolbar({ meta, dirty, editable, onBack, onSave }) {
 }
 
 function EditorBody({ treeProps, detailProps, treeWidth, onDividerMouseDown }) {
-  const { standard, selectedNode, actions, editable } = treeProps;
-  const { updateField, isNew } = detailProps;
+  const { standard, selectedNode, actions, editable, overrides } = treeProps;
+  const { updateField, isNew, onChangeParam } = detailProps;
   return (
     <div className="standard-editor-body">
       <div className="standard-editor-tree-panel" style={{ width: treeWidth, minWidth: MIN_TREE_WIDTH, maxWidth: MAX_TREE_WIDTH }}>
-        <StandardTree standard={standard} selectedNode={selectedNode} actions={actions} />
+        <StandardTree standard={standard} selectedNode={selectedNode} actions={actions} overrides={overrides} />
       </div>
       <div className="standard-editor-divider" role="separator" tabIndex={0} onMouseDown={onDividerMouseDown} onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.preventDefault(); }} />
       <div className="standard-editor-detail-panel">
-        <StandardDetail standard={standard} selectedNode={selectedNode} onUpdateField={updateField} editable={editable} isNew={isNew} />
+        <StandardDetail standard={standard} selectedNode={selectedNode} onUpdateField={updateField} editable={editable} isNew={isNew} overrides={overrides} onChangeParam={onChangeParam} />
       </div>
     </div>
   );
@@ -125,25 +132,59 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
     save,
   } = useStandardDetail(standardId, isNew);
 
+  const { selectedProject } = useAppState();
+  const { overrides: savedOverrides, save: saveOverrides } = useStandardsOverrides(selectedProject);
+  const [draftOverrides, setDraftOverrides] = useState(null);
+  const overrides = draftOverrides ?? savedOverrides;
+  const overridesDirty = draftOverrides !== null;
+
+  const handleChangeParam = useCallback((reqId, paramName, value) => {
+    setDraftOverrides((prev) => {
+      const base = structuredClone(prev ?? savedOverrides);
+      const reqOverrides = { ...(base[reqId] || {}) };
+      if (value === null) delete reqOverrides[paramName];
+      else reqOverrides[paramName] = value;
+      if (Object.keys(reqOverrides).length === 0) delete base[reqId];
+      else base[reqId] = reqOverrides;
+      return base;
+    });
+  }, [savedOverrides]);
+
+  const customizedCount = useMemo(() => {
+    const reqIds = new Set(
+      (standard?.principles || []).flatMap((p) => (p.requirements || []).map((r) => r.id)));
+    return Object.keys(overrides).filter((id) => reqIds.has(id)).length;
+  }, [standard, overrides]);
+
   const { width: treeWidth, onMouseDown: onDividerMouseDown } = useResizable(DEFAULT_TREE_WIDTH);
-  const handleSave = async () => { await save(); if (onSaved) onSaved(standard?.id); };
+
+  const handleSave = async () => {
+    if (editable) await save();
+    if (overridesDirty) {
+      await saveOverrides(overrides);
+      setDraftOverrides(null);
+    }
+    if (onSaved) onSaved(standard?.id);
+  };
 
   const earlyReturn = EditorLoadingOrError({ loading, error, standard, onBack });
   if (earlyReturn) return earlyReturn;
 
   const treeActions = buildTreeActions({ addPrinciple, removePrinciple, addRequirement, removeRequirement, setSelectedNode, editable });
+  const onChangeParam = selectedProject ? handleChangeParam : undefined;
 
   return (
     <div className="standard-editor standard-editor--terminal">
       <EditorToolbar
         meta={{ isNew, standard, standardId }}
         dirty={dirty} editable={editable}
+        overridesDirty={overridesDirty} customizedCount={customizedCount}
         onBack={onBack} onSave={handleSave}
       />
       {error && <p className="inline-error" style={{ margin: INLINE_ERROR_MARGIN }}>{error}</p>}
       <EditorBody
-        treeProps={{ standard, selectedNode, actions: treeActions, editable }}
-        detailProps={{ updateField, isNew }}
+        treeProps={{ standard, selectedNode, actions: treeActions, editable, overrides }}
+        detailProps={{ updateField, isNew, onChangeParam }}
         treeWidth={treeWidth}
         onDividerMouseDown={onDividerMouseDown}
       />
