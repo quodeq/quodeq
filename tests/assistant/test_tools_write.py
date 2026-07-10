@@ -95,3 +95,31 @@ def test_write_tools_error_without_worktree(wt_ctx):
     reg = ToolRegistry()
     register_write_tools(reg, replace(wt_ctx, worktree_dir=None))
     assert reg.dispatch("write_repo_file", {"path": "x", "content": ""})["ok"] is False
+
+
+def test_workflow_write_denied_case_insensitive(wt_ctx):
+    reg = _registry(wt_ctx)
+    for path in (".GitHub/Workflows/evil.yml", ".github/Workflows/evil.yml"):
+        out = reg.dispatch("write_repo_file", {"path": path, "content": "on: push\n"})
+        assert out["ok"] is False and "workflow" in out["error"], path
+    assert not (wt_ctx.worktree_dir / ".github" / "workflows").exists()
+
+
+def test_edit_rejects_non_utf8_and_binary(wt_ctx):
+    (wt_ctx.worktree_dir / "latin.py").write_bytes(b"# caf\xe9\nTARGET = 1\n")
+    (wt_ctx.worktree_dir / "blob.bin").write_bytes(b"\x00\x01TARGET")
+    reg = _registry(wt_ctx)
+    out = reg.dispatch("edit_repo_file", {"path": "latin.py", "old_string": "TARGET = 1",
+                                          "new_string": "TARGET = 9"})
+    assert out["ok"] is False
+    assert (wt_ctx.worktree_dir / "latin.py").read_bytes() == b"# caf\xe9\nTARGET = 1\n"
+    out = reg.dispatch("edit_repo_file", {"path": "blob.bin", "old_string": "TARGET",
+                                          "new_string": "X"})
+    assert out["ok"] is False
+
+
+def test_edit_result_size_capped(wt_ctx):
+    reg = _registry(wt_ctx)
+    out = reg.dispatch("edit_repo_file", {"path": "app.py", "old_string": "a = 1",
+                                          "new_string": "x" * 70_000})
+    assert out["ok"] is False and "exceed" in out["error"]

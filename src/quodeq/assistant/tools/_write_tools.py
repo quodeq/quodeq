@@ -15,7 +15,7 @@ from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.assistant.tools._repo_tools import _jail
 from quodeq.assistant.worktree import WorktreeError, diff_stats, diff_text
 
-_MAX_CONTENT_CHARS = 65_536
+_MAX_CONTENT_BYTES = 65_536
 _MAX_DIFF_CHARS = 12_000  # guard.py fences tool results at 16k; leave JSON headroom
 
 
@@ -23,8 +23,8 @@ def _jail_write(ctx: ToolContext, rel_path: str) -> Path:
     if ctx.worktree_dir is None:
         raise ToolError("write access is not enabled for this conversation")
     target = _jail(ctx, rel_path)
-    workflows = (ctx.worktree_dir / ".github" / "workflows").resolve()
-    if target == workflows or workflows in target.parents:
+    rel_parts = target.relative_to(ctx.worktree_dir.resolve()).parts
+    if [p.lower() for p in rel_parts[:2]] == [".github", "workflows"]:
         raise ToolError("editing CI workflow files is not allowed")
     return target
 
@@ -34,24 +34,34 @@ def _edit_repo_file(ctx: ToolContext, path: str, old_string: str,
     target = _jail_write(ctx, path)
     if not target.is_file():
         raise ToolError(f"not a file: {path}")
-    text = target.read_text(encoding="utf-8", errors="replace")
+    raw = target.read_bytes()
+    if b"\x00" in raw[:1024]:
+        raise ToolError("cannot edit a binary file")
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ToolError("cannot edit a non-UTF-8 file, rewrite it with write_repo_file instead") from exc
     count = text.count(old_string) if old_string else 0
     if count == 0:
         raise ToolError("old_string not found in file")
     if count > 1:
         raise ToolError(
             f"old_string matches {count} times, add surrounding context to make it unique")
-    target.write_text(text.replace(old_string, new_string, 1), encoding="utf-8")
+    new_text = text.replace(old_string, new_string, 1)
+    if len(new_text.encode("utf-8")) > _MAX_CONTENT_BYTES:
+        raise ToolError(f"edited file would exceed {_MAX_CONTENT_BYTES} bytes")
+    target.write_text(new_text, encoding="utf-8")
     return {"path": path, "edited": True}
 
 
 def _write_repo_file(ctx: ToolContext, path: str, content: str) -> dict:
-    if len(content) > _MAX_CONTENT_CHARS:
-        raise ToolError(f"content exceeds {_MAX_CONTENT_CHARS} characters")
+    data = content.encode("utf-8")
+    if len(data) > _MAX_CONTENT_BYTES:
+        raise ToolError(f"content exceeds {_MAX_CONTENT_BYTES} bytes")
     target = _jail_write(ctx, path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(content, encoding="utf-8")
-    return {"path": path, "bytes": len(content.encode("utf-8"))}
+    target.write_bytes(data)
+    return {"path": path, "bytes": len(data)}
 
 
 def _delete_repo_file(ctx: ToolContext, path: str) -> dict:
