@@ -1493,3 +1493,40 @@
   .standards-cell--num:first-of-type,
   .standards-cell--actions { display: none; }
 }
+
+/* ── Threshold fields ───────────────────────────────────────────────── */
+.threshold-fields {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.threshold-fields-title {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.threshold-field-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.threshold-field-row input[type="number"] {
+  width: 90px;
+}
+
+.threshold-field-hint {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.threshold-reset-btn {
+  margin-left: auto;
+  font-size: 0.7rem;
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  cursor: pointer;
+}
