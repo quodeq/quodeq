@@ -155,6 +155,7 @@ def build_consolidated_prompt(
 
     standards_text = render_all_standards(
         context.standards_dir, dimensions, evaluators_dir=context.evaluators_dir,
+        overrides=load_project_overrides(context.project_root),
     ) if context.standards_dir else ctx.NO_STANDARDS
 
     manifest_context = ctx.render_manifest_context(context)
