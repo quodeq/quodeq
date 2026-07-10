@@ -10,7 +10,7 @@
      "dimension": "usability", "cwes": [209], "reqs": ["U-APR-1"],
      "severity": "major", "note": "raw stack trace shown to end user"},
     {"file": "api.py", "line": 9, "anchor": "\"error\": \"bad input\"",
-     "dimension": "usability", "cwes": [], "reqs": ["U-APR-2"],
+     "dimension": "usability", "cwes": [390], "reqs": ["U-APR-2"],
      "severity": "minor", "note": "error response lacks machine-readable code"}
   ]
 }

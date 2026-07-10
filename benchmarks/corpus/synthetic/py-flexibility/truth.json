@@ -4,10 +4,10 @@
   "clean_files": ["config_loader.py"],
   "labels": [
     {"file": "settings.py", "line": 1, "end_line": 3, "anchor": "postgres://prod-db.internal",
-     "dimension": "flexibility", "cwes": [547], "reqs": ["F-ADP-1"],
+     "dimension": "flexibility", "cwes": [1188, 547], "reqs": ["F-ADP-1"],
      "severity": "major", "note": "environment-specific values hardcoded"},
     {"file": "session_store.py", "line": 1, "anchor": "_SESSIONS",
-     "dimension": "flexibility", "cwes": [1108], "reqs": ["F-SCL-1"],
+     "dimension": "flexibility", "cwes": [1057, 1108], "reqs": ["F-SCL-1"],
      "severity": "major", "note": "in-process session state blocks horizontal scaling"}
   ]
 }
