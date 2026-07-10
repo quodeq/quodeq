@@ -120,23 +120,38 @@ def finding_keys_in_scope(ctx: ToolContext) -> set[tuple]:
     rather than a stack trace.
     """
     keys: set[tuple] = set()
+
+    def _add(v: dict) -> None:
+        keys.add((_requirement_of(v), str(v.get("file") or ""), _coerce_line(v.get("line"))))
+
     if _has_run(ctx):
-        try:
-            raw, _ = _violations_from_run(ctx, None)
-            keys |= {(_requirement_of(v), str(v.get("file") or ""),
-                      _coerce_line(v.get("line"))) for v in raw}
-        except (ToolError, OSError, ValueError):
-            pass
-        try:
-            for f in SqliteFindingsRepository(ctx.run_dir).list_all():
-                keys.add((str(f.req or ""), str(f.file or ""), _coerce_line(f.line)))
-        except Exception:  # noqa: BLE001 - a corrupt/missing db must not block the read
-            pass
+        eval_dir = ctx.run_dir / "evaluation"
+        if eval_dir.is_dir():
+            # Parse each dimension file INDEPENDENTLY: one corrupt/truncated file
+            # (a known failure mode of deadline-cut runs) must drop only its own
+            # findings, not discard every healthy dimension's keys.
+            for p in sorted(eval_dir.glob("*.json")):
+                try:
+                    data = json.loads(p.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    continue
+                for v in (data.get("violations") or []):
+                    _add(v)
+        # SQL findings (the search_findings source). Read only an EXISTING db so
+        # a read-only draft never creates evaluation.db or kicks a projection on
+        # a run that has none -- when there is no db there are no SQL findings to
+        # miss anyway.
+        if (ctx.run_dir / "evaluation.db").is_file():
+            try:
+                for f in SqliteFindingsRepository(ctx.run_dir).list_all():
+                    keys.add((str(f.req or ""), str(f.file or ""), _coerce_line(f.line)))
+            except Exception:  # noqa: BLE001 - a corrupt db must not block the read
+                pass
     else:
         try:
             for d in (_accumulated_dims(ctx) or []):
-                keys |= {(_requirement_of(v), str(v.get("file") or ""),
-                          _coerce_line(v.get("line"))) for v in (d.get("violations") or [])}
+                for v in (d.get("violations") or []):
+                    _add(v)
         except (ToolError, OSError, ValueError):
             pass
     return keys

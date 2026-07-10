@@ -158,6 +158,21 @@ def test_draft_dismiss_accepts_sql_only_finding(tmp_path):
     assert out["ok"] is True
 
 
+def test_draft_dismiss_survives_corrupt_dimension_file(tmp_path):
+    # A single corrupt dimension JSON must drop only its own findings, not
+    # discard every healthy dimension's keys (which would falsely reject a
+    # valid dismiss on a legacy run with no SQL findings db).
+    ctx = _seed_run_ctx(tmp_path, [
+        {"principle": "P1", "req": "R1", "file": "a.py", "line": 10,
+         "severity": "major", "title": "t", "reason": "r"}])
+    (ctx.run_dir / "evaluation" / "reliability.json").write_text("{not json")
+    out = build_registry(ctx).dispatch("draft_action", {
+        "action_type": "dismiss_finding",
+        "payload": {"req": "R1", "file": "a.py", "line": 10, "reason": "fp"},
+    })
+    assert out["ok"] is True
+
+
 def test_draft_dismiss_accepts_req_none_finding(tmp_path):
     # A finding with no req (practiceId-only identity) is dismissable with an
     # empty req, mirroring the dashboard. The old validator rejected empty req,
