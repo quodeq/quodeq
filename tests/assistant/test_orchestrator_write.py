@@ -74,3 +74,22 @@ def test_grant_without_git_repo_stays_read_only(tmp_path, monkeypatch):
     run_turn(_request(True), repository=store, tool_ctx=ctx,
              turn_fn=_capture_turn(seen), capability_fn=lambda *a: True)
     assert "edit_repo_file" not in seen["names"]
+
+
+def test_cli_branch_passes_write_args(tmp_path, repo, monkeypatch):
+    store, ctx = _fixture(tmp_path, repo, monkeypatch)
+    seen = {}
+
+    def fake_cli_turn(*, messages, config, session_id, prior_session_id,
+                      repository, emit):
+        seen["args"] = config.mcp_server_args
+        seen["worktree_dir"] = config.worktree_dir
+        return "ok"
+
+    monkeypatch.setattr("quodeq.assistant.orchestrator._provider_type",
+                        lambda p: "cli")
+    run_turn(_request(True), repository=store, tool_ctx=ctx,
+             turn_fn=None, cli_turn_fn=fake_cli_turn)
+    assert "--enable-write" in seen["args"]
+    assert "--worktree-dir" in seen["args"]
+    assert seen["worktree_dir"] is not None

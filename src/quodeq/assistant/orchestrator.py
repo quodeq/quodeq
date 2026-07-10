@@ -61,6 +61,8 @@ def _mcp_server_args(request: TurnRequest, tool_ctx: ToolContext) -> list[str]:
         args += ["--project-id", str(tool_ctx.project_id)]
     if tool_ctx.reports_dir is not None:
         args += ["--reports-dir", str(tool_ctx.reports_dir)]
+    if tool_ctx.worktree_dir is not None:
+        args += ["--enable-write", "--worktree-dir", str(tool_ctx.worktree_dir)]
     return args
 
 
@@ -112,6 +114,7 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
                     web_enabled=request.web_enabled,
                     system_prompt=messages[0]["content"],
                     skill_block=skill_block,
+                    worktree_dir=tool_ctx.worktree_dir,
                 ),
                 session_id=request.session_id,
                 prior_session_id=(repository.get_session(request.session_id) or {}).get("cli_session_id"),
