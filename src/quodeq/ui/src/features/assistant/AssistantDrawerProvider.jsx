@@ -129,6 +129,7 @@ export function AssistantDrawerProvider({ children }) {
     if (!sid) return;
     try {
       const ws = await fetchAssistantWorkspace(sid);
+      if (sessionIdRef.current !== sid) return;   // context switched mid-flight
       setWorkspace(ws.worktree);
     } catch { /* advisory only */ }
   }, []);
