@@ -59,6 +59,7 @@ def _build_req_index(iso_data: dict) -> dict[str, list[dict]]:
 
     Each requirement dict has:
       id, source, text, severity, scope, refs (empty list),
+      params (optional, only when declared in source),
       _cwe_ids, _wcag_ids, _cert_ids (internal, stripped before output)
     """
     index: dict[str, list[dict]] = {}
@@ -77,7 +78,7 @@ def _build_req_index(iso_data: dict) -> dict[str, list[dict]]:
                 "_cert_ids": req.get("cert", []),
                 "refs": [],
             }
-            if req.get("params"):
+            if req.get("params") is not None:
                 entry["params"] = req["params"]
             index[principle].append(entry)
     return index
