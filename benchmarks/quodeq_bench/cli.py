@@ -39,6 +39,7 @@ def _run(args: argparse.Namespace) -> int:
         model=args.model,
         dimensions=args.dimensions,
         time_limit=args.time_limit,
+        n_subagents=args.n_subagents,
         quodeq_cmd=tuple(args.quodeq_cmd.split()),
     )
     repo_root = Path.cwd()
@@ -111,6 +112,7 @@ def main(argv: list[str] | None = None) -> int:
     run_p.add_argument("--dimensions", default=_ALL_DIMENSIONS)
     run_p.add_argument("--reps", type=int, default=1)
     run_p.add_argument("--time-limit", type=int, default=900)
+    run_p.add_argument("--n-subagents", type=int, default=2)
     run_p.add_argument("--out", default="benchmarks/results/local")
     run_p.add_argument("--replay-root", default=None)
     run_p.add_argument("--quodeq-cmd", default="quodeq")

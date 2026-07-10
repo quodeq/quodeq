@@ -95,3 +95,14 @@ def test_run_replay_missing_case_dir_exits_2(tmp_path: Path) -> None:
     assert code == 2
     report = json.loads((out / "report.json").read_text(encoding="utf-8"))
     assert report["errored"] is True
+
+
+def test_run_accepts_n_subagents_flag(tmp_path: Path) -> None:
+    corpus, replay = _corpus_with_replay(tmp_path)
+    out = tmp_path / "results"
+    code = main([
+        "run", "--corpus", str(corpus), "--provider", "ollama",
+        "--model", "test", "--replay-root", str(replay),
+        "--n-subagents", "1", "--out", str(out),
+    ])
+    assert code == 0

@@ -187,18 +187,30 @@ infrastructure failure, not a metric failure.
 
 `.github/workflows/benchmark.yml`:
 
-- **Trigger:** PRs touching `src/quodeq/data/prompts/**`,
-  `src/quodeq/analysis/**`, `src/quodeq/data/standards/**`, or
-  `benchmarks/**`.
+> **Amended 2026-07-10 (post-review):** the original design pinned a cloud
+> Haiku model behind an Actions API-key secret. The maintainer has no API
+> key (usage plan only) and runs nightlies with local models on a
+> self-hosted runner — so the gate runs there instead, with the same local
+> model the nightlies use. Per-PR triggering was dropped (hours-long local
+> runs don't fit PR latency); the gate is a scheduled alarm.
+
+- **Trigger:** weekly schedule (Saturday 12:00 UTC, after the Friday
+  nightly window drains) plus `workflow_dispatch` for on-demand runs.
+- **Runner:** self-hosted `quodeq` runner with local Ollama (same
+  requirement as `quodeq-nightly.yml`); no cloud secrets.
 - **Scope:** synthetic corpus only.
-- **Model:** one pinned Claude Haiku version (API key in Actions secrets),
-  fixed temperature; the pinned model ID lives in `baselines/gate.json` so
-  bumping it is an explicit, reviewed change.
-- **Noise damping:** 2 repetitions, metrics averaged.
+- **Model:** the pinned provider/model live in `baselines/gate.json`
+  (currently `ollama` / `gemma4:26b-mlx` — the nightly model), so bumping
+  it is an explicit, reviewed change. `--n-subagents 1` because local
+  Ollama serves one request at a time.
+- **Noise damping:** 2 repetitions, metrics averaged (local models are
+  noisier than cloud; widen the threshold if early armed weeks
+  false-alarm).
 - **Gate rule:** fail if any dimension's recall or precision drops >5 points
-  vs `baselines/gate.json`. Improvements are adopted by updating the baseline
-  in the same PR (the workflow prints the refreshed baseline JSON).
-- **Cost target:** <$1 per gated PR.
+  vs `baselines/gate.json`. Improvements are adopted by updating the
+  baseline in the same PR.
+- **Cost:** zero cloud spend; a few hours of idle-weekend compute on the
+  nightly machine.
 - Errored runs (provider/infra) fail the job with a distinct message and do
   not touch the baseline.
 

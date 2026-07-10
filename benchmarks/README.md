@@ -9,10 +9,15 @@ labeled corpus. Not shipped in the wheel. See
 ```bash
 PYTHONPATH=benchmarks uv run python -m quodeq_bench run \
   --corpus benchmarks/corpus/synthetic \
-  --provider claude --model claude-haiku-4-5-20251001 \
+  --provider ollama --model gemma4:26b-mlx \
+  --n-subagents 1 \
   --out benchmarks/results/local
 PYTHONPATH=benchmarks uv run python -m quodeq_bench markdown benchmarks/results/local/report.json
 ```
+
+Use `--n-subagents 1` with local Ollama (it serves one request at a time —
+see quodeq.env). Any provider/model quodeq supports works; the CI gate uses
+the provider/model pinned in `baselines/gate.json`.
 
 ## Compare / gate
 
@@ -32,10 +37,13 @@ uv run pytest tests/benchmarks/ -q
 ## Arming the gate
 
 The committed `baselines/gate.json` starts as `"bootstrap": true` (compare
-always passes). To arm it: take the `report.json` from a green CI run (or a
-local run with the pinned model), copy its `metrics` object into
-`gate.json`, remove the `bootstrap` key, and commit. When a PR legitimately
-improves metrics, refresh the baseline the same way in that PR.
+always passes). To arm it: take the `report.json` from a green gate run (or
+a local run with the pinned model), copy its `metrics` object into
+`gate.json`, remove the `bootstrap` key, and commit. When a change
+legitimately improves metrics, refresh the baseline the same way in that PR.
 
-The `BENCHMARK_ANTHROPIC_API_KEY` repository secret must be set for the
-workflow to run.
+The gate runs weekly (Saturday 12:00 UTC) on the self-hosted `quodeq`
+runner with the local model pinned in `gate.json` — no cloud API key
+needed. Trigger it manually any time via workflow_dispatch. Local models
+are noisier than cloud ones: keep `--reps` at 2–3 and expect to widen the
+threshold if the first armed weeks show false alarms.
