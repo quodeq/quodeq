@@ -1,6 +1,7 @@
 {
   "id": "maintainability",
   "name": "Maintainability",
+  "description": "How effectively the codebase can be modified by people who did not write it. Modularity, reusability, analysability, modifiability, and testability keep changes safe, fast, and predictable as the system grows.",
   "sources": [
     "iso25010",
     "cisq"
@@ -8,6 +9,7 @@
   "principles": [
     {
       "name": "Modularity",
+      "description": "Each part of the codebase has a focused responsibility and clean boundaries. Small modules, low coupling, and limited fan-out make a single change easy to reason about.",
       "source": "iso25010",
       "requirements": [
         {
@@ -20,7 +22,7 @@
             {
               "source": "cwe",
               "id": "1121",
-              "name": "CWE-1121",
+              "name": "Excessive McCabe Cyclomatic Complexity",
               "url": "https://cwe.mitre.org/data/definitions/1121.html"
             },
             {
@@ -50,7 +52,7 @@
             {
               "source": "cwe",
               "id": "1080",
-              "name": "CWE-1080",
+              "name": "Source Code File with Excessive Number of Lines of Code",
               "url": "https://cwe.mitre.org/data/definitions/1080.html"
             },
             {
@@ -71,7 +73,7 @@
             {
               "source": "cwe",
               "id": "1047",
-              "name": "CWE-1047",
+              "name": "Modules with Circular Dependencies",
               "url": "https://cwe.mitre.org/data/definitions/1047.html"
             },
             {
@@ -92,7 +94,7 @@
             {
               "source": "cwe",
               "id": "1064",
-              "name": "CWE-1064",
+              "name": "Invokable Control Element with Signature Containing an Excessive Number of Parameters",
               "url": "https://cwe.mitre.org/data/definitions/1064.html"
             },
             {
@@ -122,7 +124,7 @@
             {
               "source": "cwe",
               "id": "1048",
-              "name": "CWE-1048",
+              "name": "Invokable Control Element with Large Number of Outward Calls",
               "url": "https://cwe.mitre.org/data/definitions/1048.html"
             },
             {
@@ -143,7 +145,7 @@
             {
               "source": "cwe",
               "id": "1074",
-              "name": "CWE-1074",
+              "name": "Class with Excessively Deep Inheritance",
               "url": "https://cwe.mitre.org/data/definitions/1074.html"
             },
             {
@@ -164,7 +166,7 @@
             {
               "source": "cwe",
               "id": "1045",
-              "name": "CWE-1045",
+              "name": "Parent Class with a Virtual Destructor and a Child Class without a Virtual Destructor",
               "url": "https://cwe.mitre.org/data/definitions/1045.html"
             },
             {
@@ -185,7 +187,7 @@
             {
               "source": "cwe",
               "id": "1054",
-              "name": "CWE-1054",
+              "name": "Invocation of a Control Element at an Unnecessarily Deep Horizontal Layer",
               "url": "https://cwe.mitre.org/data/definitions/1054.html"
             },
             {
@@ -206,7 +208,7 @@
             {
               "source": "cwe",
               "id": "1090",
-              "name": "CWE-1090",
+              "name": "Method Containing Access of a Member Element from Another Class",
               "url": "https://cwe.mitre.org/data/definitions/1090.html"
             },
             {
@@ -227,43 +229,43 @@
             {
               "source": "cwe",
               "id": "1042",
-              "name": "CWE-1042",
+              "name": "Static Member Data Element outside of a Singleton Class Element",
               "url": "https://cwe.mitre.org/data/definitions/1042.html"
             },
             {
               "source": "cwe",
               "id": "1043",
-              "name": "CWE-1043",
+              "name": "Data Element Aggregating an Excessively Large Number of Non-Primitive Elements",
               "url": "https://cwe.mitre.org/data/definitions/1043.html"
             },
             {
               "source": "cwe",
               "id": "1055",
-              "name": "CWE-1055",
+              "name": "Multiple Inheritance from Concrete Classes",
               "url": "https://cwe.mitre.org/data/definitions/1055.html"
             },
             {
               "source": "cwe",
               "id": "1062",
-              "name": "CWE-1062",
+              "name": "Parent Class with References to Child Class",
               "url": "https://cwe.mitre.org/data/definitions/1062.html"
             },
             {
               "source": "cwe",
               "id": "1079",
-              "name": "CWE-1079",
+              "name": "Parent Class without Virtual Destructor Method",
               "url": "https://cwe.mitre.org/data/definitions/1079.html"
             },
             {
               "source": "cwe",
               "id": "1086",
-              "name": "CWE-1086",
+              "name": "Class with Excessive Number of Child Classes",
               "url": "https://cwe.mitre.org/data/definitions/1086.html"
             },
             {
               "source": "cwe",
               "id": "1087",
-              "name": "CWE-1087",
+              "name": "Class with Virtual Method without a Virtual Destructor",
               "url": "https://cwe.mitre.org/data/definitions/1087.html"
             }
           ]
@@ -278,25 +280,25 @@
             {
               "source": "cwe",
               "id": "1056",
-              "name": "CWE-1056",
+              "name": "Invokable Control Element with Variadic Parameters",
               "url": "https://cwe.mitre.org/data/definitions/1056.html"
             },
             {
               "source": "cwe",
               "id": "1060",
-              "name": "CWE-1060",
+              "name": "Excessive Number of Inefficient Server-Side Data Accesses",
               "url": "https://cwe.mitre.org/data/definitions/1060.html"
             },
             {
               "source": "cwe",
               "id": "1073",
-              "name": "CWE-1073",
+              "name": "Non-SQL Invokable Control Element with Excessive Number of Data Resource Accesses",
               "url": "https://cwe.mitre.org/data/definitions/1073.html"
             },
             {
               "source": "cwe",
               "id": "1084",
-              "name": "CWE-1084",
+              "name": "Invokable Control Element with Excessive File or Data Access Operations",
               "url": "https://cwe.mitre.org/data/definitions/1084.html"
             }
           ]
@@ -311,13 +313,13 @@
             {
               "source": "cwe",
               "id": "766",
-              "name": "CWE-766",
+              "name": "Critical Data Element Declared Public",
               "url": "https://cwe.mitre.org/data/definitions/766.html"
             },
             {
               "source": "cwe",
               "id": "1092",
-              "name": "CWE-1092",
+              "name": "Use of Same Invokable Control Element in Multiple Architectural Layers",
               "url": "https://cwe.mitre.org/data/definitions/1092.html"
             }
           ]
@@ -332,31 +334,31 @@
             {
               "source": "cwe",
               "id": "1051",
-              "name": "CWE-1051",
+              "name": "Initialization with Hard-Coded Network Resource Configuration Data",
               "url": "https://cwe.mitre.org/data/definitions/1051.html"
             },
             {
               "source": "cwe",
               "id": "1100",
-              "name": "CWE-1100",
+              "name": "Insufficient Isolation of System-Dependent Functions",
               "url": "https://cwe.mitre.org/data/definitions/1100.html"
             },
             {
               "source": "cwe",
               "id": "1102",
-              "name": "CWE-1102",
+              "name": "Reliance on Machine-Dependent Data Representation",
               "url": "https://cwe.mitre.org/data/definitions/1102.html"
             },
             {
               "source": "cwe",
               "id": "1103",
-              "name": "CWE-1103",
+              "name": "Use of Platform-Dependent Third Party Components",
               "url": "https://cwe.mitre.org/data/definitions/1103.html"
             },
             {
               "source": "cwe",
               "id": "1105",
-              "name": "CWE-1105",
+              "name": "Insufficient Encapsulation of Machine-Dependent Functionality",
               "url": "https://cwe.mitre.org/data/definitions/1105.html"
             }
           ]
@@ -365,6 +367,7 @@
     },
     {
       "name": "Reusability",
+      "description": "Useful pieces can be lifted into other contexts without dragging unrelated code. Stable interfaces, no hidden global state, and clear inputs and outputs keep components portable.",
       "source": "iso25010",
       "requirements": [
         {
@@ -377,7 +380,7 @@
             {
               "source": "cwe",
               "id": "1041",
-              "name": "CWE-1041",
+              "name": "Use of Redundant Code",
               "url": "https://cwe.mitre.org/data/definitions/1041.html"
             },
             {
@@ -398,7 +401,7 @@
             {
               "source": "cwe",
               "id": "1057",
-              "name": "CWE-1057",
+              "name": "Data Access Operations Outside of Expected Data Manager Component",
               "url": "https://cwe.mitre.org/data/definitions/1057.html"
             },
             {
@@ -419,7 +422,7 @@
             {
               "source": "cwe",
               "id": "1061",
-              "name": "CWE-1061",
+              "name": "Insufficient Encapsulation",
               "url": "https://cwe.mitre.org/data/definitions/1061.html"
             },
             {
@@ -440,7 +443,7 @@
             {
               "source": "cwe",
               "id": "1188",
-              "name": "CWE-1188",
+              "name": "Initialization of a Resource with an Insecure Default",
               "url": "https://cwe.mitre.org/data/definitions/1188.html"
             }
           ]
@@ -455,13 +458,13 @@
             {
               "source": "cwe",
               "id": "1066",
-              "name": "CWE-1066",
+              "name": "Missing Serialization Control Element",
               "url": "https://cwe.mitre.org/data/definitions/1066.html"
             },
             {
               "source": "cwe",
               "id": "1070",
-              "name": "CWE-1070",
+              "name": "Serializable Data Element Containing non-Serializable Item Elements",
               "url": "https://cwe.mitre.org/data/definitions/1070.html"
             }
           ]
@@ -476,19 +479,19 @@
             {
               "source": "cwe",
               "id": "1058",
-              "name": "CWE-1058",
+              "name": "Invokable Control Element in Multi-Thread Context with non-Final Static Storable or Member Element",
               "url": "https://cwe.mitre.org/data/definitions/1058.html"
             },
             {
               "source": "cwe",
               "id": "1063",
-              "name": "CWE-1063",
+              "name": "Creation of Class Instance within a Static Code Block",
               "url": "https://cwe.mitre.org/data/definitions/1063.html"
             },
             {
               "source": "cwe",
               "id": "1096",
-              "name": "CWE-1096",
+              "name": "Singleton Class Instance Creation without Proper Locking or Synchronization",
               "url": "https://cwe.mitre.org/data/definitions/1096.html"
             }
           ]
@@ -503,19 +506,19 @@
             {
               "source": "cwe",
               "id": "1082",
-              "name": "CWE-1082",
+              "name": "Class Instance Self Destruction Control Element",
               "url": "https://cwe.mitre.org/data/definitions/1082.html"
             },
             {
               "source": "cwe",
               "id": "1097",
-              "name": "CWE-1097",
+              "name": "Persistent Storable Data Element without Associated Comparison Control Element",
               "url": "https://cwe.mitre.org/data/definitions/1097.html"
             },
             {
               "source": "cwe",
               "id": "1098",
-              "name": "CWE-1098",
+              "name": "Data Element containing Pointer Item without Proper Copy Control Element",
               "url": "https://cwe.mitre.org/data/definitions/1098.html"
             }
           ]
@@ -524,6 +527,7 @@
     },
     {
       "name": "Analyzability",
+      "description": "A reader can understand what the code does and why. Naming, documentation, type annotations, and consistent structure shorten the time between opening a file and trusting it.",
       "source": "iso25010",
       "requirements": [
         {
@@ -536,7 +540,7 @@
             {
               "source": "cwe",
               "id": "1080",
-              "name": "CWE-1080",
+              "name": "Source Code File with Excessive Number of Lines of Code",
               "url": "https://cwe.mitre.org/data/definitions/1080.html"
             },
             {
@@ -557,7 +561,7 @@
             {
               "source": "cwe",
               "id": "1080",
-              "name": "CWE-1080",
+              "name": "Source Code File with Excessive Number of Lines of Code",
               "url": "https://cwe.mitre.org/data/definitions/1080.html"
             },
             {
@@ -587,7 +591,7 @@
             {
               "source": "cwe",
               "id": "1121",
-              "name": "CWE-1121",
+              "name": "Excessive McCabe Cyclomatic Complexity",
               "url": "https://cwe.mitre.org/data/definitions/1121.html"
             },
             {
@@ -617,7 +621,7 @@
             {
               "source": "cwe",
               "id": "1121",
-              "name": "CWE-1121",
+              "name": "Excessive McCabe Cyclomatic Complexity",
               "url": "https://cwe.mitre.org/data/definitions/1121.html"
             },
             {
@@ -638,7 +642,7 @@
             {
               "source": "cwe",
               "id": "1053",
-              "name": "CWE-1053",
+              "name": "Missing Documentation for Design",
               "url": "https://cwe.mitre.org/data/definitions/1053.html"
             },
             {
@@ -659,7 +663,7 @@
             {
               "source": "cwe",
               "id": "1075",
-              "name": "CWE-1075",
+              "name": "Unconditional Control Flow Transfer outside of Switch Block",
               "url": "https://cwe.mitre.org/data/definitions/1075.html"
             },
             {
@@ -680,7 +684,7 @@
             {
               "source": "cwe",
               "id": "1095",
-              "name": "CWE-1095",
+              "name": "Loop Condition Value Update within the Loop",
               "url": "https://cwe.mitre.org/data/definitions/1095.html"
             },
             {
@@ -701,25 +705,25 @@
             {
               "source": "cwe",
               "id": "1120",
-              "name": "CWE-1120",
+              "name": "Excessive Code Complexity",
               "url": "https://cwe.mitre.org/data/definitions/1120.html"
             },
             {
               "source": "cwe",
               "id": "1122",
-              "name": "CWE-1122",
+              "name": "Excessive Halstead Complexity",
               "url": "https://cwe.mitre.org/data/definitions/1122.html"
             },
             {
               "source": "cwe",
               "id": "1124",
-              "name": "CWE-1124",
+              "name": "Excessively Deep Nesting",
               "url": "https://cwe.mitre.org/data/definitions/1124.html"
             },
             {
               "source": "cwe",
               "id": "1125",
-              "name": "CWE-1125",
+              "name": "Excessive Attack Surface",
               "url": "https://cwe.mitre.org/data/definitions/1125.html"
             }
           ]
@@ -734,43 +738,43 @@
             {
               "source": "cwe",
               "id": "710",
-              "name": "CWE-710",
+              "name": "Improper Adherence to Coding Standards",
               "url": "https://cwe.mitre.org/data/definitions/710.html"
             },
             {
               "source": "cwe",
               "id": "1076",
-              "name": "CWE-1076",
+              "name": "Insufficient Adherence to Expected Conventions",
               "url": "https://cwe.mitre.org/data/definitions/1076.html"
             },
             {
               "source": "cwe",
               "id": "1078",
-              "name": "CWE-1078",
+              "name": "Inappropriate Source Code Style or Formatting",
               "url": "https://cwe.mitre.org/data/definitions/1078.html"
             },
             {
               "source": "cwe",
               "id": "1099",
-              "name": "CWE-1099",
+              "name": "Inconsistent Naming Conventions for Identifiers",
               "url": "https://cwe.mitre.org/data/definitions/1099.html"
             },
             {
               "source": "cwe",
               "id": "1113",
-              "name": "CWE-1113",
+              "name": "Inappropriate Comment Style",
               "url": "https://cwe.mitre.org/data/definitions/1113.html"
             },
             {
               "source": "cwe",
               "id": "1114",
-              "name": "CWE-1114",
+              "name": "Inappropriate Whitespace Style",
               "url": "https://cwe.mitre.org/data/definitions/1114.html"
             },
             {
               "source": "cwe",
               "id": "1115",
-              "name": "CWE-1115",
+              "name": "Source Code Element without Standard Prologue",
               "url": "https://cwe.mitre.org/data/definitions/1115.html"
             }
           ]
@@ -785,43 +789,43 @@
             {
               "source": "cwe",
               "id": "570",
-              "name": "CWE-570",
+              "name": "Expression is Always False",
               "url": "https://cwe.mitre.org/data/definitions/570.html"
             },
             {
               "source": "cwe",
               "id": "571",
-              "name": "CWE-571",
+              "name": "Expression is Always True",
               "url": "https://cwe.mitre.org/data/definitions/571.html"
             },
             {
               "source": "cwe",
               "id": "783",
-              "name": "CWE-783",
+              "name": "Operator Precedence Logic Error",
               "url": "https://cwe.mitre.org/data/definitions/783.html"
             },
             {
               "source": "cwe",
               "id": "1069",
-              "name": "CWE-1069",
+              "name": "Empty Exception Block",
               "url": "https://cwe.mitre.org/data/definitions/1069.html"
             },
             {
               "source": "cwe",
               "id": "1071",
-              "name": "CWE-1071",
+              "name": "Empty Code Block",
               "url": "https://cwe.mitre.org/data/definitions/1071.html"
             },
             {
               "source": "cwe",
               "id": "1119",
-              "name": "CWE-1119",
+              "name": "Excessive Use of Unconditional Branching",
               "url": "https://cwe.mitre.org/data/definitions/1119.html"
             },
             {
               "source": "cwe",
               "id": "1164",
-              "name": "CWE-1164",
+              "name": "Irrelevant Code",
               "url": "https://cwe.mitre.org/data/definitions/1164.html"
             }
           ]
@@ -836,43 +840,43 @@
             {
               "source": "cwe",
               "id": "1068",
-              "name": "CWE-1068",
+              "name": "Inconsistency Between Implementation and Documented Design",
               "url": "https://cwe.mitre.org/data/definitions/1068.html"
             },
             {
               "source": "cwe",
               "id": "1110",
-              "name": "CWE-1110",
+              "name": "Incomplete Design Documentation",
               "url": "https://cwe.mitre.org/data/definitions/1110.html"
             },
             {
               "source": "cwe",
               "id": "1111",
-              "name": "CWE-1111",
+              "name": "Incomplete I/O Documentation",
               "url": "https://cwe.mitre.org/data/definitions/1111.html"
             },
             {
               "source": "cwe",
               "id": "1112",
-              "name": "CWE-1112",
+              "name": "Incomplete Documentation of Program Execution",
               "url": "https://cwe.mitre.org/data/definitions/1112.html"
             },
             {
               "source": "cwe",
               "id": "1116",
-              "name": "CWE-1116",
+              "name": "Inaccurate Comments",
               "url": "https://cwe.mitre.org/data/definitions/1116.html"
             },
             {
               "source": "cwe",
               "id": "1117",
-              "name": "CWE-1117",
+              "name": "Callable with Insufficient Behavioral Summary",
               "url": "https://cwe.mitre.org/data/definitions/1117.html"
             },
             {
               "source": "cwe",
               "id": "1118",
-              "name": "CWE-1118",
+              "name": "Insufficient Documentation of Error Handling Techniques",
               "url": "https://cwe.mitre.org/data/definitions/1118.html"
             }
           ]
@@ -887,19 +891,19 @@
             {
               "source": "cwe",
               "id": "563",
-              "name": "CWE-563",
+              "name": "Assignment to Variable without Use",
               "url": "https://cwe.mitre.org/data/definitions/563.html"
             },
             {
               "source": "cwe",
               "id": "1109",
-              "name": "CWE-1109",
+              "name": "Use of Same Variable for Multiple Purposes",
               "url": "https://cwe.mitre.org/data/definitions/1109.html"
             },
             {
               "source": "cwe",
               "id": "1126",
-              "name": "CWE-1126",
+              "name": "Declaration of Variable with Unnecessarily Wide Scope",
               "url": "https://cwe.mitre.org/data/definitions/1126.html"
             }
           ]
@@ -914,7 +918,7 @@
             {
               "source": "cwe",
               "id": "546",
-              "name": "CWE-546",
+              "name": "Suspicious Comment",
               "url": "https://cwe.mitre.org/data/definitions/546.html"
             }
           ]
@@ -923,6 +927,7 @@
     },
     {
       "name": "Modifiability",
+      "description": "Changes can be made safely without unexpected consequences elsewhere. Encapsulation, tests, and avoiding hidden assumptions let edits stay local.",
       "source": "iso25010",
       "requirements": [
         {
@@ -935,7 +940,7 @@
             {
               "source": "cwe",
               "id": "1059",
-              "name": "CWE-1059",
+              "name": "Insufficient Technical Documentation",
               "url": "https://cwe.mitre.org/data/definitions/1059.html"
             },
             {
@@ -956,7 +961,7 @@
             {
               "source": "cwe",
               "id": "1059",
-              "name": "CWE-1059",
+              "name": "Insufficient Technical Documentation",
               "url": "https://cwe.mitre.org/data/definitions/1059.html"
             },
             {
@@ -977,7 +982,7 @@
             {
               "source": "cwe",
               "id": "1061",
-              "name": "CWE-1061",
+              "name": "Insufficient Encapsulation",
               "url": "https://cwe.mitre.org/data/definitions/1061.html"
             },
             {
@@ -998,7 +1003,7 @@
             {
               "source": "cwe",
               "id": "561",
-              "name": "CWE-561",
+              "name": "Dead Code",
               "url": "https://cwe.mitre.org/data/definitions/561.html"
             },
             {
@@ -1019,7 +1024,7 @@
             {
               "source": "cwe",
               "id": "1085",
-              "name": "CWE-1085",
+              "name": "Invokable Control Element with Excessive Volume of Commented-out Code",
               "url": "https://cwe.mitre.org/data/definitions/1085.html"
             },
             {
@@ -1040,43 +1045,43 @@
             {
               "source": "cwe",
               "id": "407",
-              "name": "CWE-407",
+              "name": "Inefficient Algorithmic Complexity",
               "url": "https://cwe.mitre.org/data/definitions/407.html"
             },
             {
               "source": "cwe",
               "id": "474",
-              "name": "CWE-474",
+              "name": "Use of Function with Inconsistent Implementations",
               "url": "https://cwe.mitre.org/data/definitions/474.html"
             },
             {
               "source": "cwe",
               "id": "475",
-              "name": "CWE-475",
+              "name": "Undefined Behavior for Input to API",
               "url": "https://cwe.mitre.org/data/definitions/475.html"
             },
             {
               "source": "cwe",
               "id": "477",
-              "name": "CWE-477",
+              "name": "Use of Obsolete Function",
               "url": "https://cwe.mitre.org/data/definitions/477.html"
             },
             {
               "source": "cwe",
               "id": "483",
-              "name": "CWE-483",
+              "name": "Incorrect Block Delimitation",
               "url": "https://cwe.mitre.org/data/definitions/483.html"
             },
             {
               "source": "cwe",
               "id": "676",
-              "name": "CWE-676",
+              "name": "Use of Potentially Dangerous Function",
               "url": "https://cwe.mitre.org/data/definitions/676.html"
             },
             {
               "source": "cwe",
               "id": "1177",
-              "name": "CWE-1177",
+              "name": "Use of Prohibited Code",
               "url": "https://cwe.mitre.org/data/definitions/1177.html"
             }
           ]
@@ -1091,19 +1096,19 @@
             {
               "source": "cwe",
               "id": "1052",
-              "name": "CWE-1052",
+              "name": "Excessive Use of Hard-Coded Literals in Initialization",
               "url": "https://cwe.mitre.org/data/definitions/1052.html"
             },
             {
               "source": "cwe",
               "id": "1106",
-              "name": "CWE-1106",
+              "name": "Insufficient Use of Symbolic Constants",
               "url": "https://cwe.mitre.org/data/definitions/1106.html"
             },
             {
               "source": "cwe",
               "id": "1107",
-              "name": "CWE-1107",
+              "name": "Insufficient Isolation of Symbolic Constant Definitions",
               "url": "https://cwe.mitre.org/data/definitions/1107.html"
             }
           ]
@@ -1118,7 +1123,7 @@
             {
               "source": "cwe",
               "id": "1108",
-              "name": "CWE-1108",
+              "name": "Excessive Reliance on Global Variables",
               "url": "https://cwe.mitre.org/data/definitions/1108.html"
             }
           ]
@@ -1133,13 +1138,13 @@
             {
               "source": "cwe",
               "id": "1093",
-              "name": "CWE-1093",
+              "name": "Excessively Complex Data Representation",
               "url": "https://cwe.mitre.org/data/definitions/1093.html"
             },
             {
               "source": "cwe",
               "id": "1101",
-              "name": "CWE-1101",
+              "name": "Reliance on Runtime Component in Generated Code",
               "url": "https://cwe.mitre.org/data/definitions/1101.html"
             }
           ]
@@ -1148,6 +1153,7 @@
     },
     {
       "name": "Testability",
+      "description": "The system is built to be exercised by automated tests. Pure functions, dependency injection, deterministic behaviour, and seams between layers make assertions easy to write and trust.",
       "source": "iso25010",
       "requirements": [
         {
@@ -1160,7 +1166,7 @@
             {
               "source": "cwe",
               "id": "1059",
-              "name": "CWE-1059",
+              "name": "Insufficient Technical Documentation",
               "url": "https://cwe.mitre.org/data/definitions/1059.html"
             },
             {
@@ -1181,7 +1187,7 @@
             {
               "source": "cwe",
               "id": "1061",
-              "name": "CWE-1061",
+              "name": "Insufficient Encapsulation",
               "url": "https://cwe.mitre.org/data/definitions/1061.html"
             },
             {
@@ -1202,7 +1208,7 @@
             {
               "source": "cwe",
               "id": "1059",
-              "name": "CWE-1059",
+              "name": "Insufficient Technical Documentation",
               "url": "https://cwe.mitre.org/data/definitions/1059.html"
             },
             {
@@ -1223,7 +1229,7 @@
             {
               "source": "cwe",
               "id": "1059",
-              "name": "CWE-1059",
+              "name": "Insufficient Technical Documentation",
               "url": "https://cwe.mitre.org/data/definitions/1059.html"
             },
             {
@@ -1244,7 +1250,7 @@
             {
               "source": "cwe",
               "id": "1059",
-              "name": "CWE-1059",
+              "name": "Insufficient Technical Documentation",
               "url": "https://cwe.mitre.org/data/definitions/1059.html"
             },
             {
@@ -1265,7 +1271,7 @@
             {
               "source": "cwe",
               "id": "1173",
-              "name": "CWE-1173",
+              "name": "Improper Use of Validation Framework",
               "url": "https://cwe.mitre.org/data/definitions/1173.html"
             }
           ]
@@ -1280,7 +1286,7 @@
             {
               "source": "cwe",
               "id": "1127",
-              "name": "CWE-1127",
+              "name": "Compilation with Insufficient Warnings or Errors",
               "url": "https://cwe.mitre.org/data/definitions/1127.html"
             }
           ]
@@ -1295,7 +1301,7 @@
             {
               "source": "cwe",
               "id": "1123",
-              "name": "CWE-1123",
+              "name": "Excessive Use of Self-Modifying Code",
               "url": "https://cwe.mitre.org/data/definitions/1123.html"
             }
           ]
@@ -1310,13 +1316,13 @@
             {
               "source": "cwe",
               "id": "459",
-              "name": "CWE-459",
+              "name": "Incomplete Cleanup",
               "url": "https://cwe.mitre.org/data/definitions/459.html"
             },
             {
               "source": "cwe",
               "id": "772",
-              "name": "CWE-772",
+              "name": "Missing Release of Resource after Effective Lifetime",
               "url": "https://cwe.mitre.org/data/definitions/772.html"
             }
           ]
