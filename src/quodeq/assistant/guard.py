@@ -10,6 +10,9 @@ MAX_TOOL_ITERATIONS = 6
 # Skill turns legitimately chain search -> standard -> code -> draft; give
 # them headroom without raising the default for free-form turns.
 SKILL_MAX_TOOL_ITERATIONS = 12
+# Write-granted turns chain read -> edit -> edit -> diff across several files;
+# 6 iterations starves them. Applies only when the write toggle is on.
+WRITE_MAX_TOOL_ITERATIONS = 16
 MAX_TOOL_RESULT_CHARS = 16_000
 
 _PREAMBLE = (
