@@ -14,6 +14,7 @@ export function classifyDiffLine(line) {
 
 export function WorkspaceDiffPanel({ sessionId, onChanged }) {
   const [diff, setDiff] = useState(null);
+  const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState(null); // {kind, message, prUrl}
@@ -21,18 +22,28 @@ export function WorkspaceDiffPanel({ sessionId, onChanged }) {
   const [prTitle, setPrTitle] = useState('Quodeq assistant fix');
   const [prBody, setPrBody] = useState('');
 
-  useEffect(() => {
+  const loadDiff = useCallback(() => {
     let cancelled = false;
+    setDiff(null); setError(null);
     fetchAssistantWorkspaceDiff(sessionId)
-      .then((d) => { if (!cancelled) setDiff(d.diff ?? ''); })
+      .then((d) => { if (!cancelled) { setDiff(d.diff ?? ''); setTruncated(!!d.truncated); } })
       .catch((err) => { if (!cancelled) setError(err?.message || String(err)); });
     return () => { cancelled = true; };
   }, [sessionId]);
+
+  useEffect(() => loadDiff(), [loadDiff]);
 
   const act = useCallback(async (fn, kind) => {
     setBusy(true); setError(null);
     try {
       const res = await fn();
+      // PR fail-soft: branch kept, worktree still active. Do NOT lock the panel;
+      // surface the message and let the user retry, apply, or discard.
+      if (kind === 'pr' && !res.prUrl) {
+        setError(res.message || 'Branch kept locally; PR was not created.');
+        onChanged?.();
+        return;
+      }
       setOutcome({ kind, message: res.message || null, prUrl: res.prUrl || null });
       onChanged?.();
     } catch (err) {
@@ -45,7 +56,7 @@ export function WorkspaceDiffPanel({ sessionId, onChanged }) {
   if (outcome) {
     return (
       <div className="workspace-diff">
-        <p className="workspace-diff-outcome">
+        <p className="workspace-diff-outcome" role="status" aria-live="polite">
           {outcome.kind === 'applied' && 'Changes applied to your working tree (uncommitted). Review and commit them yourself.'}
           {outcome.kind === 'discarded' && 'Changes discarded. The worktree and branch were removed.'}
           {outcome.kind === 'pr' && (outcome.prUrl
@@ -56,11 +67,19 @@ export function WorkspaceDiffPanel({ sessionId, onChanged }) {
     );
   }
 
+  const empty = diff !== null && diff.trim() === '';
+
   return (
     <div className="workspace-diff">
-      {error && <p className="workspace-diff-error">{error}</p>}
-      {diff === null && !error && <p>Loading diff...</p>}
-      {diff !== null && (
+      {truncated && (
+        <p className="workspace-diff-warning" role="alert">
+          Diff truncated at 2 MB for display. Apply and Create PR act on the full set of changes, which is larger than shown here.
+        </p>
+      )}
+      {error && <p className="workspace-diff-error" role="alert">{error}</p>}
+      {diff === null && !error && <p aria-live="polite">Loading diff...</p>}
+      {empty && <p className="workspace-diff-empty">No changes in this worktree.</p>}
+      {diff !== null && !empty && (
         <pre className="workspace-diff-body">
           {diff.split('\n').map((line, i) => (
             // eslint-disable-next-line react/no-array-index-key
@@ -69,12 +88,15 @@ export function WorkspaceDiffPanel({ sessionId, onChanged }) {
         </pre>
       )}
       <div className="workspace-diff-actions">
-        <button type="button" disabled={busy || !diff}
+        <button type="button" disabled={busy} onClick={() => loadDiff()}>
+          Refresh
+        </button>
+        <button type="button" disabled={busy || !diff || empty}
           onClick={() => act(() => applyAssistantWorkspace(sessionId), 'applied')}>
           Apply to repo
         </button>
-        <button type="button" disabled={busy || !diff}
-          onClick={() => setPrOpen((v) => !v)}>
+        <button type="button" disabled={busy || !diff || empty}
+          onClick={() => setPrOpen((v) => !v)} aria-expanded={prOpen}>
           Create PR...
         </button>
         <button type="button" disabled={busy}
@@ -84,9 +106,9 @@ export function WorkspaceDiffPanel({ sessionId, onChanged }) {
       </div>
       {prOpen && (
         <div className="workspace-diff-pr">
-          <input type="text" value={prTitle} placeholder="PR title"
+          <input type="text" value={prTitle} placeholder="PR title" aria-label="PR title"
             onChange={(e) => setPrTitle(e.target.value)} />
-          <textarea value={prBody} placeholder="PR description"
+          <textarea value={prBody} placeholder="PR description" aria-label="PR description"
             onChange={(e) => setPrBody(e.target.value)} rows={4} />
           <button type="button" disabled={busy || !prTitle.trim()}
             onClick={() => act(() => createAssistantWorkspacePr(sessionId,

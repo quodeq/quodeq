@@ -475,3 +475,5 @@
 .workspace-diff-actions { display: flex; gap: 8px; }
 .workspace-diff-pr { display: flex; flex-direction: column; gap: 6px; }
 .workspace-diff-error { color: var(--color-danger, #ef5350); }
+.workspace-diff-warning { color: var(--color-danger, #ef5350); font-weight: 600; }
+.workspace-diff-empty { color: var(--color-text-muted, #8a8279); }
