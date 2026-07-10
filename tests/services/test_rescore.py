@@ -3,7 +3,7 @@ from quodeq.core.types.finding import Finding, Totals, SeverityTally
 from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.types.dimension import DimensionResult
 
-from quodeq.services.rescore import rescore_dimensions
+from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
 
 
 def _make_violation(practice_id="P1", severity="major", req="R1", file="a.py", line=1, reason="bug"):
@@ -35,6 +35,16 @@ def _make_dimension(name="Reliability", violations=None, compliance=None, source
         ),
         source_file_count=source_file_count,
     )
+
+
+def test_rescore_dimension_matches_string_line():
+    """A finding whose line is a string ("10") is still suppressed by a dismissal
+    stored with an int line (10). dismissed_keys stores int(line); Finding.line is
+    typed int|str|None, so the read side must coerce too or a string-lined finding
+    never matches its own dismissal."""
+    dim = _make_dimension(violations=[_make_violation(req="R1", file="a.py", line="10")])
+    rescored = _rescore_dimension(dim, {("R1", "a.py", 10)})
+    assert rescored.violations == []  # string-lined finding filtered out
 
 
 def test_rescore_no_dismissals_returns_rescored_data():

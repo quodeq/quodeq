@@ -58,11 +58,18 @@ def _apply_create_standard(payload: dict, app: Flask) -> dict:
 
 
 def _canonical_finding_key(payload: dict, ctx: ToolContext) -> dict:
+    # A finding's identity is (req, file, line). `req` (the requirement id) is
+    # OPTIONAL on a finding -- practiceId is the guaranteed field and `req` is
+    # frequently absent -- and the suppression filter keys on `req or ""`. So we
+    # accept an empty req (a req=None finding is dismissed with req=""), mirror-
+    # ing the dashboard, which echoes the finding's own req verbatim. file and a
+    # non-negative integer line are always required; _require_matching_finding
+    # then confirms the whole key matches a real finding before it is recorded.
     req = str(payload.get("req") or "").strip()
     file = str(payload.get("file") or "").strip()
     line = payload.get("line")
-    if not req or not file or not isinstance(line, int) or isinstance(line, bool) or line < 0:
-        raise ToolError("req, file, and a non-negative integer line are required")
+    if not file or not isinstance(line, int) or isinstance(line, bool) or line < 0:
+        raise ToolError("file and a non-negative integer line are required")
     if not ctx.project_id:
         raise ToolError("no project attached to this session")
     try:
@@ -76,11 +83,31 @@ def _canonical_finding_key(payload: dict, ctx: ToolContext) -> dict:
     return canonical
 
 
+def _require_matching_finding(ctx: ToolContext, canonical: dict) -> None:
+    """Reject a finding action whose key matches no finding in scope.
+
+    The model must dismiss/verify by the finding's real (req, file, line) --
+    obtainable from get_report/get_violations (now carrying `requirement`) or
+    search_findings. If the key matches nothing, recording it would be a silent
+    no-op that reports success but never suppresses the finding, so we fail the
+    draft in-loop with a message that tells the model how to get the right key.
+    """
+    from quodeq.assistant.tools._read_tools import finding_keys_in_scope  # noqa: PLC0415
+
+    key = (canonical["req"], canonical["file"], canonical["line"])
+    if key not in finding_keys_in_scope(ctx):
+        raise ToolError(
+            f"no finding matches file={canonical['file']} line={canonical['line']} "
+            f"req={canonical['req'] or '(none)'} in this scope. Read the exact "
+            "requirement with get_report or search_findings, then retry with it.")
+
+
 def _validate_dismiss_finding(payload: dict, ctx: ToolContext) -> dict:
     canonical = _canonical_finding_key(payload, ctx)
     reason = str(payload.get("reason") or "").strip()
     if not reason:
         raise ToolError("a dismissal reason is required")
+    _require_matching_finding(ctx, canonical)
     canonical["reason"] = reason
     return canonical
 
@@ -111,6 +138,7 @@ def _validate_verify_finding(payload: dict, ctx: ToolContext) -> dict:
     note = str(payload.get("note") or "").strip()
     if not note:
         raise ToolError("a one-line note explaining why the finding is real is required")
+    _require_matching_finding(ctx, canonical)
     canonical["note"] = note
     return canonical
 
