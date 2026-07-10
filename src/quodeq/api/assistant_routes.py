@@ -27,9 +27,20 @@ _running_turns: set[str] = set()
 _running_lock = threading.Lock()
 
 
-def _turn_in_flight(sid: str) -> bool:
+def _try_claim_turn(sid: str) -> bool:
+    """Atomically claim the per-session turn slot for a workspace action so a
+    concurrent /messages turn (or another apply/pr) 409s instead of racing the
+    same worktree. Returns False if already claimed."""
     with _running_lock:
-        return sid in _running_turns
+        if sid in _running_turns:
+            return False
+        _running_turns.add(sid)
+        return True
+
+
+def _release_turn(sid: str) -> None:
+    with _running_lock:
+        _running_turns.discard(sid)
 
 
 def _api_provider(provider_id: str) -> dict | None:

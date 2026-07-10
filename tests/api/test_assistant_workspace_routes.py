@@ -111,3 +111,57 @@ def test_apply_blocked_while_turn_in_flight(app, client, repo, monkeypatch):
     finally:
         with ar._running_lock:
             ar._running_turns.discard(sid)
+
+
+def test_apply_claims_turn_slot_during_apply_and_releases(app, client, repo, monkeypatch):
+    sid, store, _ = _session_with_worktree(app, client, repo)
+    import quodeq.api.assistant_routes as ar
+    from quodeq.assistant.worktree import WorktreeManager
+    seen = {}
+    orig = WorktreeManager.apply_to_repo
+    def spy(self):
+        with ar._running_lock:
+            seen["claimed"] = sid in ar._running_turns
+        return orig(self)
+    monkeypatch.setattr(WorktreeManager, "apply_to_repo", spy)
+    resp = client.post(f"/api/assistant/sessions/{sid}/workspace/apply")
+    assert resp.status_code == 200 and seen["claimed"] is True
+    with ar._running_lock:
+        assert sid not in ar._running_turns  # released after
+
+
+def test_apply_survives_remove_failure(app, client, repo, monkeypatch):
+    sid, store, _ = _session_with_worktree(app, client, repo)
+    from quodeq.assistant.worktree import WorktreeError, WorktreeManager
+    monkeypatch.setattr(WorktreeManager, "remove",
+                        lambda self, delete_branch=True: (_ for _ in ()).throw(WorktreeError("busy")))
+    resp = client.post(f"/api/assistant/sessions/{sid}/workspace/apply")
+    assert resp.status_code == 200 and resp.get_json()["applied"] is True
+    assert (repo / "app.py").read_bytes() == b"x = 2\n"      # patch landed
+    assert store.get_worktree(sid)["status"] == "applied"    # status advanced, no 500
+
+
+def test_workspace_apply_requires_csrf_origin(tmp_path, monkeypatch):
+    # These routes MUTATE the user's repo; confirm the app-wide security stack gates them.
+    import quodeq.api.security as security
+    from flask import Flask
+    from quodeq.api._rate_limit import create_rate_limit_store
+    from quodeq.api.assistant_routes import register_assistant_routes
+    monkeypatch.setattr("quodeq.api.assistant_routes.get_provider_configs",
+                        lambda: {"ollama": {"type": "api", "api_base": "http://x/v1"}})
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.config["ASSISTANT_DB_PATH"] = str(tmp_path / "a.db")
+    app.config["STANDARDS_EVALUATORS_DIR"] = str(tmp_path / "e")
+    app.config["STANDARDS_COMPILED_DIR"] = str(tmp_path / "c")
+    app.config["STANDARDS_DIMENSIONS_FILE"] = str(tmp_path / "d.json")
+    # configure_security(app, rate_limit_store, api_key); api_key=None keeps the
+    # localhost-only auth path so the test-client (127.0.0.1) clears auth and the
+    # failure is specifically the CSRF/Origin 403, not an auth 401.
+    security.configure_security(app, create_rate_limit_store(), None)
+    register_assistant_routes(app)
+    client = app.test_client()
+    # cross-origin POST (Origin mismatch) must be rejected by the CSRF check
+    resp = client.post("/api/assistant/sessions/x/workspace/apply",
+                       headers={"Origin": "http://evil.example"})
+    assert resp.status_code == 403
