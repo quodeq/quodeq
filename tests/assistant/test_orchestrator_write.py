@@ -93,3 +93,29 @@ def test_cli_branch_passes_write_args(tmp_path, repo, monkeypatch):
     assert "--enable-write" in seen["args"]
     assert "--worktree-dir" in seen["args"]
     assert seen["worktree_dir"] is not None
+
+
+def test_write_enabled_gemini_turn_stays_read_only(tmp_path, repo, monkeypatch):
+    # gemini registers its MCP server via a global `gemini mcp add`, so a
+    # concurrent no-grant turn could spawn its server against a grant turn's
+    # registration. The write grant must never activate for global-register CLIs.
+    store, ctx = _fixture(tmp_path, repo, monkeypatch)
+    seen = {}
+
+    def fake_cli_turn(*, messages, config, session_id, prior_session_id,
+                      repository, emit):
+        seen["args"] = config.mcp_server_args
+        seen["worktree_dir"] = config.worktree_dir
+        seen["system"] = messages[0]["content"]
+        return "ok"
+
+    request = TurnRequest(session_id="s1", text="hi", ui_state=None,
+                          api_base="http://x", api_key=None, provider="gemini",
+                          model="m", write_enabled=True)
+    run_turn(request, repository=store, tool_ctx=ctx,
+             turn_fn=None, cli_turn_fn=fake_cli_turn)
+    assert "--enable-write" not in seen["args"]
+    assert "--worktree-dir" not in seen["args"]
+    assert seen["worktree_dir"] is None
+    assert "# Write access" not in seen["system"]
+    assert store.get_worktree("s1") is None

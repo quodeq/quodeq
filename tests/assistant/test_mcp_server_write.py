@@ -26,3 +26,12 @@ def test_mcp_registry_with_write_flag(tmp_path):
     names = _build_registry_from_args(ns).names()
     assert {"edit_repo_file", "write_repo_file", "delete_repo_file",
             "get_worktree_diff"} <= set(names)
+
+
+def test_mcp_registry_enable_write_without_worktree(tmp_path):
+    # --enable-write without a worktree must stay read-only: write tools are
+    # jailed to the worktree, so no worktree means no write surface at all.
+    ns = _ns(tmp_path, enable_write=True, worktree_dir="")
+    names = _build_registry_from_args(ns).names()
+    assert "edit_repo_file" not in names
+    assert "write_repo_file" not in names

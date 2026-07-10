@@ -9,6 +9,7 @@ from quodeq.assistant._context import build_system_prompt, build_turn_message
 from quodeq.assistant.adapters._api import ApiTurnConfig, run_api_turn
 from quodeq.assistant.adapters._capabilities import supports_native_tools
 from quodeq.assistant.adapters._cli import CliTurnConfig, run_cli_turn
+from quodeq.assistant.adapters._cli_config import load_cli_chat_config
 from quodeq.assistant.guard import (
     MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, WRITE_MAX_TOOL_ITERATIONS)
 from quodeq.assistant.skills import load_skills
@@ -43,6 +44,26 @@ def _split_skill(text: str):
 
 def _provider_type(provider: str) -> str:
     return get_provider_configs().get(provider, {}).get("type", "cli")
+
+
+# MCP config styles scoped to a single invocation: a per-turn temp config file
+# (claude) or an inline config override (codex). "cli-register" is NOT here:
+# it mutates a global settings file, so concurrent sessions could interleave
+# and a no-grant turn would spawn its MCP server against a grant turn's
+# registration, leaking write tools jailed to another session's worktree.
+_ISOLATED_MCP_STYLES = frozenset({"config-file", "config-arg"})
+
+
+def _write_safe_provider(provider: str) -> bool:
+    """Whether the write grant may activate for this provider. API providers
+    register tools in-process (no MCP config involved); CLI providers qualify
+    only when their MCP config is per-invocation isolated."""
+    if _provider_type(provider) != "cli":
+        return True
+    try:
+        return load_cli_chat_config(provider).mcp_style in _ISOLATED_MCP_STYLES
+    except KeyError:
+        return False
 
 
 def _mcp_server_args(request: TurnRequest, tool_ctx: ToolContext) -> list[str]:
@@ -88,9 +109,11 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
         # tools via argv, and cloud APIs (openrouter/custom) stay excluded.
         web_tools_on = request.web_enabled and request.provider in LOCAL_PROVIDERS
         # Server-derived write grant, mirror of web_tools_on: the client flag
-        # alone is never enough. Requires an attached LOCAL git repo.
+        # alone is never enough. Requires an attached LOCAL git repo and a
+        # provider whose tool wiring is per-invocation isolated.
         write_on = (request.write_enabled and tool_ctx.repo_root is not None
-                    and (tool_ctx.repo_root / ".git").exists())
+                    and (tool_ctx.repo_root / ".git").exists()
+                    and _write_safe_provider(request.provider))
         if write_on:
             manager = ensure_session_worktree(
                 repository, repo_root=tool_ctx.repo_root,
