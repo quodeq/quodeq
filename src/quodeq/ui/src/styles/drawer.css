@@ -38,3 +38,51 @@
   padding: 12px 16px; font-size: 0.8125rem; color: var(--color-text-muted);
   font-family: var(--font-mono, monospace);
 }
+
+/* ── Repo-attachment + pending-changes chips (drawer header) ──────────
+   Same shape as .drawer-model-chip (assistant.css): compact squared tag,
+   font-family/size/padding/radius match; color varies by state. */
+.drawer-repo-chip {
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: var(--color-success, #4caf7d);
+  background: color-mix(in srgb, var(--color-success, #4caf7d) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-success, #4caf7d) 30%, transparent);
+  border-radius: 4px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+.drawer-repo-chip--off {
+  color: var(--color-text-muted, inherit);
+  background: color-mix(in srgb, var(--color-text-muted, #8a8279) 10%, transparent);
+  border-color: color-mix(in srgb, var(--color-text-muted, #8a8279) 25%, transparent);
+}
+.drawer-changes-chip {
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  cursor: pointer;
+  color: var(--color-danger, #c0392b);
+  background: color-mix(in srgb, var(--color-danger, #c0392b) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger, #c0392b) 30%, transparent);
+  border-radius: 4px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+.drawer-changes-chip:hover {
+  background: color-mix(in srgb, var(--color-danger, #c0392b) 20%, transparent);
+}
+
+/* Write-access pencil: danger-tinted when ON (editing the repo is a
+   higher-stakes action than the web toggle, which stays accent-colored). */
+.assistant-drawer-write[aria-pressed="true"] {
+  border-color: var(--color-danger, #c0392b);
+  color: var(--color-danger, #c0392b);
+}
+.assistant-drawer-write:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
