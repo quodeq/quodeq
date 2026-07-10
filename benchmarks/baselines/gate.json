@@ -1,0 +1,7 @@
+{
+  "bootstrap": true,
+  "provider": "claude",
+  "model": "claude-haiku-4-5-20251001",
+  "threshold": 0.05,
+  "metrics": {}
+}
