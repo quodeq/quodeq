@@ -17,6 +17,7 @@ from quodeq.analysis._config import (
 )
 from quodeq.analysis._mcp_config import _codex_mcp_config_arg, _create_mcp_config
 from quodeq.analysis._provider_cache import get_provider_configs as _get_provider_configs
+from quodeq.shared._models import normalize_model_id
 from quodeq.shared.utils import get_ai_cmd, get_ai_model
 
 _log = logging.getLogger(__name__)
@@ -75,6 +76,12 @@ def _build_mcp_args(
     if config.jsonl_file is None:
         return [], None
     mcp_style = provider_cfg.get("mcp_style", "config-file")
+    if mcp_style == "cli-register":
+        # The findings server is registered out-of-band (`<cmd> mcp add` in
+        # subprocess._run_cli_analysis), so no config file/arg is needed —
+        # but the CLI must still receive its allow-list args (e.g. gemini's
+        # --allowed-mcp-server-names) or the registered server stays blocked.
+        return list(provider_cfg.get("mcp_permission_args", [])), None
     if mcp_style not in {"config-file", "config-arg"}:
         return [], None
 
@@ -130,7 +137,7 @@ def _build_model_budget_prompt_args(
     """Build model, budget, turns, and prompt args."""
     args: list[str] = []
     if model:
-        args.extend(["--model", model])
+        args.extend(["--model", normalize_model_id(provider_cfg.get("cmd", ""), model)])
     if provider_cfg.get("supports_budget", True) and config.analysis_budget:
         args.extend(["--max-budget-usd", str(config.analysis_budget)])
     if provider_cfg.get("supports_turns", True) and config.max_turns is not None:

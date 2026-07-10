@@ -31,7 +31,7 @@ _CLI_INSTALL_HINTS: dict[str, str] = {
     ),
     "gemini": (
         "Install Gemini CLI:\n"
-        "  npm install -g @anthropic-ai/gemini-cli\n"
+        "  npm install -g @google/gemini-cli\n"
         "  https://geminicli.com/docs/get-started/installation/"
     ),
 }

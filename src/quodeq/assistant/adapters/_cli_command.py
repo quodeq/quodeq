@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import re
 
 from quodeq.assistant.adapters._cli_config import CliChatConfig
+from quodeq.shared._models import normalize_model_id
 
 _NATIVE_WEB_TOOLS = ("WebSearch", "WebFetch")
 
@@ -55,10 +55,7 @@ def _resume_args(cfg: CliChatConfig, prior: str | None, new_id: str) -> tuple[li
 def _model_arg(cfg: CliChatConfig, model: str | None) -> str | None:
     if not model:
         return None
-    value = model.strip()
-    if cfg.cmd == "codex" and re.fullmatch(r"\d+(?:\.\d+)*(?:-[A-Za-z0-9_.-]+)?", value):
-        return f"gpt-{value}"
-    return value
+    return normalize_model_id(cfg.cmd, model)
 
 
 def build_turn_argv(cfg: CliChatConfig, *, prompt: str, model: str | None,

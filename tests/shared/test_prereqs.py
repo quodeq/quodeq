@@ -152,3 +152,11 @@ class TestProviderInjection:
         result = subprocess.CompletedProcess([], 0, stdout="1.0.0\n")
         with patch("subprocess.run", return_value=result):
             _check_cli_provider("claude")  # must not raise
+
+
+class TestInstallHints:
+    def test_gemini_hint_uses_google_npm_scope(self):
+        from quodeq.shared.prereqs import _CLI_INSTALL_HINTS
+
+        assert "@google/gemini-cli" in _CLI_INSTALL_HINTS["gemini"]
+        assert "@anthropic-ai/gemini-cli" not in _CLI_INSTALL_HINTS["gemini"]
