@@ -38,7 +38,7 @@ def _ollama_rss_mb() -> int:
     """RSS of the first ``ollama`` process (if any) in MB. 0 if not running."""
     try:
         out = subprocess.run(
-            ["pgrep", "-x", "ollama"], capture_output=True, text=True,
+            ["pgrep", "-x", "ollama"], capture_output=True, text=True, encoding="utf-8",
             timeout=_PS_TIMEOUT_S, check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
@@ -54,7 +54,7 @@ def _ollama_rss_mb() -> int:
 def _ps_rss_mb(pid: int) -> int:
     try:
         out = subprocess.run(
-            ["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True,
+            ["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True, encoding="utf-8",
             timeout=_PS_TIMEOUT_S, check=False,
         )
     except (OSError, subprocess.TimeoutExpired):

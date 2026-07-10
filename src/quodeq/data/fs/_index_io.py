@@ -50,7 +50,7 @@ def _save_index(reports_dir: Path, index: dict[str, str]) -> None:
     tmp = ""
     try:
         fd, tmp = tempfile.mkstemp(dir=reports_dir, suffix=".tmp")
-        with os.fdopen(fd, "w") as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(index, f, indent=2)
         os.replace(tmp, index_path)
     except Exception as exc:

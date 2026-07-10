@@ -148,5 +148,5 @@ def spawn_turn(argv: list[str], *, cwd: Path, env: dict) -> subprocess.Popen:
     return subprocess.Popen(
         argv, cwd=str(cwd), env=env,
         stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, start_new_session=True,
+        text=True, encoding="utf-8", start_new_session=True,
     )

@@ -43,7 +43,7 @@ def _run_git_log(src: Path, months: int = 3) -> str | None:
     try:
         result = subprocess.run(
             ["git", "log", f"--since={months} months ago", "--name-only", "--format=%H%n%ai"],
-            cwd=str(src), capture_output=True, text=True, timeout=_GIT_LOG_TIMEOUT_S,
+            cwd=str(src), capture_output=True, text=True, encoding="utf-8", timeout=_GIT_LOG_TIMEOUT_S,
         )
         return result.stdout if result.returncode == 0 else None
     except (OSError, subprocess.TimeoutExpired):
@@ -57,7 +57,7 @@ def _iter_git_log(src: Path, months: int = 3):
     try:
         proc = subprocess.Popen(
             ["git", "log", f"--since={months} months ago", "--name-only", "--format=%H%n%ai"],
-            cwd=str(src), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+            cwd=str(src), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8",
         )
     except OSError:
         return

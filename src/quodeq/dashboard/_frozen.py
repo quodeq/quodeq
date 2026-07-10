@@ -57,7 +57,7 @@ def source_user_path() -> None:
         if shell not in _ALLOWED_SHELLS:
             shell = "/bin/zsh"
         result = subprocess.run(
-            [shell, "-c", cmd], capture_output=True, text=True,
+            [shell, "-c", cmd], capture_output=True, text=True, encoding="utf-8",
             timeout=_CMD_DISCOVERY_TIMEOUT_S,
         )
         if result.returncode == 0 and result.stdout.strip():

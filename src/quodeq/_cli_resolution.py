@@ -54,7 +54,7 @@ def _create_worktree(repo_dir: Path, branch: str) -> Path | None:
     try:
         subprocess.run(
             ["git", "-C", str(repo_dir), "worktree", "add", str(worktree_dir), branch],
-            capture_output=True, text=True, check=True, timeout=_WORKTREE_TIMEOUT_S,
+            capture_output=True, text=True, encoding="utf-8", check=True, timeout=_WORKTREE_TIMEOUT_S,
         )
         return worktree_dir
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
@@ -69,7 +69,7 @@ def _cleanup_worktree(repo_dir: Path, worktree_dir: Path) -> None:
     try:
         subprocess.run(
             ["git", "-C", str(repo_dir), "worktree", "remove", str(worktree_dir), "--force"],
-            capture_output=True, text=True, timeout=_WORKTREE_TIMEOUT_S,
+            capture_output=True, text=True, encoding="utf-8", timeout=_WORKTREE_TIMEOUT_S,
         )
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
         _logger.debug("Failed to clean up worktree %s: %s", worktree_dir, exc)
