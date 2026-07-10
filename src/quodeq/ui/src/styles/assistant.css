@@ -463,3 +463,15 @@
 .assistant-command-desc { color: var(--color-text-muted); margin-left: auto; }
 
 .assistant-msg-local { border-left: 2px solid var(--color-border); padding-left: 8px; }
+
+/* ── Workspace diff review panel ─────────────────────── */
+.workspace-diff { display: flex; flex-direction: column; gap: 8px; padding: 8px; min-height: 0; }
+.workspace-diff-body { overflow: auto; font-size: 12px; line-height: 1.45; margin: 0; flex: 1; }
+.wsdiff-add { color: var(--color-success, #4caf50); }
+.wsdiff-del { color: var(--color-danger, #ef5350); }
+.wsdiff-hunk { color: var(--color-accent, #7aa2f7); }
+.wsdiff-file { font-weight: 600; }
+.wsdiff-ctx { opacity: 0.8; }
+.workspace-diff-actions { display: flex; gap: 8px; }
+.workspace-diff-pr { display: flex; flex-direction: column; gap: 6px; }
+.workspace-diff-error { color: var(--color-danger, #ef5350); }
