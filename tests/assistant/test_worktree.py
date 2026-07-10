@@ -93,3 +93,42 @@ def test_remove_fallback_when_dir_deleted_out_of_band(manager, repo):
     manager.remove()  # must not raise; prunes and deletes the branch
     out = _run(["git", "-C", str(repo), "branch", "--list", manager.branch])
     assert out.strip() == ""
+
+
+def test_apply_to_repo_leaves_uncommitted_changes(manager, repo):
+    (manager.path / "app.py").write_bytes(b"print('bye')\n")
+    stats = manager.apply_to_repo()
+    assert (repo / "app.py").read_bytes() == b"print('bye')\n"
+    assert stats and stats[0]["file"] == "app.py"
+    # uncommitted: repo status is dirty
+    out = _run(["git", "-C", str(repo), "status", "--porcelain"])
+    assert "app.py" in out
+
+
+def test_apply_conflict_applies_nothing(manager, repo):
+    (manager.path / "app.py").write_bytes(b"print('worktree')\n")
+    (repo / "app.py").write_bytes(b"print('diverged')\n")  # user edited too
+    with pytest.raises(WorktreeError):
+        manager.apply_to_repo()
+    assert (repo / "app.py").read_bytes() == b"print('diverged')\n"
+
+
+def test_apply_no_changes_errors(manager):
+    with pytest.raises(WorktreeError, match="no changes"):
+        manager.apply_to_repo()
+
+
+def test_apply_binary_change(manager, repo):
+    (manager.path / "logo.bin").write_bytes(b"\x00\x01\x02\xff")
+    manager.apply_to_repo()
+    assert (repo / "logo.bin").read_bytes() == b"\x00\x01\x02\xff"
+
+
+def test_create_pr_fail_soft_without_gh(manager, monkeypatch):
+    (manager.path / "app.py").write_bytes(b"print('bye')\n")
+    monkeypatch.setattr("quodeq.assistant.worktree.shutil.which", lambda _: None)
+    # no origin remote in the fixture repo: push fails first, branch is kept
+    result = manager.create_pr("t", "b")
+    assert result["prUrl"] is None
+    assert result["branch"] == manager.branch
+    assert "branch" in result["message"] or "push" in result["message"]

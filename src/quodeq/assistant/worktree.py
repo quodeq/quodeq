@@ -21,7 +21,7 @@ class WorktreeError(Exception):
     """User-facing worktree/git failure."""
 
 
-def _run(argv: list[str], *, cwd: Path | None = None) -> str:
+def _run_bytes(argv: list[str], *, cwd: Path | None = None) -> bytes:
     try:
         proc = subprocess.run(  # noqa: S603 - argv list, no shell
             argv, cwd=str(cwd) if cwd else None,
@@ -30,11 +30,15 @@ def _run(argv: list[str], *, cwd: Path | None = None) -> str:
         raise WorktreeError(f"{argv[0]} is not installed") from exc
     except subprocess.TimeoutExpired as exc:
         raise WorktreeError(f"{argv[0]} timed out") from exc
-    out = (proc.stdout or b"").decode("utf-8", errors="replace")
-    err = (proc.stderr or b"").decode("utf-8", errors="replace")
     if proc.returncode != 0:
+        err = (proc.stderr or b"").decode("utf-8", errors="replace")
+        out = (proc.stdout or b"").decode("utf-8", errors="replace")
         raise WorktreeError((err or out).strip() or f"{argv[0]} failed")
-    return out
+    return proc.stdout or b""
+
+
+def _run(argv: list[str], *, cwd: Path | None = None) -> str:
+    return _run_bytes(argv, cwd=cwd).decode("utf-8", errors="replace")
 
 
 def diff_text(worktree: Path) -> str:
@@ -122,3 +126,63 @@ class WorktreeManager:
                 _run(["git", "-C", str(self.repo_root), "branch", "-D", self.branch])
             except WorktreeError:
                 pass  # branch already gone; removal is best-effort
+
+    def apply_to_repo(self) -> list[dict]:
+        """Apply the worktree diff onto the user's working tree, uncommitted.
+
+        git apply --check runs first so a conflict applies NOTHING. The patch
+        is generated with --binary and written as raw bytes so binary and
+        non-UTF-8 changes survive the roundtrip."""
+        _run(["git", "-C", str(self.path), "add", "-N", "."])
+        patch = _run_bytes(["git", "-C", str(self.path), "diff", "--binary"])
+        if not patch.strip():
+            raise WorktreeError("no changes to apply")
+        stats = diff_stats(self.path)
+        patch_file = self.path / ".quodeq-apply.patch"
+        patch_file.write_bytes(patch)
+        try:
+            _run(["git", "-C", str(self.repo_root), "apply", "--check",
+                  str(patch_file)])
+            _run(["git", "-C", str(self.repo_root), "apply", str(patch_file)])
+        finally:
+            patch_file.unlink(missing_ok=True)
+        return stats
+
+    def commit_all(self, message: str) -> None:
+        status = _run(["git", "-C", str(self.path), "status", "--porcelain"])
+        if not status.strip():
+            return
+        _run(["git", "-C", str(self.path), "add", "-A"])
+        _run(["git", "-C", str(self.path),
+              "-c", "user.name=Quodeq Assistant",
+              "-c", "user.email=assistant@quodeq.local",
+              "commit", "-q", "-m", message])
+
+    def create_pr(self, title: str, body: str) -> dict:
+        """Commit, push, gh pr create. Fail-soft: the branch is always kept."""
+        self.commit_all(title or "Quodeq assistant fix")
+        try:
+            _run(["git", "-C", str(self.path), "push", "-u", "origin", self.branch])
+        except WorktreeError as exc:
+            return {"prUrl": None, "branch": self.branch, "pushed": False,
+                    "message": (f"Push failed: {exc}. The branch exists locally,"
+                                " push it and open a PR manually.")}
+        if shutil.which("gh") is None:
+            return {"prUrl": None, "branch": self.branch, "pushed": True,
+                    "message": ("Branch pushed. Install and authenticate the gh"
+                                " CLI, or open the PR from your git host.")}
+        # gh runs with the parent process env on purpose (it needs the user's
+        # own auth). It is NOT routed through the scrubbed-env CLI spawner
+        # used for AI provider CLIs; that scrubber exists to keep secrets
+        # away from a model-driven process, and `gh pr create` here is a
+        # human-approved, fixed-argv action.
+        try:
+            out = _run(["gh", "pr", "create", "--title", title or self.branch,
+                        "--body", body or "", "--head", self.branch],
+                       cwd=self.path)
+        except WorktreeError as exc:
+            return {"prUrl": None, "branch": self.branch, "pushed": True,
+                    "message": f"gh pr create failed: {exc}"}
+        url = out.strip().splitlines()[-1] if out.strip() else None
+        return {"prUrl": url, "branch": self.branch, "pushed": True,
+                "message": "PR created"}
