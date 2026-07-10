@@ -1,9 +1,9 @@
 """DDL for the assistant conversation store (~/.quodeq/assistant.db)."""
 
-ASSISTANT_SCHEMA_VERSION = 2
+ASSISTANT_SCHEMA_VERSION = 3
 
 ASSISTANT_DDL = """
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;
 
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
@@ -43,6 +43,17 @@ CREATE TABLE IF NOT EXISTS events (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id, seq);
+
+CREATE TABLE IF NOT EXISTS worktrees (
+    session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+    project_id TEXT,
+    repo_root TEXT NOT NULL,
+    path TEXT NOT NULL,
+    branch TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active', 'applied', 'pr_created', 'discarded', 'stale')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 # Ordered forward migrations from an older on-disk schema. Each entry is
@@ -52,4 +63,15 @@ CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id, seq);
 ASSISTANT_MIGRATIONS: list[tuple[int, str]] = [
     (2, "ALTER TABLE sessions ADD COLUMN project_id TEXT;\n"
         "PRAGMA user_version = 2;"),
+    (3, "CREATE TABLE IF NOT EXISTS worktrees (\n"
+        "    session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,\n"
+        "    project_id TEXT,\n"
+        "    repo_root TEXT NOT NULL,\n"
+        "    path TEXT NOT NULL,\n"
+        "    branch TEXT NOT NULL,\n"
+        "    status TEXT NOT NULL DEFAULT 'active'\n"
+        "        CHECK (status IN ('active', 'applied', 'pr_created', 'discarded', 'stale')),\n"
+        "    created_at TEXT NOT NULL DEFAULT (datetime('now'))\n"
+        ");\n"
+        "PRAGMA user_version = 3;"),
 ]

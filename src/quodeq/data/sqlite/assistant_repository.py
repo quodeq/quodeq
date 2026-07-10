@@ -138,3 +138,40 @@ class AssistantRepository:
                 (session_id, after_seq, limit),
             ).fetchall()
         return [(r["seq"], json.loads(r["frame_json"])) for r in rows]
+
+    def upsert_worktree(self, *, session_id: str, project_id: str | None,
+                        repo_root: str, path: str, branch: str) -> dict:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO worktrees (session_id, project_id, repo_root, path,"
+                " branch, status) VALUES (?, ?, ?, ?, ?, 'active')"
+                " ON CONFLICT(session_id) DO UPDATE SET project_id=excluded.project_id,"
+                " repo_root=excluded.repo_root, path=excluded.path,"
+                " branch=excluded.branch, status='active'",
+                (session_id, project_id, repo_root, path, branch),
+            )
+        return self.get_worktree(session_id)  # type: ignore[return-value]
+
+    def get_worktree(self, session_id: str) -> dict | None:
+        with self._connect() as conn:
+            return conn.execute(
+                "SELECT * FROM worktrees WHERE session_id = ?", (session_id,)
+            ).fetchone()
+
+    def set_worktree_status(self, session_id: str, status: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE worktrees SET status = ? WHERE session_id = ?",
+                (status, session_id),
+            )
+
+    def list_worktrees(self, status: str, project_id: str | None = None) -> list[dict]:
+        with self._connect() as conn:
+            if project_id is None:
+                return conn.execute(
+                    "SELECT * FROM worktrees WHERE status = ?", (status,)
+                ).fetchall()
+            return conn.execute(
+                "SELECT * FROM worktrees WHERE status = ? AND project_id = ?",
+                (status, project_id),
+            ).fetchall()
