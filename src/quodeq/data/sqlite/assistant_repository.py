@@ -147,7 +147,8 @@ class AssistantRepository:
                 " branch, status) VALUES (?, ?, ?, ?, ?, 'active')"
                 " ON CONFLICT(session_id) DO UPDATE SET project_id=excluded.project_id,"
                 " repo_root=excluded.repo_root, path=excluded.path,"
-                " branch=excluded.branch, status='active'",
+                " branch=excluded.branch, status='active',"
+                " created_at=strftime('%Y-%m-%d %H:%M:%f','now')",
                 (session_id, project_id, repo_root, path, branch),
             )
         return self.get_worktree(session_id)  # type: ignore[return-value]

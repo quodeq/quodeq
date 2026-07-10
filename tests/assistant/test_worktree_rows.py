@@ -1,4 +1,5 @@
 import sqlite3
+import time
 
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
@@ -22,6 +23,18 @@ def test_worktree_row_lifecycle(tmp_path):
     row = store.upsert_worktree(session_id="s1", project_id="proj",
                                 repo_root="/repo", path="/wt2", branch="quodeq/fix-2")
     assert row["status"] == "active" and row["path"] == "/wt2"
+
+
+def test_upsert_bumps_created_at_on_reuse(tmp_path):
+    store = _store(tmp_path)
+    r1 = store.upsert_worktree(session_id="s1", project_id="proj",
+                               repo_root="/repo", path="/wt", branch="quodeq/fix-1")
+    store.set_worktree_status("s1", "applied")
+    time.sleep(0.01)  # ensure a later subsecond timestamp
+    r2 = store.upsert_worktree(session_id="s1", project_id="proj",
+                               repo_root="/repo", path="/wt2", branch="quodeq/fix-2")
+    assert r2["status"] == "active"
+    assert r2["created_at"] != r1["created_at"]  # generation bumped
 
 
 def test_get_worktree_missing(tmp_path):
