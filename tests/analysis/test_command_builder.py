@@ -47,6 +47,26 @@ _CODEX_CFG = {
 }
 
 
+_GEMINI_CFG = {
+    "gemini": {
+        "type": "cli",
+        "cmd": "gemini",
+        "cmd_subcommand": "",
+        "base_args": "--output-format stream-json --yolo",
+        "prompt_style": "flag",
+        "prompt_flag": "-p",
+        "mcp_style": "cli-register",
+        "mcp_add_separator": False,
+        "mcp_permission_args": ["--allowed-mcp-server-names", "quodeq-findings"],
+        "supports_tools": False,
+        "supports_budget": False,
+        "supports_turns": False,
+        "env_set_if_missing": {},
+        "env_remove": [],
+    }
+}
+
+
 def _patch_providers(cfg: dict):
     return patch("quodeq.analysis._command._get_provider_configs", return_value=cfg)
 
@@ -128,6 +148,13 @@ class TestBuildAiCmdCodex:
         idx = args.index("--model")
         assert args[idx + 1] == "gpt-5.4"
 
+    def test_normalizes_numeric_model_shorthand(self):
+        config = AnalysisConfig(ai_cmd="codex", ai_model="5.4")
+        with _patch_providers(_CODEX_CFG):
+            args, _ = _build_ai_cmd("Analyze", config)
+        idx = args.index("--model")
+        assert args[idx + 1] == "gpt-5.4"
+
     def test_inlines_codex_mcp_config_arg_with_jsonl(self, tmp_path):
         import sys
         import tomllib
@@ -155,3 +182,41 @@ class TestBuildAiCmdCodex:
         assert str(jsonl.resolve()) in server["args"]
         assert "--queue" in server["args"] and str(queue.resolve()) in server["args"]
         assert "--agent-id" in server["args"] and "agent-0" in server["args"]
+
+
+class TestBuildAiCmdGemini:
+    """Gemini provider command building (cli-register MCP style)."""
+
+    def test_cli_register_emits_permission_args_with_jsonl(self, tmp_path):
+        jsonl = tmp_path / "findings.jsonl"
+        jsonl.touch()
+        config = AnalysisConfig(
+            ai_cmd="gemini", ai_model="gemini-2.5-pro",
+            jsonl_file=jsonl, compiled_dir=tmp_path, dimension="security",
+        )
+        with _patch_providers(_GEMINI_CFG):
+            args, mcp_path = _build_ai_cmd("Analyze", config)
+        # Server registration happens out-of-band (`gemini mcp add`), so no
+        # config file or inline config — but the CLI must still be told the
+        # registered server is allowed, or every tool call is blocked.
+        assert mcp_path is None
+        assert "--mcp-config" not in args
+        assert "-c" not in args
+        idx = args.index("--allowed-mcp-server-names")
+        assert args[idx + 1] == "quodeq-findings"
+
+    def test_cli_register_no_mcp_args_without_jsonl(self):
+        config = AnalysisConfig(ai_cmd="gemini", ai_model="gemini-2.5-pro")
+        with _patch_providers(_GEMINI_CFG):
+            args, mcp_path = _build_ai_cmd("Analyze", config)
+        assert mcp_path is None
+        assert "--allowed-mcp-server-names" not in args
+
+    def test_prompt_via_flag_and_stream_json(self):
+        config = AnalysisConfig(ai_cmd="gemini", ai_model="gemini-2.5-pro")
+        with _patch_providers(_GEMINI_CFG):
+            args, _ = _build_ai_cmd("Analyze this", config)
+        assert args[0] == "gemini"
+        assert "--yolo" in args
+        pidx = args.index("-p")
+        assert args[pidx + 1] == "Analyze this"
