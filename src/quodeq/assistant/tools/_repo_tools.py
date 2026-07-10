@@ -19,6 +19,8 @@ def _jail(ctx: ToolContext, rel_path: str) -> Path:
             "no analyzed repository attached to this session. Call get_context "
             "to confirm scope; if repoAttached is false, use dashboard tools "
             "such as get_overview/get_violations instead of read_repo_file.")
+    if ctx.worktree_dir is not None and not ctx.worktree_dir.is_dir():
+        raise ToolError("write worktree is missing; reads cannot be served")
     root = root_path.resolve()
     target = (root / rel_path).resolve()
     if target != root and root not in target.parents:
