@@ -70,3 +70,33 @@ def test_find_evidence_dir(tmp_path: Path) -> None:
     evidence = _write_evidence(tmp_path)
     assert find_evidence_dir(tmp_path) == evidence
     assert find_evidence_dir(tmp_path / "nowhere") is None
+
+
+def test_req_refs_parsed_when_refs_absent(tmp_path: Path) -> None:
+    """Finding with no refs key but req_refs dicts yields CWEs from req_refs."""
+    violation = {
+        "schema_version": 1,
+        "p": "Integrity",
+        "t": "violation",
+        "d": "security",
+        "w": "SQL injection via string concatenation",
+        "file": "db.py",
+        "line": 7,
+        "severity": "critical",
+        "reason": "user input in SQL",
+        "req": "S-INT-2",
+        "vt": "sql-injection",
+        "req_refs": [
+            {"label": "CWE-89", "url": "https://cwe.mitre.org/data/definitions/89.html"},
+            {"label": "OWASP-A03"},
+        ],
+    }
+    evidence = tmp_path / "run" / "evidence"
+    evidence.mkdir(parents=True)
+    (evidence / "security_evidence.jsonl").write_text(
+        json.dumps(violation) + "\n", encoding="utf-8"
+    )
+    findings, _ = load_findings(evidence)
+    assert len(findings) == 1
+    assert "CWE-89" in findings[0].refs
+    assert parse_cwe_refs(findings[0].refs) == (89,)

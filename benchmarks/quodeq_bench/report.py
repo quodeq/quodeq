@@ -25,12 +25,24 @@ def collect_meta(repo_root: Path, provider: str, model: str, reps: int) -> dict:
         if path.is_file():
             digest.update(str(path.relative_to(prompts_dir)).encode())
             digest.update(path.read_bytes())
+    compiled_dir = repo_root / "src" / "quodeq" / "data" / "standards" / "compiled"
+    if compiled_dir.is_dir():
+        for path in sorted(compiled_dir.rglob("*")):
+            if path.is_file():
+                digest.update(str(path.relative_to(compiled_dir)).encode())
+                digest.update(path.read_bytes())
+    corpus_digest = hashlib.sha256()
+    corpus_root = repo_root / "benchmarks" / "corpus" / "synthetic"
+    for truth_path in sorted(corpus_root.glob("*/truth.json")):
+        corpus_digest.update(str(truth_path.relative_to(corpus_root)).encode())
+        corpus_digest.update(truth_path.read_bytes())
     return {
         "provider": provider,
         "model": model,
         "reps": reps,
         "quodeq_commit": commit,
         "prompts_hash": digest.hexdigest(),
+        "corpus_hash": corpus_digest.hexdigest(),
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
 

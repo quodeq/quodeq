@@ -37,6 +37,12 @@ def _finding_from_line(obj: dict) -> Finding | None:
     line = obj.get("line")
     if not isinstance(line, int) or line < 1:
         return None
+    refs = [str(r) for r in obj.get("refs", [])]
+    for ref in obj.get("req_refs", []):
+        if isinstance(ref, dict):
+            label = ref.get("label")
+            if isinstance(label, str):
+                refs.append(label)
     return Finding(
         dimension=str(obj.get("d", "")),
         file=str(obj.get("file", "")),
@@ -44,7 +50,7 @@ def _finding_from_line(obj: dict) -> Finding | None:
         severity=str(obj.get("severity", "")),
         req=str(obj.get("req", "")),
         vt=str(obj.get("vt", "")),
-        refs=tuple(str(r) for r in obj.get("refs", [])),
+        refs=tuple(refs),
         title=str(obj.get("w", "")),
     )
 

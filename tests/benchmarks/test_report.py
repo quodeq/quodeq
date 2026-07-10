@@ -46,6 +46,7 @@ def test_collect_meta_in_repo() -> None:
     assert meta["reps"] == 2
     assert len(meta["quodeq_commit"]) >= 7
     assert len(meta["prompts_hash"]) == 64
+    assert len(meta["corpus_hash"]) == 64
 
 
 def test_prompts_hash_reflects_subdirectory(tmp_path: Path) -> None:
