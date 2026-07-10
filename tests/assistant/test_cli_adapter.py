@@ -360,6 +360,41 @@ def test_codex_turn_is_wrapped_in_external_os_sandbox(tmp_path, monkeypatch):
     assert not Path(argv[2]).exists()
 
 
+def _codex_sandbox_dirs(tmp_path, monkeypatch, cfg):
+    seen = {}
+
+    def spy(*, writable_dirs, writable_files):
+        seen["dirs"] = writable_dirs
+        return [], None
+
+    monkeypatch.setattr(_cli_mod, "external_sandbox_prefix", spy)
+    lines = ['{"type": "thread.started", "thread_id": "th-1"}',
+             '{"type": "item.completed", "item": {"type": "agent_message", "text": "ok"}}']
+    run_cli_turn(
+        messages=[{"role": "user", "content": "hi"}],
+        config=cfg, session_id="s1", prior_session_id=None,
+        repository=_repo(tmp_path), emit=lambda f: None,
+        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+    return seen["dirs"]
+
+
+def test_codex_sandbox_writable_dirs_include_worktree(tmp_path, monkeypatch):
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    cfg = dataclasses.replace(_config(tmp_path), provider="codex", model="5",
+                              worktree_dir=wt)
+    dirs = _codex_sandbox_dirs(tmp_path, monkeypatch, cfg)
+    assert str(wt) in dirs
+
+
+def test_codex_sandbox_writable_dirs_omit_worktree_when_none(tmp_path, monkeypatch):
+    cfg = dataclasses.replace(_config(tmp_path), provider="codex", model="5")
+    dirs = _codex_sandbox_dirs(tmp_path, monkeypatch, cfg)
+    # only the scratch cwd and ~/.codex are writable on read-only turns
+    assert len(dirs) == 2
+    assert str(Path.home() / ".codex") in dirs
+
+
 def test_json_error_event_raises_message(tmp_path):
     repo = _repo(tmp_path)
     lines = [

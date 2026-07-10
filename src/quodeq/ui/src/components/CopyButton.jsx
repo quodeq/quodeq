@@ -80,6 +80,14 @@ export function GlobeIcon() {
   );
 }
 
+export function PencilIcon() {
+  return (
+    <svg width={ICON_SIZE} height={ICON_SIZE} viewBox={ICON_VIEWBOX} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+    </svg>
+  );
+}
+
 export default function CopyButton({ onClick, label, className, icon, 'aria-label': ariaLabel }) {
   const [copied, setCopied] = useState(false);
 
