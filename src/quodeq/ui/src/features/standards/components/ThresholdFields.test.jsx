@@ -76,4 +76,33 @@ describe('ThresholdFields', () => {
     rerender(<ThresholdFields requirement={REQ} reqOverrides={{}} onChangeParam={onChangeParam} />);
     expect(input).toHaveValue(50);
   });
+
+  it('does NOT call onChangeParam for an out-of-range integer (above max)', () => {
+    const onChangeParam = vi.fn();
+    render(<ThresholdFields requirement={REQ} reqOverrides={{}} onChangeParam={onChangeParam} />);
+    const input = screen.getByLabelText('Max function lines');
+    // 501 > spec.max (500)
+    fireEvent.change(input, { target: { value: '501' } });
+    expect(onChangeParam).not.toHaveBeenCalled();
+  });
+
+  it('does NOT call onChangeParam for an out-of-range integer (below min)', () => {
+    const onChangeParam = vi.fn();
+    render(<ThresholdFields requirement={REQ} reqOverrides={{}} onChangeParam={onChangeParam} />);
+    const input = screen.getByLabelText('Max function lines');
+    // 5 < spec.min (10)
+    fireEvent.change(input, { target: { value: '5' } });
+    expect(onChangeParam).not.toHaveBeenCalled();
+  });
+
+  it('restores effective value on blur after typing an out-of-range integer', () => {
+    const onChangeParam = vi.fn();
+    render(<ThresholdFields requirement={REQ} reqOverrides={{ max_lines: 60 }} onChangeParam={onChangeParam} />);
+    const input = screen.getByLabelText('Max function lines');
+    fireEvent.change(input, { target: { value: '999' } });
+    expect(onChangeParam).not.toHaveBeenCalled();
+    fireEvent.blur(input);
+    // Should snap back to the current effective value (60)
+    expect(input).toHaveValue(60);
+  });
 });

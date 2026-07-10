@@ -135,6 +135,7 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
   const { selectedProject } = useAppState();
   const { overrides: savedOverrides, save: saveOverrides } = useStandardsOverrides(selectedProject);
   const [draftOverrides, setDraftOverrides] = useState(null);
+  const [overridesSaveError, setOverridesSaveError] = useState(null);
   const overrides = draftOverrides ?? savedOverrides;
   const overridesDirty = draftOverrides !== null;
 
@@ -162,12 +163,18 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
   const { width: treeWidth, onMouseDown: onDividerMouseDown } = useResizable(DEFAULT_TREE_WIDTH);
 
   const handleSave = async () => {
-    if (editable) await save();
-    if (overridesDirty) {
-      await saveOverrides(overrides);
-      setDraftOverrides(null);
+    setOverridesSaveError(null);
+    try {
+      if (editable) await save();
+      if (overridesDirty) {
+        await saveOverrides(overrides);
+        setDraftOverrides(null);
+      }
+      if (onSaved) onSaved(standard?.id);
+    } catch (err) {
+      // Keep the draft so the user can retry; surface the error inline.
+      setOverridesSaveError(err?.message || 'Failed to save overrides');
     }
-    if (onSaved) onSaved(standard?.id);
   };
 
   const earlyReturn = EditorLoadingOrError({ loading, error, standard, onBack });
@@ -185,6 +192,7 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
         onBack={onBack} onSave={handleSave}
       />
       {error && <p className="inline-error" style={{ margin: INLINE_ERROR_MARGIN }}>{error}</p>}
+      {overridesSaveError && <p className="inline-error" style={{ margin: INLINE_ERROR_MARGIN }}>{overridesSaveError}</p>}
       <EditorBody
         treeProps={{ standard, selectedNode, actions: treeActions, editable, overrides }}
         detailProps={{ updateField, isNew, onChangeParam }}

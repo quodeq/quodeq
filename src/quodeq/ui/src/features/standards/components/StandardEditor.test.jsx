@@ -185,4 +185,47 @@ describe('StandardEditor — override state wiring', () => {
     // ThresholdFields only renders when onChangeParam is provided
     expect(screen.queryByText(/^Thresholds$/i)).not.toBeInTheDocument();
   });
+
+  it('failed saveOverrides shows an inline error and keeps the Save button (draft preserved)', async () => {
+    const saveOverrides = vi.fn().mockRejectedValue(new Error('Network error'));
+    useAppState.mockReturnValue({ selectedProject: 'proj-1' });
+    useStandardsOverrides.mockReturnValue({ overrides: {}, counts: {}, loading: false, error: null, save: saveOverrides });
+    useStandardDetail.mockReturnValue(makeDetail());
+
+    render(<StandardEditor standardId="iso-25010" onBack={() => {}} />);
+
+    const input = screen.getByLabelText('Max function lines');
+    fireEvent.change(input, { target: { value: '60' } });
+
+    const saveBtn = await screen.findByRole('button', { name: /^save$/i });
+    fireEvent.click(saveBtn);
+
+    // Error message appears inline
+    await waitFor(() => {
+      expect(screen.getByText(/Network error/i)).toBeInTheDocument();
+    });
+    // Save button is still present (draft not cleared)
+    expect(screen.getByRole('button', { name: /^save$/i })).toBeInTheDocument();
+  });
+
+  it('onSaved is NOT called when saveOverrides rejects', async () => {
+    const saveOverrides = vi.fn().mockRejectedValue(new Error('Server error'));
+    const onSaved = vi.fn();
+    useAppState.mockReturnValue({ selectedProject: 'proj-1' });
+    useStandardsOverrides.mockReturnValue({ overrides: {}, counts: {}, loading: false, error: null, save: saveOverrides });
+    useStandardDetail.mockReturnValue(makeDetail());
+
+    render(<StandardEditor standardId="iso-25010" onBack={() => {}} onSaved={onSaved} />);
+
+    const input = screen.getByLabelText('Max function lines');
+    fireEvent.change(input, { target: { value: '60' } });
+
+    const saveBtn = await screen.findByRole('button', { name: /^save$/i });
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Server error/i)).toBeInTheDocument();
+    });
+    expect(onSaved).not.toHaveBeenCalled();
+  });
 });

@@ -19,14 +19,24 @@ function ThresholdFieldRow({ name, spec, effectiveValue, overridden, onChangePar
 
     const num = Number(raw);
     if (raw !== '' && Number.isInteger(num)) {
-      onChangeParam(name, num);
+      const inRange =
+        (spec.min == null || num >= spec.min) &&
+        (spec.max == null || num <= spec.max);
+      if (inRange) {
+        onChangeParam(name, num);
+      }
+      // out-of-range: do not fire; blur will restore effective value
     }
   }
 
   function handleBlur() {
     const num = Number(draft);
-    if (draft === '' || !Number.isInteger(num)) {
-      // Invalid draft — snap back to effective value
+    const inRange =
+      Number.isInteger(num) &&
+      (spec.min == null || num >= spec.min) &&
+      (spec.max == null || num <= spec.max);
+    if (draft === '' || !inRange) {
+      // Invalid or out-of-range draft — snap back to effective value
       setDraft(String(effectiveValue));
     }
     setDirty(false);
