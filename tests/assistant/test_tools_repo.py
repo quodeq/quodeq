@@ -75,3 +75,14 @@ def test_repo_tools_without_repo_root(ctx):
     out = reg.dispatch("read_repo_file", {"path": "x"})
     assert out["ok"] is False
     assert "get_context" in out["error"]
+
+
+def test_reads_reroot_to_worktree(ctx, tmp_path):
+    from dataclasses import replace
+
+    wt = tmp_path / "worktree"
+    (wt / "src").mkdir(parents=True)
+    (wt / "src" / "app.py").write_bytes(b"print('worktree')\n")
+    reg = build_registry(replace(ctx, worktree_dir=wt))
+    out = reg.dispatch("read_repo_file", {"path": "src/app.py"})
+    assert out["ok"] and out["result"]["content"] == "print('worktree')\n"
