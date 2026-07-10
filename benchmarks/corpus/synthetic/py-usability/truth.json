@@ -1,0 +1,16 @@
+{
+  "language": "python",
+  "exhaustive": true,
+  "clean_files": [],
+  "labels": [
+    {"file": "cli_tool.py", "line": 6, "end_line": 8, "anchor": "args = sys.argv[1:]",
+     "dimension": "usability", "cwes": [1053], "reqs": ["U-LRN-1"],
+     "severity": "minor", "note": "manual argv parsing, no --help"},
+    {"file": "cli_tool.py", "line": 15, "anchor": "traceback.print_exc()",
+     "dimension": "usability", "cwes": [209], "reqs": ["U-APR-1"],
+     "severity": "major", "note": "raw stack trace shown to end user"},
+    {"file": "api.py", "line": 9, "anchor": "\"error\": \"bad input\"",
+     "dimension": "usability", "cwes": [], "reqs": ["U-APR-2"],
+     "severity": "minor", "note": "error response lacks machine-readable code"}
+  ]
+}
