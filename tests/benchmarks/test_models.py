@@ -60,3 +60,17 @@ def test_rejects_nonpositive_line(tmp_path: Path) -> None:
     bad["labels"][0]["line"] = 0
     with pytest.raises(TruthError, match="line"):
         load_truth(_write_case(tmp_path, bad))
+
+
+def test_rejects_missing_file_key(tmp_path: Path) -> None:
+    bad = json.loads(json.dumps(_VALID))
+    del bad["labels"][0]["file"]
+    with pytest.raises(TruthError, match="file"):
+        load_truth(_write_case(tmp_path, bad))
+
+
+def test_rejects_non_list_labels(tmp_path: Path) -> None:
+    bad = json.loads(json.dumps(_VALID))
+    bad["labels"] = "oops"
+    with pytest.raises(TruthError, match="list"):
+        load_truth(_write_case(tmp_path, bad))

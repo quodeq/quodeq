@@ -44,6 +44,11 @@ class CaseTruth:
 
 
 def _parse_label(raw: dict, index: int) -> Label:
+    if not isinstance(raw, dict):
+        raise TruthError(f"label {index}: must be an object")
+    file_value = raw.get("file")
+    if not isinstance(file_value, str) or not file_value:
+        raise TruthError(f"label {index}: file must be a non-empty string, got {file_value!r}")
     line = raw.get("line")
     if not isinstance(line, int) or line < 1:
         raise TruthError(f"label {index}: line must be a positive int, got {line!r}")
@@ -61,7 +66,7 @@ def _parse_label(raw: dict, index: int) -> Label:
     if end_line is not None and (not isinstance(end_line, int) or end_line < line):
         raise TruthError(f"label {index}: end_line must be >= line")
     return Label(
-        file=str(raw["file"]),
+        file=file_value,
         line=line,
         dimension=dimension,
         severity=severity,
@@ -79,8 +84,11 @@ def load_truth(case_dir: Path) -> CaseTruth:
         raw = json.loads(truth_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise TruthError(f"{truth_path}: {exc}") from exc
+    raw_labels = raw.get("labels", [])
+    if not isinstance(raw_labels, list):
+        raise TruthError(f"{truth_path}: labels must be a list, got {type(raw_labels).__name__}")
     labels = tuple(
-        _parse_label(item, i) for i, item in enumerate(raw.get("labels", []))
+        _parse_label(item, i) for i, item in enumerate(raw_labels)
     )
     if not labels:
         raise TruthError(f"{truth_path}: no labels")
