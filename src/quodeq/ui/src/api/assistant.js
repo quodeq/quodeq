@@ -24,3 +24,24 @@ export function assistantEventsUrl(sessionId, afterSeq = 0) {
 export function fetchAssistantCatalog() {
   return request('/assistant/skills');
 }
+
+export function fetchAssistantWorkspace(sessionId) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/workspace`);
+}
+
+export function fetchAssistantWorkspaceDiff(sessionId) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/workspace/diff`);
+}
+
+export function applyAssistantWorkspace(sessionId) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/workspace/apply`, { method: 'POST' });
+}
+
+export function createAssistantWorkspacePr(sessionId, body) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/workspace/pr`,
+    { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function discardAssistantWorkspace(sessionId) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/workspace/discard`, { method: 'POST' });
+}
