@@ -122,7 +122,7 @@ def write_state(state: dict, path: Path) -> None:
     fd, tmp_path = tempfile.mkstemp(dir=str(parent), suffix=".tmp", prefix=".queue_")
     cleanup_tmp: str | None = tmp_path
     try:
-        with os.fdopen(fd, "w") as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(state, f)
             f.flush()
             os.fsync(f.fileno())

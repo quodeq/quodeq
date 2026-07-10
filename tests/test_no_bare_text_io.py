@@ -14,6 +14,7 @@ via ``_NON_TEXT_OPEN``; binary-mode opens are exempted by ``_BINARY_MODE``.
 """
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -64,5 +65,84 @@ def test_no_bare_text_io() -> None:
     assert not offenders, (
         f"{len(offenders)} text-I/O call(s) without explicit encoding "
         "(breaks on Windows cp1252). Pass encoding='utf-8':\n  "
+        + "\n  ".join(offenders)
+    )
+
+
+# --- subprocess text=True / os.fdopen coverage (AST-based) -----------------
+#
+# subprocess.run/Popen(..., text=True) decodes child output with the locale
+# code page on Windows, exactly like bare open(). The line-based scan above
+# cannot catch it because the encoding= kwarg may sit on a different line of
+# the same multi-line call, so this check parses the AST instead. os.fdopen
+# in text mode shares the same default and is missed by the open() regex.
+
+_SUBPROCESS_FUNCS = frozenset({"run", "Popen", "check_output", "check_call", "call"})
+
+# Sites that legitimately cannot pin encoding (document the reason).
+# Format: "src-relative/path.py:LINE"
+_SUBPROCESS_ALLOWLIST: set[str] = set()
+
+
+def _is_subprocess_call(node: ast.Call) -> bool:
+    func = node.func
+    return (
+        isinstance(func, ast.Attribute)
+        and func.attr in _SUBPROCESS_FUNCS
+        and isinstance(func.value, ast.Name)
+        and "subprocess" in func.value.id
+    )
+
+
+def _is_text_fdopen(node: ast.Call) -> bool:
+    func = node.func
+    if not (
+        isinstance(func, ast.Attribute)
+        and func.attr == "fdopen"
+        and isinstance(func.value, ast.Name)
+        and func.value.id == "os"
+    ):
+        return False
+    mode = "r"
+    if len(node.args) > 1 and isinstance(node.args[1], ast.Constant):
+        mode = node.args[1].value
+    for kw in node.keywords:
+        if kw.arg == "mode" and isinstance(kw.value, ast.Constant):
+            mode = kw.value.value
+    return isinstance(mode, str) and "b" not in mode
+
+
+def _subprocess_text_offenders() -> list[str]:
+    bad: list[str] = []
+    for py in sorted(SRC.rglob("*.py")):
+        rel = py.relative_to(SRC).as_posix()
+        tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if f"{rel}:{node.lineno}" in _SUBPROCESS_ALLOWLIST:
+                continue
+            kwargs = {kw.arg for kw in node.keywords if kw.arg}
+            if "encoding" in kwargs:
+                continue
+            if _is_subprocess_call(node):
+                wants_text = any(
+                    kw.arg in ("text", "universal_newlines")
+                    and isinstance(kw.value, ast.Constant)
+                    and kw.value.value is True
+                    for kw in node.keywords
+                )
+                if wants_text:
+                    bad.append(f"{rel}:{node.lineno}: subprocess {node.func.attr}(text=True)")
+            elif _is_text_fdopen(node):
+                bad.append(f"{rel}:{node.lineno}: os.fdopen() in text mode")
+    return bad
+
+
+def test_no_bare_subprocess_text() -> None:
+    offenders = _subprocess_text_offenders()
+    assert not offenders, (
+        f"{len(offenders)} subprocess/fdopen call(s) decode text without explicit "
+        "encoding (breaks on Windows cp1252). Pass encoding='utf-8':\n  "
         + "\n  ".join(offenders)
     )

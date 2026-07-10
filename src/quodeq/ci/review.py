@@ -28,7 +28,7 @@ def detect_pr(pr_override: int | None = None) -> tuple[int, str]:
         try:
             result = subprocess.run(
                 ["gh", "pr", "view", str(pr_override), "--json", "number,baseRefName"],
-                capture_output=True, text=True, check=True,
+                capture_output=True, text=True, encoding="utf-8", check=True,
             )
         except FileNotFoundError:
             raise ReviewError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
@@ -40,7 +40,7 @@ def detect_pr(pr_override: int | None = None) -> tuple[int, str]:
     try:
         result = subprocess.run(
             ["gh", "pr", "view", "--json", "number,baseRefName"],
-            capture_output=True, text=True, check=True,
+            capture_output=True, text=True, encoding="utf-8", check=True,
         )
     except FileNotFoundError:
         raise ReviewError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
@@ -62,7 +62,7 @@ def get_github_token() -> str:
     try:
         result = subprocess.run(
             ["gh", "auth", "token"],
-            capture_output=True, text=True, check=True,
+            capture_output=True, text=True, encoding="utf-8", check=True,
         )
     except FileNotFoundError:
         raise ReviewError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
@@ -81,7 +81,7 @@ def get_repo_info() -> tuple[str, str]:
     try:
         result = subprocess.run(
             ["gh", "repo", "view", "--json", "owner,name"],
-            capture_output=True, text=True, check=True,
+            capture_output=True, text=True, encoding="utf-8", check=True,
         )
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
         raise ReviewError(

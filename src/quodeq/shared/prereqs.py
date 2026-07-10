@@ -67,7 +67,7 @@ def _run_version_cmd(cmd: list[str]) -> str:
         if not isinstance(token, str) or not _SAFE_CMD_TOKEN_RE.fullmatch(token):
             raise ValueError(f"unsafe command token: {token!r}")
     result = subprocess.run(
-        cmd, capture_output=True, text=True, check=True, shell=_IS_WIN32,
+        cmd, capture_output=True, text=True, encoding="utf-8", check=True, shell=_IS_WIN32,
         timeout=_VERSION_CMD_TIMEOUT_S,
     )
     return result.stdout.strip()

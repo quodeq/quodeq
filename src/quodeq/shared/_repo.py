@@ -50,7 +50,7 @@ def git_remote_url(repo_path: str) -> str | None:
         result = subprocess.run(
             ["git", "-C", repo_path, "config", "--get", "remote.origin.url"],
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8",
             check=True,
         )
     except (FileNotFoundError, subprocess.CalledProcessError):
