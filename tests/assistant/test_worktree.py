@@ -153,3 +153,44 @@ def test_create_pr_fail_soft_without_gh(manager, monkeypatch):
     assert result["prUrl"] is None
     assert result["branch"] == manager.branch
     assert "branch" in result["message"] or "push" in result["message"]
+
+
+from quodeq.assistant.worktree import ensure_session_worktree, gc_stale_worktrees
+from quodeq.data.sqlite.assistant_repository import AssistantRepository
+
+
+def _store(tmp_path):
+    store = AssistantRepository(tmp_path / "assistant.db")
+    store.create_session(session_id="s1", provider="ollama", project_id="proj")
+    return store
+
+
+def test_ensure_creates_once_then_reuses(repo, tmp_path):
+    store = _store(tmp_path)
+    m1 = ensure_session_worktree(store, repo_root=repo, project_id="proj",
+                                 session_id="s1", base=tmp_path / "wts")
+    assert m1.exists()
+    assert store.get_worktree("s1")["branch"] == m1.branch
+    m2 = ensure_session_worktree(store, repo_root=repo, project_id="proj",
+                                 session_id="s1", base=tmp_path / "wts")
+    assert m2.path == m1.path and m2.branch == m1.branch
+
+
+def test_ensure_after_terminal_status_makes_fresh_worktree(repo, tmp_path):
+    store = _store(tmp_path)
+    m1 = ensure_session_worktree(store, repo_root=repo, project_id="proj",
+                                 session_id="s1", base=tmp_path / "wts")
+    m1.remove()
+    store.set_worktree_status("s1", "discarded")
+    m2 = ensure_session_worktree(store, repo_root=repo, project_id="proj",
+                                 session_id="s1", base=tmp_path / "wts")
+    assert m2.exists()
+    assert store.get_worktree("s1")["status"] == "active"
+
+
+def test_gc_marks_missing_paths_stale(repo, tmp_path):
+    store = _store(tmp_path)
+    store.upsert_worktree(session_id="s1", project_id="proj", repo_root=str(repo),
+                          path=str(tmp_path / "gone"), branch="quodeq/fix-x")
+    gc_stale_worktrees(store)
+    assert store.get_worktree("s1")["status"] == "stale"

@@ -196,3 +196,29 @@ class WorktreeManager:
         url = out.strip().splitlines()[-1] if out.strip() else None
         return {"prUrl": url, "branch": self.branch, "pushed": True,
                 "message": "PR created"}
+
+
+def ensure_session_worktree(repository, *, repo_root: Path, project_id: str | None,
+                            session_id: str, base: Path | None = None) -> WorktreeManager:
+    """Return the session's active worktree, creating one when needed."""
+    row = repository.get_worktree(session_id)
+    if row and row["status"] == "active" and Path(row["path"]).is_dir():
+        return WorktreeManager(repo_root=Path(row["repo_root"]),
+                               path=Path(row["path"]), branch=row["branch"])
+    manager = WorktreeManager.for_session(repo_root, project_id or "project",
+                                          session_id, base=base)
+    if manager.path.exists():  # crash leftover or terminal reuse: start clean
+        shutil.rmtree(manager.path, ignore_errors=True)
+        _run(["git", "-C", str(repo_root), "worktree", "prune"])
+    manager.create()
+    repository.upsert_worktree(session_id=session_id, project_id=project_id,
+                               repo_root=str(repo_root), path=str(manager.path),
+                               branch=manager.branch)
+    return manager
+
+
+def gc_stale_worktrees(repository) -> None:
+    """Mark active rows whose worktree directory vanished (crash cleanup)."""
+    for row in repository.list_worktrees("active"):
+        if not Path(row["path"]).is_dir():
+            repository.set_worktree_status(row["session_id"], "stale")
