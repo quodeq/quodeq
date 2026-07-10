@@ -32,6 +32,45 @@ const actions = {
   onToggleVisibility: vi.fn(),
 };
 
+describe('StandardsTable customized badge', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    exportStandard.mockResolvedValue({ data: {}, fileName: 'test.json' });
+  });
+
+  it('shows the customized badge when customizedCounts has a nonzero entry for the standard', () => {
+    render(
+      <StandardsTable
+        grouped={{ custom: [STANDARD] }}
+        actions={actions}
+        customizedCounts={{ 'my-std': 3 }}
+      />,
+    );
+    expect(screen.getByText('3 customized')).toBeInTheDocument();
+  });
+
+  it('does not show the badge when customizedCounts has no entry for the standard', () => {
+    render(
+      <StandardsTable
+        grouped={{ custom: [STANDARD] }}
+        actions={actions}
+        customizedCounts={{}}
+      />,
+    );
+    expect(screen.queryByText(/customized/i)).toBeNull();
+  });
+
+  it('does not show the badge when customizedCounts is undefined', () => {
+    render(
+      <StandardsTable
+        grouped={{ custom: [STANDARD] }}
+        actions={actions}
+      />,
+    );
+    expect(screen.queryByText(/customized/i)).toBeNull();
+  });
+});
+
 describe('StandardsTable download error handling (#500)', () => {
   beforeEach(() => {
     vi.clearAllMocks();

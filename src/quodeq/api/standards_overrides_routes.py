@@ -83,9 +83,6 @@ def register_overrides_routes(app: Flask) -> None:
             logger.info("standards.overrides cleared project=%s", project_id)
             return jsonify({"overrides": {}})
         override_path.parent.mkdir(parents=True, exist_ok=True)
-        override_path.write_text(
-            json.dumps({"version": 1, "overrides": clean}, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        override_path.write_text(json.dumps({"version": 1, "overrides": clean}, indent=2) + "\n", encoding="utf-8")
         logger.info("standards.overrides saved project=%s reqs=%d", project_id, len(clean))
         return jsonify({"overrides": clean})
