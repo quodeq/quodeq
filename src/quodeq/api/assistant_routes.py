@@ -18,7 +18,7 @@ from quodeq.api._assistant_helpers import (
 )
 from quodeq.api._sse_log_helpers import sse_line
 from quodeq.assistant import get_provider_configs
-from quodeq.assistant.orchestrator import TurnRequest, run_turn
+from quodeq.assistant.orchestrator import TurnRequest, run_turn, write_safe_provider
 from quodeq.assistant.skills import RESERVED_COMMANDS, load_skills
 from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES, ACTIONS, ActionConflict
 
@@ -75,7 +75,9 @@ def register_assistant_routes(app: Flask) -> None:
             run_id=run_dir,
             project_id=str(project_id) if project_id else None,
         )
-        write_available = bool(repo_root) and (Path(repo_root) / ".git").exists()
+        write_available = (bool(repo_root)
+                           and (Path(repo_root) / ".git").exists()
+                           and write_safe_provider(str(body["provider"])))
         return jsonify({"sessionId": session_id,
                         "repoAttached": repo_root is not None,
                         "repoReason": repo_reason,

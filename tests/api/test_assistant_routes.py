@@ -26,6 +26,7 @@ def app(tmp_path, monkeypatch):
     catalog = {
         "ollama": {"type": "api", "api_base": "http://localhost:11434/v1"},
         "claude": {"type": "cli"},
+        "gemini": {"type": "cli"},
     }
     monkeypatch.setattr(
         "quodeq.api.assistant_routes.get_provider_configs", lambda: catalog
@@ -599,17 +600,31 @@ def test_create_session_reports_detachment(client, monkeypatch):
 
 
 def test_message_passes_write_enabled(client, app, monkeypatch):
+    import threading
     seen = {}
+    done = threading.Event()
     monkeypatch.setattr("quodeq.api._assistant_helpers.local_provider_busy",
                         lambda p: False)
 
     def fake_run_turn(turn, **kw):
         seen["write_enabled"] = turn.write_enabled
+        done.set()
     monkeypatch.setattr("quodeq.api.assistant_routes.run_turn", fake_run_turn)
     sid = client.post("/api/assistant/sessions",
                       json={"provider": "ollama"}).get_json()["sessionId"]
     client.post(f"/api/assistant/sessions/{sid}/messages",
                 json={"text": "hi", "writeEnabled": True})
-    import time
-    time.sleep(0.2)  # run_turn runs on a daemon thread
+    assert done.wait(timeout=2)  # run_turn runs on a daemon thread
     assert seen.get("write_enabled") is True
+
+
+def test_create_session_write_unavailable_for_unsafe_provider(client, monkeypatch, tmp_path):
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    monkeypatch.setattr("quodeq.api._assistant_helpers.repo_attach_info",
+                        lambda pid: (str(repo), "ok"))
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "gemini", "projectId": "p1"})
+    data = resp.get_json()
+    assert data["repoAttached"] is True
+    assert data["writeAvailable"] is False

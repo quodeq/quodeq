@@ -54,7 +54,7 @@ def _provider_type(provider: str) -> str:
 _ISOLATED_MCP_STYLES = frozenset({"config-file", "config-arg"})
 
 
-def _write_safe_provider(provider: str) -> bool:
+def write_safe_provider(provider: str) -> bool:
     """Whether the write grant may activate for this provider. API providers
     register tools in-process (no MCP config involved); CLI providers qualify
     only when their MCP config is per-invocation isolated."""
@@ -113,7 +113,7 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
         # provider whose tool wiring is per-invocation isolated.
         write_on = (request.write_enabled and tool_ctx.repo_root is not None
                     and (tool_ctx.repo_root / ".git").exists()
-                    and _write_safe_provider(request.provider))
+                    and write_safe_provider(request.provider))
         if write_on:
             manager = ensure_session_worktree(
                 repository, repo_root=tool_ctx.repo_root,
