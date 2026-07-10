@@ -23,7 +23,7 @@ def collect_meta(repo_root: Path, provider: str, model: str, reps: int) -> dict:
     prompts_dir = repo_root / "src" / "quodeq" / "data" / "prompts"
     for path in sorted(prompts_dir.rglob("*")):
         if path.is_file():
-            digest.update(path.name.encode())
+            digest.update(str(path.relative_to(prompts_dir)).encode())
             digest.update(path.read_bytes())
     return {
         "provider": provider,
@@ -45,6 +45,13 @@ def build_report(
     }
 
 
+def _avg(values: list[float | int]) -> float | int:
+    mean = round(sum(values) / len(values), 4)
+    if all(isinstance(v, int) for v in values) and float(mean).is_integer():
+        return int(mean)
+    return mean
+
+
 def average_reports(reports: list[dict]) -> dict:
     if not reports:
         raise ValueError("no reports to average")
@@ -54,7 +61,7 @@ def average_reports(reports: list[dict]) -> dict:
         rows = [r["metrics"][dim] for r in reports if dim in r["metrics"]]
         keys = rows[0].keys()
         averaged[dim] = {
-            key: round(sum(row[key] for row in rows) / len(rows), 4) for key in keys
+            key: _avg([row[key] for row in rows]) for key in keys
         }
     return {
         "meta": reports[0]["meta"],

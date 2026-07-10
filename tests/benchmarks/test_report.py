@@ -46,3 +46,20 @@ def test_collect_meta_in_repo() -> None:
     assert meta["reps"] == 2
     assert len(meta["quodeq_commit"]) >= 7
     assert len(meta["prompts_hash"]) == 64
+
+
+def test_prompts_hash_reflects_subdirectory(tmp_path: Path) -> None:
+    prompts = tmp_path / "src" / "quodeq" / "data" / "prompts"
+    (prompts / "a").mkdir(parents=True)
+    (prompts / "a" / "x.md").write_text("same content", encoding="utf-8")
+    first = collect_meta(tmp_path, "p", "m", 1)["prompts_hash"]
+    (prompts / "b").mkdir()
+    (prompts / "a" / "x.md").rename(prompts / "b" / "x.md")
+    second = collect_meta(tmp_path, "p", "m", 1)["prompts_hash"]
+    assert first != second
+
+
+def test_average_preserves_integer_counts() -> None:
+    avg = average_reports([_report(0.8, 0.5), _report(0.6, 1.0)])
+    assert avg["metrics"]["security"]["total_labels"] == 4
+    assert isinstance(avg["metrics"]["security"]["total_labels"], int)
