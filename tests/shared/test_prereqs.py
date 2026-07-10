@@ -74,9 +74,26 @@ class TestCheckApiProvider:
             with pytest.raises(RuntimeError, match="llama-server is not running"):
                 _check_api_provider("llamacpp")
 
-    def test_non_ollama_api_passes(self):
-        # Cloud API providers have no connectivity check
-        _check_api_provider("openrouter")
+    def test_keyless_api_provider_passes(self):
+        # API providers that don't require a key have no connectivity check
+        cfg = {"custom": {"type": "api", "api_key_env": "AI_API_KEY"}}
+        with patch("quodeq.shared.prereqs.get_provider_configs", return_value=cfg):
+            _check_api_provider("custom", env={"PATH": "/usr/bin"})
+
+    def test_openrouter_missing_key_raises(self):
+        cfg = {"openrouter": {
+            "type": "api", "api_key_env": "OPENROUTER_API_KEY", "api_key_required": True,
+        }}
+        with patch("quodeq.shared.prereqs.get_provider_configs", return_value=cfg):
+            with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY"):
+                _check_api_provider("openrouter", env={"PATH": "/usr/bin"})
+
+    def test_openrouter_with_key_passes(self):
+        cfg = {"openrouter": {
+            "type": "api", "api_key_env": "OPENROUTER_API_KEY", "api_key_required": True,
+        }}
+        with patch("quodeq.shared.prereqs.get_provider_configs", return_value=cfg):
+            _check_api_provider("openrouter", env={"OPENROUTER_API_KEY": "sk-or-x"})
 
 
 class TestIsProviderExplicitlyConfigured:
