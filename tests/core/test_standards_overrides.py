@@ -122,3 +122,12 @@ def test_validate_overrides_rejects_non_dict():
     clean, errors = validate_overrides(["nope"], {})
     assert clean == {}
     assert errors == ["overrides must be an object"]
+
+
+def test_extract_requirements_applies_overrides():
+    from quodeq.core.standards.refs import extract_requirements
+    data = {"principles": [{"name": "Analyzability", "requirements": [REQ]}]}
+    plain = extract_requirements(data)
+    tuned = extract_requirements(data, overrides={"M-ANA-2": {"max_lines": 60}})
+    assert plain["M-ANA-2"]["text"] == "Functions MUST NOT exceed 50 lines"
+    assert tuned["M-ANA-2"]["text"] == "Functions MUST NOT exceed 60 lines"
