@@ -1,0 +1,16 @@
+{
+  "language": "javascript",
+  "exhaustive": true,
+  "clean_files": ["db.js"],
+  "labels": [
+    {"file": "server.js", "line": 8, "anchor": "SELECT * FROM users WHERE id = ${",
+     "dimension": "security", "cwes": [89, 564], "reqs": [],
+     "severity": "critical", "note": "SQL injection via template literal"},
+    {"file": "server.js", "line": 13, "anchor": "eval(req.query.expr)",
+     "dimension": "security", "cwes": [95, 94], "reqs": [],
+     "severity": "critical", "note": "eval of user input"},
+    {"file": "config.js", "line": 2, "end_line": 3, "anchor": "apiKey: \"sk-live",
+     "dimension": "security", "cwes": [798], "reqs": ["S-CON-1"],
+     "severity": "critical", "note": "hardcoded credentials"}
+  ]
+}

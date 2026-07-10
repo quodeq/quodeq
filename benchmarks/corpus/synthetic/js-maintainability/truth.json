@@ -1,0 +1,13 @@
+{
+  "language": "javascript",
+  "exhaustive": true,
+  "clean_files": ["format.js"],
+  "labels": [
+    {"file": "report.js", "line": 1, "end_line": 36, "anchor": "function buildReport(orders",
+     "dimension": "maintainability", "cwes": [1121], "reqs": ["M-MOD-1"],
+     "severity": "major", "note": "high-complexity nested report builder"},
+    {"file": "report.js", "line": 1, "anchor": "locale, currency, audit, verbose",
+     "dimension": "maintainability", "cwes": [1064], "reqs": ["M-MOD-4"],
+     "severity": "minor", "note": "9 positional parameters"}
+  ]
+}
