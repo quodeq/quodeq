@@ -152,7 +152,23 @@ def test_create_pr_fail_soft_without_gh(manager, monkeypatch):
     result = manager.create_pr("t", "b")
     assert result["prUrl"] is None
     assert result["branch"] == manager.branch
-    assert "branch" in result["message"] or "push" in result["message"]
+    assert "push failed" in result["message"].lower()
+
+
+def test_create_pr_push_failure_restores_worktree_changes(manager, repo):
+    (manager.path / "app.py").write_bytes(b"print('bye')\n")
+    result = manager.create_pr("t", "b")           # fixture repo has no origin -> push fails
+    assert result["pushed"] is False
+    # changes are back in the working tree (not stranded in a commit)
+    assert "print('bye')" in diff_text(manager.path)
+    stats = manager.apply_to_repo()                 # in-app apply works again
+    assert stats and (repo / "app.py").read_bytes() == b"print('bye')\n"
+
+
+def test_commit_all_returns_committed(manager):
+    assert manager.commit_all("m") is False          # clean worktree
+    (manager.path / "app.py").write_bytes(b"print('bye')\n")
+    assert manager.commit_all("m") is True
 
 
 from quodeq.assistant.worktree import ensure_session_worktree, gc_stale_worktrees

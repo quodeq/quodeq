@@ -54,6 +54,18 @@ describe('WorkspaceDiffPanel', () => {
     expect(screen.getByText('Discard')).toBeTruthy();
   });
 
+  it('shows a terminal message when the branch pushed but no PR was created', async () => {
+    const api = await import('../../api/assistant.js');
+    api.createAssistantWorkspacePr.mockResolvedValueOnce({ prUrl: null, branch: 'b', pushed: true, message: 'Branch pushed. Open the PR from your git host.' });
+    render(<WorkspaceDiffPanel sessionId="s1" onChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('Apply to repo')).toBeTruthy());
+    fireEvent.click(screen.getByText('Create PR...'));
+    fireEvent.click(screen.getByText('Create PR'));
+    await waitFor(() => expect(screen.getByText(/Branch pushed/i)).toBeTruthy());
+    // terminal: Apply button is gone
+    expect(screen.queryByText('Apply to repo')).toBeNull();
+  });
+
   it('shows an empty-state message when there are no changes', async () => {
     const api = await import('../../api/assistant.js');
     api.fetchAssistantWorkspaceDiff.mockResolvedValueOnce({ diff: '', truncated: false, stats: [] });

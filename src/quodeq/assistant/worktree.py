@@ -158,25 +158,32 @@ class WorktreeManager:
             patch_file.unlink(missing_ok=True)
         return stats
 
-    def commit_all(self, message: str) -> None:
+    def commit_all(self, message: str) -> bool:
         status = _run(["git", "-C", str(self.path), "status", "--porcelain"])
         if not status.strip():
-            return
+            return False
         _run(["git", "-C", str(self.path), "add", "-A"])
         _run(["git", "-C", str(self.path),
               "-c", "user.name=Quodeq Assistant",
               "-c", "user.email=assistant@quodeq.local",
               "commit", "-q", "-m", message])
+        return True
 
     def create_pr(self, title: str, body: str) -> dict:
-        """Commit, push, gh pr create. Fail-soft: the branch is always kept."""
-        self.commit_all(title or "Quodeq assistant fix")
+        """Commit, push, gh pr create. Fail-soft: the branch is always kept.
+
+        On push failure the just-made commit is rolled back (soft) so the
+        changes return to the working tree and in-app apply/diff/review keep
+        working; on push success the commit stays (it is on the remote)."""
+        committed = self.commit_all(title or "Quodeq assistant fix")
         try:
             _run(["git", "-C", str(self.path), "push", "-u", "origin", self.branch])
         except WorktreeError as exc:
+            if committed:
+                _run(["git", "-C", str(self.path), "reset", "--soft", "HEAD~1"])
             return {"prUrl": None, "branch": self.branch, "pushed": False,
-                    "message": (f"Push failed: {exc}. The branch exists locally,"
-                                " push it and open a PR manually.")}
+                    "message": (f"Push failed: {exc}. The changes are back in the"
+                                " worktree; apply them or open a PR manually.")}
         if shutil.which("gh") is None:
             return {"prUrl": None, "branch": self.branch, "pushed": True,
                     "message": ("Branch pushed. Install and authenticate the gh"

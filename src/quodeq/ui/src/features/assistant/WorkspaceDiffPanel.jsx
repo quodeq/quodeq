@@ -40,7 +40,13 @@ export function WorkspaceDiffPanel({ sessionId, onChanged }) {
       // PR fail-soft: branch kept, worktree still active. Do NOT lock the panel;
       // surface the message and let the user retry, apply, or discard.
       if (kind === 'pr' && !res.prUrl) {
-        setError(res.message || 'Branch kept locally; PR was not created.');
+        if (res.pushed) {
+          // Branch is on the remote; local apply is moot. Terminal message.
+          setOutcome({ kind: 'pr', message: res.message || null, prUrl: null });
+        } else {
+          // Push failed: changes restored to the worktree; keep buttons to retry/apply/discard.
+          setError(res.message || 'Branch kept locally; PR was not created.');
+        }
         onChanged?.();
         return;
       }
