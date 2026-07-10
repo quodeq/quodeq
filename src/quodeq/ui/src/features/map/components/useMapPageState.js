@@ -97,14 +97,14 @@ export default function useMapPageState({ data, callbacks, tabKey = 0 }) {
   const appIsDark = useThemeIsDark();
   const [darkMode, _setDarkMode] = useState(() => {
     if (appIsDark) return true;
-    try { const v = localStorage.getItem(MAP_DARK_KEY); return v === null ? true : v === '1'; } catch { return true; }
+    try { const v = localStorage.getItem(MAP_DARK_KEY); return v === null ? false : v === '1'; } catch { return false; }
   });
   const setDarkMode = (v) => { _setDarkMode(v); try { localStorage.setItem(MAP_DARK_KEY, v ? '1' : '0'); } catch {} };
   // A dark app theme always forces dark viz; back on light, restore the
-  // user's stored viz preference.
+  // user's stored viz preference (defaulting to light when none is stored).
   useEffect(() => {
     if (appIsDark) { _setDarkMode(true); }
-    else { try { const v = localStorage.getItem(MAP_DARK_KEY); _setDarkMode(v === null ? true : v === '1'); } catch { _setDarkMode(true); } }
+    else { try { const v = localStorage.getItem(MAP_DARK_KEY); _setDarkMode(v === null ? false : v === '1'); } catch { _setDarkMode(false); } }
   }, [appIsDark]);
   const [currentPath, _setCurrentPath] = useState(cached.currentPath);
   const setCurrentPath = (p) => { writeCachedState('map', selectedProject, { currentPath: p }); _setCurrentPath(p); };
