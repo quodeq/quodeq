@@ -17,6 +17,7 @@ from quodeq.api._assistant_helpers import (
     local_provider_busy,
 )
 from quodeq.api._sse_log_helpers import sse_line
+from quodeq.api.assistant_workspace_routes import register_assistant_workspace_routes
 from quodeq.assistant import get_provider_configs
 from quodeq.assistant.orchestrator import TurnRequest, run_turn, write_safe_provider
 from quodeq.assistant.skills import RESERVED_COMMANDS, load_skills
@@ -24,6 +25,11 @@ from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES, A
 
 _running_turns: set[str] = set()
 _running_lock = threading.Lock()
+
+
+def _turn_in_flight(sid: str) -> bool:
+    with _running_lock:
+        return sid in _running_turns
 
 
 def _api_provider(provider_id: str) -> dict | None:
@@ -43,6 +49,8 @@ def _known_provider(provider_id: str) -> dict | None:
 
 
 def register_assistant_routes(app: Flask) -> None:
+    register_assistant_workspace_routes(app)
+
     @app.post("/api/assistant/sessions")
     def create_assistant_session():
         body = request.get_json(silent=True) or {}
