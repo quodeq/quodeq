@@ -66,7 +66,7 @@ def _build_req_index(iso_data: dict) -> dict[str, list[dict]]:
         principle = sc["name"]
         index[principle] = []
         for req in sc.get("requirements", []):
-            index[principle].append({
+            entry = {
                 "id": req["id"],
                 "source": "iso25010",
                 "text": req["text"],
@@ -76,7 +76,10 @@ def _build_req_index(iso_data: dict) -> dict[str, list[dict]]:
                 "_wcag_ids": req.get("wcag", []),
                 "_cert_ids": req.get("cert", []),
                 "refs": [],
-            })
+            }
+            if req.get("params"):
+                entry["params"] = req["params"]
+            index[principle].append(entry)
     return index
 
 
