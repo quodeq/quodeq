@@ -39,6 +39,7 @@ export const standardsKeys = {
   list: () => ["standards", "list"],
   library: () => ["standards", "library"],
   cwes: () => ["standards", "cwes"],
+  overrides: (projectId) => ["standards", "overrides", projectId],
 };
 
 export const settingsKeys = {
