@@ -173,6 +173,19 @@ describe('StandardEditor — override state wiring', () => {
     expect(screen.getByText(/1 thresholds customized/i)).toBeInTheDocument();
   });
 
+  it('StandardTree labels show resolved override value, not raw placeholder', async () => {
+    setup({ savedOverrides: { 'M-ANA-2': { max_lines: 75 } } });
+    render(<StandardEditor standardId="iso-25010" onBack={() => {}} />);
+    // Expand the principle node so the requirement node renders
+    const principleRow = screen.getByText('Maintainability');
+    fireEvent.click(principleRow);
+    // The tree node label should show the resolved text with "75", not the raw placeholder
+    await waitFor(() => {
+      expect(screen.getByText(/75 lines/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/\{max_lines\}/)).not.toBeInTheDocument();
+  });
+
   it('customized badge is absent when no overrides exist', () => {
     setup({ savedOverrides: {} });
     render(<StandardEditor standardId="iso-25010" onBack={() => {}} />);
