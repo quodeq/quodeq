@@ -69,3 +69,27 @@ def test_remove_deletes_worktree_and_branch(manager, repo):
 def test_run_raises_on_failure(repo):
     with pytest.raises(WorktreeError):
         _run(["git", "-C", str(repo), "not-a-command"])
+
+
+def test_create_recovers_from_stale_dir(repo, tmp_path):
+    m = WorktreeManager.for_session(repo, "proj", "abcdef1234567890",
+                                    base=tmp_path / "wts")
+    m.path.mkdir(parents=True)
+    (m.path / ".DS_Store").write_bytes(b"junk")
+    m.create()
+    assert m.exists() and m.branch == "quodeq/fix-abcdef12"
+
+
+def test_for_session_sanitizes_project_segment(repo, tmp_path):
+    base = tmp_path / "wts"
+    m = WorktreeManager.for_session(repo, "../evil/../../name", "abcdef1234567890",
+                                    base=base)
+    assert base.resolve() in m.path.resolve().parents
+
+
+def test_remove_fallback_when_dir_deleted_out_of_band(manager, repo):
+    import shutil as _shutil
+    _shutil.rmtree(manager.path)
+    manager.remove()  # must not raise; prunes and deletes the branch
+    out = _run(["git", "-C", str(repo), "branch", "--list", manager.branch])
+    assert out.strip() == ""

@@ -6,6 +6,7 @@ All git/gh invocations are argv lists (never shell strings) with explicit
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -61,6 +62,12 @@ def worktrees_base() -> Path:
         "QUODEQ_WORKTREES_DIR", str(Path.home() / ".quodeq" / "worktrees")))
 
 
+def _safe_segment(value: str) -> str:
+    """Collapse a user-facing name to a filesystem-safe single path segment."""
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", value or "").strip("-.")
+    return cleaned or "project"
+
+
 @dataclass
 class WorktreeManager:
     repo_root: Path
@@ -73,7 +80,7 @@ class WorktreeManager:
         base = base or worktrees_base()
         short = session_id[:8]
         return cls(repo_root=Path(repo_root),
-                   path=base / (project_id or "project") / short,
+                   path=base / _safe_segment(project_id or "project") / short,
                    branch=f"{_BRANCH_PREFIX}{short}")
 
     def exists(self) -> bool:
@@ -82,6 +89,9 @@ class WorktreeManager:
     def create(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         _run(["git", "-C", str(self.repo_root), "worktree", "prune"])
+        if self.path.exists() and not self.exists():
+            # stale leftover directory (crash, stray files); a live worktree has .git
+            shutil.rmtree(self.path, ignore_errors=True)
         last_err: WorktreeError | None = None
         for attempt in range(_MAX_BRANCH_TRIES):
             candidate = (self.branch if attempt == 0
@@ -93,7 +103,7 @@ class WorktreeManager:
                 return
             except WorktreeError as exc:
                 last_err = exc
-                if "already exists" not in str(exc):
+                if "a branch named" not in str(exc):
                     raise
         raise WorktreeError(f"could not allocate a fix branch: {last_err}")
 
