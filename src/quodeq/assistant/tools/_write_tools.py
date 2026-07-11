@@ -48,9 +48,14 @@ def _edit_repo_file(ctx: ToolContext, path: str, old_string: str,
         raise ToolError(
             f"old_string matches {count} times, add surrounding context to make it unique")
     new_text = text.replace(old_string, new_string, 1)
-    if len(new_text.encode("utf-8")) > _MAX_CONTENT_BYTES:
+    encoded = new_text.encode("utf-8")
+    if len(encoded) > _MAX_CONTENT_BYTES:
         raise ToolError(f"edited file would exceed {_MAX_CONTENT_BYTES} bytes")
-    target.write_text(new_text, encoding="utf-8")
+    # write_bytes, not write_text: text mode translates "\n" to the platform
+    # newline on Windows, which would rewrite (and on a CRLF file double) every
+    # line ending in the user's repo. Preserve the file's exact bytes, changing
+    # only the edited span.
+    target.write_bytes(encoded)
     return {"path": path, "edited": True}
 
 

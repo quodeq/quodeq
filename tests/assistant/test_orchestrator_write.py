@@ -11,6 +11,7 @@ def repo(tmp_path):
     root = tmp_path / "repo"
     root.mkdir()
     _run(["git", "-C", str(root), "init", "-q", "-b", "main"])
+    _run(["git", "-C", str(root), "config", "core.autocrlf", "false"])
     _run(["git", "-C", str(root), "config", "user.name", "T"])
     _run(["git", "-C", str(root), "config", "user.email", "t@example.com"])
     (root / "app.py").write_bytes(b"x = 1\n")
