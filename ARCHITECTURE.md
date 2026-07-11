@@ -11,24 +11,34 @@
 | `assistant/` | Embedded LLM assistant: sessions, tool registry, provider turn adapters, guard | core/, data/, services/, llm_bridge/ |
 | `api/` | HTTP layer: Flask routes, security, rate limiting | core/, services/, update/, assistant/ |
 | `analysis/` | Evaluation pipeline: AI orchestration, subagents, prompts, MCP | core/, engine/, data/, services/ |
-| `dashboard/` | Server/process management: build UI, start API, health checks | services/, api/ |
+| `dashboard/` | Server/process management: build UI, start API, health checks | services/, api/, update/ |
+| `llm_bridge/` | LLM provider bridge: Ollama, OpenRouter, CLI-tool providers | (not yet covered by import checker) |
+| `terminal/` | Embedded-terminal PTY backends (Unix pty / Windows ConPTY) + manager | core/ |
+| `update/` | Update-notification subsystem (notify-only; never self-replaces the binary) | None |
+| `ci/` | CI integration: report posting, evidence reading, SARIF export | (not yet covered by import checker) |
+| `context/` | Context enrichment: path-role classification, project shape, precedent fingerprinting | (not yet covered by import checker) |
+| `ui/` | React + Vite dashboard frontend (npm project, served by the Flask API) | n/a (JavaScript) |
 | `shared/` | Cross-cutting utilities: config, logging, env helpers | None (stdlib only) |
 | `config/` | Configuration: paths, discipline detection, standards fetching | shared/ |
 
 ## Import Rules
 
 ```
-core/          -> stdlib, core/ only
-engine/        -> stdlib, core/, analysis/
-data/          -> stdlib, core/
-services/      -> stdlib, core/, data/ (via services/ports.py)
-assistant/     -> stdlib, core/, data/, services/, llm_bridge/
-api/           -> stdlib, core/, services/, update/, assistant/
-analysis/      -> stdlib, core/, engine/, data/, services/
-dashboard/     -> stdlib, services/, api/
-shared/        -> stdlib only
-config/        -> stdlib, shared/
+core/          -> core/
+engine/        -> core/, analysis/
+data/          -> core/
+services/      -> core/, data/ (by convention via services/ports.py)
+assistant/     -> core/, data/, services/, llm_bridge/
+api/           -> core/, services/, update/, assistant/, terminal/
+analysis/      -> core/, engine/, data/, services/
+dashboard/     -> services/, api/, update/
+terminal/      -> core/
+update/        -> (nothing)
 ```
+
+Every checked layer may additionally import stdlib plus the cross-cutting
+`shared/` and `config/` packages. Layers not listed (`llm_bridge/`, `ci/`,
+`context/`, `ui/`) are not yet covered by the checker.
 
 These rules are enforced in CI by `tools/check_imports.py` via `tests/tools/test_import_layers.py`.
 Pre-existing violations are grandfathered in `tools/import_baseline.txt` (a burn-down list: fix
@@ -49,7 +59,7 @@ imports rather than add entries). Regenerate the baseline only with justificatio
 - Private modules use `_` prefix (e.g., `_fs_projects.py`).
 - Public APIs live in the parent `__init__.py` with re-exports for backward compatibility.
 - Frozen dataclasses for data transfer objects.
-- `services/ports.py` is the single boundary between services and data layers.
+- `services/ports.py` is the single boundary between services and data layers (a convention — `tools/check_imports.py` allows any services→data import; keep new ones behind ports.py anyway).
 
 ## Runtime State Model
 
@@ -63,8 +73,9 @@ Each evaluation has a directory under `~/.quodeq/evaluations/<project_uuid>/<run
 | `.heartbeat` | CLI (`shared/run_heartbeat.py`) | Empty file whose mtime is the liveness signal. Touched every 5s while `state ∈ {running, finalizing}`. |
 | `.pid` | CLI (`_cli_evaluation.py`) | OS PID. Used by the cancel flow (`services/_external_jobs.py`) to deliver SIGTERM. |
 | `evidence/manifest.json` | Analysis engine | Scan inputs. Presence marks "a run was started." |
-| `evidence/<dim>_evidence.jsonl` | Subagent pool | **Durable findings log.** Append-only stream, source of truth. JSONL is human-readable, recoverable from any disk, and never deleted by the system. |
-| `evaluation.db` | Analysis pipeline (`FindingsRouter`) + scoring engine | **Indexed projection of the JSONL.** SQLite + FTS5. Dual-written alongside JSONL during analysis. The dashboard prefers it for queries when present; deleted-or-absent → loader falls back to JSONL/JSON. Rebuildable from JSONL at any time. Set `QUODEQ_DISABLE_SQLITE=1` to skip both the write and the read for instant rollback. |
+| `evidence/<dim>_evidence.jsonl` | Subagent pool (via `analysis/mcp/router.py::FindingsRouter`) | **Durable findings log.** Append-only stream, source of truth. JSONL is human-readable, recoverable from any disk, and never deleted by the system. |
+| `events.jsonl` | Analysis MCP server (`analysis/mcp/findings_server.py`) + mutation services (dismiss/verify) via `core/events/writer.py::EventLogWriter` | **Event Log.** Append-only stream of typed events (`RUN_STARTED`, `JUDGMENT_CREATED`, `FINDING_DISMISSED`, …) defined in `core/events/models.py`. |
+| `evaluation.db` | Projection layer (`data/projection/projector.py::Projector` → `data/sqlite/findings_repository.py::SqliteFindingsRepository`) | **State Store: indexed projection of the Event Log.** SQLite + FTS5. Reads self-ensure the store is fresh against `events.jsonl` before returning rows; `services/_post_run_hook.py` also projects when a JobManager job finishes. Deleted-or-absent → rebuilt from the Event Log; loader falls back to JSONL/JSON. Set `QUODEQ_DISABLE_SQLITE=1` to skip both the write and the read for instant rollback. |
 | `evaluation/<dim>.json` | Scoring engine | Per-dimension report (the UI's "report" artifact). |
 | `run.log` | CLI + dashboard subprocess | Verbatim stderr tee. Consumed by the live-terminal SSE endpoint and for historical replay. |
 | `scan.json` | Report assembly | Aggregate report (legacy lifecycle signal; superseded by `status.json`). |
@@ -140,5 +151,6 @@ Dashboard
 | SQLite index + sync | `src/quodeq/services/run_index.py`, `_index_sync.py` |
 | Provider (DB-backed) | `src/quodeq/services/filesystem.py` |
 | In-memory jobs | `src/quodeq/services/jobs.py` |
-| Live terminal SSE | `src/quodeq/api/_log_stream_routes.py` |
-| Live terminal UI | `src/quodeq/ui/src/features/evaluation/components/LiveTerminal.jsx` |
+| Live terminal SSE | `src/quodeq/api/_log_stream_routes.py`, `_sse_log_helpers.py` |
+| Live terminal UI | `src/quodeq/ui/src/features/evaluation/components/ConsoleLogViewer.jsx` + `eval-log/useJobLogStream.js` |
+| Event Log → State Store projection | `src/quodeq/data/projection/projector.py`, `src/quodeq/data/sqlite/findings_repository.py` |
