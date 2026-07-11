@@ -70,8 +70,11 @@ def build_cache_writer(
     # Provenance context, captured once at construction (run-constant). These
     # left the cache key in schema 3 but are recorded on each entry so reuse
     # across a model/prompts/standards boundary is surfaceable, not silent.
+    # src_root doubles as the project root whose threshold overrides fold
+    # into the standards hash — must match classify's _current_provenance.
     standards_hash = (
-        (_hash_standards(standards_dir, dimension) if standards_dir else "") or ""
+        (_hash_standards(standards_dir, dimension, src_root) if standards_dir else "")
+        or ""
     )
     prompts_hash = _hash_prompts_combined()
     version = quodeq_version()
