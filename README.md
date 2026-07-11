@@ -19,11 +19,7 @@
 
 ---
 
-AI models can now autonomously find and exploit zero-day vulnerabilities across operating systems, browsers, and web applications. Thousands of previously unknown flaws uncovered in weeks, not years.
-
-The code you ship today will be read by models that can spot what humans miss. But the tools to prepare for this are locked behind enterprise contracts and partner programs.
-
-Quodeq exists to change that.
+AI models can now find vulnerabilities and design flaws that human review misses, but most tools that put this to work are locked behind enterprise contracts. Quodeq is the open alternative.
 
 **Open source. MIT license. Runs locally. No telemetry. No account. No servers.**
 
@@ -93,7 +89,7 @@ ollama serve    # runs in the background
 **Cloud, faster** — one of the agentic CLIs (at least one):
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) — `npm install -g @anthropic-ai/claude-code`
 - [Codex CLI](https://developers.openai.com/codex/quickstart) — `npm install -g @openai/codex`
-- [Gemini CLI](https://geminicli.com/docs/get-started/installation/) — `npm install -g @anthropic-ai/gemini-cli`
+- [Gemini CLI](https://geminicli.com/docs/get-started/installation/) — `npm install -g @google/gemini-cli`
 
 ### 4. Launch the dashboard
 
@@ -253,6 +249,8 @@ Quodeq scores each principle on a 0 to 10 scale using four independent constrain
 ### Standards
 
 By default, Quodeq evaluates the six ISO 25010 dimensions. It also ships with **Clean Architecture** and **Domain-Driven Design** standards. You can create your own from the dashboard, or ask any AI to generate one as a `.json` file and import it.
+
+Numeric thresholds on the built-in standards (max function lines, max parameters, ...) can be tuned per project from the dashboard. Overrides live in `.quodeq/standards-overrides.json` at the repo root, so the whole team scans with the same numbers.
 
 ---
 

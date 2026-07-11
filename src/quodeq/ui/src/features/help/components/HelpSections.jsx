@@ -37,10 +37,10 @@ export function Philosophy() {
   return (
     <section className="help-section">
       <h2>The Quodeq Philosophy</h2>
-      <p>Quodeq is a quality compass for your codebase. Not a linter, not a static analyzer. An AI-powered evaluator that reads and understands your code the way a senior engineer would, then reports both what is wrong and what is right.</p>
+      <p>Quodeq reads your code the way a reviewer would and reports both what is wrong and what is right. It is not a linter: it evaluates meaning, not syntax.</p>
 
       <h3>Why Quodeq exists</h3>
-      <p>Traditional code-quality tools count syntax violations. They flag a long function or a missing null check, but they cannot tell you whether your architecture has a dependency leak, whether your error-handling strategy is coherent, or whether your domain model has eroded.</p>
+      <p>Traditional code-quality tools count syntax violations. They flag a long function or a missing null check, but they cannot tell you that your architecture leaks dependencies or that your domain model has eroded.</p>
       <p>Quodeq sends AI agents into your codebase with read-only tools to explore, follow imports, understand patterns, and evaluate quality against structured standards. Every finding cites a file, a line, a code snippet, and a principle.</p>
 
       <h3>How an evaluation runs</h3>
@@ -56,7 +56,7 @@ export function Philosophy() {
       <p>Quodeq reports <strong>violations and compliance</strong>. Scoring uses the ratio between them, so a project with many violations but strong compliance patterns scores more fairly than one with the same violations and no evidence of good practice. Agents actively look for files that follow standards correctly, not just files that break them.</p>
 
       <h3>The Q&#xB2; scoring formula</h3>
-      <p>Each principle is scored 0 to 10 using four constraints designed to avoid the usual pitfalls of naive scoring.</p>
+      <p>Each principle is scored 0 to 10 under four constraints.</p>
       <ul>
         <li>A hyperbolic <strong>violation base</strong> means the first violations hurt most. Fifty minor issues will not tank a score the way five critical ones do.</li>
         <li>A <strong>compliance lift</strong> fills the gap between the base and 10 with evidence of good practice, so compliance always helps and never hurts.</li>
@@ -64,7 +64,7 @@ export function Philosophy() {
         <li>A <strong>severity grade floor</strong> keeps the label honest. Only an actual critical violation can produce a <em>Critical</em> grade.</li>
       </ul>
 
-      <p>Quodeq ships with ISO 25010 dimensions plus Clean Architecture and DDD. It evaluates any codebase in any language: Python, TypeScript, Go, Rust, Java, Swift, anything. You can also write your own standards for whatever quality means in your project.</p>
+      <p>Quodeq ships with ISO 25010 dimensions plus Clean Architecture and DDD. It works in any language, and you can write your own standards for whatever quality means in your project.</p>
     </section>
   );
 }
@@ -95,7 +95,7 @@ export function GettingStarted() {
 
       <h3>Requirements</h3>
       <ul>
-        <li><strong>Python 3.12+</strong> and <strong>Node.js 18+</strong>.</li>
+        <li><strong>Python 3.12+</strong>. The dashboard UI ships pre-built, so Node.js is not required.</li>
         <li>At least one AI provider configured. See <em>AI Providers</em>.</li>
       </ul>
     </section>
@@ -150,10 +150,10 @@ export function Providers() {
       </ul>
       <p>Use <strong>Test connection</strong> in the provider tab to verify the key and model before launching a real run.</p>
 
-      <h3>CLI (Claude Code, Codex)</h3>
+      <h3>CLI (Claude Code, Codex, Gemini)</h3>
       <p>Delegates to an AI CLI you already have authenticated on your machine. The CLI handles auth and billing; Quodeq drives it.</p>
       <ol>
-        <li>Install and sign in to your CLI of choice (Claude Code, Codex, etc.).</li>
+        <li>Install and sign in to your CLI of choice (Claude Code, Codex, Gemini CLI).</li>
         <li>In <strong>Settings → CLI Provider</strong>, pick the binary and a model id like <code>gpt-5</code> or <code>claude-sonnet-4-6</code>.</li>
         <li>Optionally pin a different model per power tier (Fast, Balanced, Thorough).</li>
       </ol>
@@ -217,6 +217,9 @@ export function Evaluations() {
         <li><strong>Sub-agents</strong> how many parallel agents run. Higher is faster, costs more.</li>
         <li><strong>Time budget</strong> a soft cap on run length. Quodeq scores whatever has completed when the timer expires.</li>
       </ul>
+
+      <h3>Excluding paths</h3>
+      <p>Add a <code>.quodeqignore</code> file at the scan root to keep fixture, vendored, or generated code out of every evaluation. One glob per line, relative to the root; naming a directory excludes everything under it. Exclusions apply everywhere files are collected, on top of the built-in skips (<code>node_modules</code>, <code>dist</code>, dot-directories).</p>
 
       <h3>Incremental and clean scans</h3>
       <p>By default, Quodeq carries findings for unchanged files forward and re-evaluates only files that have changed since the last run. This keeps subsequent scans fast without losing coverage.</p>
@@ -321,7 +324,7 @@ COMPLIANT   src/api.py:88       Parameterized query prevents injection     CWE-8
       ]} />
 
       <h3>Fix plans</h3>
-      <p>From any violation, the <strong>Fix plan</strong> button opens a side-pane with a structured remediation packet: file path, line number, code context, the violated principle, and concrete guidance. Copy it and paste into your AI agent or IDE. It is designed to give the receiving model everything it needs to apply the fix without follow-up questions.</p>
+      <p>From any violation, the <strong>Fix plan</strong> button opens a side-pane with a structured remediation packet: file path, line number, code context, the violated principle, and concrete guidance. Copy it into your AI agent or IDE; it carries everything the model needs to apply the fix.</p>
 
       <h3>Dismissing a finding</h3>
       <p>If a finding is a false positive or an accepted trade-off, dismiss it from the violation detail. You will be asked for a reason. Dismissed findings:</p>
@@ -342,7 +345,7 @@ export function CodeMap() {
   return (
     <section className="help-section">
       <h2>Code Map</h2>
-      <p>The <strong>Map</strong> tab visualizes your codebase as shapes you can scan at a glance. Two metrics, three layouts, six combinations.</p>
+      <p>The <strong>Map</strong> tab draws your codebase as shapes you can scan at a glance: two metrics crossed with three layouts.</p>
 
       <h3>Pick a metric</h3>
       <ul>
@@ -452,7 +455,15 @@ export function Standards() {
       <p>The <strong>Standards</strong> tab is where you decide what quality means for your project. Browse, edit, import, and create the rules Quodeq evaluates against.</p>
 
       <h3>Built-in standards</h3>
-      <p>Quodeq ships with managed standards for the six ISO 25010 dimensions plus Clean Architecture and DDD Design. They are <strong>read-only</strong> (you can view them but not edit) and marked as <em>Managed</em>. To turn one off, hide it with the {ICON_EYE_ON} visibility toggle.</p>
+      <p>Quodeq ships with managed standards for the six ISO 25010 dimensions plus Clean Architecture and DDD Design. Their structure is <strong>read-only</strong> and marked as <em>Managed</em>, but their numeric thresholds are editable (see below). To turn one off, hide it with the {ICON_EYE_ON} visibility toggle.</p>
+
+      <h3>Customizing thresholds</h3>
+      <p>Many requirements carry a number: max function lines, max parameters, and so on. You can change these per project without cloning the standard. Select the requirement and edit the value in its <strong>Thresholds</strong> section, which shows the default and the allowed range. Out-of-range values are rejected, and <em>Reset to default</em> removes the override. Custom standards can declare thresholds too.</p>
+      <p>The tree marks customized requirements with a dot and shows the value in effect in each label. Standards with overrides get an <em>N thresholds customized</em> badge. Evaluations judge against your values, not the shipped ones.</p>
+      <p>Overrides are saved to <code>.quodeq/standards-overrides.json</code> in the project root. Commit the file and the whole team scans with the same numbers. If it is missing or malformed, the defaults apply; a scan never fails because of it.</p>
+      <Tip title="Not the grade thresholds">
+        The boundaries in the <em>Grade Formula</em> editor decide how scores map to letter grades. These thresholds decide when code violates a requirement.
+      </Tip>
 
       <h3>Creating your own</h3>
       <ol>
@@ -505,6 +516,57 @@ state management, and error boundaries. Use this schema:
   );
 }
 
+export function Assistant() {
+  return (
+    <section className="help-section">
+      <h2>Assistant</h2>
+      <p>The assistant is a chat panel that knows your project. It explains scores, digs into findings, and drafts standards using the same data you see in the dashboard.</p>
+
+      <h3>Turning it on</h3>
+      <p>Off by default. Enable it under <strong>Settings → Assistant</strong>, then toggle it with <code>Ctrl+`</code> (<code>Cmd+`</code> on macOS). It lives in a resizable drawer at the bottom of the dashboard.</p>
+
+      <h3>What it can see</h3>
+      <p>The assistant follows you around the app: it knows which project, run, tab, and dimension you are looking at, so <em>why is this score low?</em> needs no extra context. Its tools read scores, reports, and violations, search findings, and read files from the analyzed repository. All of them are read-only.</p>
+
+      <h3>Actions need your approval</h3>
+      <p>The assistant cannot change anything on its own. Ask it to dismiss a finding, verify one, or create a standard and it drafts the action as a preview card; nothing happens until you press <strong>Apply</strong>.</p>
+
+      <h3>Slash commands and skills</h3>
+      <KeyTable rows={[
+        ['/help', 'What the assistant can do.'],
+        ['/skills', 'List the built-in skills: explain-score, explain-finding, verify-finding, create-standard.'],
+        ['/clear', 'Start a fresh conversation.'],
+      ]} />
+      <p>Skills are guided workflows. The welcome screen suggests the ones relevant to the tab you are on.</p>
+
+      <h3>Provider and privacy</h3>
+      <p>By default the assistant uses your evaluation provider; pick a separate provider or model under <strong>Settings → Assistant</strong>. Cloud providers bill each message like any other call. Web search is off by default and only offered on local providers. Closing the drawer keeps the conversation; reloading the page starts a fresh one.</p>
+    </section>
+  );
+}
+
+export function Terminal() {
+  return (
+    <section className="help-section">
+      <h2>Terminal</h2>
+      <p>A real shell inside the dashboard: your login shell, on your machine, with your tools. Quodeq only hosts the window.</p>
+
+      <h3>Turning it on</h3>
+      <p>Off by default. Enable it under <strong>Settings → Enable terminal</strong>, then toggle it with <code>Shift+Ctrl+`</code> (<code>Shift+Cmd+`</code> on macOS). It shares the bottom drawer with the assistant; switch between them with the drawer tabs.</p>
+
+      <h3>How the session behaves</h3>
+      <ul>
+        <li><strong>One session</strong>, started in your home directory with your default shell.</li>
+        <li><strong>It keeps running</strong> when you close the drawer, switch tabs, or reload the page. The session lives in the dashboard server, and recent output is replayed when you reconnect.</li>
+        <li><strong>One window at a time</strong>: opening it in a second browser window shows a busy notice instead.</li>
+      </ul>
+
+      <h3>Safety</h3>
+      <p>The terminal only works when the dashboard is bound to localhost, and it is disabled entirely in remote mode (when <code>QUODEQ_API_KEY</code> is set). Quodeq strips its own secrets from the shell environment. Beyond that it is exactly as powerful, and as dangerous, as your normal terminal.</p>
+    </section>
+  );
+}
+
 export function Settings() {
   return (
     <section className="help-section">
@@ -514,7 +576,7 @@ export function Settings() {
       <h3>Provider tabs</h3>
       <ul>
         <li><strong>Cloud</strong> hosted APIs (OpenRouter or a custom OpenAI-compatible endpoint). API key, base URL, model id, and a <em>Test connection</em> button.</li>
-        <li><strong>CLI</strong> local AI CLIs you have authenticated (Claude Code, Codex). Pick the binary, then a model id.</li>
+        <li><strong>CLI</strong> local AI CLIs you have authenticated (Claude Code, Codex, Gemini). Pick the binary, then a model id.</li>
         <li><strong>Ollama</strong> models on your local Ollama server. Quodeq lists whatever you have pulled.</li>
         <li><strong>Omlx</strong> an MLX-native local server. The tab appears only on Apple Silicon Macs.</li>
         <li><strong>llama.cpp</strong> a local llama-server instance. Shows the GGUF currently loaded.</li>
@@ -537,6 +599,9 @@ export function Settings() {
         <li><strong>Automatic checks</strong> turns the daily background check on or off.</li>
         <li>Set <code>QUODEQ_NO_UPDATE_NOTIFIER=1</code> to disable automatic checks and CLI notices entirely.</li>
       </ul>
+
+      <h3>Assistant and terminal</h3>
+      <p>Both ship disabled. The <em>Assistant</em> section turns the chat drawer on and picks its provider and model; <em>Enable terminal</em> switches on the embedded shell. See the <strong>Assistant</strong> and <strong>Terminal</strong> help sections.</p>
 
       <h3>Grade formula</h3>
       <p>The <em>Grade formula</em> section opens the formula editor, where severity weights, curve shape, grade boundaries, and dimension weights live. See the <strong>Grade Formula</strong> help section for the full tour.</p>

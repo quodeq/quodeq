@@ -11,6 +11,8 @@ import {
   History,
   GradeFormula,
   Standards,
+  Assistant,
+  Terminal,
   Settings,
 } from './HelpSections.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
@@ -28,6 +30,8 @@ const SECTIONS = [
   { id: 'history', label: 'History & Trends' },
   { id: 'grade-formula', label: 'Grade Formula' },
   { id: 'standards', label: 'Custom Standards' },
+  { id: 'assistant', label: 'Assistant' },
+  { id: 'terminal', label: 'Terminal' },
   { id: 'settings', label: 'Settings' },
 ];
 
@@ -43,6 +47,8 @@ const SECTION_COMPONENTS = {
   'history': History,
   'grade-formula': GradeFormula,
   'standards': Standards,
+  'assistant': Assistant,
+  'terminal': Terminal,
   'settings': Settings,
 };
 
