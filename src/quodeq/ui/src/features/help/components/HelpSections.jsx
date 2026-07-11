@@ -218,6 +218,9 @@ export function Evaluations() {
         <li><strong>Time budget</strong> a soft cap on run length. Quodeq scores whatever has completed when the timer expires.</li>
       </ul>
 
+      <h3>Excluding paths</h3>
+      <p>Add a <code>.quodeqignore</code> file at the scan root to keep fixture, vendored, or generated code out of every evaluation. One glob per line, relative to the root; naming a directory excludes everything under it. Exclusions apply everywhere files are collected, on top of the built-in skips (<code>node_modules</code>, <code>dist</code>, dot-directories).</p>
+
       <h3>Incremental and clean scans</h3>
       <p>By default, Quodeq carries findings for unchanged files forward and re-evaluates only files that have changed since the last run. This keeps subsequent scans fast without losing coverage.</p>
       <p>The <strong>Clean scan</strong> toggle forces a full re-analysis of every file. Use it after a big refactor, when you change standards, or whenever you want a fresh start. The toggle has three states:</p>
