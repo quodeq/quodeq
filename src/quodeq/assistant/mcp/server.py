@@ -1,4 +1,4 @@
-"""Read-only stdio MCP server exposing the assistant tool registry to a CLI."""
+"""Stdio MCP server exposing the assistant tool registry to a CLI (writes only with --enable-write)."""
 from __future__ import annotations
 
 import argparse
@@ -11,6 +11,7 @@ from quodeq.assistant.guard import MAX_TOOL_RESULT_CHARS
 from quodeq.assistant.mcp import _jsonrpc
 from quodeq.assistant.tools import ToolContext, build_registry
 from quodeq.assistant.tools._registry import ToolRegistry
+from quodeq.assistant.tools._write_tools import register_write_tools
 from quodeq.assistant import AssistantRepository
 
 _PROTOCOL = "2024-11-05"
@@ -81,8 +82,12 @@ def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:
         dimensions_file=Path(ns.dimensions_file),
         project_id=ns.project_id or None,
         reports_dir=reports_dir,
+        worktree_dir=Path(ns.worktree_dir) if getattr(ns, "worktree_dir", "") else None,
     )
-    return build_registry(ctx)
+    registry = build_registry(ctx)
+    if getattr(ns, "enable_write", False) and ctx.worktree_dir is not None:
+        register_write_tools(registry, ctx)
+    return registry
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -96,6 +101,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--dimensions-file", required=True)
     parser.add_argument("--project-id", default="")
     parser.add_argument("--reports-dir", default="")
+    parser.add_argument("--enable-write", action="store_true")
+    parser.add_argument("--worktree-dir", default="")
     ns = parser.parse_args(argv)
     serve(_build_registry_from_args(ns), stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
 

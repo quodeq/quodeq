@@ -453,10 +453,33 @@ export default function App() {
   // fetched once on mount.
   const [dismissRefreshKey, setDismissRefreshKey] = useState(0);
   const bumpDismissRefresh = () => setDismissRefreshKey((k) => k + 1);
-  const { refreshDashboard: refreshDashboardForApply } = state;
+  const { refreshDashboard: refreshDashboardForApply, selectedProject } = state;
+  // Shared with the manual dismiss handlers below (buildDismissPayload
+  // callers). Patches the dashboard/scores caches from a dismiss response's
+  // delta so the Overview updates instantly instead of waiting on a refetch.
+  const applyDelta = (project, scores, delta) =>
+    applyMutationDelta(queryClient, project, delta && { ...delta, dimensions: scores?.dimensions });
   useEffect(() => {
     const handler = (event) => {
       if (event.detail?.actionType === 'dismiss_finding') {
+        // Apply the delta first so the currently-visible screen patches in
+        // place immediately; the refresh/refetch below is the lazy,
+        // eventual-correctness path (e.g. for views the delta doesn't cover).
+        // Prefer the delta's own project over the live selectedProject: the
+        // apply POST may resolve after the user switched projects, and the
+        // delta is frozen to the action's project. Keying the patch on the
+        // live selection would write project A's rollup into project B's cache.
+        if (event.detail.delta) {
+          try {
+            applyDelta(
+              event.detail.delta?.project || selectedProject,
+              event.detail.scores,
+              event.detail.delta,
+            );
+          } catch {
+            // Instant patch is best-effort; the lazy refresh below is the fallback.
+          }
+        }
         bumpDismissRefresh();
         // Assistant-applied dismissals mutate the same payloads manual ones
         // do; invalidate the project queries so frozen run views (staleTime
@@ -467,7 +490,7 @@ export default function App() {
     };
     window.addEventListener('quodeq:assistant-action-applied', handler);
     return () => window.removeEventListener('quodeq:assistant-action-applied', handler);
-  }, [refreshDashboardForApply]);
+  }, [refreshDashboardForApply, selectedProject]);
   // Auto-open is a once-per-session decision. Without this guard, closing the
   // wizard sets wizardEntry → null, which re-fires this effect and re-opens
   // the wizard immediately because projects.length is still 0. The user's
@@ -648,8 +671,7 @@ export default function App() {
     // Overview updates instantly. Additive — the refreshDashboard /
     // bumpDismissRefresh mechanisms below still run. The delta carries only the
     // mutation shape; the caller folds in the rescored dims from result.scores.
-    applyDelta: (project, scores, delta) =>
-      applyMutationDelta(queryClient, project, delta && { ...delta, dimensions: scores?.dimensions }),
+    applyDelta,
     bumpDismissRefresh,
     dismissRefreshKey,
   };

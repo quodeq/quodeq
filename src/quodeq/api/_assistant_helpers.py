@@ -58,6 +58,26 @@ def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str 
     return str(run_dir), resolve_repo_root(project_id)
 
 
+def repo_attach_info(project_id: str | None) -> tuple[str | None, str]:
+    """(repo_root, reason) for the UI's attachment chip and write gate.
+
+    Reasons: ok, no_project, unknown_project, no_recorded_path,
+    online_project, path_missing."""
+    if not project_id:
+        return None, "no_project"
+    info = get_project_info(get_evaluations_dir(), project_id)
+    if info is None:
+        return None, "unknown_project"
+    path = info.get("path")
+    if not path or not isinstance(path, str):
+        return None, "no_recorded_path"
+    if str(info.get("location", "")).lower() == "online" or "://" in path:
+        return None, "online_project"
+    if not Path(path).is_dir():
+        return None, "path_missing"
+    return path, "ok"
+
+
 def resolve_repo_root(project_id: str) -> str | None:
     """Resolve the project's local working copy from ``project_id`` alone.
 
@@ -70,11 +90,7 @@ def resolve_repo_root(project_id: str) -> str | None:
     to the evaluations root; the stored ``path`` itself is server-side data
     written at analysis time, never client input.
     """
-    info = get_project_info(get_evaluations_dir(), project_id)
-    path = (info or {}).get("path")
-    if not path or not isinstance(path, str) or not Path(path).is_dir():
-        return None
-    return path
+    return repo_attach_info(project_id)[0]
 
 
 def get_repository(app: Flask) -> AssistantRepository:

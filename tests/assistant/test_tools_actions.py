@@ -1,7 +1,30 @@
+import json
+
 import pytest
 
 from quodeq.assistant.tools import ToolContext, build_registry
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
+
+
+def _seed_run_ctx(tmp_path, violations, *, dbname="assistant_run.db"):
+    """Run-scoped ctx whose eval JSON carries `violations` so the dismiss/verify
+    match-check (finding_keys_in_scope) can confirm the drafted key is real."""
+    eval_root = tmp_path / "evals"
+    run_dir = eval_root / "proj" / "run1"
+    (run_dir / "evaluation").mkdir(parents=True)
+    (run_dir / "evaluation" / "security.json").write_text(json.dumps({
+        "dimension": "security", "overallScore": 50, "overallGrade": "C",
+        "principles": [], "violations": violations,
+        "totals": {"violations": len(violations)},
+    }))
+    store = AssistantRepository(tmp_path / dbname)
+    store.create_session(session_id="s1", provider="ollama")
+    return ToolContext(
+        repository=store, session_id="s1", run_dir=run_dir, repo_root=None,
+        evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
+        dimensions_file=tmp_path / "d.json",
+        project_id="proj", reports_dir=eval_root,
+    )
 
 _VALID_STANDARD = {
     "id": "api-errors", "name": "API Error Contract", "description": "d",
@@ -79,21 +102,91 @@ def test_draft_dismiss_requires_reason(project_ctx):
     assert "reason" in out["error"]
 
 
-def test_draft_dismiss_canonicalizes_from_session(project_ctx):
-    out = build_registry(project_ctx).dispatch("draft_action", {
+def test_draft_dismiss_canonicalizes_from_session(tmp_path):
+    ctx = _seed_run_ctx(tmp_path, [
+        {"principle": "P1", "req": "r1", "file": "a.py", "line": 3,
+         "severity": "major", "title": "t", "reason": "r"}])
+    out = build_registry(ctx).dispatch("draft_action", {
         "action_type": "dismiss_finding",
         "payload": {"req": "r1", "file": "a.py", "line": 3,
                     "reason": "guarded two lines above",
                     "project": "spoofed-by-model"},
     })
     assert out["ok"] is True
-    stored = project_ctx.repository.get_action(out["result"]["action_id"])
+    stored = ctx.repository.get_action(out["result"]["action_id"])
     assert stored["payload"]["project"] == "proj"  # session wins over model payload
     assert stored["payload"]["reason"] == "guarded two lines above"
-    frames = [f for _, f in project_ctx.repository.events_after("s1", 0)]
+    frames = [f for _, f in ctx.repository.events_after("s1", 0)]
     draft = next(f for f in frames if f["type"] == "action_draft")
     assert draft["summary"] == {"req": "r1", "file": "a.py", "line": 3,
                                 "reason": "guarded two lines above"}
+
+
+def test_draft_dismiss_rejects_unmatched_key(tmp_path):
+    # The model dismisses with the PRINCIPLE (the only id get_violations used to
+    # expose) as req. No finding has that (req, file, line), so recording it
+    # would be a silent no-op. The draft fails in-loop instead.
+    ctx = _seed_run_ctx(tmp_path, [
+        {"principle": "P1", "req": "r1", "file": "a.py", "line": 3,
+         "severity": "major", "title": "t", "reason": "r"}])
+    out = build_registry(ctx).dispatch("draft_action", {
+        "action_type": "dismiss_finding",
+        "payload": {"req": "P1", "file": "a.py", "line": 3, "reason": "fp"},
+    })
+    assert out["ok"] is False
+    assert "no finding matches" in out["error"]
+
+
+def test_draft_dismiss_accepts_sql_only_finding(tmp_path):
+    # A finding surfaced by search_findings (SQL) but absent from the eval JSON
+    # (the two stores can drift) must still be dismissable -- the match-check
+    # unions both sources so it never falsely rejects a finding the model saw.
+    from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
+
+    ctx = _seed_run_ctx(tmp_path, [])  # empty eval JSON
+    SqliteFindingsRepository(ctx.run_dir).insert_finding({
+        "p": "P1", "d": "security", "req": "SQL-1", "t": "violation",
+        "severity": "major", "file": "z.py", "line": 42, "end_line": 42,
+        "w": "t", "reason": "r", "snippet": "s", "vt": "code", "context": "",
+        "scope": "file", "req_refs": [], "confidence": 90,
+        "provenance_downgrade": 0,
+    })
+    out = build_registry(ctx).dispatch("draft_action", {
+        "action_type": "dismiss_finding",
+        "payload": {"req": "SQL-1", "file": "z.py", "line": 42, "reason": "fp"},
+    })
+    assert out["ok"] is True
+
+
+def test_draft_dismiss_survives_corrupt_dimension_file(tmp_path):
+    # A single corrupt dimension JSON must drop only its own findings, not
+    # discard every healthy dimension's keys (which would falsely reject a
+    # valid dismiss on a legacy run with no SQL findings db).
+    ctx = _seed_run_ctx(tmp_path, [
+        {"principle": "P1", "req": "R1", "file": "a.py", "line": 10,
+         "severity": "major", "title": "t", "reason": "r"}])
+    (ctx.run_dir / "evaluation" / "reliability.json").write_text("{not json")
+    out = build_registry(ctx).dispatch("draft_action", {
+        "action_type": "dismiss_finding",
+        "payload": {"req": "R1", "file": "a.py", "line": 10, "reason": "fp"},
+    })
+    assert out["ok"] is True
+
+
+def test_draft_dismiss_accepts_req_none_finding(tmp_path):
+    # A finding with no req (practiceId-only identity) is dismissable with an
+    # empty req, mirroring the dashboard. The old validator rejected empty req,
+    # making such findings undismissable by the assistant.
+    ctx = _seed_run_ctx(tmp_path, [
+        {"principle": "P1", "file": "a.py", "line": 3,  # no req key
+         "severity": "major", "title": "t", "reason": "r"}])
+    out = build_registry(ctx).dispatch("draft_action", {
+        "action_type": "dismiss_finding",
+        "payload": {"file": "a.py", "line": 3, "reason": "fp"},  # req omitted
+    })
+    assert out["ok"] is True
+    stored = ctx.repository.get_action(out["result"]["action_id"])
+    assert stored["payload"]["req"] == ""
 
 
 def test_draft_verify_requires_note_and_project(ctx, project_ctx):

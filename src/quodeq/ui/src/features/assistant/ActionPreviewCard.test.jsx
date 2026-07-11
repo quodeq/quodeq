@@ -62,3 +62,24 @@ it('dispatches quodeq:assistant-action-applied on successful apply', async () =>
   expect(events[0].detail.actionType).toBe('dismiss_finding');
   window.removeEventListener('quodeq:assistant-action-applied', handler);
 });
+
+it('includes the scores and delta from the apply response in the dispatched event', async () => {
+  const events = [];
+  const handler = (e) => events.push(e);
+  window.addEventListener('quodeq:assistant-action-applied', handler);
+  const scores = { dimensions: [{ dimension: 'security', overallScore: 80 }] };
+  const delta = {
+    kind: 'dismiss', dismissed: { req: 'R1', file: 'a.py', line: 3 },
+    runId: 'run1', isLatest: false, accumulated: null,
+  };
+  applyAssistantAction.mockResolvedValueOnce({ applied: true, result: { dismissed: true, scores, delta } });
+  const dismissAction = { actionId: 'a4', actionType: 'dismiss_finding',
+    summary: { req: 'R1', file: 'a.py', line: 3, reason: 'fp' } };
+  render(<ActionPreviewCard action={dismissAction} />);
+  fireEvent.click(screen.getByRole('button', { name: /apply/i }));
+  await waitFor(() => expect(applyAssistantAction).toHaveBeenCalledWith('a4'));
+  await waitFor(() => expect(events.length).toBe(1));
+  expect(events[0].detail.delta).toEqual(delta);
+  expect(events[0].detail.scores).toEqual(scores);
+  window.removeEventListener('quodeq:assistant-action-applied', handler);
+});

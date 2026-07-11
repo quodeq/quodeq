@@ -70,10 +70,91 @@ def _principle_of(v: dict):
     return v.get("principle") or v.get("practiceId")
 
 
+def _requirement_of(v: dict) -> str:
+    # The requirement id (Finding.req) is the FIRST element of the (req, file,
+    # line) identity that dismiss/verify and the suppression filter key on.
+    # Run-scoped eval JSON and the accumulated serialized-Finding payload both
+    # key it as "req"; accept "requirement" too for any producer that already
+    # renamed it. Often absent (req is optional; practiceId is the guaranteed
+    # identity), so it is normalized to "" rather than None so it round-trips
+    # as a valid dismiss key.
+    return str(v.get("req") or v.get("requirement") or "")
+
+
+def _coerce_line(line) -> int:
+    # dismiss keys store line as int; Finding.line is typed int|str|None. Coerce
+    # so a string line ("5") still matches a stored int line (5).
+    try:
+        return int(line)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _trim_violation(v: dict) -> dict:
     out = {k: v.get(k) for k in _VIOLATION_FIELDS}
     out["principle"] = _principle_of(v)
+    # Expose the requirement id so the model can form a correct dismiss/verify
+    # key. Without it, get_report/get_violations only surfaced `principle`, and
+    # a dismiss drafted from that data carried a wrong/empty req that never
+    # matched the finding on the suppression read path (silent no-op).
+    out["requirement"] = _requirement_of(v)
     return out
+
+
+def finding_keys_in_scope(ctx: ToolContext) -> set[tuple]:
+    """Every ``(req, file, line)`` identity the model can see in this scope.
+
+    Used to validate a dismiss/verify draft against a real finding before it is
+    recorded, so the model cannot persist an action whose key matches nothing.
+    Unions EVERY source a read tool can surface, so the check never falsely
+    rejects a finding the model legitimately saw:
+
+    - run scope: the UNCAPPED eval-JSON violations (get_report/get_violations)
+      AND the SQL findings table (search_findings) -- the two can drift, and a
+      finding present in only one must still be dismissable.
+    - overview scope: the accumulated per-dimension-latest violations.
+
+    Best-effort: each source is guarded independently so one unreadable source
+    (e.g. a missing eval dir or a corrupt evaluation.db) still leaves the others
+    usable, and a wholly unreadable scope surfaces as "no matching finding"
+    rather than a stack trace.
+    """
+    keys: set[tuple] = set()
+
+    def _add(v: dict) -> None:
+        keys.add((_requirement_of(v), str(v.get("file") or ""), _coerce_line(v.get("line"))))
+
+    if _has_run(ctx):
+        eval_dir = ctx.run_dir / "evaluation"
+        if eval_dir.is_dir():
+            # Parse each dimension file INDEPENDENTLY: one corrupt/truncated file
+            # (a known failure mode of deadline-cut runs) must drop only its own
+            # findings, not discard every healthy dimension's keys.
+            for p in sorted(eval_dir.glob("*.json")):
+                try:
+                    data = json.loads(p.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    continue
+                for v in (data.get("violations") or []):
+                    _add(v)
+        # SQL findings (the search_findings source). Read only an EXISTING db so
+        # a read-only draft never creates evaluation.db or kicks a projection on
+        # a run that has none -- when there is no db there are no SQL findings to
+        # miss anyway.
+        if (ctx.run_dir / "evaluation.db").is_file():
+            try:
+                for f in SqliteFindingsRepository(ctx.run_dir).list_all():
+                    keys.add((str(f.req or ""), str(f.file or ""), _coerce_line(f.line)))
+            except Exception:  # noqa: BLE001 - a corrupt db must not block the read
+                pass
+    else:
+        try:
+            for d in (_accumulated_dims(ctx) or []):
+                for v in (d.get("violations") or []):
+                    _add(v)
+        except (ToolError, OSError, ValueError):
+            pass
+    return keys
 
 
 def _severity_key(v: dict):

@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { createAssistantSession, fetchAssistantCatalog, postAssistantMessage } from '../../api/assistant.js';
+import { createAssistantSession, fetchAssistantCatalog, fetchAssistantWorkspace, postAssistantMessage } from '../../api/assistant.js';
 import useAssistantProvider from '../settings/hooks/useAssistantProvider.js';
 import useTerminalSettings from '../settings/hooks/useTerminalSettings.js';
 import { useAssistantStream } from './useAssistantStream.js';
@@ -98,6 +98,16 @@ export function AssistantDrawerProvider({ children }) {
   // switch: web access is opt-in per conversation, never sticky.
   const [webEnabled, setWebEnabled] = useState(false);
   const toggleWebEnabled = useCallback(() => setWebEnabled((prev) => !prev), []);
+
+  // Per-conversation write access: default OFF, reset on every context switch,
+  // mirrors the web toggle. repoInfo/workspace mirror the server's view.
+  const [writeEnabled, setWriteEnabled] = useState(false);
+  const toggleWriteEnabled = useCallback(() => setWriteEnabled((prev) => !prev), []);
+  const writeEnabledRef = useRef(false);
+  writeEnabledRef.current = writeEnabled;
+  const [repoInfo, setRepoInfo] = useState(null);   // {attached, reason, writeAvailable}
+  const [workspace, setWorkspace] = useState(null); // status route's `worktree` object
+
   // Tracks the most recently *requested* session context key, set
   // synchronously at startSession call time. Because startSession awaits a
   // network round-trip, a check-then-act guard on React state would let two
@@ -111,7 +121,22 @@ export function AssistantDrawerProvider({ children }) {
   // drives the drawer's loading indicator and input-disable. Merely opening a
   // session connects the event stream, which must not look like "loading".
   const [turnActive, setTurnActive] = useState(false);
-  const stream = useAssistantStream(sessionId, { onDone: () => setTurnActive(false) });
+
+  const sessionIdRef = useRef(null);
+  sessionIdRef.current = sessionId;
+  const refreshWorkspace = useCallback(async () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    try {
+      const ws = await fetchAssistantWorkspace(sid);
+      if (sessionIdRef.current !== sid) return;   // context switched mid-flight
+      setWorkspace(ws.worktree);
+    } catch { /* advisory only */ }
+  }, []);
+  const stream = useAssistantStream(sessionId, { onDone: () => {
+    setTurnActive(false);
+    if (writeEnabledRef.current) refreshWorkspace();
+  } });
 
   // A fresh session (open, project/run switch) has no turn in flight.
   useEffect(() => { setTurnActive(false); }, [sessionId]);
@@ -220,6 +245,10 @@ export function AssistantDrawerProvider({ children }) {
     setLocalError(null);
     setUserTurns([]);
     setWebEnabled(false);
+    setWriteEnabled(false);
+    setRepoInfo({ attached: !!created.repoAttached, reason: created.repoReason || null,
+                  writeAvailable: !!created.writeAvailable });
+    setWorkspace(null);
     setSessionCtxKey(key);
     setSessionId(created.sessionId);
     setSessionMeta({ provider: ctx?.provider ?? null, model: ctx?.model ?? null });
@@ -249,14 +278,14 @@ export function AssistantDrawerProvider({ children }) {
     setUserTurns((prev) => [...prev, { role: 'user', text, atIndex: stream.messages.length }]);
     setTurnActive(true);  // turn is now in flight until the stream's done/error
     try {
-      await postAssistantMessage(sessionId, { text, uiState, webEnabled });
+      await postAssistantMessage(sessionId, { text, uiState, webEnabled, writeEnabled });
     } catch (err) {
       // The optimistic user turn stays in the transcript; surface the failure
       // so the user knows the message didn't reach the assistant.
       setLocalError(`Couldn't send message: ${err?.message || err}`);
       setTurnActive(false);
     }
-  }, [sessionId, stream.messages.length, webEnabled]);
+  }, [sessionId, stream.messages.length, webEnabled, writeEnabled]);
 
   // Client-answered meta-commands (/help, /skills, /actions): show the user
   // turn and the local response in the transcript without any server call.
@@ -280,9 +309,11 @@ export function AssistantDrawerProvider({ children }) {
     sessionReady: sessionId != null,
     provider: sessionMeta.provider, model: sessionMeta.model,
     webEnabled, toggleWebEnabled,
+    writeEnabled, toggleWriteEnabled, repoInfo, workspace, refreshWorkspace,
+    sessionId,
     catalog, addLocalExchange,
     startSession, sendMessage, resetConversation,
-  }), [isOpen, open, close, toggle, closeActiveTab, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, catalog, addLocalExchange, startSession, sendMessage, resetConversation]);
+  }), [isOpen, open, close, toggle, closeActiveTab, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled, repoInfo, workspace, refreshWorkspace, catalog, addLocalExchange, startSession, sendMessage, resetConversation]);
 
   return (
     <AssistantDrawerContext.Provider value={value}>

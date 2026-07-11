@@ -12,6 +12,10 @@ const drawer = {
 };
 vi.mock('../assistant/AssistantDrawerProvider.jsx', () => ({ useAssistantDrawer: () => drawer }));
 vi.mock('../terminal/TerminalPane.jsx', () => ({ default: () => <div data-testid="tty" /> }));
+vi.mock('../side-pane/index.js', () => ({
+  useSidePane: () => ({ addWindow: vi.fn() }),
+  workspaceDiffSpec: vi.fn(),
+}));
 import { BottomDrawer } from './BottomDrawer.jsx';
 
 it('shows a tab for each OPEN panel (both, since both are open)', () => {

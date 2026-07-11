@@ -2,16 +2,20 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from quodeq.assistant import get_provider_configs
 from quodeq.assistant._context import build_system_prompt, build_turn_message
 from quodeq.assistant.adapters._api import ApiTurnConfig, run_api_turn
 from quodeq.assistant.adapters._capabilities import supports_native_tools
 from quodeq.assistant.adapters._cli import CliTurnConfig, run_cli_turn
-from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS
+from quodeq.assistant.adapters._cli_config import load_cli_chat_config
+from quodeq.assistant.guard import (
+    MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, WRITE_MAX_TOOL_ITERATIONS)
 from quodeq.assistant.skills import load_skills
 from quodeq.assistant.tools import ToolContext, build_registry, register_web_tools
+from quodeq.assistant.tools._write_tools import register_write_tools
+from quodeq.assistant.worktree import ensure_session_worktree
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 from quodeq.llm_bridge import LOCAL_PROVIDERS
 
@@ -28,6 +32,7 @@ class TurnRequest:
     provider: str
     model: str
     web_enabled: bool = False
+    write_enabled: bool = False
 
 
 def _split_skill(text: str):
@@ -39,6 +44,26 @@ def _split_skill(text: str):
 
 def _provider_type(provider: str) -> str:
     return get_provider_configs().get(provider, {}).get("type", "cli")
+
+
+# MCP config styles scoped to a single invocation: a per-turn temp config file
+# (claude) or an inline config override (codex). "cli-register" is NOT here:
+# it mutates a global settings file, so concurrent sessions could interleave
+# and a no-grant turn would spawn its MCP server against a grant turn's
+# registration, leaking write tools jailed to another session's worktree.
+_ISOLATED_MCP_STYLES = frozenset({"config-file", "config-arg"})
+
+
+def write_safe_provider(provider: str) -> bool:
+    """Whether the write grant may activate for this provider. API providers
+    register tools in-process (no MCP config involved); CLI providers qualify
+    only when their MCP config is per-invocation isolated."""
+    if _provider_type(provider) != "cli":
+        return True
+    try:
+        return load_cli_chat_config(provider).mcp_style in _ISOLATED_MCP_STYLES
+    except KeyError:
+        return False
 
 
 def _mcp_server_args(request: TurnRequest, tool_ctx: ToolContext) -> list[str]:
@@ -57,6 +82,8 @@ def _mcp_server_args(request: TurnRequest, tool_ctx: ToolContext) -> list[str]:
         args += ["--project-id", str(tool_ctx.project_id)]
     if tool_ctx.reports_dir is not None:
         args += ["--reports-dir", str(tool_ctx.reports_dir)]
+    if tool_ctx.worktree_dir is not None:
+        args += ["--enable-write", "--worktree-dir", str(tool_ctx.worktree_dir)]
     return args
 
 
@@ -81,8 +108,21 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
         # In-process web tools are local-API-only: claude gets NATIVE web
         # tools via argv, and cloud APIs (openrouter/custom) stay excluded.
         web_tools_on = request.web_enabled and request.provider in LOCAL_PROVIDERS
+        # Server-derived write grant, mirror of web_tools_on: the client flag
+        # alone is never enough. Requires an attached LOCAL git repo and a
+        # provider whose tool wiring is per-invocation isolated.
+        write_on = (request.write_enabled and tool_ctx.repo_root is not None
+                    and (tool_ctx.repo_root / ".git").exists()
+                    and write_safe_provider(request.provider))
+        if write_on:
+            manager = ensure_session_worktree(
+                repository, repo_root=tool_ctx.repo_root,
+                project_id=tool_ctx.project_id, session_id=request.session_id)
+            tool_ctx = replace(tool_ctx, worktree_dir=manager.path)
         messages = [{"role": "system",
-                     "content": build_system_prompt(skill=skill, web_enabled=web_tools_on)},
+                     "content": build_system_prompt(skill=skill,
+                                                    web_enabled=web_tools_on,
+                                                    write_enabled=write_on)},
                     *({"role": m["role"], "content": m["content"]} for m in history)]
         if _provider_type(request.provider) == "cli":
             skill_block = (f"[skill:{skill.name}]\n{skill.instructions}"
@@ -97,6 +137,7 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
                     web_enabled=request.web_enabled,
                     system_prompt=messages[0]["content"],
                     skill_block=skill_block,
+                    worktree_dir=tool_ctx.worktree_dir,
                 ),
                 session_id=request.session_id,
                 prior_session_id=(repository.get_session(request.session_id) or {}).get("cli_session_id"),
@@ -108,12 +149,15 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
                 model=request.model,
                 native_tools=capability_fn(request.provider, request.api_base,
                                            request.model),
-                max_tool_iterations=(SKILL_MAX_TOOL_ITERATIONS if skill is not None
-                                     else MAX_TOOL_ITERATIONS),
+                max_tool_iterations=max(
+                    SKILL_MAX_TOOL_ITERATIONS if skill is not None else MAX_TOOL_ITERATIONS,
+                    WRITE_MAX_TOOL_ITERATIONS if write_on else 0),
             )
             registry = build_registry(tool_ctx)
             if web_tools_on:
                 register_web_tools(registry)
+            if write_on:
+                register_write_tools(registry, tool_ctx)
             final = turn_fn(messages=messages, config=config,
                             registry=registry, emit=emit)
         repository.add_message(request.session_id, "assistant", final)

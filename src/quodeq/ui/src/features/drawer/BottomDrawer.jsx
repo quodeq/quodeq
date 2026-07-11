@@ -1,7 +1,8 @@
 import React, { useCallback, useRef, lazy, Suspense } from 'react';
 import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';
 import { AssistantPane } from '../assistant/AssistantDrawer.jsx';
-import { ChevronUpIcon, ChevronDownIcon, GlobeIcon, RotateCcwIcon } from '../../components/CopyButton.jsx';
+import { ChevronUpIcon, ChevronDownIcon, GlobeIcon, PencilIcon, RotateCcwIcon } from '../../components/CopyButton.jsx';
+import { useSidePane, workspaceDiffSpec } from '../side-pane/index.js';
 
 const TerminalPane = lazy(() => import('../terminal/TerminalPane.jsx'));
 
@@ -25,7 +26,9 @@ export function BottomDrawer({ uiState }) {
   const { isOpen, height, setHeight, closeActiveTab, openPanels, activeTab, selectTab,
           maximized, toggleMaximized, setMaximized, provider, model,
           streaming, webEnabled, toggleWebEnabled,
-          sessionReady, resetConversation } = useAssistantDrawer();
+          writeEnabled, toggleWriteEnabled, repoInfo, workspace, refreshWorkspace,
+          sessionId, sessionReady, resetConversation } = useAssistantDrawer();
+  const { addWindow } = useSidePane();
   const dragRef = useRef(null);
 
   const handleDragMove = useCallback((event) => {
@@ -80,6 +83,20 @@ export function BottomDrawer({ uiState }) {
             {modelLabel}
           </span>
         )}
+        {active === 'assistant' && repoInfo && (
+          <span className={`drawer-repo-chip${repoInfo.attached ? '' : ' drawer-repo-chip--off'}`}
+            title={repoInfo.attached ? 'Repository attached'
+              : `Repository not attached: ${repoInfo.reason || 'unknown'}`}>
+            {repoInfo.attached ? 'repo' : 'no repo'}
+          </span>
+        )}
+        {active === 'assistant' && workspace?.filesChanged > 0 && (
+          <button type="button" className="drawer-changes-chip"
+            onClick={() => addWindow(workspaceDiffSpec({ sessionId, key: workspace.createdAt, onChanged: refreshWorkspace }))}
+            title="Review pending changes">
+            {workspace.filesChanged} file{workspace.filesChanged === 1 ? '' : 's'} changed
+          </button>
+        )}
         <div className="assistant-drawer-controls">
           {active === 'assistant' && (
             <button type="button" className="assistant-drawer-btn"
@@ -88,6 +105,16 @@ export function BottomDrawer({ uiState }) {
               title="New conversation (clears the model context)"
               disabled={streaming || !sessionReady}>
               <RotateCcwIcon />
+            </button>
+          )}
+          {active === 'assistant' && repoInfo?.writeAvailable && (
+            <button type="button" className="assistant-drawer-btn assistant-drawer-write"
+              onClick={toggleWriteEnabled}
+              aria-pressed={writeEnabled}
+              aria-label="Allow repository edits for this conversation"
+              title="Allow repository edits for this conversation (isolated worktree, you review before anything lands)"
+              disabled={streaming}>
+              <PencilIcon />
             </button>
           )}
           {active === 'assistant' && WEB_PROVIDERS.has(provider) && (

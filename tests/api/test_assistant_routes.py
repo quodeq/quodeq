@@ -26,6 +26,7 @@ def app(tmp_path, monkeypatch):
     catalog = {
         "ollama": {"type": "api", "api_base": "http://localhost:11434/v1"},
         "claude": {"type": "cli"},
+        "gemini": {"type": "cli"},
     }
     monkeypatch.setattr(
         "quodeq.api.assistant_routes.get_provider_configs", lambda: catalog
@@ -268,6 +269,10 @@ def test_create_session_resolves_run_from_project_and_run_id(client, app, monkey
         "quodeq.api._assistant_helpers.resolve_run_location",
         lambda project_id, run_id: (str(run_dir), "/src/selectives-android"),
     )
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.repo_attach_info",
+        lambda project_id: ("/src/selectives-android", "ok"),
+    )
     resp = client.post("/api/assistant/sessions",
                        json={"provider": "ollama", "projectId": "selectives", "runId": "run-9"})
     assert resp.status_code == 201
@@ -392,8 +397,8 @@ def test_create_session_attaches_repo_root_without_run(client, app, monkeypatch)
     # is a project-level fact, so it must attach anyway; otherwise repo tools
     # fail with "no analyzed repository attached" in the app's default state.
     monkeypatch.setattr(
-        "quodeq.api._assistant_helpers.resolve_repo_root",
-        lambda project_id: "/src/selectives-android",
+        "quodeq.api._assistant_helpers.repo_attach_info",
+        lambda project_id: ("/src/selectives-android", "ok"),
     )
     resp = client.post("/api/assistant/sessions",
                        json={"provider": "ollama", "projectId": "selectives"})
@@ -534,6 +539,45 @@ def test_apply_dismiss_finding_writes_action_log(client, app, tmp_path, monkeypa
     assert dismissed_keys(evals / "proj") == {("r1", "a.py", 3)}
 
 
+def test_apply_dismiss_finding_returns_delta_for_run_scoped_session(client, app, tmp_path, monkeypatch):
+    # A run-scoped dismiss (runId present, mirroring an assistant session
+    # opened against a specific run) must return the same delta shape the
+    # manual /api/findings/dismiss route returns, so the UI can patch its
+    # caches in place instead of waiting on a lazy refetch.
+    evals = tmp_path / "evals"
+    run_dir = evals / "proj" / "run1"
+    (run_dir / "evaluation").mkdir(parents=True)
+    (run_dir / "evaluation" / "security.json").write_text(json.dumps({
+        "dimension": "security", "overallScore": 50, "overallGrade": "C",
+        "principles": [], "violations": [
+            {"principle": "P1", "req": "r1", "file": "a.py", "line": 3,
+             "severity": "major", "title": "t", "reason": "r"},
+        ],
+        "totals": {"violations": 1},
+    }))
+    monkeypatch.setitem(app.config, "EVALUATIONS_DIR", str(evals))
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(action_id="a1", session_id="s1",
+                       action_type="dismiss_finding",
+                       payload={"project": "proj", "req": "r1", "file": "a.py",
+                                "line": 3, "reason": "false positive: guarded",
+                                "runId": "run1"},
+                       content_hash="h")
+    resp = client.post("/api/assistant/actions/a1/apply")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["result"]["dismissed"] is True
+    delta = body["result"]["delta"]
+    assert delta["kind"] == "dismiss"
+    assert delta["dismissed"] == {"req": "r1", "file": "a.py", "line": 3}
+    # The delta names its own project so the client patches the right cache
+    # even if the user switched projects while the apply POST was in flight.
+    assert delta["project"] == "proj"
+    from quodeq.services.dismissed import dismissed_keys
+    assert dismissed_keys(evals / "proj") == {("r1", "a.py", 3)}
+
+
 def test_apply_verify_finding_writes_badge(client, app, tmp_path, monkeypatch):
     evals = tmp_path / "evals"
     (evals / "proj").mkdir(parents=True)
@@ -568,3 +612,58 @@ def test_apply_verify_finding_traversal_payload_400(client, app, tmp_path, monke
     # The traversal target directory must not have been created.
     escape_dir = tmp_path / "escape"
     assert not escape_dir.exists()
+
+
+def test_create_session_reports_attachment(client, monkeypatch, tmp_path):
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    monkeypatch.setattr("quodeq.api._assistant_helpers.repo_attach_info",
+                        lambda pid: (str(repo), "ok"))
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "projectId": "p1"})
+    data = resp.get_json()
+    assert data["repoAttached"] is True
+    assert data["repoReason"] == "ok"
+    assert data["writeAvailable"] is True
+
+
+def test_create_session_reports_detachment(client, monkeypatch):
+    monkeypatch.setattr("quodeq.api._assistant_helpers.repo_attach_info",
+                        lambda pid: (None, "path_missing"))
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "projectId": "p1"})
+    data = resp.get_json()
+    assert data["repoAttached"] is False
+    assert data["repoReason"] == "path_missing"
+    assert data["writeAvailable"] is False
+
+
+def test_message_passes_write_enabled(client, app, monkeypatch):
+    import threading
+    seen = {}
+    done = threading.Event()
+    monkeypatch.setattr("quodeq.api._assistant_helpers.local_provider_busy",
+                        lambda p: False)
+
+    def fake_run_turn(turn, **kw):
+        seen["write_enabled"] = turn.write_enabled
+        done.set()
+    monkeypatch.setattr("quodeq.api.assistant_routes.run_turn", fake_run_turn)
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama"}).get_json()["sessionId"]
+    client.post(f"/api/assistant/sessions/{sid}/messages",
+                json={"text": "hi", "writeEnabled": True})
+    assert done.wait(timeout=2)  # run_turn runs on a daemon thread
+    assert seen.get("write_enabled") is True
+
+
+def test_create_session_write_unavailable_for_unsafe_provider(client, monkeypatch, tmp_path):
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    monkeypatch.setattr("quodeq.api._assistant_helpers.repo_attach_info",
+                        lambda pid: (str(repo), "ok"))
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "gemini", "projectId": "p1"})
+    data = resp.get_json()
+    assert data["repoAttached"] is True
+    assert data["writeAvailable"] is False

@@ -82,6 +82,48 @@ def test_search_findings(ctx):
     assert hit["requirement"] == "req-1"
 
 
+def _req_ctx(tmp_path):
+    """A run whose eval JSON carries `req` on one violation and omits it on another."""
+    run_dir = tmp_path / "run"
+    eval_dir = run_dir / "evaluation"
+    eval_dir.mkdir(parents=True)
+    (eval_dir / "security.json").write_text(json.dumps({
+        "dimension": "security", "overallScore": 50, "overallGrade": "C",
+        "principles": [{"name": "P1", "grade": "C"}],
+        "violations": [
+            {"principle": "P1", "req": "M-1", "file": "a.py", "line": 3,
+             "severity": "critical", "title": "t", "reason": "r"},
+            {"principle": "P2", "file": "b.py", "line": 7,  # no req key
+             "severity": "major", "title": "t2", "reason": "r2"},
+        ],
+        "totals": {"violations": 2},
+    }))
+    repo = AssistantRepository(tmp_path / "assistant.db")
+    repo.create_session(session_id="s1", provider="ollama")
+    return ToolContext(
+        repository=repo, session_id="s1", run_dir=run_dir, repo_root=None,
+        evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
+        dimensions_file=tmp_path / "d.json")
+
+
+def test_get_report_exposes_requirement(tmp_path):
+    # get_report must surface `requirement` so the model can form a correct
+    # dismiss/verify key. A finding with no req exposes "" (not missing/None).
+    reg = build_registry(_req_ctx(tmp_path))
+    viols = reg.dispatch("get_report", {"dimension": "security"})["result"]["violations"]
+    by_file = {v["file"]: v for v in viols}
+    assert by_file["a.py"]["requirement"] == "M-1"
+    assert by_file["b.py"]["requirement"] == ""
+
+
+def test_get_violations_exposes_requirement(tmp_path):
+    reg = build_registry(_req_ctx(tmp_path))
+    viols = reg.dispatch("get_violations", {"dimension": "security"})["result"]["violations"]
+    by_file = {v["file"]: v for v in viols}
+    assert by_file["a.py"]["requirement"] == "M-1"
+    assert by_file["b.py"]["requirement"] == ""
+
+
 def test_search_findings_limit_floor_clamped(ctx):
     # limit=0 (or negative) must not reach the repo -- clamp to >=1 instead.
     reg = build_registry(ctx)
@@ -114,7 +156,9 @@ def test_get_report_includes_trimmed_violations(ctx):
     viols = report["violations"]
     assert len(viols) == 3
     # Trimmed fields only; snippet/context dropped to protect context size.
-    assert set(viols[0]) == {"principle", "file", "line", "severity", "title", "reason"}
+    # `requirement` is included so the model can form a dismiss/verify key.
+    assert set(viols[0]) == {"principle", "requirement", "file", "line",
+                             "severity", "title", "reason"}
     assert all("snippet" not in v and "context" not in v for v in viols)
 
 
@@ -138,7 +182,8 @@ def test_get_violations_for_dimension(ctx):
     res = out["result"]
     # Severity-sorted: critical first, then major, then minor.
     assert [v["severity"] for v in res["violations"]] == ["critical", "major", "minor"]
-    assert set(res["violations"][0]) == {"principle", "file", "line", "severity", "title", "reason"}
+    assert set(res["violations"][0]) == {"principle", "requirement", "file", "line",
+                                         "severity", "title", "reason"}
     assert res["by_principle"] == {"P1": 2, "P2": 1}
     assert res["dimension"] == "security"
 
