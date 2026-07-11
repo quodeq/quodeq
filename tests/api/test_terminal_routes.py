@@ -21,8 +21,8 @@ class _FakeManager:
     def __init__(self):
         self.killed = False; self._alive = False; self.ensured = None
     def ensure_session(self, *, cwd, cols, rows): self._alive = True; self.ensured = (cwd, cols, rows)
-    def scrollback(self): return b"hi\n"
-    def read(self, max_bytes=65536): return b""
+    def scrollback(self): return "hi\n"
+    def read(self, max_bytes=65536): return ""
     def write(self, data): pass
     def resize(self, cols, rows): pass
     def kill(self): self.killed = True; self._alive = False
@@ -126,8 +126,8 @@ class _LiveManager:
     def __init__(self):
         self._alive = True
     def ensure_session(self, *, cwd, cols, rows): self._alive = True
-    def scrollback(self): return b"ready\n"
-    def read(self, max_bytes=65536): time.sleep(0.05); return b""
+    def scrollback(self): return "ready\n"
+    def read(self, max_bytes=65536): time.sleep(0.05); return ""
     def write(self, data): pass
     def resize(self, cols, rows): pass
     def kill(self): self._alive = False
