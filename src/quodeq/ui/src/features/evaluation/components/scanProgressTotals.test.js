@@ -68,6 +68,7 @@ test('computeOverallProgress: returns zeros when progress is null', () => {
   assert.deepEqual(r, {
     totalFiles: 0, takenFiles: 0, overallPct: 0,
     projectTotal: null, cachedFiles: null, coveredFiles: null, coveredPct: null,
+    excludedFiles: null,
   });
 });
 
@@ -354,6 +355,69 @@ test('computeOverallProgress: completed incremental run reads full coverage', ()
   const r = computeOverallProgress(progress);
   assert.equal(r.coveredFiles, 100);
   assert.equal(r.coveredPct, 100);
+});
+
+// ---------------------------------------------------------------------------
+// computeOverallProgress — excluded files (API size cap)
+// ---------------------------------------------------------------------------
+
+test('computeOverallProgress: excludedFiles is the max across dims, not the sum', () => {
+  // The size cap is dim-agnostic: every dim reports the same excluded
+  // count. Summing would multiply it by the number of dims.
+  const progress = {
+    projectFiles: 100,
+    dimensions: [
+      { id: 'security',    state: 'running', files: { taken: 8, total: 20 },
+        filesCached: 80, filesProjectTotal: 100, filesExcluded: 3 },
+      { id: 'reliability', state: 'pending', files: { taken: 0, total: 10 },
+        filesCached: 90, filesProjectTotal: 100, filesExcluded: 3 },
+    ],
+  };
+  const r = computeOverallProgress(progress);
+  assert.equal(r.excludedFiles, 3);
+});
+
+test('computeOverallProgress: excludedFiles is null when no dim carries the field (legacy run)', () => {
+  const progress = {
+    projectFiles: 100,
+    dimensions: [
+      { id: 'security', state: 'running', files: { taken: 8, total: 20 },
+        filesCached: 80, filesProjectTotal: 100 },
+    ],
+  };
+  const r = computeOverallProgress(progress);
+  assert.equal(r.excludedFiles, null);
+});
+
+test('computeOverallProgress: excludedFiles is 0 when dims report zero excluded', () => {
+  const progress = {
+    projectFiles: 100,
+    dimensions: [
+      { id: 'security', state: 'running', files: { taken: 8, total: 20 },
+        filesCached: 80, filesProjectTotal: 100, filesExcluded: 0 },
+    ],
+  };
+  const r = computeOverallProgress(progress);
+  assert.equal(r.excludedFiles, 0);
+});
+
+test('computeOverallProgress: excludedFiles reads the dims that carry it when others lack it', () => {
+  // Mixed payload (e.g. a dim added mid-rollout): use whatever is known.
+  const progress = {
+    projectFiles: 100,
+    dimensions: [
+      { id: 'security',    state: 'running', files: { taken: 8, total: 20 },
+        filesCached: 80, filesProjectTotal: 100, filesExcluded: 5 },
+      { id: 'reliability', state: 'pending', files: { taken: 0, total: 10 } },
+    ],
+  };
+  const r = computeOverallProgress(progress);
+  assert.equal(r.excludedFiles, 5);
+});
+
+test('computeOverallProgress: excludedFiles is null when progress is null or empty', () => {
+  assert.equal(computeOverallProgress(null).excludedFiles, null);
+  assert.equal(computeOverallProgress({ dimensions: [] }).excludedFiles, null);
 });
 
 test('computeOverallProgress: fully-cached re-scan keeps coverage despite empty queues', () => {

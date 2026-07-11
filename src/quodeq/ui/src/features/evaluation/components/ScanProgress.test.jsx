@@ -177,6 +177,31 @@ describe('ScanProgress total coverage (incremental runs)', () => {
     expect(container.querySelector('.scan-progress__bar-fill--cached')).toBeNull();
   });
 
+  it('appends the excluded count to the coverage line when files were excluded', async () => {
+    const payload = coveragePayload();
+    payload.dimensions[0].filesExcluded = 3;
+    getEvaluationProgress.mockResolvedValue(payload);
+    withEvalLog(<ScanProgress job={baseJob} />, ctx);
+    expect(await screen.findByText('88 / 100')).toBeInTheDocument();
+    expect(screen.getByText(/3 excluded \(size cap\)/)).toBeInTheDocument();
+  });
+
+  it('shows no excluded segment when the payload reports zero excluded', async () => {
+    const payload = coveragePayload();
+    payload.dimensions[0].filesExcluded = 0;
+    getEvaluationProgress.mockResolvedValue(payload);
+    withEvalLog(<ScanProgress job={baseJob} />, ctx);
+    expect(await screen.findByText('88 / 100')).toBeInTheDocument();
+    expect(screen.queryByText(/excluded/)).toBeNull();
+  });
+
+  it('shows no excluded segment on legacy payloads without the field', async () => {
+    getEvaluationProgress.mockResolvedValue(coveragePayload());
+    withEvalLog(<ScanProgress job={baseJob} />, ctx);
+    expect(await screen.findByText('88 / 100')).toBeInTheDocument();
+    expect(screen.queryByText(/excluded/)).toBeNull();
+  });
+
   it('fully-cached re-scan shows coverage, not preparing', async () => {
     // Nothing new to analyze this run: totalFiles 0 but full coverage data.
     getEvaluationProgress.mockResolvedValue({

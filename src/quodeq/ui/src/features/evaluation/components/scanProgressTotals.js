@@ -38,11 +38,12 @@ export function dimFileEstimate(progress) {
 }
 
 const NO_COVERAGE = { projectTotal: null, cachedFiles: null, coveredFiles: null, coveredPct: null };
+const NO_EXCLUDED = { excludedFiles: null };
 
 export function computeOverallProgress(progress) {
   const dims = progress?.dimensions || [];
   if (dims.length === 0) {
-    return { totalFiles: 0, takenFiles: 0, overallPct: 0, ...NO_COVERAGE };
+    return { totalFiles: 0, takenFiles: 0, overallPct: 0, ...NO_COVERAGE, ...NO_EXCLUDED };
   }
 
   // "preparing…" only when *nothing* is known yet — i.e. no dim has
@@ -52,7 +53,7 @@ export function computeOverallProgress(progress) {
   const anyDimStarted = dims.some((d) => d?.state === 'running' || d?.state === 'done');
   const anyTotalKnown = dims.some((d) => (d?.files?.total ?? 0) > 0);
   if (!anyDimStarted && !anyTotalKnown) {
-    return { totalFiles: 0, takenFiles: 0, overallPct: 0, ...NO_COVERAGE };
+    return { totalFiles: 0, takenFiles: 0, overallPct: 0, ...NO_COVERAGE, ...NO_EXCLUDED };
   }
 
   // Sum across dims using whatever total each one carries. Pending dims
@@ -65,6 +66,9 @@ export function computeOverallProgress(progress) {
   let hasCoverage = true;
   let cachedFiles = 0;
   let projectTotal = 0;
+  // Files over the API size cap. The cap is dim-agnostic, so every dim
+  // reports the same count — max, not sum, or N dims would multiply it.
+  let excludedFiles = null;
   for (const d of dims) {
     takenFiles += d?.files?.taken ?? 0;
     totalFiles += d?.files?.total ?? 0;
@@ -73,6 +77,9 @@ export function computeOverallProgress(progress) {
       projectTotal += d.filesProjectTotal;
     } else {
       hasCoverage = false;
+    }
+    if (Number.isFinite(d?.filesExcluded)) {
+      excludedFiles = Math.max(excludedFiles ?? 0, d.filesExcluded);
     }
   }
 
@@ -87,5 +94,5 @@ export function computeOverallProgress(progress) {
       }
     : NO_COVERAGE;
 
-  return { totalFiles, takenFiles, overallPct: pct(takenFiles, totalFiles), ...coverage };
+  return { totalFiles, takenFiles, overallPct: pct(takenFiles, totalFiles), ...coverage, excludedFiles };
 }
