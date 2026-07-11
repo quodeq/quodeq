@@ -95,7 +95,7 @@ export function GettingStarted() {
 
       <h3>Requirements</h3>
       <ul>
-        <li><strong>Python 3.12+</strong> and <strong>Node.js 18+</strong>.</li>
+        <li><strong>Python 3.12+</strong>. The dashboard UI ships pre-built, so Node.js is not required.</li>
         <li>At least one AI provider configured. See <em>AI Providers</em>.</li>
       </ul>
     </section>
@@ -150,10 +150,10 @@ export function Providers() {
       </ul>
       <p>Use <strong>Test connection</strong> in the provider tab to verify the key and model before launching a real run.</p>
 
-      <h3>CLI (Claude Code, Codex)</h3>
+      <h3>CLI (Claude Code, Codex, Gemini)</h3>
       <p>Delegates to an AI CLI you already have authenticated on your machine. The CLI handles auth and billing; Quodeq drives it.</p>
       <ol>
-        <li>Install and sign in to your CLI of choice (Claude Code, Codex, etc.).</li>
+        <li>Install and sign in to your CLI of choice (Claude Code, Codex, Gemini CLI).</li>
         <li>In <strong>Settings → CLI Provider</strong>, pick the binary and a model id like <code>gpt-5</code> or <code>claude-sonnet-4-6</code>.</li>
         <li>Optionally pin a different model per power tier (Fast, Balanced, Thorough).</li>
       </ol>
@@ -573,7 +573,7 @@ export function Settings() {
       <h3>Provider tabs</h3>
       <ul>
         <li><strong>Cloud</strong> hosted APIs (OpenRouter or a custom OpenAI-compatible endpoint). API key, base URL, model id, and a <em>Test connection</em> button.</li>
-        <li><strong>CLI</strong> local AI CLIs you have authenticated (Claude Code, Codex). Pick the binary, then a model id.</li>
+        <li><strong>CLI</strong> local AI CLIs you have authenticated (Claude Code, Codex, Gemini). Pick the binary, then a model id.</li>
         <li><strong>Ollama</strong> models on your local Ollama server. Quodeq lists whatever you have pulled.</li>
         <li><strong>Omlx</strong> an MLX-native local server. The tab appears only on Apple Silicon Macs.</li>
         <li><strong>llama.cpp</strong> a local llama-server instance. Shows the GGUF currently loaded.</li>
