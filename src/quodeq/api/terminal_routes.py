@@ -97,9 +97,11 @@ def register_terminal_routes(app: Flask, manager: TerminalManager | None = None)
             try:
                 manager.ensure_session(cwd=os.path.expanduser("~"), cols=80, rows=24)
                 # Replay scrollback so a reattaching client sees recent history.
+                # Already text: the manager decodes incrementally, so the ring
+                # never holds a torn multi-byte character.
                 sb = manager.scrollback()
                 if sb:
-                    ws.send("0" + sb.decode("utf-8", "replace"))
+                    ws.send("0" + sb)
             except Exception:
                 # Spawn failure or early disconnect must not propagate past
                 # flask-sock (would surface as a 500); close cleanly instead.
@@ -119,7 +121,7 @@ def register_terminal_routes(app: Flask, manager: TerminalManager | None = None)
                             break
                         continue
                     try:
-                        ws.send("0" + data.decode("utf-8", "replace"))
+                        ws.send("0" + data)
                     except Exception:
                         break
                 stop.set()
