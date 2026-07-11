@@ -1,8 +1,15 @@
 # Quodeq accuracy benchmarks
 
 Dev/release tooling that measures quodeq's finding accuracy against a
-labeled corpus. Not shipped in the wheel. See
-`docs/superpowers/specs/2026-07-10-accuracy-benchmark-harness-design.md`.
+labeled corpus. Not shipped in the wheel.
+
+How it works: each case under `.corpus/synthetic/` is a tiny project with
+violations planted on purpose and listed in its `truth.json` (the answer
+key). The harness runs `quodeq evaluate` on a temp copy of each case,
+parses the evidence JSONL, and matches findings to labels (same file,
+line within ±5 or the label's span, and CWE/requirement class). From the
+matches it computes per-dimension precision, recall, and F1, and compares
+them against the committed baseline.
 
 The corpus lives in the hidden directory `.corpus/` **on purpose**: its
 files contain intentionally seeded violations (the answer key), and

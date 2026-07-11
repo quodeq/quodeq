@@ -14,7 +14,10 @@ or shipped in the wheel.
   do NOT rename it to a visible path or the planted bugs will sink
   quodeq's own dashboard grades.
 
-Add new cases per the format in
-`docs/superpowers/specs/2026-07-10-accuracy-benchmark-harness-design.md`;
-the integrity test (`tests/benchmarks/test_corpus_integrity.py`)
-validates labels automatically.
+To add a case: copy the structure of an existing one (source files +
+`truth.json` with `language`, `exhaustive`, `clean_files`, and one label
+per planted issue — each label needs `file`, `line`, an `anchor`
+substring that appears on that line, `dimension`, `severity`, and at
+least one of `cwes`/`reqs`). The integrity test
+(`tests/benchmarks/test_corpus_integrity.py`) validates labels
+automatically.
