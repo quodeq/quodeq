@@ -50,6 +50,16 @@ def test_edit_unique_match(wt_ctx):
     assert (wt_ctx.repo_root / "app.py").read_bytes() == b"a = 1\nb = 2\nb = 2\n"
 
 
+def test_edit_preserves_crlf_bytes(wt_ctx):
+    # byte-exact contract: an edit must not rewrite line endings, even on
+    # Windows where text-mode writes would turn \r\n into \r\r\n
+    (wt_ctx.worktree_dir / "crlf.py").write_bytes(b"a = 1\r\nb = 2\r\n")
+    reg = _registry(wt_ctx)
+    assert reg.dispatch("edit_repo_file", {"path": "crlf.py", "old_string": "a = 1",
+                                           "new_string": "a = 9"})["ok"]
+    assert (wt_ctx.worktree_dir / "crlf.py").read_bytes() == b"a = 9\r\nb = 2\r\n"
+
+
 def test_edit_rejects_ambiguous_and_missing(wt_ctx):
     reg = _registry(wt_ctx)
     assert reg.dispatch("edit_repo_file", {"path": "app.py", "old_string": "b = 2",

@@ -23,6 +23,10 @@ class WorktreeError(Exception):
 
 
 def _run_bytes(argv: list[str], *, cwd: Path | None = None) -> bytes:
+    if argv[0] == "git":
+        # never let core.autocrlf (Git-for-Windows default: true) rewrite line
+        # endings at checkout/diff/apply; the tool contract is byte-exact files
+        argv = ["git", "-c", "core.autocrlf=false", *argv[1:]]
     try:
         proc = subprocess.run(  # noqa: S603 - argv list, no shell
             argv, cwd=str(cwd) if cwd else None,
