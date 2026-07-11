@@ -50,7 +50,9 @@ def _edit_repo_file(ctx: ToolContext, path: str, old_string: str,
     new_text = text.replace(old_string, new_string, 1)
     if len(new_text.encode("utf-8")) > _MAX_CONTENT_BYTES:
         raise ToolError(f"edited file would exceed {_MAX_CONTENT_BYTES} bytes")
-    target.write_text(new_text, encoding="utf-8")
+    # bytes, not text mode: Windows text-mode writes translate \n to \r\n,
+    # corrupting files that already use \r\n into \r\r\n
+    target.write_bytes(new_text.encode("utf-8"))
     return {"path": path, "edited": True}
 
 
