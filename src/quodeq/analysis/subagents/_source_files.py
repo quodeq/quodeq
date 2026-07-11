@@ -1,6 +1,7 @@
 """Source file listing and filtering for subagent queues."""
 from __future__ import annotations
 
+from quodeq.analysis import dispatch_policy
 from quodeq.analysis._types import RunConfig
 from quodeq.analysis.subagents.priority import PriorityContext, prioritize_files
 from quodeq.shared.logging import log_warning
@@ -8,11 +9,15 @@ from quodeq.shared.logging import log_warning
 
 def _list_source_files(
     config: RunConfig, dim_id: str, *, ignore_file_filter: bool = False,
-) -> tuple[list[str], set[str]]:
+) -> tuple[list[str], set[str], list[str]]:
     """List source files for the subagent queue from the target or manifest.
 
-    Returns (files, extensions) or ([], set()) if none found.
+    Returns (files, extensions, excluded) or ([], set(), []) if none found.
     Files are returned in priority order (most important first).
+
+    ``excluded`` holds files the active provider can never dispatch (API
+    size cap) — kept out of ``files`` so queues, estimates, and coverage
+    denominators all agree with what the worker will actually send.
     """
     # Prefer target-scoped files when available
     if config.target is not None and config.target.source_files:
@@ -22,7 +27,13 @@ def _list_source_files(
         files = config.manifest.source_files
         extensions = set(config.manifest.language_stats.keys()) if config.manifest.language_stats else set()
     else:
-        return [], set()
+        return [], set(), []
+
+    excluded: list[str] = []
+    if dispatch_policy.provider_is_api():
+        files, excluded = dispatch_policy.split_api_dispatchable(config.src, files)
+        if not files:
+            return [], extensions, excluded
 
     # Prioritize files: most important first
     category = None
@@ -47,4 +58,4 @@ def _list_source_files(
         filter_set = config.options.incremental_file_filter
         files = [f for f in files if f in filter_set]
 
-    return files, extensions
+    return files, extensions, excluded

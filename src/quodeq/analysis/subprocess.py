@@ -23,6 +23,7 @@ from quodeq.analysis._command import (
 )
 from quodeq.analysis._config import AnalysisConfig, HeartbeatCallback, _SpawnPaths
 from quodeq.analysis._process import AnalysisError, _check_process_result, _spawn_and_monitor
+from quodeq.analysis import dispatch_policy
 from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
 from quodeq.analysis.stream.counters import count_files_in_stream
@@ -101,7 +102,6 @@ def _run_cli_analysis(
 
 
 _MAX_API_PROMPT_CHARS = int(os.environ.get("QUODEQ_MAX_API_PROMPT_CHARS", "30000"))  # Target prompt size for local models (~8K tokens)
-_MAX_API_FILE_SIZE = int(os.environ.get("QUODEQ_MAX_API_FILE_SIZE", "15000"))  # Skip files larger than 15KB
 
 
 def _load_skip_dirs() -> frozenset[str]:
@@ -144,7 +144,7 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
         if f in stat_cache
         and not any(p in f.parts for p in _SKIP_DIRS)
         and not any(p.startswith(".") for p in f.relative_to(work_dir).parts)
-        and 0 < stat_cache[f] < _MAX_API_FILE_SIZE
+        and 0 < stat_cache[f] < dispatch_policy.api_file_size_cap()
     ]
     # Prioritize code files over markup
     code_files = [f for f in filtered if f.suffix in _CODE_EXTS]
@@ -296,6 +296,23 @@ def _resolve_provider_config(cfg: AnalysisConfig) -> tuple[str, str, str]:
     return model, api_base, api_key
 
 
+def _write_skip_markers(jsonl_file: Path, skipped: list[str], reason: str) -> None:
+    """Append ``file_done: skipped`` markers for taken-but-undispatched files.
+
+    Invariant: every file taken from a queue must end with a marker. A
+    silent drop leaves the file uncached, so every incremental run re-queues
+    and re-drops it — the dim never converges (the perpetual-97% bug).
+    ``skipped`` (unlike ``error``) does not feed the failure-streak breaker
+    or the post-run reachability guard.
+    """
+    from quodeq.analysis.mcp.router import FindingsRouter  # noqa: PLC0415
+    jsonl_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(jsonl_file, "a", encoding="utf-8") as fh:
+        router = FindingsRouter(fh)
+        for f in skipped:
+            router.mark_file_done(file=f, status="skipped", reason=reason)
+
+
 def _gather_api_source_files(
     work_dir: Path, cfg: AnalysisConfig, jsonl_file: Path, stream_file: Path,
 ) -> list[Path] | None:
@@ -306,10 +323,18 @@ def _gather_api_source_files(
     if cfg.queue_path and cfg.queue_path.exists():
         queue = FileQueue(cfg.queue_path)
         taken = queue.take(count=min(cfg.max_files_per_agent or 10, 3), agent_id=cfg.agent_id)
-        source_files = [
-            work_dir / f for f in taken
-            if (work_dir / f).exists() and (work_dir / f).stat().st_size < _MAX_API_FILE_SIZE
-        ]
+        # Enumeration applies the same predicate, so dropped files here mean
+        # the file changed (or vanished) between queue build and dispatch.
+        dispatchable, dropped = dispatch_policy.split_api_dispatchable(work_dir, taken)
+        if dropped:
+            _write_skip_markers(
+                jsonl_file, dropped,
+                reason=(
+                    f"skipped: missing or over the API file-size cap "
+                    f"({dispatch_policy.api_file_size_cap()} bytes)"
+                ),
+            )
+        source_files = [work_dir / f for f in dispatchable]
         _log.debug("Took %d files from queue for API analysis", len(source_files))
         if not source_files:
             # Don't touch jsonl_file — it's the SHARED `{dim}_evidence.jsonl`

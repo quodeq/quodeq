@@ -83,10 +83,27 @@ class RunConfig:
 
     @property
     def source_file_count(self) -> int:
-        """Derive source file count from the target or manifest."""
+        """Files the active provider can actually analyze.
+
+        This is the coverage denominator (``coveragePct = files_read /
+        source_file_count``). For API providers, files over the dispatch
+        size cap can never be read, so counting them would pin coverage
+        below 100% forever; they are excluded here to match what the
+        queue/estimates enumerate. CLI providers have no cap and keep the
+        raw manifest count.
+        """
         if self.target:
-            return self.target.total_files
-        return self.manifest.total_files if self.manifest else 0
+            files, total = self.target.source_files, self.target.total_files
+        elif self.manifest:
+            files, total = self.manifest.source_files, self.manifest.total_files
+        else:
+            return 0
+        # Late import: dispatch_policy reads provider config; keep _types a leaf.
+        from quodeq.analysis import dispatch_policy  # noqa: PLC0415
+        if not files or not dispatch_policy.provider_is_api():
+            return total
+        dispatchable, _excluded = dispatch_policy.split_api_dispatchable(self.src, files)
+        return len(dispatchable)
 
 
 @dataclass(frozen=True)

@@ -114,7 +114,7 @@ def process_dimension_with_subagents(
     """
     evidence_dir = config.work_dir or config.src
 
-    files, extensions = _list_source_files(config, dim_id)
+    files, extensions, _excluded = _list_source_files(config, dim_id)
     if not files:
         log_warning(
             f"[{idx}/{ctx.total}] {dim_id} -- no source files for subagent queue"

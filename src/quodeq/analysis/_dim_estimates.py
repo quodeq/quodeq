@@ -30,12 +30,14 @@ from typing import Any
 
 from quodeq.analysis._types import RunConfig
 from quodeq.analysis.cache import LocalFileBackend, classify_files_via_cache
+from quodeq.analysis.dispatch_policy import api_file_size_cap
 from quodeq.analysis.subagents._source_files import _list_source_files
 from quodeq.shared.dim_estimates_io import (
     DIM_ESTIMATES_FILENAME,
     read_dim_estimates,
     write_dim_estimates,
 )
+from quodeq.shared.logging import log_info
 
 __all__ = [
     "DIM_ESTIMATES_FILENAME",
@@ -58,10 +60,24 @@ def compute_dim_estimates(
     estimates: dict[str, dict[str, Any]] = {}
     file_filter = config.options.incremental_file_filter
     cache = LocalFileBackend()
+    excluded_logged = False
     for dim_id in dimensions:
-        files, _ext = _list_source_files(config, dim_id, ignore_file_filter=True)
+        files, _ext, excluded = _list_source_files(config, dim_id, ignore_file_filter=True)
+        n_excluded = len(excluded)
+        if n_excluded and not excluded_logged:
+            # The excluded set is dim-agnostic (size cap only), so log it
+            # once per run, not once per dimension.
+            log_info(
+                f"  {n_excluded} file(s) excluded from analysis: over the API "
+                f"file-size cap ({api_file_size_cap()} bytes). Raise "
+                f"QUODEQ_MAX_API_FILE_SIZE to include them."
+            )
+            excluded_logged = True
         if not files:
-            estimates[dim_id] = {"count": 0, "reason": "empty", "total": 0, "cached": 0}
+            estimates[dim_id] = {
+                "count": 0, "reason": "empty", "total": 0, "cached": 0,
+                "excluded": n_excluded,
+            }
             continue
         if config.options.incremental:
             classify = classify_files_via_cache(config, dim_id, files, cache)
@@ -74,10 +90,17 @@ def compute_dim_estimates(
             estimates[dim_id] = {
                 "count": miss_count, "reason": reason,
                 "total": len(files), "cached": len(files) - miss_count,
+                "excluded": n_excluded,
             }
         elif file_filter is not None:
             count = sum(1 for f in files if f in file_filter)
-            estimates[dim_id] = {"count": count, "reason": "diff", "total": count, "cached": 0}
+            estimates[dim_id] = {
+                "count": count, "reason": "diff", "total": count, "cached": 0,
+                "excluded": n_excluded,
+            }
         else:
-            estimates[dim_id] = {"count": len(files), "reason": "full", "total": len(files), "cached": 0}
+            estimates[dim_id] = {
+                "count": len(files), "reason": "full", "total": len(files), "cached": 0,
+                "excluded": n_excluded,
+            }
     return estimates
