@@ -38,7 +38,7 @@ def _request(write_enabled):
 
 
 def _capture_turn(seen):
-    def fake_turn(*, messages, config, registry, emit):
+    def fake_turn(*, messages, config, registry, emit, **_):
         seen["names"] = registry.names()
         seen["iters"] = config.max_tool_iterations
         seen["system"] = messages[0]["content"]
@@ -82,7 +82,7 @@ def test_cli_branch_passes_write_args(tmp_path, repo, monkeypatch):
     seen = {}
 
     def fake_cli_turn(*, messages, config, session_id, prior_session_id,
-                      repository, emit):
+                      repository, emit, **_):
         seen["args"] = config.mcp_server_args
         seen["worktree_dir"] = config.worktree_dir
         return "ok"
@@ -104,7 +104,7 @@ def test_write_enabled_gemini_turn_stays_read_only(tmp_path, repo, monkeypatch):
     seen = {}
 
     def fake_cli_turn(*, messages, config, session_id, prior_session_id,
-                      repository, emit):
+                      repository, emit, **_):
         seen["args"] = config.mcp_server_args
         seen["worktree_dir"] = config.worktree_dir
         seen["system"] = messages[0]["content"]

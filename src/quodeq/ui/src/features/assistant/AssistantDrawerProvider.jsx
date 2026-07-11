@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { createAssistantSession, fetchAssistantCatalog, fetchAssistantWorkspace, postAssistantMessage } from '../../api/assistant.js';
+import { createAssistantSession, fetchAssistantCatalog, fetchAssistantWorkspace, postAssistantMessage, stopAssistantTurn } from '../../api/assistant.js';
 import useAssistantProvider from '../settings/hooks/useAssistantProvider.js';
 import useTerminalSettings from '../settings/hooks/useTerminalSettings.js';
 import { useAssistantStream } from './useAssistantStream.js';
@@ -287,6 +287,18 @@ export function AssistantDrawerProvider({ children }) {
     }
   }, [sessionId, stream.messages.length, webEnabled, writeEnabled]);
 
+  // Ask the server to cancel the in-flight turn. turnActive stays true until
+  // the stream's terminal `stopped` frame arrives (server truth, same as
+  // done/error), so the UI can't unlock before the turn thread actually ends.
+  const stopTurn = useCallback(async () => {
+    if (!sessionId || !turnActive) return;
+    try {
+      await stopAssistantTurn(sessionId);
+    } catch (err) {
+      setLocalError(`Couldn't stop the turn: ${err?.message || err}`);
+    }
+  }, [sessionId, turnActive]);
+
   // Client-answered meta-commands (/help, /skills, /actions): show the user
   // turn and the local response in the transcript without any server call.
   const addLocalExchange = useCallback((userText, responseText) => {
@@ -312,8 +324,8 @@ export function AssistantDrawerProvider({ children }) {
     writeEnabled, toggleWriteEnabled, repoInfo, workspace, refreshWorkspace,
     sessionId,
     catalog, addLocalExchange,
-    startSession, sendMessage, resetConversation,
-  }), [isOpen, open, close, toggle, closeActiveTab, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled, repoInfo, workspace, refreshWorkspace, catalog, addLocalExchange, startSession, sendMessage, resetConversation]);
+    startSession, sendMessage, stopTurn, resetConversation,
+  }), [isOpen, open, close, toggle, closeActiveTab, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled, repoInfo, workspace, refreshWorkspace, catalog, addLocalExchange, startSession, sendMessage, stopTurn, resetConversation]);
 
   return (
     <AssistantDrawerContext.Provider value={value}>

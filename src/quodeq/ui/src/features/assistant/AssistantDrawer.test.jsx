@@ -12,7 +12,7 @@ const state = {
     { role: 'local', text: '**Commands** listed' },
     { role: 'tool', name: 'get_report', argsSummary: '{"dimension":"security"}' },
   ],
-  streaming: false, error: null, sendMessage: vi.fn(),
+  streaming: false, error: null, sendMessage: vi.fn(), stopTurn: vi.fn(),
   catalog: null, addLocalExchange: vi.fn(), resetConversation: vi.fn(),
 };
 vi.mock('./AssistantDrawerProvider.jsx', () => ({ useAssistantDrawer: () => state }));
@@ -21,6 +21,7 @@ import { AssistantPane } from './AssistantDrawer.jsx';
 
 beforeEach(() => {
   state.sendMessage.mockClear();
+  state.stopTurn.mockClear();
   state.addLocalExchange.mockClear();
   state.resetConversation.mockClear();
 });
@@ -90,4 +91,17 @@ it('shows the welcome panel when the transcript is empty', () => {
   render(<AssistantPane uiState={{ view: 'overview' }} />);
   expect(screen.getByText(/explain scores/i)).toBeInTheDocument();
   state.messages = prev;
+});
+
+it('shows a Stop control while a turn is streaming and it stops the turn', () => {
+  state.streaming = true;
+  render(<AssistantPane uiState={{}} />);
+  fireEvent.click(screen.getByRole('button', { name: /stop/i }));
+  expect(state.stopTurn).toHaveBeenCalled();
+  state.streaming = false;
+});
+
+it('hides the Stop control when no turn is running', () => {
+  render(<AssistantPane uiState={{}} />);
+  expect(screen.queryByRole('button', { name: /stop/i })).toBeNull();
 });

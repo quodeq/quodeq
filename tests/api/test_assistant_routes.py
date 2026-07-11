@@ -667,3 +667,50 @@ def test_create_session_write_unavailable_for_unsafe_provider(client, monkeypatc
     data = resp.get_json()
     assert data["repoAttached"] is True
     assert data["writeAvailable"] is False
+
+
+# ---- stop-turn endpoint -----------------------------------------------------
+
+def test_stop_unknown_session_404(client):
+    assert client.post("/api/assistant/sessions/nope/stop").status_code == 404
+
+
+def test_stop_without_running_turn_409(client):
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
+    resp = client.post(f"/api/assistant/sessions/{sid}/stop")
+    assert resp.status_code == 409
+
+
+def test_stop_cancels_running_turn_and_frees_the_token(client, monkeypatch):
+    import threading
+    started, finished = threading.Event(), threading.Event()
+
+    def fake_run_turn(request, *, repository, tool_ctx, cancel, **kw):
+        started.set()
+        assert cancel.wait(timeout=5)  # blocks until the stop route cancels
+        finished.set()
+
+    monkeypatch.setattr("quodeq.api.assistant_routes.run_turn", fake_run_turn)
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
+    assert client.post(f"/api/assistant/sessions/{sid}/messages",
+                       json={"text": "hi"}).status_code == 202
+    assert started.wait(timeout=5)
+
+    resp = client.post(f"/api/assistant/sessions/{sid}/stop")
+    assert resp.status_code == 202
+    assert resp.get_json() == {"stopping": True}
+    assert finished.wait(timeout=5)
+
+    # once the worker unwinds, the token is gone: a second stop has nothing to
+    # cancel, and a new message can claim the turn slot again
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        if client.post(f"/api/assistant/sessions/{sid}/stop").status_code == 409:
+            break
+        time.sleep(0.01)
+    else:
+        pytest.fail("cancel token not cleaned up after the turn ended")
+    assert client.post(f"/api/assistant/sessions/{sid}/messages",
+                       json={"text": "again"}).status_code == 202

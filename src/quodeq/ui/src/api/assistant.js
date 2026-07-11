@@ -9,6 +9,11 @@ export function postAssistantMessage(sessionId, body) {
     { method: 'POST', body: JSON.stringify(body) });
 }
 
+export function stopAssistantTurn(sessionId) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/stop`,
+    { method: 'POST' });
+}
+
 export function applyAssistantAction(actionId) {
   return request(`/assistant/actions/${encodeURIComponent(actionId)}/apply`, { method: 'POST' });
 }

@@ -78,6 +78,10 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
         append({ role: 'action', actionId: frame.actionId, actionType: frame.actionType, summary: frame.summary }); }
       else if (frame.type === 'warning') { beginContent(); flushTokens(); append({ role: 'warning', message: frame.message }); }
       else if (frame.type === 'error') { flushTokens(); setError(frame.message || 'error'); endTurn(); }
+      // User-initiated stop: terminal like done (turn over, stream stays
+      // open), plus a visible marker so the truncated answer isn't mistaken
+      // for a complete one.
+      else if (frame.type === 'stopped') { flushTokens(); append({ role: 'warning', message: 'Stopped.' }); endTurn(); }
       else if (frame.type === 'done') { endTurn(); }
       else if (frame.type === 'heartbeat') { /* liveness only: resetInactivity() already ran above */ }
     };

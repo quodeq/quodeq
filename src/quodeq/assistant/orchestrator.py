@@ -10,6 +10,7 @@ from quodeq.assistant.adapters._api import ApiTurnConfig, run_api_turn
 from quodeq.assistant.adapters._capabilities import supports_native_tools
 from quodeq.assistant.adapters._cli import CliTurnConfig, run_cli_turn
 from quodeq.assistant.adapters._cli_config import load_cli_chat_config
+from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.guard import (
     MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, WRITE_MAX_TOOL_ITERATIONS)
 from quodeq.assistant.skills import load_skills
@@ -89,10 +90,11 @@ def _mcp_server_args(request: TurnRequest, tool_ctx: ToolContext) -> list[str]:
 
 def run_turn(request: TurnRequest, *, repository: AssistantRepository,
              tool_ctx: ToolContext, turn_fn=None, capability_fn=None,
-             cli_turn_fn=None) -> None:
+             cli_turn_fn=None, cancel: CancelToken | None = None) -> None:
     turn_fn = turn_fn or run_api_turn
     capability_fn = capability_fn or supports_native_tools
     cli_turn_fn = cli_turn_fn or run_cli_turn
+    cancel = cancel or CancelToken()
     emit = lambda frame: repository.append_event(request.session_id, frame)  # noqa: E731
     try:
         skill_name, text = _split_skill(request.text)
@@ -141,7 +143,7 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
                 ),
                 session_id=request.session_id,
                 prior_session_id=(repository.get_session(request.session_id) or {}).get("cli_session_id"),
-                repository=repository, emit=emit,
+                repository=repository, emit=emit, cancel=cancel,
             )
         else:
             config = ApiTurnConfig(
@@ -159,9 +161,15 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
             if write_on:
                 register_write_tools(registry, tool_ctx)
             final = turn_fn(messages=messages, config=config,
-                            registry=registry, emit=emit)
+                            registry=registry, emit=emit, cancel=cancel)
         repository.add_message(request.session_id, "assistant", final)
         emit({"type": "done"})
+    except TurnCancelled as exc:
+        # User-initiated stop, not a failure. Persist any partial answer so
+        # the next turn's replayed history matches what the user saw.
+        if exc.partial:
+            repository.add_message(request.session_id, "assistant", exc.partial)
+        emit({"type": "stopped"})
     except Exception as exc:  # noqa: BLE001 - turn thread must never die silently
         _logger.exception("assistant turn failed for session %s", request.session_id)
         emit({"type": "error", "message": str(exc)})

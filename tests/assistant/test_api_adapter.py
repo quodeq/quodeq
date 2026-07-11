@@ -154,3 +154,130 @@ def test_extra_body_openai_uses_reasoning_effort(monkeypatch):
     assert body["reasoning_effort"] == "none"
     assert "chat_template_kwargs" not in body
     assert "num_ctx" not in body
+
+
+# ---- stop-turn cancellation -------------------------------------------------
+
+class ClosableFakeClient(FakeClient):
+    def __init__(self, scripts):
+        super().__init__(scripts)
+        self.closed = False
+
+    def close(self):
+        self.closed = True
+
+
+def test_cancel_mid_stream_raises_turn_cancelled_with_partial():
+    import pytest
+    from quodeq.assistant.cancel import CancelToken, TurnCancelled
+    token = CancelToken()
+    client = ClosableFakeClient([[_delta("Hel"), _delta("lo"), _delta(finish="stop")]])
+    frames = []
+
+    def emit(frame):
+        frames.append(frame)
+        token.cancel()  # user hits Stop after the first streamed token
+
+    with pytest.raises(TurnCancelled) as exc:
+        run_api_turn(messages=[{"role": "user", "content": "hi"}],
+                     config=_config(), registry=_registry(),
+                     emit=emit, client_factory=lambda c: client, cancel=token)
+    assert exc.value.partial == "Hel"
+    assert [f["text"] for f in frames if f["type"] == "token"] == ["Hel"]
+
+
+def test_precancelled_closes_client_and_skips_request():
+    import pytest
+    from quodeq.assistant.cancel import CancelToken, TurnCancelled
+    token = CancelToken()
+    token.cancel()
+    client = ClosableFakeClient([])
+
+    with pytest.raises(TurnCancelled) as exc:
+        run_api_turn(messages=[{"role": "user", "content": "hi"}],
+                     config=_config(), registry=_registry(),
+                     emit=lambda f: None, client_factory=lambda c: client, cancel=token)
+    assert exc.value.partial == ""
+    assert client.calls == []      # never asked the model anything
+    assert client.closed is True   # kill hook ran immediately
+
+
+def test_stream_error_while_cancelled_is_turn_cancelled():
+    # cancel() closes the HTTP client to interrupt a stalled stream; the read
+    # then raises in the turn thread. That exception is the cancellation
+    # succeeding, not a turn failure.
+    import pytest
+    from quodeq.assistant.cancel import CancelToken, TurnCancelled
+    token = CancelToken()
+
+    def dying_stream():
+        yield _delta("Hel")
+        raise RuntimeError("connection closed mid-read")
+
+    client = ClosableFakeClient([dying_stream()])
+
+    def emit(frame):
+        token.cancel()
+
+    with pytest.raises(TurnCancelled) as exc:
+        run_api_turn(messages=[{"role": "user", "content": "hi"}],
+                     config=_config(), registry=_registry(),
+                     emit=emit, client_factory=lambda c: client, cancel=token)
+    assert exc.value.partial == "Hel"
+
+
+def test_stream_error_without_cancel_still_raises():
+    import pytest
+
+    def dying_stream():
+        yield _delta("Hel")
+        raise RuntimeError("connection dropped")
+
+    client = ClosableFakeClient([dying_stream()])
+    with pytest.raises(RuntimeError, match="connection dropped"):
+        run_api_turn(messages=[{"role": "user", "content": "hi"}],
+                     config=_config(), registry=_registry(),
+                     emit=lambda f: None, client_factory=lambda c: client)
+
+
+def test_cancel_interrupts_a_stalled_stream_read():
+    # Live-repro regression: cancel() while the turn thread is BLOCKED inside
+    # the chunk read (model stalled / connection wedged). Closing the client
+    # from another thread does not reliably wake a blocked socket read, so the
+    # turn must not depend on another chunk arriving to notice the cancel.
+    import threading
+    import time
+    import pytest
+    from quodeq.assistant.cancel import CancelToken, TurnCancelled
+    token = CancelToken()
+    release = threading.Event()
+
+    def stalled_stream():
+        yield _delta("Hel")
+        release.wait(timeout=30)  # blocks like a dead connection: no data, no EOF
+        yield _delta("lo")
+
+    client = ClosableFakeClient([stalled_stream()])
+    outcome = {}
+
+    def _turn():
+        try:
+            run_api_turn(messages=[{"role": "user", "content": "hi"}],
+                         config=_config(), registry=_registry(),
+                         emit=lambda f: None, client_factory=lambda c: client,
+                         cancel=token)
+            outcome["result"] = "returned"
+        except TurnCancelled as exc:
+            outcome["result"] = "cancelled"
+            outcome["partial"] = exc.partial
+
+    t = threading.Thread(target=_turn, daemon=True)
+    t.start()
+    time.sleep(0.3)   # let the turn consume "Hel" and block in the stalled read
+    token.cancel()
+    t.join(timeout=3)
+    release.set()     # unblock the abandoned reader so the test process exits clean
+    if t.is_alive():
+        pytest.fail("turn thread still blocked 3s after cancel()")
+    assert outcome["result"] == "cancelled"
+    assert outcome["partial"] == "Hel"

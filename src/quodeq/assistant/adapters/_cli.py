@@ -17,6 +17,7 @@ from quodeq.assistant.adapters._cli_config import load_cli_chat_config
 from quodeq.assistant.adapters._cli_spawn import (
     build_chat_env, external_sandbox_prefix, scratch_cwd, spawn_turn)
 from quodeq.assistant.adapters._linereader import iter_lines
+from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.mcp import _config as mcp_config
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 from quodeq.shared._process_kill import kill_proc_tree as _kill_proc_tree
@@ -67,7 +68,7 @@ def _raw_error_line(line: str) -> str | None:
 def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
               prior_session_id: str | None, new_session_id: str,
               repository: AssistantRepository, emit: Callable[[dict], None],
-              spawn_fn) -> tuple[str, str | None, int, str | None, str | None]:
+              spawn_fn, cancel: CancelToken) -> tuple[str, str | None, int, str | None, str | None]:
     mcp_config_path = None
     mcp_config_arg = None
     if cli_cfg.mcp_style == "config-file":
@@ -112,6 +113,10 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
         # wall-clock guard: a hung/silent CLI can't wedge the turn slot forever
         timer = threading.Timer(TURN_TIMEOUT_S, lambda: _kill_proc_tree(proc))
         timer.start()
+        # Stop endpoint: cancelling the token kills the process tree, which
+        # EOFs stdout below and lets the turn unwind (runs immediately if the
+        # stop already landed).
+        cancel.register_kill(lambda: _kill_proc_tree(proc))
         texts, errors, raw_errors, parsed_sid = [], [], [], spec.session_id
         last_emitted = None
         saw_result = False
@@ -185,8 +190,12 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
 
 def run_cli_turn(*, messages: list[dict], config: CliTurnConfig, session_id: str,
                  prior_session_id: str | None, repository: AssistantRepository,
-                 emit: Callable[[dict], None], spawn_fn=None) -> str:
+                 emit: Callable[[dict], None], spawn_fn=None,
+                 cancel: CancelToken | None = None) -> str:
     spawn_fn = spawn_fn or spawn_turn
+    cancel = cancel or CancelToken()
+    if cancel.cancelled:  # stop landed before the turn even spawned
+        raise TurnCancelled("")
     cli_cfg = load_cli_chat_config(config.provider)
     prompt = _latest_user(messages)
     if cli_cfg.system_prompt_style == "message-prefix":
@@ -207,7 +216,13 @@ def run_cli_turn(*, messages: list[dict], config: CliTurnConfig, session_id: str
     final, _sid, _rc, structured_error, raw_error = _run_once(
         config, cli_cfg, prompt=prompt, session_id=session_id,
         prior_session_id=prior_session_id, new_session_id=str(uuid.uuid4()),
-        repository=repository, emit=emit, spawn_fn=spawn_fn)
+        repository=repository, emit=emit, spawn_fn=spawn_fn, cancel=cancel)
+    # A stopped turn is neither a failure nor a rebuild trigger: the kill
+    # leaves empty/partial output and often a nonzero exit, all of which the
+    # paths below would misread (rebuilding would RERUN the turn the user
+    # just stopped). Unwind with whatever text already streamed.
+    if cancel.cancelled:
+        raise TurnCancelled(final)
     # rebuild from the full transcript when a resumed turn came back empty, or
     # when it reported a structured failure (a partial answer before an explicit
     # error is not trustworthy). A non-empty answer with only a benign non-zero
@@ -217,7 +232,9 @@ def run_cli_turn(*, messages: list[dict], config: CliTurnConfig, session_id: str
         final, _sid, _rc, structured_error, raw_error = _run_once(
             config, cli_cfg, prompt=_full_transcript(messages), session_id=session_id,
             prior_session_id=None, new_session_id=str(uuid.uuid4()),
-            repository=repository, emit=emit, spawn_fn=spawn_fn)
+            repository=repository, emit=emit, spawn_fn=spawn_fn, cancel=cancel)
+        if cancel.cancelled:
+            raise TurnCancelled(final)
     if structured_error:
         raise RuntimeError(structured_error)
     if final == "":

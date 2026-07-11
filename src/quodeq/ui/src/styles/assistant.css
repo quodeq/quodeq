@@ -385,6 +385,30 @@
   cursor: not-allowed;
 }
 
+/* Stop button: overlays the right edge of the (disabled) input while a turn
+   streams. The row is position:relative, so anchor to it. */
+.assistant-stop-btn {
+  position: absolute;
+  right: 1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  background: var(--color-surface-alt);
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.assistant-stop-btn:hover {
+  border-color: var(--color-accent);
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

@@ -159,3 +159,21 @@ it('a null JSON payload frame is ignored instead of crashing', () => {
   expect(result.current.messages.length).toBe(0);
   expect(result.current.error).toBe(null);
 });
+
+it('a stopped frame ends the turn with a stop marker, not an error', () => {
+  const onDone = vi.fn();
+  const { result } = renderHook(() => useAssistantStream('s1', { onDone }));
+  const es = MockES.instances[0];
+  act(() => { es.emit('message', { type: 'token', text: 'partial' }); });
+  flush();
+  act(() => { es.emit('message', { type: 'stopped' }); });
+  flush();
+  expect(result.current.streaming).toBe(false);
+  expect(result.current.error).toBeNull();
+  expect(onDone).toHaveBeenCalledTimes(1);
+  // the partial answer stays, followed by a visible stop marker
+  expect(result.current.messages.find((m) => m.role === 'assistant').text).toBe('partial');
+  expect(result.current.messages.some((m) => m.role === 'warning' && /stopped/i.test(m.message))).toBe(true);
+  // the connection survives for the next turn, like done
+  expect(es.closed).toBeFalsy();
+});
