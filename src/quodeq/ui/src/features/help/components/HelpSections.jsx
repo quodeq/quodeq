@@ -513,6 +513,57 @@ state management, and error boundaries. Use this schema:
   );
 }
 
+export function Assistant() {
+  return (
+    <section className="help-section">
+      <h2>Assistant</h2>
+      <p>The assistant is a chat panel that knows your project. It explains scores, digs into findings, and drafts standards using the same data you see in the dashboard.</p>
+
+      <h3>Turning it on</h3>
+      <p>Off by default. Enable it under <strong>Settings → Assistant</strong>, then toggle it with <code>Ctrl+`</code> (<code>Cmd+`</code> on macOS). It lives in a resizable drawer at the bottom of the dashboard.</p>
+
+      <h3>What it can see</h3>
+      <p>The assistant follows you around the app: it knows which project, run, tab, and dimension you are looking at, so <em>why is this score low?</em> needs no extra context. Its tools read scores, reports, and violations, search findings, and read files from the analyzed repository. All of them are read-only.</p>
+
+      <h3>Actions need your approval</h3>
+      <p>The assistant cannot change anything on its own. Ask it to dismiss a finding, verify one, or create a standard and it drafts the action as a preview card; nothing happens until you press <strong>Apply</strong>.</p>
+
+      <h3>Slash commands and skills</h3>
+      <KeyTable rows={[
+        ['/help', 'What the assistant can do.'],
+        ['/skills', 'List the built-in skills: explain-score, explain-finding, verify-finding, create-standard.'],
+        ['/clear', 'Start a fresh conversation.'],
+      ]} />
+      <p>Skills are guided workflows. The welcome screen suggests the ones relevant to the tab you are on.</p>
+
+      <h3>Provider and privacy</h3>
+      <p>By default the assistant uses your evaluation provider; pick a separate provider or model under <strong>Settings → Assistant</strong>. Cloud providers bill each message like any other call. Web search is off by default and only offered on local providers. Closing the drawer keeps the conversation; reloading the page starts a fresh one.</p>
+    </section>
+  );
+}
+
+export function Terminal() {
+  return (
+    <section className="help-section">
+      <h2>Terminal</h2>
+      <p>A real shell inside the dashboard: your login shell, on your machine, with your tools. Quodeq only hosts the window.</p>
+
+      <h3>Turning it on</h3>
+      <p>Off by default. Enable it under <strong>Settings → Enable terminal</strong>, then toggle it with <code>Shift+Ctrl+`</code> (<code>Shift+Cmd+`</code> on macOS). It shares the bottom drawer with the assistant; switch between them with the drawer tabs.</p>
+
+      <h3>How the session behaves</h3>
+      <ul>
+        <li><strong>One session</strong>, started in your home directory with your default shell.</li>
+        <li><strong>It keeps running</strong> when you close the drawer, switch tabs, or reload the page. The session lives in the dashboard server, and recent output is replayed when you reconnect.</li>
+        <li><strong>One window at a time</strong>: opening it in a second browser window shows a busy notice instead.</li>
+      </ul>
+
+      <h3>Safety</h3>
+      <p>The terminal only works when the dashboard is bound to localhost, and it is disabled entirely in remote mode (when <code>QUODEQ_API_KEY</code> is set). Quodeq strips its own secrets from the shell environment. Beyond that it is exactly as powerful, and as dangerous, as your normal terminal.</p>
+    </section>
+  );
+}
+
 export function Settings() {
   return (
     <section className="help-section">
@@ -545,6 +596,9 @@ export function Settings() {
         <li><strong>Automatic checks</strong> turns the daily background check on or off.</li>
         <li>Set <code>QUODEQ_NO_UPDATE_NOTIFIER=1</code> to disable automatic checks and CLI notices entirely.</li>
       </ul>
+
+      <h3>Assistant and terminal</h3>
+      <p>Both ship disabled. The <em>Assistant</em> section turns the chat drawer on and picks its provider and model; <em>Enable terminal</em> switches on the embedded shell. See the <strong>Assistant</strong> and <strong>Terminal</strong> help sections.</p>
 
       <h3>Grade formula</h3>
       <p>The <em>Grade formula</em> section opens the formula editor, where severity weights, curve shape, grade boundaries, and dimension weights live. See the <strong>Grade Formula</strong> help section for the full tour.</p>
