@@ -13,6 +13,7 @@ def test_edit_diff_apply_roundtrip(tmp_path, monkeypatch):
     repo = tmp_path / "repo"
     repo.mkdir()
     _run(["git", "-C", str(repo), "init", "-q", "-b", "main"])
+    _run(["git", "-C", str(repo), "config", "core.autocrlf", "false"])
     _run(["git", "-C", str(repo), "config", "user.name", "T"])
     _run(["git", "-C", str(repo), "config", "user.email", "t@example.com"])
     (repo / "app.py").write_bytes(b"x = 1\n")

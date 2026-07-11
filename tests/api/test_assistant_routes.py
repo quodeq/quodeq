@@ -539,6 +539,45 @@ def test_apply_dismiss_finding_writes_action_log(client, app, tmp_path, monkeypa
     assert dismissed_keys(evals / "proj") == {("r1", "a.py", 3)}
 
 
+def test_apply_dismiss_finding_returns_delta_for_run_scoped_session(client, app, tmp_path, monkeypatch):
+    # A run-scoped dismiss (runId present, mirroring an assistant session
+    # opened against a specific run) must return the same delta shape the
+    # manual /api/findings/dismiss route returns, so the UI can patch its
+    # caches in place instead of waiting on a lazy refetch.
+    evals = tmp_path / "evals"
+    run_dir = evals / "proj" / "run1"
+    (run_dir / "evaluation").mkdir(parents=True)
+    (run_dir / "evaluation" / "security.json").write_text(json.dumps({
+        "dimension": "security", "overallScore": 50, "overallGrade": "C",
+        "principles": [], "violations": [
+            {"principle": "P1", "req": "r1", "file": "a.py", "line": 3,
+             "severity": "major", "title": "t", "reason": "r"},
+        ],
+        "totals": {"violations": 1},
+    }))
+    monkeypatch.setitem(app.config, "EVALUATIONS_DIR", str(evals))
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(action_id="a1", session_id="s1",
+                       action_type="dismiss_finding",
+                       payload={"project": "proj", "req": "r1", "file": "a.py",
+                                "line": 3, "reason": "false positive: guarded",
+                                "runId": "run1"},
+                       content_hash="h")
+    resp = client.post("/api/assistant/actions/a1/apply")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["result"]["dismissed"] is True
+    delta = body["result"]["delta"]
+    assert delta["kind"] == "dismiss"
+    assert delta["dismissed"] == {"req": "r1", "file": "a.py", "line": 3}
+    # The delta names its own project so the client patches the right cache
+    # even if the user switched projects while the apply POST was in flight.
+    assert delta["project"] == "proj"
+    from quodeq.services.dismissed import dismissed_keys
+    assert dismissed_keys(evals / "proj") == {("r1", "a.py", 3)}
+
+
 def test_apply_verify_finding_writes_badge(client, app, tmp_path, monkeypatch):
     evals = tmp_path / "evals"
     (evals / "proj").mkdir(parents=True)

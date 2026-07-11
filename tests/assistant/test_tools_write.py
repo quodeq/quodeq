@@ -11,6 +11,7 @@ def wt_ctx(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
     _run(["git", "-C", str(repo), "init", "-q", "-b", "main"])
+    _run(["git", "-C", str(repo), "config", "core.autocrlf", "false"])
     _run(["git", "-C", str(repo), "config", "user.name", "T"])
     _run(["git", "-C", str(repo), "config", "user.email", "t@example.com"])
     (repo / "app.py").write_bytes(b"a = 1\nb = 2\nb = 2\n")
