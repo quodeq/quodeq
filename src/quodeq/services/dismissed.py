@@ -242,7 +242,14 @@ def restore_all_findings(project_dir: Path) -> int:
 
 
 def _finding_key(f: Finding) -> tuple:
-    return (f.req or "", f.file or "", f.line or 0)
+    # line is coerced to int to match the stored dismiss key (dismissed_keys
+    # stores int(line)); Finding.line is typed int|str|None, so a string line
+    # would otherwise never match its own dismissal.
+    try:
+        line = int(f.line)
+    except (TypeError, ValueError):
+        line = 0
+    return (f.req or "", f.file or "", line)
 
 
 def recount_totals(

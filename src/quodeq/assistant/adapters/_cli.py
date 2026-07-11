@@ -40,6 +40,7 @@ class CliTurnConfig:
     web_enabled: bool = False
     system_prompt: str = ""
     skill_block: str = ""
+    worktree_dir: Path | None = None
 
 
 def _latest_user(messages: list[dict]) -> str:
@@ -102,7 +103,9 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
             # cwd, temp, ~/.codex, and the assistant db (which draft_action writes).
             db = str(cfg.db_path)
             prefix, sandbox_cleanup = external_sandbox_prefix(
-                writable_dirs=[str(cwd), str(Path.home() / ".codex")],
+                writable_dirs=[str(cwd), str(Path.home() / ".codex"),
+                               *([str(cfg.worktree_dir)]
+                                 if cfg.worktree_dir else [])],
                 writable_files=[db, db + "-wal", db + "-shm", db + "-journal"])
             argv = prefix + argv
         proc = spawn_fn(argv, cwd=cwd, env=build_chat_env())

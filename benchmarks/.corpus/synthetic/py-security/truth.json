@@ -1,0 +1,19 @@
+{
+  "language": "python",
+  "exhaustive": true,
+  "clean_files": ["storage.py"],
+  "labels": [
+    {"file": "app.py", "line": 13, "anchor": "f\"SELECT * FROM users",
+     "dimension": "security", "cwes": [89, 564], "reqs": ["S-INT-1", "S-INT-2", "S-INT-7"],
+     "severity": "critical", "note": "SQL injection via f-string"},
+    {"file": "app.py", "line": 22, "anchor": "shell=True",
+     "dimension": "security", "cwes": [78, 77], "reqs": ["S-AUT-1", "S-AUT-2", "S-INT-16"],
+     "severity": "critical", "note": "command injection via shell=True"},
+    {"file": "config.py", "line": 1, "end_line": 2, "anchor": "API_KEY = \"sk-live",
+     "dimension": "security", "cwes": [798], "reqs": ["S-CON-1", "S-CON-6", "S-CON-19"],
+     "severity": "critical", "note": "hardcoded credentials"},
+    {"file": "crypto_util.py", "line": 5, "anchor": "hashlib.md5",
+     "dimension": "security", "cwes": [327, 328, 916], "reqs": ["S-INT-5", "S-CON-11", "S-CON-15", "S-AUT-17"],
+     "severity": "major", "note": "weak hash for passwords"}
+  ]
+}

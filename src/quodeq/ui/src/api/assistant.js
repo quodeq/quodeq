@@ -24,3 +24,30 @@ export function assistantEventsUrl(sessionId, afterSeq = 0) {
 export function fetchAssistantCatalog() {
   return request('/assistant/skills');
 }
+
+export function fetchAssistantWorkspace(sessionId) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/workspace`);
+}
+
+export function fetchAssistantWorkspaceDiff(sessionId) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/workspace/diff`);
+}
+
+// Mutations run git push + gh, each up to ~120s, so they use a longer client
+// timeout than the 30s default to avoid falsely reporting a failure mid-flight.
+const WORKSPACE_MUTATION_TIMEOUT_MS = 300000;
+
+export function applyAssistantWorkspace(sessionId) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/workspace/apply`,
+    { method: 'POST', timeout: WORKSPACE_MUTATION_TIMEOUT_MS });
+}
+
+export function createAssistantWorkspacePr(sessionId, body) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/workspace/pr`,
+    { method: 'POST', body: JSON.stringify(body), timeout: WORKSPACE_MUTATION_TIMEOUT_MS });
+}
+
+export function discardAssistantWorkspace(sessionId) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/workspace/discard`,
+    { method: 'POST', timeout: WORKSPACE_MUTATION_TIMEOUT_MS });
+}

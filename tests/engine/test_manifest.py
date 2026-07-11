@@ -1,7 +1,6 @@
 """Tests for the source manifest builder."""
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -62,6 +61,42 @@ def test_skips_excluded_dirs(tmp_path: Path, detection: dict) -> None:
     manifest = build_manifest(tmp_path, detection)
     assert manifest.total_files == 3
     assert manifest.language == "javascript"
+
+
+def test_skip_patterns_exclude_matching_files(tmp_path: Path, detection: dict) -> None:
+    """Files matching a skip_patterns glob are excluded from the manifest."""
+    for i in range(3):
+        (tmp_path / f"app{i}.js").write_text(f"const x = {i};")
+    (tmp_path / "bundle.min.js").write_text("var a=1;var b=2;")
+
+    manifest = build_manifest(tmp_path, detection)
+    assert manifest.total_files == 3
+    assert "bundle.min.js" not in manifest.source_files
+
+
+def test_skip_patterns_match_at_any_depth(tmp_path: Path, detection: dict) -> None:
+    """skip_patterns apply to files in nested directories, not just the root."""
+    sub = tmp_path / "assets" / "js"
+    sub.mkdir(parents=True)
+    (sub / "lib.min.js").write_text("var a=1;")
+    for i in range(3):
+        (tmp_path / f"app{i}.js").write_text(f"const x = {i};")
+
+    manifest = build_manifest(tmp_path, detection)
+    assert manifest.total_files == 3
+    assert "assets/js/lib.min.js" not in manifest.source_files
+
+
+def test_missing_skip_patterns_key_includes_all_files(tmp_path: Path, detection: dict) -> None:
+    """Without a skip_patterns key, no file-level filtering happens."""
+    del detection["skip_patterns"]
+    for i in range(3):
+        (tmp_path / f"app{i}.js").write_text(f"const x = {i};")
+    (tmp_path / "bundle.min.js").write_text("var a=1;")
+
+    manifest = build_manifest(tmp_path, detection)
+    assert manifest.total_files == 4
+    assert "bundle.min.js" in manifest.source_files
 
 
 def test_multi_language_detection(tmp_path: Path, detection: dict) -> None:
@@ -245,6 +280,38 @@ def test_build_monorepo_partitions_files_by_subproject(
     assert web.language == "typescript"
     assert "React Best Practices" in web.frameworks
     assert all(f.startswith("apps/web/") for f in web.source_files)
+
+
+def test_monorepo_walk_applies_skip_patterns(tmp_path: Path, detection: dict) -> None:
+    """The multi-scope (monorepo) walk honours skip_patterns too."""
+    from quodeq.config.paths import default_paths
+
+    _write(
+        tmp_path / "apps/web/package.json",
+        '{"name":"web","dependencies":{"react":"^18.0.0","react-dom":"^18.0.0"}}',
+    )
+    _write(tmp_path / "apps/web/tsconfig.json", "{}")
+    _write(tmp_path / "apps/web/src/App.ts", "export const App = () => null;\n")
+    _write(tmp_path / "apps/web/src/index.ts", "import {App} from './App';\n")
+    _write(tmp_path / "apps/web/src/util.ts", "export const noop = () => {};\n")
+    _write(tmp_path / "apps/web/src/vendor.min.js", "var a=1;")
+
+    _write(
+        tmp_path / "services/api/pyproject.toml",
+        '[project]\nname = "api"\ndependencies = ["flask==3.1.3"]\n',
+    )
+    _write(tmp_path / "services/api/src/api/__init__.py", "")
+    _write(tmp_path / "services/api/src/api/main.py", "from flask import Flask\n")
+    _write(tmp_path / "services/api/src/api/routes.py", "from flask import Blueprint\n")
+
+    disciplines_conf = default_paths().disciplines_conf
+    if not disciplines_conf.exists():
+        pytest.skip("disciplines.conf not installed")
+
+    manifest = build_manifest(tmp_path, detection, disciplines_conf=disciplines_conf)
+
+    all_files = [f for t in manifest.targets for f in t.source_files]
+    assert "apps/web/src/vendor.min.js" not in all_files
 
 
 def test_build_single_root_project_uses_legacy_path(
