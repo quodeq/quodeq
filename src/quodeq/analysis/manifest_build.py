@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import os
 from collections import Counter
+from fnmatch import fnmatchcase
 from pathlib import Path
 
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
@@ -36,6 +37,15 @@ def _deepest_scope(rel_path: str, scope_paths: list[str]) -> str | None:
             best = scope
             best_depth = depth
     return best
+
+
+def _matches_skip_pattern(rel_path: str, skip_patterns: list[str]) -> bool:
+    """Return True when *rel_path* (POSIX, relative to the scan root) matches a
+    skip_patterns glob from detection.json. fnmatch's ``*`` crosses directory
+    separators, so ``*.min.js`` excludes matching files at any depth — the same
+    semantics as .quodeqignore patterns.
+    """
+    return any(fnmatchcase(rel_path, pat) for pat in skip_patterns)
 
 
 def target_name(language: str, category: str | None) -> str:
@@ -102,6 +112,7 @@ def _build_targets_from_disciplines(
 
 def _walk_and_group(
     src: Path, ext_map: dict[str, str], skip_dirs: set[str],
+    skip_patterns: list[str],
     scope_path: str | None = None,
 ) -> tuple[dict[str, list[str]], Counter[str], dict[str, Counter]]:
     """Walk *src* (or a scoped subdirectory) once, grouping files by language.
@@ -129,6 +140,8 @@ def _walk_and_group(
                 # across platforms — downstream consumers and scope-prefix
                 # matching all assume "/".
                 rel = os.path.relpath(os.path.join(dirpath, fname), src).replace(os.sep, "/")
+                if _matches_skip_pattern(rel, skip_patterns):
+                    continue
                 lang = ext_map.get(suffix, _UNKNOWN_LANG)
                 files_by_lang.setdefault(lang, []).append(rel)
                 ext_counts[suffix] += 1
@@ -137,7 +150,8 @@ def _walk_and_group(
 
 
 def _walk_and_partition_by_scope(
-    src: Path, ext_map: dict[str, str], skip_dirs: set[str], scope_paths: list[str],
+    src: Path, ext_map: dict[str, str], skip_dirs: set[str],
+    skip_patterns: list[str], scope_paths: list[str],
 ) -> tuple[
     dict[str, dict[str, list[str]]],
     Counter[str],
@@ -162,6 +176,8 @@ def _walk_and_partition_by_scope(
             # Match the POSIX-style scope_paths from detect_matches_recursive
             # so prefix matching works on Windows.
             rel = os.path.relpath(os.path.join(dirpath, fname), src).replace(os.sep, "/")
+            if _matches_skip_pattern(rel, skip_patterns):
+                continue
             owner = _deepest_scope(rel, scope_paths)
             if owner is None:
                 continue
@@ -176,6 +192,7 @@ def _build_multi_scope_manifest(
     src: Path,
     ext_map: dict[str, str],
     skip_dirs: set[str],
+    skip_patterns: list[str],
     registry: DisciplineRegistry,
     sub_results: list[tuple[str, list[str]]],
 ) -> SourceManifest:
@@ -183,7 +200,7 @@ def _build_multi_scope_manifest(
     scope_paths = [rel for rel, _ in sub_results]
     matches_by_scope = {rel: matches for rel, matches in sub_results}
     files_by_scope, ext_counts_overall, ext_counts_by_scope_lang = _walk_and_partition_by_scope(
-        src, ext_map, skip_dirs, scope_paths,
+        src, ext_map, skip_dirs, skip_patterns, scope_paths,
     )
 
     targets: list[AnalysisTarget] = []
@@ -218,12 +235,13 @@ def _build_single_scope_manifest(
     src: Path,
     ext_map: dict[str, str],
     skip_dirs: set[str],
+    skip_patterns: list[str],
     disciplines_conf: Path | None,
     scope_path: str | None,
 ) -> SourceManifest:
     """Legacy single-scope path: walk once at the (optionally scoped) root."""
     files_by_lang, ext_counts, ext_counts_by_lang = _walk_and_group(
-        src, ext_map, skip_dirs, scope_path=scope_path,
+        src, ext_map, skip_dirs, skip_patterns, scope_path=scope_path,
     )
     all_source_files_count = sum(len(f) for f in files_by_lang.values())
 
@@ -279,10 +297,11 @@ def build_manifest(
     """
     ext_map: dict[str, str] = detection.get("extensions", {})
     skip_dirs = set(detection.get("skip_dirs", []))
+    skip_patterns: list[str] = detection.get("skip_patterns", [])
 
     if scope_path is not None:
         return _build_single_scope_manifest(
-            src, ext_map, skip_dirs, disciplines_conf, scope_path,
+            src, ext_map, skip_dirs, skip_patterns, disciplines_conf, scope_path,
         )
 
     registry: DisciplineRegistry | None = None
@@ -299,7 +318,9 @@ def build_manifest(
         )
         if not is_single_root:
             return _build_multi_scope_manifest(
-                src, ext_map, skip_dirs, registry, sub_results,
+                src, ext_map, skip_dirs, skip_patterns, registry, sub_results,
             )
 
-    return _build_single_scope_manifest(src, ext_map, skip_dirs, disciplines_conf, None)
+    return _build_single_scope_manifest(
+        src, ext_map, skip_dirs, skip_patterns, disciplines_conf, None,
+    )

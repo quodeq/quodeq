@@ -84,7 +84,7 @@ it('startSession creates a session; sendMessage posts to it', async () => {
   await act(async () => { screen.getByText('start').click(); });
   expect(createAssistantSession).toHaveBeenCalledWith({ provider: 'claude', model: 'sonnet', projectId: 'p', runId: 'r' });
   await act(async () => { screen.getByText('send').click(); });
-  expect(postAssistantMessage).toHaveBeenCalledWith('s1', { text: 'hi', uiState: { activeTab: 'overview' }, webEnabled: false });
+  expect(postAssistantMessage).toHaveBeenCalledWith('s1', { text: 'hi', uiState: { activeTab: 'overview' }, webEnabled: false, writeEnabled: false });
 });
 
 it('exposes the active session provider/model for the drawer header', async () => {
@@ -136,7 +136,7 @@ it('startSession race: the latest requested context wins even if it resolves fir
   // The stale pA resolution must be ignored — pB's session stays committed.
   expect(postAssistantMessage).not.toHaveBeenCalled();
   await act(async () => { hookRef.sendMessage('x', {}); });
-  expect(postAssistantMessage).toHaveBeenCalledWith('sess-pB', { text: 'x', uiState: {}, webEnabled: false });
+  expect(postAssistantMessage).toHaveBeenCalledWith('sess-pB', { text: 'x', uiState: {}, webEnabled: false, writeEnabled: false });
 });
 
 it('webEnabled toggles, rides the POST body, and resets on a new session', async () => {
@@ -150,7 +150,7 @@ it('webEnabled toggles, rides the POST body, and resets on a new session', async
   expect(screen.getByTestId('web').textContent).toBe('true');
   await act(async () => { screen.getByText('send').click(); });
   expect(postAssistantMessage).toHaveBeenCalledWith('s1',
-    { text: 'hi', uiState: { activeTab: 'overview' }, webEnabled: true });
+    { text: 'hi', uiState: { activeTab: 'overview' }, webEnabled: true, writeEnabled: false });
   // switching context (new session) resets the toggle to off
   await act(async () => { screen.getByText('startA').click(); });
   expect(screen.getByTestId('web').textContent).toBe('false');

@@ -240,6 +240,12 @@ def dismiss_delta(
         "file": dismissed.get("file"),
         "line": dismissed.get("line"),
     }
+    # Name the project so the assistant apply handler patches the cache keyed
+    # on the delta's own project, not the live-selected one. The manual route
+    # passes its own projectId to applyMutationDelta and ignores this field, so
+    # this is additive. Kept here (not in _mutation_envelope) to limit the blast
+    # radius to the one kind the assistant forwards.
+    envelope["project"] = project
     return envelope
 
 

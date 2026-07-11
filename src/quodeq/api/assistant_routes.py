@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import threading
 import uuid
+from pathlib import Path
 
 from flask import Flask, Response, current_app, jsonify, request
 
@@ -16,13 +17,30 @@ from quodeq.api._assistant_helpers import (
     local_provider_busy,
 )
 from quodeq.api._sse_log_helpers import sse_line
+from quodeq.api.assistant_workspace_routes import register_assistant_workspace_routes
 from quodeq.assistant import get_provider_configs
-from quodeq.assistant.orchestrator import TurnRequest, run_turn
+from quodeq.assistant.orchestrator import TurnRequest, run_turn, write_safe_provider
 from quodeq.assistant.skills import RESERVED_COMMANDS, load_skills
 from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES, ACTIONS, ActionConflict
 
 _running_turns: set[str] = set()
 _running_lock = threading.Lock()
+
+
+def _try_claim_turn(sid: str) -> bool:
+    """Atomically claim the per-session turn slot for a workspace action so a
+    concurrent /messages turn (or another apply/pr) 409s instead of racing the
+    same worktree. Returns False if already claimed."""
+    with _running_lock:
+        if sid in _running_turns:
+            return False
+        _running_turns.add(sid)
+        return True
+
+
+def _release_turn(sid: str) -> None:
+    with _running_lock:
+        _running_turns.discard(sid)
 
 
 def _api_provider(provider_id: str) -> dict | None:
@@ -42,6 +60,8 @@ def _known_provider(provider_id: str) -> dict | None:
 
 
 def register_assistant_routes(app: Flask) -> None:
+    register_assistant_workspace_routes(app)
+
     @app.post("/api/assistant/sessions")
     def create_assistant_session():
         body = request.get_json(silent=True) or {}
@@ -55,19 +75,18 @@ def register_assistant_routes(app: Flask) -> None:
         # remote API-key caller arbitrary server-side file access. The real UI
         # never sends these — it sends {projectId, runId} and the server
         # resolves run_dir/repo_root itself via the jailed resolver.
-        run_dir, repo_root = None, None
-        # Only bind a single run when the UI selected a SPECIFIC run. On the
-        # overview it sends projectId with no runId → the session stays
-        # run-unscoped and the detail tools read the accumulated
-        # (per-dimension-latest) composition from project_id + reports_dir.
-        if body.get("projectId") and body.get("runId"):
-            run_dir, repo_root = _assistant_helpers.resolve_run_location(
-                str(body["projectId"]), str(body["runId"]),
-            )
-        elif body.get("projectId"):
-            # The repo root is a project-level fact; without it, run-unscoped
-            # sessions (the app's default state) cannot read code at all.
-            repo_root = _assistant_helpers.resolve_repo_root(str(body["projectId"]))
+        run_dir, repo_root, repo_reason = None, None, "no_project"
+        if body.get("projectId"):
+            repo_root, repo_reason = _assistant_helpers.repo_attach_info(
+                str(body["projectId"]))
+            # Only bind a single run when the UI selected a SPECIFIC run. On
+            # the overview it sends projectId with no runId → the session
+            # stays run-unscoped and the detail tools read the accumulated
+            # (per-dimension-latest) composition from project_id + reports_dir.
+            if body.get("runId"):
+                run_dir, _ = _assistant_helpers.resolve_run_location(
+                    str(body["projectId"]), str(body["runId"]),
+                )
         project_id = body.get("projectId")
         get_repository(app).create_session(
             session_id=session_id, provider=body["provider"],
@@ -75,7 +94,13 @@ def register_assistant_routes(app: Flask) -> None:
             run_id=run_dir,
             project_id=str(project_id) if project_id else None,
         )
-        return jsonify({"sessionId": session_id}), 201
+        write_available = (bool(repo_root)
+                           and (Path(repo_root) / ".git").exists()
+                           and write_safe_provider(str(body["provider"])))
+        return jsonify({"sessionId": session_id,
+                        "repoAttached": repo_root is not None,
+                        "repoReason": repo_reason,
+                        "writeAvailable": write_available}), 201
 
     @app.get("/api/assistant/skills")
     def get_assistant_catalog():
@@ -144,6 +169,7 @@ def register_assistant_routes(app: Flask) -> None:
                 api_key=api_key, provider=session["provider"],
                 model=body.get("model") or session.get("model") or provider_cfg.get("model", ""),
                 web_enabled=bool(body.get("webEnabled", False)),
+                write_enabled=bool(body.get("writeEnabled", False)),
             )
             tool_ctx = build_tool_context(app, session)
 

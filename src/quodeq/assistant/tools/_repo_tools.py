@@ -13,12 +13,15 @@ _DENY_SUFFIXES = (".pem", ".key", ".p12", ".pfx", ".keystore")
 
 
 def _jail(ctx: ToolContext, rel_path: str) -> Path:
-    if ctx.repo_root is None:
+    root_path = ctx.worktree_dir or ctx.repo_root
+    if root_path is None:
         raise ToolError(
             "no analyzed repository attached to this session. Call get_context "
             "to confirm scope; if repoAttached is false, use dashboard tools "
             "such as get_overview/get_violations instead of read_repo_file.")
-    root = ctx.repo_root.resolve()
+    if ctx.worktree_dir is not None and not ctx.worktree_dir.is_dir():
+        raise ToolError("write worktree is missing; reads cannot be served")
+    root = root_path.resolve()
     target = (root / rel_path).resolve()
     if target != root and root not in target.parents:
         raise ToolError("path escapes the analyzed repository")

@@ -75,3 +75,35 @@ def test_repo_tools_without_repo_root(ctx):
     out = reg.dispatch("read_repo_file", {"path": "x"})
     assert out["ok"] is False
     assert "get_context" in out["error"]
+
+
+def test_reads_reroot_to_worktree(ctx, tmp_path):
+    from dataclasses import replace
+
+    wt = tmp_path / "worktree"
+    (wt / "src").mkdir(parents=True)
+    (wt / "src" / "app.py").write_bytes(b"print('worktree')\n")
+    reg = build_registry(replace(ctx, worktree_dir=wt))
+    out = reg.dispatch("read_repo_file", {"path": "src/app.py"})
+    assert out["ok"] and out["result"]["content"] == "print('worktree')\n"
+
+
+def test_worktree_root_keeps_jail_protections(ctx, tmp_path):
+    from dataclasses import replace
+
+    wt = tmp_path / "worktree2"
+    (wt / "src").mkdir(parents=True)
+    (wt / ".env").write_text("SECRET=y\n")
+    (wt / "link").symlink_to(ctx.repo_root / "src" / "app.py")
+    reg = build_registry(replace(ctx, worktree_dir=wt))
+    assert reg.dispatch("read_repo_file", {"path": ".env"})["ok"] is False
+    assert reg.dispatch("read_repo_file", {"path": "link"})["ok"] is False
+    assert reg.dispatch("read_repo_file", {"path": "../outside"})["ok"] is False
+
+
+def test_stale_worktree_dir_errors_clearly(ctx, tmp_path):
+    from dataclasses import replace
+
+    reg = build_registry(replace(ctx, worktree_dir=tmp_path / "gone"))
+    out = reg.dispatch("read_repo_file", {"path": "src/app.py"})
+    assert out["ok"] is False and "worktree" in out["error"]

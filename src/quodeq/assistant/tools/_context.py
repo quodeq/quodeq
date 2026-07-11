@@ -20,3 +20,6 @@ class ToolContext:
     # evaluations root. Both optional so run-scoped-only sessions still work.
     project_id: str | None = None
     reports_dir: Path | None = None
+    # Set only for write-granted turns: the session's fix worktree. When set,
+    # repo reads AND writes are jailed here so the model sees its own edits.
+    worktree_dir: Path | None = None

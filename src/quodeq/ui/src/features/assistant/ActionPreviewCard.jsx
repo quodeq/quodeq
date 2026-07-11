@@ -42,8 +42,10 @@ export function ActionPreviewCard({ action }) {
   async function handleApply() {
     setStatus('pending');
     try {
-      await applyAssistantAction(actionId);
-      window.dispatchEvent(new CustomEvent('quodeq:assistant-action-applied', { detail: { actionType } }));
+      const res = await applyAssistantAction(actionId);
+      window.dispatchEvent(new CustomEvent('quodeq:assistant-action-applied', {
+        detail: { actionType, scores: res?.result?.scores, delta: res?.result?.delta },
+      }));
       setStatus('applied');
     } catch {
       setStatus('error');
