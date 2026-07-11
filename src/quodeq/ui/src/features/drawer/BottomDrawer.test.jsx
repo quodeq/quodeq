@@ -50,11 +50,23 @@ it('the maximize control toggles the maximized state', () => {
   expect(drawer.toggleMaximized).toHaveBeenCalled();
 });
 
-it('the close (×) button closes only the active tab, not the whole drawer', () => {
+it('the hide button hides only the active tab, not the whole drawer', () => {
   render(<BottomDrawer uiState={{}} />);
-  fireEvent.click(screen.getByRole('button', { name: /close tab/i }));
+  fireEvent.click(screen.getByRole('button', { name: /hide tab/i }));
   expect(drawer.closeActiveTab).toHaveBeenCalled();
   expect(drawer.close).not.toHaveBeenCalled();
+});
+
+it('the maximized-restore glyph is distinct from the hide chevron', () => {
+  // Both panels hide (nothing is killed), so the hide button is a chevron-down.
+  // When maximized, the restore control must NOT render the same chevron-down
+  // next to it — it uses the shrink glyph instead.
+  drawer.maximized = true;
+  render(<BottomDrawer uiState={{}} />);
+  const restore = screen.getByRole('button', { name: /restore/i });
+  const hide = screen.getByRole('button', { name: /hide tab/i });
+  expect(restore.innerHTML).not.toBe(hide.innerHTML);
+  drawer.maximized = false;
 });
 
 it('the model chip sits with the tabs on the left, not in the right controls', () => {
