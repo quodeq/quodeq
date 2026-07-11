@@ -50,10 +50,12 @@
         },
         {
           "id": "M-MOD-7",
-          "text": "Inheritance depth MUST NOT exceed 4 levels",
+          "text": "Inheritance depth MUST NOT exceed {max_inheritance_depth} levels",
           "cwe": [
             1074
-          ]
+          ],
+          "params": {"max_inheritance_depth": {"label": "Max inheritance depth", "type": "int",
+                                               "default": 4, "min": 1, "max": 20}}
         },
         {
           "id": "M-MOD-8",
@@ -186,10 +188,12 @@
       "requirements": [
         {
           "id": "M-ANA-1",
-          "text": "Source files MUST NOT exceed 300 lines",
+          "text": "Source files MUST NOT exceed {max_file_lines} lines",
           "cwe": [
             1080
-          ]
+          ],
+          "params": {"max_file_lines": {"label": "Max source file lines", "type": "int",
+                                        "default": 300, "min": 50, "max": 5000}}
         },
         {
           "id": "M-ANA-2",
