@@ -11,6 +11,7 @@ from __future__ import annotations
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.services import _fs_reports
+from quodeq.services.scoring import rescore_accumulated
 
 
 def _get_overview(ctx: ToolContext, as_of: str | None = None) -> dict:
@@ -23,6 +24,11 @@ def _get_overview(ctx: ToolContext, as_of: str | None = None) -> dict:
     payload = _fs_reports.get_accumulated(str(ctx.reports_dir), ctx.project_id, as_of)
     if payload is None:
         raise ToolError(f"no accumulated data for project: {ctx.project_id}")
+    # Project-wide dismiss/delete rescore: the raw accumulated payload keeps
+    # the baked pre-triage scores, so without this the assistant quotes lower
+    # scores than the Overview shows for the same project (no-op when the
+    # project has no active dismissals/deletions).
+    payload = rescore_accumulated(payload, ctx.reports_dir, ctx.project_id)
     dimensions = [
         {
             "dimension": d.get("dimension"),

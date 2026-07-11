@@ -6,8 +6,12 @@ import json
 
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.core.types import to_camel_dict
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 from quodeq.services import _fs_reports
+from quodeq.services.deleted import deleted_keys
+from quodeq.services.dismissed import dismissed_keys
+from quodeq.services.scoring import rescore_accumulated, scored_run_dimensions
 from quodeq.services.standards import StandardsService
 
 def _require_run(ctx: ToolContext):
@@ -24,20 +28,52 @@ def _has_run(ctx: ToolContext) -> bool:
     return ctx.run_dir is not None and ctx.run_dir.exists()
 
 
-def _accumulated_dims(ctx: ToolContext) -> list[dict] | None:
+def _accumulated_dims(ctx: ToolContext, *, rescored: bool = True) -> list[dict] | None:
     """Per-dimension-latest composition (the dashboard/overview data).
 
     Each entry is one dimension sourced from ITS OWN latest run — so the set
     can span several runs, exactly like the dashboard. Carries overallScore/
     Grade, principles, violations and the source run (``fromRunId``). Returns
     None when the session has no project scope.
+
+    By default the project-wide dismiss/delete rescore is applied so the
+    scores the model quotes match the Overview (``get_project_scores``) — the
+    raw ``compute_accumulated`` payload filters dismissed violations from the
+    lists but leaves the baked pre-triage scores untouched.
+    ``rescored=False`` returns that raw payload; it exists for
+    ``finding_keys_in_scope``, which must keep seeing every finding a
+    dismiss/verify key could legitimately reference.
     """
     if ctx.reports_dir is None or ctx.project_id is None:
         return None
     payload = _fs_reports.get_accumulated(str(ctx.reports_dir), ctx.project_id, None)
     if payload is None:
         return None
+    if rescored:
+        payload = rescore_accumulated(payload, ctx.reports_dir, ctx.project_id)
     return payload.get("dimensions", []) or []
+
+
+def _scored_run_dims(ctx: ToolContext) -> list[dict] | None:
+    """The selected run's dimensions with the project-wide dismiss/delete
+    rescore applied, as camelCase dicts.
+
+    Routes through ``scored_run_dimensions`` — the same seam the explorer,
+    dashboard and dimension detail read through — so the assistant quotes the
+    same dismiss-adjusted score as every UI surface. Returns None when the
+    project has no active dismissals/deletions (callers keep the raw eval-JSON
+    read: byte-identical output, no parse round-trip) or when the run's
+    location can't be resolved against the reports tree (fail-open: raw data
+    beats erroring the chat turn).
+    """
+    project_dir = ctx.run_dir.parent
+    try:
+        if not dismissed_keys(project_dir) and not deleted_keys(project_dir):
+            return None
+        dims = scored_run_dimensions(project_dir.parent, project_dir.name, ctx.run_dir.name)
+    except Exception:  # noqa: BLE001 - unresolvable layout: serve raw, not a ToolError
+        return None
+    return [to_camel_dict(d) for d in dims]
 
 
 def _no_scope_error() -> ToolError:
@@ -149,7 +185,10 @@ def finding_keys_in_scope(ctx: ToolContext) -> set[tuple]:
                 pass
     else:
         try:
-            for d in (_accumulated_dims(ctx) or []):
+            # rescored=False: the identity check must keep seeing every finding
+            # a dismiss/verify key could reference, including already-dismissed
+            # ones (idempotent re-dismiss / verify must still match).
+            for d in (_accumulated_dims(ctx, rescored=False) or []):
                 for v in (d.get("violations") or []):
                     _add(v)
         except (ToolError, OSError, ValueError):
@@ -181,6 +220,11 @@ def _get_scores(ctx: ToolContext) -> dict:
         eval_dir = ctx.run_dir / "evaluation"
         if not eval_dir.is_dir():
             raise ToolError("no evaluation reports in this run")
+        scored = _scored_run_dims(ctx)
+        if scored is not None:
+            return {d["dimension"]: {
+                "score": d.get("overallScore"), "grade": d.get("overallGrade"),
+            } for d in scored if d.get("dimension")}
         out = {}
         for path in sorted(eval_dir.glob("*.json")):
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -207,6 +251,19 @@ def _get_report(ctx: ToolContext, dimension: str) -> dict:
                ("dimension", "overallScore", "overallGrade", "principles",
                 "totals", "coveragePct")}
         viols = data.get("violations") or []
+        scored = _scored_run_dims(ctx)
+        if scored is not None:
+            entry = next((d for d in scored if d.get("dimension") == dimension), None)
+            if entry is not None:
+                # Swap in the dismiss-adjusted fields; keep the raw report's
+                # shape (coveragePct etc.) untouched. Principles get the same
+                # "name" normalization as the accumulated branch below.
+                out["overallScore"] = entry.get("overallScore")
+                out["overallGrade"] = entry.get("overallGrade")
+                out["principles"] = [{**p, "name": p.get("name") or p.get("principle")}
+                                     for p in (entry.get("principles") or [])]
+                out["totals"] = entry.get("totals")
+                viols = entry.get("violations") or []
         out["violations"] = [_trim_violation(v) for v in viols[:_REPORT_VIOLATION_CAP]]
         return out
     dims = _accumulated_dims(ctx)
@@ -269,11 +326,19 @@ def _violations_from_run(ctx: ToolContext, dimension: str | None):
                 f"no report for dimension: {dimension} in this run. "
                 "Check get_scores for available dimensions, or get_overview "
                 "for accumulated scores across runs.")
+        scored = _scored_run_dims(ctx)
+        if scored is not None:
+            entry = next((d for d in scored if d.get("dimension") == dimension), None)
+            if entry is not None:
+                return entry.get("violations") or [], dimension
         return json.loads(path.read_text(encoding="utf-8")).get("violations") or [], dimension
     if not eval_dir.is_dir():
         raise ToolError(
             "no evaluation reports in this run. Try get_overview for "
             "accumulated scores across runs.")
+    scored = _scored_run_dims(ctx)
+    if scored is not None:
+        return [v for d in scored for v in (d.get("violations") or [])], None
     raw: list = []
     for p in sorted(eval_dir.glob("*.json")):
         raw.extend(json.loads(p.read_text(encoding="utf-8")).get("violations") or [])
