@@ -161,7 +161,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   if (!jobId) return null;
 
   const dims = progress?.dimensions || [];
-  const { totalFiles, takenFiles, overallPct, projectTotal, cachedFiles, coveredFiles, coveredPct } =
+  const { totalFiles, takenFiles, overallPct, projectTotal, cachedFiles, coveredFiles, coveredPct, excludedFiles } =
     computeOverallProgress(progress);
   // Segmented coverage view only when there is actually a cached portion to
   // show — full scans and legacy runs keep the familiar run-only display.
@@ -220,7 +220,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
           <div className="scan-progress__meta">
             <span>
               {showCoverage ? (
-                <><strong>{coveredFiles} / {projectTotal}</strong> files · {coveredPct}% total{totalFiles > 0 ? <> · this run {takenFiles} / {totalFiles}</> : <> · nothing new this run</>}</>
+                <><strong>{coveredFiles} / {projectTotal}</strong> files · {coveredPct}% total{excludedFiles > 0 && <> · {excludedFiles} excluded (size cap)</>}{totalFiles > 0 ? <> · this run {takenFiles} / {totalFiles}</> : <> · nothing new this run</>}</>
               ) : totalFiles > 0 ? (
                 <><strong>{takenFiles} / {totalFiles}</strong> checks · {overallPct}%</>
               ) : <strong>preparing…</strong>}
