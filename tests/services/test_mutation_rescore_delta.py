@@ -42,6 +42,15 @@ class TestDismissDeltaEnvelope:
         assert "isLatest" in delta
         assert "accumulated" in delta
 
+    def test_carries_its_own_project(self, tmp_path):
+        # The assistant apply handler patches caches keyed on the delta's own
+        # project, not the live-selected one, so the delta must name it. This
+        # prevents patching project B's cache with project A's rollup when the
+        # user switches projects while an apply POST is in flight.
+        _make_run(tmp_path, "projA", "run-1")
+        delta = dismiss_delta(str(tmp_path), "projA", "run-1", dict(_DISMISSED))
+        assert delta["project"] == "projA"
+
     def test_without_run_id_accumulated_is_none(self, tmp_path):
         _make_run(tmp_path, "proj", "run-1")
         delta = dismiss_delta(str(tmp_path), "proj", None, dict(_DISMISSED))

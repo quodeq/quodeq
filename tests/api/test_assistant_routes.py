@@ -571,6 +571,9 @@ def test_apply_dismiss_finding_returns_delta_for_run_scoped_session(client, app,
     delta = body["result"]["delta"]
     assert delta["kind"] == "dismiss"
     assert delta["dismissed"] == {"req": "r1", "file": "a.py", "line": 3}
+    # The delta names its own project so the client patches the right cache
+    # even if the user switched projects while the apply POST was in flight.
+    assert delta["project"] == "proj"
     from quodeq.services.dismissed import dismissed_keys
     assert dismissed_keys(evals / "proj") == {("r1", "a.py", 3)}
 

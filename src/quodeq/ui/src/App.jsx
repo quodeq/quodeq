@@ -455,7 +455,7 @@ export default function App() {
   const bumpDismissRefresh = () => setDismissRefreshKey((k) => k + 1);
   const { refreshDashboard: refreshDashboardForApply, selectedProject } = state;
   // Shared with the manual dismiss handlers below (buildDismissPayload
-  // callers) — patches the dashboard/scores caches from a dismiss response's
+  // callers). Patches the dashboard/scores caches from a dismiss response's
   // delta so the Overview updates instantly instead of waiting on a refetch.
   const applyDelta = (project, scores, delta) =>
     applyMutationDelta(queryClient, project, delta && { ...delta, dimensions: scores?.dimensions });
@@ -465,8 +465,20 @@ export default function App() {
         // Apply the delta first so the currently-visible screen patches in
         // place immediately; the refresh/refetch below is the lazy,
         // eventual-correctness path (e.g. for views the delta doesn't cover).
+        // Prefer the delta's own project over the live selectedProject: the
+        // apply POST may resolve after the user switched projects, and the
+        // delta is frozen to the action's project. Keying the patch on the
+        // live selection would write project A's rollup into project B's cache.
         if (event.detail.delta) {
-          applyDelta(selectedProject, event.detail.scores, event.detail.delta);
+          try {
+            applyDelta(
+              event.detail.delta?.project || selectedProject,
+              event.detail.scores,
+              event.detail.delta,
+            );
+          } catch {
+            // Instant patch is best-effort; the lazy refresh below is the fallback.
+          }
         }
         bumpDismissRefresh();
         // Assistant-applied dismissals mutate the same payloads manual ones
