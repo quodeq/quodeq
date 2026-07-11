@@ -88,6 +88,71 @@ def test_signal_handler_sets_process_cancel_event(tmp_path: Path) -> None:
         cancellation.reset()
 
 
+@_POSIX_SIGNALS
+def test_signal_handlers_installed_before_first_status_write(tmp_path: Path) -> None:
+    """Handlers must be live before status.json first appears on disk.
+
+    External cancellers (dashboard, e2e tests) treat the existence of
+    status.json as "safe to SIGTERM". If __enter__ wrote the file before
+    installing handlers, a signal landing in that gap would hit the default
+    handler and kill the run with the status stuck at pending.
+    """
+    from quodeq.shared import run_lifecycle as rl
+
+    order: list[str] = []
+    real_signal = signal.signal
+    real_write = rl.write_status
+
+    def recording_signal(sig, handler):
+        order.append("install")
+        return real_signal(sig, handler)
+
+    def recording_write(*args, **kwargs):
+        order.append("write")
+        return real_write(*args, **kwargs)
+
+    with patch.object(rl.signal, "signal", side_effect=recording_signal), \
+         patch.object(rl, "write_status", side_effect=recording_write):
+        with _ctx(tmp_path):
+            pass
+
+    assert "install" in order and "write" in order
+    assert order.index("install") < order.index("write")
+
+
+@_POSIX_SIGNALS
+@pytest.mark.timeout(30)
+def test_sigterm_mid_status_write_does_not_deadlock(tmp_path: Path) -> None:
+    """A signal interrupting a status write must not deadlock the handler.
+
+    The SIGTERM handler runs on the main thread and writes status.json
+    itself. When the interrupted frame is already inside write_status
+    holding the module write lock, a non-reentrant lock blocks the handler
+    forever — observed as the CLI never exiting after SIGTERM under
+    full-suite load.
+    """
+    import os
+
+    fired = {"done": False}
+    orig_replace = Path.replace
+
+    def replace_and_signal(self, target):
+        if not fired["done"] and self.name == "status.json.tmp":
+            fired["done"] = True
+            # Delivered to the main thread while _write_lock is held; the
+            # handler runs at the next bytecode boundary, still inside it.
+            os.kill(os.getpid(), signal.SIGTERM)
+        return orig_replace(self, target)
+
+    with pytest.raises(SystemExit):
+        with _ctx(tmp_path) as ctx:
+            with patch.object(Path, "replace", replace_and_signal):
+                ctx.set_phase("analyzing")
+    status = read_status(tmp_path)
+    assert status["state"] == "cancelled"
+    assert status["exit_reason"] == "signal_SIGTERM"
+
+
 def test_context_enter_resets_stale_cancel_event(tmp_path: Path) -> None:
     """Entering a new lifecycle context must clear leftover cancel state
     so a second run in the same process does not see cancellation from the first."""
