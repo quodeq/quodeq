@@ -167,7 +167,7 @@ def _serve(manager):
 def _connect(port):
     # werkzeug's WS handshake exposes request.host without the port, so the
     # Origin must match that (browsers keep Host+Origin consistent for real).
-    c = simple_websocket.Client(
+    c = _Client(
         f"ws://127.0.0.1:{port}/api/terminal/ws",
         headers={"Origin": "http://127.0.0.1"})
     try:
@@ -177,15 +177,42 @@ def _connect(port):
             c.close()
 
 
+# Receive timeouts are upper bounds, not waits: generous so a CPU-starved
+# server thread (full-suite load) can't turn a passing test into a flake.
+_RECV_TIMEOUT = 10
+
+
+if _WS_OK:
+    class _Client(simple_websocket.Client):
+        """Work around a simple-websocket (<= 1.1.0) client handshake bug.
+
+        Client.handshake() feeds recv'd bytes to wsproto but consumes only the
+        first event (AcceptConnection). Our server sends scrollback (and maybe
+        a close) microseconds after the 101, so under suite load those frames
+        coalesce into the same recv: their events stay queued inside wsproto
+        while the reader thread blocks on recv() for bytes that never come,
+        and receive() times out — the flake this suite used to have.
+        """
+        def handshake(self):
+            super().handshake()
+            # Drain events queued during the handshake. Safe: the reader
+            # thread only starts after handshake() returns. A drained server
+            # close sets connected=False, which would make Base.__init__
+            # raise — undo that and let the reader thread see EOF instead;
+            # close_reason is already recorded for ConnectionClosed.
+            self._handle_events()
+            self.connected = True
+
+
 @_ws_test
 def test_ws_single_active_connection_refuses_second():
     with _serve(_LiveManager()) as port:
         with _connect(port) as a:
-            assert a.receive(timeout=2) == "0ready\n"   # A acquired the conn lock
+            assert a.receive(timeout=_RECV_TIMEOUT) == "0ready\n"   # A acquired the conn lock
             with _connect(port) as b:
                 msg = None
                 with contextlib.suppress(simple_websocket.ConnectionClosed):
-                    msg = b.receive(timeout=2)
+                    msg = b.receive(timeout=_RECV_TIMEOUT)
                 assert msg is not None and "already open" in msg
 
 
@@ -225,7 +252,7 @@ def test_ws_spawn_failure_closes_cleanly_and_frees_lock():
     with _serve(_FlakyManager()) as port:
         with _connect(port) as first:       # ensure_session raises -> clean close
             with contextlib.suppress(simple_websocket.ConnectionClosed):
-                first.receive(timeout=2)    # must not hang / must not 500
+                first.receive(timeout=_RECV_TIMEOUT)    # must not hang / must not 500
         # the conn lock's finally released even though spawn failed -> reattach works
         with _connect(port) as second:
-            assert second.receive(timeout=2) == "0ready\n"
+            assert second.receive(timeout=_RECV_TIMEOUT) == "0ready\n"
