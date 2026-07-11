@@ -48,12 +48,6 @@ export default function RequirementForm({ requirement, principleIndex, reqIndex,
         />
       </div>
 
-      <ReferenceEditor
-        refs={requirement.refs || []}
-        onChange={(updated) => onUpdateField([...basePath, 'refs'], updated)}
-        disabled={!editable}
-      />
-
       {hasParams && onChangeParam && (
         <ThresholdFields
           requirement={requirement}
@@ -61,6 +55,12 @@ export default function RequirementForm({ requirement, principleIndex, reqIndex,
           onChangeParam={onChangeParam}
         />
       )}
+
+      <ReferenceEditor
+        refs={requirement.refs || []}
+        onChange={(updated) => onUpdateField([...basePath, 'refs'], updated)}
+        disabled={!editable}
+      />
     </div>
   );
 }

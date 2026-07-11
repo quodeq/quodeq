@@ -138,7 +138,7 @@
         {
           "id": "M-MOD-7",
           "source": "iso25010",
-          "text": "Inheritance depth MUST NOT exceed 4 levels",
+          "text": "Inheritance depth MUST NOT exceed {max_inheritance_depth} levels",
           "severity": null,
           "scope": null,
           "refs": [
@@ -154,7 +154,16 @@
               "name": "Inheritance depth MUST NOT exceed 4 levels",
               "url": "https://www.it-cisq.org/coding-rules/"
             }
-          ]
+          ],
+          "params": {
+            "max_inheritance_depth": {
+              "label": "Max inheritance depth",
+              "type": "int",
+              "default": 4,
+              "min": 1,
+              "max": 20
+            }
+          }
         },
         {
           "id": "M-MOD-8",
@@ -533,7 +542,7 @@
         {
           "id": "M-ANA-1",
           "source": "iso25010",
-          "text": "Source files MUST NOT exceed 300 lines",
+          "text": "Source files MUST NOT exceed {max_file_lines} lines",
           "severity": null,
           "scope": null,
           "refs": [
@@ -549,7 +558,16 @@
               "name": "Source files MUST NOT exceed language-appropriate line limits",
               "url": "https://www.it-cisq.org/coding-rules/"
             }
-          ]
+          ],
+          "params": {
+            "max_file_lines": {
+              "label": "Max source file lines",
+              "type": "int",
+              "default": 300,
+              "min": 50,
+              "max": 5000
+            }
+          }
         },
         {
           "id": "M-ANA-2",
