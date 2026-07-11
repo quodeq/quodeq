@@ -88,6 +88,15 @@ export function PencilIcon() {
   );
 }
 
+// Filled square: stop the in-flight assistant turn.
+export function StopIcon() {
+  return (
+    <svg width={ICON_SIZE} height={ICON_SIZE} viewBox={ICON_VIEWBOX} fill="currentColor" stroke="none" aria-hidden="true">
+      <rect x="6" y="6" width="12" height="12" rx="2" />
+    </svg>
+  );
+}
+
 export default function CopyButton({ onClick, label, className, icon, 'aria-label': ariaLabel }) {
   const [copied, setCopied] = useState(false);
 

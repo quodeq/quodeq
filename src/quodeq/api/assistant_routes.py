@@ -19,11 +19,16 @@ from quodeq.api._assistant_helpers import (
 from quodeq.api._sse_log_helpers import sse_line
 from quodeq.api.assistant_workspace_routes import register_assistant_workspace_routes
 from quodeq.assistant import get_provider_configs
+from quodeq.assistant.cancel import CancelToken
 from quodeq.assistant.orchestrator import TurnRequest, run_turn, write_safe_provider
 from quodeq.assistant.skills import RESERVED_COMMANDS, load_skills
 from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES, ACTIONS, ActionConflict
 
 _running_turns: set[str] = set()
+# Cancel token per session with a /messages turn in flight; the /stop route
+# fires it. Workspace actions (apply/pr) claim the turn slot too but are not
+# stoppable, so they never appear here.
+_cancel_tokens: dict[str, CancelToken] = {}
 _running_lock = threading.Lock()
 
 
@@ -135,6 +140,7 @@ def register_assistant_routes(app: Flask) -> None:
             if sid in _running_turns:
                 return jsonify({"error": "a turn is already running"}), 409
             _running_turns.add(sid)
+            cancel = _cancel_tokens[sid] = CancelToken()
         # Everything from here through Thread.start() must free the slot on
         # failure — otherwise an exception (e.g. build_tool_context blowing
         # up) leaves `sid` in `_running_turns` forever and every future POST
@@ -175,17 +181,34 @@ def register_assistant_routes(app: Flask) -> None:
 
             def _worker():
                 try:
-                    run_turn(turn, repository=repo, tool_ctx=tool_ctx)
+                    run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
                 finally:
                     with _running_lock:
                         _running_turns.discard(sid)
+                        _cancel_tokens.pop(sid, None)
 
             threading.Thread(target=_worker, daemon=True).start()
         except Exception:
             with _running_lock:
                 _running_turns.discard(sid)
+                _cancel_tokens.pop(sid, None)
             raise
         return jsonify({"accepted": True}), 202
+
+    @app.post("/api/assistant/sessions/<sid>/stop")
+    def stop_assistant_turn(sid: str):
+        if get_repository(app).get_session(sid) is None:
+            return jsonify({"error": "unknown session"}), 404
+        with _running_lock:
+            token = _cancel_tokens.get(sid)
+        if token is None:
+            return jsonify({"error": "no turn running"}), 409
+        # Fire outside the lock: cancel() runs kill hooks (proc-tree kill /
+        # client close) that must not serialize other sessions' turn claims.
+        token.cancel()
+        # 202: the turn thread still has to unwind; the SSE `stopped` frame is
+        # the authoritative end-of-turn signal for the UI.
+        return jsonify({"stopping": True}), 202
 
     @app.get("/api/assistant/sessions/<sid>/events")
     def assistant_events(sid: str):

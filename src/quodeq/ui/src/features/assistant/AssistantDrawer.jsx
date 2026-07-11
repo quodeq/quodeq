@@ -4,6 +4,7 @@ import { MessageList } from './MessageList.jsx';
 import { CommandMenu } from './CommandMenu.jsx';
 import { AssistantWelcome } from './AssistantWelcome.jsx';
 import { buildMetaResponse, matchCommands, parseMetaCommand } from './commands.js';
+import { StopIcon } from '../../components/CopyButton.jsx';
 
 /**
  * Residual assistant content rendered inside the shared BottomDrawer host.
@@ -17,7 +18,7 @@ import { buildMetaResponse, matchCommands, parseMetaCommand } from './commands.j
  */
 export function AssistantPane({ uiState }) {
   const {
-    messages, streaming, error, sendMessage,
+    messages, streaming, error, sendMessage, stopTurn,
     catalog, addLocalExchange, resetConversation,
   } = useAssistantDrawer();
   const [draft, setDraft] = useState('');
@@ -84,6 +85,13 @@ export function AssistantPane({ uiState }) {
           disabled={streaming}
           rows={1}
         />
+        {streaming && (
+          <button type="button" className="assistant-stop-btn"
+            onClick={stopTurn}
+            aria-label="Stop generating" title="Stop generating">
+            <StopIcon />
+          </button>
+        )}
       </div>
     </>
   );

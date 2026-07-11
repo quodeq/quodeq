@@ -255,7 +255,7 @@ def test_cli_config_carries_system_prompt_and_skill_block(setup):
     repo, ctx = setup
     captured = {}
 
-    def fake_cli(*, messages, config, session_id, prior_session_id, repository, emit):
+    def fake_cli(*, messages, config, session_id, prior_session_id, repository, emit, **_):
         captured["config"] = config
         return "answer"
 
@@ -272,7 +272,7 @@ def test_cli_config_skill_block_empty_without_skill(setup):
     repo, ctx = setup
     captured = {}
 
-    def fake_cli(*, messages, config, session_id, prior_session_id, repository, emit):
+    def fake_cli(*, messages, config, session_id, prior_session_id, repository, emit, **_):
         captured["config"] = config
         return "answer"
 
@@ -288,7 +288,7 @@ def test_skill_turns_get_extra_iterations(setup):
     repo, ctx = setup
     captured = {}
 
-    def fake_api(*, messages, config, registry, emit):
+    def fake_api(*, messages, config, registry, emit, **_):
         captured["config"] = config
         return "ok"
 
@@ -303,3 +303,64 @@ def test_skill_turns_get_extra_iterations(setup):
                           provider="ollama", model="m")
     run_turn(request, repository=repo, tool_ctx=ctx, turn_fn=fake_api)
     assert captured["config"].max_tool_iterations == 6
+
+
+# ---- stop-turn cancellation -------------------------------------------------
+
+def test_cancelled_cli_turn_emits_stopped_and_persists_partial(setup, monkeypatch):
+    from quodeq.assistant.cancel import TurnCancelled
+    repo, ctx = setup
+    monkeypatch.setattr("quodeq.assistant.orchestrator.get_provider_configs",
+                        lambda: {"claude": {"type": "cli"}})
+
+    def cancelled_cli_turn(**kwargs):
+        raise TurnCancelled("partial answer")
+
+    monkeypatch.setattr("quodeq.assistant.orchestrator.run_cli_turn", cancelled_cli_turn)
+    req = TurnRequest(session_id="s1", text="hi", ui_state=None, api_base="", api_key=None,
+                      provider="claude", model="sonnet")
+    run_turn(req, repository=repo, tool_ctx=ctx)
+    msgs = repo.list_messages("s1")
+    # the partial answer the user watched stream must survive in the history
+    assert (msgs[-1]["role"], msgs[-1]["content"]) == ("assistant", "partial answer")
+    frames = [f for _, f in repo.events_after("s1", 0)]
+    assert frames[-1]["type"] == "stopped"
+    assert not any(f["type"] == "error" for f in frames)
+
+
+def test_cancelled_turn_without_partial_persists_no_assistant_message(setup):
+    from quodeq.assistant.cancel import TurnCancelled
+    repo, ctx = setup
+
+    def cancelled_turn(**_):
+        raise TurnCancelled("")
+
+    run_turn(_request(), repository=repo, tool_ctx=ctx, turn_fn=cancelled_turn,
+             capability_fn=lambda *a, **k: True)
+    assert [m["role"] for m in repo.list_messages("s1")] == ["user"]
+    frames = [f for _, f in repo.events_after("s1", 0)]
+    assert frames[-1]["type"] == "stopped"
+
+
+def test_run_turn_threads_cancel_token_to_adapter(setup):
+    from quodeq.assistant.cancel import CancelToken
+    repo, ctx = setup
+    seen = {}
+
+    def fake_turn(*, cancel, **_):
+        seen["default"] = cancel
+        return "hi"
+
+    run_turn(_request(), repository=repo, tool_ctx=ctx, turn_fn=fake_turn,
+             capability_fn=lambda *a, **k: True)
+    assert isinstance(seen["default"], CancelToken)
+
+    token = CancelToken()
+
+    def fake_turn2(*, cancel, **_):
+        seen["explicit"] = cancel
+        return "hi"
+
+    run_turn(_request(), repository=repo, tool_ctx=ctx, turn_fn=fake_turn2,
+             capability_fn=lambda *a, **k: True, cancel=token)
+    assert seen["explicit"] is token

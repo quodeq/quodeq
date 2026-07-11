@@ -5,6 +5,7 @@ import { AssistantDrawerProvider, useAssistantDrawer } from './AssistantDrawerPr
 vi.mock('../../api/assistant.js', () => ({
   createAssistantSession: vi.fn(async () => ({ sessionId: 's1' })),
   postAssistantMessage: vi.fn(async () => ({ accepted: true })),
+  stopAssistantTurn: vi.fn(async () => ({ stopping: true })),
   assistantEventsUrl: (id, a) => `/api/assistant/sessions/${id}/events?after=${a}`,
   fetchAssistantCatalog: vi.fn(async () => ({ commands: [], skills: [], actions: [] })),
 }));
@@ -15,7 +16,7 @@ vi.mock('./useAssistantStream.js', () => ({
     return { messages: [], streaming: false, error: null, reset: vi.fn() };
   },
 }));
-import { createAssistantSession, postAssistantMessage, fetchAssistantCatalog } from '../../api/assistant.js';
+import { createAssistantSession, postAssistantMessage, stopAssistantTurn, fetchAssistantCatalog } from '../../api/assistant.js';
 
 function Probe() {
   const d = useAssistantDrawer();
@@ -36,6 +37,7 @@ function Probe() {
       <button onClick={d.toggle}>toggle</button>
       <button onClick={() => d.openTab('assistant')}>openAssistant</button>
       <button onClick={() => d.sendMessage('hi', { activeTab: 'overview' })}>send</button>
+      <button onClick={d.stopTurn}>stop</button>
       <button onClick={d.resetConversation}>reset</button>
       <button onClick={() => d.addLocalExchange?.('/help', 'HELP TEXT')}>localExchange</button>
     </div>
@@ -219,4 +221,28 @@ it('addLocalExchange appends a user and a local message', async () => {
   expect(hookRef.messages).toHaveLength(2);
   expect(hookRef.messages[0]).toMatchObject({ role: 'user', text: '/help', atIndex: 0 });
   expect(hookRef.messages[1]).toMatchObject({ role: 'local', text: 'HELP TEXT', atIndex: 0 });
+});
+
+it('stopTurn posts a stop for the active session while a turn is in flight', async () => {
+  render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+  await act(async () => { screen.getByText('start').click(); });
+  await act(async () => { screen.getByText('send').click(); });   // turn in flight
+  await act(async () => { screen.getByText('stop').click(); });
+  expect(stopAssistantTurn).toHaveBeenCalledWith('s1');
+});
+
+it('stopTurn is a no-op when no turn is in flight', async () => {
+  render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+  await act(async () => { screen.getByText('start').click(); });
+  await act(async () => { screen.getByText('stop').click(); });   // nothing running
+  expect(stopAssistantTurn).not.toHaveBeenCalled();
+});
+
+it('stopTurn failure surfaces an error instead of dying silently', async () => {
+  stopAssistantTurn.mockRejectedValueOnce(new Error('stop failed'));
+  render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+  await act(async () => { screen.getByText('start').click(); });
+  await act(async () => { screen.getByText('send').click(); });
+  await act(async () => { screen.getByText('stop').click(); });
+  expect(screen.getByTestId('error').textContent).toContain('stop failed');
 });

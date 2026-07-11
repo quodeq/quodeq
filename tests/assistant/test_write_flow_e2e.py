@@ -27,7 +27,7 @@ def test_edit_diff_apply_roundtrip(tmp_path, monkeypatch):
         evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
         dimensions_file=tmp_path / "d.json", project_id="proj")
 
-    def scripted_model_turn(*, messages, config, registry, emit):
+    def scripted_model_turn(*, messages, config, registry, emit, **_):
         # the "model": edit a file, self-review the diff, report done
         out = registry.dispatch("edit_repo_file", {
             "path": "app.py", "old_string": "x = 1", "new_string": "x = 2"})
