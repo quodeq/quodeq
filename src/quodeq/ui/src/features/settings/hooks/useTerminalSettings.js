@@ -4,7 +4,8 @@ export const TERMINAL_ENABLED_KEY = 'cc-terminal-enabled';
 const CHANGE_EVENT = 'terminal-settings-changed';
 
 function loadEnabled(storage) {
-  return storage.getItem(TERMINAL_ENABLED_KEY) === 'true';
+  // Enabled by default: only an explicit opt-out ('false') disables it.
+  return storage.getItem(TERMINAL_ENABLED_KEY) !== 'false';
 }
 
 export default function useTerminalSettings({ storage = localStorage } = {}) {

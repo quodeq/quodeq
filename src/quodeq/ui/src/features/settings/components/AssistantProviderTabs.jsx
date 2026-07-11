@@ -43,7 +43,7 @@ export default function AssistantProviderTabs({ providerConfigs }) {
         <div className="settings-row-label">
           <span className="settings-label">Enable assistant</span>
           <span className="settings-description">
-            Shows the assistant button (✦) in the toolbar and enables the Ctrl+` panel. Off by default.
+            Shows the assistant button (✦) in the toolbar and enables the Ctrl+` panel. On by default.
           </span>
         </div>
         <div className="settings-pill-group" role="tablist">

@@ -3,8 +3,8 @@ import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_SETTINGS_CHANGED_EVENT } fro
 
 export const ASSISTANT_ACTIVE_PROVIDER_KEY = 'cc-assistant-active-provider';
 export const ASSISTANT_MODE_KEY = 'cc-assistant-mode';
-// The assistant is OFF by default: the toolbar launcher only appears once the
-// user explicitly enables it in Settings.
+// The assistant is ON by default: the toolbar launcher shows until the user
+// explicitly disables it in Settings.
 export const ASSISTANT_ENABLED_KEY = 'cc-assistant-enabled';
 
 // Broadcast so every useAssistantProvider() instance (Settings tab, drawer, ...)
@@ -19,8 +19,8 @@ const CHANGE_EVENT = 'assistant-provider-changed';
 function loadState(storage) {
   const mode = storage.getItem(ASSISTANT_MODE_KEY) === 'custom' ? 'custom' : 'default';
   const analysisActive = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
-  // Default OFF: only 'true' enables it.
-  const enabled = storage.getItem(ASSISTANT_ENABLED_KEY) === 'true';
+  // Default ON: only an explicit opt-out ('false') disables it.
+  const enabled = storage.getItem(ASSISTANT_ENABLED_KEY) !== 'false';
 
   if (mode === 'default') {
     const model = analysisActive

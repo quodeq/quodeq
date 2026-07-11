@@ -5,12 +5,18 @@ import useTerminalSettings from './useTerminalSettings.js';
 beforeEach(() => localStorage.clear());
 afterEach(() => localStorage.clear());
 
-it('is disabled by default and setEnabled persists + syncs across instances', () => {
+it('is enabled by default and setEnabled persists + syncs across instances', () => {
   const a = renderHook(() => useTerminalSettings());
   const b = renderHook(() => useTerminalSettings());
-  expect(a.result.current.enabled).toBe(false);
-  act(() => a.result.current.setEnabled(true));
   expect(a.result.current.enabled).toBe(true);
-  expect(localStorage.getItem('cc-terminal-enabled')).toBe('true');
-  expect(b.result.current.enabled).toBe(true);
+  act(() => a.result.current.setEnabled(false));
+  expect(a.result.current.enabled).toBe(false);
+  expect(localStorage.getItem('cc-terminal-enabled')).toBe('false');
+  expect(b.result.current.enabled).toBe(false);
+});
+
+it('an explicit opt-out sticks across new instances', () => {
+  localStorage.setItem('cc-terminal-enabled', 'false');
+  const { result } = renderHook(() => useTerminalSettings());
+  expect(result.current.enabled).toBe(false);
 });

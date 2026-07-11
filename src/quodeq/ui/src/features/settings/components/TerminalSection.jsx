@@ -22,7 +22,7 @@ export default function TerminalSection() {
         <div className="settings-row-label">
           <span className="settings-label">Enable terminal</span>
           <span className="settings-description">
-            Shows a shell (❯_) in the toolbar drawer. Ctrl+Shift+` opens it. Localhost only; off by default.
+            Shows a shell (❯_) in the toolbar drawer. Ctrl+Shift+` opens it. Localhost only; on by default.
           </span>
         </div>
         <div className="settings-pill-group" role="tablist">

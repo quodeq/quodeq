@@ -51,15 +51,15 @@ describe('AssistantProviderTabs', () => {
     localStorage.clear();
     localStorage.setItem('cc-active-provider', 'claude');
     localStorage.setItem('cc-claude-model', 'sonnet');
-    // Enabled by default in these tests so the model-source rows render; the
-    // off-by-default behaviour has its own test below.
+    // Pinned enabled so the model-source rows render regardless of the
+    // default; the explicit opt-out behaviour has its own test below.
     localStorage.setItem('cc-assistant-enabled', 'true');
     fakeApi.getAiClients.mockClear();
     fakeApi.getOllamaModels.mockClear();
   });
   afterEach(() => localStorage.clear());
 
-  it('when disabled (the default) only the Enable toggle shows, no model source', async () => {
+  it('when explicitly disabled only the Enable toggle shows, no model source', async () => {
     localStorage.setItem('cc-assistant-enabled', 'false');
     const { container, queryAllByRole, queryByText } = await renderPanel();
     // Only the On/Off enable toggle is present — no Default/Custom, no note.
