@@ -118,7 +118,7 @@ def _summarize_dismiss_finding(canonical: dict) -> dict:
 
 
 def _apply_dismiss_finding(payload: dict, app: Flask) -> dict:
-    from quodeq.services.mutation_rescore import rescore_with_fallback  # noqa: PLC0415
+    from quodeq.services.mutation_rescore import dismiss_delta, rescore_with_fallback  # noqa: PLC0415
     from quodeq.services.dismissed import dismiss_finding  # noqa: PLC0415
     from quodeq.shared._env import get_evaluations_dir  # noqa: PLC0415
 
@@ -129,8 +129,16 @@ def _apply_dismiss_finding(payload: dict, app: Flask) -> dict:
         "req": payload["req"], "file": payload["file"], "line": payload["line"],
         "dismissReason": payload["reason"],
     })
-    scores = rescore_with_fallback(evaluations_dir, payload["project"], payload.get("runId"))
-    return {"dismissed": True, "scores": scores}
+    run_id = payload.get("runId")
+    scores = rescore_with_fallback(evaluations_dir, payload["project"], run_id)
+    # Mirror the manual /api/findings/dismiss route so the UI can patch its
+    # caches from this response instead of waiting on a lazy invalidation.
+    # run_id is None in overview scope -- dismiss_delta handles that by
+    # returning an inert-but-valid envelope (isLatest False, accumulated None).
+    delta = dismiss_delta(evaluations_dir, payload["project"], run_id, {
+        "req": payload["req"], "file": payload["file"], "line": payload["line"],
+    })
+    return {"dismissed": True, "scores": scores, "delta": delta}
 
 
 def _validate_verify_finding(payload: dict, ctx: ToolContext) -> dict:
