@@ -7,6 +7,7 @@ from collections import Counter
 from fnmatch import fnmatchcase
 from pathlib import Path
 
+from quodeq.analysis._ignore import is_ignored, load_ignore_patterns
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 from quodeq.config.discipline_registry import DisciplineRegistry
 
@@ -110,16 +111,31 @@ def _build_targets_from_disciplines(
     return _build_targets_from_matches(registry, matches, files_by_lang, ext_counts_by_lang)
 
 
+def _prune_ignored_dirs(
+    src: Path, dirpath: str, dirnames: list[str], ignore_patterns: list[str],
+) -> None:
+    """Drop directories matching an ignore pattern so they are never descended."""
+    dirnames[:] = [
+        d for d in dirnames
+        if not is_ignored(
+            os.path.relpath(os.path.join(dirpath, d), src).replace(os.sep, "/"),
+            ignore_patterns,
+        )
+    ]
+
+
 def _walk_and_group(
     src: Path, ext_map: dict[str, str], skip_dirs: set[str],
     skip_patterns: list[str],
     scope_path: str | None = None,
+    ignore_patterns: list[str] | None = None,
 ) -> tuple[dict[str, list[str]], Counter[str], dict[str, Counter]]:
     """Walk *src* (or a scoped subdirectory) once, grouping files by language.
 
     When *scope_path* is given (relative to *src*), only files under that
     subdirectory are included.  Relative paths in the result are still
     expressed relative to *src* so callers see the same format regardless.
+    *ignore_patterns* (.quodeqignore) are anchored at *src*, not the scope.
     """
     walk_root = src
     if scope_path:
@@ -127,12 +143,15 @@ def _walk_and_group(
         if candidate.is_dir():
             walk_root = candidate
 
+    ignore_patterns = ignore_patterns or []
     files_by_lang: dict[str, list[str]] = {}
     ext_counts: Counter[str] = Counter()
     ext_counts_by_lang: dict[str, Counter] = {}
     all_extensions = set(ext_map.keys())
     for dirpath, dirnames, filenames in os.walk(walk_root):
         dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
+        if ignore_patterns:
+            _prune_ignored_dirs(src, dirpath, dirnames, ignore_patterns)
         for fname in filenames:
             suffix = os.path.splitext(fname)[1]
             if suffix in all_extensions:
@@ -141,6 +160,8 @@ def _walk_and_group(
                 # matching all assume "/".
                 rel = os.path.relpath(os.path.join(dirpath, fname), src).replace(os.sep, "/")
                 if _matches_skip_pattern(rel, skip_patterns):
+                    continue
+                if ignore_patterns and is_ignored(rel, ignore_patterns):
                     continue
                 lang = ext_map.get(suffix, _UNKNOWN_LANG)
                 files_by_lang.setdefault(lang, []).append(rel)
@@ -152,6 +173,7 @@ def _walk_and_group(
 def _walk_and_partition_by_scope(
     src: Path, ext_map: dict[str, str], skip_dirs: set[str],
     skip_patterns: list[str], scope_paths: list[str],
+    ignore_patterns: list[str] | None = None,
 ) -> tuple[
     dict[str, dict[str, list[str]]],
     Counter[str],
@@ -163,12 +185,15 @@ def _walk_and_partition_by_scope(
     every scope are silently dropped — they don't belong to any classified
     subproject and shouldn't appear in any target.
     """
+    ignore_patterns = ignore_patterns or []
     files_by_scope_lang: dict[str, dict[str, list[str]]] = {s: {} for s in scope_paths}
     ext_counts_overall: Counter[str] = Counter()
     ext_counts_by_scope_lang: dict[str, dict[str, Counter]] = {s: {} for s in scope_paths}
     all_extensions = set(ext_map.keys())
     for dirpath, dirnames, filenames in os.walk(src):
         dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
+        if ignore_patterns:
+            _prune_ignored_dirs(src, dirpath, dirnames, ignore_patterns)
         for fname in filenames:
             suffix = os.path.splitext(fname)[1]
             if suffix not in all_extensions:
@@ -177,6 +202,8 @@ def _walk_and_partition_by_scope(
             # so prefix matching works on Windows.
             rel = os.path.relpath(os.path.join(dirpath, fname), src).replace(os.sep, "/")
             if _matches_skip_pattern(rel, skip_patterns):
+                continue
+            if ignore_patterns and is_ignored(rel, ignore_patterns):
                 continue
             owner = _deepest_scope(rel, scope_paths)
             if owner is None:
@@ -195,12 +222,14 @@ def _build_multi_scope_manifest(
     skip_patterns: list[str],
     registry: DisciplineRegistry,
     sub_results: list[tuple[str, list[str]]],
+    ignore_patterns: list[str] | None = None,
 ) -> SourceManifest:
     """Produce a manifest with one target group per detected subproject scope."""
     scope_paths = [rel for rel, _ in sub_results]
     matches_by_scope = {rel: matches for rel, matches in sub_results}
     files_by_scope, ext_counts_overall, ext_counts_by_scope_lang = _walk_and_partition_by_scope(
         src, ext_map, skip_dirs, skip_patterns, scope_paths,
+        ignore_patterns=ignore_patterns,
     )
 
     targets: list[AnalysisTarget] = []
@@ -238,10 +267,12 @@ def _build_single_scope_manifest(
     skip_patterns: list[str],
     disciplines_conf: Path | None,
     scope_path: str | None,
+    ignore_patterns: list[str] | None = None,
 ) -> SourceManifest:
     """Legacy single-scope path: walk once at the (optionally scoped) root."""
     files_by_lang, ext_counts, ext_counts_by_lang = _walk_and_group(
         src, ext_map, skip_dirs, skip_patterns, scope_path=scope_path,
+        ignore_patterns=ignore_patterns,
     )
     all_source_files_count = sum(len(f) for f in files_by_lang.values())
 
@@ -294,14 +325,19 @@ def build_manifest(
 
     *detection* is the parsed content of detection.json. *disciplines_conf* is
     optional; without it, no discipline-based classification runs.
+
+    A ``.quodeqignore`` file at *src* adds repo-local exclusions on top of the
+    built-in skip_dirs (see quodeq.analysis._ignore for the pattern syntax).
     """
     ext_map: dict[str, str] = detection.get("extensions", {})
     skip_dirs = set(detection.get("skip_dirs", []))
     skip_patterns: list[str] = detection.get("skip_patterns", [])
+    ignore_patterns = load_ignore_patterns(src)
 
     if scope_path is not None:
         return _build_single_scope_manifest(
             src, ext_map, skip_dirs, skip_patterns, disciplines_conf, scope_path,
+            ignore_patterns=ignore_patterns,
         )
 
     registry: DisciplineRegistry | None = None
@@ -319,8 +355,10 @@ def build_manifest(
         if not is_single_root:
             return _build_multi_scope_manifest(
                 src, ext_map, skip_dirs, skip_patterns, registry, sub_results,
+                ignore_patterns=ignore_patterns,
             )
 
     return _build_single_scope_manifest(
         src, ext_map, skip_dirs, skip_patterns, disciplines_conf, None,
+        ignore_patterns=ignore_patterns,
     )

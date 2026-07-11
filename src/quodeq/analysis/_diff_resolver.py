@@ -10,6 +10,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from quodeq.analysis._ignore import is_ignored, load_ignore_patterns
+
 _GIT_TIMEOUT_S = 15
 
 
@@ -36,11 +38,17 @@ def resolve_diff_files(src: Path, ref: str) -> list[str]:
     """Return files changed between ``HEAD`` and ``merge-base(ref, HEAD)``.
 
     Deleted files (in diff but absent from ``HEAD``) are dropped — PR mode
-    only analyzes files that still exist on the PR branch.
+    only analyzes files that still exist on the PR branch. Paths excluded by
+    ``.quodeqignore`` are dropped too, so they never re-enter analysis via
+    diff detection.
     """
     base_sha = _git(["merge-base", ref, "HEAD"], src).strip()
     if not base_sha:
         raise DiffResolveError(f"empty merge-base output for ref {ref!r}")
     raw = _git(["diff", "--name-only", f"{base_sha}..HEAD"], src)
     candidates = [line.strip() for line in raw.splitlines() if line.strip()]
-    return [f for f in candidates if (src / f).is_file()]
+    ignore_patterns = load_ignore_patterns(src)
+    return [
+        f for f in candidates
+        if (src / f).is_file() and not is_ignored(f, ignore_patterns)
+    ]
