@@ -240,6 +240,75 @@ class TestSkippedMarkerSemantics:
         assert recent == []
 
 
+class TestSizeAwareBatching:
+    """Raising the size cap must not overflow the context via multi-file
+    batches: one model call's inlined file content stays within the prompt
+    char budget, and an oversized file dispatches solo."""
+
+    def _files(self, tmp_path: Path, sizes: list[int]) -> list[Path]:
+        out = []
+        for i, size in enumerate(sizes):
+            p = tmp_path / f"f{i}.py"
+            p.write_text("x" * size)
+            out.append(p)
+        return out
+
+    def test_greedy_packing_preserves_order(self, tmp_path: Path):
+        from quodeq.analysis.subprocess import _batch_files_by_size
+
+        files = self._files(tmp_path, [100, 100, 100, 100])
+        batches = _batch_files_by_size(files, budget=250)
+
+        assert batches == [files[0:2], files[2:4]]
+
+    def test_oversized_file_goes_solo(self, tmp_path: Path):
+        from quodeq.analysis.subprocess import _batch_files_by_size
+
+        files = self._files(tmp_path, [50, 900, 50])
+        batches = _batch_files_by_size(files, budget=300)
+
+        assert batches == [[files[0]], [files[1]], [files[2]]]
+
+    def test_empty_input_yields_no_batches(self, tmp_path: Path):
+        from quodeq.analysis.subprocess import _batch_files_by_size
+
+        assert _batch_files_by_size([], budget=300) == []
+
+    def test_bridge_makes_one_api_call_per_sub_batch(
+        self, tmp_path: Path, api_provider, monkeypatch,
+    ):
+        from unittest.mock import patch as mpatch
+        from quodeq.analysis._config import AnalysisConfig
+        from quodeq.analysis.subagents.file_queue import FileQueue
+        from quodeq.analysis.subprocess import _run_api_analysis_bridge
+
+        src = tmp_path / "src"
+        src.mkdir()
+        for name in ("a.py", "b.py", "c.py"):
+            (src / name).write_text("x = 1\n" * 20)  # 120 bytes each
+        queue_path = tmp_path / "q.json"
+        FileQueue(queue_path, ["a.py", "b.py", "c.py"])
+        jsonl_file = tmp_path / "security_evidence.jsonl"
+        cfg = AnalysisConfig(
+            queue_path=queue_path, jsonl_file=jsonl_file,
+            max_files_per_agent=10, agent_id="a1", dimension="security",
+        )
+
+        monkeypatch.setenv("QUODEQ_MAX_API_PROMPT_CHARS", "150")
+        calls: list[list[str]] = []
+        with mpatch(
+            "quodeq.analysis.subprocess._resolve_provider_config",
+            return_value=("m", "http://localhost:1", ""),
+        ), mpatch(
+            "quodeq.analysis._api_runner.run_api_analysis",
+            side_effect=lambda **kw: calls.append(kw["source_file_paths"]),
+        ):
+            _run_api_analysis_bridge(src, "prompt", tmp_path / "a1.stream", cfg)
+
+        # 120B each with a 150B budget: every file gets its own call.
+        assert calls == [["a.py"], ["b.py"], ["c.py"]]
+
+
 class TestEstimatesSidecarRoundTrip:
     def test_excluded_survives_write_read_round_trip(self, tmp_path: Path):
         from quodeq.shared.dim_estimates_io import read_dim_estimates, write_dim_estimates

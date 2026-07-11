@@ -101,7 +101,21 @@ def _run_cli_analysis(
         _check_process_result(process, stream_err)
 
 
-_MAX_API_PROMPT_CHARS = int(os.environ.get("QUODEQ_MAX_API_PROMPT_CHARS", "30000"))  # Target prompt size for local models (~8K tokens)
+_DEFAULT_MAX_API_PROMPT_CHARS = 30000  # Target inlined-file budget for local models (~8K tokens)
+
+
+def _api_prompt_char_budget() -> int:
+    """Max bytes of file content to inline per model call.
+
+    Read per call (not at import) so QUODEQ_MAX_API_PROMPT_CHARS can be
+    raised together with QUODEQ_MAX_API_FILE_SIZE / QUODEQ_CONTEXT_SIZE
+    when running larger-context models.
+    """
+    raw = os.environ.get("QUODEQ_MAX_API_PROMPT_CHARS", "")
+    try:
+        return int(raw) if raw else _DEFAULT_MAX_API_PROMPT_CHARS
+    except ValueError:
+        return _DEFAULT_MAX_API_PROMPT_CHARS
 
 
 def _load_skip_dirs() -> frozenset[str]:
@@ -158,7 +172,7 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
     total_chars = 0
     for f in code_files + markup_files:
         size = stat_cache[f]
-        if total_chars + size > _MAX_API_PROMPT_CHARS:
+        if total_chars + size > _api_prompt_char_budget():
             continue
         selected.append(f)
         total_chars += size
@@ -346,6 +360,32 @@ def _gather_api_source_files(
     return _gather_source_files(work_dir)
 
 
+def _batch_files_by_size(files: list[Path], budget: int) -> list[list[Path]]:
+    """Greedy, order-preserving split so one model call's inlined file
+    content stays within *budget* bytes.
+
+    A single file over the budget still dispatches solo: the call may come
+    back truncated, but then only that file gets the error marker and
+    re-dispatches, instead of dragging its batchmates down with it.
+    """
+    batches: list[list[Path]] = []
+    current: list[Path] = []
+    current_size = 0
+    for f in files:
+        try:
+            size = f.stat().st_size
+        except OSError:
+            size = 0
+        if current and current_size + size > budget:
+            batches.append(current)
+            current, current_size = [], 0
+        current.append(f)
+        current_size += size
+    if current:
+        batches.append(current)
+    return batches
+
+
 def _run_api_analysis_bridge(
     work_dir: Path, prompt: str, stream_file: Path, cfg: AnalysisConfig,
 ) -> None:
@@ -353,8 +393,10 @@ def _run_api_analysis_bridge(
 
     Builds its own prompt using assemble_api_prompt() instead of the CLI
     prompt, which contains MCP tool-use instructions that confuse API models.
+    Files are dispatched in size-budgeted sub-batches (one model call each)
+    so a batch of large files cannot overflow the model context.
     """
-    from quodeq.analysis._api_runner import run_api_analysis, ApiRunnerConfig
+    from quodeq.analysis import _api_runner
 
     model, api_base, api_key = _resolve_provider_config(cfg)
 
@@ -370,38 +412,40 @@ def _run_api_analysis_bridge(
 
     overrides = load_project_overrides(work_dir)
     standards_text = _load_standards_text(cfg.compiled_dir, cfg.dimension, overrides=overrides)
-    api_prompt = assemble_api_prompt(
-        source_files=source_files,
-        standards_text=standards_text,
-        dimension=cfg.dimension or "general",
-        repo_name=str(work_dir.name),
-        repo_root=work_dir,
-    )
 
-    # POSIX-style separators: paths flow into findings (file fields,
-    # downstream JSONL projection) and into the prompt; the rest of the
-    # pipeline assumes forward slashes (path-role classifier, enrichment,
-    # SQLite store). Backslashes on Windows would break those joins.
-    rel_paths = [f.relative_to(work_dir).as_posix() for f in source_files]
-    run_api_analysis(
-        prompt=api_prompt,
-        jsonl_file=jsonl_file,
-        config=ApiRunnerConfig(
-            model=model,
-            api_base=api_base,
-            api_key=api_key,
-            context_size=cfg.context_size,
-        ),
-        compiled_dir=cfg.compiled_dir,
-        dimension=cfg.dimension,
-        work_dir=work_dir,
-        source_file_paths=rel_paths,
-        # Wire the synchronous cache-write closure when the pool layer
-        # supplied a RunConfig carrier. Legacy callers pass nothing and
-        # the API runner simply skips the cache write.
-        run_config=cfg.run_config,
-        dim_id=cfg.dimension,
-    )
+    for batch in _batch_files_by_size(source_files, _api_prompt_char_budget()):
+        api_prompt = assemble_api_prompt(
+            source_files=batch,
+            standards_text=standards_text,
+            dimension=cfg.dimension or "general",
+            repo_name=str(work_dir.name),
+            repo_root=work_dir,
+        )
+
+        # POSIX-style separators: paths flow into findings (file fields,
+        # downstream JSONL projection) and into the prompt; the rest of the
+        # pipeline assumes forward slashes (path-role classifier, enrichment,
+        # SQLite store). Backslashes on Windows would break those joins.
+        rel_paths = [f.relative_to(work_dir).as_posix() for f in batch]
+        _api_runner.run_api_analysis(
+            prompt=api_prompt,
+            jsonl_file=jsonl_file,
+            config=_api_runner.ApiRunnerConfig(
+                model=model,
+                api_base=api_base,
+                api_key=api_key,
+                context_size=cfg.context_size,
+            ),
+            compiled_dir=cfg.compiled_dir,
+            dimension=cfg.dimension,
+            work_dir=work_dir,
+            source_file_paths=rel_paths,
+            # Wire the synchronous cache-write closure when the pool layer
+            # supplied a RunConfig carrier. Legacy callers pass nothing and
+            # the API runner simply skips the cache write.
+            run_config=cfg.run_config,
+            dim_id=cfg.dimension,
+        )
 
     stream_file.write_text('{"type":"api_runner","status":"complete"}\n', encoding="utf-8")
     _log.debug("API analysis complete, evidence written to %s", jsonl_file)
