@@ -16,14 +16,14 @@ beforeEach(() => {
 });
 afterEach(() => localStorage.clear());
 
-it('is hidden when the terminal is disabled (the default)', () => {
+it('is hidden when the terminal is explicitly disabled in Settings', () => {
+  localStorage.setItem('cc-terminal-enabled', 'false');
   const { container } = render(<TerminalLauncherButton />);
   expect(container).toBeEmptyDOMElement();
   expect(screen.queryByRole('button', { name: /terminal/i })).toBeNull();
 });
 
-it('renders and toggles the terminal panel when enabled', () => {
-  localStorage.setItem('cc-terminal-enabled', 'true');
+it('renders and toggles the terminal panel by default (enabled)', () => {
   render(<TerminalLauncherButton />);
   const btn = screen.getByRole('button', { name: /terminal/i });
   expect(btn).toHaveClass('topbar-btn', 'topbar-btn--icon');

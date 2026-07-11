@@ -16,14 +16,14 @@ beforeEach(() => {
 });
 afterEach(() => localStorage.clear());
 
-it('is hidden when the assistant is disabled (the default)', () => {
+it('is hidden when the assistant is explicitly disabled in Settings', () => {
+  localStorage.setItem('cc-assistant-enabled', 'false');
   const { container } = render(<AssistantLauncherButton />);
   expect(container).toBeEmptyDOMElement();
   expect(screen.queryByRole('button', { name: /assistant/i })).toBeNull();
 });
 
-it('is an icon-only labelled toggle when enabled; click toggles the panel', () => {
-  localStorage.setItem('cc-assistant-enabled', 'true');
+it('is an icon-only labelled toggle by default (enabled); click toggles the panel', () => {
   render(<AssistantLauncherButton />);
   const btn = screen.getByRole('button', { name: /assistant/i });
   expect(btn).toHaveClass('topbar-btn', 'topbar-btn--icon');

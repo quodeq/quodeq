@@ -6,8 +6,8 @@ export function AssistantLauncherButton() {
   const { openPanels, toggleTopbar } = useAssistantDrawer();
   const { enabled } = useAssistantProvider();
 
-  // The assistant is off by default; the launcher only appears once enabled
-  // in Settings.
+  // The assistant is on by default; the launcher disappears only when the
+  // user disables it in Settings.
   if (!enabled) return null;
 
   // Highlighted whenever the assistant panel is open/selected (both launchers

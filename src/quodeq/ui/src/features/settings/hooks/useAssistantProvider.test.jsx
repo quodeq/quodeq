@@ -92,21 +92,27 @@ it('default mode updates live when the analysis gate fires the shared event', ()
   expect(result.current.model).toBe('sonnet');
 });
 
-it('is disabled by default and setEnabled persists + syncs across instances', () => {
+it('is enabled by default and setEnabled persists + syncs across instances', () => {
   const a = renderHook(() => useAssistantProvider());
   const b = renderHook(() => useAssistantProvider());
-  // Off by default — the launcher stays hidden until the user opts in.
-  expect(a.result.current.enabled).toBe(false);
-
-  act(() => a.result.current.setEnabled(true));
+  // On by default — the launcher shows until the user opts out in Settings.
   expect(a.result.current.enabled).toBe(true);
-  expect(localStorage.getItem('cc-assistant-enabled')).toBe('true');
-  // Other instances (drawer provider, launcher) see it live.
-  expect(b.result.current.enabled).toBe(true);
 
   act(() => a.result.current.setEnabled(false));
   expect(a.result.current.enabled).toBe(false);
+  expect(localStorage.getItem('cc-assistant-enabled')).toBe('false');
+  // Other instances (drawer provider, launcher) see it live.
   expect(b.result.current.enabled).toBe(false);
+
+  act(() => a.result.current.setEnabled(true));
+  expect(a.result.current.enabled).toBe(true);
+  expect(b.result.current.enabled).toBe(true);
+});
+
+it('an explicit opt-out sticks across new instances', () => {
+  localStorage.setItem('cc-assistant-enabled', 'false');
+  const { result } = renderHook(() => useAssistantProvider());
+  expect(result.current.enabled).toBe(false);
 });
 
 it('syncs mode/provider changes across independent hook instances', () => {
