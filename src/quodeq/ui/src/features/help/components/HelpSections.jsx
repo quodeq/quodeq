@@ -37,10 +37,10 @@ export function Philosophy() {
   return (
     <section className="help-section">
       <h2>The Quodeq Philosophy</h2>
-      <p>Quodeq is a quality compass for your codebase. Not a linter, not a static analyzer. An AI-powered evaluator that reads and understands your code the way a senior engineer would, then reports both what is wrong and what is right.</p>
+      <p>Quodeq reads your code the way a reviewer would and reports both what is wrong and what is right. It is not a linter: it evaluates meaning, not syntax.</p>
 
       <h3>Why Quodeq exists</h3>
-      <p>Traditional code-quality tools count syntax violations. They flag a long function or a missing null check, but they cannot tell you whether your architecture has a dependency leak, whether your error-handling strategy is coherent, or whether your domain model has eroded.</p>
+      <p>Traditional code-quality tools count syntax violations. They flag a long function or a missing null check, but they cannot tell you that your architecture leaks dependencies or that your domain model has eroded.</p>
       <p>Quodeq sends AI agents into your codebase with read-only tools to explore, follow imports, understand patterns, and evaluate quality against structured standards. Every finding cites a file, a line, a code snippet, and a principle.</p>
 
       <h3>How an evaluation runs</h3>
@@ -56,7 +56,7 @@ export function Philosophy() {
       <p>Quodeq reports <strong>violations and compliance</strong>. Scoring uses the ratio between them, so a project with many violations but strong compliance patterns scores more fairly than one with the same violations and no evidence of good practice. Agents actively look for files that follow standards correctly, not just files that break them.</p>
 
       <h3>The Q&#xB2; scoring formula</h3>
-      <p>Each principle is scored 0 to 10 using four constraints designed to avoid the usual pitfalls of naive scoring.</p>
+      <p>Each principle is scored 0 to 10 under four constraints.</p>
       <ul>
         <li>A hyperbolic <strong>violation base</strong> means the first violations hurt most. Fifty minor issues will not tank a score the way five critical ones do.</li>
         <li>A <strong>compliance lift</strong> fills the gap between the base and 10 with evidence of good practice, so compliance always helps and never hurts.</li>
@@ -64,7 +64,7 @@ export function Philosophy() {
         <li>A <strong>severity grade floor</strong> keeps the label honest. Only an actual critical violation can produce a <em>Critical</em> grade.</li>
       </ul>
 
-      <p>Quodeq ships with ISO 25010 dimensions plus Clean Architecture and DDD. It evaluates any codebase in any language: Python, TypeScript, Go, Rust, Java, Swift, anything. You can also write your own standards for whatever quality means in your project.</p>
+      <p>Quodeq ships with ISO 25010 dimensions plus Clean Architecture and DDD. It works in any language, and you can write your own standards for whatever quality means in your project.</p>
     </section>
   );
 }
@@ -321,7 +321,7 @@ COMPLIANT   src/api.py:88       Parameterized query prevents injection     CWE-8
       ]} />
 
       <h3>Fix plans</h3>
-      <p>From any violation, the <strong>Fix plan</strong> button opens a side-pane with a structured remediation packet: file path, line number, code context, the violated principle, and concrete guidance. Copy it and paste into your AI agent or IDE. It is designed to give the receiving model everything it needs to apply the fix without follow-up questions.</p>
+      <p>From any violation, the <strong>Fix plan</strong> button opens a side-pane with a structured remediation packet: file path, line number, code context, the violated principle, and concrete guidance. Copy it into your AI agent or IDE; it carries everything the model needs to apply the fix.</p>
 
       <h3>Dismissing a finding</h3>
       <p>If a finding is a false positive or an accepted trade-off, dismiss it from the violation detail. You will be asked for a reason. Dismissed findings:</p>
@@ -342,7 +342,7 @@ export function CodeMap() {
   return (
     <section className="help-section">
       <h2>Code Map</h2>
-      <p>The <strong>Map</strong> tab visualizes your codebase as shapes you can scan at a glance. Two metrics, three layouts, six combinations.</p>
+      <p>The <strong>Map</strong> tab draws your codebase as shapes you can scan at a glance: two metrics crossed with three layouts.</p>
 
       <h3>Pick a metric</h3>
       <ul>
@@ -452,7 +452,15 @@ export function Standards() {
       <p>The <strong>Standards</strong> tab is where you decide what quality means for your project. Browse, edit, import, and create the rules Quodeq evaluates against.</p>
 
       <h3>Built-in standards</h3>
-      <p>Quodeq ships with managed standards for the six ISO 25010 dimensions plus Clean Architecture and DDD Design. They are <strong>read-only</strong> (you can view them but not edit) and marked as <em>Managed</em>. To turn one off, hide it with the {ICON_EYE_ON} visibility toggle.</p>
+      <p>Quodeq ships with managed standards for the six ISO 25010 dimensions plus Clean Architecture and DDD Design. Their structure is <strong>read-only</strong> and marked as <em>Managed</em>, but their numeric thresholds are editable (see below). To turn one off, hide it with the {ICON_EYE_ON} visibility toggle.</p>
+
+      <h3>Customizing thresholds</h3>
+      <p>Many requirements carry a number: max function lines, max parameters, and so on. You can change these per project without cloning the standard. Select the requirement and edit the value in its <strong>Thresholds</strong> section, which shows the default and the allowed range. Out-of-range values are rejected, and <em>Reset to default</em> removes the override. Custom standards can declare thresholds too.</p>
+      <p>The tree marks customized requirements with a dot and shows the value in effect in each label. Standards with overrides get an <em>N thresholds customized</em> badge. Evaluations judge against your values, not the shipped ones.</p>
+      <p>Overrides are saved to <code>.quodeq/standards-overrides.json</code> in the project root. Commit the file and the whole team scans with the same numbers. If it is missing or malformed, the defaults apply; a scan never fails because of it.</p>
+      <Tip title="Not the grade thresholds">
+        The boundaries in the <em>Grade Formula</em> editor decide how scores map to letter grades. These thresholds decide when code violates a requirement.
+      </Tip>
 
       <h3>Creating your own</h3>
       <ol>
