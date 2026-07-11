@@ -16,6 +16,10 @@ vi.mock('../../api/terminal.js', () => ({
   killTerminal: vi.fn(async () => ({ ok: true })),
   terminalSocketUrl: () => 'ws://localhost/api/terminal/ws',
 }));
+// Mock the socket hook: jsdom has no real terminal WS to reach, and the
+// overlay tests need to drive each connection status directly.
+const socketState = { status: 'open', send: vi.fn(), resize: vi.fn(), reconnectNow: vi.fn() };
+vi.mock('./useTerminalSocket.js', () => ({ useTerminalSocket: vi.fn(() => socketState) }));
 import TerminalPane from './TerminalPane.jsx';
 
 it('mounts an xterm terminal when active', async () => {
@@ -48,4 +52,32 @@ it('shows the gate reason and does not mount xterm when disabled', async () => {
   expect(disabled).toHaveTextContent('localhost only');
   expect(screen.queryByTestId('tty-root')).toBeNull();
   expect(Terminal).not.toHaveBeenCalled();
+});
+
+it('shows no overlay while the socket is open or on the initial connect', async () => {
+  socketState.status = 'open';
+  render(<TerminalPane active />);
+  await screen.findByTestId('tty-root');
+  expect(screen.queryByTestId('tty-overlay')).toBeNull();
+  socketState.status = 'connecting';
+  render(<TerminalPane active />);
+  expect(screen.queryByTestId('tty-overlay')).toBeNull();
+});
+
+it('shows a reconnecting banner when the socket drops, and Retry calls reconnectNow', async () => {
+  const { userEvent } = await import('@testing-library/user-event').then((m) => ({ userEvent: m.default }));
+  socketState.status = 'reconnecting';
+  socketState.reconnectNow = vi.fn();
+  render(<TerminalPane active />);
+  const overlay = await screen.findByTestId('tty-overlay');
+  expect(overlay).toHaveTextContent('Terminal disconnected. Reconnecting');
+  await userEvent.click(screen.getByRole('button', { name: 'Retry now' }));
+  expect(socketState.reconnectNow).toHaveBeenCalled();
+});
+
+it('shows a busy banner when another window owns the terminal', async () => {
+  socketState.status = 'busy';
+  render(<TerminalPane active />);
+  const overlay = await screen.findByTestId('tty-overlay');
+  expect(overlay).toHaveTextContent('already open in another window');
 });
