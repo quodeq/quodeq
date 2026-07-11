@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, lazy, Suspense } from 'react';
 import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';
 import { AssistantPane } from '../assistant/AssistantDrawer.jsx';
-import { ChevronUpIcon, ChevronDownIcon, GlobeIcon, PencilIcon, RotateCcwIcon } from '../../components/CopyButton.jsx';
+import { ChevronDownIcon, GlobeIcon, MaximizeIcon, MinimizeIcon, PencilIcon, RotateCcwIcon } from '../../components/CopyButton.jsx';
 import { useSidePane, workspaceDiffSpec } from '../side-pane/index.js';
 
 const TerminalPane = lazy(() => import('../terminal/TerminalPane.jsx'));
@@ -131,10 +131,15 @@ export function BottomDrawer({ uiState }) {
             aria-label={maximized ? 'Restore drawer' : 'Maximize drawer'}
             aria-pressed={maximized}
             title={maximized ? 'Restore' : 'Maximize'}>
-            {maximized ? <ChevronDownIcon /> : <ChevronUpIcon />}
+            {maximized ? <MinimizeIcon /> : <MaximizeIcon />}
           </button>
+          {/* Chevron-down, NOT an ×: neither panel is killed by this. The
+              terminal's PTY shell and an in-flight assistant turn keep running
+              server-side; reopening the tab reattaches to them. */}
           <button type="button" className="assistant-drawer-btn" onClick={closeActiveTab}
-            aria-label="Close tab" title="Close tab">&times;</button>
+            aria-label="Hide tab" title="Hide (keeps running in the background)">
+            <ChevronDownIcon />
+          </button>
         </div>
       </header>
       {openPanels.includes('assistant') && (
