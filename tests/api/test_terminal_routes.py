@@ -190,6 +190,37 @@ def test_ws_single_active_connection_refuses_second():
 
 
 @_ws_test
+def test_ws_busy_close_uses_dedicated_code():
+    # The client must NOT auto-reconnect against a held lock (it would ping-pong
+    # and spam the other window), so the refusal carries close code 4002.
+    with _serve(_LiveManager()) as port:
+        with _connect(port) as a:
+            assert a.receive(timeout=2) == "0ready\n"
+            with _connect(port) as b:
+                with pytest.raises(simple_websocket.ConnectionClosed) as exc:
+                    b.receive(timeout=2)   # banner frame...
+                    b.receive(timeout=2)   # ...then the close
+                assert exc.value.reason == 4002
+
+
+@_ws_test
+def test_ws_gate_refusal_close_uses_dedicated_code():
+    # Bad Origin -> gate refuses the handshake with close code 4003 so the
+    # client reports it instead of retrying forever.
+    with _serve(_LiveManager()) as port:
+        c = simple_websocket.Client(
+            f"ws://127.0.0.1:{port}/api/terminal/ws",
+            headers={"Origin": "http://evil.example"})
+        try:
+            with pytest.raises(simple_websocket.ConnectionClosed) as exc:
+                c.receive(timeout=2)
+            assert exc.value.reason == 4003
+        finally:
+            with contextlib.suppress(Exception):
+                c.close()
+
+
+@_ws_test
 def test_ws_spawn_failure_closes_cleanly_and_frees_lock():
     with _serve(_FlakyManager()) as port:
         with _connect(port) as first:       # ensure_session raises -> clean close

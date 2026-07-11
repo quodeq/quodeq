@@ -39,6 +39,13 @@ def _gate_reason() -> str | None:
     )
 
 
+# App-specific WS close codes (4000-4999 range). The client's auto-reconnect
+# keys off these: a retry against a held lock or a closed gate can never
+# succeed, so it must not loop — only unexpected drops are retried.
+_WS_CLOSE_BUSY = 4002     # single-connection lock held by another window
+_WS_CLOSE_REFUSED = 4003  # terminal gate refused the handshake
+
+
 def _clamp_winsize(value: int) -> int:
     """Keep a terminal dimension within struct.pack('HH') range (1..65535)."""
     return max(1, min(int(value), 65535))
@@ -85,13 +92,13 @@ def register_terminal_routes(app: Flask, manager: TerminalManager | None = None)
     @sock.route("/api/terminal/ws")
     def terminal_ws(ws):
         if _gate_reason() is not None:
-            ws.close()
+            ws.close(_WS_CLOSE_REFUSED)
             return
         if not _conn_lock.acquire(blocking=False):
             try:
                 ws.send("0\r\n[terminal already open in another window]\r\n")
             finally:
-                ws.close()
+                ws.close(_WS_CLOSE_BUSY)
             return
         try:
             try:

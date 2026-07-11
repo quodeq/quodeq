@@ -63,7 +63,7 @@ export default function TerminalPane({ active }) {
   // `active` is used ONLY to gate fitting (the fit effects below).
   const paneLive = checked && reason === null;
 
-  const { status, send, resize } = useTerminalSocket({
+  const { status, send, resize, reconnectNow } = useTerminalSocket({
     active: paneLive,
     restartKey,
     onData: (s) => termRef.current?.write(s),
@@ -177,5 +177,23 @@ export default function TerminalPane({ active }) {
   if (reason) {
     return <div className="tty-disabled" data-testid="tty-disabled">{reason}</div>;
   }
-  return <div ref={rootRef} className="tty-root" data-testid="tty-root" onKeyDown={containerKeyDown} />;
+  // A dead socket swallows keystrokes with no visual cue, so any not-connected
+  // state after mount gets an explicit banner. 'connecting' is excluded: the
+  // initial handshake resolves in milliseconds and a flash would be noise.
+  const overlay = {
+    reconnecting: { text: 'Terminal disconnected. Reconnecting…', btn: 'Retry now' },
+    busy: { text: 'Terminal is already open in another window.', btn: 'Use it here' },
+    refused: { text: 'Terminal connection refused by the server.', btn: 'Retry' },
+  }[status];
+  return (
+    <div className="tty-wrap" onKeyDown={containerKeyDown}>
+      <div ref={rootRef} className="tty-root" data-testid="tty-root" />
+      {overlay && (
+        <div className="tty-overlay" data-testid="tty-overlay" role="status">
+          <span>{overlay.text}</span>
+          <button type="button" className="tty-overlay-btn" onClick={reconnectNow}>{overlay.btn}</button>
+        </div>
+      )}
+    </div>
+  );
 }
