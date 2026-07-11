@@ -51,15 +51,13 @@ def test_edit_unique_match(wt_ctx):
     assert (wt_ctx.repo_root / "app.py").read_bytes() == b"a = 1\nb = 2\nb = 2\n"
 
 
-def test_edit_preserves_crlf_line_endings(wt_ctx):
-    # A CRLF file (a Windows user's repo) must keep its exact line endings on
-    # edit. write_text would translate "\n" to the platform newline on Windows
-    # and double every "\r\n" into "\r\r\n"; write_bytes preserves the file.
+def test_edit_preserves_crlf_bytes(wt_ctx):
+    # byte-exact contract: an edit must not rewrite line endings, even on
+    # Windows where text-mode writes would turn \r\n into \r\r\n
     (wt_ctx.worktree_dir / "crlf.py").write_bytes(b"a = 1\r\nb = 2\r\n")
     reg = _registry(wt_ctx)
-    out = reg.dispatch("edit_repo_file", {"path": "crlf.py", "old_string": "a = 1",
-                                          "new_string": "a = 9"})
-    assert out["ok"]
+    assert reg.dispatch("edit_repo_file", {"path": "crlf.py", "old_string": "a = 1",
+                                           "new_string": "a = 9"})["ok"]
     assert (wt_ctx.worktree_dir / "crlf.py").read_bytes() == b"a = 9\r\nb = 2\r\n"
 
 

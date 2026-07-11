@@ -106,6 +106,19 @@ def test_apply_to_repo_leaves_uncommitted_changes(manager, repo):
     assert "app.py" in out
 
 
+def test_byte_exact_despite_autocrlf(repo, tmp_path):
+    # core.autocrlf=true is the Git-for-Windows default; checkout and apply
+    # must still preserve repo bytes exactly (LF stays LF)
+    _run(["git", "-C", str(repo), "config", "core.autocrlf", "true"])
+    manager = WorktreeManager.for_session(repo, "proj", "feedbeef12345678",
+                                          base=tmp_path / "wts")
+    manager.create()
+    assert (manager.path / "app.py").read_bytes() == b"print('hi')\n"
+    (manager.path / "app.py").write_bytes(b"print('bye')\n")
+    manager.apply_to_repo()
+    assert (repo / "app.py").read_bytes() == b"print('bye')\n"
+
+
 def test_apply_conflict_applies_nothing(manager, repo):
     (manager.path / "app.py").write_bytes(b"print('worktree')\n")
     (repo / "app.py").write_bytes(b"print('diverged')\n")  # user edited too
