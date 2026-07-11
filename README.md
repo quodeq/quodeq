@@ -144,6 +144,28 @@ quodeq evaluate /path/to/project --scope src/api    # Scoped to a subdirectory
 quodeq evaluate /path/to/project -d security        # Single dimension
 ```
 
+### Excluding paths (`.quodeqignore`)
+
+To keep fixture, vendored, or generated code out of an evaluation, add a
+`.quodeqignore` file at the scan root. Each line is a glob pattern matched
+against paths relative to that root; a pattern that names a directory excludes
+everything under it. Blank lines and `#` comments are skipped, and `*` crosses
+directory separators.
+
+```gitignore
+# test fixtures with intentionally bad code
+benchmarks/corpus/
+tests/fixtures
+
+# generated files, at any depth
+*.gen.py
+*.min.js
+```
+
+Exclusions apply everywhere files are collected — full scans, `--scope` runs,
+monorepo subproject discovery, and `--diff-from` change detection — on top of
+the built-in skips (`node_modules`, `dist`, dot-directories, ...).
+
 ### SARIF / GitHub code scanning
 
 Quodeq can emit findings as [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
