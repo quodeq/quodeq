@@ -516,6 +516,30 @@ def _rescore_accumulated_response(
     return {**accumulated, "dimensions": new_dims, "summary": new_summary}
 
 
+def rescore_accumulated(
+    accumulated: dict[str, Any] | None,
+    reports_root: Path, project: str,
+    params: ScoringParams | None = None,
+) -> dict[str, Any] | None:
+    """Public seam: project-wide dismiss/delete rescore for an accumulated payload.
+
+    Callers that read ``compute_accumulated`` directly (rather than through
+    ``get_project_scores``) get scores that ignore dismissals/deletions --
+    ``filter_dismissed_from_dimensions`` drops the violations but leaves the
+    baked scores untouched. Route the payload through here so every consumer
+    reports the same dismiss-adjusted score as the Overview. No-op when the
+    project has no active dismissals or deletions.
+
+    When *params* is None the saved grade-formula params are loaded, matching
+    ``get_project_scores``.
+    """
+    if not accumulated:
+        return accumulated
+    if params is None:
+        params = load_params()
+    return _rescore_accumulated_response(accumulated, reports_root, project, params=params)
+
+
 def get_project_scores(
     reports_root: Path, project: str, as_of: str | None = None,
 ) -> dict[str, Any] | None:
