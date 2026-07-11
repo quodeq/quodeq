@@ -14,6 +14,7 @@ import logging
 from pathlib import Path
 
 from quodeq.shared.utils import read_json
+from quodeq.core.standards.overrides import resolve_requirement_text
 
 _logger = logging.getLogger(__name__)
 
@@ -65,8 +66,12 @@ def extract_refs(data: dict) -> dict[str, list[dict]]:
     return lookup
 
 
-def extract_requirements(data: dict) -> dict[str, dict]:
+def extract_requirements(data: dict, overrides: dict[str, dict] | None = None) -> dict[str, dict]:
     """Extract {req_id: {principle, text}} from a compiled-standards dict.
+
+    When *overrides* is supplied, requirement text placeholders are resolved
+    using the per-requirement override values (see
+    :func:`quodeq.core.standards.overrides.resolve_requirement_text`).
 
     This is the pure-logic counterpart of ``load_compiled_requirements``.
     """
@@ -79,7 +84,7 @@ def extract_requirements(data: dict) -> dict[str, dict]:
                 continue
             lookup[req_id] = {
                 "principle": principle_name,
-                "text": req.get("text", ""),
+                "text": resolve_requirement_text(req, (overrides or {}).get(req_id)),
             }
     return lookup
 
@@ -149,19 +154,28 @@ def load_compiled_refs_multi(
 def load_compiled_requirements_multi(
     compiled_dir: str | Path | None, dimensions: list[str],
     evaluators_dir: Path | None = None,
+    overrides: dict[str, dict] | None = None,
 ) -> dict[str, dict]:
     """Load requirements for multiple dimensions, merging into a single lookup."""
     merged: dict[str, dict] = {}
     for dim in dimensions:
-        merged.update(load_compiled_requirements(compiled_dir, dim, evaluators_dir=evaluators_dir))
+        merged.update(load_compiled_requirements(
+            compiled_dir, dim,
+            evaluators_dir=evaluators_dir,
+            overrides=overrides,
+        ))
     return merged
 
 
 def load_compiled_requirements(
     compiled_dir: str | Path | None, dimension: str | None,
     evaluators_dir: Path | None = None,
+    overrides: dict[str, dict] | None = None,
 ) -> dict[str, dict]:
     """Load {req_id: {principle, text}} from compiled standards on disk.
+
+    When *overrides* is supplied, requirement text placeholders are resolved
+    using the per-requirement override values.
 
     Backward-compat convenience wrapper that handles file I/O then delegates
     to the pure :func:`extract_requirements`.  Used by the MCP server to
@@ -170,4 +184,4 @@ def load_compiled_requirements(
     data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
     if not data:
         return {}
-    return extract_requirements(data)
+    return extract_requirements(data, overrides=overrides)

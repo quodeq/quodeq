@@ -244,3 +244,38 @@ def test_report_gaps_finds_orphan_cwes(tmp_path):
     assert len(gaps) == 1
     assert "9999" in gaps[0]
     assert "Orphan CWE" in gaps[0]
+
+
+def test_build_req_index_carries_params_through(tmp_path):
+    _make_iso(tmp_path, "maintainability", [{
+        "name": "Analyzability",
+        "requirements": [
+            {"id": "M-ANA-2", "text": "Functions MUST NOT exceed {max_lines} lines",
+             "cwe": [1080],
+             "params": {"max_lines": {"label": "Max function lines", "type": "int",
+                                      "default": 50, "min": 10, "max": 500}}},
+            {"id": "M-ANA-3", "text": "Nesting depth MUST NOT exceed 4 levels",
+             "cwe": [1121]},
+        ]
+    }])
+    _make_cisq(tmp_path, "maintainability", [])
+
+    index = build_req_index(tmp_path, "maintainability")
+
+    with_params, without_params = index["Analyzability"]
+    assert with_params["params"]["max_lines"]["default"] == 50
+    assert "params" not in without_params
+
+
+def test_build_req_index_keeps_empty_params_dict(tmp_path):
+    _make_iso(tmp_path, "maintainability", [{
+        "name": "Analyzability",
+        "requirements": [
+            {"id": "M-ANA-9", "text": "Placeholder", "cwe": [], "params": {}},
+        ]
+    }])
+    _make_cisq(tmp_path, "maintainability", [])
+
+    index = build_req_index(tmp_path, "maintainability")
+
+    assert index["Analyzability"][0]["params"] == {}

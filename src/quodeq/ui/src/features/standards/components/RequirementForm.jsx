@@ -1,14 +1,22 @@
 import { useRef, useEffect } from 'react';
 import ReferenceEditor from './ReferenceEditor.jsx';
+import ThresholdFields from './ThresholdFields.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
+import { resolveRequirementText } from '../resolveRequirementText.js';
 
-export default function RequirementForm({ requirement, principleIndex, reqIndex, onUpdateField, editable }) {
+export default function RequirementForm({ requirement, principleIndex, reqIndex, onUpdateField, editable,
+                                          reqOverrides, onChangeParam }) {
   const basePath = ['principles', principleIndex, 'requirements', reqIndex];
   const ruleRef = useRef(null);
 
   useEffect(() => {
     if (!requirement.text && ruleRef.current) ruleRef.current.focus();
   }, [principleIndex, reqIndex]);
+
+  const hasParams = Boolean(requirement.params);
+  const displayText = hasParams && !editable
+    ? resolveRequirementText(requirement, reqOverrides)
+    : requirement.text || '';
 
   return (
     <div className="requirement-form">
@@ -20,7 +28,7 @@ export default function RequirementForm({ requirement, principleIndex, reqIndex,
           ref={ruleRef}
           id={`req-text-${principleIndex}-${reqIndex}`}
           className="form-input"
-          value={requirement.text || ''}
+          value={displayText}
           onChange={(e) => onUpdateField([...basePath, 'text'], e.target.value)}
           disabled={!editable}
           placeholder="e.g. Source code dependencies must point inward only"
@@ -45,6 +53,14 @@ export default function RequirementForm({ requirement, principleIndex, reqIndex,
         onChange={(updated) => onUpdateField([...basePath, 'refs'], updated)}
         disabled={!editable}
       />
+
+      {hasParams && onChangeParam && (
+        <ThresholdFields
+          requirement={requirement}
+          reqOverrides={reqOverrides}
+          onChangeParam={onChangeParam}
+        />
+      )}
     </div>
   );
 }

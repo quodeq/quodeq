@@ -104,3 +104,25 @@ export async function exportStandard(standardId) {
   const { managed, type, origin, originHash, principleCount, requirementCount, ...portable } = detail;
   return { id: standardId, data: portable, fileName: `${standardId}.quodeq` };
 }
+
+/**
+ * Fetch per-project threshold overrides for all standards requirements.
+ * @param {string} projectId
+ * @returns {Promise<{ overrides: Object, counts: Object }>}
+ */
+export async function getStandardsOverrides(projectId) {
+  return request(`/projects/${encodeURIComponent(projectId)}/standards-overrides`);
+}
+
+/**
+ * Persist threshold overrides for a project.
+ * @param {string} projectId
+ * @param {Object} overrides - Map of requirementId → param overrides, e.g. `{ 'M-ANA-2': { max_lines: 60 } }`
+ * @returns {Promise<{ overrides: Object }>}
+ */
+export async function putStandardsOverrides(projectId, overrides) {
+  return request(`/projects/${encodeURIComponent(projectId)}/standards-overrides`, {
+    method: 'PUT',
+    body: JSON.stringify({ overrides }),
+  });
+}

@@ -46,6 +46,7 @@ class PromptContext:
     extra_vars: dict[str, str] = field(default_factory=dict)
     work_dir: Path | None = None
     previous_findings: list[dict] = field(default_factory=list)
+    project_root: Path | None = None
 
 
 def render_manifest_context(context: PromptContext) -> str:

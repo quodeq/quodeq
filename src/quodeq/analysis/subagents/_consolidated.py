@@ -115,6 +115,7 @@ def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: Any) -> str:
             manifest=config.manifest,
             target=config.target,
             work_dir=config.work_dir or config.src,
+            project_root=config.src,
         ),
     )
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 
 from quodeq.analysis.prompts import _context as ctx
+from quodeq.core.standards.overrides import load_project_overrides
 from quodeq.analysis.prompts._renderers import (
     _load_dimension_data,
     render_compiled_standards,
@@ -101,10 +102,12 @@ def build_analysis_prompt(template: str, context: ctx.PromptContext) -> str:
     if context.standards_dir:
         compiled_dir = context.standards_dir / "compiled"
         _eval_dir = context.evaluators_dir
+        _overrides = load_project_overrides(context.project_root)
         if compiled_dir.exists() or (_eval_dir and _eval_dir.is_dir()):
             if context.work_dir:
                 compact = render_compact_standards(
                     compiled_dir, context.dimension, evaluators_dir=_eval_dir,
+                    overrides=_overrides,
                 )
                 if compact != ctx.NO_STANDARDS_FOR_DIM:
                     standards_checklist = write_standards_and_instruction(
@@ -115,6 +118,7 @@ def build_analysis_prompt(template: str, context: ctx.PromptContext) -> str:
             else:
                 standards_checklist = render_compiled_standards(
                     compiled_dir, context.dimension, evaluators_dir=_eval_dir,
+                    overrides=_overrides,
                 )
 
     manifest_context = ctx.render_manifest_context(context)
@@ -151,6 +155,7 @@ def build_consolidated_prompt(
 
     standards_text = render_all_standards(
         context.standards_dir, dimensions, evaluators_dir=context.evaluators_dir,
+        overrides=load_project_overrides(context.project_root),
     ) if context.standards_dir else ctx.NO_STANDARDS
 
     manifest_context = ctx.render_manifest_context(context)

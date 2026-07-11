@@ -59,6 +59,7 @@ def _build_req_index(iso_data: dict) -> dict[str, list[dict]]:
 
     Each requirement dict has:
       id, source, text, severity, scope, refs (empty list),
+      params (optional, only when declared in source),
       _cwe_ids, _wcag_ids, _cert_ids (internal, stripped before output)
     """
     index: dict[str, list[dict]] = {}
@@ -66,7 +67,7 @@ def _build_req_index(iso_data: dict) -> dict[str, list[dict]]:
         principle = sc["name"]
         index[principle] = []
         for req in sc.get("requirements", []):
-            index[principle].append({
+            entry = {
                 "id": req["id"],
                 "source": "iso25010",
                 "text": req["text"],
@@ -76,7 +77,10 @@ def _build_req_index(iso_data: dict) -> dict[str, list[dict]]:
                 "_wcag_ids": req.get("wcag", []),
                 "_cert_ids": req.get("cert", []),
                 "refs": [],
-            })
+            }
+            if req.get("params") is not None:
+                entry["params"] = req["params"]
+            index[principle].append(entry)
     return index
 
 
@@ -119,6 +123,13 @@ def compile_dimension(standards_dir: Path, dimension: str, cwe_db=None) -> dict:
     """Compile a single dimension into the requirement-centric output format."""
     iso_data = _load_iso_data(standards_dir, dimension)
     dim_name = iso_data.get("name", dimension.title())
+    dim_description = iso_data.get("description")
+    # Build a sub_characteristic name -> description lookup from the source.
+    sc_descriptions: dict[str, str] = {
+        sc["name"]: sc["description"]
+        for sc in iso_data.get("sub_characteristics", [])
+        if sc.get("description")
+    }
     index = build_req_index(standards_dir, dimension, cwe_db, iso_data=iso_data)
 
     sources = ["iso25010"]
@@ -137,18 +148,24 @@ def compile_dimension(standards_dir: Path, dimension: str, cwe_db=None) -> dict:
         for req in reqs:
             r = {k: v for k, v in req.items() if not k.startswith("_")}
             req_list.append(r)
-        principles.append({
+        principle: dict = {
             "name": principle_name,
-            "source": "iso25010",
-            "requirements": req_list,
-        })
+        }
+        if principle_name in sc_descriptions:
+            principle["description"] = sc_descriptions[principle_name]
+        principle["source"] = "iso25010"
+        principle["requirements"] = req_list
+        principles.append(principle)
 
-    return {
+    result: dict = {
         "id": dimension,
         "name": dim_name,
-        "sources": sources,
-        "principles": principles,
     }
+    if dim_description:
+        result["description"] = dim_description
+    result["sources"] = sources
+    result["principles"] = principles
+    return result
 
 
 def report_gaps(standards_dir: Path, dimension: str) -> list[str]:

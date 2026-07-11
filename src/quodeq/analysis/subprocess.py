@@ -171,12 +171,21 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
 _MAX_STANDARDS_CHARS = int(os.environ.get("QUODEQ_MAX_STANDARDS_CHARS", "50000"))  # Allow full standards for models with large context
 
 
-def _load_standards_text(compiled_dir: Path | None, dimension: str | None) -> str:
+def _load_standards_text(
+    compiled_dir: Path | None,
+    dimension: str | None,
+    overrides: dict | None = None,
+) -> str:
     """Load compiled standards as structured JSON for the API prompt.
 
     Renders from the compiled JSON as a compact JSON array grouped by principle,
     so API models see explicit structure instead of a flat requirement list.
     Falls back to the .md file if JSON is unavailable.
+
+    *overrides* is the per-project threshold override map from
+    :func:`quodeq.core.standards.overrides.load_project_overrides`.  When
+    supplied, placeholder templates in requirement text are resolved before
+    the text is sent to the model.
 
     Truncates to _MAX_STANDARDS_CHARS to keep prompts within context limits.
     """
@@ -186,7 +195,7 @@ def _load_standards_text(compiled_dir: Path | None, dimension: str | None) -> st
     if json_path.exists():
         try:
             data = _json.loads(json_path.read_text(encoding="utf-8"))
-            text = _render_standards_grouped(data)
+            text = _render_standards_grouped(data, overrides=overrides)
             if text:
                 if len(text) > _MAX_STANDARDS_CHARS:
                     _log.info("Truncating %s standards from %d to %d chars for API prompt",
@@ -207,12 +216,19 @@ def _load_standards_text(compiled_dir: Path | None, dimension: str | None) -> st
     return ""
 
 
-def _render_standards_grouped(data: dict) -> str:
+def _render_standards_grouped(data: dict, overrides: dict | None = None) -> str:
     """Render standards as a compact JSON array grouped by principle.
 
     The explicit structure helps local models give attention to ALL principle
     groups instead of fixating on the first ones in a flat list.
+
+    *overrides* is the per-project ``{req_id: {param: value}}`` map produced
+    by :func:`quodeq.core.standards.overrides.load_project_overrides`.  When
+    present, each requirement's text template is resolved before being emitted
+    so that models never receive raw ``{placeholder}`` strings.
     """
+    from quodeq.core.standards.overrides import resolve_requirement_text  # noqa: PLC0415
+
     principles = data.get("principles", [])
     if not principles:
         return ""
@@ -221,7 +237,7 @@ def _render_standards_grouped(data: dict) -> str:
         checklist.append({
             "principle": p.get("name", "Unknown"),
             "requirements": [
-                {"id": r["id"], "rule": r["text"]}
+                {"id": r["id"], "rule": resolve_requirement_text(r, (overrides or {}).get(r["id"]))}
                 for r in p.get("requirements", [])
             ],
         })
@@ -325,7 +341,10 @@ def _run_api_analysis_bridge(
     if source_files is None:
         return
 
-    standards_text = _load_standards_text(cfg.compiled_dir, cfg.dimension)
+    from quodeq.core.standards.overrides import load_project_overrides  # noqa: PLC0415
+
+    overrides = load_project_overrides(work_dir)
+    standards_text = _load_standards_text(cfg.compiled_dir, cfg.dimension, overrides=overrides)
     api_prompt = assemble_api_prompt(
         source_files=source_files,
         standards_text=standards_text,

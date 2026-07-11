@@ -39,6 +39,7 @@ def write_standards_and_instruction(work_dir: Path, dimension: str, content: str
 
 def render_all_standards(
     standards_dir: Path, dimensions: list[str], evaluators_dir: Path | None = None,
+    overrides: dict[str, dict] | None = None,
 ) -> str:
     """Render compact standards for all dimensions, separated by headers.
 
@@ -46,6 +47,7 @@ def render_all_standards(
         standards_dir: Root standards directory containing a ``compiled/`` subdirectory.
         dimensions: Dimension IDs to include (e.g. ``["security", "reliability"]``).
         evaluators_dir: Optional path to custom evaluator JSON files.
+        overrides: Optional per-project threshold overrides as ``{requirement_id: {param: value}}``.
 
     Returns:
         Markdown string with per-dimension sections, or a fallback message
@@ -57,7 +59,7 @@ def render_all_standards(
         return NO_STANDARDS
     sections = []
     for dim in dimensions:
-        compact = render_compact_standards(compiled_dir, dim, evaluators_dir=_eval_dir)
+        compact = render_compact_standards(compiled_dir, dim, evaluators_dir=_eval_dir, overrides=overrides)
         if compact != NO_STANDARDS_FOR_DIM:
             sections.append(f"## {dim.title()}\n\n{compact}")
     return "\n\n".join(sections) if sections else NO_STANDARDS

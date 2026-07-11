@@ -15,7 +15,7 @@ import { createProject } from '../models/project.js';
 import { request, BASE } from './request.js';
 
 export { listDismissedFindings, dismissFinding, restoreFinding, restoreAllFindings, getRescore, deleteFinding, deleteAllFindings, listVerifiedFindings, unverifyFinding } from './findings.js';
-export { listStandards, getStandard, createStandard, updateStandard, deleteStandard, duplicateStandard, listLibrary, listCwes, importFromLibrary, importStandard, exportStandard } from './standards.js';
+export { listStandards, getStandard, createStandard, updateStandard, deleteStandard, duplicateStandard, listLibrary, listCwes, importFromLibrary, importStandard, exportStandard, getStandardsOverrides, putStandardsOverrides } from './standards.js';
 export {
   createAssistantSession, postAssistantMessage,
   applyAssistantAction, rejectAssistantAction, assistantEventsUrl,

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useStandards } from './hooks/useStandards.js';
 import { useVisibleStandards } from './hooks/useVisibleStandards.js';
+import { useStandardsOverrides } from './hooks/useStandardsOverrides.js';
 import StandardsTable from './components/StandardsTable.jsx';
 import StandardEditor from './components/StandardEditor.jsx';
 import ImportModal from './components/ImportModal.jsx';
 import { TermHeader } from '../../components/terminal/index.js';
+import { useAppState } from '../../hooks/useAppState.js';
 
 function useStandardsPageActions(refresh, handleDelete, addVisible, removeVisible) {
   const [view, setView] = useState({ mode: 'list' });
@@ -24,14 +26,14 @@ function useStandardsPageActions(refresh, handleDelete, addVisible, removeVisibl
   };
 }
 
-function StandardsListView({ grouped, loading, error, actions }) {
+function StandardsListView({ grouped, loading, error, actions, customizedCounts }) {
   return (
     <>
       {error && <p className="inline-error inline-error--spaced">{error}</p>}
       {loading ? (
         <div className="standards-loading">Loading standards...</div>
       ) : (
-        <StandardsTable grouped={grouped} actions={actions} />
+        <StandardsTable grouped={grouped} actions={actions} customizedCounts={customizedCounts} />
       )}
     </>
   );
@@ -40,6 +42,8 @@ function StandardsListView({ grouped, loading, error, actions }) {
 export default function StandardsPage() {
   const { grouped, loading, error, refresh, handleDelete, handleDuplicate } = useStandards();
   const { isVisible, toggle, add: addVisible, remove: removeVisible } = useVisibleStandards();
+  const { selectedProject } = useAppState();
+  const { counts: customizedCounts } = useStandardsOverrides(selectedProject);
   const {
     view,
     showImport,
@@ -71,7 +75,7 @@ export default function StandardsPage() {
           <button type="button" className="btn-primary" onClick={handleNewStandard}>+ New Standard</button>
         </div>
       </div>
-      <StandardsListView grouped={grouped} loading={loading} error={error} actions={{ onEdit: handleEdit, onDelete: handleDeleteWithCleanup, onDuplicate: handleDuplicate, isVisible, onToggleVisibility: toggle }} />
+      <StandardsListView grouped={grouped} loading={loading} error={error} actions={{ onEdit: handleEdit, onDelete: handleDeleteWithCleanup, onDuplicate: handleDuplicate, isVisible, onToggleVisibility: toggle }} customizedCounts={customizedCounts} />
       {showImport && <ImportModal onClose={() => setShowImport(false)} onImported={() => { setShowImport(false); refresh(); }} />}
     </div>
   );
