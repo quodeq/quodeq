@@ -57,6 +57,12 @@ def _write_compiled_standards(standards_dir: Path, dim: str, payload: str) -> No
     (compiled / f"{dim}.json").write_text(payload)
 
 
+def _write_project_overrides(src: Path, payload: str) -> None:
+    path = src / ".quodeq" / "standards-overrides.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(payload)
+
+
 @pytest.fixture
 def cache(tmp_path: Path) -> LocalFileBackend:
     return LocalFileBackend(root=tmp_path / "cache")
@@ -258,6 +264,34 @@ class TestProvenanceDrift:
         assert result.misses == []
         assert result.provenance_drift == {}
 
+    def test_reports_standards_drift_when_overrides_change(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        # Threshold overrides fold into the standards hash: entries produced
+        # before a project tuned .quodeq/standards-overrides.json must show
+        # standards drift on reuse — the compiled JSON alone is unchanged.
+        from quodeq.analysis.fingerprint import _hash_standards
+
+        src = tmp_path / "src"
+        files = _write_files(src, {"a.py": "x"})
+        standards_dir = tmp_path / "standards"
+        _write_compiled_standards(standards_dir, "security", '{"rule": "v1"}')
+        config = _make_config(src, standards_dir=standards_dir)
+        pre_override = _hash_standards(standards_dir, "security") or ""
+        self._seed(cache, config, files, provenance={
+            "model_id": "test-model", "standards_hash": pre_override,
+            "prompts_hash": "", "quodeq_version": "",
+        })
+
+        _write_project_overrides(
+            src, '{"version": 1, "overrides": {"S-INJ-1": {"max_lines": 60}}}',
+        )
+        result = classify_files_via_cache(config, "security", files, cache)
+
+        # Reuse still happens (permissive key) but is flagged, not silent.
+        assert result.misses == []
+        assert result.provenance_drift["standards_hash"]["count"] == 1
+
     def test_no_drift_when_provenance_matches(self, tmp_path: Path, cache: LocalFileBackend):
         files = _write_files(tmp_path / "src", {"a.py": "x"})
         config = _make_config(tmp_path / "src", model="same-model")
@@ -424,6 +458,42 @@ class TestPersist:
         assert "prompts_hash" in entry.provenance
         assert "standards_hash" in entry.provenance
         assert "quodeq_version" in entry.provenance
+
+    def test_persisted_provenance_folds_project_overrides(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        # The persisted standards_hash must be the override-aware value —
+        # identical to what classify computes for the same run — or the very
+        # next classify would report phantom standards drift.
+        from quodeq.analysis.fingerprint import _hash_standards
+
+        src = tmp_path / "src"
+        files = _write_files(src, {"a.py": "x"})
+        standards_dir = tmp_path / "standards"
+        _write_compiled_standards(standards_dir, "security", '{"rule": "v1"}')
+        _write_project_overrides(
+            src, '{"version": 1, "overrides": {"S-INJ-1": {"max_lines": 60}}}',
+        )
+        config = _make_config(src, standards_dir=standards_dir, work_dir=tmp_path / "work")
+        miss_keys = {f: build_cache_key_for_file(config, f, "security") for f in files}
+
+        jsonl = tmp_path / "work" / "security_evidence.jsonl"
+        jsonl.parent.mkdir(parents=True, exist_ok=True)
+        jsonl.write_text(
+            json.dumps({"_marker": "file_done", "file": "a.py", "status": "ok"}) + "\n"
+        )
+        persist_dispatch_results(
+            config, "security", miss_files=files,
+            jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
+        )
+
+        entry = cache.get(miss_keys["a.py"])
+        assert entry is not None
+        expected = _hash_standards(standards_dir, "security", src)
+        assert entry.provenance["standards_hash"] == expected
+        assert entry.provenance["standards_hash"] != _hash_standards(
+            standards_dir, "security",
+        )
 
     def test_handles_missing_jsonl(self, tmp_path: Path, cache: LocalFileBackend):
         files = _write_files(tmp_path / "src", {"a.py": "x"})

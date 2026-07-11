@@ -169,6 +169,49 @@ class TestReadAccumulatedSummary:
         assert score is None
         assert files is None
 
+    @patch("quodeq.services._fs_metadata.summarize_dimensions")
+    @patch("quodeq.services._fs_metadata.read_run_data")
+    def test_card_summary_keeps_dims_not_in_latest_config(
+        self, mock_read, mock_summarize, tmp_path, monkeypatch,
+    ):
+        """Dims absent from the latest run's config are KEPT (show all,
+        count all) so the card grade matches the accumulated overview."""
+        from quodeq.core.types import DimensionResult
+        from quodeq.services.ports import RunInfo
+
+        # Bypass the persisted project-summary cache so we observe the fresh
+        # computation (the cache is keyed by project name, not reports_root).
+        monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
+        reports_root = tmp_path / "evaluations"
+        project = "proj"
+        latest_dir = reports_root / project / "run-new"
+        latest_dir.mkdir(parents=True)
+        # Latest run configured only security + reliability.
+        (latest_dir / "dimensions.json").write_text(
+            json.dumps({
+                "schema_version": 1,
+                "dimensions": {"security": {"state": "done"}, "reliability": {"state": "done"}},
+            }),
+            encoding="utf-8",
+        )
+        mock_read.return_value = [
+            DimensionResult(dimension="security", overall_score="8.0", source_file_count=10),
+            DimensionResult(dimension="reliability", overall_score="7.0"),
+            DimensionResult(dimension="clean-architecture", overall_score="4.0"),
+        ]
+        mock_summarize.return_value = type(
+            "S", (), {"overall_grade": "A", "numeric_average": 7.5},
+        )()
+
+        runs = [RunInfo(run_id="run-new", date_iso="2026-01-02", date_label="Jan 02")]
+        _read_accumulated_summary(reports_root, project, runs)
+
+        # summarize_dimensions must see ALL dims, including the one missing
+        # from the latest config.
+        called_dims = mock_summarize.call_args[0][0]
+        names = sorted(d.dimension for d in called_dims)
+        assert names == ["clean-architecture", "reliability", "security"], names
+
     def test_project_card_reflects_overlaid_sql_grades_and_loaded_params(
         self, tmp_path, monkeypatch,
     ):

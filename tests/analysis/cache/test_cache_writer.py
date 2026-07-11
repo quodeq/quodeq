@@ -124,6 +124,48 @@ def test_cache_writer_records_provenance_and_content_hash(tmp_path):
     assert prov["quodeq_version"] == (quodeq.__version__ or "")
 
 
+def test_cache_writer_provenance_folds_project_overrides(tmp_path):
+    """The written standards_hash is the override-aware value (folding
+    .quodeq/standards-overrides.json under src_root), matching what
+    classify-time provenance computes — otherwise every later run would
+    report phantom standards drift on entries this writer produced."""
+    from quodeq.analysis.cache.cache_writer import build_cache_writer
+    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
+    from quodeq.analysis.cache.local import LocalFileBackend
+    from quodeq.analysis.fingerprint import _hash_standards
+
+    src_root = tmp_path / "src"
+    (src_root / ".quodeq").mkdir(parents=True)
+    (src_root / "Foo.kt").write_text("class Foo")
+    (src_root / ".quodeq" / "standards-overrides.json").write_text(
+        '{"version": 1, "overrides": {"F-ADP-1": {"max_lines": 60}}}'
+    )
+    standards_dir = tmp_path / "standards"
+    (standards_dir / "compiled").mkdir(parents=True)
+    (standards_dir / "compiled" / "flexibility.json").write_text('{"rule": "v1"}')
+
+    cache_root = tmp_path / "cache"
+    write = build_cache_writer(
+        cache_root=cache_root,
+        src_root=src_root,
+        standards_dir=standards_dir,
+        dimension="flexibility",
+        model_id="sonnet",
+        language="kotlin",
+    )
+    write("Foo.kt", [])
+
+    config = _make_config(src_root, standards_dir=standards_dir, model="sonnet")
+    key = build_cache_key_for_file(config, "Foo.kt", "flexibility")
+    entry = LocalFileBackend(root=cache_root).get(key)
+    assert entry is not None
+    expected = _hash_standards(standards_dir, "flexibility", src_root)
+    assert entry.provenance["standards_hash"] == expected
+    assert entry.provenance["standards_hash"] != _hash_standards(
+        standards_dir, "flexibility",
+    )
+
+
 def test_entry_is_self_describing_for_future_key_migration(tmp_path):
     """The schema-3 self-describing guarantee: an entry stores EVERY field its
     key was computed from (content hash, path, dimension, language), so a

@@ -58,12 +58,19 @@ def _dismissed_key_for_violation(v: dict) -> tuple:
     return (req, raw_file, 0)
 
 
-def _deleted_key_for_violation(v: dict, dimension: str) -> tuple:
-    """Build a (dimension, principle, file) suppression key from a violation dict."""
+def _deleted_key_for_violation(v: dict, dimension: str, principle: str | None = None) -> tuple:
+    """Build a (dimension, principle, file) suppression key from a violation dict.
+
+    Parsed eval violations are camelCase (``practiceId``); ``principle`` is
+    kept as a fallback for pre-camelCase dicts. Principle-group entries carry
+    no principle field at all, so callers pass the group name as *principle*.
+    """
     raw_file = v.get("file", "")
     if v.get("line") is None and ":" in raw_file:
         raw_file = raw_file.rsplit(":", 1)[0]
-    return (dimension or "", v.get("principle", "") or "", raw_file)
+    if principle is None:
+        principle = v.get("practiceId") or v.get("principle") or ""
+    return (dimension or "", principle or "", raw_file)
 
 
 def _filter_dismissed_from_result(
@@ -84,10 +91,11 @@ def _filter_dismissed_from_result(
             ]
         for p in result.get("principles", []):
             if "violations" in p:
+                group_principle = p.get("name", "") or ""
                 p["violations"] = [
                     v for v in p["violations"]
                     if _dismissed_key_for_violation(v) not in dkeys
-                    and (not delkeys or _deleted_key_for_violation(v, dimension) not in delkeys)
+                    and (not delkeys or _deleted_key_for_violation(v, dimension, group_principle) not in delkeys)
                 ]
     return result
 
@@ -118,6 +126,51 @@ def _try_evidence_formats(
     return None
 
 
+def _apply_rescored_grades(
+    result: "dict[str, Any] | None", base: Path, project: str, run_id: str, dimension: str,
+) -> "dict[str, Any] | None":
+    """Overlay the project-wide dismiss-adjusted score/grade onto a parsed eval dict.
+
+    ``parse_eval_from_json`` carries the frozen eval-time overall + principle
+    grades (in ``principleGrades`` / ``principles``). After dismissed and
+    deleted violations are filtered from the lists, those grades are stale --
+    they still describe the pre-dismiss scan. Recompute them with the SAME
+    ``scored_run_dimensions`` transform the accumulated overview, the per-run
+    explorer, and the dashboard selected run use, then substitute the
+    dimension's overall score/grade (the ``isOverall`` entry) and its
+    per-principle score/grade so the dimension detail agrees with every other
+    view. A no-op when there are no active dismissals/deletions.
+    """
+    if not isinstance(result, dict):
+        return result
+    # No active project-wide filters -> the eval-time grades are already correct;
+    # skip the extra run read. base.parent is the project dir.
+    if not _dismissed_keys(base.parent) and not _deleted_keys(base.parent):
+        return result
+    from quodeq.services.scoring import scored_run_dimensions  # noqa: PLC0415
+
+    reports_root = base.parent.parent
+    try:
+        rescored = scored_run_dimensions(reports_root, project, run_id)
+    except (ValueError, FileNotFoundError, OSError):
+        return result
+    dim = next((d for d in rescored if (d.dimension or "") == dimension), None)
+    if dim is None:
+        return result
+
+    principle_grade = {p.principle: (p.score, p.grade) for p in dim.principles}
+    for pg in result.get("principleGrades", []):
+        if pg.get("isOverall") or pg.get("principle") == "Overall":
+            pg["score"] = dim.overall_score
+            pg["grade"] = dim.overall_grade
+        elif pg.get("principle") in principle_grade:
+            pg["score"], pg["grade"] = principle_grade[pg["principle"]]
+    for p in result.get("principles", []):
+        if p.get("name") in principle_grade:
+            p["score"], p["grade"] = principle_grade[p["name"]]
+    return result
+
+
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
     options: _ResolveOptions | None = None,
@@ -136,10 +189,11 @@ def resolve_dimension_eval(
 
     eval_path = base / "evaluation" / f"{dimension}.json"
     if _exists(eval_path):
-        return _filter_dismissed_from_result(
+        filtered = _filter_dismissed_from_result(
             parse_eval_from_json(eval_path, project, run_id, dimension, compiled_dir=compiled_dir),
             dkeys, delkeys, dimension,
         )
+        return _apply_rescored_grades(filtered, base, project, run_id, dimension)
 
     markdown_path = base / "evaluation" / f"{dimension}_eval.md"
     if _exists(markdown_path):

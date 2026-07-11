@@ -221,6 +221,36 @@ def sync_index_for_run(db: sqlite3.Connection, run_dir: Path) -> None:
         _sync_one_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
 
 
+def sync_project_dates(db: sqlite3.Connection, project_dir: Path, project_uuid: str) -> None:
+    """Mtime-gated upsert of one project's runs' ``started_at`` into the index.
+
+    Lighter than :func:`sync_index` / ``_sync_one_run``: refreshes only rows whose
+    ``status.json`` mtime changed, and skips stale-promotion (the run date needs
+    only the immutable ``started_at``). Runs without ``status.json`` are left to
+    the caller's ``parse_run_date`` fallback. The mtime cache is keyed by
+    ``(project_uuid, run_id)`` so it matches the row regardless of ``job_id``.
+    """
+    if not project_dir.is_dir():
+        return
+    with db:
+        for run_dir in project_dir.iterdir():
+            if not run_dir.is_dir() or run_dir.name.startswith("."):
+                continue
+            if not (run_dir / "status.json").exists():
+                continue
+            disk_mtime = _status_mtime_ns(run_dir)
+            cached = db.execute(
+                "SELECT status_mtime FROM runs WHERE project_uuid=? AND run_id=?",
+                (project_uuid, run_dir.name),
+            ).fetchone()
+            if cached is None or cached[0] != disk_mtime:
+                try:
+                    _upsert_from_status(
+                        db, run_dir, project_uuid=project_uuid, run_id=run_dir.name)
+                except Exception:
+                    _logger.warning("date-sync upsert failed for %s", run_dir, exc_info=True)
+
+
 # ---------------------------------------------------------------------------
 # Public query API
 # ---------------------------------------------------------------------------
@@ -241,6 +271,22 @@ def list_runs(db: sqlite3.Connection, *, limit: int = 0) -> list[RunRow]:
     if limit > 0:
         sql += f" LIMIT {int(limit)}"
     return [_row_to_runrow(r) for r in db.execute(sql).fetchall()]
+
+
+def list_runs_for_project(
+    db: sqlite3.Connection, project_uuid: str, *, limit: int = 0,
+) -> list[RunRow]:
+    """Return one project's runs ordered by started_at DESC. limit=0 = no limit.
+
+    Native indexed query — the replacement for walking the project's run dirs.
+    """
+    sql = (
+        f"SELECT {_LIST_COLS} FROM runs WHERE project_uuid = ? "
+        "ORDER BY started_at DESC"
+    )
+    if limit > 0:
+        sql += f" LIMIT {int(limit)}"
+    return [_row_to_runrow(r) for r in db.execute(sql, (project_uuid,)).fetchall()]
 
 
 def get_run(db: sqlite3.Connection, job_id: str) -> RunRow | None:

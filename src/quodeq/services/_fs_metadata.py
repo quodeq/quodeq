@@ -67,31 +67,64 @@ def _read_accumulated_summary(
 ) -> tuple[str | None, float | None, int | None]:
     """Compute accumulated grade and score across all runs. Returns (grade, score, files).
 
-    ``read_run_data`` overlays the SQL grade tables for event-log runs, so the
-    project-card summary reflects dismisses and any applied grade formula.
+    The card summary applies the same project-wide dismiss/delete rescore as
+    every other read path (see the ``_rescore_dimension`` step below), so the
+    repositories-screen grade agrees with the Overview / explorer / trend.
     *params* (loaded from the saved formula when None) keeps the aggregate
     threshold labels and dimension weights consistent with the dashboard.
     """
     if params is None:
         from quodeq.services import grade_formula  # noqa: PLC0415
         params = grade_formula.load_params()
-    try:
-        latest_by_dim: dict[str, object] = {}
-        files_count: int | None = None
-        for run in runs:
-            dims = read_run_data(reports_root, entry_name, run.run_id)
-            for d in dims:
-                if d.dimension and d.dimension not in latest_by_dim:
-                    latest_by_dim[d.dimension] = d
-                if files_count is None and d.source_file_count:
-                    files_count = d.source_file_count
-        acc_dims = list(latest_by_dim.values())
-        if not acc_dims:
-            return None, None, files_count
-        summary = summarize_dimensions(acc_dims, params)
-        return summary.overall_grade, summary.numeric_average, files_count
-    except (OSError, json.JSONDecodeError, KeyError):
-        return None, None, None
+
+    from quodeq.services.score_cache import (  # noqa: PLC0415
+        accumulated_cache_version, cached_project_summary, per_run_versions,
+    )
+    project_dir = reports_root / entry_name
+    run_versions = per_run_versions(
+        project_dir, entry_name, params, [(r.run_id, r.status) for r in runs])
+    version = accumulated_cache_version(project_dir, params, run_versions, as_of=None)
+
+    def _compute() -> dict:
+        try:
+            latest_by_dim: dict[str, object] = {}
+            files_count: int | None = None
+            for run in runs:
+                dims = read_run_data(reports_root, entry_name, run.run_id)
+                for d in dims:
+                    if d.dimension and d.dimension not in latest_by_dim:
+                        latest_by_dim[d.dimension] = d
+                    if files_count is None and d.source_file_count:
+                        files_count = d.source_file_count
+            acc_dims = list(latest_by_dim.values())
+            # Apply the project-wide dismiss/delete rescore so the card agrees
+            # with every other read path (detail/explorer/dashboard/trend all
+            # route through ``scored_run_dimensions``, i.e. read_run_data +
+            # ``_rescore_dimension``). ``read_run_data`` returns the raw scan;
+            # its SQL grade overlay reflects dismisses only when the run is
+            # freshly projected, and NEVER reflects deletions. Without this the
+            # project-card grade kept a stale, too-low value for any project
+            # with deletions (or dismissals on a not-yet-reprojected run) —
+            # diverging from the score shown everywhere else.
+            from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
+            from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
+            from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
+            dismissed = dismissed_keys(project_dir)
+            deleted = deleted_keys(project_dir)
+            if dismissed or deleted:
+                acc_dims = [
+                    _rescore_dimension(d, dismissed, deleted, params=params)
+                    for d in acc_dims
+                ]
+            if not acc_dims:
+                return {"grade": None, "score": None, "files": files_count}
+            summary = summarize_dimensions(acc_dims, params)
+            return {"grade": summary.overall_grade, "score": summary.numeric_average, "files": files_count}
+        except (OSError, json.JSONDecodeError, KeyError):
+            return {"grade": None, "score": None, "files": None}
+
+    payload = cached_project_summary(entry_name, version, _compute)
+    return payload["grade"], payload["score"], payload["files"]
 
 
 def _read_language_stats(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> dict[str, int]:

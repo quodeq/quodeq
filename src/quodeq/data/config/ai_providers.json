@@ -32,7 +32,16 @@
     "supports_turns": true,
     "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
     "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
-    "env_remove": ["CLAUDECODE"]
+    "env_remove": ["CLAUDECODE"],
+    "assistant": {
+      "assistant_args": ["--print", "--output-format", "stream-json", "--verbose",
+                         "--include-partial-messages",
+                         "--disallowedTools", "Bash Edit Write NotebookEdit WebFetch WebSearch",
+                         "--allowedTools", "mcp__quodeq-assistant", "--strict-mcp-config"],
+      "resume_style": "flag-resume",
+      "session_id_source": "preassign",
+      "system_prompt_style": "argv-append"
+    }
   },
   "codex": {
     "type": "cli",
@@ -41,13 +50,22 @@
     "cmd_subcommand": "exec",
     "base_args": "--json --dangerously-bypass-approvals-and-sandbox",
     "prompt_style": "positional",
-    "mcp_style": "cli-register",
+    "mcp_style": "config-arg",
     "supports_tools": false,
     "supports_budget": false,
     "supports_turns": false,
     "mcp_permission_args": [],
     "env_set_if_missing": {},
-    "env_remove": []
+    "env_remove": [],
+    "requires_external_sandbox": true,
+    "assistant": {
+      "assistant_args": ["--json", "--dangerously-bypass-approvals-and-sandbox",
+                         "--disable", "shell_tool", "-c", "tools.web_search=false",
+                         "--skip-git-repo-check"],
+      "resume_style": "exec-resume",
+      "session_id_source": "parse-jsonl",
+      "system_prompt_style": "message-prefix"
+    }
   },
   "gemini": {
     "type": "cli",
@@ -64,7 +82,14 @@
     "supports_budget": false,
     "supports_turns": false,
     "env_set_if_missing": {},
-    "env_remove": []
+    "env_remove": [],
+    "assistant": {
+      "assistant_args": ["--output-format", "stream-json", "--approval-mode", "plan",
+                         "--allowed-mcp-server-names", "quodeq-assistant"],
+      "resume_style": "gemini-resume",
+      "session_id_source": "preassign",
+      "system_prompt_style": "message-prefix"
+    }
   },
   "openrouter": {
     "type": "api",
@@ -72,6 +97,7 @@
     "model": "baidu/cobuddy:free",
     "api_base": "https://openrouter.ai/api/v1",
     "api_key_env": "OPENROUTER_API_KEY",
+    "api_key_required": true,
     "browse_url": "https://openrouter.ai/models"
   },
   "custom": {

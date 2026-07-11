@@ -33,6 +33,8 @@
  * @property {string|null}   [exitReason]        - per-dim or run-level exit signal.
  *   Values: "done" (success), "time_limit", "failure_streak", "cancelled",
  *   "error", or null/missing (legacy, treated as "done" by the UI).
+ * @property {number}        [dismissedCount]    - re-found violations hidden by the
+ *   project-level dismissed filter (dashboard run view). Missing when zero.
  *
  * @typedef {Object} DimensionEval
  * @property {string}           dimension

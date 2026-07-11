@@ -39,6 +39,7 @@ export function LevelInfoPanel({ levelInfo }) {
  * @returns {object|null} { title, lines, hint, detailAction }
  */
 export function computeLevelInfo(scene, nav, projectName, onNavigate, navRef) {
+  if (!scene) return null;
   if (nav.depth === 0) {
     const clusterStars = nav.clusterCx != null
       ? scene.stars.filter(s => s._clusterCx === nav.clusterCx && s._clusterCy === nav.clusterCy)

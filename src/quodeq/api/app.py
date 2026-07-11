@@ -109,6 +109,9 @@ def create_app(
         app.config["STANDARDS_COMPILED_DIR"] = str(paths.standards_dir / "compiled")
         app.config["STANDARDS_DIMENSIONS_FILE"] = str(paths.dimensions_file)
 
+    if "ASSISTANT_DB_PATH" not in app.config:
+        app.config["ASSISTANT_DB_PATH"] = str(Path.home() / ".quodeq" / "assistant.db")
+
     if api_key is None:
         _logger.warning(
             "QUODEQ_API_KEY is not set — API restricted to localhost only. "
@@ -116,6 +119,11 @@ def create_app(
         )
 
     configure_security(app, store, api_key)
+    from quodeq.api._compression import configure_compression
+    configure_compression(app)
+    app.config["QUODEQ_API_KEY"] = api_key
+    from quodeq.shared.utils import get_action_api_host as _gah
+    app.config["QUODEQ_BIND_HOST"] = _gah()
     log_buffer, verbose = _configure_logging(app)
     _register_health_route(app, verbose)
     register_all_routes(app, provider, eval_store, static_dist, log_buffer)

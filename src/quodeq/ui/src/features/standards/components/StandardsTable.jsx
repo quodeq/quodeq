@@ -136,7 +136,7 @@ function isDeletableStandard(type) {
   return type !== STANDARD_TYPES.BUILTIN && type !== STANDARD_TYPES.QUODEQ;
 }
 
-function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onToggleVisibility }) {
+function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onToggleVisibility, customizedCounts }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [downloadError, setDownloadError] = useState(null);
@@ -161,6 +161,11 @@ function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onTog
         </div>
         <div className="standards-cell standards-cell--base">
           <span className={`standards-base-pill standards-base-pill--${standard.type}`}>{baseLabel}</span>
+          {customizedCounts?.[standard.id] > 0 && (
+            <span className="standards-customized-badge">
+              {customizedCounts[standard.id]} customized
+            </span>
+          )}
         </div>
         <div className="standards-cell standards-cell--num">{principleCount}</div>
         <div className="standards-cell standards-cell--num">{requirementCount}</div>
@@ -209,7 +214,7 @@ function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onTog
   );
 }
 
-export default function StandardsTable({ grouped, actions }) {
+export default function StandardsTable({ grouped, actions, customizedCounts }) {
   const { onEdit, onDelete, onDuplicate, isVisible, onToggleVisibility } = actions;
   const all = useMemo(
     () => [...(grouped.builtin || []), ...(grouped.quodeq || []), ...(grouped.community || []), ...(grouped.custom || [])],
@@ -244,6 +249,7 @@ export default function StandardsTable({ grouped, actions }) {
             onDelete={onDelete}
             onDuplicate={onDuplicate}
             onToggleVisibility={onToggleVisibility}
+            customizedCounts={customizedCounts}
           />
         ))}
       </div>

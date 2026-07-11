@@ -1,0 +1,716 @@
+import json
+import time
+
+import pytest
+from flask import Flask
+
+from quodeq.api.assistant_routes import register_assistant_routes
+from quodeq.data.sqlite.assistant_repository import AssistantRepository
+
+_VALID_STANDARD = {
+    "id": "api-errors", "name": "API Error Contract", "description": "d",
+    "weight": 1.0, "source": "assistant",
+    "principles": [{"name": "P1", "description": "", "requirements": [
+        {"id": "r1", "text": "Endpoints return RFC7807", "description": "", "refs": []},
+    ]}],
+}
+
+
+@pytest.fixture()
+def app(tmp_path, monkeypatch):
+    # deterministic provider catalog for tests
+    # NOTE: real get_provider_configs() (quodeq.llm_bridge / analysis._provider_cache)
+    # returns dict[str, dict] keyed by provider id, not {"providers": [...]}.
+    # See src/quodeq/analysis/_provider_cache.py:67 and
+    # src/quodeq/data/config/ai_providers.json (top-level keys are provider ids).
+    catalog = {
+        "ollama": {"type": "api", "api_base": "http://localhost:11434/v1"},
+        "claude": {"type": "cli"},
+        "gemini": {"type": "cli"},
+    }
+    monkeypatch.setattr(
+        "quodeq.api.assistant_routes.get_provider_configs", lambda: catalog
+    )
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.config["ASSISTANT_DB_PATH"] = str(tmp_path / "assistant.db")
+    app.config["STANDARDS_EVALUATORS_DIR"] = str(tmp_path / "evaluators")
+    app.config["STANDARDS_COMPILED_DIR"] = str(tmp_path / "compiled")
+    app.config["STANDARDS_DIMENSIONS_FILE"] = str(tmp_path / "dimensions.json")
+    register_assistant_routes(app)
+    return app
+
+
+@pytest.fixture()
+def client(app):
+    return app.test_client()
+
+
+def _repo(app):
+    return AssistantRepository(app.config["ASSISTANT_DB_PATH"])
+
+
+def test_create_session(client):
+    resp = client.post("/api/assistant/sessions", json={"provider": "ollama", "model": "m"})
+    assert resp.status_code == 201
+    assert resp.get_json()["sessionId"]
+
+
+def test_create_session_rejects_unknown_provider(client):
+    assert client.post("/api/assistant/sessions", json={"provider": "nope"}).status_code == 400
+
+
+def test_create_session_accepts_cli_provider(client):
+    resp = client.post("/api/assistant/sessions", json={"provider": "claude", "model": "sonnet"})
+    assert resp.status_code == 201
+    assert resp.get_json()["sessionId"]
+
+
+def test_cli_provider_not_busy_gated(client, app, monkeypatch):
+    # even with a running job, a CLI provider session accepts a message (no single-slot contention)
+    monkeypatch.setattr("quodeq.api._assistant_helpers.local_provider_busy", lambda p: False)
+    monkeypatch.setattr("quodeq.api.assistant_routes.run_turn", lambda *a, **k: None)
+    sid = client.post("/api/assistant/sessions", json={"provider": "claude"}).get_json()["sessionId"]
+    resp = client.post(f"/api/assistant/sessions/{sid}/messages", json={"text": "hi"})
+    assert resp.status_code == 202
+
+
+def test_post_message_spawns_turn_and_streams(client, app, monkeypatch):
+    # The stream now stays open past a turn's `done` (so 2nd+ turns still
+    # reach the browser), so bound the idle backstop to keep this consuming
+    # test from blocking the full 600s window once the turn's frames drain.
+    monkeypatch.setattr("quodeq.api._assistant_helpers._POLL_SECONDS", 0.001)
+    monkeypatch.setattr("quodeq.api._assistant_helpers._IDLE_LIMIT", 30)
+
+    def fake_run_turn(request, *, repository, tool_ctx, **kw):
+        repository.add_message(request.session_id, "user", request.text)
+        repository.append_event(request.session_id, {"type": "token", "text": "hi"})
+        repository.append_event(request.session_id, {"type": "done"})
+
+    monkeypatch.setattr("quodeq.api.assistant_routes.run_turn", fake_run_turn)
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
+    resp = client.post(f"/api/assistant/sessions/{sid}/messages", json={"text": "hello"})
+    assert resp.status_code == 202
+    time.sleep(0.3)  # let the daemon thread finish
+    stream = client.get(f"/api/assistant/sessions/{sid}/events?after=0")
+    body = stream.get_data(as_text=True)
+    assert '"type": "token"' in body
+    assert '"type": "done"' in body
+
+
+def test_event_frames_keeps_yielding_past_a_done_frame(app, monkeypatch):
+    # Regression for the 2nd-turn hang: event_frames must NOT terminate on a
+    # `done` frame. A turn's done is a marker, not the end of the stream — an
+    # event appended AFTER a done (i.e. the next turn) must still be yielded so
+    # one SSE connection serves the whole session.
+    monkeypatch.setattr("quodeq.api._assistant_helpers._POLL_SECONDS", 0.001)
+    monkeypatch.setattr("quodeq.api._assistant_helpers._IDLE_LIMIT", 40)
+    from quodeq.api._assistant_helpers import event_frames
+
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    # Turn 1: a token then a done marker.
+    repo.append_event("s1", {"type": "token", "text": "A"})
+    repo.append_event("s1", {"type": "done"})
+
+    gen = event_frames(repo, "s1", 0)
+    frames = []
+    # Drain turn 1 (skipping heartbeat sentinels), then append turn 2's frames
+    # and confirm the SAME generator delivers them — proving it did not stop
+    # on the first done.
+    appended_turn2 = False
+    for item in gen:
+        if item is None:
+            if not appended_turn2:
+                repo.append_event("s1", {"type": "token", "text": "B"})
+                repo.append_event("s1", {"type": "done"})
+                appended_turn2 = True
+            continue
+        _seq, frame = item
+        frames.append(frame)
+        # Stop once we've seen turn 2's content delivered past turn 1's done.
+        if frame.get("type") == "token" and frame.get("text") == "B":
+            break
+
+    types_texts = [(f.get("type"), f.get("text")) for f in frames]
+    assert ("token", "A") in types_texts
+    # A done was yielded (turn marker) but did NOT terminate the generator...
+    assert ("done", None) in types_texts
+    # ...because turn 2's token, appended AFTER that done, still arrived.
+    assert ("token", "B") in types_texts
+
+
+def test_events_stream_heartbeats_while_idle(client, monkeypatch):
+    # No message ever posted -> no rows to replay. With small _POLL_SECONDS/
+    # _IDLE_LIMIT the stream must emit repeated ":keepalive" comments (not
+    # just the one at open) instead of hanging until the idle limit, proving
+    # event_frames yields a heartbeat sentinel on each idle tick.
+    monkeypatch.setattr("quodeq.api._assistant_helpers._POLL_SECONDS", 0.001)
+    monkeypatch.setattr("quodeq.api._assistant_helpers._IDLE_LIMIT", 5)
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
+    stream = client.get(f"/api/assistant/sessions/{sid}/events?after=0")
+    body = stream.get_data(as_text=True)
+    assert body.count(":keepalive") >= 2
+
+
+def test_events_stream_emits_heartbeat_data_frame_on_sustained_idle(client, monkeypatch):
+    # A slow local model can go 60s+ without a data frame. EventSource ignores
+    # ":keepalive" SSE comments, so the browser's inactivity timer never
+    # resets on comments alone. The generator must also emit a real
+    # {"type": "heartbeat"} DATA frame on a throttled cadence (every 20th
+    # idle tick == ~5s at the real _POLL_SECONDS) so the client sees liveness,
+    # while a final "done" frame still terminates the stream normally.
+    monkeypatch.setattr("quodeq.api._assistant_helpers._POLL_SECONDS", 0.001)
+    monkeypatch.setattr("quodeq.api._assistant_helpers._IDLE_LIMIT", 100)
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
+    stream = client.get(f"/api/assistant/sessions/{sid}/events?after=0")
+    body = stream.get_data(as_text=True)
+    assert '"type": "heartbeat"' in body
+    assert body.count(":keepalive") >= 2
+
+
+def test_idle_limit_is_a_600s_safety_cap_not_a_60s_timeout():
+    # A legitimate turn (cold-loading local 26B model, or a CLI provider near
+    # its ~500s read timeout) can run minutes without a done/error frame yet
+    # still be alive. run_turn always writes a terminal done/error frame on
+    # completion, so event_frames already exits correctly then; _IDLE_LIMIT
+    # only guards against a turn that dies without ever emitting one (e.g. a
+    # crashed daemon thread), so it must be generous, not a tight timeout.
+    from quodeq.api import _assistant_helpers
+    assert _assistant_helpers._IDLE_LIMIT == 2400
+
+
+def test_turn_lock_is_freed_when_setup_raises(client, app, monkeypatch):
+    # If build_tool_context (or anything else between the lock `add` and the
+    # worker thread starting) raises, the session's slot must still be freed
+    # -- otherwise every future POST to this session 409s forever.
+    calls = {"n": 0}
+
+    def _boom(*_a, **_kw):
+        calls["n"] += 1
+        raise RuntimeError("setup exploded")
+
+    monkeypatch.setattr("quodeq.api.assistant_routes.build_tool_context", _boom)
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
+
+    # TESTING=True propagates unhandled exceptions to the test client instead
+    # of converting them to a 500 response -- assert the exception surfaces
+    # (mirroring the real 500 a caller would get), not a canned status code.
+    with pytest.raises(RuntimeError, match="setup exploded"):
+        client.post(f"/api/assistant/sessions/{sid}/messages", json={"text": "hi"})
+    assert calls["n"] == 1
+
+    # The slot must have been freed -- a second POST must NOT see a stale 409.
+    with pytest.raises(RuntimeError, match="setup exploded"):
+        client.post(f"/api/assistant/sessions/{sid}/messages", json={"text": "hi again"})
+    assert calls["n"] == 2
+
+
+def test_post_message_unknown_session_404(client):
+    assert client.post("/api/assistant/sessions/nope/messages",
+                       json={"text": "x"}).status_code == 404
+
+
+def test_local_provider_ignores_request_api_base(client, app, monkeypatch):
+    captured = {}
+
+    def fake_run_turn(request, *, repository, tool_ctx, **kw):
+        captured["api_base"] = request.api_base
+        captured["api_key"] = request.api_key
+        repository.append_event(request.session_id, {"type": "done"})
+
+    monkeypatch.setattr("quodeq.api.assistant_routes.run_turn", fake_run_turn)
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
+    resp = client.post(
+        f"/api/assistant/sessions/{sid}/messages",
+        json={"text": "hello", "apiBase": "http://evil.internal/v1", "apiKey": "leaked"},
+    )
+    assert resp.status_code == 202
+    time.sleep(0.3)
+    assert captured["api_base"] == "http://localhost:11434/v1"
+    assert captured["api_key"] is None
+
+
+def test_non_fixed_provider_also_ignores_request_api_base(client, app, monkeypatch):
+    # SSRF guard: even a genuinely caller-defined provider (custom/openrouter)
+    # must take api_base from the SERVER catalog, never the request body, so a
+    # request can't redirect the turn's HTTP at an internal host.
+    catalog = {"openrouter": {"type": "api", "api_base": "https://openrouter.ai/api/v1"}}
+    monkeypatch.setattr("quodeq.api.assistant_routes.get_provider_configs", lambda: catalog)
+    captured = {}
+
+    def fake_run_turn(request, *, repository, tool_ctx, **kw):
+        captured["api_base"] = request.api_base
+        repository.append_event(request.session_id, {"type": "done"})
+
+    monkeypatch.setattr("quodeq.api.assistant_routes.run_turn", fake_run_turn)
+    monkeypatch.setattr("quodeq.api._assistant_helpers.local_provider_busy", lambda p: False)
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "openrouter", "model": "m"}).get_json()["sessionId"]
+    resp = client.post(
+        f"/api/assistant/sessions/{sid}/messages",
+        json={"text": "hi", "apiBase": "http://169.254.169.254/latest/meta-data/"},
+    )
+    assert resp.status_code == 202
+    time.sleep(0.3)
+    assert captured["api_base"] == "https://openrouter.ai/api/v1"
+
+
+def test_create_session_resolves_run_from_project_and_run_id(client, app, monkeypatch, tmp_path):
+    # a resolver stub standing in for the real services lookup
+    run_dir = tmp_path / "proj-uuid" / "run-9"
+    run_dir.mkdir(parents=True)
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.resolve_run_location",
+        lambda project_id, run_id: (str(run_dir), "/src/selectives-android"),
+    )
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.repo_attach_info",
+        lambda project_id: ("/src/selectives-android", "ok"),
+    )
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "projectId": "selectives", "runId": "run-9"})
+    assert resp.status_code == 201
+    sid = resp.get_json()["sessionId"]
+    from quodeq.data.sqlite.assistant_repository import AssistantRepository
+    sess = AssistantRepository(app.config["ASSISTANT_DB_PATH"]).get_session(sid)
+    assert sess["run_id"] == str(run_dir)
+    assert sess["project_uuid"] == "/src/selectives-android"
+    assert sess["project_id"] == "selectives"
+
+
+def test_create_session_stores_project_id_without_run(client, app):
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "projectId": "selectives"})
+    assert resp.status_code == 201
+    sid = resp.get_json()["sessionId"]
+    from quodeq.data.sqlite.assistant_repository import AssistantRepository
+    sess = AssistantRepository(app.config["ASSISTANT_DB_PATH"]).get_session(sid)
+    assert sess["project_id"] == "selectives"
+    # No runId supplied → run stays unscoped. Detail tools read the accumulated
+    # (per-dimension-latest) composition via project_id, not a single run.
+    assert sess["run_id"] is None
+
+
+def test_client_supplied_rundir_repo_root_are_ignored(client, app, monkeypatch):
+    # Client-supplied runDir/repoRoot must NOT be stored verbatim -- they'd
+    # flow to the MCP subprocess's --run-dir/--repo-root with no path jail,
+    # giving arbitrary server-side file access. Without projectId/runId the
+    # session must stay unscoped, not adopt the raw client values.
+    monkeypatch.setattr("quodeq.api._assistant_helpers.resolve_run_location",
+                        lambda *a: (_ for _ in ()).throw(AssertionError("should not resolve")))
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "runDir": "/explicit/run", "repoRoot": "/explicit/repo"})
+    assert resp.status_code == 201
+    sid = resp.get_json()["sessionId"]
+    from quodeq.data.sqlite.assistant_repository import AssistantRepository
+    sess = AssistantRepository(app.config["ASSISTANT_DB_PATH"]).get_session(sid)
+    assert sess["run_id"] != "/explicit/run"
+    assert sess["project_uuid"] != "/explicit/repo"
+    assert sess["run_id"] is None
+    assert sess["project_uuid"] is None
+
+
+def test_resolve_run_location_rejects_path_traversal(monkeypatch, tmp_path):
+    # Evaluations root with a real run inside it, plus a sibling dir OUTSIDE
+    # the root that a "../.." project id could otherwise reach.
+    evals = tmp_path / "evaluations"
+    (evals / "proj" / "run-1").mkdir(parents=True)
+    outside = tmp_path / "outside" / "run-1"
+    outside.mkdir(parents=True)
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.get_evaluations_dir", lambda: str(evals)
+    )
+    from quodeq.api._assistant_helpers import resolve_run_location
+    # A traversal project id that would escape the root must NOT resolve, even
+    # though the escaped target ("../outside/run-1") exists on disk.
+    assert resolve_run_location("../outside", "run-1") == (None, None)
+    assert resolve_run_location("../..", "outside") == (None, None)
+    # Sanity: a legit project id still resolves inside the root.
+    run_dir, _ = resolve_run_location("proj", "run-1")
+    assert run_dir == str((evals / "proj" / "run-1").resolve())
+
+
+def test_resolve_repo_root_returns_local_working_copy(monkeypatch, tmp_path):
+    evals = tmp_path / "evaluations"
+    (evals / "proj").mkdir(parents=True)
+    repo_dir = tmp_path / "src" / "client-app"
+    repo_dir.mkdir(parents=True)
+    (evals / "proj" / "repository_info.json").write_text(
+        json.dumps({"path": str(repo_dir)}), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.get_evaluations_dir", lambda: str(evals)
+    )
+    from quodeq.api._assistant_helpers import resolve_repo_root
+    assert resolve_repo_root("proj") == str(repo_dir)
+
+
+def test_resolve_repo_root_rejects_urls_and_missing_dirs(monkeypatch, tmp_path):
+    # Online projects record a URL as their path; moved repos record a dir
+    # that no longer exists. Neither is a readable working copy, so the
+    # session must stay detached rather than carry a bogus repo root.
+    evals = tmp_path / "evaluations"
+    for name, path in (
+        ("online", "https://github.com/acme/app"),
+        ("ssh", "git@github.com:acme/app.git"),
+        ("moved", str(tmp_path / "gone")),
+    ):
+        (evals / name).mkdir(parents=True)
+        (evals / name / "repository_info.json").write_text(
+            json.dumps({"path": path}), encoding="utf-8"
+        )
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.get_evaluations_dir", lambda: str(evals)
+    )
+    from quodeq.api._assistant_helpers import resolve_repo_root
+    assert resolve_repo_root("online") is None
+    assert resolve_repo_root("ssh") is None
+    assert resolve_repo_root("moved") is None
+    assert resolve_repo_root("nonexistent") is None
+
+
+def test_resolve_run_location_detaches_unreadable_repo_root(monkeypatch, tmp_path):
+    # Run-scoped resolution applies the same working-copy guard: an online
+    # project's URL path must not ride along as a bogus repo root.
+    evals = tmp_path / "evaluations"
+    (evals / "proj" / "run-1").mkdir(parents=True)
+    (evals / "proj" / "repository_info.json").write_text(
+        json.dumps({"path": "https://github.com/acme/app"}), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.get_evaluations_dir", lambda: str(evals)
+    )
+    from quodeq.api._assistant_helpers import resolve_run_location
+    run_dir, repo_root = resolve_run_location("proj", "run-1")
+    assert run_dir == str((evals / "proj" / "run-1").resolve())
+    assert repo_root is None
+
+
+def test_create_session_attaches_repo_root_without_run(client, app, monkeypatch):
+    # Overview/accumulated views send projectId with no runId. The repo root
+    # is a project-level fact, so it must attach anyway; otherwise repo tools
+    # fail with "no analyzed repository attached" in the app's default state.
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.repo_attach_info",
+        lambda project_id: ("/src/selectives-android", "ok"),
+    )
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "projectId": "selectives"})
+    assert resp.status_code == 201
+    sid = resp.get_json()["sessionId"]
+    sess = AssistantRepository(app.config["ASSISTANT_DB_PATH"]).get_session(sid)
+    assert sess["project_uuid"] == "/src/selectives-android"
+    assert sess["run_id"] is None  # run scope untouched: still accumulated
+
+
+def test_apply_action_creates_standard(client, app):
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(action_id="a1", session_id="s1",
+                       action_type="create_standard",
+                       payload=_VALID_STANDARD, content_hash="h")
+    resp = client.post("/api/assistant/actions/a1/apply")
+    assert resp.status_code == 200
+    assert repo.get_action("a1")["status"] == "applied"
+    # standard file written by StandardsService
+    import pathlib
+    written = pathlib.Path(app.config["STANDARDS_EVALUATORS_DIR"]) / "api-errors.json"
+    assert written.exists()
+    assert json.loads(written.read_text())["name"] == "API Error Contract"
+
+
+def test_apply_twice_conflicts(client, app):
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(action_id="a1", session_id="s1",
+                       action_type="create_standard",
+                       payload=_VALID_STANDARD, content_hash="h")
+    assert client.post("/api/assistant/actions/a1/apply").status_code == 200
+    assert client.post("/api/assistant/actions/a1/apply").status_code == 409
+
+
+def test_reject_action(client, app):
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(action_id="a1", session_id="s1",
+                       action_type="create_standard",
+                       payload=_VALID_STANDARD, content_hash="h")
+    resp = client.post("/api/assistant/actions/a1/reject")
+    assert resp.status_code == 200
+    assert repo.get_action("a1")["status"] == "rejected"
+
+
+def test_apply_unknown_action_404(client):
+    assert client.post("/api/assistant/actions/missing/apply").status_code == 404
+
+
+def _wait_for(seen, key, timeout=2.0):
+    deadline = time.time() + timeout
+    while key not in seen and time.time() < deadline:
+        time.sleep(0.01)
+    return seen.get(key)
+
+
+def test_web_enabled_body_key_threads_to_turn_request(client, monkeypatch):
+    seen = {}
+    monkeypatch.setattr("quodeq.api.assistant_routes.run_turn",
+                        lambda turn, **kw: seen.setdefault("turn", turn))
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama"}).get_json()["sessionId"]
+    resp = client.post(f"/api/assistant/sessions/{sid}/messages",
+                       json={"text": "hi", "webEnabled": True})
+    assert resp.status_code == 202
+    turn = _wait_for(seen, "turn")
+    assert turn is not None and turn.web_enabled is True
+
+
+def test_web_enabled_defaults_false_when_absent(client, monkeypatch):
+    seen = {}
+    monkeypatch.setattr("quodeq.api.assistant_routes.run_turn",
+                        lambda turn, **kw: seen.setdefault("turn", turn))
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama"}).get_json()["sessionId"]
+    client.post(f"/api/assistant/sessions/{sid}/messages", json={"text": "hi"})
+    turn = _wait_for(seen, "turn")
+    assert turn is not None and turn.web_enabled is False
+
+
+def test_apply_invalid_payload_400(client, app):
+    # A malformed stored draft (missing "principles") must yield a clean 400,
+    # not a 500 — import_from_file raises ValueError on validation failure.
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    invalid = {k: v for k, v in _VALID_STANDARD.items() if k != "principles"}
+    repo.create_action(action_id="a-bad", session_id="s1",
+                       action_type="create_standard",
+                       payload=invalid, content_hash="h")
+    resp = client.post("/api/assistant/actions/a-bad/apply")
+    assert resp.status_code == 400
+    assert resp.get_json()["error"]
+    assert repo.get_action("a-bad")["status"] == "drafted"
+
+
+def test_assistant_catalog(client):
+    resp = client.get("/api/assistant/skills")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert [c["name"] for c in body["commands"]] == ["help", "skills", "actions", "clear"]
+    names = {s["name"] for s in body["skills"]}
+    assert {"create-standard", "explain-finding", "explain-score"} <= names
+    one = next(s for s in body["skills"] if s["name"] == "explain-score")
+    assert one["argumentHint"] and isinstance(one["views"], list)
+    assert [a["type"] for a in body["actions"]] == ["create_standard", "dismiss_finding", "verify_finding"]
+    assert all(a["description"] for a in body["actions"])
+
+
+def test_reject_after_apply_conflicts(client, app):
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(action_id="a1", session_id="s1",
+                       action_type="create_standard", payload=_VALID_STANDARD,
+                       content_hash="h")
+    assert client.post("/api/assistant/actions/a1/apply").status_code == 200
+    resp = client.post("/api/assistant/actions/a1/reject")
+    assert resp.status_code == 409
+    sess = repo.get_action("a1")
+    assert sess["status"] == "applied"  # apply outcome survives the replay
+
+
+def test_apply_dismiss_finding_writes_action_log(client, app, tmp_path, monkeypatch):
+    evals = tmp_path / "evals"
+    (evals / "proj").mkdir(parents=True)
+    monkeypatch.setitem(app.config, "EVALUATIONS_DIR", str(evals))
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(action_id="a1", session_id="s1",
+                       action_type="dismiss_finding",
+                       payload={"project": "proj", "req": "r1", "file": "a.py",
+                                "line": 3, "reason": "false positive: guarded"},
+                       content_hash="h")
+    resp = client.post("/api/assistant/actions/a1/apply")
+    assert resp.status_code == 200
+    from quodeq.services.dismissed import dismissed_keys
+    assert dismissed_keys(evals / "proj") == {("r1", "a.py", 3)}
+
+
+def test_apply_dismiss_finding_returns_delta_for_run_scoped_session(client, app, tmp_path, monkeypatch):
+    # A run-scoped dismiss (runId present, mirroring an assistant session
+    # opened against a specific run) must return the same delta shape the
+    # manual /api/findings/dismiss route returns, so the UI can patch its
+    # caches in place instead of waiting on a lazy refetch.
+    evals = tmp_path / "evals"
+    run_dir = evals / "proj" / "run1"
+    (run_dir / "evaluation").mkdir(parents=True)
+    (run_dir / "evaluation" / "security.json").write_text(json.dumps({
+        "dimension": "security", "overallScore": 50, "overallGrade": "C",
+        "principles": [], "violations": [
+            {"principle": "P1", "req": "r1", "file": "a.py", "line": 3,
+             "severity": "major", "title": "t", "reason": "r"},
+        ],
+        "totals": {"violations": 1},
+    }))
+    monkeypatch.setitem(app.config, "EVALUATIONS_DIR", str(evals))
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(action_id="a1", session_id="s1",
+                       action_type="dismiss_finding",
+                       payload={"project": "proj", "req": "r1", "file": "a.py",
+                                "line": 3, "reason": "false positive: guarded",
+                                "runId": "run1"},
+                       content_hash="h")
+    resp = client.post("/api/assistant/actions/a1/apply")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["result"]["dismissed"] is True
+    delta = body["result"]["delta"]
+    assert delta["kind"] == "dismiss"
+    assert delta["dismissed"] == {"req": "r1", "file": "a.py", "line": 3}
+    # The delta names its own project so the client patches the right cache
+    # even if the user switched projects while the apply POST was in flight.
+    assert delta["project"] == "proj"
+    from quodeq.services.dismissed import dismissed_keys
+    assert dismissed_keys(evals / "proj") == {("r1", "a.py", 3)}
+
+
+def test_apply_verify_finding_writes_badge(client, app, tmp_path, monkeypatch):
+    evals = tmp_path / "evals"
+    (evals / "proj").mkdir(parents=True)
+    monkeypatch.setitem(app.config, "EVALUATIONS_DIR", str(evals))
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(action_id="a1", session_id="s1",
+                       action_type="verify_finding",
+                       payload={"project": "proj", "req": "r1", "file": "a.py",
+                                "line": 3, "note": "real: unsanitized input"},
+                       content_hash="h")
+    assert client.post("/api/assistant/actions/a1/apply").status_code == 200
+    from quodeq.services.verified import verified_entries
+    assert [e["note"] for e in verified_entries(evals / "proj")] == ["real: unsanitized input"]
+
+
+def test_apply_verify_finding_traversal_payload_400(client, app, tmp_path, monkeypatch):
+    """A drafted verify_finding whose stored payload has a traversal project must return 400
+    and must NOT create any actions.jsonl outside the evaluations root."""
+    evals = tmp_path / "evals"
+    evals.mkdir(parents=True)
+    monkeypatch.setitem(app.config, "EVALUATIONS_DIR", str(evals))
+    repo = _repo(app)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(action_id="a-traverse", session_id="s1",
+                       action_type="verify_finding",
+                       payload={"project": "../escape", "req": "r1", "file": "a.py",
+                                "line": 3, "note": "would escape"},
+                       content_hash="h")
+    resp = client.post("/api/assistant/actions/a-traverse/apply")
+    assert resp.status_code == 400
+    # The traversal target directory must not have been created.
+    escape_dir = tmp_path / "escape"
+    assert not escape_dir.exists()
+
+
+def test_create_session_reports_attachment(client, monkeypatch, tmp_path):
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    monkeypatch.setattr("quodeq.api._assistant_helpers.repo_attach_info",
+                        lambda pid: (str(repo), "ok"))
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "projectId": "p1"})
+    data = resp.get_json()
+    assert data["repoAttached"] is True
+    assert data["repoReason"] == "ok"
+    assert data["writeAvailable"] is True
+
+
+def test_create_session_reports_detachment(client, monkeypatch):
+    monkeypatch.setattr("quodeq.api._assistant_helpers.repo_attach_info",
+                        lambda pid: (None, "path_missing"))
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "projectId": "p1"})
+    data = resp.get_json()
+    assert data["repoAttached"] is False
+    assert data["repoReason"] == "path_missing"
+    assert data["writeAvailable"] is False
+
+
+def test_message_passes_write_enabled(client, app, monkeypatch):
+    import threading
+    seen = {}
+    done = threading.Event()
+    monkeypatch.setattr("quodeq.api._assistant_helpers.local_provider_busy",
+                        lambda p: False)
+
+    def fake_run_turn(turn, **kw):
+        seen["write_enabled"] = turn.write_enabled
+        done.set()
+    monkeypatch.setattr("quodeq.api.assistant_routes.run_turn", fake_run_turn)
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama"}).get_json()["sessionId"]
+    client.post(f"/api/assistant/sessions/{sid}/messages",
+                json={"text": "hi", "writeEnabled": True})
+    assert done.wait(timeout=2)  # run_turn runs on a daemon thread
+    assert seen.get("write_enabled") is True
+
+
+def test_create_session_write_unavailable_for_unsafe_provider(client, monkeypatch, tmp_path):
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    monkeypatch.setattr("quodeq.api._assistant_helpers.repo_attach_info",
+                        lambda pid: (str(repo), "ok"))
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "gemini", "projectId": "p1"})
+    data = resp.get_json()
+    assert data["repoAttached"] is True
+    assert data["writeAvailable"] is False
+
+
+# ---- stop-turn endpoint -----------------------------------------------------
+
+def test_stop_unknown_session_404(client):
+    assert client.post("/api/assistant/sessions/nope/stop").status_code == 404
+
+
+def test_stop_without_running_turn_409(client):
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
+    resp = client.post(f"/api/assistant/sessions/{sid}/stop")
+    assert resp.status_code == 409
+
+
+def test_stop_cancels_running_turn_and_frees_the_token(client, monkeypatch):
+    import threading
+    started, finished = threading.Event(), threading.Event()
+
+    def fake_run_turn(request, *, repository, tool_ctx, cancel, **kw):
+        started.set()
+        assert cancel.wait(timeout=5)  # blocks until the stop route cancels
+        finished.set()
+
+    monkeypatch.setattr("quodeq.api.assistant_routes.run_turn", fake_run_turn)
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
+    assert client.post(f"/api/assistant/sessions/{sid}/messages",
+                       json={"text": "hi"}).status_code == 202
+    assert started.wait(timeout=5)
+
+    resp = client.post(f"/api/assistant/sessions/{sid}/stop")
+    assert resp.status_code == 202
+    assert resp.get_json() == {"stopping": True}
+    assert finished.wait(timeout=5)
+
+    # once the worker unwinds, the token is gone: a second stop has nothing to
+    # cancel, and a new message can claim the turn slot again
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        if client.post(f"/api/assistant/sessions/{sid}/stop").status_code == 409:
+            break
+        time.sleep(0.01)
+    else:
+        pytest.fail("cancel token not cleaned up after the turn ended")
+    assert client.post(f"/api/assistant/sessions/{sid}/messages",
+                       json={"text": "again"}).status_code == 202

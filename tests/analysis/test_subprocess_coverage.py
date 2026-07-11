@@ -90,6 +90,81 @@ class TestRenderStandardsGrouped:
         parsed = json.loads(result)
         assert parsed[0]["principle"] == "Unknown"
 
+    def test_resolves_default_params_when_no_overrides(self):
+        """With no override file, placeholders must be replaced by defaults — no raw templates in output."""
+        data = {
+            "principles": [{
+                "name": "Analyzability",
+                "requirements": [{
+                    "id": "M-ANA-2",
+                    "text": "Functions MUST NOT exceed {max_lines} lines",
+                    "params": {"max_lines": {"label": "Max function lines", "type": "int",
+                                            "default": 50, "min": 10, "max": 500}},
+                }],
+            }],
+        }
+        result = _render_standards_grouped(data, overrides=None)
+        parsed = json.loads(result)
+        rule = parsed[0]["requirements"][0]["rule"]
+        assert "{max_lines}" not in rule, f"raw placeholder still present: {rule!r}"
+        assert "50" in rule
+
+    def test_resolves_overridden_value(self):
+        """With an override, the tuned value appears in the emitted text."""
+        data = {
+            "principles": [{
+                "name": "Analyzability",
+                "requirements": [{
+                    "id": "M-ANA-2",
+                    "text": "Functions MUST NOT exceed {max_lines} lines",
+                    "params": {"max_lines": {"label": "Max function lines", "type": "int",
+                                            "default": 50, "min": 10, "max": 500}},
+                }],
+            }],
+        }
+        result = _render_standards_grouped(data, overrides={"M-ANA-2": {"max_lines": 80}})
+        parsed = json.loads(result)
+        rule = parsed[0]["requirements"][0]["rule"]
+        assert "80" in rule
+        assert "{max_lines}" not in rule
+
+
+# ---------------------------------------------------------------------------
+# _load_standards_text (override threading)
+# ---------------------------------------------------------------------------
+
+class TestLoadStandardsTextOverrides:
+    _DIM = {
+        "principles": [{
+            "name": "Analyzability",
+            "requirements": [{
+                "id": "M-ANA-2",
+                "text": "Functions MUST NOT exceed {max_lines} lines",
+                "params": {"max_lines": {"label": "Max function lines", "type": "int",
+                                         "default": 50, "min": 10, "max": 500}},
+            }],
+        }],
+    }
+
+    def test_no_override_file_uses_default(self, tmp_path):
+        """No placeholder braces in output when analyzed repo has no override file."""
+        (tmp_path / "compiled").mkdir()
+        (tmp_path / "compiled" / "maintainability.json").write_text(json.dumps(self._DIM))
+        result = _load_standards_text(tmp_path / "compiled", "maintainability", overrides=None)
+        assert "{max_lines}" not in result
+        assert "50" in result
+
+    def test_override_value_appears_in_text(self, tmp_path):
+        """When an override is supplied, the overridden value appears in the emitted text."""
+        (tmp_path / "compiled").mkdir()
+        (tmp_path / "compiled" / "maintainability.json").write_text(json.dumps(self._DIM))
+        result = _load_standards_text(
+            tmp_path / "compiled", "maintainability",
+            overrides={"M-ANA-2": {"max_lines": 75}},
+        )
+        assert "75" in result
+        assert "{max_lines}" not in result
+
 
 # ---------------------------------------------------------------------------
 # _load_standards_text
@@ -296,6 +371,17 @@ class TestResolveProviderConfig:
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
             _, _, key = _resolve_provider_config(cfg)
         assert key == "secret"
+
+    def test_required_api_key_missing_raises(self, monkeypatch):
+        provider = {"openrouter": {
+            "type": "api", "model": "m", "api_base": "https://openrouter.ai/api/v1",
+            "api_key_env": "OPENROUTER_API_KEY", "api_key_required": True,
+        }}
+        monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+        cfg = AnalysisConfig(ai_cmd="openrouter", ai_model="m")
+        with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
+            with pytest.raises(Exception, match="OPENROUTER_API_KEY"):
+                _resolve_provider_config(cfg)
 
     def test_omlx_falls_back_to_read_omlx_api_key(self):
         provider = {"omlx": {"type": "api", "model": "m", "api_base": "http://localhost:8000/v1"}}

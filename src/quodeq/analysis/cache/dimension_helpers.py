@@ -84,7 +84,7 @@ _PROV_LABELS = {
 def _current_provenance(config: RunConfig, dimension: str) -> dict:
     """The provenance the current run would stamp on a fresh entry."""
     standards_hash = (
-        _hash_standards(config.standards_dir, dimension)
+        _hash_standards(config.standards_dir, dimension, config.src)
         if config.standards_dir else ""
     ) or ""
     return {
@@ -285,7 +285,7 @@ def persist_dispatch_results(
     # Provenance context — run-constant, computed once. These left the cache
     # key in schema 3; recording them keeps each entry self-describing.
     standards_hash = (
-        _hash_standards(config.standards_dir, dimension)
+        _hash_standards(config.standards_dir, dimension, config.src)
         if config.standards_dir else ""
     ) or ""
     prompts_hash = _hash_prompts_combined()

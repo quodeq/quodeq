@@ -1,18 +1,22 @@
 {
   "id": "maintainability",
   "name": "Maintainability",
+  "description": "How effectively the codebase can be modified by people who did not write it. Modularity, reusability, analysability, modifiability, and testability keep changes safe, fast, and predictable as the system grows.",
   "iso_25010": "Maintainability",
   "version": "2023",
   "sub_characteristics": [
     {
       "name": "Modularity",
+      "description": "Each part of the codebase has a focused responsibility and clean boundaries. Small modules, low coupling, and limited fan-out make a single change easy to reason about.",
       "requirements": [
         {
           "id": "M-MOD-1",
-          "text": "Cyclomatic complexity MUST be ≤10 per function",
+          "text": "Cyclomatic complexity MUST be ≤{max_complexity} per function",
           "cwe": [
             1121
-          ]
+          ],
+          "params": {"max_complexity": {"label": "Max cyclomatic complexity", "type": "int",
+                                        "default": 10, "min": 1, "max": 100}}
         },
         {
           "id": "M-MOD-2",
@@ -30,10 +34,12 @@
         },
         {
           "id": "M-MOD-4",
-          "text": "Functions MUST have ≤5 parameters; use an options object for more",
+          "text": "Functions MUST have ≤{max_params} parameters; use an options object for more",
           "cwe": [
             1064
-          ]
+          ],
+          "params": {"max_params": {"label": "Max function parameters", "type": "int",
+                                    "default": 5, "min": 1, "max": 30}}
         },
         {
           "id": "M-MOD-6",
@@ -44,10 +50,12 @@
         },
         {
           "id": "M-MOD-7",
-          "text": "Inheritance depth MUST NOT exceed 4 levels",
+          "text": "Inheritance depth MUST NOT exceed {max_inheritance_depth} levels",
           "cwe": [
             1074
-          ]
+          ],
+          "params": {"max_inheritance_depth": {"label": "Max inheritance depth", "type": "int",
+                                               "default": 4, "min": 1, "max": 20}}
         },
         {
           "id": "M-MOD-8",
@@ -116,6 +124,7 @@
     },
     {
       "name": "Reusability",
+      "description": "Useful pieces can be lifted into other contexts without dragging unrelated code. Stable interfaces, no hidden global state, and clear inputs and outputs keep components portable.",
       "requirements": [
         {
           "id": "M-REU-1",
@@ -175,27 +184,34 @@
     },
     {
       "name": "Analyzability",
+      "description": "A reader can understand what the code does and why. Naming, documentation, type annotations, and consistent structure shorten the time between opening a file and trusting it.",
       "requirements": [
         {
           "id": "M-ANA-1",
-          "text": "Source files MUST NOT exceed 300 lines",
+          "text": "Source files MUST NOT exceed {max_file_lines} lines",
           "cwe": [
             1080
-          ]
+          ],
+          "params": {"max_file_lines": {"label": "Max source file lines", "type": "int",
+                                        "default": 300, "min": 50, "max": 5000}}
         },
         {
           "id": "M-ANA-2",
-          "text": "Functions MUST NOT exceed 50 lines",
+          "text": "Functions MUST NOT exceed {max_lines} lines",
           "cwe": [
             1080
-          ]
+          ],
+          "params": {"max_lines": {"label": "Max function lines", "type": "int",
+                                   "default": 50, "min": 10, "max": 500}}
         },
         {
           "id": "M-ANA-3",
-          "text": "Nesting depth MUST NOT exceed 4 levels",
+          "text": "Nesting depth MUST NOT exceed {max_depth} levels",
           "cwe": [
             1121
-          ]
+          ],
+          "params": {"max_depth": {"label": "Max nesting depth", "type": "int",
+                                   "default": 4, "min": 1, "max": 20}}
         },
         {
           "id": "M-ANA-4",
@@ -294,6 +310,7 @@
     },
     {
       "name": "Modifiability",
+      "description": "Changes can be made safely without unexpected consequences elsewhere. Encapsulation, tests, and avoiding hidden assumptions let edits stay local.",
       "requirements": [
         {
           "id": "M-MDF-1",
@@ -371,6 +388,7 @@
     },
     {
       "name": "Testability",
+      "description": "The system is built to be exercised by automated tests. Pure functions, dependency injection, deterministic behaviour, and seams between layers make assertions easy to write and trust.",
       "requirements": [
         {
           "id": "M-TST-1",

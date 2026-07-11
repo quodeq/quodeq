@@ -6,6 +6,7 @@ import ContextBlock from '../../../components/ContextBlock.jsx';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import usePretextHeight from '../../../hooks/usePretextHeight.js';
 import { useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
+import { VerifiedChip } from '../../violations/components/VerifiedChip.jsx';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
@@ -91,25 +92,28 @@ export function EvalViolationCard({ v, principle, index, onDismiss }) {
         <SevBadge level={v.severity} format="long" />
         <span className="vrow-label">[{v.principle || principle}]</span>
         {filename && <FileCopyBtn display={display} copyText={ref} />}
-        <button
-          type="button"
-          className="fix-plan-btn"
-          onClick={() => { const spec = violationFixPlanSpec(v, v.principle || principle); if (spec) addWindow(spec); }}
-        >
-          <SparkleIcon />
-          Fix plan
-        </button>
-        {onDismiss && (
+        <div className="vrow-actions">
+          <VerifiedChip v={v} />
           <button
             type="button"
-            className="dismiss-btn"
-            onClick={(e) => { e.stopPropagation(); onDismiss(v); }}
-            title="Dismiss this finding (exclude from scoring)"
-            aria-label="Dismiss this finding (exclude from scoring)"
+            className="fix-plan-btn"
+            onClick={() => { const spec = violationFixPlanSpec(v, v.principle || principle); if (spec) addWindow(spec); }}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <SparkleIcon />
+            Fix plan
           </button>
-        )}
+          {onDismiss && (
+            <button
+              type="button"
+              className="dismiss-btn"
+              onClick={(e) => { e.stopPropagation(); onDismiss(v); }}
+              title="Dismiss this finding (exclude from scoring)"
+              aria-label="Dismiss this finding (exclude from scoring)"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          )}
+        </div>
       </div>
       <ViolationDetail item={v} />
     </div>

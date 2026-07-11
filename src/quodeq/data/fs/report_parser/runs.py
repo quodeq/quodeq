@@ -175,6 +175,8 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
     """
     validate_path_segment(project)
     project_dir = reports_root / project
+    from quodeq.services.run_dates import project_run_dates  # noqa: PLC0415
+    index_dates = project_run_dates(reports_root, project)
     run_infos: list[RunInfo] = []
     for entry in safe_read_dir(project_dir):
         if not entry.is_dir() or entry.name.startswith("."):
@@ -194,7 +196,11 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
         else:
             raw_state = _read_run_status(run_dir)
             status = raw_state if raw_state in ("cancelled", "failed") else "complete"
-        date_iso, date_label = parse_run_date(reports_root, project, entry.name)
+        cached = index_dates.get(entry.name)
+        if cached is not None:
+            date_iso, date_label = cached
+        else:
+            date_iso, date_label = parse_run_date(reports_root, project, entry.name)
         run_infos.append(RunInfo(run_id=entry.name, date_iso=date_iso, date_label=date_label, status=status))
     run_infos.sort(key=lambda r: (r.date_iso or "", r.run_id), reverse=True)
     if limit > 0:

@@ -2,7 +2,7 @@ import React, { useMemo, lazy, Suspense } from 'react';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import DimensionCardsGrid from './DimensionCardsGrid.jsx';
 import { formatRunId, gradeLetter, complianceRatio, extDisplayName } from '../../../utils/formatters.js';
-import { collapseByPeriod, collectPeriodDimensions, bucketKey } from '../../../utils/dailyGrouping.js';
+import { collapseByPeriod, collectPeriodDimensions, bucketKey, extractDimensionPeriodSeries, sliceTrendAtRun } from '../../../utils/dailyGrouping.js';
 const RunHistoryPanel = lazy(() => import('./RunHistoryPanel.jsx'));
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
@@ -16,12 +16,20 @@ import { filterTrendByVisibleStandards, filterTrendByVisibleStandardsDaily, filt
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { buildOverviewReport } from '../../../utils/reportBuilder.js';
 
+// Sparkline history length for the per-dimension period series (matches the
+// old DimensionScorePanel SPARKLINE_LIMIT).
+const DIM_SPARKLINE_LIMIT = 10;
+
 // ---------------------------------------------------------------------------
 // Accumulated overview panel helpers
 // ---------------------------------------------------------------------------
 
-function computeAccumulatedStats(accumulated, accumulatedDimensions, dailyTrend, selectedRunId) {
-  const curr = parseFloat(accumulated?.summary?.numericAverage);
+// The "vs previous" delta compares two accumulated numericAverage points from the
+// trend (this run vs the prior run). With fewer than two trend entries there is no
+// comparable previous point, so the delta stays null rather than falling back to
+// summary.previousNumericAverage: that value is the prior run's own-dimension average,
+// not comparable to the accumulated numericAverage (an apples-to-oranges subtraction).
+export function computeAccumulatedStats(accumulatedDimensions, dailyTrend, selectedRunId) {
   let scoreDelta = null;
   if (dailyTrend && dailyTrend.length >= 2) {
     const selectedIdx = selectedRunId ? dailyTrend.findIndex((t) => t.runId === selectedRunId) : 0;
@@ -29,10 +37,6 @@ function computeAccumulatedStats(accumulated, accumulatedDimensions, dailyTrend,
     const current = parseFloat(dailyTrend[idx]?.numericAverage);
     const previous = idx + 1 < dailyTrend.length ? parseFloat(dailyTrend[idx + 1]?.numericAverage) : NaN;
     if (!Number.isNaN(current) && !Number.isNaN(previous)) scoreDelta = (current - previous).toFixed(1);
-  }
-  if (scoreDelta === null) {
-    const prev = parseFloat(accumulated?.summary?.previousNumericAverage);
-    scoreDelta = (Number.isNaN(curr) || Number.isNaN(prev)) ? null : (curr - prev).toFixed(1);
   }
 
   const withDates = accumulatedDimensions
@@ -131,7 +135,7 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulated
   );
 }
 
-function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, selectedDayDimNames }) {
+function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, selectedDayDimNames, dimTrends }) {
   return (
     <section className="quality-dimensions" aria-label="Quality dimensions">
       <div className="quality-dimensions__head">
@@ -142,6 +146,7 @@ function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, sele
           sortedDimensions={sortedDimensions}
           onDimensionClick={onDimensionClick}
           selectedDayDimNames={selectedDayDimNames}
+          dimTrends={dimTrends}
         />
       </div>
     </section>
@@ -152,7 +157,7 @@ function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, sele
 // Accumulated overview panel
 // ---------------------------------------------------------------------------
 
-function useAccumulatedComputations(data) {
+export function useAccumulatedComputations(data) {
   const { accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, trend, selectedRunId, granularity = 'day' } = data;
   const dayRuns = dailyRuns || availableRuns;
   const dayTrend = useMemo(() => collapseByPeriod(trend, 'day'), [trend]);
@@ -185,19 +190,44 @@ function useAccumulatedComputations(data) {
   // period-collapsed representatives.
   const filteredTrend = useMemo(() => filterTrendByVisibleStandards(trend, visibleSet), [trend, visibleSet]);
   const filteredDimensions = useMemo(() => accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase())), [accumulatedDimensions, visibleIds]);
+
+  // Period-aware per-dimension trends: one entry per visible dimension,
+  // { delta, scores }, bucketed by the selected granularity from the raw
+  // (visible-filtered, per-run) trend. Feeds both the dimension cards and
+  // the DIMENSIONS panel so their deltas/sparklines match the Overview chart.
+  // The trend is sliced at the selected overview run first, so navigating to
+  // a previous period truncates the series at that point in time — arrows
+  // and sparklines then agree with the as-of scores on the cards. The delta
+  // compares the last two buckets in which the dimension has data (carry-over
+  // semantics, same as the dimmed cards).
+  const asOfTrend = useMemo(
+    () => sliceTrendAtRun(filteredTrend, currentOverviewRun),
+    [filteredTrend, currentOverviewRun]
+  );
+  const dimTrends = useMemo(() => {
+    const map = {};
+    for (const dim of filteredDimensions) {
+      const name = dim.dimension || '';
+      const series = extractDimensionPeriodSeries(asOfTrend, name, granularity, DIM_SPARKLINE_LIMIT);
+      const scores = series.map((s) => s.score);
+      const delta = scores.length >= 2 ? scores[scores.length - 1] - scores[scores.length - 2] : null;
+      map[name.toLowerCase()] = { delta, scores };
+    }
+    return map;
+  }, [filteredDimensions, asOfTrend, granularity]);
   const filteredAccumulated = useMemo(() => filterAccumulatedByVisibleStandards(accumulated, visibleSet, filteredPeriodTrend, currentOverviewRun), [accumulated, visibleSet, filteredPeriodTrend, currentOverviewRun]);
-  const filteredStats = useMemo(() => computeAccumulatedStats(filteredAccumulated, filteredDimensions, filteredPeriodTrend, currentOverviewRun), [filteredAccumulated, filteredDimensions, filteredPeriodTrend, currentOverviewRun]);
+  const filteredStats = useMemo(() => computeAccumulatedStats(filteredDimensions, filteredPeriodTrend, currentOverviewRun), [filteredDimensions, filteredPeriodTrend, currentOverviewRun]);
 
   // Preserve today's "panel appears iff ≥2 days of data" behavior, regardless
   // of the chosen grouping — so the selector never disappears on collapse.
   const chartMountable = filteredDayTrend.length >= 2;
 
-  return { currentOverviewRun, selectedDayDimNames, filteredPeriodTrend, filteredTrend, filteredDimensions, filteredAccumulated, filteredStats, chartMountable };
+  return { currentOverviewRun, selectedDayDimNames, filteredPeriodTrend, filteredTrend, filteredDimensions, filteredAccumulated, filteredStats, chartMountable, dimTrends };
 }
 
 export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const { onRunClick, onDimensionClick, onNavigate } = callbacks;
-  const { currentOverviewRun, selectedDayDimNames, filteredPeriodTrend, filteredTrend, filteredDimensions, filteredAccumulated, filteredStats, chartMountable } = useAccumulatedComputations(data);
+  const { currentOverviewRun, selectedDayDimNames, filteredPeriodTrend, filteredTrend, filteredDimensions, filteredAccumulated, filteredStats, chartMountable, dimTrends } = useAccumulatedComputations(data);
 
   const topFiles = useMemo(
     () => withDimensionsStr(buildTopOffendingFiles(filteredDimensions || [])),
@@ -262,13 +292,14 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
             />
           )}
         </Suspense>
-        <DimensionScorePanel dimensions={filteredDimensions} onBarClick={onDimensionClick} runDate={filteredStats.lastRun.date} runId={filteredStats.lastRun.runId} trend={filteredTrend} />
+        <DimensionScorePanel dimensions={filteredDimensions} onBarClick={onDimensionClick} dimTrends={dimTrends} />
       </div>
 
       <AccumulatedDimensionsSection
         sortedDimensions={filteredStats.sorted}
         onDimensionClick={onDimensionClick}
         selectedDayDimNames={selectedDayDimNames}
+        dimTrends={dimTrends}
       />
 
       {topFiles.length > 0 && (

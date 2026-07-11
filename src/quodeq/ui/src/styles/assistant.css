@@ -1,0 +1,503 @@
+/* LLM Assistant UI: drawer, action-preview card, and launcher styles.
+   Token-driven only — no hardcoded colors. */
+
+.assistant-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+}
+
+.assistant-card-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.assistant-card-name {
+  font-weight: 600;
+}
+
+.assistant-card-meta {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.assistant-card-note { color: var(--color-text-muted); font-size: 12px; margin-top: 2px; }
+
+.assistant-card-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.assistant-card-actions button {
+  padding: 0.375rem 0.875rem;
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.assistant-card-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.assistant-card-apply {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: 1px solid var(--color-accent);
+}
+
+.assistant-card-reject {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.assistant-card-status {
+  font-size: 0.8125rem;
+}
+
+.assistant-card-status-applied {
+  color: var(--color-accent);
+}
+
+.assistant-card-status-rejected,
+.assistant-card-status-error {
+  color: var(--color-text-muted);
+}
+
+/* ── Drawer shell ─────────────────────────────────────── */
+.assistant-drawer, .bottom-drawer {
+  /* Follow the active theme instead of the always-dark console tokens: remap
+     them to the surface/text tokens locally (same technique as the evaluation
+     console in evaluation.css), so the drawer is light in light mode and dark
+     in dark mode. All the drawer's console-token references below inherit these. */
+  --color-console-bg: var(--color-surface-alt);
+  --color-console-text: var(--color-text);
+
+  position: fixed;
+  /* Start at the sidebar's right edge — touching it, not overlapping it. */
+  left: var(--sidebar-width);
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-console-bg);
+  color: var(--color-console-text);
+  border-top: 1px solid var(--color-border);
+  border-left: 1px solid var(--color-border);
+  box-shadow: 0 -8px 24px color-mix(in srgb, var(--color-text) 15%, transparent);
+  font-family: var(--font-mono);
+  /* Slide in sync with the sidebar's 200ms width transition (hover-follow rule below). */
+  transition: left 200ms ease;
+}
+
+/* Follow the sidebar when it expands on hover (desktop only — below 900px the
+   drawer is full-width and the sidebar is off-canvas). Without this the
+   expanded sidebar overlaps the drawer's left edge. */
+@media (min-width: 901px) {
+  .app-shell:has(.sidebar:hover) .assistant-drawer,
+  .app-shell:has(.sidebar:hover) .bottom-drawer {
+    left: var(--sidebar-expanded-width);
+  }
+}
+
+/* Below the layout breakpoint the sidebar is no longer a left column
+   (app-shell collapses to a single column), so the drawer spans full width. */
+@media (max-width: 900px) {
+  .assistant-drawer, .bottom-drawer {
+    left: 0;
+    border-left: none;
+  }
+}
+
+/* Maximized: grow to (near) full height. `top` anchors just below the topbar
+   so it never covers it; with bottom:0 already set, the height fills between
+   them (no inline height is applied in this state). */
+.bottom-drawer--maximized {
+  top: 56px;
+  height: auto;
+}
+
+.assistant-drawer-drag {
+  flex: 0 0 auto;
+  height: 6px;
+  cursor: row-resize;
+  touch-action: none;
+}
+
+.assistant-drawer-drag::before {
+  content: '';
+  display: block;
+  width: 48px;
+  height: 3px;
+  margin: 1.5px auto 0;
+  border-radius: 2px;
+  background: var(--color-border);
+}
+
+.assistant-drawer-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.assistant-drawer-title {
+  font-size: 0.8125rem;
+  color: var(--color-console-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assistant-drawer-controls {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: auto;  /* chip sits left with the tabs; controls stay right */
+}
+
+.assistant-drawer-btn {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 0.25rem;
+  color: var(--color-console-text);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.assistant-drawer-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.assistant-drawer-btn:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+/* Web-access globe: accent when ON (scoped so the maximize button's
+   aria-pressed keeps its plain look). */
+.assistant-drawer-web[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.assistant-drawer-web:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── Message transcript ──────────────────────────────── */
+.assistant-messages {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.assistant-msg {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.assistant-msg-user {
+  align-self: flex-end;
+  max-width: 80%;
+  padding: 0.375rem 0.625rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: 0.5rem;
+}
+
+.assistant-msg-assistant {
+  color: var(--color-console-text);
+}
+
+.assistant-msg-tool {
+  color: var(--color-text-subtle, var(--color-text-muted));
+  font-style: italic;
+}
+
+.assistant-msg-warning {
+  color: var(--color-text-muted);
+}
+
+.assistant-msg-action {
+  align-self: stretch;
+}
+
+/* Markdown content inside assistant messages — same shape as
+   .side-pane-md, retextured for the drawer's terminal background. */
+.assistant-md {
+  contain: layout;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.assistant-md a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+  text-underline-offset: 2px;
+}
+
+.assistant-md a:hover {
+  text-decoration-color: var(--color-accent);
+}
+
+.assistant-md code {
+  background: color-mix(in srgb, var(--color-console-text) 12%, transparent);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+.assistant-md pre {
+  background: color-mix(in srgb, var(--color-console-text) 8%, transparent);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: scroll;
+  scrollbar-gutter: stable;
+}
+
+.assistant-md pre > code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.assistant-md .md-table-wrap {
+  overflow-x: scroll;
+  scrollbar-gutter: stable;
+  margin: 12px 0;
+}
+
+.assistant-md table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  font-size: 0.9em;
+}
+
+.assistant-md th,
+.assistant-md td {
+  border: 1px solid var(--color-border);
+  padding: 6px 10px;
+  text-align: left;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.assistant-md blockquote {
+  border-left: 3px solid var(--color-accent);
+  margin: 12px 0;
+  padding: 0 12px;
+  color: var(--color-text-muted);
+}
+
+/* ── Streaming indicator ─────────────────────────────── */
+.assistant-streaming-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.25rem 0;
+}
+
+.assistant-streaming-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  opacity: 0.4;
+  animation: assistant-streaming-pulse 1s ease-in-out infinite;
+}
+
+.assistant-streaming-dot:nth-child(2) { animation-delay: 0.15s; }
+.assistant-streaming-dot:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes assistant-streaming-pulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.85); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+/* ── Error banner ─────────────────────────────────────── */
+.assistant-drawer-error {
+  flex: 0 0 auto;
+  padding: 0.375rem 1rem;
+  font-size: 0.75rem;
+  color: var(--color-accent);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ── Prompt input ─────────────────────────────────────── */
+.assistant-drawer-input-row {
+  flex: 0 0 auto;
+  padding: 0.5rem 1rem 0.75rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.assistant-drawer-input {
+  width: 100%;
+  resize: none;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--color-console-text);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+/* Placeholder hint — the browser default is too faint; make it clearly legible. */
+.assistant-drawer-input::placeholder {
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  opacity: 1;
+}
+
+.assistant-drawer-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.assistant-drawer-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Stop button: overlays the right edge of the (disabled) input while a turn
+   streams. The row is position:relative, so anchor to it. */
+.assistant-stop-btn {
+  position: absolute;
+  right: 1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  background: var(--color-surface-alt);
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.assistant-stop-btn:hover {
+  border-color: var(--color-accent);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Tab strip (one tab per OPEN panel) + tab panels ───── */
+.drawer-tabs { display: flex; gap: 2px; align-items: stretch; }
+.drawer-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  padding: 4px 12px;
+  cursor: pointer;
+  border-radius: 5px 5px 0 0;
+  white-space: nowrap;
+  transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+.drawer-tab:hover {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+.drawer-tab--active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+.drawer-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+/* Model tag in the drawer header (Assistant tab): a compact squared accent
+   tag next to the tabs, integrating the provider/model without a subtitle. */
+.drawer-model-chip {
+  align-self: center;
+  max-width: 14rem;   /* px-based cap so short model names show in full (a %
+                         would resolve against a content-sized flex box and
+                         ellipsize even short names) */
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+  border-radius: 4px;
+  padding: 1px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Command layer: welcome panel, pills, autocomplete, local messages --- */
+.assistant-drawer-input-row { position: relative; }
+
+.assistant-welcome { flex: 1; overflow-y: auto; padding: 12px 16px; color: var(--color-text); }
+.assistant-welcome-intro { margin: 0 0 8px; color: var(--color-text-muted); font-size: 13px; }
+.assistant-welcome-commands { list-style: none; margin: 0 0 12px; padding: 0; font-size: 12px; }
+.assistant-welcome-commands li { margin: 3px 0; color: var(--color-text-muted); }
+.assistant-welcome-commands code { font-family: var(--font-mono); color: var(--color-text); margin-right: 6px; }
+.assistant-welcome-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.assistant-pill { border: 1px solid var(--color-border); background: var(--color-surface-alt); color: var(--color-text); border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+.assistant-pill:hover { border-color: var(--color-accent); }
+
+.assistant-command-menu { position: absolute; bottom: 100%; left: 0; right: 0; margin-bottom: 4px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; overflow: hidden; z-index: 10; }
+.assistant-command-item { display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left; padding: 6px 10px; background: none; border: none; color: var(--color-text); cursor: pointer; font-size: 12px; }
+.assistant-command-item.selected, .assistant-command-item:hover { background: var(--color-surface-alt); }
+.assistant-command-name { font-family: var(--font-mono); }
+.assistant-command-hint { color: var(--color-text-subtle); }
+.assistant-command-desc { color: var(--color-text-muted); margin-left: auto; }
+
+.assistant-msg-local { border-left: 2px solid var(--color-border); padding-left: 8px; }
+
+/* ── Workspace diff review panel ─────────────────────── */
+.workspace-diff { display: flex; flex-direction: column; gap: 8px; padding: 8px; min-height: 0; }
+.workspace-diff-body { overflow: auto; font-size: 12px; line-height: 1.45; margin: 0; flex: 1; }
+.wsdiff-add { color: var(--color-success, #4caf50); }
+.wsdiff-del { color: var(--color-danger, #ef5350); }
+.wsdiff-hunk { color: var(--color-accent, #7aa2f7); }
+.wsdiff-file { font-weight: 600; }
+.wsdiff-ctx { opacity: 0.8; }
+.workspace-diff-actions { display: flex; gap: 8px; }
+.workspace-diff-pr { display: flex; flex-direction: column; gap: 6px; }
+.workspace-diff-error { color: var(--color-danger, #ef5350); }
+.workspace-diff-warning { color: var(--color-danger, #ef5350); font-weight: 600; }
+.workspace-diff-empty { color: var(--color-text-muted, #8a8279); }

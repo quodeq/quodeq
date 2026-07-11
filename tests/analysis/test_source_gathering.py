@@ -117,7 +117,14 @@ class TestGatherApiSourceFiles:
         result = _gather_api_source_files(tmp_path, cfg, jsonl_file, stream_file)
 
         assert result is None
-        assert jsonl_file.read_text() == existing
+        content = jsonl_file.read_text()
+        # Prior findings survive untouched; the undispatchable files get
+        # explicit skipped markers appended (never a silent drop).
+        assert content.startswith(existing)
+        import json
+        markers = [json.loads(line) for line in content.splitlines()[2:]]
+        assert {m["file"] for m in markers} == {"missing1.py", "missing2.py", "missing3.py"}
+        assert all(m["_marker"] == "file_done" and m["status"] == "skipped" for m in markers)
 
 
 class TestLoadSkipDirs:

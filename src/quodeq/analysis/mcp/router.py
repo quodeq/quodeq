@@ -149,9 +149,16 @@ class FindingsRouter:
             worker's completion record.
           - on ``status="error"``: the accumulated findings are popped and
             dropped without invoking the callback. The next run re-dispatches.
+          - on ``status="skipped"``: like ``error`` (no cache entry), but it
+            neither feeds the failure-streak breaker nor the post-run
+            reachability guard. Written for files the worker cannot dispatch
+            at all (API size cap / missing on disk) — an explicit record that
+            the file was considered, not a transient failure to retry loudly.
         """
-        if status not in ("ok", "error"):
-            raise ValueError(f"mark_file_done: status must be 'ok' or 'error', got {status!r}")
+        if status not in ("ok", "error", "skipped"):
+            raise ValueError(
+                f"mark_file_done: status must be 'ok', 'error', or 'skipped', got {status!r}"
+            )
         payload: dict = {"_marker": "file_done", "file": file, "status": status}
         if reason is not None:
             payload["reason"] = reason

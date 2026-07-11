@@ -47,7 +47,13 @@ _ALLOWED_TRANSITIONS: dict[RunState, frozenset[RunState]] = {
     RunState.CANCELLED: frozenset(),
 }
 
-_write_lock = threading.Lock()
+# Reentrant: the lifecycle SIGINT/SIGTERM handler runs on the main thread and
+# writes status itself. A plain Lock deadlocks when the signal interrupts a
+# frame that is already inside write_status holding the lock. Cross-thread
+# exclusion is unchanged; the atomic tmp+rename keeps reentrant interleaving
+# consistent (the handler raises SystemExit, so the interrupted write's
+# remaining statements never run).
+_write_lock = threading.RLock()
 
 
 class IllegalTransitionError(RuntimeError):

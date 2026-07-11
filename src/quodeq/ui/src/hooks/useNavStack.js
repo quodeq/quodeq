@@ -50,11 +50,13 @@ function createNavActions(setNavStack, navStackRef, history) {
     if (stepsBack > 0) history.go(-stepsBack);
   }
 
-  function navTab(page) {
+  function navTab(page, params = {}) {
     const prev = navStackRef.current;
     const stepsBack = prev.length - 1;
     const prevKey = prev.length === 1 && prev[0].page === page ? (prev[0]._tabKey || 0) : 0;
-    const next = [{ page, _tabKey: prevKey + 1 }];
+    // Spread params first so page/_tabKey stay authoritative and can't be
+    // clobbered by a caller-supplied params key.
+    const next = [{ ...params, page, _tabKey: prevKey + 1 }];
     setNavStack(next);
     if (stepsBack > 0) history.go(-stepsBack);
   }

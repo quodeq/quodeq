@@ -5,6 +5,7 @@ import json
 import logging
 from pathlib import Path
 
+from quodeq.core.standards.overrides import resolve_requirement_text
 from quodeq.shared.utils import read_json
 
 _logger = logging.getLogger(__name__)
@@ -38,7 +39,12 @@ def _load_dimension_data(
         return None
 
 
-def render_compiled_standards(compiled_dir: Path, dimension: str, evaluators_dir: Path | None = None) -> str:
+def render_compiled_standards(
+    compiled_dir: Path,
+    dimension: str,
+    evaluators_dir: Path | None = None,
+    overrides: dict[str, dict] | None = None,
+) -> str:
     """Render compiled standards as a requirements checklist organized by principle."""
     data = _load_dimension_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
     if data is None:
@@ -52,7 +58,8 @@ def render_compiled_standards(compiled_dir: Path, dimension: str, evaluators_dir
         if principle.get("description"):
             lines.append(principle["description"])
         for req in reqs:
-            req_line = f"- **{req['id']}**: {req['text']}"
+            text = resolve_requirement_text(req, (overrides or {}).get(req["id"]))
+            req_line = f"- **{req['id']}**: {text}"
             if req.get("description"):
                 req_line += f" — {req['description']}"
             lines.append(req_line)
@@ -60,7 +67,12 @@ def render_compiled_standards(compiled_dir: Path, dimension: str, evaluators_dir
     return "\n".join(lines)
 
 
-def render_compact_standards(compiled_dir: Path, dimension: str, evaluators_dir: Path | None = None) -> str:
+def render_compact_standards(
+    compiled_dir: Path,
+    dimension: str,
+    evaluators_dir: Path | None = None,
+    overrides: dict[str, dict] | None = None,
+) -> str:
     """Render a compact standards checklist as JSON for the AI analyzer.
 
     Returns a compact JSON array grouped by principle with requirement IDs
@@ -77,7 +89,7 @@ def render_compact_standards(compiled_dir: Path, dimension: str, evaluators_dir:
         checklist.append({
             "principle": principle.get("name", "Unknown"),
             "requirements": [
-                {"id": r["id"], "rule": r["text"]}
+                {"id": r["id"], "rule": resolve_requirement_text(r, (overrides or {}).get(r["id"]))}
                 for r in reqs
             ],
         })

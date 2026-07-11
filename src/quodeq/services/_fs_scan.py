@@ -101,7 +101,7 @@ def _list_branches(project_dir: Path) -> list[str]:
     try:
         result = subprocess.run(
             ["git", "-C", str(project_dir), "branch", "--format=%(refname:short)"],
-            capture_output=True, text=True, timeout=_GIT_TIMEOUT_S,
+            capture_output=True, text=True, encoding="utf-8", timeout=_GIT_TIMEOUT_S,
         )
         if result.returncode != 0:
             return []

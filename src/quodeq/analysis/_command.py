@@ -15,8 +15,9 @@ from quodeq.analysis._config import (
     _MCP_TOOL_MARK_FILE_DONE,
     _MCP_TOOL_REPORT_FINDING,
 )
-from quodeq.analysis._mcp_config import _create_mcp_config
+from quodeq.analysis._mcp_config import _codex_mcp_config_arg, _create_mcp_config
 from quodeq.analysis._provider_cache import get_provider_configs as _get_provider_configs
+from quodeq.shared._models import normalize_model_id
 from quodeq.shared.utils import get_ai_cmd, get_ai_model
 
 _log = logging.getLogger(__name__)
@@ -75,7 +76,13 @@ def _build_mcp_args(
     if config.jsonl_file is None:
         return [], None
     mcp_style = provider_cfg.get("mcp_style", "config-file")
-    if mcp_style != "config-file":
+    if mcp_style == "cli-register":
+        # The findings server is registered out-of-band (`<cmd> mcp add` in
+        # subprocess._run_cli_analysis), so no config file/arg is needed —
+        # but the CLI must still receive its allow-list args (e.g. gemini's
+        # --allowed-mcp-server-names) or the registered server stays blocked.
+        return list(provider_cfg.get("mcp_permission_args", [])), None
+    if mcp_style not in {"config-file", "config-arg"}:
         return [], None
 
     agent_params = _AgentParams(
@@ -89,6 +96,14 @@ def _build_mcp_args(
         model_id=_resolve_model_id(config),
         language=_resolve_language(config),
     )
+    if mcp_style == "config-arg":
+        return [
+            "-c",
+            _codex_mcp_config_arg(
+                config.jsonl_file, config.compiled_dir, config.dimension, agent_params,
+            ),
+        ], None
+
     mcp_config_path = _create_mcp_config(
         config.jsonl_file, config.compiled_dir, config.dimension, agent_params,
     )
@@ -122,7 +137,7 @@ def _build_model_budget_prompt_args(
     """Build model, budget, turns, and prompt args."""
     args: list[str] = []
     if model:
-        args.extend(["--model", model])
+        args.extend(["--model", normalize_model_id(provider_cfg.get("cmd", ""), model)])
     if provider_cfg.get("supports_budget", True) and config.analysis_budget:
         args.extend(["--max-budget-usd", str(config.analysis_budget)])
     if provider_cfg.get("supports_turns", True) and config.max_turns is not None:
@@ -243,6 +258,19 @@ def _resolve_language(config: AnalysisConfig) -> str:
     return ""
 
 
+def _is_known_cli_provider(cmd: str) -> bool:
+    """Return True only if *cmd* matches a registered provider of type 'cli'.
+
+    ``cmd`` ultimately comes from the user-controlled AI_CMD/AI_PROVIDER env
+    var (see ``quodeq.shared._env.get_ai_cmd``) with no prior validation. Gate
+    subprocess execution to the known provider registry so a typo'd or
+    unexpected value fails closed instead of shelling out to an arbitrary
+    program. Only ``type == "cli"`` providers reach this CLI-register path;
+    API-type providers (ollama, omlx, custom, ...) never do.
+    """
+    return _get_provider_configs().get(cmd, {}).get("type") == "cli"
+
+
 def _register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = None) -> str | None:
     """Register the findings MCP server via `<cmd> mcp add`.
 
@@ -250,6 +278,9 @@ def _register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = 
     the cached name immediately.  Removes any stale registration first.
     Returns the server name on success, None on failure.
     """
+    if not _is_known_cli_provider(cmd):
+        _log.warning("Refusing to register MCP server: unknown CLI provider %r", cmd)
+        return None
     name = _mcp_server_name(config)
     key = f"{cmd}:{name}"
     with _cli_mcp_lock:
@@ -278,6 +309,8 @@ def _register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = 
 
 def _unregister_cli_mcp(cmd: str, name: str) -> None:
     """Remove the findings MCP server via `<cmd> mcp remove`."""
+    if not _is_known_cli_provider(cmd):
+        return
     try:
         subprocess.run(
             [cmd, "mcp", "remove", name],

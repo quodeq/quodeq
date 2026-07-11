@@ -2797,6 +2797,7 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 
 .scan-progress__bar {
+  display: flex;
   height: 6px;
   background: var(--color-surface-alt);
   border-radius: 3px;
@@ -2809,6 +2810,7 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 .scan-progress__bar-fill--done    { background: var(--color-success, #56d364); }
 .scan-progress__bar-fill--partial { background: var(--color-warn, #d29922); }
+.scan-progress__bar-fill--cached  { background: var(--color-accent); opacity: 0.35; }
 
 .scan-progress__meta {
   display: flex;
@@ -3053,20 +3055,23 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 
 /* ------------------------------------------------------------
-   evaluate-job-id-line — minimal mono row showing just the job
-   ID with a copy button. Replaces the old `term-meta-grid`
-   block that surfaced project / provider / repo redundantly.
+   evaluate-job-id-line — minimal mono grid showing the job ID
+   with a copy button on the first row, and the provider · model
+   chip beneath the id on a second row. Replaces the old
+   `term-meta-grid` block that surfaced project / provider / repo
+   redundantly.
    ------------------------------------------------------------ */
 .evaluate-job-id-line {
-  display: flex;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: var(--term-space-2);
+  row-gap: 2px;
   align-items: center;
-  gap: var(--term-space-2);
   padding: var(--term-space-1) 0;
   margin-bottom: var(--term-space-2);
   font-family: var(--term-font-mono);
   font-size: 11px;
   color: var(--color-text-muted);
-  flex-wrap: wrap;
 }
 .evaluate-job-id-line__label {
   text-transform: uppercase;
@@ -3079,3 +3084,22 @@ button.eval-provider-badge--clickable:focus-visible {
   padding: 0;
   font-family: var(--term-font-mono);
 }
+.evaluate-job-id-line__value {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--term-space-2);
+  min-width: 0;
+}
+.evaluate-job-id-line__model {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.verified-chip { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; border: none; border-radius: 50%; background: var(--color-accent); color: var(--color-on-accent); cursor: pointer; flex-shrink: 0; }
+.verified-chip:hover { opacity: 0.85; }
+/* Right-aligned action cluster: the verified chip (when present), fix plan,
+   and dismiss stay together and wrap as one unit. The group carries the auto
+   margin, so the inner fix plan yields its own. Rows keep today's layout when
+   the chip is absent. */
+.vdetail-row-main .vrow-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+.vdetail-row-main .vrow-actions .fix-plan-btn { margin-left: 0; }

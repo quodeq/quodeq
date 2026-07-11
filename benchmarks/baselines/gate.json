@@ -1,0 +1,7 @@
+{
+  "bootstrap": true,
+  "provider": "ollama",
+  "model": "gemma4:26b-mlx",
+  "threshold": 0.05,
+  "metrics": {}
+}

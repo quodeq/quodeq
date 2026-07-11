@@ -1,0 +1,19 @@
+{
+  "language": "python",
+  "exhaustive": true,
+  "clean_files": ["pipeline.py"],
+  "labels": [
+    {"file": "worker.py", "line": 9, "anchor": "except:",
+     "dimension": "reliability", "cwes": [703, 396, 390], "reqs": ["R-FT-1", "R-FT-7", "R-FT-14"],
+     "severity": "major", "note": "bare except swallows all errors"},
+    {"file": "client.py", "line": 5, "anchor": "requests.get(url)",
+     "dimension": "reliability", "cwes": [400, 1088], "reqs": ["R-AVL-4", "R-AVL-2"],
+     "severity": "major", "note": "network call without timeout"},
+    {"file": "client.py", "line": 10, "anchor": "while True:",
+     "dimension": "reliability", "cwes": [835], "reqs": ["R-FT-12", "R-AVL-3"],
+     "severity": "major", "note": "unbounded retry loop"},
+    {"file": "tempfile_io.py", "line": 2, "anchor": "open(path)",
+     "dimension": "reliability", "cwes": [772, 404], "reqs": ["R-REC-1", "R-REC-6"],
+     "severity": "minor", "note": "file handle never closed"}
+  ]
+}

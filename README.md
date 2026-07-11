@@ -6,7 +6,7 @@
 </p>
 
 <h2 align="center">AI-powered code quality and security scanner</h2>
-<p align="center"><strong>v1.5.2</strong></p>
+<p align="center"><strong>v1.6.0</strong></p>
 <p align="center">
   <a href="https://github.com/quodeq/quodeq/actions/workflows/test.yml"><img src="https://github.com/quodeq/quodeq/actions/workflows/test.yml/badge.svg" alt="Tests" /></a>
   <a href="https://github.com/quodeq/quodeq/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
@@ -19,11 +19,7 @@
 
 ---
 
-AI models can now autonomously find and exploit zero-day vulnerabilities across operating systems, browsers, and web applications. Thousands of previously unknown flaws uncovered in weeks, not years.
-
-The code you ship today will be read by models that can spot what humans miss. But the tools to prepare for this are locked behind enterprise contracts and partner programs.
-
-Quodeq exists to change that.
+AI models can now find vulnerabilities and design flaws that human review misses, but most tools that put this to work are locked behind enterprise contracts. Quodeq is the open alternative.
 
 **Open source. MIT license. Runs locally. No telemetry. No account. No servers.**
 
@@ -93,7 +89,7 @@ ollama serve    # runs in the background
 **Cloud, faster** — one of the agentic CLIs (at least one):
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) — `npm install -g @anthropic-ai/claude-code`
 - [Codex CLI](https://developers.openai.com/codex/quickstart) — `npm install -g @openai/codex`
-- [Gemini CLI](https://geminicli.com/docs/get-started/installation/) — `npm install -g @anthropic-ai/gemini-cli`
+- [Gemini CLI](https://geminicli.com/docs/get-started/installation/) — `npm install -g @google/gemini-cli`
 
 ### 4. Launch the dashboard
 
@@ -143,6 +139,28 @@ quodeq evaluate /path/to/project
 quodeq evaluate /path/to/project --scope src/api    # Scoped to a subdirectory
 quodeq evaluate /path/to/project -d security        # Single dimension
 ```
+
+### Excluding paths (`.quodeqignore`)
+
+To keep fixture, vendored, or generated code out of an evaluation, add a
+`.quodeqignore` file at the scan root. Each line is a glob pattern matched
+against paths relative to that root; a pattern that names a directory excludes
+everything under it. Blank lines and `#` comments are skipped, and `*` crosses
+directory separators.
+
+```gitignore
+# test fixtures with intentionally bad code
+benchmarks/corpus/
+tests/fixtures
+
+# generated files, at any depth
+*.gen.py
+*.min.js
+```
+
+Exclusions apply everywhere files are collected — full scans, `--scope` runs,
+monorepo subproject discovery, and `--diff-from` change detection — on top of
+the built-in skips (`node_modules`, `dist`, dot-directories, ...).
 
 ### SARIF / GitHub code scanning
 
@@ -231,6 +249,8 @@ Quodeq scores each principle on a 0 to 10 scale using four independent constrain
 ### Standards
 
 By default, Quodeq evaluates the six ISO 25010 dimensions. It also ships with **Clean Architecture** and **Domain-Driven Design** standards. You can create your own from the dashboard, or ask any AI to generate one as a `.json` file and import it.
+
+Numeric thresholds on the built-in standards (max function lines, max parameters, ...) can be tuned per project from the dashboard. Overrides live in `.quodeq/standards-overrides.json` at the repo root, so the whole team scans with the same numbers.
 
 ---
 

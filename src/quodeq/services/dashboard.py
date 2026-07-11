@@ -22,7 +22,9 @@ from quodeq.services.ports import (
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services._dashboard_trend import build_accumulated_trend
+from quodeq.services._trend_fetcher import make_trend_fetcher
 from quodeq.services.dim_resolution import is_eligible_for_default_view
+from quodeq.services.dismissed import filter_dismissed_from_dimensions
 
 _logger = logging.getLogger(__name__)
 
@@ -75,8 +77,9 @@ def _run_dim_cache_max(override: int | None = None, env: dict[str, str] | None =
 # / _collect_previous_scores / build_accumulated_trend all walk) cost ~750ms
 # per request even on warm calls. The shared cache eliminates the cross-request
 # I/O without compromising the per-request consistency guarantees (the cache
-# is keyed by (reports_root, project, run_id) and runs are immutable once
-# finalized).
+# is keyed by (reports_root, project, run_id, suppression_version) so a
+# dismiss/delete produces a new key and never serves a pre-suppression score,
+# and runs are immutable once finalized).
 #
 # Tests that need isolation can pass an explicit DashboardCacheConfig.
 _SHARED_RUN_DIM_CACHE, _SHARED_RUN_DIM_LOCK = OrderedDict(), threading.Lock()
@@ -144,12 +147,14 @@ def _make_run_dimension_fetcher(
     cache: OrderedDict[tuple, list[DimensionResult]] | None = None,
     lock: threading.Lock | None = None,
     max_size: int | None = None,
+    version: str = "",
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a cached fetcher for run dimension data (LRU, bounded).
 
     Defaults to the module-level shared cache so reads of the same run's
-    dimensions across requests reuse work. Tests pass explicit cache/lock to
-    isolate state.
+    dimensions across requests reuse work. *version* scopes the cache key to the
+    project's suppression state so a dismiss/delete invalidates it. Tests pass
+    explicit cache/lock to isolate state.
     """
     return make_lru_dimension_fetcher(
         reports_root,
@@ -157,7 +162,33 @@ def _make_run_dimension_fetcher(
         cache if cache is not None else _SHARED_RUN_DIM_CACHE,
         lock if lock is not None else _SHARED_RUN_DIM_LOCK,
         max_size if max_size is not None else _run_dim_cache_max(),
+        version=version,
     )
+
+
+def _rescore_run_dimensions(
+    dims: list[DimensionResult],
+    reports_root: Path,
+    project: str,
+    params: ScoringParams,
+) -> list[DimensionResult]:
+    """Apply the project-wide dismiss/delete rescore to a run's dimensions.
+
+    Identity when the project has no active dismissals/deletions. Otherwise each
+    dimension passes through the same ``_rescore_dimension`` transform the
+    accumulated view and the per-run explorer use, so every read path reports
+    the identical dismiss-adjusted score/grade.
+    """
+    from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
+    from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
+    from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
+
+    project_dir = reports_root / project
+    dismissed = dismissed_keys(project_dir)
+    deleted = deleted_keys(project_dir)
+    if not dismissed and not deleted:
+        return dims
+    return [_rescore_dimension(d, dismissed, deleted, params=params) for d in dims]
 
 
 def _count_eval_files(reports_root: Path, project: str, run_id: str) -> int:
@@ -183,6 +214,7 @@ def _make_status_aware_fetcher(
     cache: OrderedDict[tuple, list[DimensionResult]] | None = None,
     lock: threading.Lock | None = None,
     max_size: int | None = None,
+    version: str = "",
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a fetcher with two self-healing properties on top of the LRU cache.
 
@@ -203,7 +235,7 @@ def _make_status_aware_fetcher(
     resolved_lock = lock if lock is not None else _SHARED_RUN_DIM_LOCK
     cached = _make_run_dimension_fetcher(
         reports_root, project,
-        cache=resolved_cache, lock=resolved_lock, max_size=max_size,
+        cache=resolved_cache, lock=resolved_lock, max_size=max_size, version=version,
     )
     status_by_id = {r.run_id: r.status for r in runs}
 
@@ -216,7 +248,7 @@ def _make_status_aware_fetcher(
         # validate when an actual evaluation/ directory exists on disk:
         # without that anchor we'd evict every test stub that pre-seeds
         # the cache without creating disk state.
-        key = (reports_root, project, run_id)
+        key = (reports_root, project, run_id, version)
         if key in resolved_cache:
             eval_dir = reports_root / project / run_id / "evaluation"
             if eval_dir.is_dir():
@@ -285,6 +317,37 @@ def _attach_exit_reason_to_dim(
     return out
 
 
+def _attach_dismissed_count_to_dim(
+    dim_dict: dict[str, Any], dismissed_counts: dict[str, int],
+) -> dict[str, Any]:
+    """Add ``dismissedCount`` to a serialized dimension dict when > 0.
+
+    The count says how many of the scan's re-found violations were hidden by
+    the project-level dismissed filter, so the UI can explain the gap between
+    "what the scan found" and "what the view shows". Omitted when nothing was
+    filtered, mirroring the exitReason convention.
+    """
+    count = dismissed_counts.get(dim_dict.get("dimension") or "", 0)
+    if count <= 0:
+        return dim_dict
+    return {**dim_dict, "dismissedCount": count}
+
+
+def _slim_history_dim(dim: DimensionResult) -> dict[str, Any]:
+    """Serialize a history-context dimension without its finding bodies.
+
+    The previousByDimension / stalePreviousByDimension / staleDimensions keys
+    exist to carry scores, grades, and provenance (run id, dates) for trend
+    context; the UI reads only the scalar fields inlined on each selected-run
+    dimension (previousScore, trend, stale, fromRunId). No consumer reads the
+    violations/compliance arrays from these keys, yet on large projects they
+    dominated the payload: for a 201-run project, an old run's dashboard was
+    19.9 MB of which these three keys carried 18.6 MB of finding bodies.
+    Totals keep the counts; only the bodies are dropped.
+    """
+    return to_camel_dict(replace(dim, violations=[], compliance=[]))
+
+
 def _build_dashboard_result(
     project: str,
     runs: list[RunInfo],
@@ -292,10 +355,14 @@ def _build_dashboard_result(
     payload: _DashboardPayload,
     *,
     exit_reason: str | None = None,
+    dismissed_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Assemble the final dashboard response dict from pre-computed parts."""
     dim_dicts = [
-        _attach_exit_reason_to_dim(to_camel_dict(d), exit_reason)
+        _attach_dismissed_count_to_dim(
+            _attach_exit_reason_to_dim(to_camel_dict(d), exit_reason),
+            dismissed_counts or {},
+        )
         for d in payload.dimensions_with_trend
     ]
     return {
@@ -317,9 +384,9 @@ def _build_dashboard_result(
         },
         "trend": payload.trend,
         "dimensions": dim_dicts,
-        "previousByDimension": {k: to_camel_dict(v) for k, v in payload.previous_by_dimension.items()},
-        "stalePreviousByDimension": {k: to_camel_dict(v) for k, v in payload.stale_previous_by_dimension.items()},
-        "staleDimensions": [to_camel_dict(d) for d in payload.stale_dimensions],
+        "previousByDimension": {k: _slim_history_dim(v) for k, v in payload.previous_by_dimension.items()},
+        "stalePreviousByDimension": {k: _slim_history_dim(v) for k, v in payload.stale_previous_by_dimension.items()},
+        "staleDimensions": [_slim_history_dim(d) for d in payload.stale_dimensions],
     }
 
 
@@ -396,13 +463,39 @@ def _compute_dashboard_payload(
     else:
         history_runs = scoreable_runs[:max(max_history, selected_in_scoreable + 1)]
         history_index = selected_in_scoreable
-    # Status-aware fetcher: bypass cache for in_progress runs whose on-disk
-    # evaluation/*.json set grows as dims finish mid-run. Without this,
-    # the History page renders the partial dim set from the first read
-    # forever -- new dims that complete later never surface.
-    get_run_dimensions = _make_status_aware_fetcher(
-        reports_root, project, history_runs,
-        cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
+    # History fetcher: cache-backed, dismiss-adjusted, SCALAR-only -- the same
+    # fetcher the /scores endpoint uses. The three consumers below
+    # (_collect_previous_scores, collect_stale_dimensions, build_accumulated_trend)
+    # read only per-run scalars (dimension + overallScore + overallGrade), not
+    # the full violations. Reading + rescoring FULL data for every history run
+    # (up to _max_history_runs()) was the ~2s cost this replaces.
+    #
+    # In-progress freshness is preserved: the fast path re-reads each request
+    # (fresh per-call cache), and the heavy path's cacheable_run_ids guard makes
+    # in-progress runs compute-through without persisting a partial set. Stale-
+    # partial detection is preserved inside read_run_scalars, which falls back to
+    # full read_run_data whenever the SQL scalar projection disagrees with the
+    # on-disk evaluation/*.json count -- the same self-heal the old status-aware
+    # fetcher did via _count_eval_files. The dismiss-adjustment (Bug B) stays;
+    # it is now cached rather than recomputed on every request.
+    cacheable_run_ids = {r.run_id for r in history_runs if r.status == "complete"}
+    # Key the in-memory dimension cache by the project's suppression state so a
+    # dismiss/delete (or a formula change) invalidates warmed entries and no
+    # read path can serve a pre-dismiss score. ``score_cache_version`` already
+    # hashes dismissed + deleted keys + params. This fetcher is SHARED across the
+    # whole history window (previous-scores, stale-dimensions, and the trend all
+    # iterate many runs through it), so we keep the global project-scoped version
+    # here rather than a per-run scoped one -- per-run scoping only makes sense
+    # when a single run is in play, which this path is not.
+    from quodeq.services.score_cache import score_cache_version  # noqa: PLC0415
+    dim_cache_version = score_cache_version(reports_root / project, params)
+    get_run_dimensions = make_trend_fetcher(
+        reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
+        max_history=max_history,
+        base_fetcher_factory=lambda rr, proj: _make_run_dimension_fetcher(
+            rr, proj, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
+            version=dim_cache_version,
+        ),
     )
     previous_by_dimension = _collect_previous_scores(
         history_runs, history_index, selected_dim_names, get_run_dimensions,
@@ -452,11 +545,27 @@ def build_dashboard(
         }
 
     selected_run, selected_index = _resolve_selected_run(runs, run)
-    # read_run_data overlays the SQL grade tables for event-log runs, so the
-    # selected run's dims (and the summary derived from them) already reflect
-    # dismisses and any applied grade formula. Passing *params* keeps the
-    # aggregate threshold labels and dimension weights in sync.
-    selected_dims = read_run_data(reports_root, project, selected_run.run_id)
+    # ``read_run_data`` overlays the run's SQL grade tables, but those grades
+    # only reflect dismissals projected into THIS run and NOT project-wide
+    # dismissals/deletions that accrued later -- so the raw selected-run score
+    # can disagree with the accumulated overview. Rescore the selected run's
+    # dimensions with the SAME project-wide ``_rescore_dimension`` transform the
+    # accumulated view and the per-run explorer use, so every path reports the
+    # identical dismiss-adjusted score/grade AND drops the dismissed + deleted
+    # violations from the counts. ``read_run_data`` stays the dimension source
+    # here (a stable seam other callers and tests inject through).
+    project_dir = reports_root / project
+    raw_dims = read_run_data(reports_root, project, selected_run.run_id)
+    # ``dismissedCount`` reports how many of the scan's re-found violations were
+    # hidden by the *dismissed* filter specifically (deletions are a separate,
+    # permanent suppression), so measure it against the dismissed-only filter.
+    pre_filter_counts = {d.dimension: len(d.violations) for d in raw_dims}
+    dismissed_only = filter_dismissed_from_dimensions(raw_dims, project_dir)
+    dismissed_counts = {
+        (d.dimension or ""): pre_filter_counts.get(d.dimension, 0) - len(d.violations)
+        for d in dismissed_only
+    }
+    selected_dims = _rescore_run_dimensions(raw_dims, reports_root, project, params)
     ctx = _SelectedRunContext(
         run=selected_run,
         index=selected_index,
@@ -466,5 +575,6 @@ def build_dashboard(
     payload = _compute_dashboard_payload(reports_root, project, runs, ctx, cc, params)
     exit_reason = _read_run_exit_reason(reports_root, project, selected_run.run_id)
     return _build_dashboard_result(
-        project, runs, selected_run, payload, exit_reason=exit_reason,
+        project, runs, selected_run, payload,
+        exit_reason=exit_reason, dismissed_counts=dismissed_counts,
     )

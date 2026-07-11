@@ -80,11 +80,16 @@ class RunLifecycleContext:
 
     def __enter__(self) -> "RunLifecycleContext":
         cancellation.reset()
-        self._write(RunState.PENDING)
-        self._seed_dimension_states()
+        # Handlers and the atexit fallback must be in place before status.json
+        # first appears on disk: external cancellers (dashboard, e2e tests)
+        # treat its existence as "safe to signal", so a SIGTERM landing in the
+        # gap would hit the default handler and kill the run with the status
+        # stuck at pending.
         self._install_signal_handlers()
         atexit.register(self._finalize_on_atexit)
         self._atexit_registered = True
+        self._write(RunState.PENDING)
+        self._seed_dimension_states()
         self._transition(RunState.RUNNING)
         self._heartbeat.start()
         self._resources.start()

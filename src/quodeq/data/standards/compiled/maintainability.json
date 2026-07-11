@@ -15,7 +15,7 @@
         {
           "id": "M-MOD-1",
           "source": "iso25010",
-          "text": "Cyclomatic complexity MUST be \u226410 per function",
+          "text": "Cyclomatic complexity MUST be \u2264{max_complexity} per function",
           "severity": null,
           "scope": null,
           "refs": [
@@ -31,7 +31,16 @@
               "name": "Function cyclomatic complexity MUST be \u226410",
               "url": "https://www.it-cisq.org/coding-rules/"
             }
-          ]
+          ],
+          "params": {
+            "max_complexity": {
+              "label": "Max cyclomatic complexity",
+              "type": "int",
+              "default": 10,
+              "min": 1,
+              "max": 100
+            }
+          }
         },
         {
           "id": "M-MOD-2",
@@ -78,7 +87,7 @@
         {
           "id": "M-MOD-4",
           "source": "iso25010",
-          "text": "Functions MUST have \u22645 parameters; use an options object for more",
+          "text": "Functions MUST have \u2264{max_params} parameters; use an options object for more",
           "severity": null,
           "scope": null,
           "refs": [
@@ -94,7 +103,16 @@
               "name": "Functions MUST have \u22645 parameters",
               "url": "https://www.it-cisq.org/coding-rules/"
             }
-          ]
+          ],
+          "params": {
+            "max_params": {
+              "label": "Max function parameters",
+              "type": "int",
+              "default": 5,
+              "min": 1,
+              "max": 30
+            }
+          }
         },
         {
           "id": "M-MOD-6",
@@ -120,7 +138,7 @@
         {
           "id": "M-MOD-7",
           "source": "iso25010",
-          "text": "Inheritance depth MUST NOT exceed 4 levels",
+          "text": "Inheritance depth MUST NOT exceed {max_inheritance_depth} levels",
           "severity": null,
           "scope": null,
           "refs": [
@@ -136,7 +154,16 @@
               "name": "Inheritance depth MUST NOT exceed 4 levels",
               "url": "https://www.it-cisq.org/coding-rules/"
             }
-          ]
+          ],
+          "params": {
+            "max_inheritance_depth": {
+              "label": "Max inheritance depth",
+              "type": "int",
+              "default": 4,
+              "min": 1,
+              "max": 20
+            }
+          }
         },
         {
           "id": "M-MOD-8",
@@ -515,7 +542,7 @@
         {
           "id": "M-ANA-1",
           "source": "iso25010",
-          "text": "Source files MUST NOT exceed 300 lines",
+          "text": "Source files MUST NOT exceed {max_file_lines} lines",
           "severity": null,
           "scope": null,
           "refs": [
@@ -531,12 +558,21 @@
               "name": "Source files MUST NOT exceed language-appropriate line limits",
               "url": "https://www.it-cisq.org/coding-rules/"
             }
-          ]
+          ],
+          "params": {
+            "max_file_lines": {
+              "label": "Max source file lines",
+              "type": "int",
+              "default": 300,
+              "min": 50,
+              "max": 5000
+            }
+          }
         },
         {
           "id": "M-ANA-2",
           "source": "iso25010",
-          "text": "Functions MUST NOT exceed 50 lines",
+          "text": "Functions MUST NOT exceed {max_lines} lines",
           "severity": null,
           "scope": null,
           "refs": [
@@ -552,12 +588,21 @@
               "name": "Source files MUST NOT exceed language-appropriate line limits",
               "url": "https://www.it-cisq.org/coding-rules/"
             }
-          ]
+          ],
+          "params": {
+            "max_lines": {
+              "label": "Max function lines",
+              "type": "int",
+              "default": 50,
+              "min": 10,
+              "max": 500
+            }
+          }
         },
         {
           "id": "M-ANA-3",
           "source": "iso25010",
-          "text": "Nesting depth MUST NOT exceed 4 levels",
+          "text": "Nesting depth MUST NOT exceed {max_depth} levels",
           "severity": null,
           "scope": null,
           "refs": [
@@ -573,7 +618,16 @@
               "name": "Function cyclomatic complexity MUST be \u226410",
               "url": "https://www.it-cisq.org/coding-rules/"
             }
-          ]
+          ],
+          "params": {
+            "max_depth": {
+              "label": "Max nesting depth",
+              "type": "int",
+              "default": 4,
+              "min": 1,
+              "max": 20
+            }
+          }
         },
         {
           "id": "M-ANA-4",

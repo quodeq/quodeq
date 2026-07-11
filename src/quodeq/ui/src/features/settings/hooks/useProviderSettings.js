@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { providerKey } from '../../../constants.js';
+import { providerKey, notifyProviderSettingsChanged } from '../../../constants.js';
 
 const SETTINGS = ['model', 'model-analysis', 'model-fast', 'model-balanced', 'model-thorough', 'subagents', 'time-limit', 'per-dimension', 'verify', 'api-key', 'api-base'];
 const DEFAULTS = {
@@ -54,6 +54,9 @@ export default function useProviderSettings(providerId, defaults, { storage = lo
   const update = useCallback((key, value) => {
     setState(prev => ({ ...prev, [key]: String(value) }));
     saveProviderSetting(providerId, key, value, storage);
+    // Let the assistant gate re-read: in Default mode it mirrors the analysis
+    // model, so a model change here must update its display live.
+    notifyProviderSettingsChanged();
   }, [providerId, storage]);
 
   return { state, update };

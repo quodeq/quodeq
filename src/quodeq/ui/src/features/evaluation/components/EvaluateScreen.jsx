@@ -113,7 +113,7 @@ function NoProjectSelected({ onGoToProjects }) {
 
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
-  const { selectedProject, projectInfo, jobProjectInfo } = context;
+  const { selectedProject, projectInfo, jobProjectInfo, preselectDims } = context;
   const { onStart: onStartEvaluation, onDismiss, onCancel, onGoToProjects, onGoToSettings } = actions;
   const [toastKey, setToastKey] = useState(0);
   const [toastVisible, setToastVisible] = useState(false);
@@ -134,7 +134,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
 
       <div className="evaluate-content">
         {!job && selectedProject && (
-          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={wrappedOnStart} disabled={false} />
+          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={wrappedOnStart} disabled={false} preselectDims={preselectDims} />
         )}
 
         {!job && !selectedProject && (

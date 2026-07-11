@@ -108,6 +108,15 @@ def validate_import(data: dict) -> dict:
     return {"valid": True, "errors": [], "data": cleaned}
 
 
+def scan_text(text: str) -> list[str]:
+    """Return injection warnings for arbitrary untrusted text (empty == clean)."""
+    findings = []
+    for pattern in _INJECTION_PATTERNS:
+        if pattern.search(text):
+            findings.append(f"suspicious content matches {pattern.pattern!r}")
+    return findings
+
+
 def scan_injection(data: dict) -> list[str]:
     """Scan all string fields for potential LLM injection patterns.
 
@@ -116,6 +125,8 @@ def scan_injection(data: dict) -> list[str]:
     warnings: list[str] = []
 
     def _check(text: str, location: str) -> None:
+        if not scan_text(text):
+            return
         for pattern in _INJECTION_PATTERNS:
             m = pattern.search(text)
             if m:

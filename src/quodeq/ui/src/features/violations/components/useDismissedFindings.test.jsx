@@ -1,7 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useDismissedFindings } from './useDismissedFindings.js';
+
+// useDismissedFindings now reads useQueryClient() to fold restore/delete deltas
+// into the RQ caches. Wrap renderHook in a provider so the hook has a client.
+function withQueryClient() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  const wrapper = ({ children }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+  return { wrapper };
+}
 
 vi.mock('../../../api/index.js', () => ({
   listDismissedFindings: vi.fn(),
@@ -44,7 +57,7 @@ describe('useDismissedFindings — restore handlers', () => {
     restoreFinding.mockResolvedValueOnce({ ok: true });
     const onRefresh = vi.fn();
     const setRestoreError = vi.fn();
-    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError), withQueryClient());
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
 
     await act(async () => { await result.current.handleRestore(sampleA); });
@@ -60,7 +73,7 @@ describe('useDismissedFindings — restore handlers', () => {
     restoreFinding.mockRejectedValueOnce(new Error('boom'));
     const onRefresh = vi.fn();
     const setRestoreError = vi.fn();
-    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError), withQueryClient());
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
 
     await act(async () => { await result.current.handleRestore(sampleA); });
@@ -75,7 +88,7 @@ describe('useDismissedFindings — restore handlers', () => {
     restoreAllFindings.mockResolvedValueOnce({ ok: true, restored: 2 });
     const onRefresh = vi.fn();
     const setRestoreError = vi.fn();
-    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError), withQueryClient());
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
 
     await act(async () => { await result.current.handleRestoreAll(); });
@@ -92,7 +105,7 @@ describe('useDismissedFindings — handleDelete', () => {
     deleteFinding.mockResolvedValueOnce({ ok: true, swept: 1 });
     const onRefresh = vi.fn();
     const setRestoreError = vi.fn();
-    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError), withQueryClient());
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
 
     await act(async () => { await result.current.handleDelete(sampleA); });
@@ -112,7 +125,7 @@ describe('useDismissedFindings — handleDelete', () => {
     const dupA = { ...sampleA, line: 99 };
     listDismissedFindings.mockResolvedValueOnce([sampleA, dupA, sampleB]);
     deleteFinding.mockResolvedValueOnce({ ok: true, swept: 2 });
-    const { result } = renderHook(() => useDismissedFindings('proj', vi.fn(), vi.fn()));
+    const { result } = renderHook(() => useDismissedFindings('proj', vi.fn(), vi.fn()), withQueryClient());
     await waitFor(() => expect(result.current.dismissed).toHaveLength(3));
 
     await act(async () => { await result.current.handleDelete(sampleA); });
@@ -125,7 +138,7 @@ describe('useDismissedFindings — handleDelete', () => {
     deleteFinding.mockRejectedValueOnce(new Error('boom'));
     const onRefresh = vi.fn();
     const setRestoreError = vi.fn();
-    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError), withQueryClient());
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
 
     await act(async () => { await result.current.handleDelete(sampleA); });
@@ -143,7 +156,7 @@ describe('useDismissedFindings — handleDeleteAll', () => {
     deleteAllFindings.mockResolvedValueOnce({ ok: true, deleted: 2 });
     const onRefresh = vi.fn();
     const setRestoreError = vi.fn();
-    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError), withQueryClient());
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
 
     await act(async () => { await result.current.handleDeleteAll(); });
@@ -165,7 +178,7 @@ describe('useDismissedFindings — handleDeleteAll', () => {
     confirmDialog.mockResolvedValueOnce(false);
     const onRefresh = vi.fn();
     const setRestoreError = vi.fn();
-    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError), withQueryClient());
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
 
     await act(async () => { await result.current.handleDeleteAll(); });
@@ -182,7 +195,7 @@ describe('useDismissedFindings — handleDeleteAll', () => {
     deleteAllFindings.mockRejectedValueOnce(new Error('boom'));
     const onRefresh = vi.fn();
     const setRestoreError = vi.fn();
-    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError));
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError), withQueryClient());
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
 
     await act(async () => { await result.current.handleDeleteAll(); });

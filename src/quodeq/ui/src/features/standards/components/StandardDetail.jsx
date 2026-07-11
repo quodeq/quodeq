@@ -62,7 +62,7 @@ function RootDetail({ standard, onUpdateField, editable, isNew }) {
   );
 }
 
-export default function StandardDetail({ standard, selectedNode, onUpdateField, editable, isNew }) {
+export default function StandardDetail({ standard, selectedNode, onUpdateField, editable, isNew, overrides, onChangeParam }) {
   if (!selectedNode || !standard) return null;
 
   if (selectedNode.type === 'root') {
@@ -89,11 +89,14 @@ export default function StandardDetail({ standard, selectedNode, onUpdateField, 
     if (!requirement) return null;
     return (
       <RequirementForm
+        key={requirement.id}
         requirement={requirement}
         principleIndex={selectedNode.principleIndex}
         reqIndex={selectedNode.reqIndex}
         onUpdateField={onUpdateField}
         editable={editable}
+        reqOverrides={overrides?.[requirement.id]}
+        onChangeParam={onChangeParam ? (name, v) => onChangeParam(requirement.id, name, v) : undefined}
       />
     );
   }

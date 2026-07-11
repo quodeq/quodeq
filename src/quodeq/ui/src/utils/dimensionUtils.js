@@ -13,6 +13,17 @@ export function withDimensionsStr(files) {
 }
 
 /**
+ * Run-based delta fallback for a dimension when no period-aware trend entry is
+ * available (defensive; the accumulated overview always supplies dimTrends).
+ * Returns overallScore - previousScore, or null when either is not numeric.
+ */
+export function fallbackDelta(dim) {
+  const curr = parseFloat(dim.overallScore);
+  const prev = parseFloat(dim.previousScore);
+  return !Number.isNaN(curr) && !Number.isNaN(prev) ? curr - prev : null;
+}
+
+/**
  * Sort dimensions by violation severity (critical > major > minor),
  * keeping only dimensions that have at least one violation.
  */

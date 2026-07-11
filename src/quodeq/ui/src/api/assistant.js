@@ -1,0 +1,58 @@
+import { request, BASE } from './request.js';
+
+export function createAssistantSession(payload) {
+  return request('/assistant/sessions', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function postAssistantMessage(sessionId, body) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/messages`,
+    { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function stopAssistantTurn(sessionId) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/stop`,
+    { method: 'POST' });
+}
+
+export function applyAssistantAction(actionId) {
+  return request(`/assistant/actions/${encodeURIComponent(actionId)}/apply`, { method: 'POST' });
+}
+
+export function rejectAssistantAction(actionId) {
+  return request(`/assistant/actions/${encodeURIComponent(actionId)}/reject`, { method: 'POST' });
+}
+
+export function assistantEventsUrl(sessionId, afterSeq = 0) {
+  return `${BASE}/assistant/sessions/${encodeURIComponent(sessionId)}/events?after=${afterSeq}`;
+}
+
+export function fetchAssistantCatalog() {
+  return request('/assistant/skills');
+}
+
+export function fetchAssistantWorkspace(sessionId) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/workspace`);
+}
+
+export function fetchAssistantWorkspaceDiff(sessionId) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/workspace/diff`);
+}
+
+// Mutations run git push + gh, each up to ~120s, so they use a longer client
+// timeout than the 30s default to avoid falsely reporting a failure mid-flight.
+const WORKSPACE_MUTATION_TIMEOUT_MS = 300000;
+
+export function applyAssistantWorkspace(sessionId) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/workspace/apply`,
+    { method: 'POST', timeout: WORKSPACE_MUTATION_TIMEOUT_MS });
+}
+
+export function createAssistantWorkspacePr(sessionId, body) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/workspace/pr`,
+    { method: 'POST', body: JSON.stringify(body), timeout: WORKSPACE_MUTATION_TIMEOUT_MS });
+}
+
+export function discardAssistantWorkspace(sessionId) {
+  return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/workspace/discard`,
+    { method: 'POST', timeout: WORKSPACE_MUTATION_TIMEOUT_MS });
+}

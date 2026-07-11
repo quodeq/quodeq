@@ -232,7 +232,7 @@ def process_dimension_with_cache(
         # once per process. Best-effort: never blocks the run.
         maybe_collect_legacy_entries(cache.root)
 
-    files, _ext = _list_source_files(config, dim_id)
+    files, _ext, _excluded = _list_source_files(config, dim_id)
     if not files:
         # Nothing to classify — defer to existing path so the no-files
         # warning + single-agent fallback runs unchanged.

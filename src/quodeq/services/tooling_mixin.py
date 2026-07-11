@@ -248,7 +248,7 @@ class FsToolingMixin:
             result = subprocess.run(
                 [client_id, "/models"],
                 capture_output=True,
-                text=True,
+                text=True, encoding="utf-8",
                 timeout=_CLI_MODEL_TIMEOUT_S,
             )
             output = result.stdout if result.returncode == 0 else ""

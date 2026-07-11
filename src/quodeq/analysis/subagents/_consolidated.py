@@ -115,6 +115,7 @@ def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: Any) -> str:
             manifest=config.manifest,
             target=config.target,
             work_dir=config.work_dir or config.src,
+            project_root=config.src,
         ),
     )
 
@@ -127,7 +128,7 @@ def process_consolidated_dimensions(
     evidence_dir = config.work_dir or config.src
 
     # 1. List source files
-    files, extensions = _list_source_files(config, dimensions[0])
+    files, extensions, _excluded = _list_source_files(config, dimensions[0])
     if not files:
         log_warning("No source files for consolidated analysis")
         return {}

@@ -12,6 +12,15 @@ _ALT_PORT_ORIGINS = [
     f"http://localhost:{p}" for p in (4180, 4181, 4182, 4183)
 ]
 
+# ws:// alt-port origins for the terminal WebSocket (Task 5). WebKit/pywebview
+# enforces CSP against the WebSocket handshake scheme, so http:// alone does
+# not cover it — each alt port needs an explicit ws:// entry too.
+_WS_ALT_PORT_ORIGINS = [
+    f"ws://127.0.0.1:{p}" for p in (4180, 4181, 4182, 4183)
+] + [
+    f"ws://localhost:{p}" for p in (4180, 4181, 4182, 4183)
+]
+
 
 @pytest.fixture(scope="module")
 def csp():
@@ -70,6 +79,44 @@ def test_csp_connect_src_includes_alt_port_origins(csp):
         assert origin in connect_src, (
             f"connect-src must include alt-port origin {origin!r} "
             f"(probed by useServerHealth.js)"
+        )
+
+
+def test_csp_connect_src_includes_ws_sources(csp):
+    """connect-src must list ws:// sources for the terminal WebSocket (Task 5).
+
+    WebKit/pywebview enforces CSP against the WebSocket handshake's scheme,
+    so the terminal's ws:// connection to the alt-port server and to the
+    same-origin server both need explicit connect-src entries — the http://
+    alt-port origins already covered by
+    test_csp_connect_src_includes_alt_port_origins do not authorize ws://.
+    """
+    connect_src = _directive(csp, "connect-src")
+    assert connect_src is not None, "connect-src must be present in CSP"
+
+    # Spot-check loopback alt-port ws origins, then check the full set.
+    assert "ws://127.0.0.1:4180" in connect_src
+    assert "ws://localhost:4183" in connect_src
+    for origin in _WS_ALT_PORT_ORIGINS:
+        assert origin in connect_src, (
+            f"connect-src must include ws alt-port origin {origin!r} "
+            f"(terminal WebSocket, Task 5)"
+        )
+
+    # Same-origin ws source for the request's host. The Flask test client
+    # sends Host: localhost, so request.host renders as bare "localhost"
+    # (no port) — check exact tokens to avoid matching the ws://localhost:PORT
+    # alt-port entries above as a false-positive substring.
+    tokens = connect_src.split()
+    assert "ws://localhost" in tokens, "connect-src must include same-origin ws:// source"
+    assert "wss://localhost" in tokens, "connect-src must include same-origin wss:// source"
+
+    # Regression guard: adding ws:// sources must be additive, not a swap —
+    # the pre-existing http:// alt-port origins must still be present.
+    for origin in _ALT_PORT_ORIGINS:
+        assert origin in connect_src, (
+            f"connect-src must still include http alt-port origin {origin!r} "
+            f"(regression: ws:// sources must not replace http:// ones)"
         )
 
 

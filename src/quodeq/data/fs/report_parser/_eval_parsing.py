@@ -35,7 +35,7 @@ def parse_eval_from_json(
         _logger.warning("Failed to parse evaluation %s: %s", json_path.name, exc)
         return None
 
-    canonical = principle_names_for_dimension(dimension, compiled_dir)
+    canonical = principle_names_for_dimension(dimension, compiled_dir=compiled_dir)
 
     def _in_standard(name: Any) -> bool:
         # Permissive when no standard is available (canonical empty).

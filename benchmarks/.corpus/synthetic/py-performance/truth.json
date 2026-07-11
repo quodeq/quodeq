@@ -1,0 +1,19 @@
+{
+  "language": "python",
+  "exhaustive": true,
+  "clean_files": ["cache.py"],
+  "labels": [
+    {"file": "report_gen.py", "line": 7, "end_line": 9, "anchor": "conn.execute(",
+     "dimension": "performance", "cwes": [1084], "reqs": ["P-TIM-1"],
+     "severity": "major", "note": "database query inside a loop (N+1)"},
+    {"file": "report_gen.py", "line": 10, "anchor": "summary = summary +",
+     "dimension": "performance", "cwes": [1046, 1084], "reqs": ["P-TIM-4"],
+     "severity": "minor", "note": "string concatenation in a loop"},
+    {"file": "fetcher.py", "line": 10, "end_line": 12, "anchor": "first = await fetch_one",
+     "dimension": "performance", "cwes": [1088], "reqs": ["P-TIM-2"],
+     "severity": "major", "note": "sequential awaits on independent calls"},
+    {"file": "fetcher.py", "line": 17, "anchor": "with open(path)",
+     "dimension": "performance", "cwes": [1088], "reqs": ["P-TIM-3"],
+     "severity": "major", "note": "blocking file I/O inside async function"}
+  ]
+}

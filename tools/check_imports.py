@@ -19,9 +19,11 @@ LAYER_RULES = {
     # from the app (a leaf), and is consumed by api, dashboard, and the CLI.
     # Empty rule + the implicit self/cross-cutting allowances keep it a leaf.
     "update": set(),
-    "api": {"core", "services", "update"},
+    "api": {"core", "services", "update", "assistant", "terminal"},
     "analysis": {"core", "engine", "data", "services"},
     "dashboard": {"services", "api", "update"},
+    "assistant": {"core", "data", "services", "llm_bridge"},
+    "terminal": {"core"},
 }
 CROSS_CUTTING = {"shared", "config"}
 IMPORT_RE = re.compile(

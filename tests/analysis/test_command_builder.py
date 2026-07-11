@@ -36,11 +36,31 @@ _CODEX_CFG = {
         "cmd_subcommand": "exec",
         "base_args": "--json --dangerously-bypass-approvals-and-sandbox",
         "prompt_style": "positional",
-        "mcp_style": "cli-register",
+        "mcp_style": "config-arg",
         "supports_tools": False,
         "supports_budget": False,
         "supports_turns": False,
         "mcp_permission_args": [],
+        "env_set_if_missing": {},
+        "env_remove": [],
+    }
+}
+
+
+_GEMINI_CFG = {
+    "gemini": {
+        "type": "cli",
+        "cmd": "gemini",
+        "cmd_subcommand": "",
+        "base_args": "--output-format stream-json --yolo",
+        "prompt_style": "flag",
+        "prompt_flag": "-p",
+        "mcp_style": "cli-register",
+        "mcp_add_separator": False,
+        "mcp_permission_args": ["--allowed-mcp-server-names", "quodeq-findings"],
+        "supports_tools": False,
+        "supports_budget": False,
+        "supports_turns": False,
         "env_set_if_missing": {},
         "env_remove": [],
     }
@@ -128,14 +148,89 @@ class TestBuildAiCmdCodex:
         idx = args.index("--model")
         assert args[idx + 1] == "gpt-5.4"
 
-    def test_skips_mcp_even_with_jsonl(self, tmp_path):
+    def test_normalizes_numeric_model_shorthand(self):
+        config = AnalysisConfig(ai_cmd="codex", ai_model="5.4")
+        with _patch_providers(_CODEX_CFG):
+            args, _ = _build_ai_cmd("Analyze", config)
+        idx = args.index("--model")
+        assert args[idx + 1] == "gpt-5.4"
+
+    def test_inlines_codex_mcp_config_arg_with_jsonl(self, tmp_path):
+        import sys
+        import tomllib
+
         jsonl = tmp_path / "findings.jsonl"
         jsonl.touch()
+        queue = tmp_path / "queue.json"
         config = AnalysisConfig(
             ai_cmd="codex", ai_model="gpt-5.4",
             jsonl_file=jsonl, compiled_dir=tmp_path, dimension="security",
+            queue_path=queue, agent_id="agent-0",
         )
         with _patch_providers(_CODEX_CFG):
             args, mcp_path = _build_ai_cmd("Analyze", config)
-        assert "--mcp-config" not in args
+
         assert mcp_path is None
+        assert "--mcp-config" not in args
+        assert args[-1] == "Analyze"
+
+        mcp_arg = next(a for a in args if str(a).startswith("mcp_servers.findings="))
+        assert args[args.index(mcp_arg) - 1] == "-c"
+        server = tomllib.loads(mcp_arg)["mcp_servers"]["findings"]
+        assert server["command"] == sys.executable
+        assert "quodeq.analysis.mcp.findings_server" in server["args"]
+        assert str(jsonl.resolve()) in server["args"]
+        assert "--queue" in server["args"] and str(queue.resolve()) in server["args"]
+        assert "--agent-id" in server["args"] and "agent-0" in server["args"]
+
+
+class TestBuildAiCmdGemini:
+    """Gemini provider command building (cli-register MCP style)."""
+
+    def test_cli_register_emits_permission_args_with_jsonl(self, tmp_path):
+        jsonl = tmp_path / "findings.jsonl"
+        jsonl.touch()
+        config = AnalysisConfig(
+            ai_cmd="gemini", ai_model="gemini-2.5-pro",
+            jsonl_file=jsonl, compiled_dir=tmp_path, dimension="security",
+        )
+        with _patch_providers(_GEMINI_CFG):
+            args, mcp_path = _build_ai_cmd("Analyze", config)
+        # Server registration happens out-of-band (`gemini mcp add`), so no
+        # config file or inline config — but the CLI must still be told the
+        # registered server is allowed, or every tool call is blocked.
+        assert mcp_path is None
+        assert "--mcp-config" not in args
+        assert "-c" not in args
+        idx = args.index("--allowed-mcp-server-names")
+        assert args[idx + 1] == "quodeq-findings"
+
+    def test_cli_register_no_mcp_args_without_jsonl(self):
+        config = AnalysisConfig(ai_cmd="gemini", ai_model="gemini-2.5-pro")
+        with _patch_providers(_GEMINI_CFG):
+            args, mcp_path = _build_ai_cmd("Analyze", config)
+        assert mcp_path is None
+        assert "--allowed-mcp-server-names" not in args
+
+    def test_prompt_via_flag_and_stream_json(self):
+        config = AnalysisConfig(ai_cmd="gemini", ai_model="gemini-2.5-pro")
+        with _patch_providers(_GEMINI_CFG):
+            args, _ = _build_ai_cmd("Analyze this", config)
+        assert args[0] == "gemini"
+        assert "--yolo" in args
+        pidx = args.index("-p")
+        assert args[pidx + 1] == "Analyze this"
+
+
+class TestBuildAnalysisEnv:
+    def test_provider_api_key_survives_env_filtering(self):
+        # API providers read their key from the environment at analysis time
+        # (see _resolve_provider_config); the sensitive-key filter must never
+        # grow to swallow provider api_key_env variables.
+        from quodeq.analysis._command import _build_analysis_env
+
+        env = {"OPENROUTER_API_KEY": "sk-or-x", "QUODEQ_API_KEY": "internal", "PATH": "/usr/bin"}
+        with _patch_providers({"openrouter": {"type": "api"}}):
+            out = _build_analysis_env("openrouter", env=env)
+        assert out.get("OPENROUTER_API_KEY") == "sk-or-x"
+        assert "QUODEQ_API_KEY" not in out

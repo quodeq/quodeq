@@ -108,6 +108,7 @@ def make_lru_dimension_fetcher(
     lock: threading.Lock,
     max_size: int,
     reader: _Reader | None = None,
+    version: str = "",
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a callable that fetches dimension data for a run.
 
@@ -122,7 +123,7 @@ def make_lru_dimension_fetcher(
     ctx = _CacheContext(cache=cache, lock=lock, max_size=max_size, reader=reader)
 
     def get_run_dimensions(run_id: str) -> list[DimensionResult]:
-        key = (reports_root, project, run_id)
+        key = (reports_root, project, run_id, version)
 
         cached = _cache_lookup(key, ctx)
         if cached is not None:

@@ -53,13 +53,14 @@ function SeverityBadgeRow({ severity, onSeverityClick }) {
   );
 }
 
-function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNavigate }) {
+export function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNavigate }) {
   const dateLabel = dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId);
   const scoreNum = parseFloat(runSummary.numericAverage);
   const scoreDisplay = isNaN(scoreNum) ? '—' : scoreNum.toFixed(1);
   const grade = runSummary.overallGrade;
   const violations = runSummary.totalViolations || 0;
   const compliance = runSummary.totalCompliance || 0;
+  const dismissed = runSummary.dismissed || 0;
   const totalChecks = violations + compliance;
   const ratio = complianceRatio(violations, compliance);
 
@@ -81,7 +82,14 @@ function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNavigate }
         <Stat
           label="VIOLATIONS"
           value={violations}
-          hint={<SeverityBadgeRow severity={runSummary.severity} onSeverityClick={handleSeverity} />}
+          hint={
+            <>
+              <SeverityBadgeRow severity={runSummary.severity} onSeverityClick={handleSeverity} />
+              {dismissed > 0 && (
+                <span className="term-stat__dismissed-note">{dismissed} dismissed hidden</span>
+              )}
+            </>
+          }
           onClick={handleViolations}
           ariaLabel={violations > 0 ? 'Show all violations for this run' : undefined}
         />
@@ -182,26 +190,27 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, projectName
   }, [dashboard]);
 
   const isLoading = !dashboard || !dashboard.dimensions;
+  if (isLoading) {
+    return (
+      <div className="run-overview-fade run-overview-loading">
+        <div className="run-overview-spinner"><LoadingScreen /></div>
+      </div>
+    );
+  }
   const dimCount = (dashboard?.dimensions || []).length;
 
   return (
-    <div className={`run-overview-fade ${isLoading ? 'run-overview-loading' : 'run-overview-ready'}`}>
-      {isLoading ? (
-        <div className="run-overview-spinner"><LoadingScreen /></div>
-      ) : (
-        <>
-          <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} runSummary={runSummary} onCardNavigate={onCardNavigate} />
-          <section className="quality-dimensions" aria-label="Quality dimensions">
-            <div className="quality-dimensions__head">
-              <SectionLabel>quality_dimensions · {dimCount}</SectionLabel>
-            </div>
-            <div className="dimensions-panel">
-              <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} trendDeltas={trendDeltas} />
-            </div>
-          </section>
-          <RunFileViolations runTopFiles={runTopFiles} onFileClick={onFileClick} />
-        </>
-      )}
+    <div className="run-overview-fade run-overview-ready">
+      <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} runSummary={runSummary} onCardNavigate={onCardNavigate} />
+      <section className="quality-dimensions" aria-label="Quality dimensions">
+        <div className="quality-dimensions__head">
+          <SectionLabel>quality_dimensions · {dimCount}</SectionLabel>
+        </div>
+        <div className="dimensions-panel">
+          <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} trendDeltas={trendDeltas} />
+        </div>
+      </section>
+      <RunFileViolations runTopFiles={runTopFiles} onFileClick={onFileClick} />
     </div>
   );
 }

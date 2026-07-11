@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from quodeq.services.violations import (
+    _deleted_key_for_violation,
     _dismissed_key_for_violation,
     _filter_dismissed_from_result,
     _max_violation_files,
@@ -42,6 +43,27 @@ class TestDismissedKeyForViolation:
     def test_line_zero_explicit(self):
         v = {"req": "R", "file": "f.py", "line": 0}
         assert _dismissed_key_for_violation(v) == ("R", "f.py", 0)
+
+
+class TestDeletedKeyForViolation:
+    def test_camel_case_practice_id(self):
+        v = {"practiceId": "Modularity", "file": "a.py", "line": 3}
+        assert _deleted_key_for_violation(v, "maintainability") == ("maintainability", "Modularity", "a.py")
+
+    def test_legacy_principle_fallback(self):
+        v = {"principle": "Modularity", "file": "a.py", "line": 3}
+        assert _deleted_key_for_violation(v, "maintainability") == ("maintainability", "Modularity", "a.py")
+
+    def test_explicit_principle_override(self):
+        v = {"file": "a.py:3"}
+        assert _deleted_key_for_violation(v, "maintainability", "Modularity") == ("maintainability", "Modularity", "a.py")
+
+    def test_combined_file_line_stripped(self):
+        v = {"practiceId": "Modularity", "file": "a.py:3"}
+        assert _deleted_key_for_violation(v, "maintainability") == ("maintainability", "Modularity", "a.py")
+
+    def test_empty_dict(self):
+        assert _deleted_key_for_violation({}, "") == ("", "", "")
 
 
 class TestFilterDismissedFromResult:
@@ -85,6 +107,67 @@ class TestFilterDismissedFromResult:
         dkeys = {("R1", "a.py", 1)}
         # Should return result unchanged
         assert _filter_dismissed_from_result(result, dkeys) is result
+
+
+class TestDeletedFilteredFromDimensionEval:
+    """Permanently-deleted findings must not survive into the served dimension eval.
+
+    The JSON eval parser emits camelCase violation dicts (``practiceId``, not
+    ``principle``), so the deletion key must be built from ``practiceId``.
+    Regression test for the dimension-detail view showing deleted findings.
+    """
+
+    def test_deleted_key_matches_practice_id_violation(self, tmp_path):
+        project_dir = tmp_path / "project"
+        base = project_dir / "run"
+        (base / "evaluation").mkdir(parents=True)
+        eval_data = {
+            "dimension": "testdim",
+            "principles": [{"name": "Clear Naming", "score": 5, "grade": "C"}],
+            "violations": [
+                {"principle": "Clear Naming", "file": "src/app.py", "line": 12,
+                 "title": "t", "reason": "r", "severity": "major"},
+                {"principle": "Clear Naming", "file": "src/other.py", "line": 3,
+                 "title": "t2", "reason": "r2", "severity": "minor"},
+            ],
+        }
+        (base / "evaluation" / "testdim.json").write_text(json.dumps(eval_data))
+        (project_dir / "deleted.json").write_text(json.dumps([
+            {"dimension": "testdim", "principle": "Clear Naming", "file": "src/app.py"},
+        ]))
+
+        result = resolve_dimension_eval(base, "proj", "run", "testdim")
+
+        files = [v["file"] for v in result["violations"]]
+        assert "src/app.py" not in files
+        assert "src/other.py" in files
+
+    def test_deleted_key_matches_principle_group_violations(self, tmp_path):
+        """Group entries carry no principle field; the group name is the principle."""
+        project_dir = tmp_path / "project"
+        base = project_dir / "run"
+        (base / "evaluation").mkdir(parents=True)
+        eval_data = {
+            "dimension": "testdim",
+            "principles": [{"name": "Clear Naming", "score": 5, "grade": "C"}],
+            "violations": [
+                {"principle": "Clear Naming", "file": "src/app.py", "line": 12,
+                 "title": "t", "reason": "r", "severity": "major"},
+                {"principle": "Clear Naming", "file": "src/other.py", "line": 3,
+                 "title": "t2", "reason": "r2", "severity": "minor"},
+            ],
+        }
+        (base / "evaluation" / "testdim.json").write_text(json.dumps(eval_data))
+        (project_dir / "deleted.json").write_text(json.dumps([
+            {"dimension": "testdim", "principle": "Clear Naming", "file": "src/app.py"},
+        ]))
+
+        result = resolve_dimension_eval(base, "proj", "run", "testdim")
+
+        group = next(p for p in result["principles"] if p["name"] == "Clear Naming")
+        group_files = [v["file"] for v in group["violations"]]
+        assert "src/app.py:12" not in group_files
+        assert "src/other.py:3" in group_files
 
 
 class TestMaxViolationFiles:

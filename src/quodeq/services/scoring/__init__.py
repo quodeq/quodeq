@@ -32,14 +32,10 @@ from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.types.dimension import DimensionResult, DimensionSummary, GradeBreakdown
-from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_trend import build_accumulated_trend
+from quodeq.services._trend_fetcher import make_rescoring_fetcher, make_trend_fetcher
 from quodeq.services.accumulated import compute_accumulated
-from quodeq.services.dashboard import (
-    DashboardCacheConfig,
-    _make_run_dimension_fetcher,
-    create_dimension_cache,
-)
+from quodeq.services.dashboard import _make_run_dimension_fetcher
 from quodeq.services.grade_formula import load_params
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
@@ -47,11 +43,11 @@ from quodeq.services._fs_projects import find_children
 from quodeq.services.score_cache import (
     accumulated_cache_version,
     cached_accumulated,
-    make_cache_backed_fetcher,
-    score_cache_version,
+    per_run_versions,
 )
-from quodeq.services.ports import RunInfo, list_runs, read_run_scalars
+from quodeq.services.ports import RunInfo, list_runs, read_run_data, read_run_scalars
 from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
+from quodeq.shared.validation import validate_path_segment
 from quodeq.services.scoring._summary import recompute_summary
 
 
@@ -299,10 +295,29 @@ def get_scores_raw(
     from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
     from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
 
+    # The SQL grade tables are frozen per run and, on a stale projection,
+    # reflect only the dismissals already projected into THIS run's own findings
+    # table -- NOT project-wide dismissals/deletions that accrued later. So when
+    # the project has active dismissals/deletions AND this run has eval JSON to
+    # rescore from, defer to the eval-file path, which applies the project-wide
+    # dismiss set authoritatively via ``rescore_dimensions`` -- the SAME
+    # transform the accumulated view uses, so every per-run read agrees on the
+    # dismiss-adjusted score. Event-log-only runs (no eval JSON) can't be
+    # rescored that way; they keep the SQL path, whose ``_ensure_fresh``
+    # re-projection applies the dismissals directly to the findings table.
+    project_dir = reports_root / project
+    has_project_wide_filters = bool(dismissed_keys(project_dir) or deleted_keys(project_dir))
+    eval_dir = run_dir / "evaluation"
+    prefer_eval_rescore = (
+        has_project_wide_filters
+        and eval_dir.is_dir()
+        and any(p.suffix == ".json" for p in eval_dir.iterdir())
+    )
+
     # SQL path is meaningful only when events.jsonl exists. For older runs
     # without one, skip straight to the JSON-file fallback so we don't have
     # to wait on a no-op projection that will leave the grade tables empty.
-    if (run_dir / "events.jsonl").is_file():
+    if not prefer_eval_rescore and (run_dir / "events.jsonl").is_file():
         import sqlite3  # noqa: PLC0415
         try:
             repo = SqliteFindingsRepository(run_dir)
@@ -325,59 +340,98 @@ def get_scores_raw(
     return _build_response_from_eval_files(reports_root, project, run_id, params=params)
 
 
+def get_scores_slim(
+    reports_root: Path, project: str, run_id: str,
+) -> dict:
+    """``get_scores_raw`` with finding bodies stripped for the run-scores route.
+
+    The Explorer (the endpoint's only consumer) uses the response to overlay
+    dismissal-aware scores onto the eval payload it fetched separately: it
+    reads per-dimension/per-principle score + grade + totals, and uses each
+    violation solely as a ``req|file|line`` identity key to filter dismissed
+    findings out of the eval data. Returning full bodies made the response
+    7+ MB on finding-heavy runs; the slim form carries the same information
+    the merge needs at a fraction of the size. Compliance bodies are never
+    read from this payload, so the list is emptied (counts live in totals).
+    """
+    raw = get_scores_raw(reports_root, project, run_id)
+    slim_dims = []
+    for dim in raw.get("dimensions", []) or []:
+        slim_violations = [
+            {"req": v.get("req"), "file": v.get("file"), "line": v.get("line")}
+            for v in (dim.get("violations") or [])
+        ]
+        slim_dims.append({**dim, "violations": slim_violations, "compliance": []})
+    return {**raw, "dimensions": slim_dims}
+
+
+def scored_run_dimensions(
+    reports_root: Path, project: str, run_id: str,
+    params: ScoringParams | None = None,
+) -> list[DimensionResult]:
+    """Return a run's dimensions with the project-wide dismiss/delete rescore applied.
+
+    This is the single seam every per-run read path routes through so the SAME
+    run+dimension reports the SAME score everywhere. It is
+    ``read_run_data`` (raw, dismissals NOT applied) composed with the same
+    project-wide ``_rescore_dimension`` the accumulated view already runs, and
+    returns ``DimensionResult`` objects (not camelCase dicts).
+
+    Rescore is deliberately kept *out* of ``read_run_data`` itself: that
+    function is foundational and feeds exports and other callers that must see
+    the raw scan. Callers that want the dismiss-adjusted view ask for it here.
+
+    When *params* is None the saved grade-formula params are loaded, matching
+    ``get_scores_raw`` / ``build_dashboard``.
+    """
+    validate_path_segment(project, run_id)
+    if params is None:
+        params = load_params()
+    project_dir = reports_root / project
+    dismissed = dismissed_keys(project_dir)
+    deleted = deleted_keys(project_dir)
+    dims = read_run_data(reports_root, project, run_id)
+    if not dismissed and not deleted:
+        return dims
+    return [_rescore_dimension(d, dismissed, deleted, params=params) for d in dims]
+
+
 def _make_rescoring_fetcher(
     reports_root: Path, project: str,
     params: ScoringParams = DEFAULT_PARAMS,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a dimension fetcher that applies rescore (dismissals) to results.
 
-    Wraps the standard cached fetcher so that build_accumulated_trend
-    automatically gets rescored data.
+    Thin seam over the shared :func:`make_rescoring_fetcher` factory. Passes the
+    scoring module's own ``dismissed_keys`` / ``deleted_keys`` references so
+    monkeypatch-based tests keep working, and the full-data base fetcher.
     """
-    base_fetcher = _make_run_dimension_fetcher(reports_root, project)
-    project_dir = reports_root / project
-    dismissed = dismissed_keys(project_dir)
-    deleted = deleted_keys(project_dir)
-    if not dismissed and not deleted:
-        return base_fetcher
-
-    def rescoring_fetcher(run_id: str) -> list[DimensionResult]:
-        dims = base_fetcher(run_id)
-        return [_rescore_dimension(d, dismissed, deleted, params=params) for d in dims]
-
-    return rescoring_fetcher
+    return make_rescoring_fetcher(
+        reports_root, project, params=params,
+        base_fetcher=_make_run_dimension_fetcher(reports_root, project),
+        dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
+    )
 
 
 def _make_trend_fetcher(
     reports_root: Path, project: str,
     params: ScoringParams = DEFAULT_PARAMS,
+    cacheable_run_ids: set[str] | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return the dimension fetcher for the trend chart.
 
-    Fast path: when the project has no active dismissals/deletions, read only
-    the per-run scalar grades (``read_run_scalars``) -- the trend needs nothing
-    else. Uses a fresh per-call LRU cache so scalar (findings-less) results
-    never collide with the shared full-data cache used elsewhere.
-
-    Heavy path: when dismissals/deletions are active, wrap the findings-based
-    rescoring fetcher with the read-through score cache. The cache version is a
-    content-hash of the project's dismissals/deletions/params, so any change
-    auto-invalidates without a write-path hook.
+    Thin seam over the shared :func:`make_trend_fetcher` factory, passing the
+    scoring module's own ``read_run_scalars`` / ``dismissed_keys`` /
+    ``deleted_keys`` references (so this module's monkeypatch-based tests keep
+    working) and the shared full-data base-fetcher factory. See
+    :func:`make_trend_fetcher` for the fast/heavy path and caching semantics.
     """
-    project_dir = reports_root / project
-    if dismissed_keys(project_dir) or deleted_keys(project_dir):
-        # Heavy path: wrap the findings-based rescoring fetcher with the
-        # read-through score cache. Version is a content hash of the project's
-        # dismissals/deletions/params, so any change auto-invalidates.
-        # dismissed/deleted are read here (branch test), in _make_rescoring_fetcher,
-        # and in score_cache_version -- three reads total, each ~0.01s, acceptable.
-        base = _make_rescoring_fetcher(reports_root, project, params=params)
-        version = score_cache_version(project_dir, params)
-        return make_cache_backed_fetcher(project, version, base)
-    cache, lock = create_dimension_cache()
-    return make_lru_dimension_fetcher(
-        reports_root, project, cache, lock,
-        _max_history_runs(), reader=read_run_scalars,
+    return make_trend_fetcher(
+        reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
+        max_history=_max_history_runs(),
+        base_fetcher_factory=_make_run_dimension_fetcher,
+        read_run_scalars=read_run_scalars,
+        dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
     )
 
 
@@ -462,6 +516,30 @@ def _rescore_accumulated_response(
     return {**accumulated, "dimensions": new_dims, "summary": new_summary}
 
 
+def rescore_accumulated(
+    accumulated: dict[str, Any] | None,
+    reports_root: Path, project: str,
+    params: ScoringParams | None = None,
+) -> dict[str, Any] | None:
+    """Public seam: project-wide dismiss/delete rescore for an accumulated payload.
+
+    Callers that read ``compute_accumulated`` directly (rather than through
+    ``get_project_scores``) get scores that ignore dismissals/deletions --
+    ``filter_dismissed_from_dimensions`` drops the violations but leaves the
+    baked scores untouched. Route the payload through here so every consumer
+    reports the same dismiss-adjusted score as the Overview. No-op when the
+    project has no active dismissals or deletions.
+
+    When *params* is None the saved grade-formula params are loaded, matching
+    ``get_project_scores``.
+    """
+    if not accumulated:
+        return accumulated
+    if params is None:
+        params = load_params()
+    return _rescore_accumulated_response(accumulated, reports_root, project, params=params)
+
+
 def get_project_scores(
     reports_root: Path, project: str, as_of: str | None = None,
 ) -> dict[str, Any] | None:
@@ -502,7 +580,9 @@ def get_project_scores(
     else:
         acc_version = accumulated_cache_version(
             reports_root / project, params,
-            [(r.run_id, r.status) for r in all_runs], as_of,
+            per_run_versions(reports_root / project, project, params,
+                             [(r.run_id, r.status) for r in all_runs]),
+            as_of,
         )
         accumulated = cached_accumulated(project, acc_version, _compute_accumulated_payload)
 
@@ -513,7 +593,14 @@ def get_project_scores(
     # when the user asks for them explicitly.
     scoreable_runs = [r for r in all_runs if r.status not in ("cancelled", "failed")]
     history_runs = scoreable_runs[:_max_history_runs()]
-    trend_fetcher = _make_trend_fetcher(reports_root, project, params=params)
+    # Only completed runs may be persisted to the score cache: an in-progress
+    # run's scalar set is still growing, and the cache version can't see that,
+    # so caching its partial set would strand a stale row (e.g. 1 of 6 dims)
+    # served forever after the run finishes.
+    cacheable_run_ids = {r.run_id for r in history_runs if r.status == "complete"}
+    trend_fetcher = _make_trend_fetcher(
+        reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
+    )
     trend = build_accumulated_trend(history_runs, trend_fetcher, params=params)
 
     # Build available runs list
@@ -531,5 +618,7 @@ def get_project_scores(
 
 __all__ = [
     "get_scores_raw",
+    "get_scores_slim",
     "get_project_scores",
+    "scored_run_dimensions",
 ]

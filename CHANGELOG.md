@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.6.0] - 2026-07-11
+
+### Features
+- **AI Assistant**: a new chat drawer that understands your project. Ask about scores, principles, and specific violations without switching tabs; it reads the current overview run and the accumulated per-dimension view by default and answers in context. It runs on your analysis provider by default, or a provider you pick (cloud API or a local model, including Claude, Codex, and Gemini via their CLIs), and streams its replies. A welcome panel offers context-aware suggestion pills, and slash commands surface built-in skills. The Assistant is off until you toggle it on the first time, then on by default.
+- **Assistant web access**: an optional globe toggle lets the Assistant search the web and fetch pages while it answers, off by default and per conversation. Native web tools are used when the provider supports them; otherwise a built-in DuckDuckGo search and an SSRF-guarded fetch (no redirects, size-capped, hostile-charset safe) stand in.
+- **Assistant can dismiss, verify, and fix findings**: from the chat you can dismiss or verify a finding, and verified findings get a badge across the violation cards, the file drill-in, and the dashboard. With repo write access granted, the Assistant drafts changes in a jailed git worktree and you review them in a diff panel before choosing Apply, open a PR, or Discard. Nothing touches your working tree without that explicit gate.
+- **Embedded terminal**: a bottom drawer hosts a real terminal (and the Assistant) in tabs, backed by a PTY on macOS and Linux and ConPTY on Windows. Open it from the topbar or with Ctrl+backtick, run multiple tabs, and maximize or hide the drawer. It is gated to localhost with an origin check, and can be enabled or disabled in Settings. Terminal and Assistant are enabled by default.
+- **Editable standard thresholds**: managed standards now expose their numeric thresholds (inheritance depth, file length, and similar) as per-project overrides you can edit in the requirement form. A customized-thresholds badge marks standards you have tuned, resolved values show in the standard tree, and the overrides flow through prompts, findings, and scoring so a run reflects exactly the limits you set.
+- **Benchmark harness**: a new `quodeq-bench` toolset with a labeled corpus across all quality dimensions, a case runner (subprocess or replay), per-dimension metrics, markdown reports, and a baseline-comparison regression gate wired into CI, so changes to analysis quality are measured instead of guessed.
+- **Repo-local ignore rules**: a `.quodeqignore` file in the scanned repo excludes paths from analysis, and `detection.json` skip patterns are honored by the manifest walkers.
+
+### Improvements
+- **Period-aware dashboard trends**: the Overview dimension cards, sparklines, and deltas now respect the day/week/month grouping you choose, and the dimension-detail history uses the same grouping preference. Dimension card positions stay fixed as you change the period, and cards keep dimensions whose latest valid run is older than the window instead of dropping them. The project card grade now averages every dimension that has data.
+- **Instant run-detail and lighter payloads**: opening a run is now near-instant thanks to hover prefetch (dwell-gated so it never storms the server) and a skeleton view, and run-detail responses were slimmed dramatically with gzip on large JSON. A per-project accumulated summary cache makes the project card render instantly when warm, and a new runs endpoint serves run lists as a compact unit with ETag conditional responses.
+- **Excluded-file visibility**: the live-scan coverage header now shows how many files were excluded by the API file-size cap, and the cap is enforced at enumeration so coverage math is honest instead of silently topping out below 100%.
+- **Faster, size-budgeted API dispatch**: files sent to API providers are grouped into size-budgeted sub-batches for more efficient dispatch.
+
+### Fixes
+- **Windows portability**: assistant edits preserve file bytes exactly (CRLF safe), text I/O is pinned to UTF-8 across subprocess and file handles, and process-tree kills work cross-platform. Several tests were made Windows-portable.
+- **Terminal robustness**: multi-byte glyphs no longer tear during TUI redraws (an incremental UTF-8 decoder per session), a dropped socket now shows a reconnect overlay and recovers, and PTY size syncs to the terminal on open so full-screen TUIs are not clipped.
+- **Scoring consistency**: dismiss and delete rescoring is now applied on every per-run read path, on the project-card grade, and through the Assistant's own read tools, so a dismissed finding reads the same everywhere. Accumulated and card grades are scoped to the latest run's configured dimensions.
+- **Dashboard resilience**: a cold Overview load no longer blanks (it holds the loading screen until scores resolve and grace-falls-back otherwise), a React crash from hooks below an early return is fixed, run-detail no longer flickers, and the score cache no longer strands a run's partial in-progress dimensions.
+- **Lifecycle**: SIGTERM races in run status handling were eliminated, and cleanup never removes the system temp root.
+
 ## [1.5.2] - 2026-07-03
 
 ### Improvements

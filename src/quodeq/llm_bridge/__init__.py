@@ -7,6 +7,7 @@ from quodeq.llm_bridge._providers import (
     get_provider_configs,
     get_provider_type,
     classify_provider,
+    LOCAL_PROVIDERS,
 )
 from quodeq.llm_bridge._ollama import (
     get_ollama_status,
@@ -29,6 +30,7 @@ from quodeq.llm_bridge._models import get_known_models
 
 __all__ = [
     "get_provider_configs",
+    "LOCAL_PROVIDERS",
     "get_provider_type",
     "classify_provider",
     "get_ollama_status",

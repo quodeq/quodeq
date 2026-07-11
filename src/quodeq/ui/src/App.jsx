@@ -19,9 +19,12 @@ const HelpPage = lazy(() => import('./features/help/components/HelpPage.jsx'));
 const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
 import EmptyStateWithTour from './features/onboarding/components/EmptyStateWithTour.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
+import { useQueryClient } from '@tanstack/react-query';
 import { useApi } from './api/ApiContext.jsx';
+import { applyMutationDelta } from './api/applyMutationDelta.js';
 import { getGradeFormula } from './api/index.js';
 import { setGradeThresholds } from './utils/gradeThresholds.js';
+import { deriveEvaluatePreselect } from './utils/evaluatePreselect.js';
 import LoadingScreen from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import TopBar from './components/TopBar.jsx';
@@ -33,6 +36,11 @@ import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
 import { syncNativeTitlebar } from './utils/nativeTitlebar.js';
 import { SidePane, useSidePane } from './features/side-pane/index.js';
+import { VerifiedFindingsProvider } from './features/violations/components/verifiedFindingsContext.jsx';
+import { BottomDrawer } from './features/drawer/BottomDrawer.jsx';
+import { useAssistantDrawer } from './features/assistant/AssistantDrawerProvider.jsx';
+import { useAssistantProvider } from './features/settings/hooks/useAssistantProvider.js';
+import { deriveAssistantContext } from './features/assistant/useAssistantContext.js';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.jsx';
 import { ServerLogProvider } from './features/settings/server-log/ServerLogProvider.jsx';
@@ -83,10 +91,10 @@ function useNativeTitlebarSync(effectiveDark) {
 }
 
 /**
- * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string }} props
+ * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string, projects: Array, onGoToProjects: Function, onGoToSettings: Function, preselectDims: string[]|undefined }} props
  * @returns {JSX.Element}
  */
-function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onGoToProjects, onGoToSettings }) {
+function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onGoToProjects, onGoToSettings, preselectDims }) {
   const { connected, setConnected } = serverHealth;
   const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
   const projectInfo = projects?.find(p => (p.id || p.name) === selectedProject) || null;
@@ -101,7 +109,7 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onG
       {!connected && <ServerDisconnectedOverlay onReconnect={() => setConnected(true)} />}
       <EvaluateScreen
         evaluation={{ job, jobError, liveViolations }}
-        context={{ selectedProject, projectInfo, jobProjectInfo }}
+        context={{ selectedProject, projectInfo, jobProjectInfo, preselectDims }}
         actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation, onGoToProjects, onGoToSettings }}
       />
     </>
@@ -165,6 +173,7 @@ function renderEvalPrincipleDetail(params, props) {
         // accumulated (cross-run) rollup separately.
         const payload = { ...buildDismissPayload(v, evalPrincipal.dimension), run_id: evalPrincipal.runId };
         const result = await props.dismissFinding(selectedProject, payload);
+        props.applyDelta?.(selectedProject, result?.scores, result?.delta);
         props.refreshDashboard?.();
         props.bumpDismissRefresh?.();
         return result;
@@ -337,9 +346,11 @@ const ROUTE_RENDERERS = {
       onNavigate={props.navigation.handleNavigate}
       refreshSignal={props.dashboardData.dashboard}
       trend={props.dashboardData.dashboard?.trend || []}
+      granularity={props.dashboardData.granularity}
+      onGranularityChange={props.dashboardData.onGranularityChange}
     />
   ),
-  evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />,
+  evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} preselectDims={params.preselectDims} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />,
   file: (params, props) => (
     <FileDetailPage
       file={params.file}
@@ -349,6 +360,7 @@ const ROUTE_RENDERERS = {
       onDismiss={async (v) => {
         const payload = { ...buildDismissPayload(v), run_id: params.runId };
         const result = await props.dismissFinding(props.navigation.selectedProject, payload);
+        props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
         props.refreshDashboard?.();
         props.bumpDismissRefresh?.();
         return result;
@@ -365,6 +377,7 @@ const ROUTE_RENDERERS = {
       onDismiss={async (v) => {
         const payload = { ...buildDismissPayload(v, params.dimension), run_id: params.runId };
         const result = await props.dismissFinding(props.navigation.selectedProject, payload);
+        props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
         props.refreshDashboard?.();
         props.bumpDismissRefresh?.();
         return result;
@@ -406,7 +419,7 @@ function MainContent({ activePage, props }) {
  * @param {{ sidebar: JSX.Element, header: JSX.Element|null, content: JSX.Element }} props
  * @returns {JSX.Element}
  */
-function AppShell({ sidebar, header, content }) {
+function AppShell({ sidebar, header, content, drawer }) {
   return (
     <div className={`app-shell${header ? ' app-shell--with-topbar' : ''}`}>
       {header && <div className="app-shell__topbar">{header}</div>}
@@ -419,6 +432,7 @@ function AppShell({ sidebar, header, content }) {
           </main>
         </div>
         <SidePane />
+        {drawer}
       </div>
     </div>
   );
@@ -426,6 +440,7 @@ function AppShell({ sidebar, header, content }) {
 
 export default function App() {
   const { dismissFinding } = useApi();
+  const queryClient = useQueryClient();
   const state = useAppState();
   const APP_VERSION = state.serverVersion;
   const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
@@ -438,6 +453,44 @@ export default function App() {
   // fetched once on mount.
   const [dismissRefreshKey, setDismissRefreshKey] = useState(0);
   const bumpDismissRefresh = () => setDismissRefreshKey((k) => k + 1);
+  const { refreshDashboard: refreshDashboardForApply, selectedProject } = state;
+  // Shared with the manual dismiss handlers below (buildDismissPayload
+  // callers). Patches the dashboard/scores caches from a dismiss response's
+  // delta so the Overview updates instantly instead of waiting on a refetch.
+  const applyDelta = (project, scores, delta) =>
+    applyMutationDelta(queryClient, project, delta && { ...delta, dimensions: scores?.dimensions });
+  useEffect(() => {
+    const handler = (event) => {
+      if (event.detail?.actionType === 'dismiss_finding') {
+        // Apply the delta first so the currently-visible screen patches in
+        // place immediately; the refresh/refetch below is the lazy,
+        // eventual-correctness path (e.g. for views the delta doesn't cover).
+        // Prefer the delta's own project over the live selectedProject: the
+        // apply POST may resolve after the user switched projects, and the
+        // delta is frozen to the action's project. Keying the patch on the
+        // live selection would write project A's rollup into project B's cache.
+        if (event.detail.delta) {
+          try {
+            applyDelta(
+              event.detail.delta?.project || selectedProject,
+              event.detail.scores,
+              event.detail.delta,
+            );
+          } catch {
+            // Instant patch is best-effort; the lazy refresh below is the fallback.
+          }
+        }
+        bumpDismissRefresh();
+        // Assistant-applied dismissals mutate the same payloads manual ones
+        // do; invalidate the project queries so frozen run views (staleTime
+        // Infinity) refetch on their next mount instead of showing the
+        // pre-dismiss counts forever.
+        refreshDashboardForApply?.();
+      }
+    };
+    window.addEventListener('quodeq:assistant-action-applied', handler);
+    return () => window.removeEventListener('quodeq:assistant-action-applied', handler);
+  }, [refreshDashboardForApply, selectedProject]);
   // Auto-open is a once-per-session decision. Without this guard, closing the
   // wizard sets wizardEntry → null, which re-fires this effect and re-opens
   // the wizard immediately because projects.length is still 0. The user's
@@ -446,6 +499,25 @@ export default function App() {
   const autoOpenedRef = useRef(false);
 
   const { showToast } = useSidePane();
+
+  // Live assistant context: the pure derivation reuses the app-state object
+  // we already hold (calling useAssistantContext() would spin up a second
+  // useAppState and duplicate every dashboard query). The gate provides the
+  // active assistant provider/model.
+  const assistantGate = useAssistantProvider();
+  const assistantCtx = deriveAssistantContext(state, assistantGate);
+  const { isOpen: assistantOpen, activeTab: drawerTab, startSession: startAssistantSession } = useAssistantDrawer();
+  const { provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId } = assistantCtx;
+  // Start (or re-start) the assistant session when the drawer is open and on
+  // any provider/model/project/run change while it stays open. startSession
+  // dedupes by context key, so re-runs with an unchanged context no-op; a
+  // real project/run switch produces a fresh session. We deliberately do NOT
+  // start a session while the drawer is closed — sends only originate from the
+  // open drawer, so first-open is early enough and avoids needless sessions.
+  useEffect(() => {
+    if (!assistantOpen || drawerTab !== 'assistant') return;
+    startAssistantSession({ provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId });
+  }, [assistantOpen, drawerTab, asstProvider, asstModel, asstProjectId, asstRunId, startAssistantSession]);
 
   // Sync the client-side grade-label thresholds with the server formula at
   // boot so every gauge/badge agrees with the applied Q² parameters. The
@@ -595,6 +667,11 @@ export default function App() {
     settings: state.settings,
     refreshDashboard: state.refreshDashboard,
     dismissFinding,
+    // Patch the dashboard/scores caches from the dismiss response delta so the
+    // Overview updates instantly. Additive — the refreshDashboard /
+    // bumpDismissRefresh mechanisms below still run. The delta carries only the
+    // mutation shape; the caller folds in the rescored dims from result.scores.
+    applyDelta,
     bumpDismissRefresh,
     dismissRefreshKey,
   };
@@ -616,7 +693,9 @@ export default function App() {
         <ServerLogProvider>
           <OllamaLogProvider>
             <LlamaCppLogProvider>
+              <VerifiedFindingsProvider project={state.selectedProject}>
               <AppShell
+          drawer={<BottomDrawer uiState={assistantCtx.uiState} />}
           sidebar={
             <Sidebar
               activeTab={activeTab}
@@ -643,7 +722,7 @@ export default function App() {
               serverUrl={typeof window !== 'undefined' ? window.location.origin : null}
               provider={sidebarProvider}
               model={sidebarModel}
-              onEvaluate={state.projects?.length > 0 ? (() => navTab('evaluate')) : null}
+              onEvaluate={state.projects?.length > 0 ? (() => navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) })) : null}
               evaluating={state.evalLifecycle?.job?.status === 'running'}
               onProviderClick={() => navTab('settings')}
               onMenuToggle={() => setSidebarPinned((v) => !v)}
@@ -696,6 +775,7 @@ export default function App() {
             </Suspense>
           }
             />
+              </VerifiedFindingsProvider>
             </LlamaCppLogProvider>
           </OllamaLogProvider>
         </ServerLogProvider>

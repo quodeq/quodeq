@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
@@ -30,5 +30,20 @@ describe('CliProviderTab', () => {
     const input = container.querySelector('input.settings-model-input[type="text"]');
     expect(input).toBeTruthy();
     expect(input.value).toBe('sonnet');
+  });
+
+  it('does not suggest gpt-5-mini for Codex', () => {
+    const Wrapper = makeWrapper();
+    const state = { model: '', subagents: '4', 'time-limit-min': '60' };
+    render(
+      <Wrapper>
+        <CliProviderTab providerId="codex" state={state} update={() => {}} />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByLabelText('Model help'));
+
+    expect(screen.queryByText('gpt-5-mini')).toBeNull();
+    expect(screen.getByText(/leave this blank to use the Codex CLI default/i)).toBeTruthy();
   });
 });

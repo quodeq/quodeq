@@ -133,6 +133,21 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   const focusedDimensionData = useMemo(() => focusedDimension ? (dashboard?.dimensions || []).find((d) => d.dimension === focusedDimension) || null : null, [focusedDimension, dashboard]);
   const handlers = useDashboardHandlers(onNavigate, dashboard);
 
+  // What each view needs before it can render real content: run detail only
+  // needs the dashboard payload; the Overview also needs the scores-derived
+  // `accumulated` block (DashboardContent returns a LoadingScreen without it).
+  // These hooks MUST stay above the early returns below — calling them after a
+  // conditional return changes the hook count between renders (React error
+  // #310, a blank-crash on load).
+  const contentReady = runMode ? !!dashboard : (!!dashboard && !!accumulated);
+  // Grace state for the slow/cold-load fallback (consumed by isLoading below).
+  const [graceElapsed, setGraceElapsed] = useState(false);
+  useEffect(() => {
+    if (contentReady || !dashboard) { setGraceElapsed(false); return undefined; }
+    const timer = setTimeout(() => setGraceElapsed(true), 700);
+    return () => clearTimeout(timer);
+  }, [contentReady, dashboard]);
+
   const { projectsLoaded } = data;
   if (!projectsLoaded) return <LoadingScreen />;
   if (projects.length === 0) {
@@ -170,13 +185,21 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     );
   }
 
-  const isLoading = loading && !dashboard;
+  // Hold the full LoadingScreen until the content is ready, so we don't fade in
+  // a half-drawn page and then pop the real content in a beat later (the
+  // first-load flicker). BUT a cold score cache can take several seconds to
+  // rebuild (e.g. right after a dismiss/restore/formula change invalidates it);
+  // sitting on a blank spinner that whole time reads as "not opening". So once
+  // the dashboard payload is in and the grace has elapsed (graceElapsed, set
+  // above), fall back to the partial page (frame + a content spinner) so a slow
+  // load shows progress instead of a hang. The grace comfortably exceeds a warm
+  // load, so the fast path still gets one clean transition.
+  const isLoading = loading && !contentReady && !(dashboard && graceElapsed);
   // True while a *background* fetch is running but we're already showing
   // data (placeholderData kept the previous run on screen during a switch).
   // The page dims itself slightly so the user sees "still working" without
   // the jarring full-screen LoadingScreen.
   const isRefreshing = isFetching && !!dashboard && !isLoading;
-
   return (
     <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : 'dashboard-ready'}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
       <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
