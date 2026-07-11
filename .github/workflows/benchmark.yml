@@ -1,0 +1,83 @@
+name: Benchmark gate
+
+# Measures quodeq's finding accuracy against the labeled synthetic corpus
+# using the SAME local model the nightlies use, on the self-hosted runner.
+# No cloud API key required. Compares against benchmarks/baselines/gate.json;
+# fails on a >5-point precision/recall drop once the baseline is armed.
+#
+# Scheduled weekly (Saturday midday UTC, after the Friday nightly window has
+# drained) so the benchmark never competes with a nightly evaluation for the
+# single-request Ollama server. Run manually via workflow_dispatch any time.
+#
+# Requires the self-hosted runner labeled "quodeq" with Ollama running locally
+# (same requirement as quodeq-nightly.yml).
+
+on:
+  schedule:
+    - cron: "0 12 * * 6"
+
+  workflow_dispatch:
+    inputs:
+      reps:
+        description: "Repetitions to average (local models are noisy; 2-3 recommended)"
+        default: "2"
+
+jobs:
+  gate:
+    permissions:
+      contents: read
+    runs-on: [self-hosted, quodeq]
+    # 8 cases x 2 reps x 6 dimensions on the M4 Max + Ollama pace: a few
+    # hours. 10h leaves generous headroom without colliding with the 22:01
+    # UTC nightly.
+    timeout-minutes: 600
+    steps:
+      - uses: actions/checkout@v7.0.0
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.3.0
+      - name: Set up Python
+        run: uv python install 3.13
+      - name: Install dependencies
+        run: uv sync
+      - name: Read pinned provider/model from baseline
+        id: baseline
+        run: |
+          echo "provider=$(uv run python -c "import json; print(json.load(open('benchmarks/baselines/gate.json'))['provider'])")" >> "$GITHUB_OUTPUT"
+          echo "model=$(uv run python -c "import json; print(json.load(open('benchmarks/baselines/gate.json'))['model'])")" >> "$GITHUB_OUTPUT"
+      - name: Run benchmark
+        env:
+          PYTHONPATH: benchmarks
+        run: |
+          REPS="${{ github.event.inputs.reps }}"
+          REPS="${REPS:-2}"
+
+          # Heartbeat: keep GitHub's result-server websocket alive during long
+          # local-model runs (same pattern as quodeq-nightly.yml).
+          (while :; do date -u +"[heartbeat %H:%M:%SZ]"; sleep 30; done) &
+          HEART=$!
+          trap 'kill $HEART 2>/dev/null || true' EXIT
+
+          # --n-subagents 1: local Ollama serves one request at a time (MLX
+          # engine); parallel agents only queue into read timeouts. See quodeq.env.
+          uv run python -m quodeq_bench run \
+            --corpus benchmarks/.corpus/synthetic \
+            --provider "${{ steps.baseline.outputs.provider }}" \
+            --model "${{ steps.baseline.outputs.model }}" \
+            --reps "$REPS" \
+            --n-subagents 1 \
+            --time-limit 2700 \
+            --out benchmarks/results/gate
+      - name: Compare against baseline
+        env:
+          PYTHONPATH: benchmarks
+        run: |
+          uv run python -m quodeq_bench compare \
+            benchmarks/baselines/gate.json \
+            benchmarks/results/gate/report.json \
+            --threshold 0.05
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-report
+          path: benchmarks/results/gate/report.json

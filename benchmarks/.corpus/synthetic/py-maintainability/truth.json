@@ -1,0 +1,13 @@
+{
+  "language": "python",
+  "exhaustive": true,
+  "clean_files": ["helpers.py"],
+  "labels": [
+    {"file": "orders.py", "line": 1, "end_line": 38, "anchor": "def process_order(order, customer, inventory",
+     "dimension": "maintainability", "cwes": [1121], "reqs": ["M-MOD-1"],
+     "severity": "major", "note": "deeply nested, high-complexity god function"},
+    {"file": "orders.py", "line": 1, "anchor": "shipping, taxes, promos, audit",
+     "dimension": "maintainability", "cwes": [1064], "reqs": ["M-MOD-4"],
+     "severity": "minor", "note": "8 positional parameters"}
+  ]
+}
