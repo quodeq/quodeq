@@ -12,20 +12,22 @@ shared package.
 
 Each value is normalised to::
 
-    {"count": int, "reason": str, "total": int, "cached": int}
+    {"count": int, "reason": str, "total": int, "cached": int, "excluded": int}
 
-- ``count``  — cache misses this run will dispatch for the dim.
-- ``reason`` — short tag explaining the estimate (see
+- ``count``    — cache misses this run will dispatch for the dim.
+- ``reason``   — short tag explaining the estimate (see
   ``compute_dim_estimates`` for the tag vocabulary).
-- ``total``  — all source files for the dim (overall project size).
-- ``cached`` — files already analyzed in previous runs.
+- ``total``    — all dispatchable source files for the dim.
+- ``cached``   — files already analyzed in previous runs.
+- ``excluded`` — files the provider can never dispatch (API size cap);
+  kept out of ``total`` so coverage can reach 100%.
 
 Legacy fallbacks for older/partial payloads:
 
 - Missing ``total`` falls back to ``count``.
-- Missing ``cached`` falls back to ``0``.
+- Missing ``cached`` / ``excluded`` fall back to ``0``.
 - A bare int value (pre-dates the reason tag) becomes
-  ``{"count": v, "reason": "", "total": v, "cached": 0}``.
+  ``{"count": v, "reason": "", "total": v, "cached": 0, "excluded": 0}``.
 """
 from __future__ import annotations
 
@@ -67,7 +69,7 @@ def read_dim_estimates(run_dir: Path) -> dict[str, dict[str, Any]]:
         return {}
     out: dict[str, dict[str, Any]] = {}
     for k, v in data.items():
-        # Current format: {"count": int, "reason": str, "total": int, "cached": int}.
+        # Current format: {"count", "reason", "total", "cached", "excluded"}.
         if isinstance(v, dict) and isinstance(v.get("count"), int):
             count = v["count"]
             out[k] = {
@@ -75,8 +77,9 @@ def read_dim_estimates(run_dir: Path) -> dict[str, dict[str, Any]]:
                 "reason": str(v.get("reason", "")),
                 "total": v["total"] if isinstance(v.get("total"), int) else count,
                 "cached": v["cached"] if isinstance(v.get("cached"), int) else 0,
+                "excluded": v["excluded"] if isinstance(v.get("excluded"), int) else 0,
             }
         # Legacy format: a bare int. Older runs predate the reason tag.
         elif isinstance(v, int):
-            out[k] = {"count": v, "reason": "", "total": v, "cached": 0}
+            out[k] = {"count": v, "reason": "", "total": v, "cached": 0, "excluded": 0}
     return out

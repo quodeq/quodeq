@@ -41,7 +41,8 @@ class _DimProgress:
     estimate_reason: str | None = None  # see _dim_estimates module docstring
     exit_reason: str | None = None
     files_cached: int | None = None        # files already analyzed in previous runs
-    files_project_total: int | None = None  # all source files for this dim
+    files_project_total: int | None = None  # all dispatchable source files for this dim
+    files_excluded: int | None = None       # files the provider can never dispatch (size cap)
 
 
 @dataclass
@@ -258,6 +259,7 @@ def build_scan_progress(
         estimate_reason = estimate_meta["reason"] if estimate_meta else None
         files_cached = estimate_meta["cached"] if estimate_meta else None
         files_project_total = estimate_meta["total"] if estimate_meta else None
+        files_excluded = estimate_meta["excluded"] if estimate_meta else None
 
         tally = tally_unique_findings(evidence_dir / f"{dim_id}_evidence.jsonl")
         elapsed = _dim_elapsed_s(dim_id, run_dir, d_state)
@@ -278,6 +280,7 @@ def build_scan_progress(
             exit_reason=exit_reason,
             files_cached=files_cached,
             files_project_total=files_project_total,
+            files_excluded=files_excluded,
         ))
 
     return _ScanProgress(

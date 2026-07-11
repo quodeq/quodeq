@@ -232,6 +232,6 @@ class TestPrioritizationIntegration:
             target=target,
             manifest=SourceManifest(targets=[target], total_files=2),
         )
-        files, _ = _list_source_files(config, "security")
+        files, _, _ = _list_source_files(config, "security")
         # src/auth.py should come before tests/test_stuff.py
         assert files.index("src/auth.py") < files.index("tests/test_stuff.py")
