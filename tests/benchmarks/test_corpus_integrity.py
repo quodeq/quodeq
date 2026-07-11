@@ -4,7 +4,7 @@ import pytest
 
 from quodeq_bench.models import load_truth
 
-_CORPUS = Path(__file__).resolve().parents[2] / "benchmarks" / "corpus" / "synthetic"
+_CORPUS = Path(__file__).resolve().parents[2] / "benchmarks" / ".corpus" / "synthetic"
 
 
 def _cases() -> list[Path]:

@@ -5,7 +5,7 @@ from pathlib import Path
 from quodeq_bench.cli import main
 
 _ROOT = Path(__file__).resolve().parents[2]
-_CASE = _ROOT / "benchmarks" / "corpus" / "synthetic" / "py-security"
+_CASE = _ROOT / "benchmarks" / ".corpus" / "synthetic" / "py-security"
 _FIXTURE = Path(__file__).parent / "fixtures" / "replay" / "py-security"
 
 

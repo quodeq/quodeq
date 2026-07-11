@@ -60,7 +60,7 @@ jobs:
           # --n-subagents 1: local Ollama serves one request at a time (MLX
           # engine); parallel agents only queue into read timeouts. See quodeq.env.
           uv run python -m quodeq_bench run \
-            --corpus benchmarks/corpus/synthetic \
+            --corpus benchmarks/.corpus/synthetic \
             --provider "${{ steps.baseline.outputs.provider }}" \
             --model "${{ steps.baseline.outputs.model }}" \
             --reps "$REPS" \

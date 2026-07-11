@@ -4,11 +4,18 @@ Dev/release tooling that measures quodeq's finding accuracy against a
 labeled corpus. Not shipped in the wheel. See
 `docs/superpowers/specs/2026-07-10-accuracy-benchmark-harness-design.md`.
 
+The corpus lives in the hidden directory `.corpus/` **on purpose**: its
+files contain intentionally seeded violations (the answer key), and
+quodeq's manifest walker skips dot-directories — so quodeq's own nightly
+self-evaluation never scans the planted bugs into its own grades. The
+benchmark runner copies each case into a temp workspace before evaluating,
+so benchmark runs are unaffected by the hidden path.
+
 ## Run locally
 
 ```bash
 PYTHONPATH=benchmarks uv run python -m quodeq_bench run \
-  --corpus benchmarks/corpus/synthetic \
+  --corpus benchmarks/.corpus/synthetic \
   --provider ollama --model gemma4:26b-mlx \
   --n-subagents 1 \
   --out benchmarks/results/local
