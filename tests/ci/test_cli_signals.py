@@ -7,10 +7,14 @@ impossible to reliably send SIGTERM while the process is still alive via
 external polling.
 
 We therefore use a thin wrapper script (written to *tmp_path* per-test) that
-monkey-patches ``quodeq.analysis._pipeline._run_dry_run`` to sleep for one
-second before returning, giving us a reliable window in which to deliver
-SIGTERM.  This avoids touching production code while still exercising the
-real signal-handling path in ``RunLifecycleContext``.
+monkey-patches ``quodeq.analysis._pipeline._run_dry_run`` to write a ready
+marker and then sleep before returning. The test waits for the marker — not
+merely for status.json to exist — which guarantees the child is inside the
+interruptible pause with the lifecycle signal handlers installed before
+SIGTERM is sent. The pause is generous (tens of seconds) because SIGTERM cuts
+it short; it is a ceiling, not a duration. This avoids touching production
+code while still exercising the real signal-handling path in
+``RunLifecycleContext``.
 """
 from __future__ import annotations
 
@@ -35,17 +39,18 @@ pytestmark = pytest.mark.timeout(180)
 # ---------------------------------------------------------------------------
 
 _WRAPPER_TEMPLATE = textwrap.dedent("""\
-    \"\"\"Thin wrapper: patches dry-run to sleep so SIGTERM can interrupt it.\"\"\"
+    \"\"\"Thin wrapper: patches dry-run to pause so SIGTERM can interrupt it.\"\"\"
     import sys, time
-    from unittest.mock import patch
-
-    # Patch _run_dry_run to sleep for {pause}s before returning, so an
-    # external SIGTERM has a reliable window to arrive.
-    _orig = None
+    from pathlib import Path
 
     def _slow_dry_run(*args, **kwargs):
         import quodeq.analysis._pipeline as _pl
         result = _pl.__dict__["_run_dry_run_orig"](*args, **kwargs)
+        # Handshake: tell the test we are mid-run with the lifecycle signal
+        # handlers live, then linger in an interruptible sleep. SIGTERM cuts
+        # the sleep short, so {pause}s is a ceiling, not a duration — it is
+        # only waited out if signal delivery fails entirely.
+        Path({marker!r}).touch()
         time.sleep({pause})
         return result
 
@@ -58,10 +63,10 @@ _WRAPPER_TEMPLATE = textwrap.dedent("""\
 """)
 
 
-def _write_wrapper(tmp_path: Path, pause: float = 1.0) -> Path:
-    """Write a wrapper script that slows the dry-run and return its path."""
+def _write_wrapper(tmp_path: Path, marker: Path, pause: float = 45.0) -> Path:
+    """Write a wrapper script that pauses the dry-run and return its path."""
     script = tmp_path / "_slow_cli.py"
-    script.write_text(_WRAPPER_TEMPLATE.format(pause=pause))
+    script.write_text(_WRAPPER_TEMPLATE.format(marker=str(marker), pause=pause))
     return script
 
 
@@ -90,7 +95,8 @@ def test_sigterm_writes_cancelled_status(tmp_path: Path) -> None:
     reports = tmp_path / "reports"
     reports.mkdir()
 
-    wrapper = _write_wrapper(tmp_path, pause=1.0)
+    marker = tmp_path / "sigterm_ready"
+    wrapper = _write_wrapper(tmp_path, marker)
     env = {**os.environ, "QUODEQ_EVALUATIONS_DIR": str(reports)}
 
     proc = subprocess.Popen(
@@ -98,21 +104,28 @@ def test_sigterm_writes_cancelled_status(tmp_path: Path) -> None:
         cwd=tmp_path, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
 
-    # Wait for run_dir + status.json to exist (up to 10 s).
-    run_dir: Path | None = None
-    for _ in range(200):
-        projects = [d for d in reports.iterdir() if d.is_dir()]
-        if projects:
-            runs = [d for d in projects[0].iterdir() if d.is_dir()]
-            if runs and (runs[0] / "status.json").exists():
-                run_dir = runs[0]
-                break
+    # Wait for the handshake marker: it is written from inside the paused
+    # dry-run, so once it exists the child is guaranteed to be inside the
+    # lifecycle context with signal handlers installed and the run_dir
+    # (including status.json) already on disk.
+    deadline = time.monotonic() + 60
+    while not marker.exists():
+        if proc.poll() is not None:
+            _out, err = proc.communicate()
+            pytest.fail(f"CLI exited before reaching the dry-run pause: {err.decode()}")
+        if time.monotonic() > deadline:
+            proc.kill()
+            proc.wait()
+            pytest.fail("CLI did not reach the dry-run pause within 60 s")
         time.sleep(0.05)
 
-    if run_dir is None:
+    projects = [d for d in reports.iterdir() if d.is_dir()]
+    runs = [d for d in projects[0].iterdir() if d.is_dir()] if projects else []
+    if not runs or not (runs[0] / "status.json").exists():
         proc.kill()
         proc.wait()
-        pytest.fail("CLI did not create status.json within 10 s")
+        pytest.fail("run_dir/status.json missing even though the dry-run pause was reached")
+    run_dir = runs[0]
 
     # Send SIGTERM and wait for process to exit.
     proc.send_signal(signal.SIGTERM)
