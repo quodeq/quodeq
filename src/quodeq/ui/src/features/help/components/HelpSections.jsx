@@ -120,6 +120,7 @@ export function Projects() {
       <KeyTable rows={[
         ['Select project', 'Open it. Goes to Overview if it has runs, otherwise Evaluate.'],
         ['+ Add project', 'Open the wizard at Repo Scan to add another codebase.'],
+        ['Import project', 'Restore a project from a previously-exported file.'],
         ['Resume setup', 'Pick up an interrupted wizard with the same draft.'],
         ['Relocate', 'Update the local path if the repo moved on disk.'],
         ['Export', 'Download the run findings as JSON.'],
@@ -247,6 +248,36 @@ export function Evaluations() {
   );
 }
 
+export function Overview() {
+  return (
+    <section className="help-section">
+      <h2>Overview</h2>
+      <p>The <strong>Overview</strong> tab is a project's landing page: the accumulated quality picture plus the fastest routes into the details.</p>
+
+      <h3>Accumulated scores</h3>
+      <p>Overview shows the latest scored result for each dimension, even when those results come from different runs. Evaluate security today and maintainability tomorrow; both appear side by side, each card labeled with the run that produced it. To inspect a single run instead, open it from <em>History</em>.</p>
+
+      <h3>Header stats</h3>
+      <ul>
+        <li><strong>Score</strong> the overall number and grade, with a delta against the previous run.</li>
+        <li><strong>Violations</strong> active findings with severity badges. Click the stat, or a single badge, to open a project-wide findings view filtered to that severity.</li>
+        <li><strong>Compliance</strong> evidence of good practice. Click it to browse the compliant findings.</li>
+      </ul>
+
+      <h3>Panels</h3>
+      <ul>
+        <li><strong>Score history</strong> runs over time, groupable by day, week, or month. See <em>History &amp; Trends</em>.</li>
+        <li><strong>Dimension scores</strong> one bar per dimension. Click a bar to open that dimension in the Explorer.</li>
+        <li><strong>Dimension cards</strong> a gauge per dimension with principle detail. Click a card to open the Explorer anchored to the run behind the score.</li>
+        <li><strong>Violations by file</strong> the worst files, sorted by severity. Click a row to open the file detail.</li>
+      </ul>
+
+      <h3>The report</h3>
+      <p>The <strong>Report</strong> button in the top bar renders the whole overview as a Markdown report in the side pane, ready to download and share outside Quodeq.</p>
+    </section>
+  );
+}
+
 export function Dimensions() {
   return (
     <section className="help-section">
@@ -294,6 +325,7 @@ export function Violations() {
       </ul>
 
       <p>Each finding includes a file and line, a short reason, the offending code, and a CWE classification. Compliant findings cite the CWE the code is correctly defending against.</p>
+      <p>A <em>downgraded from critical</em> tag means the provenance gate stepped in: the finding named no reachable external input source, so it was de-escalated to major.</p>
 
       <pre className="help-pre">{`CRITICAL    src/db.py:15        SQL injection via string concatenation     CWE-89
             query = f"SELECT * FROM users WHERE id = {user_id}"
@@ -310,7 +342,7 @@ COMPLIANT   src/api.py:88       Parameterized query prevents injection     CWE-8
       <h3>Three sub-tabs, one dataset</h3>
       <p>Use the pills at the top of the tab:</p>
       <ul>
-        <li><strong>by-dimension</strong> a table of dimensions with their principles indented below, showing critical, major, and minor counts, total violations, and health per row.</li>
+        <li><strong>by-dimension</strong> a table of dimensions with their principles indented below, showing critical, major, and minor counts, total violations, and health per row. Click a column header to sort.</li>
         <li><strong>by-file</strong> the same findings arranged as your directory tree, with a breadcrumb you can drill into. Useful for tracking down a single hot spot.</li>
         <li><strong>dismissed</strong> everything you dismissed, with its reason, ready to restore or delete for good.</li>
       </ul>
@@ -323,8 +355,13 @@ COMPLIANT   src/api.py:88       Parameterized query prevents injection     CWE-8
         ['Click a finding', 'Open the leaf finding card with breadcrumb context.'],
       ]} />
 
+      <p>In the file detail, findings the agents flagged as likely false positives sit in a collapsed <strong>Low confidence</strong> group, out of the way of triage. Expand it to review them.</p>
+
       <h3>Fix plans</h3>
       <p>From any violation, the <strong>Fix plan</strong> button opens a side-pane with a structured remediation packet: file path, line number, code context, the violated principle, and concrete guidance. Copy it into your AI agent or IDE; it carries everything the model needs to apply the fix.</p>
+
+      <h3>Verified findings</h3>
+      <p>When the assistant verifies a finding (see <em>Assistant</em>), the row gets a checkmark chip. Hover it for the verification note; click it to remove the badge.</p>
 
       <h3>Dismissing a finding</h3>
       <p>If a finding is a false positive or an accepted trade-off, dismiss it from the violation detail. You will be asked for a reason. Dismissed findings:</p>
@@ -332,7 +369,7 @@ COMPLIANT   src/api.py:88       Parameterized query prevents injection     CWE-8
         <li>move to the <strong>dismissed</strong> sub-tab,</li>
         <li>are <strong>excluded from scoring</strong> (the dimension score updates immediately),</li>
         <li>are <strong>excluded from future evaluations</strong> for the same principle and file,</li>
-        <li>can be <strong>restored</strong> individually or in bulk via <em>Restore all</em>.</li>
+        <li>can be <strong>restored</strong> individually or in bulk via <em>Restore all</em>, or removed for good with <em>Delete</em> and <em>Delete all</em>.</li>
       </ul>
       <Tip title="Dismissals are durable">
         Dismissals persist across runs. They are tied to the finding's principle and file, so renaming or moving the file may bring the finding back. That is intentional.
@@ -359,6 +396,9 @@ export function CodeMap() {
         ['Galaxy', 'Force-directed cluster view. Two sub-modes: filesystem (by directory) or standards (by violated principle).'],
         ['Risk Matrix', 'Files plotted by complexity (size) vs. issue density. Top-right quadrant is your priority list.'],
       ]} />
+
+      <h3>Filter by dimension</h3>
+      <p>The <strong>Dimensions</strong> pill in the map controls narrows every layout to the dimensions you tick. A dot on the pill reminds you a filter is active.</p>
 
       <h3>Reading the views</h3>
       <ul>
@@ -608,6 +648,44 @@ export function Settings() {
 
       <h3>About</h3>
       <p>Version info, links to docs and the repo, and the kill-switch environment variables you can set if you need to disable side features. Most users will not need this section.</p>
+    </section>
+  );
+}
+
+export function CommandLine() {
+  return (
+    <section className="help-section">
+      <h2>Command Line &amp; CI</h2>
+      <p>The dashboard is one subcommand of the <code>quodeq</code> CLI. The rest run headless: scripted evaluations, pull-request reviews, and machine-readable exports.</p>
+
+      <h3>Commands</h3>
+      <KeyTable rows={[
+        ['quodeq', <>Launch the dashboard. Same as <code>quodeq dashboard</code>.</>],
+        ['quodeq evaluate <repo>', 'Run an evaluation without the UI. Takes a path or URL.'],
+        ['quodeq review', 'Evaluate your current branch and post the findings as a PR review.'],
+        ['quodeq export sarif', 'Convert a finished evaluation to a SARIF file.'],
+        ['quodeq ci report', 'Post evaluation results on a PR from inside a CI pipeline.'],
+      ]} />
+
+      <h3>Evaluate flags worth knowing</h3>
+      <ul>
+        <li><code>--dimensions</code> a comma-separated subset instead of all dimensions.</li>
+        <li><code>--branch</code> and <code>--scope</code> analyze a branch (via a temporary worktree) or a subdirectory.</li>
+        <li><code>--time-limit</code> total seconds for the run; 0 means unlimited. Quodeq scores whatever finished in time.</li>
+        <li><code>--clean-scan</code> ignore cached findings and re-analyze every file.</li>
+        <li><code>--evidence-only</code> collect findings but skip scoring.</li>
+      </ul>
+
+      <h3>Reviewing pull requests</h3>
+      <p><code>quodeq review</code> detects the PR for your current branch, evaluates only the files changed against the base branch, and posts the findings as a review through the <code>gh</code> CLI. <code>--dry-run</code> builds the review without posting; <code>--pr</code> targets a specific number.</p>
+      <p>In a pipeline, split the steps: <code>quodeq evaluate --diff-from origin/main</code> analyzes the changed files (evidence only, no scores; grading a partial diff would mislead), then <code>quodeq ci report --from-evidence</code> posts the result using a GitHub token.</p>
+
+      <h3>SARIF export</h3>
+      <p>SARIF is the findings format GitHub code scanning and GitLab understand. Add <code>--sarif findings.sarif</code> to an evaluation, or convert one afterwards with <code>quodeq export sarif</code>. Use <code>--min-severity</code> to drop noise. Code snippets stay out of the file unless you pass <code>--with-snippets</code>; they leave the machine when uploaded.</p>
+
+      <Tip title="Every command documents itself">
+        <code>quodeq &lt;command&gt; --help</code> prints the full flag list, including defaults.
+      </Tip>
     </section>
   );
 }

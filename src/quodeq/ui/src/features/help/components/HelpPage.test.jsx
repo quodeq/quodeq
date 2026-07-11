@@ -55,6 +55,33 @@ describe('HelpPage settings section', () => {
   });
 });
 
+describe('HelpPage overview section', () => {
+  it('lists Overview in the section nav right after Running Evaluations', () => {
+    render(<HelpPage />);
+    const nav = screen.getByRole('button', { name: 'Overview' });
+    expect(nav.previousSibling).toHaveTextContent('Running Evaluations');
+  });
+
+  it('documents accumulated scores and the report', () => {
+    render(<HelpPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
+    expect(screen.getByRole('heading', { level: 2, name: 'Overview' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: 'Accumulated scores' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: 'The report' })).toBeInTheDocument();
+  });
+});
+
+describe('HelpPage command line section', () => {
+  it('documents the CLI commands and PR review flow', () => {
+    render(<HelpPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Command Line & CI' }));
+    expect(screen.getByRole('heading', { level: 2, name: 'Command Line & CI' })).toBeInTheDocument();
+    expect(screen.getAllByText('quodeq review').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('quodeq export sarif').length).toBeGreaterThan(0);
+    expect(screen.getByText(/--diff-from/)).toBeInTheDocument();
+  });
+});
+
 describe('HelpPage violations section', () => {
   it('describes the real sub-tabs', () => {
     render(<HelpPage />);
