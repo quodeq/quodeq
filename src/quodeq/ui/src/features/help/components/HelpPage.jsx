@@ -5,6 +5,7 @@ import {
   Projects,
   Providers,
   Evaluations,
+  Overview,
   Dimensions,
   Violations,
   CodeMap,
@@ -14,6 +15,7 @@ import {
   Assistant,
   Terminal,
   Settings,
+  CommandLine,
 } from './HelpSections.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import BrandCarousel from '../../../components/BrandCarousel.jsx';
@@ -24,6 +26,7 @@ const SECTIONS = [
   { id: 'projects', label: 'Projects' },
   { id: 'providers', label: 'AI Providers' },
   { id: 'evaluations', label: 'Running Evaluations' },
+  { id: 'overview', label: 'Overview' },
   { id: 'dimensions', label: 'Quality Dimensions' },
   { id: 'violations', label: 'Violations & Fix Plans' },
   { id: 'map', label: 'Code Map' },
@@ -33,6 +36,7 @@ const SECTIONS = [
   { id: 'assistant', label: 'Assistant' },
   { id: 'terminal', label: 'Terminal' },
   { id: 'settings', label: 'Settings' },
+  { id: 'cli', label: 'Command Line & CI' },
 ];
 
 const SECTION_COMPONENTS = {
@@ -41,6 +45,7 @@ const SECTION_COMPONENTS = {
   'projects': Projects,
   'providers': Providers,
   'evaluations': Evaluations,
+  'overview': Overview,
   'dimensions': Dimensions,
   'violations': Violations,
   'map': CodeMap,
@@ -50,6 +55,7 @@ const SECTION_COMPONENTS = {
   'assistant': Assistant,
   'terminal': Terminal,
   'settings': Settings,
+  'cli': CommandLine,
 };
 
 function SectionNav({ active, onSelect }) {
