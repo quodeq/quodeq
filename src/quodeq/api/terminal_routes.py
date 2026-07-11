@@ -111,11 +111,11 @@ def register_terminal_routes(app: Flask, manager: TerminalManager | None = None)
                     ws.send("0" + sb)
             except Exception:
                 # Spawn failure or early disconnect must not propagate past
-                # flask-sock (would surface as a 500); close cleanly instead.
-                try:
-                    ws.close()
-                except Exception:
-                    pass
+                # flask-sock (would surface as a 500). Don't close here:
+                # flask-sock sends the close frame after this handler returns,
+                # i.e. after the outer finally has released _conn_lock, so a
+                # client that reconnects the instant it sees the close finds
+                # the lock free instead of a spurious "already open" refusal.
                 return
 
             stop = threading.Event()
