@@ -17,7 +17,7 @@ export default function GradeFormulaPage({ navigation }) {
   const projectId = navigation?.selectedProject || null;
   const [tab, setTab] = useState('severity');
   const {
-    draft, isCustom, isDirty, preview, busy, error, update, apply, resetToDefaults,
+    draft, isCustom, isDirty, preview, busy, error, partialNotice, update, apply, resetToDefaults,
   } = useGradeFormula(projectId);
 
   const onApply = async () => {
@@ -102,6 +102,7 @@ export default function GradeFormulaPage({ navigation }) {
             : isCustom ? 'custom formula active' : 'Q² defaults active'}
         </span>
         {error ? <span className="gf-dirty-hint">{error}</span> : null}
+        {partialNotice ? <span className="gf-dirty-hint" role="alert">{partialNotice}</span> : null}
       </div>
       <p className="settings-description" style={{ marginTop: 8 }}>
         These parameters do not affect the insufficient-evidence gate. Principles with too

@@ -44,9 +44,9 @@ def test_get_returns_defaults_and_is_custom_false(client, formula_path):
 
 
 def test_put_saves_and_applies(client, formula_path, monkeypatch):
-    applied = {}
     monkeypatch.setattr(
-        grade_formula, "apply_to_all_runs", lambda root: applied.setdefault("n", 7) or 7,
+        grade_formula, "apply_to_all_runs",
+        lambda root: grade_formula.ApplyResult(rescored=7, failed=[]),
     )
     payload = params_to_dict(dataclasses.replace(DEFAULT_PARAMS, base_k=0.3))
     resp = client.put("/api/grade-formula", json=payload, headers=_ORIGIN)
@@ -54,7 +54,22 @@ def test_put_saves_and_applies(client, formula_path, monkeypatch):
     body = resp.get_json()
     assert body["isCustom"] is True
     assert body["applied"] == 7
+    assert body["failed"] == 0
     assert grade_formula.load_params().base_k == 0.3
+
+
+def test_put_reports_partial_apply(client, formula_path, monkeypatch):
+    # A run that couldn't be rescored is surfaced so the client can warn the
+    # user rather than the endpoint claiming a clean success.
+    monkeypatch.setattr(
+        grade_formula, "apply_to_all_runs",
+        lambda root: grade_formula.ApplyResult(rescored=5, failed=["run-x", "run-y"]),
+    )
+    payload = params_to_dict(dataclasses.replace(DEFAULT_PARAMS, base_k=0.3))
+    resp = client.put("/api/grade-formula", json=payload, headers=_ORIGIN)
+    body = resp.get_json()
+    assert body["applied"] == 5
+    assert body["failed"] == 2
 
 
 def test_put_rejects_invalid_params_with_400(client, formula_path):
@@ -66,7 +81,10 @@ def test_put_rejects_invalid_params_with_400(client, formula_path):
 
 
 def test_delete_resets_to_defaults(client, formula_path, monkeypatch):
-    monkeypatch.setattr(grade_formula, "apply_to_all_runs", lambda root: 0)
+    monkeypatch.setattr(
+        grade_formula, "apply_to_all_runs",
+        lambda root: grade_formula.ApplyResult(rescored=0, failed=[]),
+    )
     grade_formula.save_params(dataclasses.replace(DEFAULT_PARAMS, base_k=0.3))
     resp = client.delete("/api/grade-formula", headers=_ORIGIN)
     assert resp.status_code == 200

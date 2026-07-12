@@ -138,7 +138,7 @@ def test_get_project_scores_reflects_applied_custom_params_without_dismissals(
     # Apply custom params: saves the formula and rewrites every run's SQL grades.
     grade_formula.save_params(_STRICT)
     applied = grade_formula.apply_to_all_runs(reports_root)
-    assert applied == 1
+    assert applied.rescored == 1
 
     custom_rows = {r["dimension"]: r for r in SQLiteStateStore(run_dir).read_dimension_scores()}
     custom_security = custom_rows["security"]
@@ -205,7 +205,7 @@ def test_read_run_data_overlays_sql_principle_grades_after_apply(
     )
 
     grade_formula.save_params(_STRICT)
-    assert grade_formula.apply_to_all_runs(reports_root) == 1
+    assert grade_formula.apply_to_all_runs(reports_root).rescored == 1
 
     custom_p1 = next(
         r for r in SQLiteStateStore(run_dir).read_principle_grades()
@@ -238,7 +238,7 @@ def test_read_run_data_keeps_eval_time_principle_on_name_mismatch(
     )
 
     grade_formula.save_params(_STRICT)
-    assert grade_formula.apply_to_all_runs(reports_root) == 1
+    assert grade_formula.apply_to_all_runs(reports_root).rescored == 1
     custom_rows = {r["dimension"]: r for r in SQLiteStateStore(run_dir).read_dimension_scores()}
 
     dims = read_run_data(reports_root, project, "run1")
