@@ -221,14 +221,33 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
     def cancel_or_delete_evaluation(job_id: str) -> Response | tuple[Response, int]:
         """DELETE on a running job cancels it. DELETE on a finished job removes it from history.
 
-        Query: ``?discard=true`` on a running job also wipes the in-flight
-        dim queue + fingerprint snapshots so the next run treats the work
-        as never-happened (forces a full rescan for any dim that didn't
-        finish scoring on its own).
+        Query: ``?intent=cancel|delete`` declares what the client is asking
+        for. Without it, the action is inferred from the momentary status
+        (legacy behavior), which is race-prone: a run finishing while the
+        cancel dialog is open, or a double-clicked cancel, used to fall
+        through to the permanent-purge branch and erase a run the user
+        chose to keep. With intent=cancel this endpoint can never purge;
+        with intent=delete it never silently cancels.
+
+        ``?discard=true`` on a cancel also wipes the run entirely so the
+        next run treats the work as never-happened.
         """
         snapshot = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
         if snapshot is None:
             body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+        intent = request.args.get("intent", "").lower() or None
+        if intent == "cancel" and snapshot.status != "running":
+            body, status = error_response(
+                "Evaluation already finished. Nothing was cancelled.",
+                HTTPStatus.CONFLICT, "ALREADY_FINISHED",
+            )
+            return jsonify(body), status
+        if intent == "delete" and snapshot.status == "running":
+            body, status = error_response(
+                "Evaluation is still running. Cancel it before deleting.",
+                HTTPStatus.CONFLICT, "STILL_RUNNING",
+            )
             return jsonify(body), status
         if snapshot.status == "running":
             discard = request.args.get("discard", "").lower() == "true"
