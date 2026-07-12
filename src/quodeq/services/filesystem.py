@@ -134,9 +134,14 @@ class FilesystemActionProvider(ActionProvider):
         if not ok:
             ok = self._evaluations.promote_stale_to_cancelled(job_id, reports_dir=reports_dir)
         if ok and discard_partial:
-            self._evaluations.delete(
-                job_id, reports_dir=Path(reports_dir) if reports_dir else None,
-            )
+            reports_path = Path(reports_dir) if reports_dir else None
+            if not self._evaluations.delete(job_id, reports_dir=reports_path):
+                # A wedged process can be killed without ever flipping
+                # status.json to terminal, so the index still reads
+                # "running" and delete() refuses the row. The kill already
+                # landed (ok is True): promote the stale row, then purge.
+                self._evaluations.promote_stale_to_cancelled(job_id, reports_dir=reports_dir)
+                self._evaluations.delete(job_id, reports_dir=reports_path)
         return ok
 
     def get_log_run_dir(self, job_id: str) -> Path | None:

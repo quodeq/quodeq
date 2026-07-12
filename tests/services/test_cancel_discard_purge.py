@@ -15,6 +15,7 @@ New contract: discard == the run never happened.
 from __future__ import annotations
 
 import json
+import os
 import threading
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -229,6 +230,73 @@ class TestProviderDiscardPurgesRun:
         assert snapshot is None, "discarded run must be gone from the index"
         listed = provider.list_evaluations(limit=0, reports_dir=str(reports))
         assert all(s.job_id != "ext-stale-run" for s in listed)
+
+    def test_discard_purges_even_when_status_never_flips_terminal(
+        self, tmp_path: Path,
+    ) -> None:
+        """A killed process that never writes a terminal status.json must not
+        block the purge.
+
+        Real-world shape of the bug report: the user cancels a wedged run.
+        The SIGTERM lands (cancel returns True) but the dying process never
+        flips status.json to cancelled, so the index still reads "running"
+        and EvaluationsIndex.delete refuses the row. The discard must
+        promote the stale row and purge anyway.
+        """
+        import signal as _signal
+
+        reports = tmp_path / "reports"
+        run = reports / "p" / "wedged-run"
+        (run / "evidence").mkdir(parents=True)
+        (run / "evidence" / "manifest.json").write_text("{}")
+        write_status(
+            run, state=RunState.RUNNING, job_id="ext-wedged-run",
+            started_at="2026-04-20T00:00:00+00:00", dimensions=["security"],
+            pid=os.getpid(),
+        )
+        (run / ".heartbeat").touch()
+        (run / ".pid").write_text(str(os.getpid()))
+
+        db_path = tmp_path / "idx.db"
+        provider = FilesystemActionProvider(index_db_path=db_path)
+        provider.list_evaluations(limit=0, reports_dir=str(reports))
+
+        # Intercept the tree-kill (we must not SIGTERM ourselves) and make
+        # the liveness check report the pid dead once "killed" — but leave
+        # status.json untouched, exactly like a wedged process would.
+        import quodeq.services._external_jobs as _ext_mod
+        import quodeq.services._index_sync as _sync_mod
+        original_kill_tree = _ext_mod._kill_tree
+        original_alive = _sync_mod._is_pid_alive
+        pid_killed = False
+
+        def fake_kill_tree(target_pid: int, sig: int = _signal.SIGTERM) -> None:
+            nonlocal pid_killed
+            if sig == _signal.SIGTERM:
+                pid_killed = True
+
+        def fake_alive(query_pid: int) -> bool:
+            if pid_killed:
+                return False
+            return original_alive(query_pid)
+
+        _ext_mod._kill_tree = fake_kill_tree
+        _sync_mod._is_pid_alive = fake_alive
+        try:
+            ok = provider.cancel_evaluation(
+                "ext-wedged-run", reports_dir=str(reports), discard_partial=True,
+            )
+        finally:
+            _ext_mod._kill_tree = original_kill_tree
+            _sync_mod._is_pid_alive = original_alive
+
+        assert ok is True
+        assert not run.exists(), (
+            "discard must purge the run even when the killed process never "
+            "wrote a terminal status.json"
+        )
+        listed = provider.list_evaluations(limit=0, reports_dir=str(reports))
+        assert all(s.job_id != "ext-wedged-run" for s in listed)
 
     def test_keep_findings_preserves_run_dir(self, tmp_path: Path) -> None:
         """Without discard, cancel keeps the run on disk (existing contract)."""
