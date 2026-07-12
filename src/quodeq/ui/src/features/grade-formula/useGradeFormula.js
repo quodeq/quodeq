@@ -20,6 +20,10 @@ export default function useGradeFormula(projectId) {
   const [preview, setPreview] = useState(null); // {before, after} or null
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  // Set when an apply/reset rescored some runs but not all (a locked/corrupt
+  // evaluation.db). Those runs keep the OLD formula's grades, so warn rather
+  // than let the mismatch look like a bug.
+  const [partialNotice, setPartialNotice] = useState(null);
   const debounceRef = useRef(null);
   const loadedRef = useRef(false); // true once the initial GET has populated draft
   const queryClient = useQueryClient();
@@ -73,12 +77,17 @@ export default function useGradeFormula(projectId) {
     });
   }, [requestPreview]);
 
+  const noticeFor = (d) => (d.failed > 0
+    ? `Applied, but ${d.failed} run${d.failed === 1 ? '' : 's'} could not be rescored and still show the old formula. Try applying again.`
+    : null);
+
   const apply = useCallback(async () => {
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setPartialNotice(null);
     try {
       const d = await saveGradeFormula(draft);
       setSaved(d.current); setDraft(d.current); setIsCustom(d.isCustom);
       setGradeThresholds(d.current.gradeThresholds);
+      setPartialNotice(noticeFor(d));
       invalidateScoreQueries();
       requestPreview(d.current);
       return d.applied;
@@ -91,11 +100,12 @@ export default function useGradeFormula(projectId) {
   }, [draft, requestPreview, invalidateScoreQueries]);
 
   const resetToDefaults = useCallback(async () => {
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setPartialNotice(null);
     try {
       const d = await resetGradeFormula();
       setSaved(d.current); setDraft(d.current); setIsCustom(d.isCustom);
       setGradeThresholds(d.current.gradeThresholds);
+      setPartialNotice(noticeFor(d));
       invalidateScoreQueries();
       requestPreview(d.current);
     } catch {
@@ -105,5 +115,5 @@ export default function useGradeFormula(projectId) {
     }
   }, [requestPreview, invalidateScoreQueries]);
 
-  return { draft, defaults, isCustom, isDirty, preview, busy, error, update, apply, resetToDefaults };
+  return { draft, defaults, isCustom, isDirty, preview, busy, error, partialNotice, update, apply, resetToDefaults };
 }

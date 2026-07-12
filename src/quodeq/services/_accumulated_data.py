@@ -18,8 +18,18 @@ class _DimensionBuckets:
 
 
 def _has_valid_score(dim: DimensionResult) -> bool:
-    """Return True if the dimension carries a usable overall score."""
-    return bool(dim.overall_score)
+    """Return True if the dimension carries a usable, trustworthy score.
+
+    Requires a non-empty ``overall_score`` AND that the model actually
+    inspected files. A coverage-0 eval (``files_read == 0``) is the stub
+    ``_score_completed_evidence`` writes at cancel time when no findings
+    landed; its score is meaningless and must not drive the accumulated
+    Overview (the same ``filesRead > 0`` trust rule ``scoring_view`` uses).
+    A missing ``files_read`` (None, legacy evals) is trusted as before.
+    """
+    if not dim.overall_score:
+        return False
+    return dim.files_read != 0
 
 
 def _classify_dimension(

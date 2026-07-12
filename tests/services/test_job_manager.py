@@ -381,6 +381,8 @@ class TestMonitorProcess:
         from quodeq.services import jobs as jobs_mod
         monkeypatch.setenv("QUODEQ_JOB_TIMEOUT_S", "0.05")
         monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
+        # Group-wide terminate would signal a real pid; stub it to the fake's kill.
+        monkeypatch.setattr(jobs_mod, "_terminate_process", lambda p: p.kill())
 
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
@@ -442,6 +444,9 @@ class TestMonitorProcess:
         from quodeq.services import jobs as jobs_mod
         monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
         monkeypatch.setattr(jobs_mod, "_WATCHDOG_DEADLINE_GRACE_S", 0.02)
+        # The watchdog must terminate the whole process tree, not just the
+        # parent PID; patch it to the stub's own kill so the loop can break.
+        monkeypatch.setattr(jobs_mod, "_terminate_process", lambda p: p.kill())
 
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
@@ -454,6 +459,39 @@ class TestMonitorProcess:
         mgr._monitor_process("j1", proc)
 
         assert proc.killed is True
+        assert job.exit_code == _EXIT_CODE_TIMEOUT
+        assert job.status == STATUS_FAILED
+
+    def test_watchdog_kill_terminates_the_process_tree(self, monkeypatch):
+        """The watchdog must kill the process GROUP, not just the parent PID.
+
+        The subprocess is spawned start_new_session=True, so a bare
+        process.kill() SIGKILLs only the parent — the subagent pool + AI-CLI
+        children are orphaned (token/CPU leak) and can keep writing into the
+        abandoned run dir. Every other kill path goes through
+        _terminate_process (group-wide, TERM->grace->KILL); the watchdog
+        must too.
+        """
+        from quodeq.services import jobs as jobs_mod
+        monkeypatch.setenv("QUODEQ_JOB_TIMEOUT_S", "0.05")
+        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
+        calls = []
+
+        def fake_terminate(p):
+            calls.append(p)
+            p.kill()  # let the stub's wait() start returning so the loop ends
+
+        monkeypatch.setattr(jobs_mod, "_terminate_process", fake_terminate)
+
+        store = InMemoryJobStore()
+        mgr = JobManager(job_store=store)
+        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None)
+        store.put(job)
+        proc = _NeverExitsProcess()
+        mgr._processes["j1"] = proc
+        mgr._monitor_process("j1", proc)
+
+        assert calls == [proc], "watchdog kill must go through _terminate_process"
         assert job.exit_code == _EXIT_CODE_TIMEOUT
         assert job.status == STATUS_FAILED
 
@@ -521,3 +559,34 @@ def test_list_jobs_warns_on_deprecated_reports_root_kwarg(tmp_path):
         and "reports_root" in str(w.message)
         for w in caught
     ), f"expected DeprecationWarning about reports_root, got: {[str(w.message) for w in caught]}"
+
+
+class TestEvictionOrder:
+    def test_evicts_oldest_completed_first(self):
+        """Eviction beyond _MAX_COMPLETED_JOBS must drop the OLDEST jobs.
+
+        The victims used to be taken in store-iteration order, so a store
+        wedged with old junk (crash leftovers, test pollution) could evict
+        the user's newest real runs while the junk survived.
+        """
+        from quodeq.services.jobs import _MAX_COMPLETED_JOBS
+
+        store = InMemoryJobStore()
+        mgr = JobManager(job_store=store)
+        total = _MAX_COMPLETED_JOBS + 3
+        # Insert NEWEST first so naive iteration-order eviction picks the
+        # newest as victims and the test goes red.
+        for i in reversed(range(total)):
+            store.put(Job(
+                f"j{i:03d}", "done", ["echo"],
+                "2026-01-01T00:00:00+00:00",
+                f"2026-01-01T00:{i // 60:02d}:{i % 60:02d}+00:00", 0,
+            ))
+        mgr._evict_completed_jobs()
+        remaining = {j.job_id for j in store.list()}
+        assert len(remaining) == _MAX_COMPLETED_JOBS
+        # j000..j002 have the oldest ended_at values and must be the victims.
+        assert "j000" not in remaining
+        assert "j001" not in remaining
+        assert "j002" not in remaining
+        assert f"j{total - 1:03d}" in remaining

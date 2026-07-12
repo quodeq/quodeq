@@ -18,12 +18,16 @@ const EVAL_OPTIONS_HINT = (
 
 const NO_STANDARDS_MESSAGE = 'Select at least one standard before evaluating.';
 
-export function buildScanPayload({ info, branch, scopePath, selectedDims, cleanScan }) {
+export function buildScanPayload({ info, branch, scopePath, selectedDims, cleanScan, project }) {
   const payload = { repo: info.path };
   payload.dimensions = [...selectedDims];
   if (branch) payload.branch = branch;
   if (scopePath) payload.scopePath = scopePath;
   payload.cleanScan = cleanScan !== 'off';
+  // UI-side bookkeeping (stripped before the HTTP call): lets the
+  // in-progress card label itself with the launching project before the
+  // backend's report-path marker resolves the job's own project.
+  if (project) payload.uiProject = project;
   return payload;
 }
 
@@ -73,7 +77,7 @@ function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }
   return { info, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore };
 }
 
-function useDimensionSelection(allDimensions, info, branch, scopePath, onStart, onValidationFail, preselectDims = []) {
+function useDimensionSelection(allDimensions, info, branch, scopePath, onStart, onValidationFail, preselectDims = [], project = null) {
   const [selectedDims, setSelectedDims] = useState(new Set());
   const [cleanScan, setCleanScan] = useState('off');
 
@@ -113,8 +117,17 @@ function useDimensionSelection(allDimensions, info, branch, scopePath, onStart, 
       onValidationFail?.(NO_STANDARDS_MESSAGE);
       return;
     }
-    onStart(buildScanPayload({ info, branch, scopePath, selectedDims, cleanScan }));
-    if (cleanScan === 'once') setCleanScan('off');
+    const result = onStart(buildScanPayload({ info, branch, scopePath, selectedDims, cleanScan, project }));
+    // Consume the one-shot clean toggle only when the start actually went
+    // through. A blocked start (another evaluation running) returns false;
+    // a failed start rejects. Eating the toggle in either case makes the
+    // user's retry silently run incremental.
+    if (cleanScan === 'once' && result !== false) {
+      Promise.resolve(result).then(
+        () => setCleanScan('off'),
+        () => {},
+      );
+    }
   };
 
   return { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan };
@@ -135,7 +148,7 @@ function useReEvaluateCard(project, onStart, projectInfo, preselectDims) {
   const { scanData } = useScanData(isLocal ? project : null);
 
   const { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan } =
-    useDimensionSelection(allDimensions, info, branch, scopePath, onStart, showToast, preselectDims);
+    useDimensionSelection(allDimensions, info, branch, scopePath, onStart, showToast, preselectDims, project);
 
   return {
     info, error, allDimensions, selectedDims,

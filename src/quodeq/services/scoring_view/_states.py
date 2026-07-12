@@ -147,6 +147,60 @@ def is_eligible_for_default_view(status: str) -> bool:
     return status == RUN_STATE_COMPLETE
 
 
+def select_default_view_runs(run_infos):
+    """The single run-set selection for the accumulated/default view.
+
+    ``complete`` runs when any exist. Otherwise fall back to ``cancelled``
+    runs (a keep-findings cancel is real data the user chose to keep, and
+    a fresh project whose every attempt was stopped early should still
+    show what it has). ``in_progress`` never feeds the default view (the
+    umbrella run hasn't terminated) and ``failed`` never does either (the
+    run errored; partial scoring is suspect) — including in the fallback,
+    so a partial failed run cannot masquerade as the project grade.
+
+    Used by:
+      - ``accumulated._compute_result`` — the Overview cards/headline.
+      - ``_fs_metadata._read_accumulated_summary`` — the repositories
+        screen's project-card grade.
+
+    Both consult this single function so the card a user sees on the
+    project list always matches the Overview behind the click.
+
+    Args/returns are ``RunInfo``-shaped objects (anything with a
+    ``status`` attribute); order is preserved.
+    """
+    eligible = [r for r in run_infos if is_eligible_for_default_view(r.status)]
+    if eligible:
+        return eligible
+    return [r for r in run_infos if r.status == RUN_STATE_CANCELLED]
+
+
+def select_trend_runs(run_infos):
+    """The run set behind ``dashboard.trend`` / the score-history data.
+
+    ``complete`` and ``in_progress`` runs; ``cancelled`` and ``failed``
+    are dropped — their partial scores are misleading as history points.
+    They remain in ``availableRuns`` so the UI can surface them when the
+    user asks explicitly.
+
+    ``in_progress`` entries stay in the trend because the History table
+    renders its "running" row from them; the CLIENT keeps them from
+    representing chart buckets or the day-highlight union
+    (``dailyGrouping.isBucketEligible``), mirroring the default view's
+    wait-until-terminal rule.
+
+    Used by:
+      - ``dashboard._compute_dashboard_payload`` — history window.
+      - ``scoring.get_project_scores`` — the /scores trend.
+
+    Args/returns are ``RunInfo``-shaped objects; order is preserved.
+    """
+    return [
+        r for r in run_infos
+        if r.status not in (RUN_STATE_CANCELLED, RUN_STATE_FAILED)
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Public exports
 # ---------------------------------------------------------------------------
@@ -163,4 +217,6 @@ __all__ = [
     "is_successful_run",
     "is_trustable_run",
     "is_eligible_for_default_view",
+    "select_default_view_runs",
+    "select_trend_runs",
 ]

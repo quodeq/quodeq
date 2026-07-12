@@ -96,20 +96,25 @@ function useNativeTitlebarSync(effectiveDark) {
  */
 function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onGoToProjects, onGoToSettings, preselectDims }) {
   const { connected, setConnected } = serverHealth;
-  const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
+  const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation, startedProject } = evaluation;
   const projectInfo = projects?.find(p => (p.id || p.name) === selectedProject) || null;
   // The in-progress card describes the running job's own project, which can
   // differ from the UI's global selection. Resolve it the same way so the
-  // card label follows the job rather than the selection.
+  // card label follows the job rather than the selection. Before the
+  // report-path marker resolves outputProject, the project the job was
+  // started for fills the gap; the global selection is never used.
   const jobProjectInfo = job?.outputProject
     ? (projects?.find(p => (p.id || p.name) === job.outputProject) || null)
+    : null;
+  const startedProjectInfo = startedProject
+    ? (projects?.find(p => (p.id || p.name) === startedProject) || null)
     : null;
   return (
     <>
       {!connected && <ServerDisconnectedOverlay onReconnect={() => setConnected(true)} />}
       <EvaluateScreen
         evaluation={{ job, jobError, liveViolations }}
-        context={{ selectedProject, projectInfo, jobProjectInfo, preselectDims }}
+        context={{ selectedProject, projectInfo, jobProjectInfo, startedProjectInfo, preselectDims }}
         actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation, onGoToProjects, onGoToSettings }}
       />
     </>

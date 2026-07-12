@@ -63,6 +63,18 @@ describe('buildScanPayload', () => {
     const payload = buildScanPayload({ ...baseState, scopePath: null });
     expect(payload).not.toHaveProperty('scopePath');
   });
+
+  it('carries the launching project id as uiProject', () => {
+    // The in-progress card labels itself with the job's own project; the
+    // launching project id bridges the gap until the backend resolves it.
+    const payload = buildScanPayload({ ...baseState, project: 'uuid-x' });
+    expect(payload.uiProject).toBe('uuid-x');
+  });
+
+  it('omits uiProject when no project is known', () => {
+    const payload = buildScanPayload({ ...baseState });
+    expect(payload).not.toHaveProperty('uiProject');
+  });
 });
 
 function makeFakeApi(overrides = {}) {
@@ -156,6 +168,56 @@ describe('ReEvaluateCard ephemeral gating', () => {
     // Scan button is not disabled
     const button = screen.getByRole('button', { name: /^▸\s*scan$|^scan$|running\.\.\./i });
     expect(button).not.toBeDisabled();
+  });
+});
+
+describe('ReEvaluateCard clean-scan once consumption', () => {
+  beforeEach(() => { invalidateDimensionCache(); });
+
+  const localInfo = { name: 'demo', path: '/repos/myproj', location: 'local', ephemeral: false, evaluable: true };
+  const apiWithDims = () => makeFakeApi({
+    getProjectInfo: vi.fn().mockResolvedValue(localInfo),
+    listPlugins: vi.fn().mockResolvedValue([{ dimensions: [
+      { id: 'security', label: 'Security' },
+    ] }]),
+  });
+
+  async function armOnceToggle(user) {
+    await user.click(screen.getByRole('button', { name: /clean scan/i }));
+    await user.click(screen.getByRole('button', { name: /just this scan/i }));
+    expect(screen.getByRole('button', { name: /clean scan/i })).toHaveAttribute('aria-pressed', 'true');
+  }
+
+  it('keeps the once toggle armed when the start is blocked', async () => {
+    // Regression (v1.6.0): a start swallowed by the running-job guard still
+    // consumed the one-shot clean toggle, so the user's retry silently ran
+    // incremental and counted a discarded run's files as analyzed.
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const onStart = vi.fn().mockReturnValue(false);
+    renderCard({ project: 'p-once', projectInfo: localInfo, api: apiWithDims(), onStart, preselectDims: ['security'] });
+    await waitFor(() => expect(screen.getByRole('button', { name: /security/i })).toHaveAttribute('aria-pressed', 'true'));
+
+    await armOnceToggle(user);
+    await user.click(screen.getByRole('button', { name: /^▸\s*scan$|^scan$/i }));
+
+    expect(onStart).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /clean scan/i })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('consumes the once toggle when the start goes through', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const onStart = vi.fn().mockResolvedValue({ jobId: 'j1' });
+    renderCard({ project: 'p-once2', projectInfo: localInfo, api: apiWithDims(), onStart, preselectDims: ['security'] });
+    await waitFor(() => expect(screen.getByRole('button', { name: /security/i })).toHaveAttribute('aria-pressed', 'true'));
+
+    await armOnceToggle(user);
+    await user.click(screen.getByRole('button', { name: /^▸\s*scan$|^scan$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /clean scan/i })).toHaveAttribute('aria-pressed', 'false');
+    });
   });
 });
 

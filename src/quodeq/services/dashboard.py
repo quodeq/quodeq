@@ -23,7 +23,7 @@ from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services._trend_fetcher import make_trend_fetcher
-from quodeq.services.dim_resolution import is_eligible_for_default_view
+from quodeq.services.scoring_view import is_eligible_for_default_view, select_trend_runs
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
 
 _logger = logging.getLogger(__name__)
@@ -390,6 +390,17 @@ def _build_dashboard_result(
     }
 
 
+# Fallback order for the "latest" default run when none is complete. Each
+# tier is tried newest-first; a failed run is only headlined when nothing
+# else remains (handled after this list). Complete mirrors the Overview's
+# is_eligible_for_default_view; cancelled matches its cancelled fallback.
+_LATEST_FALLBACK_ORDER = (
+    is_eligible_for_default_view,               # complete
+    lambda status: status == "cancelled",
+    lambda status: status == "in_progress",
+)
+
+
 def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     """Return the selected RunInfo and its index in *runs*, raising FileNotFoundError if absent.
 
@@ -404,18 +415,25 @@ def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     drift.
 
     If no run is complete (fresh project, only run still in progress,
-    every attempt cancelled), fall back to ``runs[0]`` rather than
-    refusing to render. Users can still navigate to a specific partial
+    every attempt cancelled), fall back by trust order — cancelled, then
+    in_progress — and only headline a ``failed`` run when there is nothing
+    else. A failed run must not headline the dashboard while a cancelled
+    run with real kept-findings data exists, or the headline would show
+    untrustworthy data the Overview cards (which never fall back to
+    ``failed``) refuse to show. Users can still navigate to any specific
     run via the score-history chart or history table.
 
     Note: run IDs are opaque UUIDs (no sensitive data), safe to include in
     error messages.
     """
     if run == _LATEST_RUN:
-        selected_run = next(
-            (r for r in runs if is_eligible_for_default_view(r.status)),
-            runs[0],
-        )
+        selected_run = None
+        for accept in _LATEST_FALLBACK_ORDER:
+            selected_run = next((r for r in runs if accept(r.status)), None)
+            if selected_run:
+                break
+        if selected_run is None:
+            selected_run = runs[0]  # only failed runs remain; show the newest
     else:
         selected_run = next((item for item in runs if item.run_id == run), None)
     if not selected_run:
@@ -442,9 +460,10 @@ def _compute_dashboard_payload(
 ) -> _DashboardPayload:
     """Compute history-dependent parts of the dashboard response."""
     selected_dim_names = {d.dimension for d in ctx.dimensions}
-    # Exclude cancelled/failed runs — they produce misleading points on the
-    # history chart. They remain visible in availableRuns for the UI.
-    scoreable_runs = [r for r in runs if r.status not in ("cancelled", "failed")]
+    # Shared trend rule (scoring_view.select_trend_runs): cancelled/failed
+    # runs are excluded — misleading history points. They remain visible in
+    # availableRuns for the UI.
+    scoreable_runs = select_trend_runs(runs)
     # Re-find the selected run's index inside scoreable_runs. ctx.index is
     # the index in the full unfiltered run list, which can exceed
     # len(history_runs) when cancelled/failed runs sit above the selected

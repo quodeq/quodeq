@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.core.scoring.params import (
@@ -99,30 +101,65 @@ def _event_log_runs(project_dir: Path) -> list[Path]:
     )
 
 
-def apply_to_all_runs(reports_root: Path) -> int:
+@dataclass(frozen=True)
+class ApplyResult:
+    """Outcome of a grade-formula apply across all runs.
+
+    ``failed`` lists the run-dir names that could not be rescored (a locked
+    or corrupt evaluation.db, etc.). A non-empty ``failed`` means the apply
+    was PARTIAL: those runs keep their old-formula grades and disagree with
+    their rescored siblings, so the caller must surface it rather than
+    report a silent success.
+    """
+    rescored: int
+    failed: list[str]
+
+
+# Transient failures (a momentarily-locked evaluation.db while a background
+# scoring thread writes) clear on their own, so a bounded retry recovers the
+# common case before a run is reported failed.
+_APPLY_RETRIES = 2
+_APPLY_RETRY_SLEEP_S = 0.15
+
+
+def apply_to_all_runs(reports_root: Path) -> ApplyResult:
     """Rescore every run that has an events.jsonl with the currently saved params.
 
     Legacy runs without an event log cannot be rescored and are skipped.
     Always clears the dashboard cache (even when nothing was rescored, e.g.
-    when *reports_root* does not exist). Returns the number of runs rescored.
+    when *reports_root* does not exist). Returns an ``ApplyResult`` with the
+    rescored count and the run-dir names that failed after retries — a
+    partial apply is reported, not swallowed, so the UI can warn the user
+    that some runs still show the old formula.
     """
     from quodeq.data.projection.grade_projector import recompute_grades  # noqa: PLC0415
     from quodeq.services.dashboard import clear_shared_dimension_cache  # noqa: PLC0415
 
     params = load_params()
-    count = 0
+    rescored = 0
+    failed: list[str] = []
     if reports_root.is_dir():
         for project_dir in sorted(p for p in reports_root.iterdir() if p.is_dir()):
             for run_dir in sorted(r for r in project_dir.iterdir() if r.is_dir()):
                 if not (run_dir / "events.jsonl").is_file():
                     continue
-                try:
-                    recompute_grades(run_dir, params=params)
-                    count += 1
-                except Exception:  # noqa: BLE001 — one bad run must not block the rest
-                    _logger.warning("Rescore failed for %s; skipping.", run_dir, exc_info=True)
+                for attempt in range(_APPLY_RETRIES + 1):
+                    try:
+                        recompute_grades(run_dir, params=params)
+                        rescored += 1
+                        break
+                    except Exception:  # noqa: BLE001 — one bad run must not block the rest
+                        if attempt < _APPLY_RETRIES:
+                            time.sleep(_APPLY_RETRY_SLEEP_S)
+                            continue
+                        failed.append(run_dir.name)
+                        _logger.warning(
+                            "Rescore failed for %s after %d attempts; it will "
+                            "keep the old formula's grades.",
+                            run_dir, _APPLY_RETRIES + 1, exc_info=True,
+                        )
     clear_shared_dimension_cache()
-    return count
+    return ApplyResult(rescored=rescored, failed=failed)
 
 
 def preview_scores(

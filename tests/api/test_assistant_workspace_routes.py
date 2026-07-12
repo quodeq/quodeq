@@ -91,6 +91,43 @@ def test_discard_removes_worktree(app, client, repo):
     assert store.get_worktree(sid)["status"] == "discarded"
 
 
+def test_discard_blocked_while_turn_in_flight(app, client, repo):
+    # Regression: discard raced apply/pr and in-flight write turns because it
+    # was the only mutating workspace route with no turn-slot claim. A held
+    # slot must 409 discard and leave the worktree intact.
+    sid, store, manager = _session_with_worktree(app, client, repo)
+    import quodeq.api.assistant_routes as ar
+    with ar._running_lock:
+        ar._running_turns.add(sid)
+    try:
+        resp = client.post(f"/api/assistant/sessions/{sid}/workspace/discard")
+        assert resp.status_code == 409
+        assert manager.path.exists()
+        assert store.get_worktree(sid)["status"] == "active"
+    finally:
+        with ar._running_lock:
+            ar._running_turns.discard(sid)
+
+
+def test_discard_claims_turn_slot_and_releases(app, client, repo, monkeypatch):
+    sid, store, _ = _session_with_worktree(app, client, repo)
+    import quodeq.api.assistant_routes as ar
+    from quodeq.assistant.worktree import WorktreeManager
+    seen = {}
+    orig = WorktreeManager.remove
+
+    def spy(self, delete_branch=True):
+        with ar._running_lock:
+            seen["claimed"] = sid in ar._running_turns
+        return orig(self, delete_branch=delete_branch)
+
+    monkeypatch.setattr(WorktreeManager, "remove", spy)
+    resp = client.post(f"/api/assistant/sessions/{sid}/workspace/discard")
+    assert resp.status_code == 200 and seen["claimed"] is True
+    with ar._running_lock:
+        assert sid not in ar._running_turns  # released after
+
+
 def test_pr_fail_soft_keeps_branch(app, client, repo, monkeypatch):
     sid, store, manager = _session_with_worktree(app, client, repo)
     # fixture repo has no origin: push fails, endpoint stays 200 fail-soft
@@ -167,3 +204,55 @@ def test_workspace_apply_requires_csrf_origin(tmp_path, monkeypatch):
     resp = client.post("/api/assistant/sessions/x/workspace/apply",
                        headers={"Origin": "http://evil.example"})
     assert resp.status_code == 403
+
+
+def _branch_exists(repo, branch):
+    from quodeq.assistant.worktree import _run
+    out = _run(["git", "-C", str(repo), "branch", "--list", branch])
+    return bool(out.strip())
+
+
+def test_gc_removes_abandoned_active_worktree_and_branch(app, client, repo):
+    # A write session the user never resolved leaks a worktree + quodeq/fix-*
+    # branch in their real repo. GC with an elapsed TTL must remove both and
+    # mark the row, not just flip status when the dir already vanished.
+    from quodeq.assistant.worktree import gc_worktrees
+    sid, store, manager = _session_with_worktree(app, client, repo)
+    assert manager.path.exists()
+    assert _branch_exists(repo, manager.branch)
+
+    gc_worktrees(store, ttl_hours=0)  # ttl=0 => any active worktree is abandoned
+
+    assert not manager.path.exists(), "abandoned worktree dir must be removed"
+    assert not _branch_exists(repo, manager.branch), "fix branch must be deleted"
+    assert store.get_worktree(sid)["status"] == "discarded"
+
+
+def test_gc_keeps_recent_active_worktree(app, client, repo):
+    from quodeq.assistant.worktree import gc_worktrees
+    sid, store, manager = _session_with_worktree(app, client, repo)
+    gc_worktrees(store, ttl_hours=72)  # created just now => under the TTL
+    assert manager.path.exists()
+    assert store.get_worktree(sid)["status"] == "active"
+
+
+def test_gc_retries_a_failed_remove_on_a_terminal_row(app, client, repo):
+    # apply/pr set the row terminal then remove(); if remove() failed the dir
+    # lingers with a non-active row the old GC never revisited. GC must retry.
+    from quodeq.assistant.worktree import gc_worktrees
+    sid, store, manager = _session_with_worktree(app, client, repo)
+    store.set_worktree_status(sid, "applied")  # terminal, but dir still exists
+    assert manager.path.exists()
+
+    gc_worktrees(store, ttl_hours=72)
+
+    assert not manager.path.exists(), "leftover worktree of a terminal row must be removed"
+
+
+def test_gc_marks_active_row_stale_when_dir_vanished(app, client, repo):
+    from quodeq.assistant.worktree import gc_worktrees
+    import shutil
+    sid, store, manager = _session_with_worktree(app, client, repo)
+    shutil.rmtree(manager.path)  # crash / external removal
+    gc_worktrees(store, ttl_hours=72)
+    assert store.get_worktree(sid)["status"] == "stale"

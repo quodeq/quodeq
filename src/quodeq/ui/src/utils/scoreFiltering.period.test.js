@@ -39,3 +39,23 @@ test('day granularity (3-arg legacy call) is unchanged: one entry per visible da
   // a3's day (Mar 28) has no visible eval, so it's dropped at day granularity — unchanged behavior.
   assert.deepEqual(result.map((r) => r.runId), ['a4', 'a2', 'a1']);
 });
+
+test('in-progress entries never contribute to a bucket accumulated average', () => {
+  // A running run's partial dims must not overwrite the bucket average:
+  // the Overview header reads the selected bucket's numericAverage, and the
+  // cards deliberately exclude in-progress runs, so a partial score here
+  // makes the headline disagree with the cards mid-scan.
+  const trend = [
+    { runId: 'live', dateISO: '2026-04-14T20:00:00', status: 'in_progress',
+      dimensions: ['security'],
+      dimensionDetails: [{ dimension: 'security', score: 2 }] },
+    { runId: 'done', dateISO: '2026-04-14T10:00:00', status: 'complete',
+      dimensions: ['security'],
+      dimensionDetails: [{ dimension: 'security', score: 8 }] },
+  ];
+  const periodTrend = collapseByPeriod(trend, 'day'); // [done] (live skipped)
+  const result = filterTrendByVisibleStandardsDaily(trend, periodTrend, new Set(['security']), 'day');
+  assert.equal(result.length, 1);
+  assert.equal(result[0].runId, 'done');
+  assert.equal(result[0].numericAverage, 8); // not dragged to 2 by the running run
+});

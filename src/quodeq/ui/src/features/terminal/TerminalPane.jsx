@@ -67,6 +67,16 @@ export default function TerminalPane({ active }) {
     active: paneLive,
     restartKey,
     onData: (s) => termRef.current?.write(s),
+    // Reset the screen on every (re)connect before the server replays
+    // scrollback, so a reconnect to a still-alive backend repaints history
+    // instead of appending a duplicate copy under it. Also re-enable input
+    // (it's disabled while disconnected — see the status effect below).
+    onOpen: () => {
+      const term = termRef.current;
+      if (!term) return;
+      try { term.reset(); } catch { /* noop */ }
+      term.options.disableStdin = false;
+    },
   });
 
   // The size must reach the PTY only once the socket is OPEN. The resize sent
@@ -166,6 +176,19 @@ export default function TerminalPane({ active }) {
     try { fitRef.current.fit(); resize(termRef.current.cols, termRef.current.rows); } catch { /* noop */ }
   }, [active, resize]);
 
+  // While the socket is not open, disable xterm input. send() already no-ops
+  // when disconnected, so keystrokes would otherwise vanish silently into a
+  // dead shell (and buffering them is unsafe — the line would land in a fresh
+  // shell on reconnect). disableStdin makes xterm ignore input while the
+  // "disconnected" overlay explains why. Declared after the mount effect so
+  // termRef is set when this first runs. `paneLive` is a dep so it re-runs
+  // once the terminal has mounted.
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term) return;
+    term.options.disableStdin = status !== 'open';
+  }, [status, paneLive]);
+
   // Bubble phase (NOT capture): xterm's textarea must receive the keydown
   // first so special keys (Delete/Backspace/arrows/Enter) work; we then stop
   // it bubbling to the window so the app's global handlers (Ctrl+[ history,
@@ -182,7 +205,10 @@ export default function TerminalPane({ active }) {
   // initial handshake resolves in milliseconds and a flash would be noise.
   const overlay = {
     reconnecting: { text: 'Terminal disconnected. Reconnecting…', btn: 'Retry now' },
-    busy: { text: 'Terminal is already open in another window.', btn: 'Use it here' },
+    // Only one window may hold the single PTY. There is no takeover, so the
+    // button offers an honest Retry (which succeeds once the other window is
+    // closed) rather than a "Use it here" that silently does nothing.
+    busy: { text: 'Terminal is open in another window. Close it there, then retry.', btn: 'Retry' },
     refused: { text: 'Terminal connection refused by the server.', btn: 'Retry' },
   }[status];
   return (

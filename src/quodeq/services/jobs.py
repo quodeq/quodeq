@@ -46,7 +46,6 @@ __all__ = [
 # NOTE: logging in inner layer — tracked for middleware extraction
 _logger = logging.getLogger(__name__)
 _REPORT_PATH_MARKER = "Report path:"
-_PROCESS_WAIT_TIMEOUT_S = 30
 _EXIT_CODE_SPAWN_FAILURE = -1
 _EXIT_CODE_TIMEOUT = -9
 _DEFAULT_LIST_LIMIT = 100
@@ -380,11 +379,14 @@ class JobManager:
     def _evict_completed_jobs(self) -> None:
         """Remove oldest completed/failed/cancelled jobs beyond _MAX_COMPLETED_JOBS."""
         all_jobs = self._store.list()
-        completed = [j.job_id for j in all_jobs if j.status != STATUS_RUNNING]
+        completed = [j for j in all_jobs if j.status != STATUS_RUNNING]
         excess = len(completed) - _MAX_COMPLETED_JOBS
         if excess > 0:
-            for jid in completed[:excess]:
-                self._store.delete(jid)
+            # Oldest first, or a store wedged with old junk would evict the
+            # user's newest real runs while the junk survived.
+            completed.sort(key=lambda j: j.ended_at or j.started_at or "")
+            for job in completed[:excess]:
+                self._store.delete(job.job_id)
 
     @property
     def _job_timeout_cap_s(self) -> float:
@@ -425,11 +427,14 @@ class JobManager:
                 if self._watchdog_should_kill(job_id, started_at):
                     elapsed = int(time.time() - started_at)
                     _logger.warning("Job %s watchdog killing after %ds", job_id, elapsed)
-                    process.kill()
-                    try:
-                        process.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
-                    except subprocess.TimeoutExpired:
-                        pass
+                    # Kill the whole process GROUP (TERM -> grace -> KILL), not
+                    # just the parent PID. The subprocess is spawned
+                    # start_new_session=True, so a bare process.kill() would
+                    # orphan the subagent pool + AI-CLI children (leaking tokens
+                    # and CPU, and letting them write into the abandoned run
+                    # dir). _terminate_process matches the cancel/shutdown paths
+                    # and waits internally.
+                    _terminate_process(process)
                     exit_code = _EXIT_CODE_TIMEOUT
                     break
         with self._lock:

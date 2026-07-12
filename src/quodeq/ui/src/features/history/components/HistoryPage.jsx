@@ -48,17 +48,17 @@ function trimTrailingZero(n) {
 }
 
 function computeDeltas(rows) {
-  // Aligns 1:1 with `rows` (which may include in-progress stubs at the
-  // front). In-progress entries have no score, so their delta is null and
-  // we compare each completed row against the next completed one.
+  // Aligns 1:1 with `rows`, which may include scoreless stub rows
+  // (in-progress runs at the front, cancelled partial rows interleaved).
+  // A scoreless row has no delta, and each scored row compares against the
+  // next SCORED row so a stub in between doesn't null out a real delta.
   return rows.map((entry, i) => {
-    if (entry.status === 'in_progress') return null;
-    let nextIdx = i + 1;
-    while (nextIdx < rows.length && rows[nextIdx].status === 'in_progress') nextIdx++;
-    if (nextIdx >= rows.length) return null;
     const curr = parseFloat(entry.numericAverage);
+    if (Number.isNaN(curr)) return null;
+    let nextIdx = i + 1;
+    while (nextIdx < rows.length && Number.isNaN(parseFloat(rows[nextIdx].numericAverage))) nextIdx++;
+    if (nextIdx >= rows.length) return null;
     const prev = parseFloat(rows[nextIdx].numericAverage);
-    if (Number.isNaN(curr) || Number.isNaN(prev)) return null;
     return Math.round((curr - prev) * 10) / 10;
   });
 }
@@ -111,6 +111,49 @@ function buildInProgressStubs(availableRuns, trend) {
     // scoring yet. Clicking would land on an empty dashboard, so the row is
     // rendered as not-yet-ready.
     .map((r) => ({ runId: r.runId, dateLabel: r.dateLabel, dateISO: null, status: 'in_progress', hasScoredDims: false }));
+}
+
+function buildCancelledStubs(availableRuns, trend) {
+  // Cancelled runs are stripped from `trend` server-side (they're not chart
+  // points), but their kept-findings scores still drive the Overview when no
+  // complete run exists. Surface them as partial, dated rows so History and
+  // the Overview agree instead of showing scores over an empty table.
+  const trendIds = new Set((trend || []).map((e) => e.runId));
+  return (availableRuns || [])
+    .filter((r) => r.status === 'cancelled' && !trendIds.has(r.runId))
+    .map((r) => ({
+      runId: r.runId, dateLabel: r.dateLabel, dateISO: r.dateISO ?? null,
+      status: 'cancelled', hasScoredDims: true,
+    }));
+}
+
+/**
+ * Ordered rows for the History table: in-progress runs on top (running now),
+ * then cancelled partial rows interleaved with the (already newest-first)
+ * trend by date. Cancelled runs are absent from `trend`, so without this a
+ * project whose only runs are cancelled shows an empty History while the
+ * Overview shows their scores.
+ */
+export function assembleHistoryRows(availableRuns, trend) {
+  const inProgress = buildInProgressStubs(availableRuns, trend);
+  const cancelled = buildCancelledStubs(availableRuns, trend);
+  const dated = [...cancelled, ...(trend || [])].sort(
+    (a, b) => (b.dateISO || '').localeCompare(a.dateISO || ''),
+  );
+  return [...inProgress, ...dated];
+}
+
+/**
+ * Assembled rows minus hidden (failed) runs — the rows the table actually
+ * shows. The "no evaluations yet" guard checks this (not just `trend`), so
+ * a project whose only runs are cancelled still populates History instead
+ * of short-circuiting to empty while the Overview shows their scores.
+ */
+export function visibleHistoryRows(availableRuns, trend) {
+  const statusById = new Map((availableRuns || []).map((r) => [r.runId, r.status]));
+  return assembleHistoryRows(availableRuns, trend).filter(
+    (r) => !HIDDEN_STATUSES.has(statusById.get(r.runId) ?? r.status),
+  );
 }
 
 function NotReadyToast({ message, onDismiss }) {
@@ -290,7 +333,7 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
   const { trend, selectedRunId, availableRuns } = data;
   const { onRunClick, onRunHover, onRunHoverEnd, onRunChange, onDeleteRun } = callbacks;
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
-  const inProgressStubs = useMemo(() => buildInProgressStubs(availableRuns, trend), [availableRuns, trend]);
+  const historyRows = useMemo(() => assembleHistoryRows(availableRuns, trend), [availableRuns, trend]);
   // Toast state for clicks on running runs that have no scored dimensions yet.
   // toastKey forces remount so consecutive clicks restart the auto-dismiss timer.
   const [toastKey, setToastKey] = useState(0);
@@ -309,9 +352,8 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
   // `content-visibility: auto` on `.history-row` (see styles/history.css),
   // so there's no need for a "Load all" pagination toggle.
   const visible = useMemo(() => {
-    const combined = [...inProgressStubs, ...trend];
-    return combined.filter((entry) => !isHiddenStatus(entry.runId));
-  }, [inProgressStubs, trend, statusByRunId]);  // eslint-disable-line react-hooks/exhaustive-deps
+    return historyRows.filter((entry) => !isHiddenStatus(entry.runId));
+  }, [historyRows, statusByRunId]);  // eslint-disable-line react-hooks/exhaustive-deps
   const deltas = useMemo(() => computeDeltas(visible), [visible]);
 
   return (
@@ -449,7 +491,11 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
       </HistoryEmptyShell>
     );
   }
-  if (!trend || trend.length === 0) {
+  // Guard on the rows the table will actually show (trend + cancelled +
+  // in-progress, minus hidden failures), not just `trend`. A project whose
+  // only runs are cancelled has an empty trend but real rows to list, and
+  // its scores already show on the Overview.
+  if (visibleHistoryRows(availableRuns, trend).length === 0) {
     if (loading || isFetching) return <LoadingScreen />;
     const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
     return (

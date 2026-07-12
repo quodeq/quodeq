@@ -172,24 +172,27 @@ export function getEvaluationProgress(jobId) {
 }
 
 /**
+ * Cancel a running evaluation. Declares intent=cancel so the server can
+ * never route this to the permanent-purge branch, even if the run finished
+ * while the confirm dialog was open (it 409s instead and the run is kept).
  * @param {string} jobId
  * @param {{discard?: boolean}} [opts]
  * @returns {Promise<Object>}
  */
 export function cancelEvaluation(jobId, opts = {}) {
-  const qs = opts.discard ? '?discard=true' : '';
+  const qs = opts.discard ? '?intent=cancel&discard=true' : '?intent=cancel';
   return request(`/evaluations/${encodeURIComponent(jobId)}${qs}`, { method: 'DELETE' });
 }
 
 /**
- * Permanently delete a non-running evaluation from history (removes scan dir + index row).
- * The server DELETE endpoint routes running jobs to cancel and finished jobs to purge —
- * this helper is the semantic alias UI callers use when they want the purge path.
+ * Permanently delete a non-running evaluation from history (removes scan
+ * dir + index row). Declares intent=delete so a run that is unexpectedly
+ * still running is refused (409) instead of being silently cancelled.
  * @param {string} jobId
  * @returns {Promise<Object>}
  */
 export function deleteEvaluation(jobId) {
-  return request(`/evaluations/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
+  return request(`/evaluations/${encodeURIComponent(jobId)}?intent=delete`, { method: 'DELETE' });
 }
 
 // ── Dimension Eval ──────────────────────────────────────────────────────

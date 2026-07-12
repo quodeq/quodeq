@@ -151,3 +151,68 @@ class TestPredicateConsistency:
                 assert is_trustable_run(status), (
                     f"{status}/{reason} is successful but NOT trustable."
                 )
+
+
+class TestSelectDefaultViewRuns:
+    """One shared rule for which runs feed the accumulated/default view.
+
+    The Overview (accumulated._compute_result) and the repositories-screen
+    project card must consult the same selection or their grades diverge:
+    the card used to take the newest run of ANY status while the Overview
+    took complete-only. And the fallback used to include failed runs,
+    letting a partial failed run masquerade as a normal project grade.
+    """
+
+    @staticmethod
+    def _run(run_id, status):
+        from quodeq.services.ports import RunInfo
+        return RunInfo(run_id=run_id, date_iso="2026-01-01", date_label="Jan 01", status=status)
+
+    def test_complete_runs_win(self):
+        from quodeq.services.scoring_view import select_default_view_runs
+        runs = [
+            self._run("r3", "cancelled"),
+            self._run("r2", "complete"),
+            self._run("r1", "failed"),
+        ]
+        assert [r.run_id for r in select_default_view_runs(runs)] == ["r2"]
+
+    def test_fallback_uses_cancelled_but_never_failed(self):
+        from quodeq.services.scoring_view import select_default_view_runs
+        runs = [
+            self._run("r3", "failed"),
+            self._run("r2", "cancelled"),
+            self._run("r1", "in_progress"),
+        ]
+        assert [r.run_id for r in select_default_view_runs(runs)] == ["r2"]
+
+    def test_failed_only_project_gets_nothing(self):
+        from quodeq.services.scoring_view import select_default_view_runs
+        runs = [self._run("r1", "failed")]
+        assert select_default_view_runs(runs) == []
+
+
+class TestSelectTrendRuns:
+    """The trend/history-chart run set, centralised next to its siblings.
+
+    Behavior-preserving move of the inline 'not cancelled/failed' filters
+    from dashboard.py and scoring/__init__.py: the trend includes
+    in_progress entries (History renders their 'running' row from trend),
+    while the CLIENT keeps them from representing chart buckets
+    (dailyGrouping.isBucketEligible).
+    """
+
+    @staticmethod
+    def _run(run_id, status):
+        from quodeq.services.ports import RunInfo
+        return RunInfo(run_id=run_id, date_iso="2026-01-01", date_label="Jan 01", status=status)
+
+    def test_keeps_complete_and_in_progress_drops_cancelled_and_failed(self):
+        from quodeq.services.scoring_view import select_trend_runs
+        runs = [
+            self._run("r4", "in_progress"),
+            self._run("r3", "complete"),
+            self._run("r2", "cancelled"),
+            self._run("r1", "failed"),
+        ]
+        assert [r.run_id for r in select_trend_runs(runs)] == ["r4", "r3"]

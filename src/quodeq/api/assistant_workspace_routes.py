@@ -10,9 +10,9 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request
 
-from quodeq.api._assistant_helpers import get_repository
+from quodeq.api._assistant_helpers import get_repository, run_assistant_hygiene
 from quodeq.assistant.worktree import (
-    WorktreeError, WorktreeManager, diff_stats, diff_text, gc_stale_worktrees)
+    WorktreeError, WorktreeManager, diff_stats, diff_text)
 
 _logger = logging.getLogger(__name__)
 
@@ -24,13 +24,11 @@ def _manager(row: dict) -> WorktreeManager:
 
 def register_assistant_workspace_routes(app: Flask) -> None:
     def _lookup(sid: str):
-        """(repo, row, error_response); runs the one-shot stale GC first."""
+        """(repo, row, error_response); runs one-shot worktree/db hygiene first."""
         repo = get_repository(app)
         if repo.get_session(sid) is None:
             return None, None, (jsonify({"error": "unknown session"}), 404)
-        if not getattr(app, "_worktree_gc_done", False):
-            gc_stale_worktrees(repo)
-            app._worktree_gc_done = True
+        run_assistant_hygiene(app)
         return repo, repo.get_worktree(sid), None
 
     @app.get("/api/assistant/sessions/<sid>/workspace")
@@ -142,11 +140,25 @@ def register_assistant_workspace_routes(app: Flask) -> None:
             return err
         if row is None:
             return jsonify({"error": "no worktree"}), 404
-        if row["status"] not in ("active", "stale"):
-            return jsonify({"error": f"worktree already {row['status']}"}), 409
+        from quodeq.api.assistant_routes import _release_turn, _try_claim_turn
+        # Claim the turn slot like apply/pr: without this, discard raced an
+        # in-flight apply (overwriting "applied" with "discarded" while the
+        # changes sat in the user's real tree) and pulled the worktree out
+        # from under a running write turn.
+        if not _try_claim_turn(sid):
+            return jsonify({"error": "a turn or workspace action is in progress;"
+                            " wait for it to finish"}), 409
         try:
-            _manager(row).remove()
-        except WorktreeError as exc:
-            return jsonify({"error": str(exc)}), 500
-        repo.set_worktree_status(sid, "discarded")
-        return jsonify({"discarded": True})
+            row = repo.get_worktree(sid)  # re-read under the claim
+            if row is None:
+                return jsonify({"error": "no worktree"}), 404
+            if row["status"] not in ("active", "stale"):
+                return jsonify({"error": f"worktree already {row['status']}"}), 409
+            try:
+                _manager(row).remove()
+            except WorktreeError as exc:
+                return jsonify({"error": str(exc)}), 500
+            repo.set_worktree_status(sid, "discarded")
+            return jsonify({"discarded": True})
+        finally:
+            _release_turn(sid)

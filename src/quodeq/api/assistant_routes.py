@@ -69,6 +69,9 @@ def register_assistant_routes(app: Flask) -> None:
 
     @app.post("/api/assistant/sessions")
     def create_assistant_session():
+        # First assistant request of the process: reap leaked worktrees +
+        # prune stale sessions before minting a new one (one-shot, best-effort).
+        _assistant_helpers.run_assistant_hygiene(app)
         body = request.get_json(silent=True) or {}
         provider_cfg = _known_provider(str(body.get("provider", "")))
         if provider_cfg is None:
@@ -259,13 +262,23 @@ def register_assistant_routes(app: Flask) -> None:
         spec = ACTIONS.get(action["action_type"])
         if spec is None:
             return jsonify({"error": "unsupported action type"}), 400
+        # Atomically claim the drafted->applied transition BEFORE running the
+        # side effect, so a double-click / two-tab race can't run spec.apply
+        # twice (which double-ran the dismiss rescore). The loser sees a
+        # non-drafted row and 409s. On failure we release back to drafted so
+        # the user can retry.
+        if not repo.set_action_status(action_id, "applied", expected="drafted"):
+            fresh = repo.get_action(action_id)
+            state = fresh["status"] if fresh else "gone"
+            return jsonify({"error": f"action already {state}"}), 409
         try:
             result = spec.apply(action["payload"], current_app)
         except ValueError as exc:
+            repo.set_action_status(action_id, "drafted")
             return jsonify({"error": str(exc)}), 400
         except ActionConflict as exc:
+            repo.set_action_status(action_id, "drafted")
             return jsonify({"error": str(exc)}), 409
-        repo.set_action_status(action_id, "applied")
         return jsonify({"applied": True, "result": result}), 200
 
     @app.post("/api/assistant/actions/<action_id>/reject")
@@ -274,9 +287,11 @@ def register_assistant_routes(app: Flask) -> None:
         action = repo.get_action(action_id)
         if action is None:
             return jsonify({"error": "unknown action"}), 404
-        # Same replay guard as apply: an applied action must not flip to
-        # rejected on a stale card click or SSE replay.
-        if action["status"] != "drafted":
-            return jsonify({"error": f"action already {action['status']}"}), 409
-        repo.set_action_status(action_id, "rejected")
+        # Same replay guard as apply, made atomic: an applied action must
+        # not flip to rejected on a stale card click, SSE replay, or a race
+        # with a concurrent apply. The compare-and-set wins at most once.
+        if not repo.set_action_status(action_id, "rejected", expected="drafted"):
+            fresh = repo.get_action(action_id)
+            state = fresh["status"] if fresh else "gone"
+            return jsonify({"error": f"action already {state}"}), 409
         return jsonify({"status": "rejected"}), 200

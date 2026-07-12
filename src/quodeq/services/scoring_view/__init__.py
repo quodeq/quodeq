@@ -29,6 +29,8 @@ from ._states import (
     is_successful_run,
     is_trustable_run,
     is_eligible_for_default_view,
+    select_default_view_runs,
+    select_trend_runs,
 )
 
 # ---------------------------------------------------------------------------
@@ -69,6 +71,8 @@ __all__ = [
     "is_successful_run",
     "is_trustable_run",
     "is_eligible_for_default_view",
+    "select_default_view_runs",
+    "select_trend_runs",
     # Models
     "DimResolution",
     "BucketView",

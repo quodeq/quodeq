@@ -39,3 +39,30 @@ describe('useAccumulatedComputations dimTrends (as-of)', () => {
     expect(dimTrends.maintainability.delta).toBe(3);
   });
 });
+
+describe('useAccumulatedComputations selectedDayDimNames (multi-run day)', () => {
+  // Two runs on the SAME day evaluating different dimensions, plus an older
+  // day. The day-highlight must union the whole day, not just the newest
+  // run (v1.6.0 bug report: only the last evaluation's cards lit up).
+  const MULTI_RUN_DAY_TREND = [
+    { runId: 'm1', dateISO: '2026-07-12T14:00:00', dateLabel: 'Jul 12', numericAverage: 9, overallGrade: 'A', dimensions: ['security'], dimensionDetails: [{ dimension: 'security', score: 9 }] },
+    { runId: 'm2', dateISO: '2026-07-12T09:00:00', dateLabel: 'Jul 12', numericAverage: 8, overallGrade: 'B', dimensions: ['maintainability'], dimensionDetails: [{ dimension: 'maintainability', score: 8 }] },
+    { runId: 'm3', dateISO: '2026-07-10T10:00:00', dateLabel: 'Jul 10', numericAverage: 6, overallGrade: 'C', dimensions: ['reliability'], dimensionDetails: [{ dimension: 'reliability', score: 6 }] },
+  ];
+
+  it('unions dimensions across every run of the selected day', () => {
+    const { selectedDayDimNames } = renderHook(() => useAccumulatedComputations({
+      accumulated: { summary: { numericAverage: 8 }, dimensions: DIMS },
+      accumulatedDimensions: DIMS,
+      availableRuns: [],
+      dailyRuns: null,
+      overviewRunIndex: 0,
+      trend: MULTI_RUN_DAY_TREND,
+      selectedRunId: 'm1',
+      granularity: 'day',
+    })).result.current;
+    expect(selectedDayDimNames.has('security')).toBe(true);
+    expect(selectedDayDimNames.has('maintainability')).toBe(true);
+    expect(selectedDayDimNames.has('reliability')).toBe(false);
+  });
+});

@@ -1,5 +1,5 @@
 import { getGradeThresholds } from './gradeThresholds.js';
-import { isoWeekKey } from './dailyGrouping.js';
+import { isoWeekKey, localDayKey } from './dailyGrouping.js';
 
 /**
  * Grade-to-CSS-class mapping.
@@ -271,10 +271,15 @@ const PERIOD_MONTH_NAMES = [
 
 /**
  * Human label for a score-history bucket at the given grouping granularity.
- * - day   -> the entry's specific date label (e.g. "25 Mar 2026")
- * - month -> "March 2026" (from the YYYY-MM prefix; timezone-naive)
- * - week  -> "Week 13, 2026" (from the ISO week key)
+ * - day   -> the entry's LOCAL date (e.g. "25 Mar 2026")
+ * - month -> "March 2026" (from the local calendar day)
+ * - week  -> "Week 13, 2026" (ISO week of the local calendar day)
  * Falls back to the entry's dateLabel (then dateISO) when unparseable.
+ *
+ * All three derive from the same local-day key the grouping uses
+ * (bucketKey/localDayKey), so a run's label always names the bucket it
+ * sits in. The server's dateLabel is UTC-rendered and disagrees with the
+ * local day for runs near midnight; it is only a fallback here.
  *
  * @param {{ dateISO?: string, dateLabel?: string }} entry
  * @param {'day'|'week'|'month'} [granularity='day']
@@ -284,7 +289,7 @@ export function formatPeriodLabel(entry, granularity = 'day') {
   const iso = entry?.dateISO || '';
   const fallback = entry?.dateLabel || iso;
   if (granularity === 'month') {
-    const [y, m] = iso.slice(0, 7).split('-');
+    const [y, m] = localDayKey(iso).slice(0, 7).split('-');
     const idx = Number(m) - 1;
     return (y && PERIOD_MONTH_NAMES[idx]) ? `${PERIOD_MONTH_NAMES[idx]} ${y}` : fallback;
   }
@@ -292,6 +297,14 @@ export function formatPeriodLabel(entry, granularity = 'day') {
     const key = isoWeekKey(iso); // 'YYYY-Www' or ''
     const [y, w] = key.split('-W');
     return (y && w) ? `Week ${Number(w)}, ${y}` : fallback;
+  }
+  if (iso.length > 10) {
+    // Same "25 Mar 2026" shape the server's dateLabel uses, but from the
+    // LOCAL date so the label names the bucket the run actually sits in.
+    const d = new Date(iso);
+    if (!Number.isNaN(d.getTime())) {
+      return `${d.getDate()} ${PERIOD_MONTH_NAMES[d.getMonth()].slice(0, 3)} ${d.getFullYear()}`;
+    }
   }
   return fallback;
 }

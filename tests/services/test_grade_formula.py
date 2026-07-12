@@ -145,8 +145,44 @@ def test_apply_to_all_runs_rescores_and_skips_legacy(tmp_path, formula_path):
     legacy.mkdir()  # no events.jsonl → must be skipped
 
     grade_formula.save_params(_STRICT)
-    count = grade_formula.apply_to_all_runs(tmp_path)
-    assert count == 1
+    result = grade_formula.apply_to_all_runs(tmp_path)
+    assert result.rescored == 1
+    assert result.failed == []
+
+
+def test_apply_to_all_runs_reports_failed_runs_and_continues(tmp_path, formula_path, monkeypatch):
+    # A run whose recompute keeps failing (e.g. a genuinely corrupt db) must
+    # be REPORTED in .failed rather than silently skipped — otherwise it keeps
+    # serving old-formula grades while its siblings show the new formula, with
+    # the apply falsely reporting full success. Other runs still rescore and
+    # the cache is still cleared.
+    project = tmp_path / "proj"
+    for name in ("run-good", "run-bad"):
+        d = project / name
+        d.mkdir(parents=True)
+        (d / "events.jsonl").write_text("")
+
+    seen = []
+
+    def flaky(run_dir, params=None):
+        seen.append(run_dir.name)
+        if run_dir.name == "run-bad":
+            raise RuntimeError("database is locked")
+
+    monkeypatch.setattr(
+        "quodeq.data.projection.grade_projector.recompute_grades", flaky,
+    )
+    cleared = {"n": 0}
+    monkeypatch.setattr(
+        "quodeq.services.dashboard.clear_shared_dimension_cache",
+        lambda: cleared.__setitem__("n", cleared["n"] + 1),
+    )
+
+    result = grade_formula.apply_to_all_runs(tmp_path)
+    assert result.rescored == 1
+    assert result.failed == ["run-bad"]
+    assert "run-good" in seen
+    assert cleared["n"] == 1  # cache cleared despite the partial failure
 
 
 def test_apply_to_all_runs_clears_cache_when_root_missing(formula_path, monkeypatch, tmp_path):
@@ -158,8 +194,9 @@ def test_apply_to_all_runs_clears_cache_when_root_missing(formula_path, monkeypa
         cleared["called"] = True
     monkeypatch.setattr(dashboard, "clear_shared_dimension_cache", fake_clear)
 
-    count = grade_formula.apply_to_all_runs(tmp_path / "does-not-exist")
-    assert count == 0
+    result = grade_formula.apply_to_all_runs(tmp_path / "does-not-exist")
+    assert result.rescored == 0
+    assert result.failed == []
     assert cleared["called"] is True
 
 

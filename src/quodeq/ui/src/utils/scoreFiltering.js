@@ -5,7 +5,7 @@
  * returned by the unified /scores endpoint.
  */
 
-import { bucketKey } from './dailyGrouping.js';
+import { bucketKey, isBucketEligible } from './dailyGrouping.js';
 
 const roundOneDecimal = (n) => Math.round(n * 10) / 10;
 
@@ -65,6 +65,11 @@ export function filterTrendByVisibleStandardsDaily(trend, periodTrend, visibleSe
   const visibleKeys = new Set();
   const rawReversed = [...trend].reverse(); // oldest first
   for (const entry of rawReversed) {
+    // A running run's partial dims must not enter the bucket average: the
+    // Overview header reads the selected bucket's numericAverage, and the
+    // cards deliberately exclude in-progress runs — a partial score here
+    // makes the headline disagree with the cards mid-scan.
+    if (!isBucketEligible(entry)) continue;
     let hasVisible = false;
     for (const d of (entry.dimensionDetails || [])) {
       const dimId = (d.dimension || '').toLowerCase();
@@ -110,11 +115,18 @@ export function filterAccumulatedByVisibleStandards(accumulated, visibleSet, fil
     visibleSet.has((d.dimension || '').toLowerCase())
   );
 
-  // Use the trend's accumulated average (consistent with History)
+  // Use the trend's accumulated average (consistent with History). When the
+  // trend is empty — e.g. an all-cancelled project, whose runs aren't chart
+  // points but whose kept-findings scores still populate the cards — fall
+  // back to the accumulated summary so the header number agrees with the
+  // dimension cards instead of reading "—" over visible scores.
   const selectedIdx = selectedRunId ? filteredTrend.findIndex((t) => t.runId === selectedRunId) : 0;
   const idx = selectedIdx >= 0 ? selectedIdx : 0;
   const trendAvg = idx < filteredTrend.length ? parseFloat(filteredTrend[idx]?.numericAverage) : null;
-  const numericAverage = (trendAvg != null && !isNaN(trendAvg)) ? trendAvg : null;
+  const summaryAvg = parseFloat(accumulated.summary?.numericAverage);
+  const numericAverage = (trendAvg != null && !isNaN(trendAvg))
+    ? trendAvg
+    : (!isNaN(summaryAvg) ? summaryAvg : null);
   const prevIdx = idx + 1;
   const prevAvg = prevIdx < filteredTrend.length ? parseFloat(filteredTrend[prevIdx]?.numericAverage) : null;
 

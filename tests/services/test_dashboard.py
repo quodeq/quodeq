@@ -235,6 +235,37 @@ class TestBuildDashboard:
             result = build_dashboard(str(tmp_path), "proj", "latest")
         assert result["selectedRun"]["runId"] == "r2"
 
+    def test_latest_prefers_cancelled_over_newer_failed(self, tmp_path):
+        # A failed run must not headline the dashboard while a cancelled run
+        # (with real kept-findings data) exists — mirror the Overview's
+        # select_default_view_runs rule so the two surfaces agree.
+        failed = RunInfo(run_id="r-failed", date_iso="2024-03-01", date_label="2024-03-01", status="failed")
+        cancelled = RunInfo(run_id="r-cancelled", date_iso="2024-02-01", date_label="2024-02-01", status="cancelled")
+        dims = [_dim("security", "B", "7.0")]
+        summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
+        with (
+            patch("quodeq.services.dashboard.list_runs", return_value=[failed, cancelled]),
+            patch("quodeq.services.dashboard.read_run_data", return_value=dims),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), "proj", "latest")
+        assert result["selectedRun"]["runId"] == "r-cancelled"
+
+    def test_latest_all_failed_still_renders_newest(self, tmp_path):
+        # If every run failed there's nothing trustworthy, but the dashboard
+        # must still render something rather than error — pick the newest.
+        failed1 = RunInfo(run_id="r2", date_iso="2024-03-01", date_label="2024-03-01", status="failed")
+        failed2 = RunInfo(run_id="r1", date_iso="2024-02-01", date_label="2024-02-01", status="failed")
+        dims = [_dim("security", "B", "7.0")]
+        summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
+        with (
+            patch("quodeq.services.dashboard.list_runs", return_value=[failed1, failed2]),
+            patch("quodeq.services.dashboard.read_run_data", return_value=dims),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+        ):
+            result = build_dashboard(str(tmp_path), "proj", "latest")
+        assert result["selectedRun"]["runId"] == "r2"
+
     def test_explicit_run_selection_overrides_latest_default(self, tmp_path):
         # Explicit selection by run_id navigates to that run regardless of
         # state — users can still inspect partial runs from the bar chart.

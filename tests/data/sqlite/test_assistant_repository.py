@@ -71,3 +71,78 @@ def test_set_cli_session_id(tmp_path):
     repo.create_session(session_id="s1", provider="claude")
     repo.set_cli_session_id("s1", "uuid-123")
     assert repo.get_session("s1")["cli_session_id"] == "uuid-123"
+
+
+def test_set_action_status_conditional_transition_is_atomic(tmp_path):
+    """A guarded transition wins exactly once, so a double apply can't
+    double-run the side effect. Without expected=, the write is unconditional
+    (back-compat)."""
+    repo = _repo(tmp_path)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(
+        action_id="a1", session_id="s1", action_type="create_standard",
+        payload={"id": "x"}, content_hash="h",
+    )
+    # First claim of drafted -> applied wins.
+    assert repo.set_action_status("a1", "applied", expected="drafted") is True
+    assert repo.get_action("a1")["status"] == "applied"
+    # Second claim from drafted loses: the row is no longer drafted.
+    assert repo.set_action_status("a1", "applied", expected="drafted") is False
+    assert repo.get_action("a1")["status"] == "applied"
+
+
+def test_set_action_status_unconditional_still_works(tmp_path):
+    repo = _repo(tmp_path)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(
+        action_id="a1", session_id="s1", action_type="create_standard",
+        payload={"id": "x"}, content_hash="h",
+    )
+    assert repo.set_action_status("a1", "applied") is True
+    assert repo.get_action("a1")["status"] == "applied"
+
+
+def test_list_all_worktrees_returns_every_status(tmp_path):
+    repo = _repo(tmp_path)
+    for sid, status in [("s1", "active"), ("s2", "applied"), ("s3", "discarded")]:
+        repo.create_session(session_id=sid, provider="ollama")
+        repo.upsert_worktree(session_id=sid, project_id="p", repo_root="/r",
+                             path=f"/w/{sid}", branch=f"b-{sid}")
+        if status != "active":
+            repo.set_worktree_status(sid, status)
+    rows = repo.list_all_worktrees()
+    assert {r["session_id"]: r["status"] for r in rows} == {
+        "s1": "active", "s2": "applied", "s3": "discarded",
+    }
+
+
+def test_prune_sessions_older_than_cascades(tmp_path):
+    import sqlite3
+    repo = _repo(tmp_path)
+    repo.create_session(session_id="old", provider="ollama")
+    repo.add_message("old", "user", "hi")
+    repo.append_event("old", {"type": "token", "text": "x"})
+    repo.create_session(session_id="new", provider="ollama")
+    repo.add_message("new", "user", "yo")
+
+    # Backdate the old session well past any TTL.
+    conn = sqlite3.connect(tmp_path / "assistant.db")
+    conn.execute("UPDATE sessions SET created_at = '2020-01-01 00:00:00' WHERE id = 'old'")
+    conn.commit()
+    conn.close()
+
+    removed = repo.prune_sessions_older_than(days=30)
+    assert removed == 1
+    assert repo.get_session("old") is None
+    assert repo.get_session("new") is not None
+    # Cascade: the old session's messages and events are gone too.
+    assert repo.list_messages("old") == []
+    assert repo.events_after("old", after_seq=0) == []
+    assert [(m["role"], m["content"]) for m in repo.list_messages("new")] == [("user", "yo")]
+
+
+def test_prune_sessions_ttl_zero_is_a_noop(tmp_path):
+    repo = _repo(tmp_path)
+    repo.create_session(session_id="s1", provider="ollama")
+    assert repo.prune_sessions_older_than(days=0) == 0
+    assert repo.get_session("s1") is not None
