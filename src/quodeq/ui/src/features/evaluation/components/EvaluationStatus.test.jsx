@@ -64,31 +64,44 @@ describe('JobIdLine', () => {
 });
 
 describe('project label', () => {
-  const selectedInfo = { id: 'uuid-b', name: 'project-b', displayName: 'Project B' };
+  const startedInfo = { id: 'uuid-c', name: 'project-c', displayName: 'Project C' };
   const jobInfo = { id: 'uuid-a', name: 'project-a', displayName: 'Project A' };
 
-  it("shows the running job's own project, not the globally-selected one", () => {
+  it("shows the running job's own project when resolvable", () => {
     renderWithClient(
       <EvaluationStatus
         job={{ ...baseJob, status: 'running', outputProject: 'uuid-a' }}
-        project="uuid-b"
-        projectInfo={selectedInfo}
         jobProjectInfo={jobInfo}
+        startedProjectInfo={startedInfo}
       />
     );
     expect(screen.getByText('Project A')).toBeInTheDocument();
-    expect(screen.queryByText('Project B')).toBeNull();
+    expect(screen.queryByText('Project C')).toBeNull();
   });
 
-  it("falls back to the selected project when the job's project is not resolvable", () => {
+  it("falls back to the project the job was started for before the report-path marker fires", () => {
     renderWithClient(
       <EvaluationStatus
         job={{ ...baseJob, status: 'running' }}
-        project="uuid-b"
-        projectInfo={selectedInfo}
         jobProjectInfo={null}
+        startedProjectInfo={startedInfo}
       />
     );
-    expect(screen.getByText('Project B')).toBeInTheDocument();
+    expect(screen.getByText('Project C')).toBeInTheDocument();
+  });
+
+  it('never labels the card with the globally-selected project', () => {
+    // Regression (v1.6.0): the card used to fall back to the UI's global
+    // selection, so switching projects mid-run showed the wrong name on a
+    // running evaluation. When the job's project is unknown, show nothing.
+    renderWithClient(
+      <EvaluationStatus
+        job={{ ...baseJob, status: 'running' }}
+        jobProjectInfo={null}
+        startedProjectInfo={null}
+      />
+    );
+    const header = document.querySelector('.evaluate-panel__top');
+    expect(header.textContent).not.toMatch(/Project [ABC]/);
   });
 });
