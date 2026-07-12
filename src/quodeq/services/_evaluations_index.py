@@ -97,20 +97,33 @@ class EvaluationsIndex:
         if snapshot.status == "running":
             return False
         reports_dir = self._coerce_reports_dir(reports_dir)
-        # Job IDs of form "ext-<run_uuid>"; run_uuid is also the run directory name.
+        # External job IDs are "ext-<run_uuid>" where run_uuid is also the
+        # run directory name. Internal job IDs are unrelated to the directory
+        # name, so prefer the snapshot's own run coordinates when present.
         run_uuid = job_id[len("ext-"):] if job_id.startswith("ext-") else job_id
+        if snapshot.output_run_id:
+            run_uuid = snapshot.output_run_id
         removed_dir = False
-        if reports_dir.is_dir():
+        if snapshot.output_project and reports_dir.is_dir():
+            candidate = reports_dir / snapshot.output_project / run_uuid
+            if candidate.is_dir():
+                shutil.rmtree(candidate, ignore_errors=True)
+                removed_dir = True
+        if not removed_dir and reports_dir.is_dir():
             for project_dir in reports_dir.iterdir():
                 candidate = project_dir / run_uuid
                 if candidate.is_dir():
                     shutil.rmtree(candidate, ignore_errors=True)
                     removed_dir = True
                     break
-        # Remove from index regardless so stale rows get cleaned up.
+        # Remove from index regardless so stale rows get cleaned up. The same
+        # on-disk run can be indexed under "ext-<run_uuid>" even when the
+        # caller holds the internal job id, so clear both key forms.
         db = self._open_index()
         try:
             _run_index.delete_run(db, job_id)
+            if run_uuid != job_id:
+                _run_index.delete_run(db, f"ext-{run_uuid}")
         finally:
             db.close()
         # Also drop any in-memory JobManager entry.

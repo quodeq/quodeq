@@ -121,14 +121,23 @@ class FilesystemActionProvider(ActionProvider):
         UI would stay stuck on "Evaluation in Progress"). When that happens
         and the snapshot is still ``running``, the index row is force-promoted
         to ``cancelled(stale_detected)`` so the UI flips out of "running".
-        Findings on disk are not touched.
+
+        On a keep-findings cancel, findings on disk are not touched. With
+        ``discard_partial`` the run must vanish entirely: after the cancel
+        lands, the run directory, its index row, and the in-memory job entry
+        are removed so no view (Overview fallback, History, status GET) can
+        surface the discarded run again.
         """
         ok = self._eval_handler.cancel_evaluation(
             job_id, reports_dir=reports_dir, discard_partial=discard_partial,
         )
-        if ok:
-            return True
-        return self._evaluations.promote_stale_to_cancelled(job_id, reports_dir=reports_dir)
+        if not ok:
+            ok = self._evaluations.promote_stale_to_cancelled(job_id, reports_dir=reports_dir)
+        if ok and discard_partial:
+            self._evaluations.delete(
+                job_id, reports_dir=Path(reports_dir) if reports_dir else None,
+            )
+        return ok
 
     def get_log_run_dir(self, job_id: str) -> Path | None:
         return self._evaluations.get_log_run_dir(job_id)

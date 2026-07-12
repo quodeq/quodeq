@@ -189,8 +189,17 @@ export function useEvaluation() {
 
   const cancelMutation = useMutation({
     mutationFn: ({ discard } = {}) => api.cancelEvaluation(jobId, { discard }),
-    onSuccess: () => {
-      if (jobId) {
+    onSuccess: (_data, variables) => {
+      if (variables?.discard) {
+        // Discard deletes the run server-side (dir + index row + job
+        // entry), so any further status poll would 404. Drop the job and
+        // its cached queries right away instead of waiting for a terminal
+        // status that will never arrive.
+        if (jobId) {
+          queryClient.removeQueries({ queryKey: evaluationKeys.evaluation(jobId) });
+        }
+        setJobId(null);
+      } else if (jobId) {
         queryClient.invalidateQueries({ queryKey: evaluationKeys.evaluation(jobId) });
       }
       // Mirror startMutation: refresh the project subtree so History's
