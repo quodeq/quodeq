@@ -42,14 +42,17 @@ def _parse_params(data: dict) -> tuple:
     return params, None
 
 
-def _state_payload(applied: int | None = None) -> dict:
+def _state_payload(result: "grade_formula.ApplyResult | None" = None) -> dict:
     payload = {
         "current": params_to_dict(grade_formula.load_params()),
         "defaults": params_to_dict(DEFAULT_PARAMS),
         "isCustom": grade_formula.is_custom(),
     }
-    if applied is not None:
-        payload["applied"] = applied
+    if result is not None:
+        payload["applied"] = result.rescored
+        # Surface a partial apply so the client can warn that some runs still
+        # show the old formula, instead of the endpoint claiming full success.
+        payload["failed"] = len(result.failed)
     return payload
 
 
@@ -66,14 +69,14 @@ def register_grade_formula_routes(app: Flask) -> None:
         if err:
             return err
         grade_formula.save_params(params)
-        applied = grade_formula.apply_to_all_runs(Path(reports_dir()))
-        return jsonify(_state_payload(applied=applied))
+        result = grade_formula.apply_to_all_runs(Path(reports_dir()))
+        return jsonify(_state_payload(result=result))
 
     @app.delete("/api/grade-formula")
     def delete_grade_formula() -> Response:
         grade_formula.reset_params()
-        applied = grade_formula.apply_to_all_runs(Path(reports_dir()))
-        return jsonify(_state_payload(applied=applied))
+        result = grade_formula.apply_to_all_runs(Path(reports_dir()))
+        return jsonify(_state_payload(result=result))
 
     @app.post("/api/grade-formula/preview")
     def preview_grade_formula() -> Response | tuple[Response, int]:
