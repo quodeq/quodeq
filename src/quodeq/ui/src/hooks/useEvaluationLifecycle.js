@@ -12,7 +12,7 @@ const DEFAULT_ANALYSIS_POWER = 2;
  * Extracts evaluation-specific state and side effects from App so that
  * App only wires the hook's return values into the component tree.
  */
-export function useEvaluationLifecycle({ settings, navigation, projects, storage: _storage }) {
+export function useEvaluationLifecycle({ settings, navigation, projects, selectedProject = null, storage: _storage }) {
   const storage = _storage || localStorage;
   const { navTab, navReset } = navigation;
   const { loadProjects, setProjects, selectProjectAndRun } = projects;
@@ -42,7 +42,15 @@ export function useEvaluationLifecycle({ settings, navigation, projects, storage
       loadProjects()
         .then((list) => setProjects(list))
         .catch((err) => console.error('Failed to refresh projects:', err));
-      selectProjectAndRun(job.outputProject, job.outputRunId);
+      // Only move the selection to the finished run when the user is
+      // already on that project (or has none selected, e.g. first-eval
+      // onboarding). Unconditional switching yanked a user browsing
+      // project B into project A the moment A's background run finished,
+      // without any nav reset. The evaluate card's "view results" button
+      // remains the explicit way to jump to another project's results.
+      if (!selectedProject || job.outputProject === selectedProject) {
+        selectProjectAndRun(job.outputProject, job.outputRunId);
+      }
     }
     prevJobRef.current = job;
   }, [job]); // eslint-disable-line react-hooks/exhaustive-deps
