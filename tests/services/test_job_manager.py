@@ -381,6 +381,8 @@ class TestMonitorProcess:
         from quodeq.services import jobs as jobs_mod
         monkeypatch.setenv("QUODEQ_JOB_TIMEOUT_S", "0.05")
         monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
+        # Group-wide terminate would signal a real pid; stub it to the fake's kill.
+        monkeypatch.setattr(jobs_mod, "_terminate_process", lambda p: p.kill())
 
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
@@ -442,6 +444,9 @@ class TestMonitorProcess:
         from quodeq.services import jobs as jobs_mod
         monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
         monkeypatch.setattr(jobs_mod, "_WATCHDOG_DEADLINE_GRACE_S", 0.02)
+        # The watchdog must terminate the whole process tree, not just the
+        # parent PID; patch it to the stub's own kill so the loop can break.
+        monkeypatch.setattr(jobs_mod, "_terminate_process", lambda p: p.kill())
 
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
@@ -454,6 +459,39 @@ class TestMonitorProcess:
         mgr._monitor_process("j1", proc)
 
         assert proc.killed is True
+        assert job.exit_code == _EXIT_CODE_TIMEOUT
+        assert job.status == STATUS_FAILED
+
+    def test_watchdog_kill_terminates_the_process_tree(self, monkeypatch):
+        """The watchdog must kill the process GROUP, not just the parent PID.
+
+        The subprocess is spawned start_new_session=True, so a bare
+        process.kill() SIGKILLs only the parent — the subagent pool + AI-CLI
+        children are orphaned (token/CPU leak) and can keep writing into the
+        abandoned run dir. Every other kill path goes through
+        _terminate_process (group-wide, TERM->grace->KILL); the watchdog
+        must too.
+        """
+        from quodeq.services import jobs as jobs_mod
+        monkeypatch.setenv("QUODEQ_JOB_TIMEOUT_S", "0.05")
+        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
+        calls = []
+
+        def fake_terminate(p):
+            calls.append(p)
+            p.kill()  # let the stub's wait() start returning so the loop ends
+
+        monkeypatch.setattr(jobs_mod, "_terminate_process", fake_terminate)
+
+        store = InMemoryJobStore()
+        mgr = JobManager(job_store=store)
+        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None)
+        store.put(job)
+        proc = _NeverExitsProcess()
+        mgr._processes["j1"] = proc
+        mgr._monitor_process("j1", proc)
+
+        assert calls == [proc], "watchdog kill must go through _terminate_process"
         assert job.exit_code == _EXIT_CODE_TIMEOUT
         assert job.status == STATUS_FAILED
 
