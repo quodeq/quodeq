@@ -175,6 +175,32 @@ def select_default_view_runs(run_infos):
     return [r for r in run_infos if r.status == RUN_STATE_CANCELLED]
 
 
+def select_trend_runs(run_infos):
+    """The run set behind ``dashboard.trend`` / the score-history data.
+
+    ``complete`` and ``in_progress`` runs; ``cancelled`` and ``failed``
+    are dropped — their partial scores are misleading as history points.
+    They remain in ``availableRuns`` so the UI can surface them when the
+    user asks explicitly.
+
+    ``in_progress`` entries stay in the trend because the History table
+    renders its "running" row from them; the CLIENT keeps them from
+    representing chart buckets or the day-highlight union
+    (``dailyGrouping.isBucketEligible``), mirroring the default view's
+    wait-until-terminal rule.
+
+    Used by:
+      - ``dashboard._compute_dashboard_payload`` — history window.
+      - ``scoring.get_project_scores`` — the /scores trend.
+
+    Args/returns are ``RunInfo``-shaped objects; order is preserved.
+    """
+    return [
+        r for r in run_infos
+        if r.status not in (RUN_STATE_CANCELLED, RUN_STATE_FAILED)
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Public exports
 # ---------------------------------------------------------------------------
@@ -192,4 +218,5 @@ __all__ = [
     "is_trustable_run",
     "is_eligible_for_default_view",
     "select_default_view_runs",
+    "select_trend_runs",
 ]

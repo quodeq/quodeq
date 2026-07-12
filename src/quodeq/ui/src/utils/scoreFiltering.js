@@ -5,7 +5,7 @@
  * returned by the unified /scores endpoint.
  */
 
-import { bucketKey } from './dailyGrouping.js';
+import { bucketKey, isBucketEligible } from './dailyGrouping.js';
 
 const roundOneDecimal = (n) => Math.round(n * 10) / 10;
 
@@ -65,6 +65,11 @@ export function filterTrendByVisibleStandardsDaily(trend, periodTrend, visibleSe
   const visibleKeys = new Set();
   const rawReversed = [...trend].reverse(); // oldest first
   for (const entry of rawReversed) {
+    // A running run's partial dims must not enter the bucket average: the
+    // Overview header reads the selected bucket's numericAverage, and the
+    // cards deliberately exclude in-progress runs — a partial score here
+    // makes the headline disagree with the cards mid-scan.
+    if (!isBucketEligible(entry)) continue;
     let hasVisible = false;
     for (const d of (entry.dimensionDetails || [])) {
       const dimId = (d.dimension || '').toLowerCase();

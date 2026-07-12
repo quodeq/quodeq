@@ -76,6 +76,57 @@ test('bucketKey: date-only strings pass through unchanged (no timezone context)'
 });
 
 // ---------------------------------------------------------------------------
+// in-progress runs never represent a bucket
+// ---------------------------------------------------------------------------
+// A running run's trend entry carries a PARTIAL cumulative average that
+// moves as each dimension finishes. The Overview cards wait for the run to
+// terminate; the chart, highlight union, and sparklines must do the same
+// or they disagree with the cards mid-scan.
+
+const TREND_WITH_RUNNING = [
+  { runId: 'live', dateISO: '2026-03-25T16:00:00', status: 'in_progress', numericAverage: 5.1, dimensions: ['security'], dimensionDetails: [{ dimension: 'security', score: 5.1 }] },
+  { runId: 'done2', dateISO: '2026-03-25T10:00:00', status: 'complete', numericAverage: 9.2, dimensions: ['maintainability'], dimensionDetails: [{ dimension: 'maintainability', score: 9.2 }] },
+  { runId: 'done1', dateISO: '2026-03-24T10:00:00', status: 'complete', numericAverage: 8.0, dimensions: ['security'], dimensionDetails: [{ dimension: 'security', score: 8.0 }] },
+];
+
+test('collapseByPeriod: an in-progress newest entry does not represent its bucket', () => {
+  const result = collapseByPeriod(TREND_WITH_RUNNING, 'day');
+  assert.equal(result.length, 2);
+  assert.equal(result[0].runId, 'done2'); // Mar 25: terminal run wins, not "live"
+  assert.equal(result[1].runId, 'done1');
+});
+
+test('collapseByPeriod: a bucket with only an in-progress entry is omitted', () => {
+  const trend = [
+    { runId: 'live', dateISO: '2026-03-26T09:00:00', status: 'in_progress', numericAverage: 4.0 },
+    { runId: 'done1', dateISO: '2026-03-24T10:00:00', status: 'complete', numericAverage: 8.0 },
+  ];
+  const result = collapseByPeriod(trend, 'day');
+  assert.equal(result.length, 1);
+  assert.equal(result[0].runId, 'done1');
+});
+
+test('collectPeriodDimensions: an in-progress run does not contribute to the day union', () => {
+  const dims = collectPeriodDimensions(TREND_WITH_RUNNING, 'done2', 'day');
+  assert.ok(dims.has('maintainability'));
+  assert.ok(!dims.has('security'), 'running run dims are not "analyzed" yet');
+});
+
+test('extractDimensionPeriodSeries: an in-progress entry never supplies a bucket point', () => {
+  const series = extractDimensionPeriodSeries(TREND_WITH_RUNNING, 'security', 'day');
+  // Mar 25's security only exists in the running run -> no Mar 25 point;
+  // Mar 24's terminal 8.0 is the latest security point.
+  assert.deepEqual(series.map((s) => s.runId), ['done1']);
+});
+
+test('entries without a status stay eligible (legacy payloads)', () => {
+  const trend = [
+    { runId: 'r1', dateISO: '2026-03-25T10:00:00', numericAverage: 9.0 },
+  ];
+  assert.equal(collapseByPeriod(trend, 'day').length, 1);
+});
+
+// ---------------------------------------------------------------------------
 // collapseByDay
 // ---------------------------------------------------------------------------
 

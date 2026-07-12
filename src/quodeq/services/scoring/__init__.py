@@ -37,6 +37,7 @@ from quodeq.services._trend_fetcher import make_rescoring_fetcher, make_trend_fe
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.dashboard import _make_run_dimension_fetcher
 from quodeq.services.grade_formula import load_params
+from quodeq.services.scoring_view import select_trend_runs
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services._fs_projects import find_children
@@ -588,10 +589,11 @@ def get_project_scores(
 
     # Build trend using the appropriate fetcher: scalar fast path when there
     # are no active dismissals/deletions, rescoring (findings) path otherwise.
-    # Exclude cancelled/failed runs — their partial scores are misleading on
-    # the history chart. They remain in availableRuns so the UI can show them
-    # when the user asks for them explicitly.
-    scoreable_runs = [r for r in all_runs if r.status not in ("cancelled", "failed")]
+    # Shared trend rule (scoring_view.select_trend_runs): cancelled/failed
+    # runs are excluded — their partial scores are misleading on the history
+    # chart. They remain in availableRuns so the UI can show them when the
+    # user asks for them explicitly.
+    scoreable_runs = select_trend_runs(all_runs)
     history_runs = scoreable_runs[:_max_history_runs()]
     # Only completed runs may be persisted to the score cache: an in-progress
     # run's scalar set is still growing, and the cache version can't see that,
