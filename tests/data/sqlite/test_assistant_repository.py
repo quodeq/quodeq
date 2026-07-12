@@ -71,3 +71,32 @@ def test_set_cli_session_id(tmp_path):
     repo.create_session(session_id="s1", provider="claude")
     repo.set_cli_session_id("s1", "uuid-123")
     assert repo.get_session("s1")["cli_session_id"] == "uuid-123"
+
+
+def test_set_action_status_conditional_transition_is_atomic(tmp_path):
+    """A guarded transition wins exactly once, so a double apply can't
+    double-run the side effect. Without expected=, the write is unconditional
+    (back-compat)."""
+    repo = _repo(tmp_path)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(
+        action_id="a1", session_id="s1", action_type="create_standard",
+        payload={"id": "x"}, content_hash="h",
+    )
+    # First claim of drafted -> applied wins.
+    assert repo.set_action_status("a1", "applied", expected="drafted") is True
+    assert repo.get_action("a1")["status"] == "applied"
+    # Second claim from drafted loses: the row is no longer drafted.
+    assert repo.set_action_status("a1", "applied", expected="drafted") is False
+    assert repo.get_action("a1")["status"] == "applied"
+
+
+def test_set_action_status_unconditional_still_works(tmp_path):
+    repo = _repo(tmp_path)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.create_action(
+        action_id="a1", session_id="s1", action_type="create_standard",
+        payload={"id": "x"}, content_hash="h",
+    )
+    assert repo.set_action_status("a1", "applied") is True
+    assert repo.get_action("a1")["status"] == "applied"

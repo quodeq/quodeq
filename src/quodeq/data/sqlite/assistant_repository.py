@@ -115,11 +115,29 @@ class AssistantRepository:
         row["payload"] = json.loads(row.pop("payload_json"))
         return row
 
-    def set_action_status(self, action_id: str, status: str) -> None:
+    def set_action_status(
+        self, action_id: str, status: str, *, expected: str | None = None,
+    ) -> bool:
+        """Set an action's status; return whether a row was updated.
+
+        With ``expected`` the write is a compare-and-set
+        (``WHERE id=? AND status=?``), so a caller can atomically claim a
+        transition — two concurrent applies of the same action can't both
+        win and double-run the side effect. Without ``expected`` the write
+        is unconditional (back-compat for the rollback path).
+        """
         with self._connect() as conn:
-            conn.execute(
-                "UPDATE actions SET status = ? WHERE id = ?", (status, action_id)
-            )
+            if expected is None:
+                cur = conn.execute(
+                    "UPDATE actions SET status = ? WHERE id = ?",
+                    (status, action_id),
+                )
+            else:
+                cur = conn.execute(
+                    "UPDATE actions SET status = ? WHERE id = ? AND status = ?",
+                    (status, action_id, expected),
+                )
+            return cur.rowcount == 1
 
     def append_event(self, session_id: str, frame: dict[str, Any]) -> int:
         with self._connect() as conn:
