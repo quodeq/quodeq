@@ -4,6 +4,7 @@ import '@testing-library/jest-dom/vitest';
 
 const fakeTerm = { open: vi.fn(), write: vi.fn(), dispose: vi.fn(), loadAddon: vi.fn(),
   onData: vi.fn(), onResize: vi.fn(), focus: vi.fn(), attachCustomKeyEventHandler: vi.fn(),
+  reset: vi.fn(),
   cols: 80, rows: 24, options: {} };
 // Use `function` (not arrow) implementations so vi.fn() produces a constructible
 // mock: xterm's Terminal/FitAddon are always invoked with `new` in TerminalPane.
@@ -17,9 +18,13 @@ vi.mock('../../api/terminal.js', () => ({
   terminalSocketUrl: () => 'ws://localhost/api/terminal/ws',
 }));
 // Mock the socket hook: jsdom has no real terminal WS to reach, and the
-// overlay tests need to drive each connection status directly.
+// overlay tests need to drive each connection status directly. lastSocketOpts
+// captures the options so a test can invoke the pane's onOpen callback.
 const socketState = { status: 'open', send: vi.fn(), resize: vi.fn(), reconnectNow: vi.fn() };
-vi.mock('./useTerminalSocket.js', () => ({ useTerminalSocket: vi.fn(() => socketState) }));
+let lastSocketOpts = null;
+vi.mock('./useTerminalSocket.js', () => ({
+  useTerminalSocket: vi.fn((opts) => { lastSocketOpts = opts; return socketState; }),
+}));
 import TerminalPane from './TerminalPane.jsx';
 
 it('mounts an xterm terminal when active', async () => {
@@ -75,9 +80,35 @@ it('shows a reconnecting banner when the socket drops, and Retry calls reconnect
   expect(socketState.reconnectNow).toHaveBeenCalled();
 });
 
-it('shows a busy banner when another window owns the terminal', async () => {
+it('shows a busy banner and an honest Retry (not a fake takeover) when another window owns the terminal', async () => {
   socketState.status = 'busy';
   render(<TerminalPane active />);
   const overlay = await screen.findByTestId('tty-overlay');
-  expect(overlay).toHaveTextContent('already open in another window');
+  expect(overlay).toHaveTextContent('open in another window');
+  // The old "Use it here" button promised a takeover that never happened
+  // (no lock eviction). The button must not claim to take over.
+  expect(screen.queryByRole('button', { name: 'Use it here' })).toBeNull();
+});
+
+it('resets xterm on every socket (re)open so a live-backend reconnect does not duplicate scrollback', async () => {
+  const { vi: _vi } = await import('vitest');
+  socketState.status = 'open';
+  fakeTerm.reset.mockClear();
+  fakeTerm.options = {};
+  render(<TerminalPane active />);
+  await screen.findByTestId('tty-root');
+  // Simulate the socket (re)opening: the pane's onOpen must reset the screen
+  // BEFORE the server's scrollback replay lands, and re-enable input.
+  expect(typeof lastSocketOpts.onOpen).toBe('function');
+  lastSocketOpts.onOpen();
+  expect(fakeTerm.reset).toHaveBeenCalled();
+  expect(fakeTerm.options.disableStdin).toBe(false);
+});
+
+it('disables stdin while disconnected so keystrokes are not silently swallowed', async () => {
+  socketState.status = 'reconnecting';
+  fakeTerm.options = {};
+  render(<TerminalPane active />);
+  await screen.findByTestId('tty-root');
+  expect(fakeTerm.options.disableStdin).toBe(true);
 });
