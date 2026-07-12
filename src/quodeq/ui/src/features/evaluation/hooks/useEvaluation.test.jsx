@@ -176,6 +176,27 @@ describe("useEvaluation", () => {
     });
   });
 
+  it("tracks the project an evaluation was started for and strips it from the API payload", async () => {
+    // The in-progress card needs the launching project's identity before
+    // the backend's report-path marker resolves outputProject. uiProject
+    // is UI-side bookkeeping only and must not leak into the HTTP body.
+    fakeApi.startEvaluation.mockResolvedValue({
+      jobId: "j-started", status: "pending", dimensions: [],
+    });
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await act(async () => {
+      await result.current.startEvaluation({
+        repo: "x", dimensions: [], uiProject: "uuid-b",
+      });
+    });
+    expect(result.current.startedProject).toBe("uuid-b");
+    expect(fakeApi.startEvaluation).toHaveBeenCalledWith(
+      expect.not.objectContaining({ uiProject: expect.anything() }),
+    );
+    act(() => result.current.clearJob());
+    expect(result.current.startedProject).toBeNull();
+  });
+
   it("cancelEvaluation with discard clears the job immediately", async () => {
     // With discard the server deletes the run entirely (dir + index row +
     // job entry). Any further status polling would 404, so the hook must

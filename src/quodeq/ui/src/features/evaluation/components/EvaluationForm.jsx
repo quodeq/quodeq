@@ -63,12 +63,20 @@ export function buildEvaluationPayload({ repo, selectedDims, branch, scopePath, 
 
 function buildAndSubmit(onStart, formState) {
   const { repo, selectedDims, branch, scopePath, cleanScan, setRepo, setSelectedDims, setBranch, setScopePath, setCleanScan } = formState;
-  onStart(buildEvaluationPayload({ repo, selectedDims, branch, scopePath, cleanScan }));
+  const result = onStart(buildEvaluationPayload({ repo, selectedDims, branch, scopePath, cleanScan }));
+  // Blocked start (another evaluation is running): keep the form and the
+  // one-shot clean toggle intact so the user's retry submits the same thing.
+  if (result === false) return;
   setRepo('');
   setSelectedDims(new Set());
   setBranch(null);
   setScopePath(null);
-  if (cleanScan === 'once') setCleanScan('off');
+  if (cleanScan === 'once') {
+    Promise.resolve(result).then(
+      () => setCleanScan('off'),
+      () => {},
+    );
+  }
 }
 
 function useEvaluationForm(onStart, onValidationFail) {

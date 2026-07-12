@@ -83,6 +83,10 @@ export function useEvaluation() {
   const queryClient = useQueryClient();
   const [jobId, setJobId] = useState(null);
   const [jobError, setJobError] = useState(null);
+  // Project id the current job was started for (UI-side). Bridges the gap
+  // until the backend's report-path marker resolves job.outputProject, so
+  // the in-progress card never has to guess from the global selection.
+  const [startedProject, setStartedProject] = useState(null);
 
   // SSE side-effect — writes status/dimensions/findings into cache.
   // No-op when VITE_USE_SSE_EVENTS is off; refetchInterval below covers.
@@ -159,17 +163,22 @@ export function useEvaluation() {
   // --- Mutations -------------------------------------------------------
   const startMutation = useMutation({
     mutationFn: (input) => {
+      // uiProject is client-side bookkeeping (which project launched this
+      // job) — strip it so it never reaches the HTTP payload.
+      const { uiProject, ...rest } = input;
       // preparePayload throws on missing provider/model — let the error
       // propagate to onError so jobError gets set with a useful message.
-      const prepared = preparePayload(input);
+      const prepared = preparePayload(rest);
       return api.startEvaluation(prepared).then((created) => ({
         ...created,
         repo: prepared.repo,
+        uiProject,
       }));
     },
     onSuccess: (created) => {
       setJobError(null);
       setJobId(created.jobId);
+      setStartedProject(created.uiProject || null);
       queryClient.setQueryData(evaluationKeys.status(created.jobId), created);
       // Invalidate the project subtree so History (and any other view
       // backed by project queries) shows the freshly-started run as
@@ -199,6 +208,7 @@ export function useEvaluation() {
           queryClient.removeQueries({ queryKey: evaluationKeys.evaluation(jobId) });
         }
         setJobId(null);
+        setStartedProject(null);
       } else if (jobId) {
         queryClient.invalidateQueries({ queryKey: evaluationKeys.evaluation(jobId) });
       }
@@ -255,6 +265,7 @@ export function useEvaluation() {
     }
     setJobId(null);
     setJobError(null);
+    setStartedProject(null);
   }, [jobId, queryClient]);
 
   return {
@@ -264,5 +275,6 @@ export function useEvaluation() {
     startEvaluation,
     clearJob,
     cancelEvaluation,
+    startedProject,
   };
 }

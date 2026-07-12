@@ -113,7 +113,7 @@ function NoProjectSelected({ onGoToProjects }) {
 
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
-  const { selectedProject, projectInfo, jobProjectInfo, preselectDims } = context;
+  const { selectedProject, projectInfo, jobProjectInfo, startedProjectInfo, preselectDims } = context;
   const { onStart: onStartEvaluation, onDismiss, onCancel, onGoToProjects, onGoToSettings } = actions;
   const [toastKey, setToastKey] = useState(0);
   const [toastVisible, setToastVisible] = useState(false);
@@ -125,7 +125,9 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
   const wrappedOnStart = (payload) => {
     setToastVisible(false);
     setToastKey(k => k + 1);
-    onStartEvaluation(payload);
+    // Pass the result through: false means the start was blocked, and the
+    // card uses that to keep one-shot state (clean-scan "once") armed.
+    return onStartEvaluation(payload);
   };
 
   return (
@@ -143,9 +145,8 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
 
         <EvaluationStatus
           job={job}
-          project={selectedProject}
-          projectInfo={projectInfo}
           jobProjectInfo={jobProjectInfo}
+          startedProjectInfo={startedProjectInfo}
           liveViolations={liveViolations}
           onDismiss={onDismiss}
           onCancel={onCancel}
