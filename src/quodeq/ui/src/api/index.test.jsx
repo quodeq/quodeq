@@ -58,3 +58,34 @@ describe('registerProject', () => {
     expect(caught.status).toBe(400);
   });
 });
+
+describe('cancelEvaluation / deleteEvaluation intent', () => {
+  // The server routes DELETE by declared intent; without these flags a run
+  // finishing mid-dialog used to get permanently purged by a cancel click.
+  beforeEach(() => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+  });
+
+  it('cancelEvaluation declares intent=cancel', async () => {
+    const { cancelEvaluation } = await import('./index.js');
+    await cancelEvaluation('j1');
+    const [url] = global.fetch.mock.calls[0];
+    expect(url).toContain('/evaluations/j1?intent=cancel');
+    expect(url).not.toContain('discard');
+  });
+
+  it('cancelEvaluation with discard keeps intent=cancel', async () => {
+    const { cancelEvaluation } = await import('./index.js');
+    await cancelEvaluation('j1', { discard: true });
+    const [url] = global.fetch.mock.calls[0];
+    expect(url).toContain('intent=cancel');
+    expect(url).toContain('discard=true');
+  });
+
+  it('deleteEvaluation declares intent=delete', async () => {
+    const { deleteEvaluation } = await import('./index.js');
+    await deleteEvaluation('ext-r1');
+    const [url] = global.fetch.mock.calls[0];
+    expect(url).toContain('/evaluations/ext-r1?intent=delete');
+  });
+});

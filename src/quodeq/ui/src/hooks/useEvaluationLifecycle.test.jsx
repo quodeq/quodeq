@@ -19,7 +19,7 @@ vi.mock("../features/evaluation/hooks/useEvaluation.js", () => ({
 
 import { useEvaluationLifecycle } from "./useEvaluationLifecycle.js";
 
-function renderLifecycle() {
+function renderLifecycle({ selectedProject = null, selectProjectAndRun = vi.fn() } = {}) {
   return renderHook(() =>
     useEvaluationLifecycle({
       settings: {},
@@ -27,11 +27,54 @@ function renderLifecycle() {
       projects: {
         loadProjects: vi.fn().mockResolvedValue([]),
         setProjects: vi.fn(),
-        selectProjectAndRun: vi.fn(),
+        selectProjectAndRun,
       },
+      selectedProject,
     }),
   );
 }
+
+describe("useEvaluationLifecycle background completion", () => {
+  beforeEach(() => {
+    evaluationState.job = null;
+    evaluationState.jobError = null;
+    evaluationState.startEvaluation = vi.fn();
+  });
+
+  it("does not switch the selection when another project's run finishes", () => {
+    // Regression: a background eval finishing on project A yanked a user
+    // viewing project B to A's data, without a nav reset.
+    evaluationState.job = {
+      jobId: "j-done", status: "done",
+      outputProject: "project-a", outputRunId: "run-a1",
+    };
+    const selectProjectAndRun = vi.fn();
+    renderLifecycle({ selectedProject: "project-b", selectProjectAndRun });
+    expect(selectProjectAndRun).not.toHaveBeenCalled();
+  });
+
+  it("selects the finished run when it belongs to the viewed project", () => {
+    evaluationState.job = {
+      jobId: "j-done", status: "done",
+      outputProject: "project-b", outputRunId: "run-b1",
+    };
+    const selectProjectAndRun = vi.fn();
+    renderLifecycle({ selectedProject: "project-b", selectProjectAndRun });
+    expect(selectProjectAndRun).toHaveBeenCalledWith("project-b", "run-b1");
+  });
+
+  it("adopts the finished run when no project is selected", () => {
+    // First-eval onboarding: nothing selected yet, so showing the fresh
+    // results is what the user expects.
+    evaluationState.job = {
+      jobId: "j-done", status: "done",
+      outputProject: "project-a", outputRunId: "run-a1",
+    };
+    const selectProjectAndRun = vi.fn();
+    renderLifecycle({ selectedProject: null, selectProjectAndRun });
+    expect(selectProjectAndRun).toHaveBeenCalledWith("project-a", "run-a1");
+  });
+});
 
 describe("useEvaluationLifecycle blocked start", () => {
   beforeEach(() => {
