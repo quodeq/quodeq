@@ -12,7 +12,7 @@ const RETRY_BASE_MS = 500;
 const RETRY_MAX_MS = 5000;
 
 // status: 'idle' | 'connecting' | 'open' | 'reconnecting' | 'busy' | 'refused'
-export function useTerminalSocket({ active, onData, restartKey = 0 }) {
+export function useTerminalSocket({ active, onData, onOpen, restartKey = 0 }) {
   const [status, setStatus] = useState('idle');
   // Bumped internally to open a fresh socket after an unexpected close.
   const [gen, setGen] = useState(0);
@@ -21,6 +21,12 @@ export function useTerminalSocket({ active, onData, restartKey = 0 }) {
   const attemptsRef = useRef(0);
   const onDataRef = useRef(onData);
   onDataRef.current = onData;
+  // Fired on EVERY socket open (initial and reconnect), before the first
+  // data frame, so the pane can reset xterm before the server replays
+  // scrollback — otherwise a live-backend reconnect appends the whole
+  // history under the existing buffer (prints twice on sleep/wake).
+  const onOpenRef = useRef(onOpen);
+  onOpenRef.current = onOpen;
 
   // An external restart (Settings kill -> fresh PTY) starts a fresh backoff
   // history; only an internal retry keeps counting attempts.
@@ -33,7 +39,13 @@ export function useTerminalSocket({ active, onData, restartKey = 0 }) {
     const ws = new WebSocket(terminalSocketUrl());
     wsRef.current = ws;
     setStatus(attemptsRef.current > 0 ? 'reconnecting' : 'connecting');
-    ws.onopen = () => { attemptsRef.current = 0; setStatus('open'); };
+    ws.onopen = () => {
+      attemptsRef.current = 0;
+      // Runs before onmessage (WS delivers open before any frame), so the
+      // reset lands ahead of the scrollback replay.
+      onOpenRef.current?.();
+      setStatus('open');
+    };
     ws.onclose = (e) => {
       if (wsRef.current === ws) wsRef.current = null;
       if (e?.code === CLOSE_BUSY) { setStatus('busy'); return; }

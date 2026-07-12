@@ -46,6 +46,23 @@ it('does not connect when inactive', () => {
   expect(MockWS.instances.length).toBe(0);
 });
 
+it('fires onOpen on EVERY socket open so the pane can reset before scrollback replay', () => {
+  // The server replays scrollback on every connect; without a reset the
+  // client appends it under the existing buffer and the whole session
+  // prints twice on a live-backend reconnect (sleep/wake). onOpen lets the
+  // pane term.reset() first, on the initial open AND every reconnect.
+  const opens = [];
+  const { result } = renderHook(() => useTerminalSocket({
+    active: true, onData: () => {}, onOpen: () => opens.push('open'),
+  }));
+  act(() => MockWS.instances[0]._open());
+  expect(opens).toEqual(['open']);
+  act(() => MockWS.instances[0]._drop(1006));
+  act(() => result.current.reconnectNow());
+  act(() => MockWS.instances[1]._open());
+  expect(opens).toEqual(['open', 'open']);
+});
+
 it('auto-reconnects after an unexpected close, with growing backoff', () => {
   vi.useFakeTimers();
   const { result } = renderHook(() => useTerminalSocket({ active: true, onData: () => {} }));
