@@ -60,6 +60,17 @@ def _claim_scoring(job_id: str) -> bool:
         return True
 
 
+def _release_scoring(job_id: str) -> None:
+    """Release a claim taken by :func:`_claim_scoring`.
+
+    Used when a discard-cancel claims the slot up front but the cancel
+    itself fails: without the release, a later legitimate cancel of the
+    same job would never get its completed dims scored.
+    """
+    with _scored_jobs_lock:
+        _scored_jobs.pop(job_id, None)
+
+
 def _read_dim_states(job: Any) -> dict[str, dict[str, Any]]:
     """Read dimensions.json for *job*'s run dir, returning the dimensions map.
 
@@ -225,10 +236,18 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
                 "cancel_evaluation: job_id=%s, discard=%s, remote_addr=%s",
                 job_id, discard, request.remote_addr,
             )
+            if discard:
+                # Claim the one-time scoring slot BEFORE the job flips to
+                # cancelled: otherwise the UI's next status poll sees the
+                # cancelled state and spawns _score_completed_evidence,
+                # resurrecting a run the user just discarded.
+                _claim_scoring(job_id)
             ok = provider.cancel_evaluation(
                 job_id, reports_dir=_reports_dir(), discard_partial=discard,
             )
             if not ok:
+                if discard:
+                    _release_scoring(job_id)
                 body, status = error_response("Could not cancel job", HTTPStatus.CONFLICT, "CONFLICT")
                 return jsonify(body), status
             return jsonify({"ok": True, "action": "cancelled", "discarded": discard})

@@ -222,13 +222,13 @@ class TestDiscardForcesFullRedispatch:
     def test_discard_wipes_cache_so_second_run_dispatches_all(self, tmp_path: Path):
         """After cancel, an explicit discard wipes the V2 cache for the
         incomplete dim. Second run sees no hits and dispatches every file."""
-        from quodeq.services.evaluation_mixin import _discard_partial_dim_state
+        from quodeq.services.evaluation_mixin import _discard_run_state
 
         config, src, work_dir, cache = _setup_run(
             tmp_path, ["a.py", "b.py", "c.py", "d.py"],
         )
 
-        # Layout so _discard_partial_dim_state can find the run.
+        # Layout so _discard_run_state can find the run.
         # reports_dir/<project>/<run-id>/evidence/
         reports_dir = tmp_path / "reports"
         run_dir = reports_dir / "proj" / "run-1"
@@ -263,7 +263,7 @@ class TestDiscardForcesFullRedispatch:
             "quodeq.services.evaluation_mixin._open_cache",
             lambda: cache,
         ):
-            _discard_partial_dim_state(str(reports_dir), {
+            _discard_run_state(str(reports_dir), {
                 "outputProject": "proj", "outputRunId": "run-1",
             })
 

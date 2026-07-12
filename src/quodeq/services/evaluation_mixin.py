@@ -339,7 +339,7 @@ class FsEvaluationMixin:
         self, job_id: str, reports_dir: str | None = None,
         *, discard_partial: bool = False,
     ) -> bool:
-        """Cancel a running evaluation job and score any completed dimensions.
+        """Cancel a running evaluation job; score completed dims unless discarding.
 
         Uses ``self.get_evaluation_status`` rather than a bare
         ``self._jobs.get_job`` so that external runs (``ext-`` prefix) also
@@ -357,9 +357,11 @@ class FsEvaluationMixin:
         the run as ``in_progress`` for a window of ~100ms-1s, producing
         the "two running rows" UX after a cancel-then-start.
 
-        When ``discard_partial`` is True we also wipe queue + fingerprint
-        files for any dim that didn't complete scoring — the next run sees
-        no salvageable state and starts fresh for those dims.
+        When ``discard_partial`` is True the run must end up as if it never
+        happened: completed evidence is NOT scored, and the traces the run
+        left in shared state (V2 cache entries, evidence scratch) are wiped.
+        ``FilesystemActionProvider.cancel_evaluation`` then removes the run
+        directory and its index row.
         """
         reports_root = Path(reports_dir) if reports_dir else None
         job = self.get_evaluation_status(job_id, reports_dir=reports_dir)
@@ -367,12 +369,13 @@ class FsEvaluationMixin:
         if ok and reports_dir and job:
             run_dir = Path(reports_dir) / job.output_project / job.output_run_id
             _wait_for_terminal_status(run_dir)
-            _score_completed_evidence(reports_dir, {
-                "outputProject": job.output_project,
-                "outputRunId": job.output_run_id,
-            })
             if discard_partial:
-                _discard_partial_dim_state(reports_dir, {
+                _discard_run_state(reports_dir, {
+                    "outputProject": job.output_project,
+                    "outputRunId": job.output_run_id,
+                })
+            else:
+                _score_completed_evidence(reports_dir, {
                     "outputProject": job.output_project,
                     "outputRunId": job.output_run_id,
                 })
@@ -452,17 +455,21 @@ def _open_cache():
     return LocalFileBackend()
 
 
-def _discard_partial_dim_state(reports_dir: str, job: dict) -> None:
-    """Wipe queue + fingerprint + V2 cache + JSONL for any dim that didn't finish scoring.
+def _discard_run_state(reports_dir: str, job: dict) -> None:
+    """Wipe every trace a discarded run left behind.
 
-    Invoked when the user opts to discard collected findings on cancel.
-    Dims with ``evaluation/<dim>.json`` (cleanly scored) are preserved -
-    only in-flight ones are reset, so partial work doesn't get accidentally
-    discarded just because the umbrella run was stopped.
+    Invoked when the user cancels with "Discard findings": the run must end
+    up as if it never happened. For EVERY dim that dispatched work (has a
+    ``<dim>_dispatch_keys.json`` sidecar) the V2 content-addressed cache
+    entries it wrote are deleted, including dims that finished cleanly.
+    Without that, the next incremental run counts the discarded run's files
+    as "analyzed in previous runs" in the coverage header. The sidecar holds
+    only this run's dispatched (cache-miss) keys, so entries written by
+    earlier kept runs are not touched.
 
-    For dims marked ``incomplete`` in ``dimensions.json``, also wipes the V2
-    content-addressed cache entries (looked up via the ``<dim>_dispatch_keys.json``
-    sidecar written by the dim runner) and the dim's evidence JSONL.
+    All per-dim scratch (queue, fingerprint, evidence JSONL, sidecar) is
+    removed so the status-GET scoring path cannot resurrect a report from
+    leftover evidence. The caller removes the run directory itself.
     """
     project = job.get("outputProject")
     run_id = job.get("outputRunId")
@@ -471,59 +478,38 @@ def _discard_partial_dim_state(reports_dir: str, job: dict) -> None:
 
     run_dir = Path(reports_dir) / project / run_id
     evidence_dir = run_dir / "evidence"
-    evaluation_dir = run_dir / "evaluation"
     if not evidence_dir.is_dir():
         return
 
-    scored_dims: set[str] = set()
-    if evaluation_dir.is_dir():
-        for eval_file in evaluation_dir.glob("*.json"):
-            scored_dims.add(eval_file.stem)
-
-    for queue_path in evidence_dir.glob("*_queue.json"):
-        dim_id = queue_path.name.replace("_queue.json", "")
-        if dim_id in scored_dims:
+    cache = None
+    for sidecar in evidence_dir.glob("*_dispatch_keys.json"):
+        try:
+            keys = json.loads(sidecar.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            _logger.warning("Could not read sidecar %s: %s", sidecar, exc)
             continue
-        for victim in (queue_path, evidence_dir / f"{dim_id}_fingerprint.json"):
+        if not isinstance(keys, dict):
+            continue
+        if cache is None:
+            cache = _open_cache()
+        for key in keys.values():
+            try:
+                cache.delete(key)
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning("Could not delete cache entry %s: %s", key, exc)
+
+    scratch_patterns = (
+        "*_queue.json", "*_fingerprint.json",
+        "*_evidence.jsonl", "*_dispatch_keys.json",
+    )
+    for pattern in scratch_patterns:
+        for victim in evidence_dir.glob(pattern):
             try:
                 victim.unlink()
             except FileNotFoundError:
                 pass
             except OSError as exc:
                 _logger.warning("Could not discard %s: %s", victim, exc)
-
-    # V2 cache + JSONL wipe for dims explicitly marked incomplete.
-    from quodeq.shared.dimensions_state import read_dimensions
-    dim_states = read_dimensions(run_dir).get("dimensions", {})
-    cache = None
-    for dim_id, info in dim_states.items():
-        if info.get("state") != "incomplete":
-            continue
-        sidecar = evidence_dir / f"{dim_id}_dispatch_keys.json"
-        if sidecar.is_file():
-            try:
-                keys = json.loads(sidecar.read_text(encoding="utf-8"))
-                if cache is None:
-                    cache = _open_cache()
-                for key in keys.values():
-                    try:
-                        cache.delete(key)
-                    except Exception as exc:  # noqa: BLE001
-                        _logger.warning("Could not delete cache entry %s: %s", key, exc)
-            except (OSError, json.JSONDecodeError) as exc:
-                _logger.warning("Could not read sidecar %s: %s", sidecar, exc)
-        else:
-            _logger.warning(
-                "No dispatch-keys sidecar for incomplete dim %s; skipping cache wipe",
-                dim_id,
-            )
-        jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
-        try:
-            jsonl.unlink()
-        except FileNotFoundError:
-            pass
-        except OSError as exc:
-            _logger.warning("Could not delete %s: %s", jsonl, exc)
 
 
 def _read_queue_files_count(queue_path: Path) -> int:

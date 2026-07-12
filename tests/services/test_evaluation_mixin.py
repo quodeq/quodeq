@@ -16,7 +16,7 @@ from quodeq.services.evaluation_mixin import (
     FsEvaluationMixin,
     SubprocessDispatcher,
     _build_evaluate_cmd,
-    _discard_partial_dim_state,
+    _discard_run_state,
     _read_project_source_file_count,
     _read_queue_files_count,
     _register_project,
@@ -437,7 +437,7 @@ class TestCancelDiscardPartial:
         )
         with patch("quodeq.services.evaluation_mixin._score_completed_evidence"), \
              patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"), \
-             patch("quodeq.services.evaluation_mixin._discard_partial_dim_state") as mock_discard:
+             patch("quodeq.services.evaluation_mixin._discard_run_state") as mock_discard:
             m.cancel_evaluation("j1", reports_dir="/reports")
         mock_discard.assert_not_called()
 
@@ -451,7 +451,7 @@ class TestCancelDiscardPartial:
         )
         with patch("quodeq.services.evaluation_mixin._score_completed_evidence"), \
              patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"), \
-             patch("quodeq.services.evaluation_mixin._discard_partial_dim_state") as mock_discard:
+             patch("quodeq.services.evaluation_mixin._discard_run_state") as mock_discard:
             m.cancel_evaluation("j1", reports_dir="/reports", discard_partial=True)
         mock_discard.assert_called_once()
         args = mock_discard.call_args.args
@@ -460,7 +460,7 @@ class TestCancelDiscardPartial:
         assert args[1]["outputRunId"] == "run1"
 
 
-class TestDiscardPartialDimState:
+class TestDiscardRunState:
     def _make_run(self, tmp_path: Path, *, dims: list[str], scored: list[str]) -> Path:
         evidence = tmp_path / "reports" / "proj" / "run1" / "evidence"
         evaluation = tmp_path / "reports" / "proj" / "run1" / "evaluation"
@@ -473,18 +473,19 @@ class TestDiscardPartialDimState:
             (evaluation / f"{dim}.json").write_text("{}")
         return tmp_path / "reports"
 
-    def test_wipes_only_unscored_dim_state(self, tmp_path: Path):
-        # security finished (has eval/security.json) — must be preserved.
-        # usability is in-flight — its queue + fingerprint must be wiped.
+    def test_wipes_scored_and_unscored_dim_state(self, tmp_path: Path):
+        # Discard means the run never happened: scratch for scored dims is
+        # wiped just like in-flight ones (the run dir itself is removed by
+        # the provider right after).
         reports = self._make_run(
             tmp_path, dims=["security", "usability"], scored=["security"],
         )
-        _discard_partial_dim_state(
+        _discard_run_state(
             str(reports), {"outputProject": "proj", "outputRunId": "run1"},
         )
         evidence = reports / "proj" / "run1" / "evidence"
-        assert (evidence / "security_queue.json").exists()
-        assert (evidence / "security_fingerprint.json").exists()
+        assert not (evidence / "security_queue.json").exists()
+        assert not (evidence / "security_fingerprint.json").exists()
         assert not (evidence / "usability_queue.json").exists()
         assert not (evidence / "usability_fingerprint.json").exists()
 
@@ -498,7 +499,7 @@ class TestDiscardPartialDimState:
         (evidence / "usability_queue.json").write_text("{}")
         (evidence / "usability_fingerprint.json").write_text("{}")
 
-        _discard_partial_dim_state(
+        _discard_run_state(
             str(tmp_path / "reports"),
             {"outputProject": "proj", "outputRunId": "run1"},
         )
@@ -506,15 +507,15 @@ class TestDiscardPartialDimState:
 
     def test_missing_evidence_dir_is_silent(self, tmp_path: Path):
         # A truly empty run dir shouldn't raise.
-        _discard_partial_dim_state(
+        _discard_run_state(
             str(tmp_path),
             {"outputProject": "ghost", "outputRunId": "ghost"},
         )
 
     def test_missing_project_or_run_id_is_silent(self, tmp_path: Path):
         # Defensive: a malformed job dict should noop, not throw.
-        _discard_partial_dim_state(str(tmp_path), {})
-        _discard_partial_dim_state(str(tmp_path), {"outputProject": "p"})
+        _discard_run_state(str(tmp_path), {})
+        _discard_run_state(str(tmp_path), {"outputProject": "p"})
 
 
 class TestScoreFailedEvaluation:

@@ -29,7 +29,7 @@ src/quodeq/services/_violations_jsonl.py:11:analysis
 src/quodeq/services/_violations_stream.py:10:analysis
 src/quodeq/services/_violations_stream.py:11:analysis
 src/quodeq/services/evaluation_mixin.py:19:analysis
-src/quodeq/services/evaluation_mixin.py:451:analysis
+src/quodeq/services/evaluation_mixin.py:454:analysis
 src/quodeq/services/jobs.py:20:analysis
 src/quodeq/services/scan_progress.py:23:analysis
 src/quodeq/services/tooling_mixin.py:17:analysis
