@@ -35,6 +35,11 @@ def _isolate_quodeq_home(tmp_path_factory: pytest.TempPathFactory,
     monkeypatch.setenv("QUODEQ_INDEX_DB_PATH", str(home / "index.db"))
     monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(home / "evaluations"))
     monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(home / "cache"))
+    # Belt-and-braces: _default_persist_dir now derives from the index-db
+    # parent, but tests that build a JobManager without a store must never
+    # touch the real ~/.quodeq/run/jobs again (it was wedged with fake jobs
+    # named job-wire/sample-project that surfaced in the real dashboard).
+    monkeypatch.setenv("QUODEQ_JOB_PERSIST_DIR", str(home / "run" / "jobs"))
 
 
 class DummyProcess:

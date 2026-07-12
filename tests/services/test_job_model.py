@@ -14,6 +14,7 @@ from quodeq.services._job_model import (
     Job,
     InMemoryJobStore,
     FileJobStore,
+    _default_persist_dir,
     _job_to_json,
     _job_from_json,
     _MAX_LOG_LINES,
@@ -384,6 +385,28 @@ class TestFileJobStore:
         store = FileJobStore(persist_dir=tmp_path)
         assert store.get("j1") is not None
 
+    def test_flipped_running_job_gets_ended_at(self, tmp_path: Path):
+        """A crashed 'running' job flipped to failed must get an ended_at.
+
+        Without it, _cleanup_stale skips the job forever (it only prunes
+        jobs with ended_at), so crash/test leftovers accumulate until they
+        wedge the completed-jobs cap and evict real history instead.
+        """
+        data = {
+            "job_id": "j1",
+            "status": "running",
+            "command": ["echo"],
+            "started_at": "2026-01-01T00:00:00+00:00",
+        }
+        (tmp_path / "j1.json").write_text(json.dumps(data))
+        store = FileJobStore(persist_dir=tmp_path)
+        job = store.get("j1")
+        assert job is not None
+        assert job.status == "failed"
+        assert job.ended_at, "flipped jobs must be prunable by _cleanup_stale"
+        on_disk = json.loads((tmp_path / "j1.json").read_text())
+        assert on_disk["ended_at"], "the flip must be persisted with ended_at"
+
     def test_write_failure_does_not_crash(self, tmp_path: Path, monkeypatch):
         """If writing to disk fails, put() should not raise."""
         store = FileJobStore(persist_dir=tmp_path)
@@ -403,6 +426,32 @@ class TestFileJobStore:
 # ---------------------------------------------------------------------------
 # REPORT_PATH_RE
 # ---------------------------------------------------------------------------
+
+
+class TestDefaultPersistDir:
+    """The job store's default location must follow the rest of the state.
+
+    It used to honor only QUODEQ_JOB_PERSIST_DIR and otherwise hardcode
+    ~/.quodeq/run/jobs, so pytest runs (which isolate QUODEQ_INDEX_DB_PATH
+    but not this) polluted the developer's real dashboard with fake jobs.
+    Deriving from the index-db parent mirrors get_score_cache_path's idiom:
+    one env override isolates every sibling store.
+    """
+
+    def test_derives_from_index_db_path(self, tmp_path: Path, monkeypatch):
+        monkeypatch.delenv("QUODEQ_JOB_PERSIST_DIR", raising=False)
+        monkeypatch.setenv("QUODEQ_INDEX_DB_PATH", str(tmp_path / "idx.db"))
+        assert _default_persist_dir() == tmp_path / "run" / "jobs"
+
+    def test_explicit_env_wins(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("QUODEQ_JOB_PERSIST_DIR", str(tmp_path / "explicit"))
+        monkeypatch.setenv("QUODEQ_INDEX_DB_PATH", str(tmp_path / "idx.db"))
+        assert _default_persist_dir() == tmp_path / "explicit"
+
+    def test_falls_back_to_home_without_any_env(self, monkeypatch):
+        monkeypatch.delenv("QUODEQ_JOB_PERSIST_DIR", raising=False)
+        monkeypatch.delenv("QUODEQ_INDEX_DB_PATH", raising=False)
+        assert _default_persist_dir() == Path.home() / ".quodeq" / "run" / "jobs"
 
 
 class TestReportPathRegex:

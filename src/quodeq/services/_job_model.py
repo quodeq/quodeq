@@ -156,8 +156,19 @@ class InMemoryJobStore:
 _logger = logging.getLogger(__name__)
 
 def _default_persist_dir() -> Path:
-    """Read persist dir from env at call time for lazy configuration."""
-    return Path(os.environ.get("QUODEQ_JOB_PERSIST_DIR", str(Path.home() / ".quodeq" / "run" / "jobs")))
+    """Read persist dir from env at call time for lazy configuration.
+
+    Resolution: QUODEQ_JOB_PERSIST_DIR, else ``run/jobs`` next to the index
+    DB (mirroring get_score_cache_path, so the test suite's
+    QUODEQ_INDEX_DB_PATH override auto-isolates this store too), which
+    itself defaults to ``~/.quodeq``. Hardcoding the home fallback here let
+    pytest runs write fake jobs into the developer's real dashboard.
+    """
+    explicit = os.environ.get("QUODEQ_JOB_PERSIST_DIR")
+    if explicit:
+        return Path(explicit)
+    from quodeq.shared._env import get_index_db_path
+    return Path(get_index_db_path()).parent / "run" / "jobs"
 _STALE_JOB_AGE_S = 24 * 60 * 60  # 24 hours
 
 
@@ -274,6 +285,10 @@ class FileJobStore:
                 if job.status == "running":
                     job.status = "failed"
                     job.exit_code = -1
+                    # Stamp an end time or _cleanup_stale (which only prunes
+                    # jobs with ended_at) keeps the flipped job forever.
+                    if not job.ended_at:
+                        job.ended_at = datetime.now(timezone.utc).isoformat()
                     self._jobs[job.job_id] = job
                     self._write(job)
                 else:
