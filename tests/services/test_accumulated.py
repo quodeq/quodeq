@@ -255,3 +255,36 @@ class TestComputeAccumulated:
         assert result is not None
         assert result["dimensions"] == []
         assert result["summary"]["dimensionCount"] == 0
+
+
+class TestFallbackExcludesFailed:
+    def test_failed_only_project_yields_empty_overview(self, tmp_path: Path):
+        # A failed run's partial evals must not masquerade as the project
+        # grade: the run errored before producing trustworthy data (this is
+        # what _compute_result's docstring always claimed; the fallback
+        # code included failed runs anyway).
+        reports_root = _setup_project(tmp_path, "proj", [
+            ("run1", [_dim("security", "3.0", "D")]),
+        ])
+        (reports_root / "proj" / "run1" / "status.json").write_text(
+            json.dumps({"state": "failed"}),
+        )
+        result = compute_accumulated(str(reports_root), "proj", None)
+        assert result is not None
+        assert result["dimensions"] == []
+        assert result["summary"]["dimensionCount"] == 0
+
+    def test_fallback_prefers_cancelled_and_skips_failed(self, tmp_path: Path):
+        reports_root = _setup_project(tmp_path, "proj", [
+            ("run2", [_dim("security", "9.0", "A")]),
+            ("run1", [_dim("security", "6.0", "C")]),
+        ])
+        (reports_root / "proj" / "run2" / "status.json").write_text(
+            json.dumps({"state": "failed"}),
+        )
+        (reports_root / "proj" / "run1" / "status.json").write_text(
+            json.dumps({"state": "cancelled"}),
+        )
+        result = compute_accumulated(str(reports_root), "proj", None)
+        assert result is not None
+        assert result["dimensions"][0]["overallScore"] == "6.0"

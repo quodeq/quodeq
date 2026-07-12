@@ -87,9 +87,16 @@ def _read_accumulated_summary(
 
     def _compute() -> dict:
         try:
+            # Same run-set selection as the accumulated Overview
+            # (complete-only, cancelled fallback, never failed or
+            # in_progress). Iterating ALL runs newest-first gave the card
+            # a different grade than the Overview whenever the newest run
+            # was cancelled/failed/in_progress.
+            from quodeq.services.scoring_view import select_default_view_runs  # noqa: PLC0415
+            view_runs = select_default_view_runs(runs)
             latest_by_dim: dict[str, object] = {}
             files_count: int | None = None
-            for run in runs:
+            for run in view_runs:
                 dims = read_run_data(reports_root, entry_name, run.run_id)
                 for d in dims:
                     if d.dimension and d.dimension not in latest_by_dim:

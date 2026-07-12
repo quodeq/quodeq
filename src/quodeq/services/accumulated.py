@@ -12,7 +12,7 @@ from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_
 from quodeq.core.types import DimensionResult, to_camel_dict
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services.deleted import filter_deleted_from_dimensions
-from quodeq.services.dim_resolution import is_eligible_for_default_view
+from quodeq.services.scoring_view import select_default_view_runs
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
 from quodeq.services._fs_projects import find_children as _find_children
 from quodeq.services.ports import RunInfo, calculate_trend, list_runs, most_frequent_grade, parse_numeric_score
@@ -170,21 +170,16 @@ def _compute_result(
     If no complete run exists but cancelled runs do (fresh project where
     every attempt was stopped early), fall back to those — better to
     show what real data we have than to render a blank dashboard. The
-    fallback explicitly excludes ``in_progress`` so a brand-new project
-    whose first run is still alive starts blank, matching the rule that
-    in-progress dims never count toward the overview.
+    fallback excludes ``in_progress`` (a brand-new project whose first
+    run is still alive starts blank) and ``failed`` (the run errored;
+    its partial scoring must not masquerade as the project grade).
 
-    The eligibility predicate is the shared
-    ``dim_resolution.is_eligible_for_default_view`` rule, used by both
-    this call site and ``dashboard._resolve_selected_run`` so the
-    headline and cards always read from the same set of runs.
+    The run-set selection is the shared
+    ``scoring_view.select_default_view_runs`` rule, also used by the
+    repositories screen's project-card summary so the card grade always
+    matches the Overview behind the click.
     """
-    eligible_run_infos = [r for r in all_run_infos if is_eligible_for_default_view(r.status)]
-    if not eligible_run_infos:
-        # Fall back to terminal-but-not-complete runs (cancelled), still
-        # excluding in_progress. ``_read_all_run_data``'s per-eval-file
-        # trustworthiness check filters out stub evals from these.
-        eligible_run_infos = [r for r in all_run_infos if r.status != "in_progress"]
+    eligible_run_infos = select_default_view_runs(all_run_infos)
     return _build_accumulated_for_runs(reports_root, project, eligible_run_infos, cache_config, params)
 
 
