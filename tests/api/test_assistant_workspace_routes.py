@@ -91,6 +91,43 @@ def test_discard_removes_worktree(app, client, repo):
     assert store.get_worktree(sid)["status"] == "discarded"
 
 
+def test_discard_blocked_while_turn_in_flight(app, client, repo):
+    # Regression: discard raced apply/pr and in-flight write turns because it
+    # was the only mutating workspace route with no turn-slot claim. A held
+    # slot must 409 discard and leave the worktree intact.
+    sid, store, manager = _session_with_worktree(app, client, repo)
+    import quodeq.api.assistant_routes as ar
+    with ar._running_lock:
+        ar._running_turns.add(sid)
+    try:
+        resp = client.post(f"/api/assistant/sessions/{sid}/workspace/discard")
+        assert resp.status_code == 409
+        assert manager.path.exists()
+        assert store.get_worktree(sid)["status"] == "active"
+    finally:
+        with ar._running_lock:
+            ar._running_turns.discard(sid)
+
+
+def test_discard_claims_turn_slot_and_releases(app, client, repo, monkeypatch):
+    sid, store, _ = _session_with_worktree(app, client, repo)
+    import quodeq.api.assistant_routes as ar
+    from quodeq.assistant.worktree import WorktreeManager
+    seen = {}
+    orig = WorktreeManager.remove
+
+    def spy(self, delete_branch=True):
+        with ar._running_lock:
+            seen["claimed"] = sid in ar._running_turns
+        return orig(self, delete_branch=delete_branch)
+
+    monkeypatch.setattr(WorktreeManager, "remove", spy)
+    resp = client.post(f"/api/assistant/sessions/{sid}/workspace/discard")
+    assert resp.status_code == 200 and seen["claimed"] is True
+    with ar._running_lock:
+        assert sid not in ar._running_turns  # released after
+
+
 def test_pr_fail_soft_keeps_branch(app, client, repo, monkeypatch):
     sid, store, manager = _session_with_worktree(app, client, repo)
     # fixture repo has no origin: push fails, endpoint stays 200 fail-soft
