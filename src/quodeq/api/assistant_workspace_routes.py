@@ -10,9 +10,9 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request
 
-from quodeq.api._assistant_helpers import get_repository
+from quodeq.api._assistant_helpers import get_repository, run_assistant_hygiene
 from quodeq.assistant.worktree import (
-    WorktreeError, WorktreeManager, diff_stats, diff_text, gc_stale_worktrees)
+    WorktreeError, WorktreeManager, diff_stats, diff_text)
 
 _logger = logging.getLogger(__name__)
 
@@ -24,13 +24,11 @@ def _manager(row: dict) -> WorktreeManager:
 
 def register_assistant_workspace_routes(app: Flask) -> None:
     def _lookup(sid: str):
-        """(repo, row, error_response); runs the one-shot stale GC first."""
+        """(repo, row, error_response); runs one-shot worktree/db hygiene first."""
         repo = get_repository(app)
         if repo.get_session(sid) is None:
             return None, None, (jsonify({"error": "unknown session"}), 404)
-        if not getattr(app, "_worktree_gc_done", False):
-            gc_stale_worktrees(repo)
-            app._worktree_gc_done = True
+        run_assistant_hygiene(app)
         return repo, repo.get_worktree(sid), None
 
     @app.get("/api/assistant/sessions/<sid>/workspace")

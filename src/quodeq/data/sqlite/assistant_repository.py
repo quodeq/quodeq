@@ -194,3 +194,26 @@ class AssistantRepository:
                 "SELECT * FROM worktrees WHERE status = ? AND project_id = ?",
                 (status, project_id),
             ).fetchall()
+
+    def list_all_worktrees(self) -> list[dict]:
+        """Every worktree row regardless of status — the GC needs to revisit
+        terminal rows whose on-disk worktree a failed ``remove`` left behind."""
+        with self._connect() as conn:
+            return conn.execute("SELECT * FROM worktrees").fetchall()
+
+    def prune_sessions_older_than(self, days: int) -> int:
+        """Delete sessions created more than *days* ago; return the count.
+
+        Bounds unbounded ~/.quodeq/assistant.db growth. FK cascades remove the
+        session's messages, actions, events, and worktree row. ``days <= 0``
+        disables pruning (no-op). Callers must GC worktrees first so a pruned
+        session's on-disk worktree/branch is already cleaned up.
+        """
+        if days <= 0:
+            return 0
+        with self._connect() as conn:
+            cur = conn.execute(
+                "DELETE FROM sessions WHERE created_at < datetime('now', ?)",
+                (f"-{int(days)} days",),
+            )
+            return cur.rowcount

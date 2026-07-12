@@ -69,6 +69,9 @@ def register_assistant_routes(app: Flask) -> None:
 
     @app.post("/api/assistant/sessions")
     def create_assistant_session():
+        # First assistant request of the process: reap leaked worktrees +
+        # prune stale sessions before minting a new one (one-shot, best-effort).
+        _assistant_helpers.run_assistant_hygiene(app)
         body = request.get_json(silent=True) or {}
         provider_cfg = _known_provider(str(body.get("provider", "")))
         if provider_cfg is None:
