@@ -23,7 +23,7 @@ from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services._trend_fetcher import make_trend_fetcher
-from quodeq.services.dim_resolution import is_eligible_for_default_view
+from quodeq.services.scoring_view import is_eligible_for_default_view, select_trend_runs
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
 
 _logger = logging.getLogger(__name__)
@@ -442,9 +442,10 @@ def _compute_dashboard_payload(
 ) -> _DashboardPayload:
     """Compute history-dependent parts of the dashboard response."""
     selected_dim_names = {d.dimension for d in ctx.dimensions}
-    # Exclude cancelled/failed runs — they produce misleading points on the
-    # history chart. They remain visible in availableRuns for the UI.
-    scoreable_runs = [r for r in runs if r.status not in ("cancelled", "failed")]
+    # Shared trend rule (scoring_view.select_trend_runs): cancelled/failed
+    # runs are excluded — misleading history points. They remain visible in
+    # availableRuns for the UI.
+    scoreable_runs = select_trend_runs(runs)
     # Re-find the selected run's index inside scoreable_runs. ctx.index is
     # the index in the full unfiltered run list, which can exceed
     # len(history_runs) when cancelled/failed runs sit above the selected

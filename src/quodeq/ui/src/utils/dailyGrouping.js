@@ -59,9 +59,31 @@ export function bucketKey(dateISO, granularity = 'day') {
 }
 
 /**
+ * Whether a trend entry may represent its bucket in the chart, the
+ * day-highlight union, and the per-dimension sparklines.
+ *
+ * In-progress runs carry a PARTIAL cumulative average that moves as each
+ * dimension finishes; the Overview cards deliberately wait for the
+ * umbrella run to terminate (the backend's default-view rule). Letting a
+ * running run supply a chart point or "analyzed today" highlight made
+ * those surfaces disagree with the cards mid-scan. History keeps its own
+ * live-run row, so running evaluations stay visible there.
+ *
+ * Entries without a status (legacy payloads) stay eligible.
+ *
+ * @param {{status?: string}} entry
+ * @returns {boolean}
+ */
+export function isBucketEligible(entry) {
+  return (entry?.status || '') !== 'in_progress';
+}
+
+/**
  * Collapse trend entries (newest-first) into one entry per period bucket,
- * keeping the first (newest) entry of each bucket — the most up-to-date
- * accumulated state for that period.
+ * keeping the first (newest) ELIGIBLE entry of each bucket — the most
+ * up-to-date terminal accumulated state for that period. A bucket whose
+ * only entries are in-progress is omitted entirely (nothing terminal to
+ * show yet), matching the empty overview of a first-run-in-flight project.
  *
  * @param {Array} trend - Trend entries, newest first
  * @param {'day'|'week'|'month'} [granularity='day']
@@ -71,11 +93,16 @@ export function collapseByPeriod(trend, granularity = 'day') {
   if (!trend || trend.length === 0) return trend;
   const collapsed = [];
   let currentKey = null;
+  let bucketFilled = false;
   for (const entry of trend) {
     const key = bucketKey(entry.dateISO, granularity);
     if (key !== currentKey) {
       currentKey = key;
+      bucketFilled = false;
+    }
+    if (!bucketFilled && isBucketEligible(entry)) {
       collapsed.push({ ...entry });
+      bucketFilled = true;
     }
   }
   return collapsed;
@@ -97,6 +124,7 @@ export function collectPeriodDimensions(trend, selectedRunId, granularity = 'day
   if (!selectedKey) return new Set();
   const names = new Set();
   for (const t of trend) {
+    if (!isBucketEligible(t)) continue; // running run's dims aren't "analyzed" yet
     if (bucketKey(t.dateISO, granularity) === selectedKey) {
       for (const dim of t.dimensions || []) names.add(dim.toLowerCase());
     }
@@ -150,6 +178,7 @@ export function extractDimensionPeriodSeries(trend, dimensionName, granularity =
   const seen = new Set();
   const out = [];
   for (const entry of trend) {
+    if (!isBucketEligible(entry)) continue; // partial mid-scan point
     const key = bucketKey(entry?.dateISO, granularity);
     if (seen.has(key)) continue;
     const details = entry?.dimensionDetails;
