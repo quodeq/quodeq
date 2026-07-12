@@ -380,11 +380,14 @@ class JobManager:
     def _evict_completed_jobs(self) -> None:
         """Remove oldest completed/failed/cancelled jobs beyond _MAX_COMPLETED_JOBS."""
         all_jobs = self._store.list()
-        completed = [j.job_id for j in all_jobs if j.status != STATUS_RUNNING]
+        completed = [j for j in all_jobs if j.status != STATUS_RUNNING]
         excess = len(completed) - _MAX_COMPLETED_JOBS
         if excess > 0:
-            for jid in completed[:excess]:
-                self._store.delete(jid)
+            # Oldest first, or a store wedged with old junk would evict the
+            # user's newest real runs while the junk survived.
+            completed.sort(key=lambda j: j.ended_at or j.started_at or "")
+            for job in completed[:excess]:
+                self._store.delete(job.job_id)
 
     @property
     def _job_timeout_cap_s(self) -> float:
