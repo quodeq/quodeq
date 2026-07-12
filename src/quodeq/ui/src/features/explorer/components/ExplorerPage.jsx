@@ -12,6 +12,7 @@ import {
   SevBadge,
   SectionLabel,
 } from '../../../components/terminal/index.js';
+import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import PrinciplesRadial from './PrinciplesRadial.jsx';
 import PrinciplesCardsRow from './PrinciplesCardsRow.jsx';
 import DimensionScoreHistoryPanel from './DimensionScoreHistoryPanel.jsx';
@@ -122,7 +123,7 @@ export default function ExplorerPage({
   }, [d.evalData, d.allViolations, activeRunId]);
   useRegisterWindowSpec('fixplan', fixPlanSpec);
 
-  if (d.loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
+  if (d.loading) return <LoadingScreen />;
   if (d.error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;
   if (!d.evalData) return <div className="empty-state"><h2>No data found</h2></div>;
 
