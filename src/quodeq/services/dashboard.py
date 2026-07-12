@@ -390,6 +390,17 @@ def _build_dashboard_result(
     }
 
 
+# Fallback order for the "latest" default run when none is complete. Each
+# tier is tried newest-first; a failed run is only headlined when nothing
+# else remains (handled after this list). Complete mirrors the Overview's
+# is_eligible_for_default_view; cancelled matches its cancelled fallback.
+_LATEST_FALLBACK_ORDER = (
+    is_eligible_for_default_view,               # complete
+    lambda status: status == "cancelled",
+    lambda status: status == "in_progress",
+)
+
+
 def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     """Return the selected RunInfo and its index in *runs*, raising FileNotFoundError if absent.
 
@@ -404,18 +415,25 @@ def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     drift.
 
     If no run is complete (fresh project, only run still in progress,
-    every attempt cancelled), fall back to ``runs[0]`` rather than
-    refusing to render. Users can still navigate to a specific partial
+    every attempt cancelled), fall back by trust order — cancelled, then
+    in_progress — and only headline a ``failed`` run when there is nothing
+    else. A failed run must not headline the dashboard while a cancelled
+    run with real kept-findings data exists, or the headline would show
+    untrustworthy data the Overview cards (which never fall back to
+    ``failed``) refuse to show. Users can still navigate to any specific
     run via the score-history chart or history table.
 
     Note: run IDs are opaque UUIDs (no sensitive data), safe to include in
     error messages.
     """
     if run == _LATEST_RUN:
-        selected_run = next(
-            (r for r in runs if is_eligible_for_default_view(r.status)),
-            runs[0],
-        )
+        selected_run = None
+        for accept in _LATEST_FALLBACK_ORDER:
+            selected_run = next((r for r in runs if accept(r.status)), None)
+            if selected_run:
+                break
+        if selected_run is None:
+            selected_run = runs[0]  # only failed runs remain; show the newest
     else:
         selected_run = next((item for item in runs if item.run_id == run), None)
     if not selected_run:

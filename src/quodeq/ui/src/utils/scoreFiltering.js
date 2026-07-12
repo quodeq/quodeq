@@ -115,11 +115,18 @@ export function filterAccumulatedByVisibleStandards(accumulated, visibleSet, fil
     visibleSet.has((d.dimension || '').toLowerCase())
   );
 
-  // Use the trend's accumulated average (consistent with History)
+  // Use the trend's accumulated average (consistent with History). When the
+  // trend is empty — e.g. an all-cancelled project, whose runs aren't chart
+  // points but whose kept-findings scores still populate the cards — fall
+  // back to the accumulated summary so the header number agrees with the
+  // dimension cards instead of reading "—" over visible scores.
   const selectedIdx = selectedRunId ? filteredTrend.findIndex((t) => t.runId === selectedRunId) : 0;
   const idx = selectedIdx >= 0 ? selectedIdx : 0;
   const trendAvg = idx < filteredTrend.length ? parseFloat(filteredTrend[idx]?.numericAverage) : null;
-  const numericAverage = (trendAvg != null && !isNaN(trendAvg)) ? trendAvg : null;
+  const summaryAvg = parseFloat(accumulated.summary?.numericAverage);
+  const numericAverage = (trendAvg != null && !isNaN(trendAvg))
+    ? trendAvg
+    : (!isNaN(summaryAvg) ? summaryAvg : null);
   const prevIdx = idx + 1;
   const prevAvg = prevIdx < filteredTrend.length ? parseFloat(filteredTrend[prevIdx]?.numericAverage) : null;
 

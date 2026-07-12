@@ -93,13 +93,18 @@ def _read_accumulated_summary(
             # a different grade than the Overview whenever the newest run
             # was cancelled/failed/in_progress.
             from quodeq.services.scoring_view import select_default_view_runs  # noqa: PLC0415
+            from quodeq.services._accumulated_data import _has_valid_score  # noqa: PLC0415
             view_runs = select_default_view_runs(runs)
             latest_by_dim: dict[str, object] = {}
             files_count: int | None = None
             for run in view_runs:
                 dims = read_run_data(reports_root, entry_name, run.run_id)
                 for d in dims:
-                    if d.dimension and d.dimension not in latest_by_dim:
+                    # Same trust gate as the accumulated Overview
+                    # (_has_valid_score): skip a coverage-0 stub so the card
+                    # falls through to a real older run instead of showing
+                    # the stub's inflated grade.
+                    if d.dimension and d.dimension not in latest_by_dim and _has_valid_score(d):
                         latest_by_dim[d.dimension] = d
                     if files_count is None and d.source_file_count:
                         files_count = d.source_file_count

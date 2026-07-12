@@ -68,6 +68,39 @@ def _setup_project(tmp_path: Path, project: str, runs: list[tuple[str, list[Dime
 # _numeric_average
 # ---------------------------------------------------------------------------
 
+class TestZeroCoverageStubExcluded:
+    """A cancelled run's coverage-0 stub eval (filesRead=0) must not drive
+    the accumulated Overview. _score_completed_evidence can write such a stub
+    at cancel time when no findings landed; its score is meaningless. The
+    accumulated reader falls through to an older run with real coverage."""
+
+    def _info(self, run_id):
+        from quodeq.services.ports import RunInfo
+        return RunInfo(run_id=run_id, date_iso="2024-01-01", date_label="Jan 01")
+
+    def test_zero_files_read_dim_falls_through_to_real_run(self):
+        from quodeq.services._accumulated_data import _read_all_run_data
+        stub = _dim("security", "9.9", "A", filesRead=0)   # coverage-0 stub, newest
+        real = _dim("security", "6.0", "C", filesRead=5)   # real, older
+        fetch = {"r2": [stub], "r1": [real]}
+        latest, _prev, _prev_run = _read_all_run_data(
+            Path("/x"), "proj", [self._info("r2"), self._info("r1")],
+            ["r2", "r1"], get_run_data=lambda rid: fetch[rid],
+        )
+        assert latest["security"].overall_score == "6.0"
+
+    def test_missing_files_read_is_still_trusted(self):
+        # Legacy evals carry no filesRead (None); those must stay valid.
+        from quodeq.services._accumulated_data import _read_all_run_data
+        legacy = _dim("security", "8.0", "A")  # no filesRead field
+        fetch = {"r1": [legacy]}
+        latest, _p, _pr = _read_all_run_data(
+            Path("/x"), "proj", [self._info("r1")], ["r1"],
+            get_run_data=lambda rid: fetch[rid],
+        )
+        assert latest["security"].overall_score == "8.0"
+
+
 class TestNumericAverage:
     def test_computes_average(self):
         """Two dimensions with scores 8.0 and 6.0 should average to 7.0."""
