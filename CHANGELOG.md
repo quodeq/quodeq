@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.6.1] - 2026-07-12
+
+### Fixes
+- **Evaluation lifecycle**: Cancel + Discard now reliably removes the run, even when the scan process is wedged and never updates its own status. Deleting an evaluation honors exactly the action you chose in the dialog instead of inferring one. The watchdog stops the entire process tree of a stuck scan, so no orphaned workers keep burning CPU in the background.
+- **Scoring consistency**: the dashboard, Overview, History, and the project card now share one run-eligibility rule, so they agree on the score, including projects whose only runs are failed or still in progress. In-progress runs no longer stand in for a chart bucket, day highlight, sparkline point, or visible-standards average; trends only reflect finished results.
+- **History**: score history groups runs by your local calendar day instead of the UTC date, so late-evening runs no longer show up under tomorrow.
+- **Evaluation cards**: a run's card always shows the project the run belongs to, and a background run finishing no longer hijacks the project you are currently viewing.
+- **Jobs**: the job store is isolated per dashboard instance, and pruning/eviction only ever touch that instance's own entries.
+- **Assistant**: applying or rejecting a suggested change is now atomic, discarding a workspace is guarded against racing with an in-flight apply, and leaked write worktrees, branches, and stale sessions are garbage-collected automatically.
+- **Terminal**: reconnecting after sleep or a dropped socket resets the view instead of duplicating scrollback, input is blocked while disconnected so keystrokes are not silently lost, and the busy indicator reflects the real connection state.
+- **Grade formula**: a formula apply that only partially succeeds now reports which projects kept stale grades instead of failing silently.
+- **UI polish**: the standard detail view uses the logo loading screen instead of a plain text fallback.
+
 ## [1.6.0] - 2026-07-11
 
 ### Features
