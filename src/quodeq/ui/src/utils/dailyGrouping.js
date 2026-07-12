@@ -1,13 +1,37 @@
 /**
- * ISO-8601 week key (Monday start; week 1 contains the first Thursday).
- * Operates timezone-naively on the YYYY-MM-DD prefix via Date.UTC, matching
- * how the day grouping slices the date string.
+ * Local calendar-day key (YYYY-MM-DD) for a trend entry's dateISO.
+ *
+ * Backend dates are UTC instants ("...T22:30:00Z") while every user-facing
+ * date renders in the viewer's local timezone. Bucketing by the UTC slice
+ * put a 00:30-local run in the previous day's group: the row displayed
+ * 12 Jul while the grouping filed it under 11 Jul. Date-only strings carry
+ * no timezone context and pass through unchanged; unparseable strings fall
+ * back to the slice so garbage still groups stably.
+ *
+ * @param {string} dateISO
+ * @returns {string}
+ */
+export function localDayKey(dateISO) {
+  const s = dateISO || '';
+  if (s.length <= 10) return s.slice(0, 10);
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s.slice(0, 10);
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+/**
+ * ISO-8601 week key (Monday start; week 1 contains the first Thursday) of
+ * the entry's LOCAL calendar day.
  *
  * @param {string} dateISO
  * @returns {string} e.g. "2026-W13", or "" when the date is missing/invalid
  */
 export function isoWeekKey(dateISO) {
-  const datePart = (dateISO || '').slice(0, 10);
+  const datePart = localDayKey(dateISO);
   const [y, m, d] = datePart.split('-').map(Number);
   if (!y || !m || !d) return '';
   const date = new Date(Date.UTC(y, m - 1, d));
@@ -20,7 +44,8 @@ export function isoWeekKey(dateISO) {
 }
 
 /**
- * Bucket key for a trend/run entry's date at the given granularity.
+ * Bucket key for a trend/run entry's date at the given granularity, based
+ * on the LOCAL calendar day so grouping agrees with the dates users see.
  * Empty dates produce "" (their own group), matching legacy day behavior.
  *
  * @param {string} dateISO
@@ -28,9 +53,9 @@ export function isoWeekKey(dateISO) {
  * @returns {string}
  */
 export function bucketKey(dateISO, granularity = 'day') {
-  if (granularity === 'month') return (dateISO || '').slice(0, 7);
+  if (granularity === 'month') return localDayKey(dateISO).slice(0, 7);
   if (granularity === 'week') return isoWeekKey(dateISO);
-  return (dateISO || '').slice(0, 10);
+  return localDayKey(dateISO);
 }
 
 /**
