@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=C9feqpR5BMI&list=PLJjpl8sE7W-U1HMePWdGis7w834NPYD3R">Watch the 2-min demo</a> · <a href="https://quodeq.ai">Website</a> · <a href="https://quodeq.ai/blog/">Blog</a> · <a href="https://github.com/quodeq/quodeq/releases/latest">Releases</a>
+  <a href="https://www.youtube.com/watch?v=hMgwULdorNk&list=PLJjpl8sE7W-U1HMePWdGis7w834NPYD3R&index=1">Watch the demo</a> · <a href="https://quodeq.ai">Website</a> · <a href="https://quodeq.ai/blog/">Blog</a> · <a href="https://github.com/quodeq/quodeq/releases/latest">Releases</a>
 </p>
 
 ---
