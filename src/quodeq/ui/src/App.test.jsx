@@ -149,3 +149,17 @@ describe('ROUTE_RENDERERS onDismiss source gating', () => {
     expect(el.props.onDismiss).toBeUndefined();
   });
 });
+
+describe('Assistant drawer close on shared project switch', () => {
+  // Task 19: shared projects have no mutation routes (dismiss/verify are
+  // local-only). The drawer must close when switching to shared to prevent
+  // writes to the local store under a shared project's id. The effect in
+  // App.jsx guards both drawer close AND session re-bind on selectedSource.
+  it('isSharedSource returns true for shared selections', () => {
+    expect(isSharedSource('shared')).toBe(true);
+  });
+
+  it('isSharedSource returns false for local selections', () => {
+    expect(isSharedSource('local')).toBe(false);
+  });
+});

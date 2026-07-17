@@ -563,7 +563,7 @@ export default function App() {
   // active assistant provider/model.
   const assistantGate = useAssistantProvider();
   const assistantCtx = deriveAssistantContext(state, assistantGate);
-  const { isOpen: assistantOpen, activeTab: drawerTab, startSession: startAssistantSession } = useAssistantDrawer();
+  const { isOpen: assistantOpen, activeTab: drawerTab, startSession: startAssistantSession, close: closeDrawer } = useAssistantDrawer();
   const { provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId } = assistantCtx;
   // Start (or re-start) the assistant session when the drawer is open and on
   // any provider/model/project/run change while it stays open. startSession
@@ -571,10 +571,17 @@ export default function App() {
   // real project/run switch produces a fresh session. We deliberately do NOT
   // start a session while the drawer is closed — sends only originate from the
   // open drawer, so first-open is early enough and avoids needless sessions.
+  // Shared projects have no mutation routes on the backend, so close the drawer
+  // when switching to a shared project to prevent dismiss/verify from writing
+  // to the local store under the shared project's id.
   useEffect(() => {
+    if (state.selectedSource === 'shared' && assistantOpen) {
+      closeDrawer();
+      return;
+    }
     if (!assistantOpen || drawerTab !== 'assistant') return;
     startAssistantSession({ provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId });
-  }, [assistantOpen, drawerTab, asstProvider, asstModel, asstProjectId, asstRunId, startAssistantSession]);
+  }, [assistantOpen, drawerTab, state.selectedSource, asstProvider, asstModel, asstProjectId, asstRunId, startAssistantSession, closeDrawer]);
 
   // Sync the client-side grade-label thresholds with the server formula at
   // boot so every gauge/badge agrees with the applied Q² parameters. The

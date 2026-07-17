@@ -233,6 +233,12 @@ export function AssistantDrawerProvider({ children }) {
     const handleKeyDown = (e) => {
       if (e.code !== 'Backquote' || !(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
+      // Terminal shortcut (Ctrl+Shift+`) is always available, regardless of
+      // project source. Only the assistant shortcut (Ctrl+`) is gated by source.
+      if (e.shiftKey) {
+        if (terminalEnabled) toggleTopbar('terminal');
+        return;
+      }
       // This provider mounts above App/useProjectState, so it can't read
       // `selectedSource` as React state; the persisted key is the
       // synchronous authority instead (see isSharedSourceActive above). The
@@ -240,7 +246,6 @@ export function AssistantDrawerProvider({ children }) {
       // collide with a shared project's id, so the shortcut must not open
       // the drawer while a shared project is selected.
       if (isSharedSourceActive()) return;
-      if (e.shiftKey) { if (terminalEnabled) toggleTopbar('terminal'); return; }
       if (assistantEnabled) toggleTopbar('assistant');
       else if (terminalEnabled) toggleTopbar('terminal');
     };
