@@ -255,6 +255,31 @@ def test_shared_projects_refresh_stale_when_origin_unreachable(
     assert "proj-a" in ids
 
 
+def test_shared_projects_score_cache_override_propagates_into_pool(
+    client, shared_clone_fixture,
+):
+    """Finding 1 regression: build_project_list runs _build_one (which
+    ultimately calls cached_project_summary) inside a ThreadPoolExecutor.
+    contextvars do NOT propagate into pool worker threads by default, so the
+    score_cache_path_override set by _with_shared_root would be invisible
+    there and per-project summaries would read/write the LOCAL score cache
+    DB instead of this clone's own one. Both must hold: the per-clone cache
+    gets written, and the local (sandboxed-default) cache never does."""
+    from quodeq.services.shared_repo import shared_score_cache_path
+    from quodeq.shared._env import get_score_cache_path
+
+    clone_cache_path = shared_score_cache_path(shared_clone_fixture)
+    local_cache_path = Path(get_score_cache_path())
+    assert not clone_cache_path.exists()
+    assert not local_cache_path.exists()
+
+    resp = client.get("/api/shared/projects")
+    assert resp.status_code == 200
+
+    assert clone_cache_path.exists()
+    assert not local_cache_path.exists()
+
+
 # --- GET /api/shared/projects/<project>/info ----------------------------------
 
 def test_shared_project_info(client, shared_clone_fixture):
