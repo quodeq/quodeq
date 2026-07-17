@@ -106,14 +106,30 @@ def check_repo_format(repo_root: Path) -> str:
     if marker.exists():
         try:
             data = json.loads(marker.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
             return "foreign"
+
+        # Marker JSON must be a dict; if not, it's foreign.
+        if not isinstance(data, dict):
+            return "foreign"
+
         if data.get("format") != FORMAT_NAME:
             return "foreign"
-        if int(data.get("version", 0)) > FORMAT_VERSION:
+
+        # Try to parse version as int; if it fails or is non-numeric, unsupported.
+        try:
+            version = int(data.get("version", 0))
+        except (ValueError, TypeError):
+            return "unsupported_version"
+
+        if version > FORMAT_VERSION:
             return "unsupported_version"
         return "ok"
-    entries = [p for p in repo_root.iterdir() if p.name != ".git"]
+
+    try:
+        entries = [p for p in repo_root.iterdir() if p.name != ".git"]
+    except OSError:
+        return "foreign"
     return "empty" if not entries else "foreign"
 
 

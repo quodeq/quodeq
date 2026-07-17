@@ -117,3 +117,47 @@ def test_check_format_foreign_repo(tmp_path):
     (repo / ".git").mkdir(parents=True)
     (repo / "README.md").write_text("some other project", encoding="utf-8")
     assert check_repo_format(repo) == "foreign"
+
+
+def test_check_format_marker_not_dict(tmp_path):
+    """Marker JSON that parses but is not a dict (e.g. list) returns 'foreign'."""
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / MARKER_FILENAME).write_text("[1, 2, 3]", encoding="utf-8")
+    assert check_repo_format(repo) == "foreign"
+
+
+def test_check_format_version_not_int_parseable(tmp_path):
+    """Version field that cannot be parsed as int returns 'unsupported_version'."""
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / MARKER_FILENAME).write_text(
+        '{"format": "%s", "version": "1.0"}' % FORMAT_NAME, encoding="utf-8"
+    )
+    assert check_repo_format(repo) == "unsupported_version"
+
+
+def test_check_format_invalid_utf8_marker(tmp_path):
+    """Marker file with invalid UTF-8 bytes returns 'foreign'."""
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    # Write raw bytes that are invalid UTF-8
+    (repo / MARKER_FILENAME).write_bytes(b"\xff\xfe invalid json")
+    assert check_repo_format(repo) == "foreign"
+
+
+def test_check_format_missing_repo_root(tmp_path):
+    """Missing repo_root directory returns 'foreign' (not FileNotFoundError)."""
+    repo = tmp_path / "nonexistent" / "repo"
+    # repo does not exist; iterdir() would raise FileNotFoundError
+    assert check_repo_format(repo) == "foreign"
+
+
+def test_check_format_wrong_format_string(tmp_path):
+    """Marker with wrong format string returns 'foreign'."""
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / MARKER_FILENAME).write_text(
+        '{"format": "something-else", "version": 1}', encoding="utf-8"
+    )
+    assert check_repo_format(repo) == "foreign"
