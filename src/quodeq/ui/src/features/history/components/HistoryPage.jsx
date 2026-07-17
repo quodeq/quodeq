@@ -407,16 +407,16 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
   );
 }
 
-export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, loading, isFetching }) {
+export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, selectedSource = 'local', loading, isFetching }) {
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
   const { deleteEvaluation } = useApi();
   // Background refresh while a run is alive so the running row flips
   // to "complete" without the user manually reloading. Scoped to this
   // page only — other tabs don't poll.
-  useRunningRunsRefresh({ selectedProject, availableRuns });
+  useRunningRunsRefresh({ selectedProject, selectedSource, availableRuns });
   // Warm the run-detail cache on row hover so clicking through is instant.
-  const { prefetchRun, cancelPrefetch } = usePrefetchRun(selectedProject);
+  const { prefetchRun, cancelPrefetch } = usePrefetchRun(selectedProject, selectedSource);
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
   const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet), [rawTrend, visibleSet]);
 

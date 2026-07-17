@@ -4,41 +4,59 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useProjectScores } from "./useProjectScores";
 import { withQueryClient } from "../test-utils/withQueryClient.jsx";
-import { getProjectScores } from "../api/index.js";
+import { ApiProvider } from "../api/ApiContext.jsx";
 import { projectKeys } from "../api/queryKeys.js";
 
-vi.mock("../api/index.js", () => ({
-  getProjectScores: vi.fn(async (project, asOf) => {
-    if (asOf) {
+function makeFakeApi() {
+  return {
+    getProjectScores: vi.fn(async (project, asOf) => {
+      if (asOf) {
+        return {
+          accumulated: { score: 80 },
+          trend: [{ runId: asOf }],
+          availableRuns: [
+            { runId: "r9", status: "complete" },
+            { runId: "r1", status: "complete" },
+          ],
+        };
+      }
       return {
-        accumulated: { score: 80 },
-        trend: [{ runId: asOf }],
+        accumulated: { score: 90 },
+        trend: [],
         availableRuns: [
           { runId: "r9", status: "complete" },
           { runId: "r1", status: "complete" },
         ],
       };
-    }
-    return {
-      accumulated: { score: 90 },
+    }),
+    sharedGetProjectScores: vi.fn(async (project, asOf) => ({
+      accumulated: { score: 55 },
       trend: [],
-      availableRuns: [
-        { runId: "r9", status: "complete" },
-        { runId: "r1", status: "complete" },
-      ],
-    };
-  }),
-}));
+      availableRuns: [{ runId: "r1", status: "complete" }],
+    })),
+  };
+}
 
-beforeEach(() => {
-  getProjectScores.mockClear();
-});
+function wrap(fakeApi, children) {
+  const QC = withQueryClient();
+  return (
+    <QC>
+      <ApiProvider value={fakeApi}>{children}</ApiProvider>
+    </QC>
+  );
+}
 
 describe("useProjectScores", () => {
+  let fakeApi;
+
+  beforeEach(() => {
+    fakeApi = makeFakeApi();
+  });
+
   it("returns null when project is empty", () => {
     const { result } = renderHook(
       () => useProjectScores({ selectedProject: "", selectedRun: null }),
-      { wrapper: withQueryClient() },
+      { wrapper: ({ children }) => wrap(fakeApi, children) },
     );
     expect(result.current.scores).toBeNull();
     expect(result.current.latestScores).toBeNull();
@@ -47,7 +65,7 @@ describe("useProjectScores", () => {
   it("fetches scores for the selected run + latest in parallel", async () => {
     const { result } = renderHook(
       () => useProjectScores({ selectedProject: "p1", selectedRun: "r9" }),
-      { wrapper: withQueryClient() },
+      { wrapper: ({ children }) => wrap(fakeApi, children) },
     );
     await waitFor(() => {
       expect(result.current.scores?.accumulated?.score).toBe(80);
@@ -58,7 +76,7 @@ describe("useProjectScores", () => {
   it("derives availableRuns from the scores payload", async () => {
     const { result } = renderHook(
       () => useProjectScores({ selectedProject: "p1", selectedRun: null }),
-      { wrapper: withQueryClient() },
+      { wrapper: ({ children }) => wrap(fakeApi, children) },
     );
     await waitFor(() => {
       expect(result.current.availableRuns.map((r) => r.runId)).toEqual(["r9", "r1"]);
@@ -69,7 +87,7 @@ describe("useProjectScores", () => {
     // Latest query returns availableRuns marking r_running as in_progress; the
     // scoped query should NOT request asOf=r_running (would leak partial dims
     // into Overview while the eval is alive). It re-uses the latest payload.
-    getProjectScores.mockImplementation(async (project, asOf) => ({
+    fakeApi.getProjectScores.mockImplementation(async (project, asOf) => ({
       accumulated: { score: asOf ? 80 : 90 },
       trend: [],
       availableRuns: [
@@ -79,35 +97,35 @@ describe("useProjectScores", () => {
     }));
     const { result } = renderHook(
       () => useProjectScores({ selectedProject: "p1", selectedRun: "r_running" }),
-      { wrapper: withQueryClient() },
+      { wrapper: ({ children }) => wrap(fakeApi, children) },
     );
     await waitFor(() => {
       expect(result.current.scores?.accumulated?.score).toBe(90);
     });
     // Confirm the scoped call was never issued with asOf=r_running.
-    const asOfArgs = getProjectScores.mock.calls.map((c) => c[1]);
+    const asOfArgs = fakeApi.getProjectScores.mock.calls.map((c) => c[1]);
     expect(asOfArgs).not.toContain("r_running");
   });
 
   it("falls back to latest when selectedRun is unknown (not in availableRuns)", async () => {
-    getProjectScores.mockImplementation(async (project, asOf) => ({
+    fakeApi.getProjectScores.mockImplementation(async (project, asOf) => ({
       accumulated: { score: asOf ? 80 : 90 },
       trend: [],
       availableRuns: [{ runId: "r_done", status: "complete" }],
     }));
     const { result } = renderHook(
       () => useProjectScores({ selectedProject: "p1", selectedRun: "r_ghost" }),
-      { wrapper: withQueryClient() },
+      { wrapper: ({ children }) => wrap(fakeApi, children) },
     );
     await waitFor(() => {
       expect(result.current.scores?.accumulated?.score).toBe(90);
     });
-    const asOfArgs = getProjectScores.mock.calls.map((c) => c[1]);
+    const asOfArgs = fakeApi.getProjectScores.mock.calls.map((c) => c[1]);
     expect(asOfArgs).not.toContain("r_ghost");
   });
 
   it("still scopes the query when selectedRun is a known completed run", async () => {
-    getProjectScores.mockImplementation(async (project, asOf) => ({
+    fakeApi.getProjectScores.mockImplementation(async (project, asOf) => ({
       accumulated: { score: asOf ? 80 : 90 },
       trend: [],
       availableRuns: [
@@ -117,12 +135,12 @@ describe("useProjectScores", () => {
     }));
     const { result } = renderHook(
       () => useProjectScores({ selectedProject: "p1", selectedRun: "r_old" }),
-      { wrapper: withQueryClient() },
+      { wrapper: ({ children }) => wrap(fakeApi, children) },
     );
     await waitFor(() => {
       expect(result.current.scores?.accumulated?.score).toBe(80);
     });
-    const asOfArgs = getProjectScores.mock.calls.map((c) => c[1]);
+    const asOfArgs = fakeApi.getProjectScores.mock.calls.map((c) => c[1]);
     expect(asOfArgs).toContain("r_old");
   });
 
@@ -145,11 +163,40 @@ describe("useProjectScores", () => {
     );
     const { result } = renderHook(
       () => useProjectScores({ selectedProject: "p1", selectedRun: "r1", keepPlaceholder: false }),
-      { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> },
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>
+            <ApiProvider value={fakeApi}>{children}</ApiProvider>
+          </QueryClientProvider>
+        ),
+      },
     );
     await waitFor(() => expect(result.current.scores?.accumulated?.score).toBe(80));
     await new Promise((r) => setTimeout(r, 50));
-    expect(getProjectScores).not.toHaveBeenCalled();
+    expect(fakeApi.getProjectScores).not.toHaveBeenCalled();
   });
 
+  // Task 17: source-aware fetch selection. A shared-source selection must
+  // read from the shared-repo mirror endpoints, never the local ones.
+  describe("source-aware fetch selection", () => {
+    it("calls getProjectScores (not sharedGetProjectScores) when selectedSource is 'local' (default)", async () => {
+      const { result } = renderHook(
+        () => useProjectScores({ selectedProject: "p1", selectedRun: null }),
+        { wrapper: ({ children }) => wrap(fakeApi, children) },
+      );
+      await waitFor(() => expect(result.current.latestScores).not.toBeNull());
+      expect(fakeApi.getProjectScores).toHaveBeenCalled();
+      expect(fakeApi.sharedGetProjectScores).not.toHaveBeenCalled();
+    });
+
+    it("calls sharedGetProjectScores (not getProjectScores) when selectedSource is 'shared'", async () => {
+      const { result } = renderHook(
+        () => useProjectScores({ selectedProject: "p1", selectedRun: null, selectedSource: "shared" }),
+        { wrapper: ({ children }) => wrap(fakeApi, children) },
+      );
+      await waitFor(() => expect(result.current.latestScores?.accumulated?.score).toBe(55));
+      expect(fakeApi.sharedGetProjectScores).toHaveBeenCalled();
+      expect(fakeApi.getProjectScores).not.toHaveBeenCalled();
+    });
+  });
 });

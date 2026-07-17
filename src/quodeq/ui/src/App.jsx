@@ -335,6 +335,7 @@ const ROUTE_RENDERERS = {
         projects={props.navigation.projects}
         projectsLoaded={props.navigation.projectsLoaded}
         selectedProject={props.navigation.selectedProject}
+        selectedSource={props.navigation.selectedSource}
         loading={props.dashboardData.loading}
         isFetching={props.dashboardData.isFetching}
         projectInfo={props.navigation.projects?.find((p) => (p.id || p.name) === props.navigation.selectedProject) || null}
@@ -348,6 +349,7 @@ const ROUTE_RENDERERS = {
       dimension={params.dimension}
       runId={params.runId}
       dateLabel={params.dateLabel}
+      selectedSource={props.navigation.selectedSource}
       onNavigate={props.navigation.handleNavigate}
       refreshSignal={props.dashboardData.dashboard}
       trend={props.dashboardData.dashboard?.trend || []}

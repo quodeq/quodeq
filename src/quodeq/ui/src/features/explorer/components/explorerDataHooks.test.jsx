@@ -1,9 +1,9 @@
 import React from 'react';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiProvider } from '../../../api/ApiContext.jsx';
-import { usePrincipleData } from './explorerDataHooks.js';
+import { usePrincipleData, useExplorerData } from './explorerDataHooks.js';
 
 // ---------------------------------------------------------------------------
 // Shared test fixtures
@@ -113,5 +113,48 @@ describe('usePrincipleData', () => {
 
     // No throw, no state change — the dismissed-set stays empty.
     expect(result.current.dismissedSet.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 17: useExplorerData source-aware fetch selection. A shared-source
+// selection must read dimension eval + run scores from the shared-repo
+// mirror endpoints, never the local ones.
+// ---------------------------------------------------------------------------
+
+function makeFakeExplorerApi() {
+  return {
+    getDimensionEval: vi.fn(async () => ({ dimension: 'security', principles: [], principleGrades: [] })),
+    getRunScores: vi.fn(async () => ({ dimensions: [] })),
+    sharedGetDimensionEval: vi.fn(async () => ({ dimension: 'security', principles: [], principleGrades: [], marker: 'shared' })),
+    sharedGetRunScores: vi.fn(async () => ({ dimensions: [], marker: 'shared' })),
+  };
+}
+
+describe('useExplorerData source-aware fetch selection', () => {
+  it("calls getDimensionEval/getRunScores (not the shared variants) when selectedSource is 'local' (default)", async () => {
+    const fakeApi = makeFakeExplorerApi();
+    const { result } = renderHook(
+      () => useExplorerData('proj', 'security', 'r1', null),
+      { wrapper: ({ children }) => <ApiProvider value={fakeApi}>{children}</ApiProvider> },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(fakeApi.getDimensionEval).toHaveBeenCalledWith('proj', 'r1', 'security');
+    expect(fakeApi.getRunScores).toHaveBeenCalledWith('proj', 'r1');
+    expect(fakeApi.sharedGetDimensionEval).not.toHaveBeenCalled();
+    expect(fakeApi.sharedGetRunScores).not.toHaveBeenCalled();
+  });
+
+  it("calls sharedGetDimensionEval/sharedGetRunScores (not the local variants) when selectedSource is 'shared'", async () => {
+    const fakeApi = makeFakeExplorerApi();
+    const { result } = renderHook(
+      () => useExplorerData('proj', 'security', 'r1', null, 'shared'),
+      { wrapper: ({ children }) => <ApiProvider value={fakeApi}>{children}</ApiProvider> },
+    );
+    await waitFor(() => expect(result.current.evalData?.marker).toBe('shared'));
+    expect(fakeApi.sharedGetDimensionEval).toHaveBeenCalledWith('proj', 'r1', 'security');
+    expect(fakeApi.sharedGetRunScores).toHaveBeenCalledWith('proj', 'r1');
+    expect(fakeApi.getDimensionEval).not.toHaveBeenCalled();
+    expect(fakeApi.getRunScores).not.toHaveBeenCalled();
   });
 });
