@@ -318,6 +318,10 @@ def import_project(reports_dir: str) -> Response | tuple[Response, int]:
         - ``file``: the project zip (required)
         - ``action``: optional, ``"replace"`` or ``"copy"`` to resolve a 409
           collision returned from a previous attempt.
+
+    Parses the multipart request, then delegates everything else (the
+    hardened validation and extraction) to ``import_zip_stream``, which has
+    no dependency on ``request`` and can be called with any zip bytes.
     """
     upload = request.files.get("file")
     if upload is None or not upload.filename:
@@ -325,6 +329,23 @@ def import_project(reports_dir: str) -> Response | tuple[Response, int]:
         return jsonify(body), status
 
     action = (request.form.get("action") or "").strip().lower() or None
+    return import_zip_stream(upload, reports_dir, action)
+
+
+def import_zip_stream(stream: Any, reports_dir: str, action: str | None) -> Response | tuple[Response, int]:
+    """Validate and materialize a project zip *stream* into *reports_dir*.
+
+    Contains all the hardened validation (path traversal, zip-bomb ratio,
+    symlinks, member limits, collision handling) that used to live directly
+    in ``import_project``. *stream* is anything with a ``.read(n)`` method
+    (a Werkzeug ``FileStorage``, an ``io.BytesIO``, or a plain file handle) —
+    this function never touches ``flask.request.files``, so it is callable
+    from any caller that already has zip bytes, such as the shared-repo
+    "pull local copy" route.
+
+    *action* is optional, ``"replace"`` or ``"copy"`` to resolve a 409
+    collision returned from a previous attempt.
+    """
     if action is not None and action not in _ALLOWED_ACTIONS:
         body, status = error_response(
             f"Invalid action; expected one of {sorted(_ALLOWED_ACTIONS)}.",
@@ -333,7 +354,7 @@ def import_project(reports_dir: str) -> Response | tuple[Response, int]:
         return jsonify(body), status
 
     size_limit = _max_zip_size_bytes()
-    raw = upload.read(size_limit + 1)
+    raw = stream.read(size_limit + 1)
     if len(raw) > size_limit:
         body, status = error_response(
             f"Archive exceeds the {size_limit // (1024 * 1024)} MB import limit.",
@@ -460,4 +481,4 @@ def import_project(reports_dir: str) -> Response | tuple[Response, int]:
 
 
 # Re-export for routing module.
-__all__ = ["import_project"]
+__all__ = ["import_project", "import_zip_stream"]

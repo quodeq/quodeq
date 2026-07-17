@@ -159,11 +159,17 @@ def test_shared_routes_409_when_unsupported_version(client):
 # --- read-only sweep ----------------------------------------------------------
 
 def test_no_mutating_routes_under_shared(app):
-    """Read-only invariant: /api/shared/* accepts only GET plus the three control POST/PUT/DELETE."""
+    """Read-only invariant: /api/shared/* accepts only GET plus the four control POST/PUT/DELETE."""
     allowed_mutations = {
         ("/api/shared/config", "PUT"),
         ("/api/shared/config", "DELETE"),
         ("/api/shared/refresh", "POST"),
+        # Deliberate, spec-approved exception: this mutates LOCAL state (the
+        # local reports directory, via import_zip_stream) to materialize a
+        # copy of a shared project -- it does not mutate the shared
+        # repository clone itself, so it does not violate the read-only
+        # invariant this test enforces for the shared repo.
+        ("/api/shared/projects/<project>/pull", "POST"),
     }
     for rule in app.url_map.iter_rules():
         if not str(rule).startswith("/api/shared"):
