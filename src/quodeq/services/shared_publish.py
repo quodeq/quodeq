@@ -11,9 +11,11 @@ import json
 import shutil
 from pathlib import Path
 
-from quodeq.shared.run_status import UnsupportedSchemaError, read_status
+from quodeq.data.actions_log import ACTIONS_LOG_FILENAME
+from quodeq.shared.dimensions_state import FILENAME as DIMENSIONS_FILENAME
+from quodeq.shared.run_status import STATUS_FILENAME, UnsupportedSchemaError, read_status
 
-_RUN_FILES = ("status.json", "dimensions.json", "events.jsonl")
+_RUN_FILES = (STATUS_FILENAME, DIMENSIONS_FILENAME, "events.jsonl")
 _EVIDENCE_DIR = "evidence"
 
 
@@ -51,10 +53,12 @@ def copy_run(run_dir: Path, dest_run_dir: Path) -> None:
 
 def _timestamp_key(line: str) -> tuple[int, str]:
     try:
-        ts = json.loads(line).get("timestamp") or ""
-        return (0, str(ts))
-    except (json.JSONDecodeError, AttributeError):
+        ts = json.loads(line).get("timestamp")
+    except (json.JSONDecodeError, AttributeError, TypeError):
         return (1, "")
+    if not ts:
+        return (1, "")
+    return (0, str(ts))
 
 
 def merge_actions_log(ours: Path, theirs: Path, dest: Path) -> None:
@@ -81,9 +85,9 @@ def stage_project(project_dir: Path, dest_project_dir: Path) -> int:
     if info.exists():
         shutil.copy2(info, dest_project_dir / "repository_info.json")
     merge_actions_log(
-        project_dir / "actions.jsonl",
-        dest_project_dir / "actions.jsonl",
-        dest_project_dir / "actions.jsonl",
+        project_dir / ACTIONS_LOG_FILENAME,
+        dest_project_dir / ACTIONS_LOG_FILENAME,
+        dest_project_dir / ACTIONS_LOG_FILENAME,
     )
     runs = list_completed_runs(project_dir)
     for run_dir in runs:

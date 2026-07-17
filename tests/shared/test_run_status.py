@@ -87,6 +87,12 @@ def test_read_unsupported_schema_raises(tmp_path: Path) -> None:
         read_status(tmp_path)
 
 
+def test_read_non_dict_json_returns_none(tmp_path: Path) -> None:
+    """status.json containing non-dict JSON (array, string, null) returns None."""
+    (tmp_path / "status.json").write_text("[1, 2, 3]")
+    assert read_status(tmp_path) is None
+
+
 def test_write_status_persists_provider_and_model(tmp_path: Path) -> None:
     write_status(
         tmp_path,

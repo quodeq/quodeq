@@ -89,3 +89,20 @@ def test_list_completed_runs_skips_unsupported_schema_version(tmp_path):
     runs = list_completed_runs(tmp_path)
     # Only the valid "done" run should be included; the unsupported one should be skipped
     assert [r.name for r in runs] == ["r-done"]
+
+
+def test_merge_actions_log_missing_timestamp_sorts_last(tmp_path):
+    """Lines missing timestamp should sort last; timestamped lines sort first in order."""
+    a = tmp_path / "a.jsonl"
+    b = tmp_path / "b.jsonl"
+    dest = tmp_path / "merged.jsonl"
+    line_ts_2 = '{"event_id":"2","timestamp":"2026-07-02T10:00:00Z","event_type":"FINDING_DISMISSED","payload":{}}'
+    line_ts_1 = '{"event_id":"1","timestamp":"2026-07-01T10:00:00Z","event_type":"FINDING_DISMISSED","payload":{}}'
+    line_no_ts = '{"event_id":"3","event_type":"FINDING_DISMISSED","payload":{}}'
+    line_invalid = "not-valid-json"
+    a.write_text(line_invalid + "\n" + line_ts_2 + "\n" + line_ts_1 + "\n")
+    b.write_text(line_no_ts + "\n")
+    merge_actions_log(a, b, dest)
+    lines = dest.read_text().splitlines()
+    # Timestamped lines come first, sorted by timestamp; non-timestamped come last in original order
+    assert lines == [line_ts_1, line_ts_2, line_invalid, line_no_ts]
