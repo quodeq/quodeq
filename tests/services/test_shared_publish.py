@@ -13,11 +13,14 @@ from quodeq.services.shared_publish import (
 def _make_run(project_dir: Path, run_id: str, state: str) -> Path:
     run = project_dir / run_id
     (run / "evidence").mkdir(parents=True)
+    (run / "evaluation").mkdir(parents=True)
     (run / "status.json").write_text(json.dumps({"state": state, "schema_version": 2}))
     (run / "dimensions.json").write_text("{}")
     (run / "events.jsonl").write_text('{"event_type":"RUN_STARTED"}\n')
     (run / "evidence" / "manifest.json").write_text("{}")
     (run / "evidence" / "security_evidence.jsonl").write_text("{}\n")
+    (run / "evaluation" / "security.json").write_text('{"dimension":"Security"}')
+    (run / "evaluation" / "reliability_eval.md").write_text("# noise")  # must NOT be copied
     (run / "run.log").write_text("noise")            # must NOT be copied
     (run / "evaluation.db").write_text("derived")     # must NOT be copied
     return run
@@ -43,6 +46,20 @@ def test_copy_run_applies_allowlist(tmp_path):
     assert (dest / "evidence" / "security_evidence.jsonl").exists()
     assert not (dest / "run.log").exists()
     assert not (dest / "evaluation.db").exists()
+
+
+def test_copy_run_copies_evaluation_json_only(tmp_path):
+    """The frozen eval-time per-dimension scores (evaluation/<dim>.json) are the
+    source of truth read_run_data() needs to render a dashboard at all; a
+    published clone without them renders an empty dashboard. Only .json files
+    from evaluation/ are copied -- markdown companions and any other junk in
+    that directory are not source-of-truth and must not be copied."""
+    src = _make_run(tmp_path / "src", "r1", "done")
+    dest = tmp_path / "dest" / "r1"
+    copy_run(src, dest)
+    assert (dest / "evaluation" / "security.json").exists()
+    assert (dest / "evaluation" / "security.json").read_text() == '{"dimension":"Security"}'
+    assert not (dest / "evaluation" / "reliability_eval.md").exists()
 
 
 def test_merge_actions_log_unions_and_sorts(tmp_path):

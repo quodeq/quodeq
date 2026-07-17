@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 _RUN_FILES = (STATUS_FILENAME, DIMENSIONS_FILENAME, "events.jsonl")
 _EVIDENCE_DIR = "evidence"
+_EVALUATION_DIR = "evaluation"
 
 
 def list_completed_runs(project_dir: Path) -> list[Path]:
@@ -62,6 +63,17 @@ def copy_run(run_dir: Path, dest_run_dir: Path) -> None:
             shutil.copy2(manifest, dest_evidence / "manifest.json")
         for src in sorted(evidence.glob("*_evidence.jsonl")):
             shutil.copy2(src, dest_evidence / src.name)
+    evaluation = run_dir / _EVALUATION_DIR
+    if evaluation.is_dir():
+        dest_evaluation = dest_run_dir / _EVALUATION_DIR
+        dest_evaluation.mkdir(exist_ok=True)
+        # Frozen eval-time per-dimension scores (e.g. security.json) are the
+        # source of truth read_run_data() needs to render a dashboard at
+        # all -- without them a published clone renders an EMPTY dashboard.
+        # Pattern-bounded like the evidence glob above: only .json files,
+        # nothing else (markdown companions, stray files) from that dir.
+        for src in sorted(evaluation.glob("*.json")):
+            shutil.copy2(src, dest_evaluation / src.name)
 
 
 def _timestamp_key(line: str) -> tuple[int, str]:
