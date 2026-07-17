@@ -93,7 +93,7 @@ export function useAppState() {
   const nav = useAppNavigation();
   const { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
   const {
-    projects, projectsLoaded, setProjects, selectedProject,
+    projects, projectsLoaded, setProjects, selectedProject, selectedSource,
     selectedRun, setSelectedRun, loadProjects, handleProjectChange,
     selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject,
   } = projectBundle;
@@ -153,7 +153,7 @@ export function useAppState() {
 
   return {
     serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navTab,
-    projects, projectsLoaded, selectedProject, selectedRun, loadProjects, handleProjectChange, handleNavigate,
+    projects, projectsLoaded, selectedProject, selectedSource, selectedRun, loadProjects, handleProjectChange, handleNavigate,
     handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject,
     dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex,
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect, prefetchHandlers,

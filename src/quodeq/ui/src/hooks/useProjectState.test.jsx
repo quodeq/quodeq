@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 
 vi.mock('../api/index.js', () => ({ listProjects: vi.fn() }));
 import { listProjects } from '../api/index.js';
@@ -52,5 +52,90 @@ describe('useProjectState — resilience to a transient projects-fetch failure',
       useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0 }));
 
     await waitFor(() => expect(result.current.selectedProject).toBe('a'));
+  });
+});
+
+function makeMemoryStorage(initial = {}) {
+  const store = { ...initial };
+  return {
+    store,
+    getItem: (key) => (key in store ? store[key] : null),
+    setItem: (key, value) => { store[key] = value; },
+  };
+}
+
+describe('useProjectState — source-aware project selection', () => {
+  it('defaults selectedSource to "local" when nothing is stored', async () => {
+    listProjects.mockResolvedValue([{ id: 'a', name: 'A' }]);
+    const { result } = renderHook(() =>
+      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0 }));
+
+    await waitFor(() => expect(result.current.selectedProject).toBe('a'));
+    expect(result.current.selectedSource).toBe('local');
+  });
+
+  it('handleProjectChange(id, "shared") exposes and persists both keys', async () => {
+    listProjects.mockResolvedValue([{ id: 'a', name: 'A' }]);
+    const storage = makeMemoryStorage();
+    const { result } = renderHook(() =>
+      useProjectState({ onNoProjects: vi.fn(), storage, retryDelayMs: 0 }));
+
+    await waitFor(() => expect(result.current.selectedProject).toBe('a'));
+
+    act(() => { result.current.handleProjectChange('shared-1', 'shared'); });
+
+    expect(result.current.selectedProject).toBe('shared-1');
+    expect(result.current.selectedSource).toBe('shared');
+    expect(storage.store['quodeq_selected_project']).toBe('shared-1');
+    expect(storage.store['quodeq_selected_source']).toBe('shared');
+  });
+
+  it('handleProjectChange(id) without a source resets source to "local"', async () => {
+    listProjects.mockResolvedValue([{ id: 'a', name: 'A' }]);
+    // Seed a stored project that matches the loaded list so the boot
+    // resolution (resolveInitialProject) does not itself call
+    // handleProjectChange and overwrite the seeded source first.
+    const storage = makeMemoryStorage({ quodeq_selected_project: 'a', quodeq_selected_source: 'shared' });
+    const { result } = renderHook(() =>
+      useProjectState({ onNoProjects: vi.fn(), storage, retryDelayMs: 0 }));
+
+    await waitFor(() => expect(result.current.selectedProject).toBe('a'));
+    // Restored from storage before any change is made.
+    expect(result.current.selectedSource).toBe('shared');
+
+    act(() => { result.current.handleProjectChange('local-1'); });
+
+    expect(result.current.selectedProject).toBe('local-1');
+    expect(result.current.selectedSource).toBe('local');
+    expect(storage.store['quodeq_selected_source']).toBe('local');
+  });
+
+  it('falls back to "local" when the stored source value is invalid', async () => {
+    listProjects.mockResolvedValue([{ id: 'a', name: 'A' }]);
+    const storage = makeMemoryStorage({ quodeq_selected_project: 'a', quodeq_selected_source: 'bogus' });
+    const { result } = renderHook(() =>
+      useProjectState({ onNoProjects: vi.fn(), storage, retryDelayMs: 0 }));
+
+    await waitFor(() => expect(result.current.selectedProject).toBe('a'));
+    expect(result.current.selectedSource).toBe('local');
+  });
+
+  it('keeps a restored shared selection on boot even though it is absent from the local projects list', async () => {
+    // The boot-time resolution effect only ever loads the *local* project
+    // list. A restored shared selection must not be validated against it
+    // (and silently reverted to the first local project + source 'local') —
+    // shared clones are resolved by Task 17's data hooks, not here.
+    listProjects.mockResolvedValue([{ id: 'local-a', name: 'Local A' }]);
+    const storage = makeMemoryStorage({ quodeq_selected_project: 'shared-xyz', quodeq_selected_source: 'shared' });
+    const onNoProjects = vi.fn();
+    const { result } = renderHook(() =>
+      useProjectState({ onNoProjects, storage, retryDelayMs: 0 }));
+
+    await waitFor(() => expect(result.current.projectsLoaded).toBe(true));
+    await new Promise((r) => setTimeout(r, 0)); // flush the resolution effect
+
+    expect(result.current.selectedProject).toBe('shared-xyz');
+    expect(result.current.selectedSource).toBe('shared');
+    expect(onNoProjects).not.toHaveBeenCalled();
   });
 });

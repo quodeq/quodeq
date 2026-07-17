@@ -616,7 +616,7 @@ export default function App() {
 
   const contentProps = {
     dashboardData: {
-      selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
+      selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
       projectsLoaded: state.projectsLoaded,
       dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
       availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
@@ -624,7 +624,7 @@ export default function App() {
       granularity: state.granularity, onGranularityChange: state.onGranularityChange,
     },
     navigation: {
-      selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
+      selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
       projectsLoaded: state.projectsLoaded,
       loadProjects: state.loadProjects,
       handleNavigate: state.handleNavigate, handleRunSelect: state.handleRunSelect,
