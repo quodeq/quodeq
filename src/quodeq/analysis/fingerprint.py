@@ -106,7 +106,14 @@ def _dimension_params_by_stat(
     except (OSError, ValueError, UnicodeDecodeError):
         return "", {}
     overrides = load_project_overrides(project_root) if project_root else {}
-    effective, non_default = dimension_params(data, overrides)
+    try:
+        effective, non_default = dimension_params(data, overrides)
+    except (AttributeError, TypeError):
+        # A shape-invalid params block (e.g. a spec that isn't a dict, or a
+        # "params" value that isn't a mapping) raises from effective_params.
+        # Analysis must never abort over a malformed compiled file -- keying
+        # degrades the same way a missing/unparseable file does.
+        return "", {}
     if not non_default:
         return "", effective
     canonical = json.dumps(non_default, sort_keys=True, separators=(",", ":"))

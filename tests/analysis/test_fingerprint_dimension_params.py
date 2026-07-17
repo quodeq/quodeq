@@ -103,3 +103,43 @@ def test_missing_dimension_file_hashes_empty(standards_dir, project_root):
 
 def test_none_standards_dir_hashes_empty(project_root):
     assert dimension_params_state(None, DIM, project_root) == ("", {})
+
+
+def _write_compiled_raw_params(standards_dir: Path, dimension: str, req_id: str, params) -> None:
+    """A compiled file whose ``params`` block has a shape ``effective_params``
+    cannot handle: a spec that isn't a dict (e.g. a bare int), or a
+    ``params`` value that isn't a mapping of name -> spec at all."""
+    compiled = standards_dir / "compiled"
+    compiled.mkdir(parents=True, exist_ok=True)
+    (compiled / f"{dimension}.json").write_text(json.dumps({
+        "id": dimension,
+        "principles": [{"name": "P", "requirements": [{
+            "id": req_id, "text": "Max {max_lines} lines",
+            "params": params,
+        }]}],
+    }))
+
+
+def test_shape_invalid_param_spec_hashes_empty_without_raising(tmp_path, project_root):
+    """``"params": {"max_lines": 5}`` -- the spec is a bare int, not a dict.
+
+    ``effective_params`` calls ``spec.get("default")`` and would raise
+    AttributeError. Keying must degrade to ("", {}), matching the
+    missing-file/unparseable-JSON behavior, not propagate the exception.
+    """
+    bad_dir = tmp_path / "standards-bad-spec"
+    _write_compiled_raw_params(bad_dir, DIM, "M-ANA-2", {"max_lines": 5})
+    assert dimension_params_state(bad_dir, DIM, project_root) == ("", {})
+
+
+def test_shape_invalid_params_list_hashes_empty_without_raising(tmp_path, project_root):
+    """``"params": [...]`` -- not a mapping at all.
+
+    ``dimension_params`` treats the list as truthy and calls
+    ``effective_params``, which does ``(req.get("params") or {}).items()``
+    and would raise AttributeError/TypeError on a list. Must degrade to
+    ("", {}) rather than crash.
+    """
+    bad_dir = tmp_path / "standards-bad-list"
+    _write_compiled_raw_params(bad_dir, DIM, "M-ANA-2", ["max_lines"])
+    assert dimension_params_state(bad_dir, DIM, project_root) == ("", {})
