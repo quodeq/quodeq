@@ -8,9 +8,8 @@ model per process). All failures raise; callers own graceful degradation.
 """
 from __future__ import annotations
 
-import logging
 import threading
-from typing import Any, Callable, Dict, List, Sequence, Tuple
+from typing import Any, Callable, Sequence
 
 import httpx
 
@@ -18,8 +17,6 @@ try:
     import openai
 except ImportError:
     openai = None  # type: ignore[assignment]
-
-_log = logging.getLogger(__name__)
 
 BATCH_TIMEOUT = httpx.Timeout(connect=10.0, read=60.0, write=30.0, pool=10.0)
 QUERY_TIMEOUT = httpx.Timeout(connect=10.0, read=10.0, write=30.0, pool=10.0)
@@ -30,6 +27,20 @@ ClientFactory = Callable[[], Any]
 def _v1_base(base_url: str) -> str:
     base = base_url.rstrip("/")
     return base if base.endswith("/v1") else base + "/v1"
+
+
+def _client_kwargs(
+    base_url: str,
+    api_key: str | None,
+    timeout: httpx.Timeout | None,
+) -> dict[str, Any]:
+    """Build kwargs for openai.OpenAI instantiation (testable without patching)."""
+    return {
+        "base_url": _v1_base(base_url),
+        "api_key": api_key or "ollama",
+        "timeout": timeout or BATCH_TIMEOUT,
+        "max_retries": 0,
+    }
 
 
 def embed_texts(
@@ -54,12 +65,7 @@ def embed_texts(
             raise RuntimeError("openai package not installed")
 
         def client_factory() -> Any:
-            return openai.OpenAI(
-                base_url=_v1_base(base_url),
-                api_key=api_key or "ollama",
-                timeout=timeout or BATCH_TIMEOUT,
-                max_retries=0,
-            )
+            return openai.OpenAI(**_client_kwargs(base_url, api_key, timeout))
 
     with client_factory() as client:
         resp = client.embeddings.create(model=model, input=list(texts))
@@ -71,7 +77,7 @@ def embed_texts(
     return [list(item.embedding) for item in items]
 
 
-_availability_cache: Dict[Tuple[str, str], bool] = {}
+_availability_cache: dict[tuple[str, str], bool] = {}
 _availability_lock = threading.Lock()
 
 
@@ -79,7 +85,7 @@ def embedding_model_available(
     model: str,
     base_url: str,
     *,
-    lister: Callable[[str], List[Dict[str, Any]]] | None = None,
+    lister: Callable[[str], list[dict[str, Any]]] | None = None,
 ) -> bool:
     """True when *model* is served at *base_url*. Cached per process.
 
@@ -93,6 +99,7 @@ def embedding_model_available(
     if cached is not None:
         return cached
     if lister is None:
+        # Narrower than _providers._LOCAL_API_MARKERS on purpose: this gates "/api/tags exists", not "is local" — localhost llama.cpp/omlx must NOT match.
         if "11434" in base_url or "ollama" in base_url.lower():
             from quodeq.llm_bridge._ollama import list_ollama_models  # noqa: PLC0415
             lister = list_ollama_models

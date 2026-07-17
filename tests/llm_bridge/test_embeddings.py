@@ -6,6 +6,8 @@ import pytest
 from quodeq.llm_bridge._embeddings import (
     BATCH_TIMEOUT,
     QUERY_TIMEOUT,
+    _client_kwargs,
+    _v1_base,
     embed_texts,
     embedding_model_available,
     reset_embedding_availability_cache,
@@ -91,3 +93,20 @@ def test_availability_permissive_for_non_ollama_base() -> None:
 def test_timeout_profiles_are_short() -> None:
     assert BATCH_TIMEOUT.read == 60.0
     assert QUERY_TIMEOUT.read == 10.0
+
+
+def test_v1_base_normalization() -> None:
+    assert _v1_base("http://localhost:11434") == "http://localhost:11434/v1"
+    assert _v1_base("http://localhost:11434/") == "http://localhost:11434/v1"
+    assert _v1_base("http://box:8080/v1") == "http://box:8080/v1"
+
+
+def test_default_client_kwargs() -> None:
+    kwargs = _client_kwargs("http://localhost:11434", None, None)
+    assert kwargs == {
+        "base_url": "http://localhost:11434/v1",
+        "api_key": "ollama",
+        "timeout": BATCH_TIMEOUT,
+        "max_retries": 0,
+    }
+    assert _client_kwargs("http://x", "key", None)["api_key"] == "key"
