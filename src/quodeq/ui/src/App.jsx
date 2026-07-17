@@ -125,11 +125,12 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onG
  * @param {{ settings: Object }} props
  * @returns {JSX.Element}
  */
-function SettingsCase({ settings, onOpenGradeFormula }) {
+function SettingsCase({ settings, onOpenGradeFormula, onSharedDisconnected }) {
   return (
     <SettingsPage
       theme={{ mode: settings.themeMode, family: settings.themeFamily, onApplyMode: settings.applyMode, onApplyFamily: settings.applyFamily }}
       onOpenGradeFormula={onOpenGradeFormula}
+      onSharedDisconnected={onSharedDisconnected}
     />
   );
 }
@@ -202,6 +203,42 @@ export function shouldBounceToEvaluate({ projectsLoaded, projectsCount, selected
  */
 export function shouldShowEvaluateButton(projectsCount, selectedSource) {
   return (projectsCount ?? 0) > 0 && selectedSource !== 'shared';
+}
+
+/**
+ * After the shared repository is disconnected in Settings, a currently
+ * 'shared' selection is left pointing at a project that no longer resolves
+ * anywhere in the app (its source has no config left) -- the user would be
+ * stranded on a broken view. Resolve what handleProjectChange should be
+ * called with to recover: the first local project if one exists, otherwise
+ * the app's own "no project selected" state (empty id, 'local' source, same
+ * as a fresh install / readStoredProject's default -- see useProjectState.js).
+ * Returns null when there's nothing to do (selection wasn't 'shared').
+ * Exported so the recovery contract is unit-testable without mounting the
+ * whole App.
+ */
+export function resolveSelectionAfterSharedDisconnect({ selectedSource, projects }) {
+  if (selectedSource !== 'shared') return null;
+  const first = (projects || [])[0];
+  const id = first ? (first.id || first.name || first) : '';
+  return { id, source: 'local' };
+}
+
+/**
+ * Whether the first-paint onboarding-wizard auto-open effect should fire.
+ * "Zero LOCAL projects" alone is not sufficient: a teammate who has
+ * connected to a shared repo and is viewing a shared project also reads as
+ * zero local projects (state.projects is always the local list per
+ * useProjectState), but they already have a real working view open -- the
+ * wizard must not cover it uninvited. Exported so this contract is
+ * unit-testable without mounting the whole App (which needs ~8 providers).
+ */
+export function shouldAutoOpenOnboardingWizard({ projectsLoaded, projectsCount, selectedSource, isEvaluating }) {
+  if (!projectsLoaded) return false;
+  if ((projectsCount ?? 0) > 0) return false;
+  if (selectedSource === 'shared') return false;
+  if (isEvaluating) return false;
+  return true;
 }
 
 function renderEvalPrincipleDetail(params, props) {
@@ -350,6 +387,7 @@ export const ROUTE_RENDERERS = {
         projects: props.navigation.projects,
         projectsLoaded: props.navigation.projectsLoaded,
         selectedProject: props.navigation.selectedProject,
+        selectedSource: props.navigation.selectedSource,
         loading: props.dashboardData.loading,
         isFetching: props.dashboardData.isFetching,
       }}
@@ -407,7 +445,20 @@ export const ROUTE_RENDERERS = {
       onGranularityChange={props.dashboardData.onGranularityChange}
     />
   ),
-  evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} preselectDims={params.preselectDims} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />,
+  evaluate: (params, props) => {
+    // Shared projects have no Evaluate flow (evaluation is local-only) --
+    // shouldShowEvaluateButton already keeps the TopBar's Evaluate button
+    // from ever linking here for a shared selection, but a stale nav-stack
+    // entry (e.g. the user was sitting on Evaluate and switched to a shared
+    // project) could still land the router on this route. Belt-and-braces:
+    // fall back to the Overview, the least-surprising landing spot, rather
+    // than rendering a dead-end evaluate screen with no source-appropriate
+    // action.
+    if (isSharedSource(props.navigation.selectedSource)) {
+      return ROUTE_RENDERERS.overview(params, props);
+    }
+    return <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} preselectDims={params.preselectDims} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />;
+  },
   file: (params, props) => (
     <FileDetailPage
       file={params.file}
@@ -441,9 +492,19 @@ export const ROUTE_RENDERERS = {
       }}
     />
   ),
-  settings: (params, props) => <SettingsCase settings={props.settings} onOpenGradeFormula={() => props.navigation.handleNavigate('grade-formula')} />,
+  settings: (params, props) => <SettingsCase
+    settings={props.settings}
+    onOpenGradeFormula={() => props.navigation.handleNavigate('grade-formula')}
+    onSharedDisconnected={() => {
+      const next = resolveSelectionAfterSharedDisconnect({
+        selectedSource: props.navigation.selectedSource,
+        projects: props.navigation.projects,
+      });
+      if (next) props.navigation.handleProjectChange(next.id, next.source);
+    }}
+  />,
   'grade-formula': (params, props) => <GradeFormulaPage navigation={props.navigation} />,
-  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} sourceTab={params.sourceTab || 'local'} actions={{ onSelect: (id, source) => { props.navigation.handleProjectChange(id, source); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup, onTabChange: (tab) => props.navigation.handleNavigate('projects', { sourceTab: tab }) }} />,
+  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} sourceTab={params.sourceTab || 'local'} actions={{ onSelect: (id, source) => { props.navigation.handleProjectChange(id, source); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup, onTabChange: (tab) => props.navigation.handleNavigate('projects', { sourceTab: tab }), onProjectsReload: props.navigation.loadProjects }} />,
   standards: () => <StandardsPage />,
   help: () => <HelpPage />,
 };
@@ -605,14 +666,26 @@ export default function App() {
     if (autoOpenedRef.current) return;
     if (!state.projectsLoaded) return;
     if (state.projects.length > 0) { autoOpenedRef.current = true; return; }
-    if (isEvaluating) return;
+    if (!shouldAutoOpenOnboardingWizard({
+      projectsLoaded: state.projectsLoaded,
+      projectsCount: state.projects.length,
+      selectedSource: state.selectedSource,
+      isEvaluating,
+    })) {
+      // Blocked for a transient reason (shared selection, an evaluation in
+      // flight) -- do NOT mark autoOpenedRef: once the block lifts (source
+      // switches back to local, the evaluation finishes) while local
+      // projects are still zero, the decision must be reconsidered rather
+      // than permanently skipped.
+      return;
+    }
     let skipped = false;
     try { skipped = localStorage.getItem('quodeq_onboarding_skipped') === 'true'; } catch { /* ignore */ }
     autoOpenedRef.current = true;
     if (!skipped) {
       setWizardEntry({ startStep: 'welcome', isFirstProject: true });
     }
-  }, [state.projectsLoaded, state.projects.length, isEvaluating]);
+  }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource]);
 
   // Project-data tabs (overview/violations/map/history) only make sense once
   // the selected project has at least one completed evaluation run. Until
@@ -690,6 +763,7 @@ export default function App() {
       selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
       projectsLoaded: state.projectsLoaded,
       dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
+      sharedProjectInfo: state.sharedProjectInfo,
       availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
       selectedDisplayName: state.selectedDisplayName,
       granularity: state.granularity, onGranularityChange: state.onGranularityChange,

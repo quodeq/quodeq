@@ -19,7 +19,7 @@ const _SETTINGS_PHRASES = [
   'code quality compass',
 ];
 
-export default function SettingsPage({ theme, onOpenGradeFormula }) {
+export default function SettingsPage({ theme, onOpenGradeFormula, onSharedDisconnected }) {
   const { mode: themeMode, family: themeFamily, onApplyMode, onApplyFamily } = theme;
   const [appVersion, setAppVersion] = useState(null);
   const [settingsPhrase, setSettingsPhrase] = useState('');
@@ -42,7 +42,7 @@ export default function SettingsPage({ theme, onOpenGradeFormula }) {
         <AssistantProviderTabs providerConfigs={providerConfigs} />
         <TerminalSection />
         <ServerSection />
-        <SharedRepoSection />
+        <SharedRepoSection onDisconnected={onSharedDisconnected} />
         <section className="panel settings-section">
           <div className="panel-header">
             <SectionLabel marker="▶">Grade formula</SectionLabel>

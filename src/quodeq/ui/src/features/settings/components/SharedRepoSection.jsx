@@ -4,7 +4,7 @@ import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
 
-export default function SharedRepoSection() {
+export default function SharedRepoSection({ onDisconnected }) {
   const { getSharedStatus, connectShared, disconnectShared } = useApi();
 
   const [newUrl, setNewUrl] = useState('');
@@ -64,6 +64,11 @@ export default function SharedRepoSection() {
         setNewUrl('');
         setConfirming(false);
         await refetchStatus();
+        // A currently-'shared' project selection has nowhere left to
+        // resolve once the repo is disconnected -- let the app reset it
+        // (back to a local project, or no selection) rather than stranding
+        // the user on a broken view.
+        onDisconnected?.();
       } catch (err) {
         const errorMsg = err?.message || 'failed to disconnect from repository';
         setError(errorMsg);

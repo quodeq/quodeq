@@ -474,13 +474,24 @@ function ConnectSharedForm({ connecting, connectError, onConnect }) {
 // Mirrors CardFooter's inline delete-confirm idiom for the 409 collision
 // case instead of the global chooseDialog modal used by manual import.
 
-function OnlineCardFooter({ projectId, onPull, onRefresh, pullConflict, onConfirmCopy, onCancelConflict }) {
+function OnlineCardFooter({ projectId, onPull, onRefresh, pullConflict, onConfirmCopy, onCancelConflict, pulled }) {
   if (pullConflict) {
     return (
       <div className="project-card-actions">
         <span className="project-delete-confirm-label">already exists.</span>
         <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={(e) => { e.stopPropagation(); onConfirmCopy(projectId); }}>copy</button>
         <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={(e) => { e.stopPropagation(); onCancelConflict(projectId); }}>cancel</button>
+      </div>
+    );
+  }
+  // Inline confirmation replacing the pull/refresh buttons for this one card,
+  // for the lifetime of the OnlineProjectsTab mount -- it only mounts while
+  // the online sub-tab is active (see the comment above OnlineProjectsTab),
+  // so switching to the local tab and back naturally clears it.
+  if (pulled) {
+    return (
+      <div className="project-card-actions">
+        <span className="project-delete-confirm-label">pulled to local</span>
       </div>
     );
   }
@@ -497,18 +508,27 @@ function OnlineCardFooter({ projectId, onPull, onRefresh, pullConflict, onConfir
 // useSharedProjects()'s refresh-on-entry mount effect fires exactly when
 // the user actually walks into this tab, not on every ProjectsPage render.
 
-function OnlineProjectsTab({ onSelect }) {
+function OnlineProjectsTab({ onSelect, onProjectsReload }) {
   const {
     configured, url, projects, lastSynced, stale,
     loading, error, connecting, connectError, connect,
     refreshing, refresh, pull,
   } = useSharedProjects();
   const [pullConflictId, setPullConflictId] = useState(null);
+  // Cards the user has successfully pulled this mount -- shows "pulled to
+  // local" in place of the pull/refresh buttons until the tab is switched
+  // (see OnlineCardFooter's `pulled` branch).
+  const [pulledIds, setPulledIds] = useState(() => new Set());
 
   async function handlePull(id) {
     try {
       await pull(id);
       setPullConflictId(null);
+      setPulledIds((prev) => new Set(prev).add(id));
+      // Without this, a project pulled here never appears on the local tab
+      // until some unrelated action happens to reload the project list --
+      // the user has no way to tell the pull actually landed a local copy.
+      await onProjectsReload?.();
     } catch (err) {
       if (err?.status === 409) {
         setPullConflictId(id);
@@ -521,6 +541,8 @@ function OnlineProjectsTab({ onSelect }) {
   async function handleConfirmCopy(id) {
     try {
       await pull(id, 'copy');
+      setPulledIds((prev) => new Set(prev).add(id));
+      await onProjectsReload?.();
     } catch (err) {
       alert(`Failed to pull project: ${err?.message || 'unknown error'}`);
     } finally {
@@ -584,6 +606,7 @@ function OnlineProjectsTab({ onSelect }) {
                       pullConflict={pullConflictId === id}
                       onConfirmCopy={handleConfirmCopy}
                       onCancelConflict={() => setPullConflictId(null)}
+                      pulled={pulledIds.has(id)}
                     />
                   ),
                 }}
@@ -597,7 +620,7 @@ function OnlineProjectsTab({ onSelect }) {
 }
 
 export default function ProjectsPage({ projects = [], selectedProject, isEvaluating = false, sourceTab = 'local', actions }) {
-  const { onSelect, onDelete, onExport, onRelocate, onAddProject, onImportProject, onResumeSetup, onTabChange } = actions;
+  const { onSelect, onDelete, onExport, onRelocate, onAddProject, onImportProject, onResumeSetup, onTabChange, onProjectsReload } = actions;
   const [confirming, setConfirming] = useState(null);
   const relocateActions = useRelocateDialog(onRelocate);
   const activeTab = sourceTab === 'online' ? 'online' : 'local';
@@ -680,7 +703,7 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
       </div>
       <ProjectsTabs activeTab={activeTab} onTabChange={onTabChange} />
       {activeTab === 'online' ? (
-        <OnlineProjectsTab onSelect={onSelect} />
+        <OnlineProjectsTab onSelect={onSelect} onProjectsReload={onProjectsReload} />
       ) : projects.length === 0 ? (
         <EmptyProjectsCTA onAddProject={onAddProject} onImportProject={onImportProject} isEvaluating={isEvaluating} />
       ) : (

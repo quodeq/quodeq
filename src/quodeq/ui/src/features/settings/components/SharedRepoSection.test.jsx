@@ -15,11 +15,11 @@ function makeFakeApi(overrides = {}) {
   };
 }
 
-function renderWithApi(fakeApi) {
+function renderWithApi(fakeApi, props = {}) {
   const QC = withQueryClient();
   return render(
     <QC>
-      <ApiProvider value={fakeApi}><SharedRepoSection /></ApiProvider>
+      <ApiProvider value={fakeApi}><SharedRepoSection {...props} /></ApiProvider>
     </QC>
   );
 }
@@ -205,5 +205,47 @@ describe('SharedRepoSection', () => {
     await user.click(cancelButton);
 
     expect(fakeApi.disconnectShared).not.toHaveBeenCalled();
+  });
+
+  // Important 4 (final whole-branch review): a currently-'shared' selection
+  // has nowhere left to resolve once the repo is disconnected. SharedRepoSection
+  // doesn't own project-selection state itself -- it calls an onDisconnected
+  // callback so App.jsx can reset the selection at the seam that actually
+  // knows about it.
+  it('calls onDisconnected after a successful disconnect', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
+      disconnectShared: vi.fn(async () => ({ configured: false })),
+    });
+    const onDisconnected = vi.fn();
+    const user = userEvent.setup();
+    renderWithApi(fakeApi, { onDisconnected });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /disconnect/i })).toBeTruthy();
+    });
+    await user.click(screen.getByRole('button', { name: /disconnect/i }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /yes/i })).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: /yes/i }));
+
+    await waitFor(() => expect(onDisconnected).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not call onDisconnected when disconnect is cancelled', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
+    });
+    const onDisconnected = vi.fn();
+    const user = userEvent.setup();
+    renderWithApi(fakeApi, { onDisconnected });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /disconnect/i })).toBeTruthy();
+    });
+    await user.click(screen.getByRole('button', { name: /disconnect/i }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /no/i })).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: /no/i }));
+
+    expect(onDisconnected).not.toHaveBeenCalled();
   });
 });

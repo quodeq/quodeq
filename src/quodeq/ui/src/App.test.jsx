@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton } from './App.jsx';
+import {
+  buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
+  resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard,
+} from './App.jsx';
 
 // Pins the contract that App.jsx's ``buildEvalPrincipal`` threads the
 // dimension's run id into ``evalPrincipal.runId``. Without it, the dismiss
@@ -161,5 +164,86 @@ describe('Assistant drawer close on shared project switch', () => {
 
   it('isSharedSource returns false for local selections', () => {
     expect(isSharedSource('local')).toBe(false);
+  });
+});
+
+// Final whole-branch review, Critical 1 (belt-and-braces): there is no
+// Evaluate flow for shared projects. shouldShowEvaluateButton already keeps
+// the TopBar from linking here, but a stale nav-stack entry could still land
+// the router on the 'evaluate' route with a shared selection -- it must fall
+// back to the Overview rather than rendering the dead-end evaluate screen.
+describe('evaluate route: shared-source fallback (Critical 1 belt-and-braces)', () => {
+  function baseProps(selectedSource) {
+    const projects = [{ id: 'proj1', name: 'proj1' }];
+    return {
+      navigation: {
+        selectedProject: 'proj1', selectedSource, projects,
+        handleNavigate: vi.fn(), handleRunSelect: vi.fn(), loadProjects: vi.fn(),
+      },
+      dashboardData: { selectedProject: 'proj1', selectedSource, projects, projectsLoaded: true },
+      serverHealth: { connected: true, setConnected: vi.fn() },
+      evaluation: {},
+    };
+  }
+
+  it('renders the Evaluate screen for a local selection', () => {
+    const el = ROUTE_RENDERERS.evaluate({}, baseProps('local'));
+    // EvaluateCase's own prop shape -- distinct from what the overview route renders.
+    expect(el.props).toHaveProperty('onGoToProjects');
+    expect(el.props).toHaveProperty('selectedProject', 'proj1');
+  });
+
+  it('falls back to exactly what the overview route renders for a shared selection', () => {
+    const props = baseProps('shared');
+    const evalEl = ROUTE_RENDERERS.evaluate({}, props);
+    const overviewEl = ROUTE_RENDERERS.overview({}, props);
+    expect(evalEl.type).toBe(overviewEl.type);
+    expect(evalEl.props).not.toHaveProperty('onGoToProjects');
+  });
+});
+
+// Important 3: the onboarding wizard must not auto-open over a teammate's
+// working shared-project view just because state.projects (the LOCAL list)
+// is empty.
+describe('shouldAutoOpenOnboardingWizard', () => {
+  const base = { projectsLoaded: true, projectsCount: 0, selectedSource: 'local', isEvaluating: false };
+
+  it('opens for a fresh local install (no projects, local source, not evaluating)', () => {
+    expect(shouldAutoOpenOnboardingWizard(base)).toBe(true);
+  });
+
+  it('does not open for a shared selection even with zero local projects', () => {
+    expect(shouldAutoOpenOnboardingWizard({ ...base, selectedSource: 'shared' })).toBe(false);
+  });
+
+  it('does not open before projects have loaded', () => {
+    expect(shouldAutoOpenOnboardingWizard({ ...base, projectsLoaded: false })).toBe(false);
+  });
+
+  it('does not open once local projects exist', () => {
+    expect(shouldAutoOpenOnboardingWizard({ ...base, projectsCount: 3 })).toBe(false);
+  });
+
+  it('does not open while an evaluation is running', () => {
+    expect(shouldAutoOpenOnboardingWizard({ ...base, isEvaluating: true })).toBe(false);
+  });
+});
+
+// Important 4: disconnecting the shared repo in Settings must not strand a
+// 'shared' selection pointing at a config that no longer exists.
+describe('resolveSelectionAfterSharedDisconnect', () => {
+  it('does nothing when the current selection is not shared', () => {
+    expect(resolveSelectionAfterSharedDisconnect({ selectedSource: 'local', projects: [{ id: 'p1' }] })).toBeNull();
+  });
+
+  it('resets to the first local project when one exists', () => {
+    const projects = [{ id: 'p1', name: 'p1' }, { id: 'p2', name: 'p2' }];
+    expect(resolveSelectionAfterSharedDisconnect({ selectedSource: 'shared', projects }))
+      .toEqual({ id: 'p1', source: 'local' });
+  });
+
+  it('clears the selection to the app\'s no-project state when there are no local projects', () => {
+    expect(resolveSelectionAfterSharedDisconnect({ selectedSource: 'shared', projects: [] }))
+      .toEqual({ id: '', source: 'local' });
   });
 });

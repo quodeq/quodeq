@@ -258,6 +258,56 @@ describe('ProjectsPage — online tab, configured', () => {
 
     await waitFor(() => expect(pullSharedProject).toHaveBeenLastCalledWith('shared-1', 'copy'));
   });
+
+  // Important 2 (final whole-branch review): a plain (non-conflicting) pull
+  // must refresh the LOCAL project list (so the local tab is current) and
+  // give the user visible feedback that it landed, not silently succeed with
+  // no observable change until some unrelated action reloads the list.
+  it('a plain pull calls onProjectsReload and shows "pulled to local" on that card', async () => {
+    const user = userEvent.setup();
+    const pullSharedProject = vi.fn(async (id) => ({ imported: true, projectId: id }));
+    const onProjectsReload = vi.fn(async () => {});
+    const fakeApi = configuredApi({ pullSharedProject });
+    renderWithApi(
+      <ProjectsPage projects={[]} sourceTab="online" actions={{ onProjectsReload }} />,
+      fakeApi,
+    );
+
+    await waitFor(() => expect(screen.getByText('demo-repo')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'pull local copy' }));
+
+    await waitFor(() => expect(pullSharedProject).toHaveBeenCalledWith('shared-1', undefined));
+    await waitFor(() => expect(onProjectsReload).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('pulled to local')).toBeInTheDocument();
+    // The pull/refresh buttons for that card are replaced by the confirmation.
+    expect(screen.queryByRole('button', { name: 'pull local copy' })).not.toBeInTheDocument();
+  });
+
+  it('the copy-retry path (409 then copy) also calls onProjectsReload and shows "pulled to local"', async () => {
+    const user = userEvent.setup();
+    const pullSharedProject = vi.fn(async (id, action) => {
+      if (!action) {
+        const err = new Error('Project already exists');
+        err.status = 409;
+        throw err;
+      }
+      return { imported: true, projectId: id };
+    });
+    const onProjectsReload = vi.fn(async () => {});
+    const fakeApi = configuredApi({ pullSharedProject });
+    renderWithApi(
+      <ProjectsPage projects={[]} sourceTab="online" actions={{ onProjectsReload }} />,
+      fakeApi,
+    );
+
+    await waitFor(() => expect(screen.getByText('demo-repo')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'pull local copy' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'copy' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'copy' }));
+
+    await waitFor(() => expect(onProjectsReload).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('pulled to local')).toBeInTheDocument();
+  });
 });
 
 // Task 20: publish action on LOCAL cards.
