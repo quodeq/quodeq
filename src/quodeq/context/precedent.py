@@ -299,7 +299,8 @@ def load_precedent_corpus(
                 try:
                     deadline = time.monotonic() + _BACKFILL_BUDGET_S
                     while time.monotonic() < deadline:
-                        missing = [fp for fp in texts if fp not in stored_fingerprints(conn)]
+                        stored = stored_fingerprints(conn)
+                        missing = [fp for fp in texts if fp not in stored]
                         if not missing:
                             break
                         chunk = missing[:_BACKFILL_CHUNK]

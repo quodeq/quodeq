@@ -117,7 +117,7 @@ def test_loader_model_unavailable_returns_none(tmp_path: Path, monkeypatch) -> N
     ) is None
 
 
-def test_loader_embed_failure_degrades_to_partial(tmp_path: Path, monkeypatch) -> None:
+def test_loader_embed_failure_with_nothing_stored_degrades_to_none(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("QUODEQ_SEMANTIC_PRECEDENTS", "1")
     project_dir = tmp_path / "project"
     project_dir.mkdir()
@@ -134,3 +134,47 @@ def test_loader_embed_failure_degrades_to_partial(tmp_path: Path, monkeypatch) -
         project_dir, run_dir,
         embed_fn=broken_embed, availability_fn=lambda m, b: True,
     ) is None
+
+
+def test_loader_embed_failure_partial_corpus(tmp_path: Path, monkeypatch) -> None:
+    """Seed two findings, embed first chunk successfully, fail on second chunk.
+
+    Verifies the loader returns a partial corpus with at least the first
+    dismissed finding's vector, instead of abandoning the whole tier.
+    """
+    monkeypatch.setenv("QUODEQ_SEMANTIC_PRECEDENTS", "1")
+    monkeypatch.setattr("quodeq.context.precedent._BACKFILL_CHUNK", 1)
+
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    run_dir = seed_dismissed(
+        project_dir, "r1",
+        req="S-CON-1", snippet="password = 'secret'", file="auth.py", line=42,
+    )
+    seed_dismissed(
+        project_dir, run_dir,
+        req="S-CON-2", snippet="api_key = None", file="db.py", line=7,
+    )
+
+    call_count = [0]
+
+    def stateful_embed(texts, **kwargs):
+        """Succeeds on first call, raises on subsequent calls."""
+        call_count[0] += 1
+        if call_count[0] > 1:
+            raise RuntimeError("server 500")
+        # Return vectors for the requested texts.
+        return [[1.0, 0.0] for _ in texts]
+
+    corpus = load_precedent_corpus(
+        project_dir, run_dir,
+        embed_fn=stateful_embed, availability_fn=lambda m, b: True,
+    )
+
+    # Corpus is not None: partial is better than nothing.
+    assert corpus is not None
+    # Patch the corpus's embed to succeed for matching (backfill failed partway).
+    corpus._embed = lambda texts: [[1.0, 0.0] for _ in texts]
+    # We can match against the first finding (which was embedded before failure).
+    score = corpus.match(precedent_text("S-CON-1", "password = 'secret'"))
+    assert score is not None and score == pytest.approx(1.0)
