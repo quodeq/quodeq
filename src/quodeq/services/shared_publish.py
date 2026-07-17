@@ -8,7 +8,10 @@ Pure file operations, no git. Invariants (spec):
 from __future__ import annotations
 
 import json
+import logging
 import shutil
+import threading
+import time
 from pathlib import Path
 
 from quodeq.data.actions_log import ACTIONS_LOG_FILENAME
@@ -22,6 +25,8 @@ from quodeq.services.shared_repo import (
 )
 from quodeq.shared.dimensions_state import FILENAME as DIMENSIONS_FILENAME
 from quodeq.shared.run_status import STATUS_FILENAME, UnsupportedSchemaError, read_status
+
+logger = logging.getLogger(__name__)
 
 _RUN_FILES = (STATUS_FILENAME, DIMENSIONS_FILENAME, "events.jsonl")
 _EVIDENCE_DIR = "evidence"
@@ -213,3 +218,48 @@ def _local_branch_name(repo: Path) -> str:
     ok, out = run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=repo)
     name = out.strip()
     return name if ok and name and name != "HEAD" else "main"
+
+
+_STATUS_LOCK = threading.Lock()
+_STATUS: dict = {
+    "state": "idle",
+    "project": None,
+    "runs": None,
+    "error": None,
+    "finished_at": None,
+}
+
+
+def get_publish_status() -> dict:
+    with _STATUS_LOCK:
+        return dict(_STATUS)
+
+
+def _run_publish(project_id: str, url: str, evaluations_root: Path) -> None:
+    try:
+        count = publish_project(project_id, url, evaluations_root=evaluations_root)
+        with _STATUS_LOCK:
+            _STATUS.update(
+                state="done", runs=count, error=None, finished_at=time.time()
+            )
+    except PublishError as exc:
+        with _STATUS_LOCK:
+            _STATUS.update(state="error", error=str(exc), finished_at=time.time())
+    except Exception as exc:  # never leave the job stuck in "running"
+        logger.exception("unexpected publish failure")
+        with _STATUS_LOCK:
+            _STATUS.update(state="error", error=str(exc), finished_at=time.time())
+
+
+def start_publish(project_id: str, url: str, *, evaluations_root: Path) -> bool:
+    with _STATUS_LOCK:
+        if _STATUS["state"] == "running":
+            return False
+        _STATUS.update(
+            state="running", project=project_id, runs=None, error=None, finished_at=None
+        )
+    thread = threading.Thread(
+        target=_run_publish, args=(project_id, url, evaluations_root), daemon=True
+    )
+    thread.start()
+    return True
