@@ -39,7 +39,7 @@ function StandardsListView({ grouped, loading, error, actions, customizedCounts 
   );
 }
 
-export default function StandardsPage() {
+export default function StandardsPage({ onRescan }) {
   const { grouped, loading, error, refresh, handleDelete, handleDuplicate } = useStandards();
   const { isVisible, toggle, add: addVisible, remove: removeVisible } = useVisibleStandards();
   const { selectedProject } = useAppState();
@@ -56,7 +56,7 @@ export default function StandardsPage() {
   } = useStandardsPageActions(refresh, handleDelete, addVisible, removeVisible);
 
   if (view.mode === 'edit' || view.mode === 'new') {
-    return <StandardEditor standardId={view.standardId} isNew={view.mode === 'new'} onBack={handleEditorBack} onSaved={handleSaved} />;
+    return <StandardEditor standardId={view.standardId} isNew={view.mode === 'new'} onBack={handleEditorBack} onSaved={handleSaved} onRescan={onRescan} />;
   }
 
   const activeCount = grouped

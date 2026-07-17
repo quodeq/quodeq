@@ -245,3 +245,105 @@ def test_put_malformed_spec_missing_bounds_does_not_500(tmp_path: Path, monkeypa
         )
         assert resp.status_code in (200, 400)  # must NOT be 500
         assert resp.status_code != 500
+
+
+def test_put_shape_invalid_param_spec_does_not_500(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """A compiled dimension file whose params spec is a bare value (not a
+    dict) must not crash _changed_dimensions with AttributeError. Same
+    degrade-and-skip contract as an unreadable/unparseable compiled file --
+    mirrors test_put_malformed_spec_missing_bounds_does_not_500's arrangement,
+    but the shape defect lives in the compiled dir, not an evaluator spec."""
+    compiled_dir = tmp_path / "compiled"
+    compiled_dir.mkdir()
+
+    dims = tmp_path / "dimensions.json"
+    dims.write_text(json.dumps({"applies": []}))
+    evaluators = tmp_path / "evaluators"
+    evaluators.mkdir()
+
+    # Shape-invalid params block: a spec must be a dict (e.g. {"default": ...}),
+    # not a bare int. effective_params() would do spec.get("default") and
+    # raise AttributeError.
+    (compiled_dir / "broken.json").write_text(json.dumps({
+        "id": "broken",
+        "principles": [{"name": "P", "requirements": [{
+            "id": "BROKEN-1",
+            "text": "At most {max_lines} lines",
+            "params": {"max_lines": 5},
+        }]}],
+    }))
+
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+
+    app = create_app(test_config={
+        "TESTING": True,
+        "STANDARDS_EVALUATORS_DIR": str(evaluators),
+        "STANDARDS_COMPILED_DIR": str(compiled_dir),
+        "STANDARDS_DIMENSIONS_FILE": str(dims),
+    })
+
+    import quodeq.api.standards_overrides_routes as _mod
+    monkeypatch.setattr(_mod, "resolve_repo_root", lambda pid: str(project_root))
+
+    with app.test_client() as c:
+        resp = c.put(OVERRIDES_URL, json={"overrides": {}}, headers=_LOCALHOST)
+        assert resp.status_code == 200
+        assert resp.status_code != 500
+
+
+# ---------------------------------------------------------------------------
+# Task 6: dryRun impact preview and changedDimensions
+# ---------------------------------------------------------------------------
+
+def test_dry_run_reports_changed_dimension_without_writing(client, project_root: Path):
+    resp = client.put(OVERRIDES_URL + "?dryRun=true",
+                      json={"overrides": {"M-ANA-2": {"max_lines": 60}}}, headers=_LOCALHOST)
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["changedDimensions"] == ["maintainability"]
+    assert not (project_root / ".quodeq" / "standards-overrides.json").exists()
+
+
+def test_dry_run_override_equal_to_default_reports_no_change(client, project_root: Path):
+    resp = client.put(OVERRIDES_URL + "?dryRun=true",
+                      json={"overrides": {"M-ANA-2": {"max_lines": 50}}}, headers=_LOCALHOST)
+    assert resp.status_code == 200
+    assert resp.get_json()["changedDimensions"] == []
+
+
+def test_dry_run_validates_like_real_put(client):
+    resp = client.put(OVERRIDES_URL + "?dryRun=true",
+                      json={"overrides": {"M-ANA-2": {"max_lines": 9}}}, headers=_LOCALHOST)
+    assert resp.status_code == 400
+
+
+def test_real_put_returns_changed_dimensions_and_writes(client, project_root: Path):
+    resp = client.put(OVERRIDES_URL,
+                      json={"overrides": {"M-ANA-2": {"max_lines": 60}}}, headers=_LOCALHOST)
+    assert resp.status_code == 200
+    assert resp.get_json()["changedDimensions"] == ["maintainability"]
+    assert (project_root / ".quodeq" / "standards-overrides.json").exists()
+
+
+def test_clearing_overrides_reports_reverted_dimension(client, project_root: Path):
+    client.put(OVERRIDES_URL, json={"overrides": {"M-ANA-2": {"max_lines": 60}}},
+               headers=_LOCALHOST)
+    resp = client.put(OVERRIDES_URL, json={"overrides": {}}, headers=_LOCALHOST)
+    assert resp.status_code == 200
+    assert resp.get_json()["changedDimensions"] == ["maintainability"]
+    assert not (project_root / ".quodeq" / "standards-overrides.json").exists()
+
+
+def test_evaluator_only_override_not_in_changed_dimensions(client_with_custom, project_root: Path):
+    """Evaluator-dir-only standards never shift cache keys, so overrides for them
+    never appear in changedDimensions, matching dimension_params_state's scope."""
+    resp = client_with_custom.put(
+        OVERRIDES_URL,
+        json={"overrides": {"CUST-1": {"max_items": 50}}},
+        headers=_LOCALHOST,
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["changedDimensions"] == []
+    saved = json.loads((project_root / ".quodeq" / "standards-overrides.json").read_text())
+    assert saved["overrides"]["CUST-1"] == {"max_items": 50}

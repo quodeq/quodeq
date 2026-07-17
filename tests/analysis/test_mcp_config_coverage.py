@@ -149,6 +149,42 @@ class TestCreateMcpConfig:
         finally:
             config_path.unlink(missing_ok=True)
 
+    def test_includes_standards_dir_from_agent_params(self, tmp_path):
+        """Final-review fix: --standards-dir is emitted from
+        _AgentParams.standards_dir -- the standards ROOT, distinct from
+        --compiled-dir (already .../compiled). Regression coverage for the
+        bug where findings_server.py received compiled_dir where it expected
+        the root, doubling the "compiled" path segment and silently missing
+        the params fingerprint.
+        """
+        jsonl = tmp_path / "findings.jsonl"
+        jsonl.touch()
+        standards_dir = tmp_path / "standards"
+        standards_dir.mkdir()
+        params = _AgentParams(standards_dir=standards_dir)
+        config_path = _create_mcp_config(jsonl, agent_params=params)
+        try:
+            data = json.loads(config_path.read_text())
+            args = data["mcpServers"]["findings"]["args"]
+            assert "--standards-dir" in args
+            assert str(standards_dir.resolve()) in args
+        finally:
+            config_path.unlink(missing_ok=True)
+
+    def test_standards_dir_omitted_by_default(self, tmp_path):
+        """No _AgentParams.standards_dir => --standards-dir is omitted
+        entirely (back-compat: cache writer degrades to no params fingerprint,
+        not a crash)."""
+        jsonl = tmp_path / "findings.jsonl"
+        jsonl.touch()
+        config_path = _create_mcp_config(jsonl, agent_params=None)
+        try:
+            data = json.loads(config_path.read_text())
+            args = data["mcpServers"]["findings"]["args"]
+            assert "--standards-dir" not in args
+        finally:
+            config_path.unlink(missing_ok=True)
+
     def test_cache_flag_fallbacks(self, tmp_path):
         """No _AgentParams overrides => model_id='unknown', language=''."""
         jsonl = tmp_path / "findings.jsonl"

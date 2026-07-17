@@ -4,6 +4,7 @@ import { useStandardsOverrides } from '../hooks/useStandardsOverrides.js';
 import { useAppState } from '../../../hooks/useAppState.js';
 import StandardTree from './StandardTree.jsx';
 import StandardDetail from './StandardDetail.jsx';
+import ThresholdImpactDialog from './ThresholdImpactDialog.jsx';
 import { STANDARD_TYPES } from '../hooks/useStandards.js';
 import { TermHeader } from '../../../components/terminal/index.js';
 
@@ -124,7 +125,7 @@ function buildTreeActions({ addPrinciple, removePrinciple, addRequirement, remov
   return { onAddPrinciple: addPrinciple, onRemovePrinciple: removePrinciple, onAddRequirement: addRequirement, onRemoveRequirement: removeRequirement, onSelectNode: setSelectedNode, editable };
 }
 
-export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
+export default function StandardEditor({ standardId, isNew, onBack, onSaved, onRescan }) {
   const {
     standard, loading, error, dirty, editable,
     selectedNode, setSelectedNode,
@@ -133,9 +134,10 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
   } = useStandardDetail(standardId, isNew);
 
   const { selectedProject } = useAppState();
-  const { overrides: savedOverrides, save: saveOverrides } = useStandardsOverrides(selectedProject);
+  const { overrides: savedOverrides, save: saveOverrides, preview: previewOverrides } = useStandardsOverrides(selectedProject);
   const [draftOverrides, setDraftOverrides] = useState(null);
   const [overridesSaveError, setOverridesSaveError] = useState(null);
+  const [pendingImpact, setPendingImpact] = useState(null); // string[] of changed dimensions while the dialog is open
   const overrides = draftOverrides ?? savedOverrides;
   const overridesDirty = draftOverrides !== null;
 
@@ -162,7 +164,8 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
 
   const { width: treeWidth, onMouseDown: onDividerMouseDown } = useResizable(DEFAULT_TREE_WIDTH);
 
-  const handleSave = async () => {
+  const commitSave = async (rescanDims = null) => {
+    setPendingImpact(null);
     setOverridesSaveError(null);
     try {
       if (editable) await save();
@@ -170,9 +173,23 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
         await saveOverrides(overrides);
         setDraftOverrides(null);
       }
+      if (rescanDims?.length && onRescan) onRescan(rescanDims);
       if (onSaved) onSaved(standard?.id);
     } catch (err) {
       // Keep the draft so the user can retry; surface the error inline.
+      setOverridesSaveError(err?.message || 'Failed to save overrides');
+    }
+  };
+
+  const handleSave = async () => {
+    setOverridesSaveError(null);
+    if (!overridesDirty) { await commitSave(); return; }
+    try {
+      const impact = await previewOverrides(overrides);
+      const changed = impact?.changedDimensions || [];
+      if (changed.length === 0) { await commitSave(); return; }
+      setPendingImpact(changed);
+    } catch (err) {
       setOverridesSaveError(err?.message || 'Failed to save overrides');
     }
   };
@@ -199,6 +216,14 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
         treeWidth={treeWidth}
         onDividerMouseDown={onDividerMouseDown}
       />
+      {pendingImpact && (
+        <ThresholdImpactDialog
+          changedDimensions={pendingImpact}
+          onCancel={() => setPendingImpact(null)}
+          onSave={() => commitSave()}
+          onSaveAndRescan={onRescan ? () => commitSave(pendingImpact) : undefined}
+        />
+      )}
     </div>
   );
 }
