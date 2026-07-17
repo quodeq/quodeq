@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { renderHook } from '@testing-library/react';
-import { useAccumulatedComputations } from './AccumulatedOverviewPanel.jsx';
+import { renderHook, render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import { useAccumulatedComputations, AccumulatedHeroSection } from './AccumulatedOverviewPanel.jsx';
 
 // Newest-first, one run per day, maintainability scored in every run.
 const TREND = [
@@ -64,5 +65,35 @@ describe('useAccumulatedComputations selectedDayDimNames (multi-run day)', () =>
     expect(selectedDayDimNames.has('security')).toBe(true);
     expect(selectedDayDimNames.has('maintainability')).toBe(true);
     expect(selectedDayDimNames.has('reliability')).toBe(false);
+  });
+});
+
+// Task 19 — the Overview page header shows a "shared · read-only" chip
+// (+ publisher sub line where available) for shared projects, and nothing
+// extra for local ones.
+describe('AccumulatedHeroSection shared read-only chip', () => {
+  const baseProps = {
+    accumulated: { summary: { numericAverage: 7 } },
+    scoreDelta: null,
+    lastDate: null,
+    accumulatedDimensions: [],
+    projectName: 'proj1',
+    projectInfo: null,
+    onCardNavigate: undefined,
+  };
+
+  it('shows the chip for a shared project', () => {
+    render(<AccumulatedHeroSection {...baseProps} selectedSource="shared" />);
+    expect(screen.getByText('shared · read-only')).toBeInTheDocument();
+  });
+
+  it('omits the chip for a local project', () => {
+    render(<AccumulatedHeroSection {...baseProps} selectedSource="local" />);
+    expect(screen.queryByText('shared · read-only')).toBeNull();
+  });
+
+  it('shows the publisher sub line when projectInfo.publishedBy is available', () => {
+    render(<AccumulatedHeroSection {...baseProps} selectedSource="shared" projectInfo={{ publishedBy: 'alice' }} />);
+    expect(screen.getByText('published by alice')).toBeInTheDocument();
   });
 });

@@ -3051,6 +3051,31 @@
   text-transform: lowercase;
 }
 
+/* "shared · read-only" chip on a shared project's page header (Overview).
+   Same shape as .badge-setup-incomplete but in the cyan/accent-info family
+   so it doesn't read as a warning — a shared project isn't a problem state,
+   just a different (read-only) one. */
+.badge-shared-readonly-group {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-left: 4px;
+}
+.badge-shared-readonly {
+  display: inline-block;
+  font-family: var(--term-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  background: color-mix(in srgb, var(--color-info, #22d3ee) 14%, transparent);
+  color: var(--color-info, #22d3ee);
+  border: 1px solid color-mix(in srgb, var(--color-info, #22d3ee) 40%, transparent);
+  border-radius: var(--term-radius, 2px);
+  padding: 2px 8px;
+}
+.badge-shared-readonly-pub {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
 /* "Complete setup" CTA card on the project view for legacy online projects.
    Same warning-tinted palette as .badge-setup-incomplete; a banner above
    the dashboard panels nudges users to clone the repo locally. */

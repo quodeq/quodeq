@@ -186,6 +186,37 @@ export function sharedGetViolations(projectId, runId) {
   );
 }
 
+// ── Findings (read-only mirrors) ────────────────────────────────────────────
+// Shared projects are read-only in the app — there are no shared mutation
+// routes (dismiss/restore/delete/unverify), only these list mirrors so the
+// dismissed/verified sub-tabs can display a shared project's existing state.
+
+// Mirrors the local listDismissedFindings' server-side hard cap (see
+// api/findings.js DISMISSED_REQUEST_LIMIT) so a shared project's dismissed
+// list isn't silently truncated to the API's default page size.
+const SHARED_DISMISSED_REQUEST_LIMIT = 5000;
+
+/**
+ * List dismissed findings for a shared project.
+ * @param {string} projectId
+ * @returns {Promise<Array>} Dismissed findings array (same item shape as listDismissedFindings)
+ */
+export function sharedListDismissedFindings(projectId) {
+  return request(
+    `/shared/projects/${encodeURIComponent(projectId)}/findings/dismissed`
+    + `?limit=${SHARED_DISMISSED_REQUEST_LIMIT}`
+  );
+}
+
+/**
+ * List verified-badge entries for a shared project.
+ * @param {string} projectId
+ * @returns {Promise<Array>} Entries: { req, file, line, note, verifiedAt }
+ */
+export function sharedListVerifiedFindings(projectId) {
+  return request(`/shared/projects/${encodeURIComponent(projectId)}/findings/verified`);
+}
+
 // ── Publish & Pull ──────────────────────────────────────────────────────────
 
 /**

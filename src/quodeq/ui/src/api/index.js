@@ -25,6 +25,7 @@ export {
   sharedListProjects, sharedGetProjectInfo, sharedGetRuns,
   sharedGetDashboard, sharedGetAccumulated, sharedGetProjectScores,
   sharedGetRunScores, sharedGetDimensionEval, sharedGetViolations,
+  sharedListDismissedFindings, sharedListVerifiedFindings,
   publishProject, pullSharedProject,
 } from './shared.js';
 

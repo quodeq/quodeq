@@ -104,6 +104,10 @@ export default function TopBar({
      next click will flip to dark). */
   effectiveDark = false,
   onToggleTheme,
+  /* 'local' | 'shared' — shared projects are read-only in this app (no
+     mutation routes exist on the backend), so the assistant (which can take
+     write actions like dismiss/verify) is not offered for them. */
+  selectedSource = 'local',
 }) {
   return (
     <header className="topbar pywebview-drag-region">
@@ -162,7 +166,7 @@ export default function TopBar({
           </button>
         )}
 
-        <AssistantLauncherButton />
+        {selectedSource !== 'shared' && <AssistantLauncherButton />}
         <TerminalLauncherButton />
 
         {(provider || model) && (

@@ -32,7 +32,7 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate }) {
 }
 
 function DashboardContent({ runMode, data, focus, callbacks }) {
-  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity } = data;
+  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource } = data;
   const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
   const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick, onNavigate, onGranularityChange } = callbacks;
   if (runMode) {
@@ -77,7 +77,7 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
       data={{
         accumulated: accumulated ? { ...accumulated, dimensions: accumulatedDimensions } : accumulated,
         accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex,
-        trend: dashboard?.trend || [], selectedRunId, selectedProject, projectInfo, granularity,
+        trend: dashboard?.trend || [], selectedRunId, selectedProject, projectInfo, granularity, selectedSource,
       }}
       callbacks={{
         onRunClick: onRunSelect, onDimensionClick: onAccumulatedDimensionClick, onNavigate, onGranularityChange,
@@ -107,7 +107,7 @@ function useDashboardHandlers(onNavigate, dashboard) {
 }
 
 export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
-  const { selectedProject, selectedRun, projects = [], dashboard, accumulated, loading, isFetching, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange } = data;
+  const { selectedProject, selectedSource, selectedRun, projects = [], dashboard, accumulated, loading, isFetching, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange } = data;
   const projectInfo = projects.find((p) => (p.id || p.name) === selectedProject) || null;
   const { onNavigate, onRunSelect, onProjectsReload } = callbacks;
   // After a successful clone-on-add migration the project's repository_info.json
@@ -208,7 +208,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       {dashboard && (
         <DashboardContent
           runMode={runMode}
-          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity }}
+          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource }}
           focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
           callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onNavigate, onGranularityChange }}
         />

@@ -12,8 +12,11 @@ function DismissedCard({ d, onRestore, onDelete }) {
         {d.severity && <span className={`severity-tag ${d.severity}`}>{d.severity}</span>}
         <span className="dismissed-label">[{dismissedLabel(d)}]</span>
         <span className="dismissed-file">{d.file}:{d.line}</span>
-        <button type="button" className="restore-btn" onClick={() => onRestore(d)}>Restore</button>
-        <button type="button" className="delete-btn" onClick={() => onDelete(d)}>Delete</button>
+        {/* onRestore/onDelete arrive as `undefined` for shared projects (no
+            mutation route exists on the backend) — hide the actions rather
+            than render a button that would silently no-op on click. */}
+        {onRestore && <button type="button" className="restore-btn" onClick={() => onRestore(d)}>Restore</button>}
+        {onDelete && <button type="button" className="delete-btn" onClick={() => onDelete(d)}>Delete</button>}
       </div>
       {(d.reason || d.title) && (
         <div className="dismissed-detail">
@@ -59,12 +62,16 @@ export default function DismissedSubTab({ dismissed, onRestore, onRestoreAll, on
         <span className="section-count">{dismissed.length} findings · not included in scoring</span>
         {dismissed.length > 1 && (
           <>
-            <button type="button" className="restore-btn" style={{ marginLeft: 'auto' }} onClick={onRestoreAll}>
-              Restore all
-            </button>
-            <button type="button" className="delete-btn" onClick={onDeleteAll}>
-              Delete all
-            </button>
+            {onRestoreAll && (
+              <button type="button" className="restore-btn" style={{ marginLeft: 'auto' }} onClick={onRestoreAll}>
+                Restore all
+              </button>
+            )}
+            {onDeleteAll && (
+              <button type="button" className="delete-btn" onClick={onDeleteAll}>
+                Delete all
+              </button>
+            )}
           </>
         )}
       </div>

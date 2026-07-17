@@ -196,6 +196,30 @@ describe('shared repo API client', () => {
     });
   });
 
+  describe('findings (read-only mirrors)', () => {
+    it('sharedListDismissedFindings GETs /shared/projects/<id>/findings/dismissed with a limit', async () => {
+      await shared.sharedListDismissedFindings('proj1');
+      expect(calls[0].url).toBe('/api/shared/projects/proj1/findings/dismissed?limit=5000');
+      expect(calls[0].opts?.method).toBeUndefined();
+    });
+
+    it('sharedListDismissedFindings encodes the project id', async () => {
+      await shared.sharedListDismissedFindings('proj/1');
+      expect(calls[0].url).toBe('/api/shared/projects/proj%2F1/findings/dismissed?limit=5000');
+    });
+
+    it('sharedListVerifiedFindings GETs /shared/projects/<id>/findings/verified', async () => {
+      await shared.sharedListVerifiedFindings('proj1');
+      expect(calls[0].url).toBe('/api/shared/projects/proj1/findings/verified');
+      expect(calls[0].opts?.method).toBeUndefined();
+    });
+
+    it('sharedListVerifiedFindings encodes the project id', async () => {
+      await shared.sharedListVerifiedFindings('proj/1');
+      expect(calls[0].url).toBe('/api/shared/projects/proj%2F1/findings/verified');
+    });
+  });
+
   describe('publish & pull', () => {
     it('publishProject POSTs /projects/<id>/publish', async () => {
       await shared.publishProject('proj1');

@@ -22,6 +22,7 @@ vi.mock('../../../api/index.js', () => ({
   restoreAllFindings: vi.fn(),
   deleteFinding: vi.fn(),
   deleteAllFindings: vi.fn(),
+  sharedListDismissedFindings: vi.fn(),
 }));
 
 vi.mock('../../../utils/confirmDialog.js', () => ({
@@ -34,6 +35,7 @@ import {
   restoreAllFindings,
   deleteFinding,
   deleteAllFindings,
+  sharedListDismissedFindings,
 } from '../../../api/index.js';
 
 import { confirmDialog } from '../../../utils/confirmDialog.js';
@@ -203,5 +205,94 @@ describe('useDismissedFindings — handleDeleteAll', () => {
     expect(setRestoreError).toHaveBeenCalledWith('Failed to delete all findings. Please try again.');
     expect(result.current.dismissed).toEqual([sampleA]);
     expect(onRefresh).not.toHaveBeenCalled();
+  });
+});
+
+// Shared projects have no mutation routes on the backend (dismiss/restore/
+// delete are local-only by design, and the same project id can exist in both
+// worlds). The dismissed list must read from the shared-repo mirror endpoint,
+// and every mutation handler must no-op even if a callback somehow gets
+// invoked — defense in depth on top of the caller passing `undefined` for
+// these handlers when wiring the dismissed sub-tab.
+describe('useDismissedFindings — shared source', () => {
+  it('reads the dismissed list via the shared endpoint instead of the local one', async () => {
+    sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
+    const { result } = renderHook(
+      () => useDismissedFindings('proj', vi.fn(), vi.fn(), 0, 'shared'),
+      withQueryClient(),
+    );
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
+
+    expect(sharedListDismissedFindings).toHaveBeenCalledWith('proj');
+    expect(listDismissedFindings).not.toHaveBeenCalled();
+  });
+
+  it('handleRestore no-ops and never calls the local restore endpoint', async () => {
+    sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
+    const onRefresh = vi.fn();
+    const { result } = renderHook(
+      () => useDismissedFindings('proj', onRefresh, vi.fn(), 0, 'shared'),
+      withQueryClient(),
+    );
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
+
+    await act(async () => { await result.current.handleRestore(sampleA); });
+
+    expect(restoreFinding).not.toHaveBeenCalled();
+    expect(result.current.dismissed).toEqual([sampleA]);
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  it('handleRestoreAll no-ops and never calls the local restore-all endpoint', async () => {
+    sharedListDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
+    const { result } = renderHook(
+      () => useDismissedFindings('proj', vi.fn(), vi.fn(), 0, 'shared'),
+      withQueryClient(),
+    );
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
+
+    await act(async () => { await result.current.handleRestoreAll(); });
+
+    expect(restoreAllFindings).not.toHaveBeenCalled();
+    expect(result.current.dismissed).toEqual([sampleA, sampleB]);
+  });
+
+  it('handleDelete no-ops and never calls the local delete endpoint', async () => {
+    sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
+    const { result } = renderHook(
+      () => useDismissedFindings('proj', vi.fn(), vi.fn(), 0, 'shared'),
+      withQueryClient(),
+    );
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
+
+    await act(async () => { await result.current.handleDelete(sampleA); });
+
+    expect(deleteFinding).not.toHaveBeenCalled();
+    expect(result.current.dismissed).toEqual([sampleA]);
+  });
+
+  it('handleDeleteAll no-ops and never opens the confirm dialog', async () => {
+    sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
+    const { result } = renderHook(
+      () => useDismissedFindings('proj', vi.fn(), vi.fn(), 0, 'shared'),
+      withQueryClient(),
+    );
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
+
+    await act(async () => { await result.current.handleDeleteAll(); });
+
+    expect(confirmDialog).not.toHaveBeenCalled();
+    expect(deleteAllFindings).not.toHaveBeenCalled();
+    expect(result.current.dismissed).toEqual([sampleA]);
+  });
+
+  it('defaults to local source when selectedSource is omitted', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA]);
+    const { result } = renderHook(
+      () => useDismissedFindings('proj', vi.fn(), vi.fn()),
+      withQueryClient(),
+    );
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
+    expect(sharedListDismissedFindings).not.toHaveBeenCalled();
   });
 });
