@@ -40,6 +40,18 @@ export function useSharedProjects() {
   // pull) doesn't re-force refresh=1.
   const enteredRef = useRef(false);
 
+  // In-flight guards: aria-disabled on the triggering button does not stop
+  // a click in this codebase's convention (buttons stay clickable so their
+  // handlers can surface a snackbar/tooltip), and the Enter-key path on
+  // TermInput bypasses the button entirely. So double-submit protection has
+  // to live here, at the hook, rather than on any one caller's button.
+  // Refs (not state) because the guard must be readable synchronously on
+  // the very next call, before any state update triggered by this call has
+  // committed/re-rendered.
+  const connectingRef = useRef(false);
+  const refreshingRef = useRef(false);
+  const pullingRef = useRef(false);
+
   const fetchList = useCallback(async (refresh) => {
     const envelope = await sharedListProjects({ refresh });
     setProjects(envelope?.projects || []);
@@ -74,6 +86,8 @@ export function useSharedProjects() {
   }, []);
 
   const connect = useCallback(async (nextUrl) => {
+    if (connectingRef.current) return; // already connecting -- ignore the repeat click/Enter
+    connectingRef.current = true;
     setConnecting(true);
     setConnectError(null);
     try {
@@ -85,11 +99,14 @@ export function useSharedProjects() {
     } catch (err) {
       setConnectError(err?.message || 'failed to connect');
     } finally {
+      connectingRef.current = false;
       setConnecting(false);
     }
   }, [connectShared, loadStatus]);
 
   const refresh = useCallback(async () => {
+    if (refreshingRef.current) return; // already refreshing -- ignore the repeat click
+    refreshingRef.current = true;
     setRefreshing(true);
     try {
       await refreshShared();
@@ -100,11 +117,20 @@ export function useSharedProjects() {
       // stale banner copy is fixed regardless of cause.
       setStale(true);
     } finally {
+      refreshingRef.current = false;
       setRefreshing(false);
     }
   }, [refreshShared, fetchList]);
 
-  const pull = useCallback((projectId, action) => pullSharedProject(projectId, action), [pullSharedProject]);
+  const pull = useCallback(async (projectId, action) => {
+    if (pullingRef.current) return; // a pull is already in flight -- ignore the repeat click
+    pullingRef.current = true;
+    try {
+      return await pullSharedProject(projectId, action);
+    } finally {
+      pullingRef.current = false;
+    }
+  }, [pullSharedProject]);
 
   return {
     configured, url, projects, lastSynced, stale,

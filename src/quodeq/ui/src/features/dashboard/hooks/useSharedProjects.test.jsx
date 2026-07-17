@@ -20,6 +20,16 @@ function makeFakeApi(overrides = {}) {
   };
 }
 
+// A promise the test controls the settlement of, so we can assert on
+// behaviour while a call is genuinely still in flight (the double-submit
+// window), rather than a promise that resolves on the same microtask tick.
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
 function wrap(fakeApi, children) {
   const QC = withQueryClient();
   return (
@@ -167,5 +177,91 @@ describe('useSharedProjects', () => {
     });
 
     expect(fakeApi.pullSharedProject).toHaveBeenCalledWith('p1', 'copy');
+  });
+
+  // Double-submit guards: aria-disabled doesn't block a click in this
+  // codebase (see ProjectsPage.jsx's is-disabled convention), so connect/
+  // refresh/pull must no-op on a repeat call while the first is still in
+  // flight, regardless of which UI path triggered it (click, Enter key,
+  // card action).
+  it('connect() ignores a second call while the first connect is still in flight', async () => {
+    const d = deferred();
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: false, url: null })),
+      connectShared: vi.fn(() => d.promise),
+    });
+    const { result } = renderHook(() => useSharedProjects(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let p1;
+    let p2;
+    act(() => {
+      p1 = result.current.connect('https://github.com/team/results.git');
+      p2 = result.current.connect('https://github.com/team/results.git');
+    });
+
+    expect(fakeApi.connectShared).toHaveBeenCalledTimes(1);
+
+    d.resolve({ configured: true, url: 'https://github.com/team/results.git' });
+    await act(async () => {
+      await p1;
+      await p2;
+    });
+
+    expect(fakeApi.connectShared).toHaveBeenCalledTimes(1);
+  });
+
+  it('refresh() ignores a second call while the first refresh is still in flight', async () => {
+    const d = deferred();
+    const fakeApi = makeFakeApi({ refreshShared: vi.fn(() => d.promise) });
+    const { result } = renderHook(() => useSharedProjects(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let p1;
+    let p2;
+    act(() => {
+      p1 = result.current.refresh();
+      p2 = result.current.refresh();
+    });
+
+    expect(fakeApi.refreshShared).toHaveBeenCalledTimes(1);
+
+    d.resolve({ stale: false, lastSynced: '2026-07-17T00:00:00Z' });
+    await act(async () => {
+      await p1;
+      await p2;
+    });
+
+    expect(fakeApi.refreshShared).toHaveBeenCalledTimes(1);
+  });
+
+  it('pull() ignores a second call while the first pull is still in flight', async () => {
+    const d = deferred();
+    const fakeApi = makeFakeApi({ pullSharedProject: vi.fn(() => d.promise) });
+    const { result } = renderHook(() => useSharedProjects(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let p1;
+    let p2;
+    act(() => {
+      p1 = result.current.pull('p1');
+      p2 = result.current.pull('p1');
+    });
+
+    expect(fakeApi.pullSharedProject).toHaveBeenCalledTimes(1);
+
+    d.resolve({ imported: true, projectId: 'p1' });
+    await act(async () => {
+      await p1;
+      await p2;
+    });
+
+    expect(fakeApi.pullSharedProject).toHaveBeenCalledTimes(1);
   });
 });

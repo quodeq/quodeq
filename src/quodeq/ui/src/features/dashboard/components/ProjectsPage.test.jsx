@@ -82,6 +82,22 @@ describe('ProjectsPage — local/online tab row', () => {
     expect(onTabChange).toHaveBeenCalledWith('local');
   });
 
+  it('re-clicking the already-active tab is a no-op -- does not call onTabChange (nav-stack dedup guard)', async () => {
+    const user = userEvent.setup();
+    const onTabChange = vi.fn();
+    render(<ProjectsPage projects={[]} actions={{ onTabChange }} />);
+
+    const local = screen.getByRole('tab', { name: 'local' });
+    await user.click(local);
+    await user.click(local);
+    expect(onTabChange).not.toHaveBeenCalled();
+
+    const online = screen.getByRole('tab', { name: 'online' });
+    await user.click(online);
+    expect(onTabChange).toHaveBeenCalledTimes(1);
+    expect(onTabChange).toHaveBeenCalledWith('online');
+  });
+
   it('local tab body (cards/empty-state) is unaffected by the new tab row', () => {
     const projects = [{ id: 'a', name: 'one', location: 'local' }];
     render(<ProjectsPage projects={projects} actions={{}} />);
@@ -171,6 +187,26 @@ describe('ProjectsPage — online tab, configured', () => {
     await waitFor(() => expect(screen.getByText(/refresh failed, showing results synced/)).toBeInTheDocument());
     const banner = screen.getByText(/refresh failed, showing results synced/);
     expect(banner.textContent).not.toMatch(/—/);
+  });
+
+  // relativeTime() returns 'today'/'yesterday' with no trailing "ago" for a
+  // same-day/one-day-old timestamp (see components/LastFetchedLine.jsx).
+  // Per the controller ruling, that copy is acceptable as-is -- the banner
+  // just has to reuse the identical label the sync line shows. This locks
+  // in the exact "synced today" rendering alongside the existing
+  // day(s)-old "ago" case above.
+  it('renders "refresh failed, showing results synced today" when lastSynced is same-day, using the same label as the sync line', async () => {
+    const fakeApi = configuredApi({
+      sharedListProjects: vi.fn(async () => ({
+        projects: [{ id: 'shared-1', name: 'demo-repo', publishedBy: 'ana', publishedAt: '2026-07-16T00:00:00Z' }],
+        lastSynced: new Date().toISOString(),
+        stale: true,
+      })),
+    });
+    renderWithApi(<ProjectsPage projects={[]} sourceTab="online" actions={{}} />, fakeApi);
+
+    await waitFor(() => expect(screen.getByText('refresh failed, showing results synced today')).toBeInTheDocument());
+    expect(screen.getByText('synced today')).toBeInTheDocument();
   });
 
   it('refresh button calls refreshShared() and re-lists', async () => {

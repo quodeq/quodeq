@@ -356,6 +356,16 @@ function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
 // ── Online tab: local | online sub-tab row ────────────────────────────────
 
 function ProjectsTabs({ activeTab, onTabChange }) {
+  // Re-clicking the already-active tab is a no-op: onTabChange drives a
+  // navPush (see App.jsx's onTabChange wiring), and pushing an identical
+  // history entry on every repeat click grows the nav stack with
+  // duplicates, making Back appear dead until they unwind. Guarded here
+  // at the component level so every caller (App.jsx and tests) benefits,
+  // not just one wiring site. Genuine local<->online switches still push.
+  const handleClick = (tab) => {
+    if (tab === activeTab) return;
+    onTabChange?.(tab);
+  };
   return (
     <div className="projects-tabs" role="tablist">
       <button
@@ -363,7 +373,7 @@ function ProjectsTabs({ activeTab, onTabChange }) {
         role="tab"
         aria-selected={activeTab === 'local'}
         className={`projects-tab${activeTab === 'local' ? ' projects-tab--active' : ''}`}
-        onClick={() => onTabChange?.('local')}
+        onClick={() => handleClick('local')}
       >
         local
       </button>
@@ -372,7 +382,7 @@ function ProjectsTabs({ activeTab, onTabChange }) {
         role="tab"
         aria-selected={activeTab === 'online'}
         className={`projects-tab${activeTab === 'online' ? ' projects-tab--active' : ''}`}
-        onClick={() => onTabChange?.('online')}
+        onClick={() => handleClick('online')}
       >
         online
       </button>
