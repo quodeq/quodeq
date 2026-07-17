@@ -236,14 +236,20 @@ def register_shared_routes(app: Flask) -> None:
             return jsonify(body), status
 
         try:
-            zip_bytes = zip_path.read_bytes()
+            with zip_path.open("rb") as stream:
+                return import_zip_stream(stream, reports_dir(), action)
+        except OSError:
+            _logger.exception("Failed to read zip for shared pull of %s", project)
+            body, status = error_response(
+                "Failed to read project archive from the shared repository",
+                HTTPStatus.INTERNAL_SERVER_ERROR, "EXPORT_ERROR",
+            )
+            return jsonify(body), status
         finally:
             try:
                 zip_path.unlink()
             except OSError as exc:
                 _logger.warning("Failed to remove temp zip %s: %s", zip_path, exc)
-
-        return import_zip_stream(io.BytesIO(zip_bytes), reports_dir(), action)
 
     # -- read-only mirrors of the project read endpoints -------------------
     #

@@ -319,9 +319,11 @@ def import_project(reports_dir: str) -> Response | tuple[Response, int]:
         - ``action``: optional, ``"replace"`` or ``"copy"`` to resolve a 409
           collision returned from a previous attempt.
 
-    Parses the multipart request, then delegates everything else (the
-    hardened validation and extraction) to ``import_zip_stream``, which has
-    no dependency on ``request`` and can be called with any zip bytes.
+    Parses the multipart request for file and action parameters, then
+    delegates validation and extraction to ``import_zip_stream``. The zip
+    stream itself has no dependency on request.files/request.form, but this
+    handler must run inside a Flask request context to access request.form
+    and request.remote_addr for logging.
     """
     upload = request.files.get("file")
     if upload is None or not upload.filename:
