@@ -33,7 +33,6 @@ from quodeq.services.shared_repo import (
     shared_evaluations_root,
     shared_index_db_path,
     shared_score_cache_path,
-    sync_shared_index,
     validate_remote_url,
 )
 from quodeq.services.shared_settings import (
@@ -218,7 +217,6 @@ def register_shared_routes(app: Flask) -> None:
         err = _validate_segment(project)
         if err:
             return err
-        sync_shared_index(url)
         try:
             runs = build_runs_unit(eval_root, shared_index_db_path(url), project)
         except Exception:
