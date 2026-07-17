@@ -288,3 +288,17 @@ def test_clearing_overrides_reports_reverted_dimension(client, project_root: Pat
     assert resp.status_code == 200
     assert resp.get_json()["changedDimensions"] == ["maintainability"]
     assert not (project_root / ".quodeq" / "standards-overrides.json").exists()
+
+
+def test_evaluator_only_override_not_in_changed_dimensions(client_with_custom, project_root: Path):
+    """Evaluator-dir-only standards never shift cache keys, so overrides for them
+    never appear in changedDimensions, matching dimension_params_state's scope."""
+    resp = client_with_custom.put(
+        OVERRIDES_URL,
+        json={"overrides": {"CUST-1": {"max_items": 50}}},
+        headers=_LOCALHOST,
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["changedDimensions"] == []
+    saved = json.loads((project_root / ".quodeq" / "standards-overrides.json").read_text())
+    assert saved["overrides"]["CUST-1"] == {"max_items": 50}

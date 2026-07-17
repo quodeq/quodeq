@@ -49,7 +49,11 @@ def _changed_dimensions(compiled_dir: Path, current: dict, proposed: dict) -> li
     """Dimensions whose non-default effective params differ between the
     current overrides file and the proposed mapping. A changed dimension is
     exactly one whose cache keys will shift, so this is the invalidation
-    impact surfaced to the user before saving."""
+    impact surfaced to the user before saving.
+
+    Scans only the compiled dir, mirroring dimension_params_state (which reads
+    only compiled/<dimension>.json), so custom evaluator-dir standards—whose
+    cache keys never shift on override change—are symmetrically never reported."""
     changed: list[str] = []
     for path in sorted(compiled_dir.glob("*.json")):
         try:
