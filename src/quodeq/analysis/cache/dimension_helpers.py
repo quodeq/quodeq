@@ -34,7 +34,12 @@ from quodeq.analysis._types import RunConfig
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_version
 from quodeq.analysis.cache.key import CacheKey, compute_key
-from quodeq.analysis.fingerprint import _hash_file, _hash_prompts_map, _hash_standards
+from quodeq.analysis.fingerprint import (
+    _hash_file,
+    _hash_prompts_map,
+    _hash_standards,
+    dimension_params_state,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -157,9 +162,10 @@ def build_cache_key_for_file(config: RunConfig, file_path: str, dimension: str) 
     """Compute the cache key for a (file, dimension) pair under ``config``.
 
     Returns a 64-char hex SHA-256. The key is permissive: it depends only on
-    the real per-unit inputs (file content, path, dimension, language), so a
-    model switch or a quodeq/standards update reuses the cached result. The
-    volatile context is recorded on the entry's provenance at write time.
+    the real per-unit inputs (file content, path, dimension, language, and
+    non-default threshold params), so a model switch or a quodeq/standards
+    update reuses the cached result. The volatile context is recorded on the
+    entry's provenance at write time.
 
     MUST stay byte-for-byte identical to the key built in
     ``cache_writer.build_cache_writer`` and ``cache.runner._key_for`` —
@@ -167,12 +173,14 @@ def build_cache_key_for_file(config: RunConfig, file_path: str, dimension: str) 
     its fields.
     """
     content_hash = _hash_file(config.src / file_path) or ""
+    params_hash, _ = dimension_params_state(config.standards_dir, dimension, config.src)
     key = CacheKey(
         schema_version=_SCHEMA_VERSION,
         file_content_hash=content_hash,
         file_path=file_path,
         dimension=dimension,
         language=config.language or "",
+        params_hash=params_hash,
     )
     return compute_key(key)
 

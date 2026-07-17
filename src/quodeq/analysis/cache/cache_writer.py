@@ -29,7 +29,7 @@ from quodeq.analysis.cache.dimension_helpers import (
 from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_version
 from quodeq.analysis.cache.key import CacheKey, compute_key
 from quodeq.analysis.cache.local import LocalFileBackend
-from quodeq.analysis.fingerprint import _hash_file, _hash_standards
+from quodeq.analysis.fingerprint import _hash_file, _hash_standards, dimension_params_state
 
 _logger = logging.getLogger(__name__)
 
@@ -78,6 +78,13 @@ def build_cache_writer(
     )
     prompts_hash = _hash_prompts_combined()
     version = quodeq_version()
+    # Computed once at construction: the params_hash keys threshold-override
+    # changes into the cache key below; effective_params is wired into
+    # provenance in a later task, kept in scope so that wiring is a pure
+    # addition here.
+    params_hash, effective_params = dimension_params_state(
+        standards_dir, dimension, src_root,
+    )
 
     def write(file_path: str, findings: list[dict]) -> None:
         target = src_root / file_path
@@ -92,6 +99,7 @@ def build_cache_writer(
             file_path=file_path,
             dimension=dimension,
             language=language,
+            params_hash=params_hash,
         )
         key = compute_key(key_struct)
         entry = CacheEntry(

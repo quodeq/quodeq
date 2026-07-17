@@ -46,6 +46,7 @@ class WorkUnit:
     evaluator_hash: str
     model_id: str
     language: str
+    params_hash: str = ""
     temperature: float | None = None
     max_tokens: int | None = None
 
@@ -86,6 +87,7 @@ def _key_for(unit: WorkUnit, schema_version: int) -> str:
         file_path=unit.file_path,
         dimension=unit.dimension,
         language=unit.language,
+        params_hash=unit.params_hash,
     ))
 
 
