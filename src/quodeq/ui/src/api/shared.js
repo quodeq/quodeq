@@ -1,6 +1,15 @@
 /**
  * Shared repository API client — read-only mirrors of the project read endpoints,
  * plus config management (connect, disconnect, refresh, status) and publish/pull.
+ *
+ * Timestamp units: the backend (services/shared_repo.py's published_meta and
+ * last_synced_at) sends publishedAt/lastSynced as UNIX epoch SECONDS (git log
+ * `%ct` is an int; st_mtime is a float) -- but every "N ago" consumer
+ * (relativeTime in components/LastFetchedLine.jsx) expects milliseconds, same
+ * as Date.now()/`new Date(ms)`. Converting seconds->ms is done once, here, at
+ * the API-client boundary, so every consumer downstream always sees ms and
+ * never has to know the wire units. Passing raw seconds through would render
+ * as a 1970 date ("57 years ago") -- see epochSecondsToMs below.
  */
 
 import { request, BASE } from './request.js';
@@ -8,14 +17,34 @@ import { createProject } from '../models/project.js';
 import { createDashboard } from '../models/dashboard.js';
 import { createDimension, createDimensionEval } from '../models/dimension.js';
 
+/**
+ * Convert a UNIX epoch-seconds timestamp (as sent by the backend) to
+ * epoch-milliseconds (as expected by every "N ago" / relativeTime consumer).
+ * Null/absent/0 all normalize to null -- there is no meaningful "N ago" for
+ * an unset timestamp, and 0 never occurs as a real value here.
+ * @param {number|null|undefined} seconds
+ * @returns {number|null}
+ */
+function epochSecondsToMs(seconds) {
+  return typeof seconds === 'number' && seconds ? seconds * 1000 : null;
+}
+
 // ── Config Management ───────────────────────────────────────────────────────
 
 /**
  * Get the shared repository connection status.
- * @returns {Promise<{configured: boolean, url: string|null, lastSynced: string|null, publish: Object}>}
+ * @returns {Promise<{configured: boolean, url: string|null, lastSynced: number|null, publish: Object}>}
+ *   lastSynced is epoch-milliseconds (converted from the backend's epoch
+ *   seconds; see epochSecondsToMs). `publish.finished_at`, if present, is
+ *   passed through unconverted (raw epoch seconds) -- no UI consumer currently
+ *   formats it as a date.
  */
-export function getSharedStatus() {
-  return request('/shared/status');
+export async function getSharedStatus() {
+  const data = await request('/shared/status');
+  return {
+    ...data,
+    lastSynced: epochSecondsToMs(data?.lastSynced),
+  };
 }
 
 /**
@@ -57,7 +86,10 @@ export function refreshShared() {
  * Unlike listProjects (returns bare array), this returns an envelope with sync metadata
  * because the shared tab needs lastSynced and stale status.
  * @param {{refresh?: boolean}} [options={}]
- * @returns {Promise<{projects: import('../models/project.js').Project[], lastSynced: string|null, stale: boolean}>}
+ * @returns {Promise<{projects: import('../models/project.js').Project[], lastSynced: number|null, stale: boolean}>}
+ *   Both the envelope's lastSynced and each project's publishedAt are
+ *   epoch-milliseconds (converted from the backend's epoch seconds; see
+ *   epochSecondsToMs).
  */
 export async function sharedListProjects({ refresh = false } = {}) {
   const refreshParam = refresh ? '1' : '0';
@@ -70,7 +102,7 @@ export async function sharedListProjects({ refresh = false } = {}) {
     projects.forEach((proj, idx) => {
       if (list[idx]) {
         proj.publishedBy = list[idx].publishedBy ?? null;
-        proj.publishedAt = list[idx].publishedAt ?? null;
+        proj.publishedAt = epochSecondsToMs(list[idx].publishedAt);
         proj.source = list[idx].source ?? 'shared';
       }
     });
@@ -78,7 +110,7 @@ export async function sharedListProjects({ refresh = false } = {}) {
 
   return {
     projects,
-    lastSynced: data?.lastSynced ?? null,
+    lastSynced: epochSecondsToMs(data?.lastSynced),
     stale: data?.stale ?? false,
   };
 }

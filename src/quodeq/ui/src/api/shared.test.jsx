@@ -35,6 +35,37 @@ describe('shared repo API client', () => {
       expect(calls[0].opts?.method).toBeUndefined();
     });
 
+    // The backend sends lastSynced as UNIX epoch SECONDS (st_mtime), not
+    // milliseconds -- relativeTime()/`new Date()` expect ms, so passing
+    // seconds straight through renders as a 1970 date ("57 years ago").
+    it('getSharedStatus converts lastSynced from epoch seconds to epoch milliseconds', async () => {
+      globalThis.fetch = vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          configured: true,
+          url: 'https://github.com/test/repo.git',
+          lastSynced: 1752751800, // realistic epoch-seconds fixture
+          syncing: false,
+          publish: { state: 'idle' },
+        }),
+      }));
+
+      const result = await shared.getSharedStatus();
+
+      expect(result.lastSynced).toBe(1752751800 * 1000);
+    });
+
+    it('getSharedStatus normalizes a null/absent lastSynced to null', async () => {
+      globalThis.fetch = vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ configured: false, url: null, lastSynced: null, publish: {} }),
+      }));
+
+      const result = await shared.getSharedStatus();
+
+      expect(result.lastSynced).toBeNull();
+    });
+
     it('connectShared PUTs /shared/config with url', async () => {
       await shared.connectShared('https://github.com/example/repo.git');
       expect(calls[0].url).toBe('/api/shared/config');
@@ -70,6 +101,11 @@ describe('shared repo API client', () => {
     });
 
     it('sharedListProjects returns envelope with projects, lastSynced, and stale', async () => {
+      // Realistic epoch-SECONDS fixtures (git log %ct / st_mtime), matching
+      // what the backend actually sends on the wire -- the client is
+      // expected to convert these to epoch-milliseconds before returning.
+      const publishedAtSeconds = 1752750000;
+      const lastSyncedSeconds = 1752751800;
       globalThis.fetch = vi.fn(async () => {
         return {
           ok: true,
@@ -80,11 +116,11 @@ describe('shared repo API client', () => {
                 name: 'Test Project',
                 runsCount: undefined, // createProject should normalize to 0
                 publishedBy: 'alice',
-                publishedAt: '2026-07-17T10:00:00Z',
+                publishedAt: publishedAtSeconds,
                 source: 'shared',
               },
             ],
-            lastSynced: '2026-07-17T10:30:00Z',
+            lastSynced: lastSyncedSeconds,
             stale: true,
           }),
         };
@@ -97,8 +133,8 @@ describe('shared repo API client', () => {
       expect(result).toHaveProperty('lastSynced');
       expect(result).toHaveProperty('stale');
 
-      // Assert sync metadata is carried through
-      expect(result.lastSynced).toBe('2026-07-17T10:30:00Z');
+      // Assert sync metadata is carried through, converted to milliseconds
+      expect(result.lastSynced).toBe(lastSyncedSeconds * 1000);
       expect(result.stale).toBe(true);
 
       // Assert projects array and that createProject normalized runsCount
@@ -107,10 +143,26 @@ describe('shared repo API client', () => {
       expect(result.projects[0].runsCount).toBe(0); // createProject normalizes missing runsCount to 0
       expect(result.projects[0].name).toBe('Test Project');
 
-      // Assert shared-specific metadata is preserved
+      // Assert shared-specific metadata is preserved, publishedAt converted to milliseconds
       expect(result.projects[0].publishedBy).toBe('alice');
-      expect(result.projects[0].publishedAt).toBe('2026-07-17T10:00:00Z');
+      expect(result.projects[0].publishedAt).toBe(publishedAtSeconds * 1000);
       expect(result.projects[0].source).toBe('shared');
+    });
+
+    it('sharedListProjects normalizes a null/absent publishedAt and lastSynced to null', async () => {
+      globalThis.fetch = vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          projects: [{ id: 'proj1', name: 'Test Project', publishedAt: null, source: 'shared' }],
+          lastSynced: null,
+          stale: false,
+        }),
+      }));
+
+      const result = await shared.sharedListProjects();
+
+      expect(result.lastSynced).toBeNull();
+      expect(result.projects[0].publishedAt).toBeNull();
     });
 
     it('sharedGetProjectInfo GETs /shared/projects/<id>/info', async () => {

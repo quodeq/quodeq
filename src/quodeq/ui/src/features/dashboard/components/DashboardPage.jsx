@@ -6,7 +6,7 @@ import IncompleteSetupCard from './IncompleteSetupCard.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
 
-function NoCompletedEvalPanel({ availableRuns = [], onNavigate }) {
+function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }) {
   const hasRunning = availableRuns.some((r) => r?.status === 'in_progress');
   if (hasRunning) {
     // First-ever evaluation is still running. There's no prior data to
@@ -18,6 +18,19 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate }) {
         description="The overview will fill in once a run finishes. You can watch dimensions complete in History."
         actionLabel="Open history"
         onAction={() => onNavigate?.('history')}
+      />
+    );
+  }
+  // Shared projects are read-only in the app -- evaluations only ever run
+  // locally (see api/shared.js's read-only-mirrors note), so the "Start
+  // evaluation" CTA has nowhere useful to send a shared-project viewer. Show
+  // the same empty shell without the button and with copy that doesn't imply
+  // there's an action to take here.
+  if (selectedSource === 'shared') {
+    return (
+      <EmptyState
+        title="No completed evaluation yet"
+        description="no completed evaluation in this shared project yet"
       />
     );
   }
@@ -57,7 +70,7 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
     // cancelled/failed. Render a clear waiting-for-results state in
     // place of the empty stat strip and dim cards (the page header
     // above still shows project name, language mix, file count).
-    return <NoCompletedEvalPanel availableRuns={availableRuns} onNavigate={onNavigate} />;
+    return <NoCompletedEvalPanel availableRuns={availableRuns} onNavigate={onNavigate} selectedSource={selectedSource} />;
   }
   if (focusedDimension) {
     return (

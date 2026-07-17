@@ -71,3 +71,42 @@ describe('DashboardPage first-load loading gate', () => {
     }
   });
 });
+
+describe('DashboardPage no-completed-evaluation empty state', () => {
+  // Project has runs (so the `!dashboard` empty state upstream doesn't
+  // fire) but none terminated cleanly, and none are in progress -- the
+  // NoCompletedEvalPanel branch under test.
+  const baseData = {
+    projectsLoaded: true,
+    projects: [{ id: 'p1', name: 'p1' }],
+    selectedProject: 'p1',
+    dashboard: {
+      dimensions: [],
+      trend: [],
+      selectedRun: { runId: 'r1', dateLabel: '2026-05-01' },
+    },
+    accumulated: { dimensions: [] },
+    loading: false,
+    isFetching: false,
+    error: null,
+    availableRuns: [{ runId: 'r1', status: 'failed' }],
+  };
+
+  it('local project: shows the Start evaluation CTA (existing behavior pinned)', () => {
+    const { getByText, queryByText } = render(
+      <DashboardPage data={{ ...baseData, selectedSource: 'local' }} callbacks={{}} runMode={false} />,
+    );
+    expect(getByText('No completed evaluation yet')).toBeTruthy();
+    expect(getByText('Start evaluation')).toBeTruthy();
+    expect(queryByText('no completed evaluation in this shared project yet')).toBeNull();
+  });
+
+  it('shared project: hides the Start evaluation CTA and shows shared-specific copy', () => {
+    const { getByText, queryByText } = render(
+      <DashboardPage data={{ ...baseData, selectedSource: 'shared' }} callbacks={{}} runMode={false} />,
+    );
+    expect(getByText('No completed evaluation yet')).toBeTruthy();
+    expect(getByText('no completed evaluation in this shared project yet')).toBeTruthy();
+    expect(queryByText('Start evaluation')).toBeNull();
+  });
+});
