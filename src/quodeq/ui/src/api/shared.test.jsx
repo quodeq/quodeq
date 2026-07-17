@@ -16,6 +16,8 @@ beforeEach(() => {
         runs: [],
         dimensions: [],
         summary: {},
+        lastSynced: null,
+        stale: false,
       }),
     };
   });
@@ -65,6 +67,50 @@ describe('shared repo API client', () => {
     it('sharedListProjects GETs /shared/projects with refresh=1 when requested', async () => {
       await shared.sharedListProjects({ refresh: true });
       expect(calls[0].url).toBe('/api/shared/projects?refresh=1');
+    });
+
+    it('sharedListProjects returns envelope with projects, lastSynced, and stale', async () => {
+      globalThis.fetch = vi.fn(async () => {
+        return {
+          ok: true,
+          json: async () => ({
+            projects: [
+              {
+                id: 'proj1',
+                name: 'Test Project',
+                runsCount: undefined, // createProject should normalize to 0
+                publishedBy: 'alice',
+                publishedAt: '2026-07-17T10:00:00Z',
+                source: 'shared',
+              },
+            ],
+            lastSynced: '2026-07-17T10:30:00Z',
+            stale: true,
+          }),
+        };
+      });
+
+      const result = await shared.sharedListProjects();
+
+      // Assert envelope shape
+      expect(result).toHaveProperty('projects');
+      expect(result).toHaveProperty('lastSynced');
+      expect(result).toHaveProperty('stale');
+
+      // Assert sync metadata is carried through
+      expect(result.lastSynced).toBe('2026-07-17T10:30:00Z');
+      expect(result.stale).toBe(true);
+
+      // Assert projects array and that createProject normalized runsCount
+      expect(Array.isArray(result.projects)).toBe(true);
+      expect(result.projects).toHaveLength(1);
+      expect(result.projects[0].runsCount).toBe(0); // createProject normalizes missing runsCount to 0
+      expect(result.projects[0].name).toBe('Test Project');
+
+      // Assert shared-specific metadata is preserved
+      expect(result.projects[0].publishedBy).toBe('alice');
+      expect(result.projects[0].publishedAt).toBe('2026-07-17T10:00:00Z');
+      expect(result.projects[0].source).toBe('shared');
     });
 
     it('sharedGetProjectInfo GETs /shared/projects/<id>/info', async () => {

@@ -54,8 +54,10 @@ export function refreshShared() {
 
 /**
  * List projects from the shared repository.
+ * Unlike listProjects (returns bare array), this returns an envelope with sync metadata
+ * because the shared tab needs lastSynced and stale status.
  * @param {{refresh?: boolean}} [options={}]
- * @returns {Promise<import('../models/project.js').Project[]>}
+ * @returns {Promise<{projects: import('../models/project.js').Project[], lastSynced: string|null, stale: boolean}>}
  */
 export async function sharedListProjects({ refresh = false } = {}) {
   const refreshParam = refresh ? '1' : '0';
@@ -74,7 +76,11 @@ export async function sharedListProjects({ refresh = false } = {}) {
     });
   }
 
-  return projects;
+  return {
+    projects,
+    lastSynced: data?.lastSynced ?? null,
+    stale: data?.stale ?? false,
+  };
 }
 
 /**
