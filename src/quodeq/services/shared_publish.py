@@ -12,6 +12,14 @@ import shutil
 from pathlib import Path
 
 from quodeq.data.actions_log import ACTIONS_LOG_FILENAME
+from quodeq.services.shared_repo import (
+    MARKER_FILENAME,
+    bootstrap_repo_layout,
+    check_repo_format,
+    ensure_shared_clone,
+    refresh_shared_clone,
+    run_git,
+)
 from quodeq.shared.dimensions_state import FILENAME as DIMENSIONS_FILENAME
 from quodeq.shared.run_status import STATUS_FILENAME, UnsupportedSchemaError, read_status
 
@@ -93,3 +101,108 @@ def stage_project(project_dir: Path, dest_project_dir: Path) -> int:
     for run_dir in runs:
         copy_run(run_dir, dest_project_dir / run_dir.name)
     return len(runs)
+
+
+class PublishError(Exception):
+    """User-facing publish failure."""
+
+
+def _app_version() -> str:
+    from quodeq import __version__
+
+    return __version__ or "0.0.0+dev"
+
+
+def publish_project(
+    project_id: str, url: str, *, evaluations_root: Path, env: dict | None = None
+) -> int:
+    project_dir = evaluations_root / project_id
+    if not project_dir.is_dir():
+        raise PublishError(f"project {project_id} not found in local evaluations")
+
+    repo = ensure_shared_clone(url, env)
+    if repo is None:
+        raise PublishError(
+            f"could not reach the shared repository, check that git can access {url}"
+        )
+    refresh_shared_clone(url, env)  # best effort, publish is still guarded by push
+
+    fmt = check_repo_format(repo)
+    if fmt == "unsupported_version":
+        raise PublishError("this shared repository requires a newer version of quodeq")
+    if fmt == "foreign":
+        raise PublishError(
+            "the configured repository does not look like a quodeq results repository, "
+            "refusing to publish into it"
+        )
+    if fmt == "empty":
+        bootstrap_repo_layout(repo)
+
+    count = stage_project(project_dir, repo / "evaluations" / project_id)
+
+    add_paths = [MARKER_FILENAME, ".gitignore", f"evaluations/{project_id}"]
+    if (repo / "evaluations" / ".gitkeep").exists():
+        add_paths.append("evaluations/.gitkeep")
+    ok, out = run_git(["add", "--", *add_paths], cwd=repo)
+    if not ok:
+        raise PublishError(f"git add failed, {out.strip()[:300]}")
+
+    ok, _ = run_git(["diff", "--cached", "--quiet"], cwd=repo)
+    if ok:
+        return count  # nothing new to publish
+
+    message = f"Publish {project_id} ({count} runs) via quodeq {_app_version()}"
+    ok, out = run_git(["commit", "-m", message], cwd=repo)
+    if not ok:
+        raise PublishError(f"git commit failed, {out.strip()[:300]}")
+
+    ok, out = _push(repo)
+    if not ok:
+        ok_rebase, out_rebase = run_git(["pull", "--rebase", "origin", "HEAD"], cwd=repo)
+        if ok_rebase:
+            ok, out = _push(repo)
+        else:
+            out = out_rebase
+    if not ok:
+        raise PublishError(
+            f"push to the shared repository failed, try again. {out.strip()[:300]}"
+        )
+    return count
+
+
+def _push(repo: Path) -> tuple[bool, str]:
+    """Push HEAD to the remote's default branch.
+
+    A fresh --depth 1 clone of a brand-new empty bare repo has no commits
+    and no origin/HEAD symref yet, so plain ``push origin HEAD`` has nothing
+    to compare against. Detect that case and push with an explicit refspec
+    instead, deriving the target branch name from the remote's symref (or
+    falling back to the local clone's current branch name).
+    """
+    ok, out = run_git(["push", "origin", "HEAD"], cwd=repo)
+    if ok:
+        return ok, out
+
+    # Fall back for a still-unborn remote default branch: push HEAD to an
+    # explicit ref name rather than relying on origin/HEAD resolution.
+    branch = _remote_default_branch(repo) or _local_branch_name(repo)
+    return run_git(["push", "origin", f"HEAD:refs/heads/{branch}"], cwd=repo)
+
+
+def _remote_default_branch(repo: Path) -> str | None:
+    ok, out = run_git(["ls-remote", "--symref", "origin", "HEAD"], cwd=repo)
+    if not ok:
+        return None
+    for line in out.splitlines():
+        if line.startswith("ref:"):
+            # "ref: refs/heads/main\tHEAD"
+            ref = line.split()[1]
+            if ref.startswith("refs/heads/"):
+                return ref[len("refs/heads/") :]
+    return None
+
+
+def _local_branch_name(repo: Path) -> str:
+    ok, out = run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=repo)
+    name = out.strip()
+    return name if ok and name and name != "HEAD" else "main"
