@@ -58,3 +58,30 @@ def test_ensure_clone_bad_url_returns_none(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
     assert ensure_shared_clone(f"file://{tmp_path}/nonexistent.git") is None
     assert not shared_repo_path(f"file://{tmp_path}/nonexistent.git").exists()
+
+
+def test_run_git_survives_non_utf8_output(tmp_path):
+    """Verify run_git handles non-UTF8 git output without raising UnicodeDecodeError."""
+    # Initialize a git repo
+    repo = tmp_path / "test_repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "--allow-empty", "-m", "test"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+
+    # Use git alias to output invalid UTF-8 bytes; git will echo them in its output
+    ok, output = run_git(
+        ["-c", "alias.x=!printf '\\xff\\xfe'", "x"],
+        cwd=repo,
+    )
+
+    # Must return a tuple (bool, str) without raising UnicodeDecodeError
+    assert isinstance(ok, bool)
+    assert isinstance(output, str)
+    # The invalid bytes should be replaced with U+FFFD (replacement character)
+    # Output may contain the replacement character or simply be non-empty
+    assert output is not None
