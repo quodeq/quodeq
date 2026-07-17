@@ -79,9 +79,9 @@ def build_cache_writer(
     prompts_hash = _hash_prompts_combined()
     version = quodeq_version()
     # Computed once at construction: the params_hash keys threshold-override
-    # changes into the cache key below; effective_params is wired into
-    # provenance in a later task, kept in scope so that wiring is a pure
-    # addition here.
+    # changes into the cache key below; effective_params is recorded on each
+    # entry's provenance so the resolved thresholds findings were judged
+    # under are surfaceable.
     params_hash, effective_params = dimension_params_state(
         standards_dir, dimension, src_root,
     )
@@ -115,6 +115,7 @@ def build_cache_writer(
             provenance=build_provenance(
                 model_id=model_id, prompts_hash=prompts_hash,
                 standards_hash=standards_hash, version=version,
+                effective_params=effective_params,
             ),
         )
         cache.put(key, entry)

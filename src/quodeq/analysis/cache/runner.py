@@ -20,7 +20,7 @@ machinery (subagent pool, API runner, ...) plugs in via the
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from quodeq.analysis.cache.backend import CacheBackend
@@ -47,6 +47,7 @@ class WorkUnit:
     model_id: str
     language: str
     params_hash: str = ""
+    effective_params: dict = field(default_factory=dict)
     temperature: float | None = None
     max_tokens: int | None = None
 
@@ -125,6 +126,7 @@ def analyze_unit(
         provenance=build_provenance(
             model_id=unit.model_id, prompts_hash=unit.prompts_hash,
             standards_hash=unit.standards_hash,
+            effective_params=unit.effective_params,
         ),
     )
     cache.put(key, entry)

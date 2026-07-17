@@ -6,6 +6,7 @@ callback, fired synchronously on each mark_file_done(status="ok").
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -290,3 +291,47 @@ def test_cache_writer_path_traversal_yields_empty_hash(tmp_path):
         f"Expected empty content hash for traversal path, "
         f"got {entry_data.get('file_content_hash')!r}"
     )
+
+
+def test_written_entry_records_effective_params(tmp_path):
+    """The written entry's provenance carries effective_params -- the
+    resolved threshold params (post-override) the findings were judged
+    under. Mirrors test_cache_writer_provenance_folds_project_overrides's
+    override fixture, but for a param'd requirement rather than max_lines
+    on the standards JSON shape alone."""
+    from quodeq.analysis.cache.cache_writer import build_cache_writer
+    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
+    from quodeq.analysis.cache.local import LocalFileBackend
+
+    src_root = tmp_path / "src"
+    (src_root / ".quodeq").mkdir(parents=True)
+    (src_root / "auth.py").write_text("class Auth: pass")
+    (src_root / ".quodeq" / "standards-overrides.json").write_text(
+        '{"version": 1, "overrides": {"M-ANA-2": {"max_lines": 60}}}'
+    )
+    standards_dir = tmp_path / "standards"
+    (standards_dir / "compiled").mkdir(parents=True)
+    (standards_dir / "compiled" / "maintainability.json").write_text(json.dumps({
+        "id": "maintainability",
+        "principles": [{"name": "P", "requirements": [{
+            "id": "M-ANA-2", "text": "Max {max_lines} lines",
+            "params": {"max_lines": {"default": 50, "min": 10, "max": 500}},
+        }]}],
+    }))
+
+    cache_root = tmp_path / "cache"
+    write = build_cache_writer(
+        cache_root=cache_root,
+        src_root=src_root,
+        standards_dir=standards_dir,
+        dimension="maintainability",
+        model_id="m",
+        language="python",
+    )
+    write("auth.py", [])
+
+    config = _make_config(src_root, standards_dir=standards_dir, model="m", language="python")
+    key = build_cache_key_for_file(config, "auth.py", "maintainability")
+    entry = LocalFileBackend(root=cache_root).get(key)
+    assert entry is not None
+    assert entry.provenance["effective_params"]["M-ANA-2"]["max_lines"] == 60

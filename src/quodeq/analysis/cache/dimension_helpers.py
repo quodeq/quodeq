@@ -296,6 +296,9 @@ def persist_dispatch_results(
         _hash_standards(config.standards_dir, dimension, config.src)
         if config.standards_dir else ""
     ) or ""
+    _, effective_params = dimension_params_state(
+        config.standards_dir, dimension, config.src,
+    )
     prompts_hash = _hash_prompts_combined()
     version = quodeq_version()
     for f in miss_files:
@@ -318,6 +321,7 @@ def persist_dispatch_results(
             provenance=build_provenance(
                 model_id=model_id, prompts_hash=prompts_hash,
                 standards_hash=standards_hash, version=version,
+                effective_params=effective_params,
             ),
         )
         cache.put(key, entry)

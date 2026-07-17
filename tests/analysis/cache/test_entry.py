@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 
-from quodeq.analysis.cache.entry import CacheEntry, ENTRY_FORMAT_VERSION
+from quodeq.analysis.cache.entry import CacheEntry, ENTRY_FORMAT_VERSION, build_provenance
 
 
 def _make(**overrides) -> CacheEntry:
@@ -119,3 +119,18 @@ def test_from_json_ignores_unknown_future_keys():
     restored = CacheEntry.from_json(future)
     assert restored.key == "abc123"
     assert restored.model_id == "m"
+
+
+class TestProvenanceEffectiveParams:
+    def test_build_provenance_records_effective_params(self):
+        prov = build_provenance(
+            model_id="m", prompts_hash="p", standards_hash="s", version="1.0",
+            effective_params={"M-ANA-2": {"max_lines": 60}},
+        )
+        assert prov["effective_params"] == {"M-ANA-2": {"max_lines": 60}}
+
+    def test_build_provenance_defaults_to_empty_params(self):
+        prov = build_provenance(
+            model_id="m", prompts_hash="p", standards_hash="s", version="1.0",
+        )
+        assert prov["effective_params"] == {}
