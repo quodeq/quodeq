@@ -58,3 +58,9 @@ export const settingsKeys = {
   llamacppModels: () => ["settings", "llamacppModels"],
   omlxModels: () => ["settings", "omlxModels"],
 };
+
+export const sharedKeys = {
+  all: () => ["shared"],
+  status: () => ["shared", "status"],
+  projects: () => ["shared", "projects"],
+};

@@ -7,6 +7,7 @@ import ProviderTabs from './ProviderTabs.jsx';
 import AssistantProviderTabs from './AssistantProviderTabs.jsx';
 import TerminalSection from './TerminalSection.jsx';
 import ServerSection from './ServerSection.jsx';
+import SharedRepoSection from './SharedRepoSection.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 
@@ -41,6 +42,7 @@ export default function SettingsPage({ theme, onOpenGradeFormula }) {
         <AssistantProviderTabs providerConfigs={providerConfigs} />
         <TerminalSection />
         <ServerSection />
+        <SharedRepoSection />
         <section className="panel settings-section">
           <div className="panel-header">
             <SectionLabel marker="▶">Grade formula</SectionLabel>
