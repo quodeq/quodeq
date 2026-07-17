@@ -33,6 +33,7 @@ from quodeq.services.shared_repo import (
     shared_evaluations_root,
     shared_index_db_path,
     shared_score_cache_path,
+    sync_shared_index,
     validate_remote_url,
 )
 from quodeq.services.shared_settings import (
@@ -189,6 +190,20 @@ def register_shared_routes(app: Flask) -> None:
     @app.get("/api/shared/projects")
     @_with_shared_root
     def shared_projects(eval_root: Path, url: str):
+        stale = None
+        if request.args.get("refresh") == "1":
+            # Refresh-on-read: the UI calls this on tab entry to force the
+            # clone up to date before listing, rather than showing whatever
+            # was last fetched. A failed refresh (host unreachable) is not
+            # fatal -- fall through and serve the existing (now-stale)
+            # clone contents, just flag it. The index is only re-synced
+            # after a successful refresh; there is nothing new to index
+            # when the fetch itself failed.
+            if refresh_shared_clone(url):
+                sync_shared_index(url)
+                stale = False
+            else:
+                stale = True
         projects = _fs_projects.build_project_list(eval_root)
         listing = {"projects": [to_camel_dict(p) for p in projects]}
         meta = published_meta(url)
@@ -197,6 +212,8 @@ def register_shared_routes(app: Flask) -> None:
             project.update(meta.get(key, {}))
             project["source"] = "shared"
         listing["lastSynced"] = last_synced_at(url)
+        if stale is not None:
+            listing["stale"] = stale
         return jsonify(listing)
 
     @app.get("/api/shared/projects/<project>/info")

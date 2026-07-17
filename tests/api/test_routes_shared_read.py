@@ -186,6 +186,69 @@ def test_shared_projects_lists_published(client, shared_clone_fixture):
     assert "lastSynced" in body
 
 
+def test_shared_projects_without_refresh_param_omits_stale(client, shared_clone_fixture):
+    """Backward compat: a plain GET (no ?refresh=1) never forces a fetch and
+    never gains a "stale" key -- the refresh-on-read behaviour is opt-in."""
+    resp = client.get("/api/shared/projects")
+    assert resp.status_code == 200
+    assert "stale" not in resp.get_json()
+
+
+def test_shared_projects_refresh_success_reports_fresh_and_syncs_index(
+    client, shared_clone_fixture, monkeypatch
+):
+    """?refresh=1 calls refresh_shared_clone first; on success it also calls
+    sync_shared_index and the response gains "stale": False."""
+    calls: list[str] = []
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared.refresh_shared_clone",
+        lambda url: calls.append(f"refresh:{url}") or True,
+    )
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared.sync_shared_index",
+        lambda url: calls.append(f"sync:{url}"),
+    )
+    resp = client.get("/api/shared/projects?refresh=1")
+    assert resp.status_code == 200
+    assert resp.get_json()["stale"] is False
+    assert calls == [f"refresh:{shared_clone_fixture}", f"sync:{shared_clone_fixture}"]
+
+
+def test_shared_projects_refresh_failure_reports_stale_and_skips_sync(
+    client, shared_clone_fixture, monkeypatch
+):
+    """When refresh_shared_clone fails, the response gains "stale": True and
+    sync_shared_index is never called (nothing new was fetched to index)."""
+    sync_calls: list[str] = []
+    monkeypatch.setattr("quodeq.api.routes_shared.refresh_shared_clone", lambda url: False)
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared.sync_shared_index",
+        lambda url: sync_calls.append(url),
+    )
+    resp = client.get("/api/shared/projects?refresh=1")
+    assert resp.status_code == 200
+    assert resp.get_json()["stale"] is True
+    assert sync_calls == []
+
+
+def test_shared_projects_refresh_stale_when_origin_unreachable(
+    client, shared_clone_fixture, tmp_path
+):
+    """End-to-end: the origin bare repo becomes unreachable (e.g. renamed
+    away/deleted), so `git fetch` fails and the forced refresh reports
+    stale, while the already-cloned (now-stale) project listing still
+    renders from the local cache instead of erroring out."""
+    origin_path = Path(shared_clone_fixture.removeprefix("file://"))
+    origin_path.rename(tmp_path / "origin-moved.git")
+
+    resp = client.get("/api/shared/projects?refresh=1")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["stale"] is True
+    ids = [p.get("id") or p.get("name") for p in body["projects"]]
+    assert "proj-a" in ids
+
+
 # --- GET /api/shared/projects/<project>/info ----------------------------------
 
 def test_shared_project_info(client, shared_clone_fixture):
