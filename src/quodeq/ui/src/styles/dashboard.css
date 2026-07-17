@@ -2946,6 +2946,7 @@
 
 .project-card-footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
   padding: var(--space-2) var(--space-4);
@@ -2957,7 +2958,9 @@
 
 .project-card:hover .project-card-footer,
 .project-card:focus-within .project-card-footer,
-.project-card:has(.project-delete-btn--confirm) .project-card-footer {
+.project-card:has(.project-delete-btn--confirm) .project-card-footer,
+.project-card:has(.project-card-footer-error) .project-card-footer,
+.project-card:has(.project-delete-btn--pending) .project-card-footer {
   opacity: 1;
   pointer-events: auto;
 }
@@ -3018,6 +3021,34 @@
 .project-delete-confirm-label {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
+}
+
+/* Publish action (local cards, leftmost in the footer -- see CardFooter in
+   ProjectsPage.jsx). Reuses the .project-delete-btn base sizing, accent
+   colored. `aria-disabled` (not the native attribute) keeps the click
+   firing while a job is running, matching this codebase's is-disabled
+   convention -- see connectingRef/refreshingRef/pullingRef in
+   useSharedProjects.js and the EmptyProjectsCTA comment. */
+.project-delete-btn--accent {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.project-delete-btn--accent:hover {
+  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+}
+
+.project-delete-btn--accent[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Publish failure text -- flex-basis:100% forces it onto its own line
+   below the button row, inside the same (now wrap-enabled) footer. */
+.project-card-footer-error {
+  flex-basis: 100%;
+  margin: var(--space-1) 0 0;
+  text-align: right;
 }
 
 /* Resume-setup badge on project cards with onboardingCompletedAt === null.

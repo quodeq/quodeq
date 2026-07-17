@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
@@ -7,35 +7,19 @@ import ProjectsPage from './ProjectsPage.jsx';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 
-describe('ProjectsPage', () => {
-  it('renders a "setup incomplete" badge on online-location projects', () => {
-    const projects = [
-      { id: 'a', name: 'local-one', location: 'local' },
-      { id: 'b', name: 'online-legacy', location: 'online' },
-    ];
-    render(<ProjectsPage projects={projects} actions={{}} />);
-    const badges = screen.queryAllByText(/setup incomplete/i);
-    expect(badges).toHaveLength(1);
-  });
-
-  it('renders no badge when all projects are local', () => {
-    const projects = [
-      { id: 'a', name: 'one', location: 'local' },
-      { id: 'b', name: 'two', location: 'local' },
-    ];
-    render(<ProjectsPage projects={projects} actions={{}} />);
-    expect(screen.queryByText(/setup incomplete/i)).not.toBeInTheDocument();
-  });
-});
-
 // Task 18: local/online sub-tabs + shared-repo browse states.
+// Task 20: publish action -- the local tab now fetches shared status/list
+// on mount too (see usePublish.js), so every render with a non-empty local
+// project list needs an ApiProvider from here on (previously the local tab
+// never touched the API at all).
 function makeFakeApi(overrides = {}) {
   return {
-    getSharedStatus: vi.fn(async () => ({ configured: false, url: null })),
+    getSharedStatus: vi.fn(async () => ({ configured: false, url: null, publish: { state: 'idle' } })),
     sharedListProjects: vi.fn(async () => ({ projects: [], lastSynced: null, stale: false })),
     connectShared: vi.fn(async (url) => ({ configured: true, url })),
     refreshShared: vi.fn(async () => ({ stale: false, lastSynced: '2026-07-17T00:00:00Z' })),
     pullSharedProject: vi.fn(async (id) => ({ imported: true, projectId: id })),
+    publishProject: vi.fn(async () => ({ started: true })),
     ...overrides,
   };
 }
@@ -48,6 +32,31 @@ function renderWithApi(ui, fakeApi) {
     </QC>
   );
 }
+
+describe('ProjectsPage', () => {
+  it('renders a "setup incomplete" badge on online-location projects', async () => {
+    const projects = [
+      { id: 'a', name: 'local-one', location: 'local' },
+      { id: 'b', name: 'online-legacy', location: 'online' },
+    ];
+    const fakeApi = makeFakeApi();
+    renderWithApi(<ProjectsPage projects={projects} actions={{}} />, fakeApi);
+    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
+    const badges = screen.queryAllByText(/setup incomplete/i);
+    expect(badges).toHaveLength(1);
+  });
+
+  it('renders no badge when all projects are local', async () => {
+    const projects = [
+      { id: 'a', name: 'one', location: 'local' },
+      { id: 'b', name: 'two', location: 'local' },
+    ];
+    const fakeApi = makeFakeApi();
+    renderWithApi(<ProjectsPage projects={projects} actions={{}} />, fakeApi);
+    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
+    expect(screen.queryByText(/setup incomplete/i)).not.toBeInTheDocument();
+  });
+});
 
 describe('ProjectsPage — local/online tab row', () => {
   it('renders both tabs, with local active by default', () => {
@@ -98,9 +107,11 @@ describe('ProjectsPage — local/online tab row', () => {
     expect(onTabChange).toHaveBeenCalledWith('online');
   });
 
-  it('local tab body (cards/empty-state) is unaffected by the new tab row', () => {
+  it('local tab body (cards/empty-state) is unaffected by the new tab row', async () => {
     const projects = [{ id: 'a', name: 'one', location: 'local' }];
-    render(<ProjectsPage projects={projects} actions={{}} />);
+    const fakeApi = makeFakeApi();
+    renderWithApi(<ProjectsPage projects={projects} actions={{}} />, fakeApi);
+    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
     expect(screen.getByText('one')).toBeInTheDocument();
   });
 });
@@ -246,5 +257,122 @@ describe('ProjectsPage — online tab, configured', () => {
     await user.click(screen.getByRole('button', { name: 'copy' }));
 
     await waitFor(() => expect(pullSharedProject).toHaveBeenLastCalledWith('shared-1', 'copy'));
+  });
+});
+
+// Task 20: publish action on LOCAL cards.
+describe('ProjectsPage — local tab, publish action', () => {
+  const localProjects = [
+    { id: 'p1', name: 'demo-one', location: 'local' },
+    { id: 'p2', name: 'demo-two', location: 'local' },
+  ];
+
+  function unconfiguredApi(overrides = {}) {
+    return makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: false, url: null, publish: { state: 'idle' } })),
+      ...overrides,
+    });
+  }
+
+  function configuredLocalApi(overrides = {}) {
+    return makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({
+        configured: true,
+        url: 'https://github.com/team/results.git',
+        publish: { state: 'idle', project: null, runs: null, error: null, finished_at: null },
+      })),
+      sharedListProjects: vi.fn(async () => ({ projects: [], lastSynced: null, stale: false })),
+      publishProject: vi.fn(async () => ({ started: true })),
+      ...overrides,
+    });
+  }
+
+  it('hides the publish button entirely when no shared repo is configured', async () => {
+    const fakeApi = unconfiguredApi();
+    renderWithApi(<ProjectsPage projects={localProjects} actions={{}} />, fakeApi);
+
+    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: 'publish' })).not.toBeInTheDocument();
+  });
+
+  it('shows a publish button per local card when a shared repo is configured', async () => {
+    const fakeApi = configuredLocalApi();
+    renderWithApi(<ProjectsPage projects={localProjects} actions={{}} />, fakeApi);
+
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'publish' })).toHaveLength(2));
+  });
+
+  it('clicking publish calls publishProject(id), then disables every publish button and labels the clicked one "publishing..."', async () => {
+    const user = userEvent.setup();
+    const fakeApi = configuredLocalApi();
+    renderWithApi(<ProjectsPage projects={localProjects} actions={{}} />, fakeApi);
+
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'publish' })).toHaveLength(2));
+
+    const [firstBtn] = screen.getAllByRole('button', { name: 'publish' });
+    await user.click(firstBtn);
+
+    await waitFor(() => expect(fakeApi.publishProject).toHaveBeenCalledWith('p1'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'publishing...' })).toBeInTheDocument());
+
+    const publishingBtn = screen.getByRole('button', { name: 'publishing...' });
+    expect(publishingBtn).toHaveAttribute('aria-disabled', 'true');
+
+    // The other card's button keeps its "publish" label (it wasn't clicked)
+    // but is disabled too -- the single global job blocks every button.
+    const otherBtn = screen.getByRole('button', { name: 'publish' });
+    expect(otherBtn).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('shows the API error message verbatim under the footer on a failed publish', async () => {
+    const user = userEvent.setup();
+    const fakeApi = configuredLocalApi({
+      publishProject: vi.fn(async () => { throw new Error('a publish is already running'); }),
+    });
+    renderWithApi(<ProjectsPage projects={localProjects} actions={{}} />, fakeApi);
+
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'publish' })).toHaveLength(2));
+    await user.click(screen.getAllByRole('button', { name: 'publish' })[0]);
+
+    await waitFor(() => expect(screen.getByText('a publish is already running')).toBeInTheDocument());
+  });
+
+  it('shows "published <relative time>" on the card once the job completes, after re-fetching the shared list', async () => {
+    // Fake timers are live for the whole test (real timers never elapse
+    // 2s here). userEvent internally schedules with setTimeout too, so
+    // this uses fireEvent (synchronous, no internal timers) for the click,
+    // and `advanceTimersByTimeAsync` (which also flushes microtasks between
+    // ticks) instead of `waitFor` to progress past each async step.
+    vi.useFakeTimers();
+    try {
+      const getSharedStatus = vi.fn()
+        .mockResolvedValueOnce({
+          configured: true, publish: { state: 'idle', project: null, runs: null, error: null, finished_at: null },
+        })
+        .mockResolvedValueOnce({ configured: true, publish: { state: 'done', project: 'p1', runs: 2 } });
+      const sharedListProjects = vi.fn()
+        .mockResolvedValueOnce({ projects: [], lastSynced: null, stale: false })
+        .mockResolvedValueOnce({
+          projects: [{ id: 'p1', name: 'demo-one', publishedAt: '2026-07-16T00:00:00Z' }],
+          lastSynced: '2026-07-17T00:00:00Z',
+          stale: false,
+        });
+      const fakeApi = configuredLocalApi({ getSharedStatus, sharedListProjects });
+      renderWithApi(<ProjectsPage projects={localProjects} actions={{}} />, fakeApi);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(screen.getAllByRole('button', { name: 'publish' })).toHaveLength(2);
+
+      fireEvent.click(screen.getAllByRole('button', { name: 'publish' })[0]);
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(fakeApi.publishProject).toHaveBeenCalledWith('p1');
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+
+      expect(screen.getByText(/published /)).toBeInTheDocument();
+      expect(sharedListProjects).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

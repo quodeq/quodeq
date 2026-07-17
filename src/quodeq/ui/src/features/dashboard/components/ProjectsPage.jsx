@@ -4,6 +4,7 @@ import { gradeLabel, gradeLetter, extDisplayName } from '../../../utils/formatte
 import { TermHeader, TermInput } from '../../../components/terminal/index.js';
 import { relativeTime } from '../../../components/LastFetchedLine.jsx';
 import { useSharedProjects } from '../hooks/useSharedProjects.js';
+import { usePublish } from '../hooks/usePublish.js';
 
 const DISCIPLINE_LABEL = {
   frontend_nextjs: 'Next.js',
@@ -115,6 +116,18 @@ function PublishedMeta({ publishedBy, publishedAt }) {
   );
 }
 
+// "published <relative time>" — LOCAL cards that have a counterpart on the
+// shared list (matched by id in ProjectsPage, see publishedAtByProject).
+// Unlike PublishedMeta above, a local card doesn't know a publishedBy (it's
+// always "you"), so this omits the "by <name>" clause entirely rather than
+// hardcoding a name.
+function LocalPublishedMeta({ publishedAt }) {
+  if (!publishedAt) return null;
+  const rel = relativeTime(publishedAt);
+  if (!rel) return null;
+  return <div className="project-card-published-meta">published {rel}</div>;
+}
+
 function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildren, source = 'local' }) {
   const { onSelect, footer, isChild = false, onResumeSetup } = cardProps;
   const id = project.id || project.name || project;
@@ -169,6 +182,7 @@ function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildr
         <div className="project-card-bottom">
           <LanguageNumbers stats={project.languageStats} filesCount={project.filesCount} />
           {source === 'online' && <PublishedMeta publishedBy={project.publishedBy} publishedAt={project.publishedAt} />}
+          {source === 'local' && <LocalPublishedMeta publishedAt={project.publishedAt} />}
           {cardChildren}
         </div>
       </div>
@@ -221,7 +235,10 @@ function computeProjectTree(projects) {
   return { children, roots };
 }
 
-function CardFooter({ name, confirming, setConfirming, onDelete, onExport }) {
+// publishActions is undefined for child/subproject cards where the caller
+// hasn't wired publish support (e.g. no shared repo configured), and for
+// online cards which never render this footer at all.
+function CardFooter({ name, confirming, setConfirming, onDelete, onExport, publishActions }) {
   if (confirming === name) {
     return (
       <div className="project-card-actions">
@@ -231,10 +248,36 @@ function CardFooter({ name, confirming, setConfirming, onDelete, onExport }) {
       </div>
     );
   }
+  const {
+    configured = false,
+    publishState = 'idle',
+    publishingProject = null,
+    publishError = null,
+    publishErrorProject = null,
+    onPublish,
+  } = publishActions || {};
+  const isThisPublishing = publishState === 'running' && publishingProject === name;
+  // Single global publish job: while ANY project is publishing, every
+  // publish button is disabled, not just the one that was clicked.
+  const publishDisabled = publishState === 'running';
+  const showError = !!publishError && publishErrorProject === name;
   return (
     <>
-      <button type="button" className="project-delete-btn" title="Download project reports" aria-label="Download project reports" onClick={(e) => { e.stopPropagation(); onExport?.(name); }}><DownloadIcon /></button>
-      <button type="button" className="project-delete-btn" title="Delete project" aria-label="Delete project" onClick={(e) => { e.stopPropagation(); setConfirming(name); }}><TrashIcon /></button>
+      <div className="project-card-actions">
+        {configured && (
+          <button
+            type="button"
+            className={`project-delete-btn project-delete-btn--accent${publishDisabled ? ' is-disabled' : ''}${isThisPublishing ? ' project-delete-btn--pending' : ''}`}
+            aria-disabled={publishDisabled || undefined}
+            onClick={(e) => { e.stopPropagation(); onPublish?.(name); }}
+          >
+            {isThisPublishing ? 'publishing...' : 'publish'}
+          </button>
+        )}
+        <button type="button" className="project-delete-btn" title="Download project reports" aria-label="Download project reports" onClick={(e) => { e.stopPropagation(); onExport?.(name); }}><DownloadIcon /></button>
+        <button type="button" className="project-delete-btn" title="Delete project" aria-label="Delete project" onClick={(e) => { e.stopPropagation(); setConfirming(name); }}><TrashIcon /></button>
+      </div>
+      {showError && <p className="inline-error project-card-footer-error">{publishError}</p>}
     </>
   );
 }
@@ -274,7 +317,7 @@ function ProjectPathContent({ id, p, relocateActions, subprojectCount = 0 }) {
   );
 }
 
-function ProjectChildren({ childList, selectedProject, onSelect, confirmActions, onResumeSetup }) {
+function ProjectChildren({ childList, selectedProject, onSelect, confirmActions, onResumeSetup, publishActions }) {
   const { confirming, setConfirming, onDelete, onExport } = confirmActions;
   return (
     <div className="project-children-outer">
@@ -282,7 +325,7 @@ function ProjectChildren({ childList, selectedProject, onSelect, confirmActions,
         const childId = child.id || child.name || child;
         return (
           <div key={childId} className="project-child-entry">
-            <ProjectCard project={child} isSelected={childId === selectedProject} cardProps={{ onSelect, isChild: true, onResumeSetup, footer: <CardFooter name={childId} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} /> }} />
+            <ProjectCard project={child} isSelected={childId === selectedProject} cardProps={{ onSelect, isChild: true, onResumeSetup, footer: <CardFooter name={childId} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} publishActions={publishActions} /> }} />
           </div>
         );
       })}
@@ -290,7 +333,7 @@ function ProjectChildren({ childList, selectedProject, onSelect, confirmActions,
   );
 }
 
-function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, dialogActions, onResumeSetup }) {
+function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, dialogActions, onResumeSetup, publishActions }) {
   const { confirmActions, relocateActions } = dialogActions;
   const { confirming, setConfirming, onDelete, onExport } = confirmActions;
   const id = p.id || p.name || p;
@@ -299,10 +342,10 @@ function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelec
   const childSelected = hasChildren && childProjects[id].some((c) => (c.id || c.name || c) === selectedProject);
   return (
     <div key={id} className={`project-card-group${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}>
-      <ProjectCard project={p} isSelected={isSelected} cardProps={{ onSelect, onResumeSetup, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} /> }}>
+      <ProjectCard project={p} isSelected={isSelected} cardProps={{ onSelect, onResumeSetup, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} publishActions={publishActions} /> }}>
         <ProjectPathContent id={id} p={p} relocateActions={relocateActions} subprojectCount={hasChildren ? childProjects[id].length : 0} />
       </ProjectCard>
-      {hasChildren && <ProjectChildren childList={childProjects[id]} selectedProject={selectedProject} onSelect={onSelect} confirmActions={confirmActions} onResumeSetup={onResumeSetup} />}
+      {hasChildren && <ProjectChildren childList={childProjects[id]} selectedProject={selectedProject} onSelect={onSelect} confirmActions={confirmActions} onResumeSetup={onResumeSetup} publishActions={publishActions} />}
     </div>
   );
 }
@@ -555,10 +598,49 @@ function OnlineProjectsTab({ onSelect }) {
 
 export default function ProjectsPage({ projects = [], selectedProject, isEvaluating = false, sourceTab = 'local', actions }) {
   const { onSelect, onDelete, onExport, onRelocate, onAddProject, onImportProject, onResumeSetup, onTabChange } = actions;
-  const { children, roots } = useMemo(() => computeProjectTree(projects), [projects]);
   const [confirming, setConfirming] = useState(null);
   const relocateActions = useRelocateDialog(onRelocate);
   const activeTab = sourceTab === 'online' ? 'online' : 'local';
+
+  // Publish action + job-progress polling for LOCAL cards (Task 20). Only
+  // fetches shared status/the shared list (both with refresh:false, so this
+  // never forces a real git fetch -- that stays the online sub-tab's job)
+  // when there's actually something to decorate: the local tab is active
+  // and has at least one card. Hooks run unconditionally either way; only
+  // the internal effect is gated.
+  const {
+    configured: sharedConfigured,
+    publishedAtByProject,
+    publishState,
+    publishingProject,
+    publishError,
+    publishErrorProject,
+    publish,
+  } = usePublish({ enabled: activeTab === 'local' && projects.length > 0 });
+
+  // Local project objects never carry publishedAt on their own (it lives
+  // only on the shared list's git-log-derived metadata) -- merge it in by
+  // id/name so ProjectCard can read `project.publishedAt` uniformly for
+  // both local and online sources.
+  const projectsWithPublished = useMemo(() => {
+    if (!sharedConfigured || Object.keys(publishedAtByProject).length === 0) return projects;
+    return projects.map((p) => {
+      const id = p.id || p.name || p;
+      const publishedAt = publishedAtByProject[id];
+      return publishedAt ? { ...p, publishedAt } : p;
+    });
+  }, [projects, publishedAtByProject, sharedConfigured]);
+
+  const { children, roots } = useMemo(() => computeProjectTree(projectsWithPublished), [projectsWithPublished]);
+
+  const publishActions = {
+    configured: sharedConfigured,
+    publishState,
+    publishingProject,
+    publishError,
+    publishErrorProject,
+    onPublish: publish,
+  };
 
   return (
     <section className="projects-page projects-page--terminal">
@@ -615,6 +697,7 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
                 confirmActions: { confirming, setConfirming, onDelete, onExport },
                 relocateActions,
               }}
+              publishActions={publishActions}
             />
           ))}
         </div>
