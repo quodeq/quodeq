@@ -125,7 +125,14 @@ def _build_router(
             )
         from quodeq.analysis.cache.cache_writer import build_cache_writer  # noqa: PLC0415
         src_root = Path(server_args.work_dir) if server_args.work_dir else Path.cwd()
-        standards_dir = Path(server_args.compiled_dir) if server_args.compiled_dir else None
+        # NOTE: standards_dir must be the standards ROOT (parent of
+        # "compiled/"), not server_args.compiled_dir. build_cache_writer /
+        # dimension_params_state append "compiled/<dim>.json" themselves;
+        # passing compiled_dir here double-appends "compiled" and the
+        # params-fingerprint lookup silently misses, keying every entry
+        # under the default-thresholds key. --standards-dir is None when
+        # not supplied by the caller (back-compat: no params fingerprint).
+        standards_dir = Path(server_args.standards_dir) if server_args.standards_dir else None
         cache_writer = build_cache_writer(
             cache_root=Path(server_args.cache_root),
             src_root=src_root,

@@ -278,6 +278,48 @@ class TestBuildMcpServerArgs:
         model_idx = args.index("--model-id")
         assert args[model_idx + 1] == "unknown"
 
+    def test_includes_standards_dir_from_run_config(self, tmp_path):
+        """Final-review fix: the cli-register path (e.g. Gemini) must also
+        emit --standards-dir from RunConfig.standards_dir -- the standards
+        ROOT, not AnalysisConfig.compiled_dir (which is already
+        standards_dir/"compiled"). Without this, the same params-fingerprint
+        bug findings_server.py had would resurface for cli-register providers.
+        """
+        from types import SimpleNamespace
+
+        jsonl = tmp_path / "findings.jsonl"
+        standards_dir = tmp_path / "standards"
+        run_config = SimpleNamespace(
+            language="kotlin",
+            standards_dir=standards_dir,
+            options=SimpleNamespace(subagent_model="sonnet", ai_model="opus"),
+        )
+        compiled = standards_dir / "compiled"
+        config = AnalysisConfig(
+            jsonl_file=jsonl, compiled_dir=compiled, dimension="security",
+            run_config=run_config,
+        )
+        args = _build_mcp_server_args(config)
+
+        assert "--standards-dir" in args
+        sd_idx = args.index("--standards-dir")
+        assert args[sd_idx + 1] == str(standards_dir.resolve())
+        # Sanity: distinct from --compiled-dir's value (the bug this guards
+        # against conflated the two).
+        cd_idx = args.index("--compiled-dir")
+        assert args[cd_idx + 1] != args[sd_idx + 1]
+
+    def test_standards_dir_absent_without_run_config(self, tmp_path):
+        """No RunConfig carrier => --standards-dir is omitted entirely (not
+        emitted as empty/None), matching the other run_config-derived flags'
+        omission pattern in this file.
+        """
+        jsonl = tmp_path / "findings.jsonl"
+        config = AnalysisConfig(jsonl_file=jsonl)
+        args = _build_mcp_server_args(config)
+
+        assert "--standards-dir" not in args
+
 
 # ---------------------------------------------------------------------------
 # _mcp_server_name
