@@ -100,7 +100,9 @@ export default function SharedRepoSection() {
         <div className="settings-row-label">
           <span className="settings-label">Repository URL</span>
           <span className="settings-description">
-            {configured ? (
+            {isLoading && !status ? (
+              <>Checking…</>
+            ) : configured ? (
               <>Configured: <code>{currentUrl}</code></>
             ) : (
               <>Not configured</>

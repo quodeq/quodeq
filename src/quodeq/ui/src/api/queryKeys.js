@@ -62,5 +62,4 @@ export const settingsKeys = {
 export const sharedKeys = {
   all: () => ["shared"],
   status: () => ["shared", "status"],
-  projects: () => ["shared", "projects"],
 };
