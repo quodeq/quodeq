@@ -1,15 +1,6 @@
 # Grandfathered layer-import violations. Do NOT add entries without
 # justification -- the goal is to burn this list down, not grow it.
 # Regenerate intentionally: python tools/check_imports.py --update-baseline
-src/quodeq/analysis/_api_runner.py:36:context
-src/quodeq/analysis/_api_runner.py:37:context
-src/quodeq/analysis/api_prompt_assembly.py:14:context
-src/quodeq/analysis/api_prompt_assembly.py:15:context
-src/quodeq/analysis/mcp/enricher.py:17:context
-src/quodeq/analysis/mcp/enricher.py:18:context
-src/quodeq/analysis/mcp/enricher.py:19:context
-src/quodeq/analysis/mcp/findings_server.py:20:context
-src/quodeq/analysis/mcp/findings_server.py:21:context
 src/quodeq/analysis/subprocess.py:262:llm_bridge
 src/quodeq/api/_evaluation_routes.py:21:analysis
 src/quodeq/api/import_project.py:30:data
