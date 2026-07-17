@@ -16,6 +16,7 @@ import { TermHeader } from '../../../components/terminal/index.js';
 import EmptyState from '../../../components/EmptyState.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import FittedText from '../../../components/FittedText.jsx';
+import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { abbrevDim } from '../utils/dimAbbrev.js';
 
 const TOAST_DISMISS_MS = 2600;
@@ -329,7 +330,7 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
   );
 }
 
-function HistoryContent({ data, callbacks, runNav, languageSub }) {
+function HistoryContent({ data, callbacks, runNav, languageSub, selectedSource }) {
   const { trend, selectedRunId, availableRuns } = data;
   const { onRunClick, onRunHover, onRunHoverEnd, onRunChange, onDeleteRun } = callbacks;
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
@@ -362,6 +363,7 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
         <TermHeader
           name="history"
           sub={`${trend.length} eval${trend.length !== 1 ? 's' : ''}${languageSub ? ` · ${languageSub}` : ''}`}
+          badge={selectedSource === 'shared' ? <SharedReadOnlyBadge /> : null}
         />
         {availableRuns && availableRuns.length > 0 && (
           <div className="history-run-nav">
@@ -473,7 +475,11 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   }, [projectInfo]);
 
   if (!projectsLoaded) return <LoadingScreen />;
-  if (projects.length === 0) {
+  // The LOCAL projects list can legitimately be empty while a teammate is
+  // viewing a shared project (they may have never added a local project of
+  // their own) -- gate this wall on the local list only for local selections,
+  // so a shared selection falls through to the normal shared data flow below.
+  if (projects.length === 0 && selectedSource !== 'shared') {
     return (
       <HistoryEmptyShell sub="no projects yet">
         <EmptyState
@@ -503,6 +509,20 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   // its scores already show on the Overview.
   if (visibleHistoryRows(availableRuns, trend).length === 0) {
     if (loading || isFetching) return <LoadingScreen />;
+    // Shared projects are read-only in the app -- evaluations only ever run
+    // locally, so "Start evaluation" has nowhere useful to send a
+    // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
+    // precedent this mirrors).
+    if (selectedSource === 'shared') {
+      return (
+        <HistoryEmptyShell sub="no evaluations yet">
+          <EmptyState
+            title="No completed evaluation yet"
+            description="no completed evaluation in this shared project yet"
+          />
+        </HistoryEmptyShell>
+      );
+    }
     const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
     return (
       <HistoryEmptyShell sub="no evaluations yet">
@@ -529,6 +549,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
       }}
       runNav={{ runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest }}
       languageSub={languageSub}
+      selectedSource={selectedSource}
     />
   );
 }

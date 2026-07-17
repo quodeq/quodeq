@@ -93,3 +93,83 @@ describe('HistoryPage — delete-run source gating', () => {
     expect(screen.getByText('Jul 1, 2026')).toBeInTheDocument();
   });
 });
+
+// Final whole-branch review: Critical 1 (evaluate CTA gating), Finding 3
+// (teammate persona -- shared selection + zero local projects), Finding 6
+// (shared read-only chip).
+function renderHistoryPageWithData(overrides = {}) {
+  const QC = withQueryClient();
+  const fakeApi = makeFakeApi();
+  render(
+    <QC>
+      <ApiProvider value={fakeApi}>
+        <HistoryPage
+          trend={[]}
+          selection={{ selectedRunId: null }}
+          availableRuns={[]}
+          dimensions={{}}
+          callbacks={{
+            onRunClick: vi.fn(),
+            onDimensionClick: vi.fn(),
+            onNavigate: vi.fn(),
+            onRunChange: vi.fn(),
+            onRunDeleted: vi.fn(),
+          }}
+          projectInfo={null}
+          projects={[]}
+          projectsLoaded
+          selectedProject="shared-1"
+          selectedSource="shared"
+          loading={false}
+          isFetching={false}
+          {...overrides}
+        />
+      </ApiProvider>
+    </QC>,
+  );
+  return fakeApi;
+}
+
+describe('HistoryPage — evaluate CTA gating for shared (Critical 1)', () => {
+  it('shared source, no evaluations yet: no Start evaluation CTA, shared-specific copy', () => {
+    renderHistoryPageWithData();
+    expect(screen.getByText('No completed evaluation yet')).toBeInTheDocument();
+    expect(screen.getByText('no completed evaluation in this shared project yet')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start evaluation' })).toBeNull();
+  });
+
+  it('local source, no evaluations yet: Start evaluation CTA present (existing behavior)', () => {
+    renderHistoryPageWithData({
+      selectedSource: 'local', selectedProject: 'p1', projects: [{ id: 'p1', name: 'p1' }],
+    });
+    expect(screen.getByRole('button', { name: 'Start evaluation' })).toBeInTheDocument();
+  });
+});
+
+describe('HistoryPage — teammate persona: shared selection + zero local projects (Finding 3)', () => {
+  it('shared source with an empty LOCAL projects list renders the shared content path, not the Add-a-project wall', () => {
+    renderHistoryPageWithData({ trend, availableRuns, selection: { selectedRunId: 'r1' } });
+    expect(screen.queryByText('No projects yet')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add a project' })).toBeNull();
+  });
+
+  it('local source with an empty local projects list still shows the Add-a-project wall (unchanged)', () => {
+    renderHistoryPageWithData({ selectedSource: 'local', selectedProject: '', projects: [] });
+    expect(screen.getByText('No projects yet')).toBeInTheDocument();
+  });
+});
+
+describe('HistoryPage — shared read-only chip (Finding 6)', () => {
+  it('shows the chip for a shared project with data', () => {
+    renderHistoryPageWithData({ trend, availableRuns, selection: { selectedRunId: 'r1' } });
+    expect(screen.getByText('shared · read-only')).toBeInTheDocument();
+  });
+
+  it('omits the chip for a local project', () => {
+    renderHistoryPageWithData({
+      trend, availableRuns, selection: { selectedRunId: 'r1' },
+      selectedSource: 'local', selectedProject: 'p1', projects: [{ id: 'p1', name: 'p1' }],
+    });
+    expect(screen.queryByText('shared · read-only')).toBeNull();
+  });
+});

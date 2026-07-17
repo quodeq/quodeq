@@ -8,6 +8,7 @@ import { TermHeader, SevBadge, FlagPill } from '../../../components/terminal/ind
 import { useDismissedFindings } from './useDismissedFindings.js';
 import EmptyState from '../../../components/EmptyState.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
+import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 
 const MAX_TREE_DEPTH = 64;
 
@@ -231,7 +232,11 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
   });
 
   if (!projectsLoaded) return <LoadingScreen />;
-  if (projects.length === 0) {
+  // The LOCAL projects list can legitimately be empty while a teammate is
+  // viewing a shared project (they may have never added a local project of
+  // their own) -- gate this wall on the local list only for local selections,
+  // so a shared selection falls through to the normal shared data flow below.
+  if (projects.length === 0 && selectedSource !== 'shared') {
     return (
       <div className="violations-page violations-page--terminal">
         <TermHeader name="violations" sub="no projects yet" />
@@ -260,6 +265,21 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
   const hasAnyDimensionData = (accumulatedDimensions || []).length > 0;
   if (!hasAnyDimensionData) {
     if (loading || isFetching) return <LoadingScreen />;
+    // Shared projects are read-only in the app -- evaluations only ever run
+    // locally, so "Start evaluation" has nowhere useful to send a
+    // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
+    // precedent this mirrors).
+    if (selectedSource === 'shared') {
+      return (
+        <div className="violations-page violations-page--terminal">
+          <TermHeader name="violations" sub="no evaluations yet" />
+          <EmptyState
+            title="No completed evaluation yet"
+            description="no completed evaluation in this shared project yet"
+          />
+        </div>
+      );
+    }
     return (
       <div className="violations-page violations-page--terminal">
         <TermHeader name="violations" sub="no evaluations yet" />
@@ -291,7 +311,11 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
     <div className="violations-page violations-page--terminal">
       {restoreError && <div className="error-banner">{restoreError}</div>}
       <div className="violations-page__top">
-        <TermHeader name="violations" sub={subLine} />
+        <TermHeader
+          name="violations"
+          sub={subLine}
+          badge={selectedSource === 'shared' ? <SharedReadOnlyBadge /> : null}
+        />
         <div className="violations-flag-row">
           <FlagPill flag="by-dimension" active={activeSubTab === 'dimension'} onClick={() => setActiveSubTab('dimension')} />
           <FlagPill flag="by-file"      active={activeSubTab === 'file'}      onClick={() => setActiveSubTab('file')} />
