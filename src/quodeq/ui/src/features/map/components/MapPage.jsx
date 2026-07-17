@@ -174,7 +174,7 @@ export default function MapPage(props) {
   const state = useMapPageState(props);
 
   if (!projectsLoaded) return <LoadingScreen />;
-  if (projects.length === 0) {
+  if (projects.length === 0 && selectedSource !== 'shared') {
     return (
       <MapEmpty sub="no projects yet">
         <EmptyState

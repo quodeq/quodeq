@@ -41,6 +41,19 @@ describe('MapPage — evaluate CTA gating for shared (Critical 1)', () => {
   });
 });
 
+describe('MapPage, teammate persona: shared selection + zero local projects', () => {
+  it('shared source with an empty LOCAL projects list renders the shared content path, not the Add-a-project wall', () => {
+    renderPage(baseData({ projects: [] }));
+    expect(screen.queryByText('No projects yet')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add a project' })).toBeNull();
+  });
+
+  it('local source with an empty local projects list still shows the Add-a-project wall (unchanged)', () => {
+    renderPage(baseData({ selectedSource: 'local', selectedProject: '', projects: [] }));
+    expect(screen.getByText('No projects yet')).toBeInTheDocument();
+  });
+});
+
 describe('MapPage — shared read-only chip (Finding 6)', () => {
   const DIMS = [{ dimension: 'security', violations: [], compliance: [] }];
 
