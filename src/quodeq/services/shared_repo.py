@@ -7,6 +7,7 @@ layout as the local evaluations dir. We keep a shallow clone under
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import shutil
@@ -91,3 +92,35 @@ def last_synced_at(url: str, env: dict | None = None) -> float | None:
         except OSError:
             continue
     return None
+
+
+MARKER_FILENAME = "quodeq.json"
+FORMAT_NAME = "quodeq-shared-evaluations"
+FORMAT_VERSION = 1
+
+_GITIGNORE_CONTENT = "**/evaluation.db\n*.log\n"
+
+
+def check_repo_format(repo_root: Path) -> str:
+    marker = repo_root / MARKER_FILENAME
+    if marker.exists():
+        try:
+            data = json.loads(marker.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return "foreign"
+        if data.get("format") != FORMAT_NAME:
+            return "foreign"
+        if int(data.get("version", 0)) > FORMAT_VERSION:
+            return "unsupported_version"
+        return "ok"
+    entries = [p for p in repo_root.iterdir() if p.name != ".git"]
+    return "empty" if not entries else "foreign"
+
+
+def bootstrap_repo_layout(repo_root: Path) -> None:
+    marker_content = json.dumps({"format": FORMAT_NAME, "version": FORMAT_VERSION}) + "\n"
+    (repo_root / MARKER_FILENAME).write_text(marker_content, encoding="utf-8")
+    (repo_root / ".gitignore").write_text(_GITIGNORE_CONTENT, encoding="utf-8")
+    evaluations = repo_root / "evaluations"
+    evaluations.mkdir(exist_ok=True)
+    (evaluations / ".gitkeep").write_text("", encoding="utf-8")

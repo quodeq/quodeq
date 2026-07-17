@@ -3,6 +3,10 @@ import subprocess
 from pathlib import Path
 
 from quodeq.services.shared_repo import (
+    FORMAT_NAME,
+    MARKER_FILENAME,
+    bootstrap_repo_layout,
+    check_repo_format,
     ensure_shared_clone,
     refresh_shared_clone,
     run_git,
@@ -85,3 +89,31 @@ def test_run_git_survives_non_utf8_output(tmp_path):
     # The invalid bytes should be replaced with U+FFFD (replacement character)
     # Output may contain the replacement character or simply be non-empty
     assert output is not None
+
+
+def test_check_format_empty_then_bootstrap_then_ok(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    assert check_repo_format(repo) == "empty"
+    bootstrap_repo_layout(repo)
+    assert check_repo_format(repo) == "ok"
+    gitignore = (repo / ".gitignore").read_text(encoding="utf-8")
+    assert "**/evaluation.db" in gitignore
+    assert "*.log" in gitignore
+    assert (repo / "evaluations").is_dir()
+
+
+def test_check_format_newer_version_unsupported(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / MARKER_FILENAME).write_text(
+        '{"format": "%s", "version": 99}' % FORMAT_NAME, encoding="utf-8"
+    )
+    assert check_repo_format(repo) == "unsupported_version"
+
+
+def test_check_format_foreign_repo(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / "README.md").write_text("some other project", encoding="utf-8")
+    assert check_repo_format(repo) == "foreign"
