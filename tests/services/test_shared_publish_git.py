@@ -1,12 +1,14 @@
 """End-to-end publish flow against a local bare repo."""
 import json
+import os
 import subprocess
 from pathlib import Path
 
 import pytest
 
+import quodeq.services.shared_publish as shared_publish
 from quodeq.services.shared_publish import PublishError, publish_project
-from quodeq.services.shared_repo import shared_repo_path
+from quodeq.services.shared_repo import ensure_shared_clone, shared_repo_path
 
 
 def _bare_origin(tmp_path: Path) -> str:
@@ -96,3 +98,122 @@ def test_publish_race_rebase_retry(tmp_path):
     subprocess.run(["git", "clone", url, str(verify)], check=True, capture_output=True)
     assert (verify / "evaluations" / "proj-uuid-1" / "run-2").exists()
     assert (verify / "evaluations" / "other-proj").exists()
+
+
+def test_failed_rebase_conflict_is_aborted_and_clone_recovers(tmp_path, monkeypatch):
+    """A real rebase conflict must not wedge the persistent clone.
+
+    The clone under QUODEQ_CACHE_ROOT is reused across publishes, so a
+    failed rebase that leaves .git/rebase-merge on disk breaks every
+    subsequent publish with git's "already a rebase-merge directory"
+    error instead of a clean PublishError.
+    """
+    url = _bare_origin(tmp_path)
+    root = _local_project(tmp_path)
+    publish_project("proj-uuid-1", url, evaluations_root=root)
+
+    # A change we will try to publish next, conflicting with a racing push.
+    (root / "proj-uuid-1" / "repository_info.json").write_text('{"name":"local-change"}')
+
+    other_counter = {"n": 0}
+
+    def push_conflicting_change() -> None:
+        # Real git operations from a second clone, racing our own publish:
+        # it modifies the SAME file our pending commit touches, so the
+        # rebase that follows a rejected push hits a genuine conflict.
+        other_counter["n"] += 1
+        other = tmp_path / f"other-{other_counter['n']}"
+        subprocess.run(["git", "clone", url, str(other)], check=True, capture_output=True)
+        (other / "evaluations" / "proj-uuid-1" / "repository_info.json").write_text(
+            json.dumps({"name": f"remote-change-{other_counter['n']}"})
+        )
+        for cmd in (
+            ["git", "add", "."],
+            ["git", "commit", "-m", f"remote edit {other_counter['n']}"],
+            ["git", "push", "origin", "HEAD"],
+        ):
+            subprocess.run(cmd, cwd=other, check=True, capture_output=True)
+
+    real_run_git = shared_publish.run_git
+
+    def racing_run_git(args, *, cwd=None, timeout=300):
+        # Only the plain "push origin HEAD" attempt races; explicit-refspec
+        # pushes and everything else go straight to the real implementation.
+        if args == ["push", "origin", "HEAD"]:
+            push_conflicting_change()
+        return real_run_git(args, cwd=cwd, timeout=timeout)
+
+    monkeypatch.setattr(shared_publish, "run_git", racing_run_git)
+
+    repo = shared_repo_path(url)
+
+    with pytest.raises(PublishError) as excinfo_2:
+        publish_project("proj-uuid-1", url, evaluations_root=root)
+    assert not (repo / ".git" / "rebase-merge").exists()
+
+    # Without the fix, the clone above would still carry a wedged
+    # .git/rebase-merge, and this next call would fail with git's own
+    # "already a rebase-merge directory" error rather than a clean,
+    # push-rejected PublishError.
+    with pytest.raises(PublishError) as excinfo_3:
+        publish_project("proj-uuid-1", url, evaluations_root=root)
+    assert not (repo / ".git" / "rebase-merge").exists()
+    assert "already a rebase-merge directory" not in str(excinfo_3.value)
+    assert "already a rebase-merge directory" not in str(excinfo_2.value)
+
+
+@pytest.mark.skipif(
+    os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0),
+    reason="chmod-based permission denial is ineffective as root or on Windows",
+)
+def test_stage_failure_raises_publish_error_not_oserror(tmp_path):
+    """An OSError from bootstrap/stage (disk full, permissions) must
+    surface as PublishError, matching the documented "raises PublishError
+    on any failure" contract, not leak as a raw OSError.
+    """
+    url = _bare_origin(tmp_path)
+    root = _local_project(tmp_path)
+
+    # Pre-create the persistent clone (same call publish_project would
+    # make), then make its directory unwritable so bootstrap_repo_layout's
+    # write_text calls fail with a real PermissionError.
+    repo = ensure_shared_clone(url, None)
+    assert repo is not None
+    repo.chmod(0o555)
+    try:
+        with pytest.raises(PublishError) as excinfo:
+            publish_project("proj-uuid-1", url, evaluations_root=root)
+        assert "failed to stage project files" in str(excinfo.value)
+    finally:
+        repo.chmod(0o755)
+
+
+def test_push_falls_back_to_explicit_refspec_when_origin_head_push_fails(tmp_path, monkeypatch):
+    """_push falls back to an explicit refspec push when a plain
+    ``push origin HEAD`` fails. The empty-remote condition this fallback
+    targets cannot be reproduced deterministically with this git version,
+    so the first push call is forced to fail; everything else runs for
+    real.
+    """
+    url = _bare_origin(tmp_path)
+    root = _local_project(tmp_path)
+
+    real_run_git = shared_publish.run_git
+    state = {"failed_once": False}
+
+    def flaky_first_push(args, *, cwd=None, timeout=300):
+        if not state["failed_once"] and args == ["push", "origin", "HEAD"]:
+            state["failed_once"] = True
+            return False, "simulated"
+        return real_run_git(args, cwd=cwd, timeout=timeout)
+
+    monkeypatch.setattr(shared_publish, "run_git", flaky_first_push)
+
+    count = publish_project("proj-uuid-1", url, evaluations_root=root)
+    assert count == 1
+    assert state["failed_once"]  # the fallback branch was actually exercised
+
+    verify = tmp_path / "verify-fallback"
+    subprocess.run(["git", "clone", url, str(verify)], check=True, capture_output=True)
+    assert (verify / "quodeq.json").exists()
+    assert (verify / "evaluations" / "proj-uuid-1" / "run-1" / "status.json").exists()

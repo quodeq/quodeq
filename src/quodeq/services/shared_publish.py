@@ -135,10 +135,13 @@ def publish_project(
             "the configured repository does not look like a quodeq results repository, "
             "refusing to publish into it"
         )
-    if fmt == "empty":
-        bootstrap_repo_layout(repo)
+    try:
+        if fmt == "empty":
+            bootstrap_repo_layout(repo)
 
-    count = stage_project(project_dir, repo / "evaluations" / project_id)
+        count = stage_project(project_dir, repo / "evaluations" / project_id)
+    except OSError as exc:
+        raise PublishError(f"failed to stage project files, {exc}") from exc
 
     add_paths = [MARKER_FILENAME, ".gitignore", f"evaluations/{project_id}"]
     if (repo / "evaluations" / ".gitkeep").exists():
@@ -162,6 +165,10 @@ def publish_project(
         if ok_rebase:
             ok, out = _push(repo)
         else:
+            # A real conflict wedges the persistent clone with a lingering
+            # .git/rebase-merge directory, breaking every future publish.
+            # The clone is reused across calls, so always leave it clean.
+            run_git(["rebase", "--abort"], cwd=repo)
             out = out_rebase
     if not ok:
         raise PublishError(
