@@ -207,7 +207,7 @@ def published_meta(url: str, env: dict | None = None) -> dict[str, dict]:
             cwd=repo,
         )
         if ok and "|" in out:
-            author, _, ts = out.strip().partition("|")
+            author, _, ts = out.strip().rpartition("|")
             try:
                 result[entry.name] = {"publishedBy": author, "publishedAt": int(ts)}
             except ValueError:
