@@ -145,7 +145,7 @@ def publish_project(
             bootstrap_repo_layout(repo)
 
         count = stage_project(project_dir, repo / "evaluations" / project_id)
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         raise PublishError(f"failed to stage project files, {exc}") from exc
 
     add_paths = [MARKER_FILENAME, ".gitignore", f"evaluations/{project_id}"]
@@ -155,14 +155,20 @@ def publish_project(
     if not ok:
         raise PublishError(f"git add failed, {out.strip()[:300]}")
 
-    ok, _ = run_git(["diff", "--cached", "--quiet"], cwd=repo)
-    if ok:
-        return count  # nothing new to publish
-
-    message = f"Publish {project_id} ({count} runs) via quodeq {_app_version()}"
-    ok, out = run_git(["commit", "-m", message], cwd=repo)
-    if not ok:
-        raise PublishError(f"git commit failed, {out.strip()[:300]}")
+    # A clean `diff --cached` only means nothing NEW was staged this call; it
+    # does not mean the remote already has our commits. A prior publish can
+    # have committed locally and then failed to push (transient network
+    # error), leaving a local commit the remote never received. Retrying
+    # with unchanged project files hits this exact "nothing staged" state,
+    # so we must still fall through to the push below rather than returning
+    # early. A push with nothing new to send exits 0 ("Everything
+    # up-to-date"), so this stays a no-op for the true idempotent case.
+    nothing_staged, _ = run_git(["diff", "--cached", "--quiet"], cwd=repo)
+    if not nothing_staged:
+        message = f"Publish {project_id} ({count} runs) via quodeq {_app_version()}"
+        ok, out = run_git(["commit", "-m", message], cwd=repo)
+        if not ok:
+            raise PublishError(f"git commit failed, {out.strip()[:300]}")
 
     ok, out = _push(repo)
     if not ok:
