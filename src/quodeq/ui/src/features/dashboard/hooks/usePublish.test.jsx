@@ -214,4 +214,36 @@ describe('usePublish', () => {
 
     expect(fakeApi.sharedListProjects).not.toHaveBeenCalled();
   });
+
+
+  it('does not leak an interval when unmounted while polling', async () => {
+    vi.useFakeTimers();
+    try {
+      const getSharedStatus = vi.fn()
+        .mockResolvedValueOnce({ configured: true, publish: { state: 'running', project: 'p1' } });
+      const fakeApi = makeFakeApi({ getSharedStatus });
+      const { unmount } = renderHook(() => usePublish({ enabled: true }), {
+        wrapper: ({ children }) => wrap(fakeApi, children),
+      });
+
+      // Mount and start a publish (which starts polling).
+      await act(async () => {
+        // getSharedStatus was called once in loadStatus (sees running).
+        expect(getSharedStatus).toHaveBeenCalledTimes(1);
+      });
+
+      // Unmount before any poll tick fires.
+      unmount();
+
+      // Advance timers past when a poll would have fired.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4000);
+      });
+
+      // Must not have called getSharedStatus again after unmount.
+      expect(getSharedStatus).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

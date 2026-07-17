@@ -116,7 +116,7 @@ function PublishedMeta({ publishedBy, publishedAt }) {
   );
 }
 
-// "published <relative time>" — LOCAL cards that have a counterpart on the
+// "published <relative time>" - LOCAL cards that have a counterpart on the
 // shared list (matched by id in ProjectsPage, see publishedAtByProject).
 // Unlike PublishedMeta above, a local card doesn't know a publishedBy (it's
 // always "you"), so this omits the "by <name>" clause entirely rather than
@@ -267,7 +267,7 @@ function CardFooter({ name, confirming, setConfirming, onDelete, onExport, publi
         {configured && (
           <button
             type="button"
-            className={`project-delete-btn project-delete-btn--accent${publishDisabled ? ' is-disabled' : ''}${isThisPublishing ? ' project-delete-btn--pending' : ''}`}
+            className={`project-delete-btn project-delete-btn--accent${isThisPublishing ? ' project-delete-btn--pending' : ''}`}
             aria-disabled={publishDisabled || undefined}
             onClick={(e) => { e.stopPropagation(); onPublish?.(name); }}
           >

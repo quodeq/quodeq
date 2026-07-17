@@ -127,6 +127,20 @@ export function usePublish({ enabled = true } = {}) {
         setPublishingProjectBoth(publish.project ?? null);
         stopPolling();
         pollTimerRef.current = setInterval(checkStatus, POLL_INTERVAL_MS);
+      } else if (publishingProjectRef.current) {
+        // The hook was disabled and re-enabled (tab toggle) while a job was
+        // running. The fetched status is no longer running, meaning the job
+        // completed while away -- reconcile local state to match the server.
+        if (publish.state === 'error') {
+          setPublishState('error');
+          setPublishError(publish.error || 'publish failed');
+          setPublishErrorProject(publish.project ?? publishingProjectRef.current);
+        } else {
+          // 'done' or an unexpected 'idle' -- refresh the shared list once
+          setPublishState('done');
+          await fetchSharedList();
+        }
+        setPublishingProjectBoth(null);
       }
     } catch {
       // Best effort -- this is a supporting meta fetch (button visibility +

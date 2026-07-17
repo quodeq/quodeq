@@ -3034,7 +3034,7 @@
   border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
-.project-delete-btn--accent:hover {
+.project-delete-btn--accent:hover:not([aria-disabled="true"]) {
   background: color-mix(in srgb, var(--color-accent) 15%, transparent);
 }
 
