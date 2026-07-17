@@ -1,10 +1,12 @@
 """Tests for shared repo clone management."""
 import subprocess
+import time
 from pathlib import Path
 
 from quodeq.services.shared_repo import (
     FORMAT_NAME,
     MARKER_FILENAME,
+    _git_env,
     bootstrap_repo_layout,
     check_repo_format,
     ensure_shared_clone,
@@ -161,3 +163,34 @@ def test_check_format_wrong_format_string(tmp_path):
         '{"format": "something-else", "version": 1}', encoding="utf-8"
     )
     assert check_repo_format(repo) == "foreign"
+
+
+def test_git_env_disables_terminal_prompt_and_keeps_lfs_skip():
+    """run_git's subprocess env must never block on an interactive git
+    credential/passphrase prompt: GIT_TERMINAL_PROMPT=0 tells git to fail
+    fast instead of trying to read a prompt from a terminal that (with
+    stdin=DEVNULL) no longer exists.
+    """
+    env = _git_env()
+    assert env["GIT_TERMINAL_PROMPT"] == "0"
+    assert env["GIT_LFS_SKIP_SMUDGE"] == "1"
+    # GIT_SSH_COMMAND must NOT be set here: overriding it would silently
+    # discard the user's own ssh config (identity files, host aliases, etc).
+    assert "GIT_SSH_COMMAND" not in env
+
+
+def test_run_git_does_not_hang_on_credential_prompt(tmp_path):
+    """Without stdin=DEVNULL, a git subcommand that reads from stdin (like
+    `credential fill`) can block waiting for input that will never come.
+    With stdin closed, git gets an immediate EOF and fails fast instead.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+
+    start = time.monotonic()
+    ok, _out = run_git(["credential", "fill"], cwd=repo, timeout=5)
+    elapsed = time.monotonic() - start
+
+    assert elapsed < 5  # never hit the timeout path
+    assert isinstance(ok, bool)

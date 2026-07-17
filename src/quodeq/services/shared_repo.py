@@ -27,6 +27,16 @@ _CACHE_ENV = "QUODEQ_CACHE_ROOT"
 _DEFAULT_GIT_TIMEOUT_S = 300
 
 
+def _git_env() -> dict[str, str]:
+    """Environment for git subprocess calls.
+
+    GIT_LFS_SKIP_SMUDGE avoids pulling LFS blobs we don't need. GIT_TERMINAL_PROMPT=0
+    stops git from blocking on an interactive credential or passphrase prompt, since
+    these subprocess calls have stdin closed (see run_git) and nobody is there to answer.
+    """
+    return {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1", "GIT_TERMINAL_PROMPT": "0"}
+
+
 def run_git(
     args: list[str], *, cwd: Path | None = None, timeout: int = _DEFAULT_GIT_TIMEOUT_S
 ) -> tuple[bool, str]:
@@ -34,7 +44,8 @@ def run_git(
         proc = subprocess.run(
             ["git", *args],
             cwd=str(cwd) if cwd else None,
-            env={**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"},
+            env=_git_env(),
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             encoding="utf-8",
