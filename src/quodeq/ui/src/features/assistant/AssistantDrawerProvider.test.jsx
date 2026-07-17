@@ -68,6 +68,37 @@ it('toggle flips visibility', () => {
   expect(screen.getByTestId('open').textContent).toBe('true');
 });
 
+describe('Ctrl+` shortcut — source gating', () => {
+  // The provider mounts above App/useProjectState and reads the persisted
+  // 'quodeq_selected_source' key synchronously at keydown time (it can't
+  // read App's state). The assistant's dismiss/verify tools act on the
+  // local store, which can collide with a shared project's id, so the
+  // shortcut must not open the drawer while a shared project is selected.
+  const fireCtrlBacktick = () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backquote', ctrlKey: true, cancelable: true }));
+  };
+
+  it('does not open the drawer when the persisted source is shared', () => {
+    localStorage.setItem('quodeq_selected_source', 'shared');
+    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+    act(() => fireCtrlBacktick());
+    expect(screen.getByTestId('open').textContent).toBe('false');
+  });
+
+  it('opens the drawer when the persisted source is local', () => {
+    localStorage.setItem('quodeq_selected_source', 'local');
+    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+    act(() => fireCtrlBacktick());
+    expect(screen.getByTestId('open').textContent).toBe('true');
+  });
+
+  it('opens the drawer when no source is persisted (defaults to local)', () => {
+    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+    act(() => fireCtrlBacktick());
+    expect(screen.getByTestId('open').textContent).toBe('true');
+  });
+});
+
 it('exposes activeTab defaulting to assistant; openTab switches the active tab', () => {
   // Both features enabled so the per-tab disable-fallback effect doesn't
   // reroute the initial tab.

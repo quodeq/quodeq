@@ -421,6 +421,12 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet), [rawTrend, visibleSet]);
 
   async function handleDeleteRun(runId, dateLabel) {
+    // Defense in depth: shared-repo runs have no delete route on the backend
+    // (mutation is local-only by design, same as dismiss/restore/verify). The
+    // real gate is the wiring below (onDeleteRun is undefined when source is
+    // 'shared', so the row never renders a delete button), but this early
+    // return covers any caller that reaches the handler directly.
+    if (selectedSource !== 'local') return;
     const label = dateLabel || runId;
     const ok = await confirmDialog({
       title: 'Delete run?',
@@ -513,7 +519,14 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   return (
     <HistoryContent
       data={{ trend, selectedRunId, availableRuns }}
-      callbacks={{ onRunClick, onRunHover: prefetchRun, onRunHoverEnd: cancelPrefetch, onRunChange, onDeleteRun: handleDeleteRun }}
+      callbacks={{
+        onRunClick, onRunHover: prefetchRun, onRunHoverEnd: cancelPrefetch, onRunChange,
+        // Shared-repo runs have no delete route on the backend (mutation is
+        // local-only by design). Passing undefined here — rather than always
+        // handleDeleteRun — is what makes the row's delete button vanish,
+        // since HistoryRow already gates on `{onDelete && ...}`.
+        onDeleteRun: selectedSource === 'local' ? handleDeleteRun : undefined,
+      }}
       runNav={{ runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest }}
       languageSub={languageSub}
     />

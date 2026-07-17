@@ -51,6 +51,10 @@ export function VerifiedFindingsProvider({ project, source = 'local', children }
     return {
       keys: new Set(notes.keys()),
       noteFor: (key) => notes.get(key) || '',
+      // Consumers (VerifiedChip) use this to drop the clickable affordance
+      // for shared projects — there is no mutation route to click into, so
+      // rendering a button would be a dead end.
+      readOnly: isShared,
       unverify: async (v) => {
         if (isShared) return;
         await unverifyFinding(project, { req: v.req, file: v.file, line: v.line });
