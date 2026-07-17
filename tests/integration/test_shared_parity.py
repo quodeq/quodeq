@@ -102,6 +102,13 @@ def real_project_fixture(tmp_path, monkeypatch):
     (project_dir / "repository_info.json").write_text(
         json.dumps({"name": _PROJECT}), encoding="utf-8",
     )
+    # Project-level scan.json (quick-scan coverage metadata). Publishing must
+    # carry it into the clone (Finding 3) so the dashboard's coverage header
+    # (totalFiles/analyzedFiles, added by _fs_reports._enrich_with_coverage)
+    # is identical on both sides instead of only appearing locally.
+    (project_dir / "scan.json").write_text(
+        json.dumps({"total_files": 42, "code_files": 30}), encoding="utf-8",
+    )
     (run_dir / "status.json").write_text(
         json.dumps({"state": "done", "schema_version": 2}), encoding="utf-8",
     )
@@ -162,6 +169,14 @@ def test_dashboard_parity_local_vs_shared(client, real_project_fixture, shared_c
     local = client.get(f"/api/projects/{_PROJECT}/dashboard?run={_RUN}").get_json()
     shared = client.get(f"/api/shared/projects/{_PROJECT}/dashboard?run={_RUN}").get_json()
     assert shared == local
+
+    # Finding 3: the published clone must carry the project-level scan.json
+    # too, so the coverage header the local dashboard derives from it
+    # (totalFiles) is present and identical on the shared side as well --
+    # not merely absent-on-both-sides, which the blanket equality above
+    # alone wouldn't distinguish from a fixed publish allowlist.
+    assert local["totalFiles"] == 42
+    assert shared["totalFiles"] == 42
 
     # The dismissed R1/a.py:10 finding must not appear on either side.
     dims = {d["dimension"]: d for d in local["dimensions"]}

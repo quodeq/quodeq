@@ -104,11 +104,22 @@ def merge_actions_log(ours: Path, theirs: Path, dest: Path) -> None:
     dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+_SCAN_FILENAME = "scan.json"
+
+
 def stage_project(project_dir: Path, dest_project_dir: Path) -> int:
     dest_project_dir.mkdir(parents=True, exist_ok=True)
     info = project_dir / "repository_info.json"
     if info.exists():
         shutil.copy2(info, dest_project_dir / "repository_info.json")
+    # Project-level scan.json (quick-scan coverage metadata: total_files etc.)
+    # is consumed by _fs_reports._enrich_with_coverage and the project-card
+    # coverage reader -- without it, a published clone's dashboard/card never
+    # shows a coverage header. Copied only when present; a project scanned
+    # before this field existed simply stays absent on the clone too.
+    scan = project_dir / _SCAN_FILENAME
+    if scan.exists():
+        shutil.copy2(scan, dest_project_dir / _SCAN_FILENAME)
     merge_actions_log(
         project_dir / ACTIONS_LOG_FILENAME,
         dest_project_dir / ACTIONS_LOG_FILENAME,

@@ -97,6 +97,32 @@ def test_stage_project_copies_info_actions_and_done_runs(tmp_path):
     assert not (dest / "r-live").exists()
 
 
+def test_stage_project_copies_scan_json_when_present(tmp_path):
+    """Finding 3 regression: _fs_reports._enrich_with_coverage and the
+    project-card coverage reader consume <project>/scan.json (totalFiles
+    etc.); stage_project's allowlist previously dropped it, so a published
+    clone's dashboard/card never showed coverage data."""
+    project = tmp_path / "local" / "proj-uuid"
+    project.mkdir(parents=True)
+    (project / "repository_info.json").write_text('{"name":"x"}')
+    (project / "scan.json").write_text(json.dumps({"total_files": 42, "code_files": 30}))
+    _make_run(project, "r-done", "done")
+    dest = tmp_path / "clone" / "evaluations" / "proj-uuid"
+    stage_project(project, dest)
+    assert (dest / "scan.json").exists()
+    assert json.loads((dest / "scan.json").read_text()) == {"total_files": 42, "code_files": 30}
+
+
+def test_stage_project_leaves_scan_json_absent_when_source_has_none(tmp_path):
+    project = tmp_path / "local" / "proj-uuid"
+    project.mkdir(parents=True)
+    (project / "repository_info.json").write_text('{"name":"x"}')
+    _make_run(project, "r-done", "done")
+    dest = tmp_path / "clone" / "evaluations" / "proj-uuid"
+    stage_project(project, dest)
+    assert not (dest / "scan.json").exists()
+
+
 def test_list_completed_runs_skips_unsupported_schema_version(tmp_path):
     """A run with schema_version > supported should be skipped, not crash."""
     run = tmp_path / "r-unsupported"

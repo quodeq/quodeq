@@ -255,6 +255,43 @@ def test_shared_projects_refresh_stale_when_origin_unreachable(
     assert "proj-a" in ids
 
 
+def _git_porcelain(repo: Path) -> str:
+    return subprocess.run(
+        ["git", "status", "--porcelain"], cwd=repo, check=True, capture_output=True, text=True,
+    ).stdout
+
+
+def test_shared_projects_listing_does_not_dirty_clone_worktree(client, shared_clone_fixture):
+    """Finding 2 regression: build_project_list's lazy onboarding backfill
+    writes onboardingCompletedAt into repository_info.json when missing --
+    the shared route must skip that write (backfill=False), or listing
+    dirties the clone's git worktree and a subsequent publish's
+    `pull --rebase` can refuse (offline refresh) with a confusing wedge.
+
+    shared_clone_fixture already publishes a repository_info.json without
+    onboardingCompletedAt (just {"name": "proj-a"}), so no extra fixture
+    crafting is needed to exercise the missing-field path. The fixture also
+    writes an evaluation/Security.json straight into the clone's working
+    tree without `git add`ing it (see its docstring), which is pre-existing
+    untracked noise unrelated to this bug -- so this test compares the
+    worktree's git status BEFORE and AFTER the request instead of asserting
+    a blanket-clean tree, to isolate exactly what the route call itself does.
+    """
+    repo = shared_repo_path(shared_clone_fixture)
+    info_path = shared_evaluations_root(shared_clone_fixture) / "proj-a" / "repository_info.json"
+    info_before = json.loads(info_path.read_text(encoding="utf-8"))
+    assert "onboardingCompletedAt" not in info_before
+    status_before = _git_porcelain(repo)
+
+    resp = client.get("/api/shared/projects")
+    assert resp.status_code == 200
+
+    status_after = _git_porcelain(repo)
+    assert status_after == status_before
+    info_after = json.loads(info_path.read_text(encoding="utf-8"))
+    assert "onboardingCompletedAt" not in info_after
+
+
 def test_shared_projects_score_cache_override_propagates_into_pool(
     client, shared_clone_fixture,
 ):

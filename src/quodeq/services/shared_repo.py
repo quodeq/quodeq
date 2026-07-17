@@ -90,14 +90,28 @@ def ensure_shared_clone(url: str, env: dict | None = None) -> Path | None:
     return repo
 
 
-def refresh_shared_clone(url: str, env: dict | None = None) -> bool:
+_DEFAULT_REFRESH_TIMEOUT_S = 30
+
+
+def refresh_shared_clone(url: str, env: dict | None = None, *, timeout: int = _DEFAULT_REFRESH_TIMEOUT_S) -> bool:
+    """Fetch + hard-reset the clone to the remote's HEAD.
+
+    Called in-request (GET /api/shared/projects?refresh=1, POST
+    /api/shared/refresh), so it must not inherit run_git's 300s default --
+    a black-holed connection would otherwise hang the request for up to 5
+    minutes. *timeout* bounds both the fetch (the network call) and the
+    reset (local but kept consistent); a black-holed connection now turns
+    into a stale=true response in ~*timeout* seconds instead. Does not
+    affect ensure_shared_clone's own (still 300s) clone timeout -- an
+    initial clone can legitimately take much longer than a refresh.
+    """
     repo = shared_repo_path(url, env)
     if not (repo / ".git").exists():
         return ensure_shared_clone(url, env) is not None
-    ok, _ = run_git(["fetch", "--depth", "1", "origin", "HEAD"], cwd=repo)
+    ok, _ = run_git(["fetch", "--depth", "1", "origin", "HEAD"], cwd=repo, timeout=timeout)
     if not ok:
         return False
-    ok, _ = run_git(["reset", "--hard", "FETCH_HEAD"], cwd=repo)
+    ok, _ = run_git(["reset", "--hard", "FETCH_HEAD"], cwd=repo, timeout=timeout)
     return ok
 
 

@@ -276,7 +276,12 @@ def register_shared_routes(app: Flask) -> None:
                 stale = False
             else:
                 stale = True
-        projects = _fs_projects.build_project_list(eval_root)
+        # backfill=False: the shared clone is a git worktree, not a local
+        # evaluations dir -- writing onboardingCompletedAt into
+        # repository_info.json here would dirty it, and a dirty worktree can
+        # make publish's `pull --rebase` refuse (confusing wedge) the next
+        # time someone publishes into this clone.
+        projects = _fs_projects.build_project_list(eval_root, backfill=False)
         listing = {"projects": [to_camel_dict(p) for p in projects]}
         meta = published_meta(url)
         for project in listing["projects"]:

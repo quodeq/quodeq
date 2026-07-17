@@ -65,6 +65,49 @@ def test_ensure_clone_and_refresh(tmp_path, monkeypatch):
     assert refresh_shared_clone(url) is True
 
 
+def test_refresh_shared_clone_passes_explicit_timeout_to_both_git_calls(tmp_path, monkeypatch):
+    """Finding 4 regression: refresh_shared_clone must not inherit run_git's
+    300s default -- it's called in-request (GET /api/shared/projects?refresh=1,
+    POST /api/shared/refresh) and a black-holed connection would otherwise
+    hang the request for up to 5 minutes. A tiny explicit *timeout* must
+    reach BOTH the fetch (network) and reset (local) run_git calls."""
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    url = _make_origin(tmp_path)
+    assert ensure_shared_clone(url) is not None
+
+    seen_timeouts: list[int] = []
+    real_run_git = run_git
+
+    def _spy(args, *, cwd=None, timeout=None):
+        seen_timeouts.append(timeout)
+        return real_run_git(args, cwd=cwd, timeout=timeout)
+
+    monkeypatch.setattr("quodeq.services.shared_repo.run_git", _spy)
+
+    assert refresh_shared_clone(url, timeout=7) is True
+    assert seen_timeouts == [7, 7]
+
+
+def test_refresh_shared_clone_default_timeout_is_bounded_not_300s(tmp_path, monkeypatch):
+    """Without an explicit timeout, refresh_shared_clone must still use a
+    short bounded default (not run_git's 300s general-purpose default)."""
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    url = _make_origin(tmp_path)
+    assert ensure_shared_clone(url) is not None
+
+    seen_timeouts: list[int] = []
+    real_run_git = run_git
+
+    def _spy(args, *, cwd=None, timeout=None):
+        seen_timeouts.append(timeout)
+        return real_run_git(args, cwd=cwd, timeout=timeout)
+
+    monkeypatch.setattr("quodeq.services.shared_repo.run_git", _spy)
+
+    assert refresh_shared_clone(url) is True
+    assert seen_timeouts == [30, 30]
+
+
 def test_ensure_clone_bad_url_returns_none(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
     assert ensure_shared_clone(f"file://{tmp_path}/nonexistent.git") is None
