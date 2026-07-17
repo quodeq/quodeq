@@ -393,7 +393,7 @@ const ROUTE_RENDERERS = {
   ),
   settings: (params, props) => <SettingsCase settings={props.settings} onOpenGradeFormula={() => props.navigation.handleNavigate('grade-formula')} />,
   'grade-formula': (params, props) => <GradeFormulaPage navigation={props.navigation} />,
-  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup }} />,
+  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} sourceTab={params.sourceTab || 'local'} actions={{ onSelect: (id, source) => { props.navigation.handleProjectChange(id, source); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup, onTabChange: (tab) => props.navigation.handleNavigate('projects', { sourceTab: tab }) }} />,
   standards: () => <StandardsPage />,
   help: () => <HelpPage />,
 };

@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { gradeLabel, gradeLetter, extDisplayName } from '../../../utils/formatters.js';
-import { TermHeader } from '../../../components/terminal/index.js';
+import { TermHeader, TermInput } from '../../../components/terminal/index.js';
+import { relativeTime } from '../../../components/LastFetchedLine.jsx';
+import { useSharedProjects } from '../hooks/useSharedProjects.js';
 
 const DISCIPLINE_LABEL = {
   frontend_nextjs: 'Next.js',
@@ -44,6 +46,25 @@ function formatPath(path) {
   return path;
 }
 
+// "https://github.com/team/results.git" -> "github.com/team/results"
+// "git@github.com:team/results.git"      -> "github.com/team/results"
+// Handles any host (not just the three formatPath() special-cases above) —
+// the shared results repo can point anywhere.
+function repoShorthand(url) {
+  if (!url) return '';
+  let s = String(url).trim();
+  const hadScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(s);
+  s = s.replace(/^[a-z][a-z0-9+.-]*:\/\//i, ''); // strip scheme://
+  s = s.replace(/^[^/@]+@/, ''); // strip user@ (credentials / scp-shorthand form)
+  // "host:path" -> "host/path" only for true scp-like shorthand (no scheme).
+  // A scheme'd URL's colon is a port separator (e.g. "example.com:8080/x")
+  // and must be left alone.
+  if (!hadScheme) s = s.replace(/^([^/]+):(?!\/)/, '$1/');
+  s = s.replace(/\.git$/i, '');
+  s = s.replace(/\/+$/, '');
+  return s;
+}
+
 function GradeChip({ grade, score }) {
   if (!grade && score == null) return null;
   const cls = grade ? `projects-grade--${grade.toLowerCase()}` : 'projects-grade--x';
@@ -71,7 +92,30 @@ function LanguageNumbers({ stats, filesCount }) {
   );
 }
 
-function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildren }) {
+// Small top-right marker distinguishing where a card's data came from: the
+// user's own local evaluations vs. a shared team results repository. Shown
+// on every card regardless of which Projects sub-tab it's listed under —
+// the online tab's cards are ProjectCards too, just with source="online".
+function ProjectCardSource({ source }) {
+  return (
+    <span className={`project-card-source project-card-source--${source}`}>
+      {source === 'online' ? '☁ online' : '⌂ local'}
+    </span>
+  );
+}
+
+// "published by <name> · <relative time>" — online-source cards only.
+function PublishedMeta({ publishedBy, publishedAt }) {
+  if (!publishedBy) return null;
+  const rel = relativeTime(publishedAt);
+  return (
+    <div className="project-card-published-meta">
+      published by {publishedBy}{rel ? ` · ${rel}` : ''}
+    </div>
+  );
+}
+
+function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildren, source = 'local' }) {
   const { onSelect, footer, isChild = false, onResumeSetup } = cardProps;
   const id = project.id || project.name || project;
   const name = project.name || project;
@@ -116,6 +160,7 @@ function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildr
             <GradeChip grade={grade} score={score} />
           </div>
           <div className="project-card-top-right">
+            <ProjectCardSource source={source} />
             {discipline && <span className="project-meta-tag">{discipline}</span>}
             <span className="project-meta-item">{project.runsCount} {project.runsCount === 1 ? 'run' : 'runs'}</span>
             {date && <span className="project-meta-date">{date}</span>}
@@ -123,6 +168,7 @@ function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildr
         </div>
         <div className="project-card-bottom">
           <LanguageNumbers stats={project.languageStats} filesCount={project.filesCount} />
+          {source === 'online' && <PublishedMeta publishedBy={project.publishedBy} publishedAt={project.publishedAt} />}
           {cardChildren}
         </div>
       </div>
@@ -307,11 +353,202 @@ function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
   );
 }
 
-export default function ProjectsPage({ projects = [], selectedProject, isEvaluating = false, actions }) {
-  const { onSelect, onDelete, onExport, onRelocate, onAddProject, onImportProject, onResumeSetup } = actions;
+// ── Online tab: local | online sub-tab row ────────────────────────────────
+
+function ProjectsTabs({ activeTab, onTabChange }) {
+  return (
+    <div className="projects-tabs" role="tablist">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === 'local'}
+        className={`projects-tab${activeTab === 'local' ? ' projects-tab--active' : ''}`}
+        onClick={() => onTabChange?.('local')}
+      >
+        local
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === 'online'}
+        className={`projects-tab${activeTab === 'online' ? ' projects-tab--active' : ''}`}
+        onClick={() => onTabChange?.('online')}
+      >
+        online
+      </button>
+    </div>
+  );
+}
+
+// ── Online tab: unconfigured (connect) state ──────────────────────────────
+
+function ConnectSharedForm({ connecting, connectError, onConnect }) {
+  const [url, setUrl] = useState('');
+  const submit = () => {
+    const trimmed = url.trim();
+    if (trimmed) onConnect(trimmed);
+  };
+  return (
+    <div className="projects-connect">
+      <h3 className="projects-connect__title">Connect a shared results repository</h3>
+      <p className="projects-connect__hint">
+        Point quodeq at a git repository your team publishes evaluation results to.
+      </p>
+      <div className="projects-connect__form">
+        <TermInput
+          command="connect"
+          placeholder="https://github.com/team/results.git"
+          value={url}
+          onChange={setUrl}
+          onSubmit={submit}
+          ariaLabel="shared repository url"
+        />
+        <button
+          type="button"
+          className={`term-btn term-btn--primary term-btn--filled${connecting ? ' is-disabled' : ''}`}
+          onClick={submit}
+          aria-disabled={connecting || undefined}
+        >
+          connect
+        </button>
+      </div>
+      {connectError && <p className="inline-error">{connectError}</p>}
+    </div>
+  );
+}
+
+// ── Online tab: per-card footer (pull local copy / refresh) ───────────────
+// Mirrors CardFooter's inline delete-confirm idiom for the 409 collision
+// case instead of the global chooseDialog modal used by manual import.
+
+function OnlineCardFooter({ projectId, onPull, onRefresh, pullConflict, onConfirmCopy, onCancelConflict }) {
+  if (pullConflict) {
+    return (
+      <div className="project-card-actions">
+        <span className="project-delete-confirm-label">already exists.</span>
+        <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={(e) => { e.stopPropagation(); onConfirmCopy(projectId); }}>copy</button>
+        <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={(e) => { e.stopPropagation(); onCancelConflict(projectId); }}>cancel</button>
+      </div>
+    );
+  }
+  return (
+    <>
+      <button type="button" className="project-delete-btn" onClick={(e) => { e.stopPropagation(); onPull(projectId); }}>pull local copy</button>
+      <button type="button" className="project-delete-btn" onClick={(e) => { e.stopPropagation(); onRefresh(); }}>refresh</button>
+    </>
+  );
+}
+
+// ── Online tab body ─────────────────────────────────────────────────────
+// Only mounted while sourceTab === 'online' (see ProjectsPage below), so
+// useSharedProjects()'s refresh-on-entry mount effect fires exactly when
+// the user actually walks into this tab, not on every ProjectsPage render.
+
+function OnlineProjectsTab({ onSelect }) {
+  const {
+    configured, url, projects, lastSynced, stale,
+    loading, error, connecting, connectError, connect,
+    refreshing, refresh, pull,
+  } = useSharedProjects();
+  const [pullConflictId, setPullConflictId] = useState(null);
+
+  async function handlePull(id) {
+    try {
+      await pull(id);
+      setPullConflictId(null);
+    } catch (err) {
+      if (err?.status === 409) {
+        setPullConflictId(id);
+      } else {
+        alert(`Failed to pull project: ${err?.message || 'unknown error'}`);
+      }
+    }
+  }
+
+  async function handleConfirmCopy(id) {
+    try {
+      await pull(id, 'copy');
+    } catch (err) {
+      alert(`Failed to pull project: ${err?.message || 'unknown error'}`);
+    } finally {
+      setPullConflictId(null);
+    }
+  }
+
+  if (loading) {
+    return <div className="projects-empty">loading shared repository status...</div>;
+  }
+
+  if (!configured) {
+    return <ConnectSharedForm connecting={connecting} connectError={connectError} onConnect={connect} />;
+  }
+
+  const shorthand = repoShorthand(url);
+  const syncedLabel = relativeTime(lastSynced) || 'just now';
+
+  return (
+    <div className="projects-online">
+      <div className="projects-online__status">
+        <div className="projects-online__sub">
+          {shorthand} · {projects.length} shared {projects.length === 1 ? 'project' : 'projects'}
+        </div>
+        <div className="projects-online__sync">
+          <span className="projects-online__sync-label">synced {syncedLabel}</span>
+          <button
+            type="button"
+            className={`projects-page__import-btn${refreshing ? ' is-disabled' : ''}`}
+            onClick={refresh}
+            aria-disabled={refreshing || undefined}
+          >
+            refresh
+          </button>
+        </div>
+      </div>
+      {stale && (
+        <div className="projects-stale-banner">
+          refresh failed, showing results synced {syncedLabel}
+        </div>
+      )}
+      {error && <p className="inline-error">{error}</p>}
+      {projects.length === 0 ? (
+        <div className="projects-empty">no shared projects yet.</div>
+      ) : (
+        <div className="projects-cards">
+          {projects.map((p) => {
+            const id = p.id || p.name || p;
+            return (
+              <ProjectCard
+                key={id}
+                project={p}
+                source="online"
+                cardProps={{
+                  onSelect: (pid) => onSelect?.(pid, 'shared'),
+                  footer: (
+                    <OnlineCardFooter
+                      projectId={id}
+                      onPull={handlePull}
+                      onRefresh={refresh}
+                      pullConflict={pullConflictId === id}
+                      onConfirmCopy={handleConfirmCopy}
+                      onCancelConflict={() => setPullConflictId(null)}
+                    />
+                  ),
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ProjectsPage({ projects = [], selectedProject, isEvaluating = false, sourceTab = 'local', actions }) {
+  const { onSelect, onDelete, onExport, onRelocate, onAddProject, onImportProject, onResumeSetup, onTabChange } = actions;
   const { children, roots } = useMemo(() => computeProjectTree(projects), [projects]);
   const [confirming, setConfirming] = useState(null);
   const relocateActions = useRelocateDialog(onRelocate);
+  const activeTab = sourceTab === 'online' ? 'online' : 'local';
 
   return (
     <section className="projects-page projects-page--terminal">
@@ -320,7 +557,7 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
           name="repositories"
           sub={`${projects.length} ${projects.length === 1 ? 'repository' : 'repositories'} evaluated`}
         />
-        {projects.length > 0 && (
+        {activeTab === 'local' && projects.length > 0 && (
           <div className="projects-page__header-actions">
             {onImportProject && (
               <button
@@ -349,7 +586,10 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
           </div>
         )}
       </div>
-      {projects.length === 0 ? (
+      <ProjectsTabs activeTab={activeTab} onTabChange={onTabChange} />
+      {activeTab === 'online' ? (
+        <OnlineProjectsTab onSelect={onSelect} />
+      ) : projects.length === 0 ? (
         <EmptyProjectsCTA onAddProject={onAddProject} onImportProject={onImportProject} isEvaluating={isEvaluating} />
       ) : (
         <div className="projects-cards">

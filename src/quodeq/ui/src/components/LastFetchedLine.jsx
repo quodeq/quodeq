@@ -1,4 +1,7 @@
-function relativeTime(iso) {
+// Exported so other "N ago" displays (e.g. the Projects page's online-tab
+// sync status and published-by lines) reuse this exact formatter instead of
+// growing a second one.
+export function relativeTime(iso) {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return null;
   const diffMs = Date.now() - then;
