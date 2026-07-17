@@ -10,7 +10,6 @@ root (via ``_with_shared_root``) instead of the local reports directory.
 from __future__ import annotations
 
 import functools
-import io
 import logging
 import zipfile
 from http import HTTPStatus
