@@ -21,6 +21,7 @@ from quodeq.services.shared_settings import (
     read_settings,
     write_settings,
 )
+from quodeq.shared.validation import validate_path_segment
 
 from .routes_common import reports_dir
 
@@ -79,6 +80,10 @@ def register_shared_routes(app: Flask) -> None:
 
     @app.post("/api/projects/<project>/publish")
     def shared_publish_start(project: str) -> tuple[Response, int]:
+        try:
+            validate_path_segment(project)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         settings = read_settings()
         if not settings.url:
             return jsonify({"error": "no shared repository configured"}), 400

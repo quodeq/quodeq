@@ -179,3 +179,20 @@ def test_publish_started_returns_202(client, tmp_path, monkeypatch):
     resp = client.post("/api/projects/some-proj/publish", headers=_ORIGIN)
     assert resp.status_code == 202
     assert resp.get_json()["started"] is True
+
+
+def test_publish_rejects_path_traversal_project_segment(client, tmp_path, monkeypatch):
+    """POST /api/projects/../publish must not reach start_publish with a
+    project id that can escape the evaluations root.
+    """
+    (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
+    called = {"n": 0}
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared.start_publish",
+        lambda *a, **kw: called.__setitem__("n", called["n"] + 1) or True,
+    )
+
+    resp = client.post("/api/projects/%2e%2e/publish", headers=_ORIGIN)
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()
+    assert called["n"] == 0
