@@ -14,6 +14,13 @@ import shutil
 import subprocess
 from pathlib import Path
 
+# Re-exported so the api layer can validate a shared-repo URL without
+# importing quodeq.data directly (the import-layer gate in
+# tools/check_imports.py allows api -> services and services -> data, but
+# not api -> data). services/evaluation_mixin.py imports the same function
+# straight from quodeq.data.fs.repo_validation for the same reason.
+from quodeq.data.fs.repo_validation import validate_remote_url  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 _CACHE_ENV = "QUODEQ_CACHE_ROOT"
