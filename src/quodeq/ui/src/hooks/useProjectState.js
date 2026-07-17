@@ -121,6 +121,7 @@ export function useProjectState({
 
   function selectProjectAndRun(project, runId) {
     persistProject(setSelectedProject, project, storage);
+    persistSource(setSelectedSource, DEFAULT_SOURCE, storage);
     setSelectedRun(runId || DEFAULT_RUN);
   }
 

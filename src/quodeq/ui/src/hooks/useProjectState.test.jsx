@@ -138,4 +138,25 @@ describe('useProjectState — source-aware project selection', () => {
     expect(result.current.selectedSource).toBe('shared');
     expect(onNoProjects).not.toHaveBeenCalled();
   });
+
+  it('selectProjectAndRun pins source to "local" even when current source is "shared"', async () => {
+    listProjects.mockResolvedValue([{ id: 'a', name: 'A' }]);
+    const storage = makeMemoryStorage();
+    const { result } = renderHook(() =>
+      useProjectState({ onNoProjects: vi.fn(), storage, retryDelayMs: 0 }));
+
+    await waitFor(() => expect(result.current.selectedProject).toBe('a'));
+
+    // Set source to 'shared'
+    act(() => { result.current.handleProjectChange('shared-1', 'shared'); });
+    expect(result.current.selectedSource).toBe('shared');
+
+    // selectProjectAndRun on a different project must reset source to 'local'
+    act(() => { result.current.selectProjectAndRun('local-2', 'run-123'); });
+
+    expect(result.current.selectedProject).toBe('local-2');
+    expect(result.current.selectedSource).toBe('local');
+    expect(result.current.selectedRun).toBe('run-123');
+    expect(storage.store['quodeq_selected_source']).toBe('local');
+  });
 });
