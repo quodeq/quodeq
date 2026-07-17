@@ -258,8 +258,14 @@ def start_publish(project_id: str, url: str, *, evaluations_root: Path) -> bool:
         _STATUS.update(
             state="running", project=project_id, runs=None, error=None, finished_at=None
         )
-    thread = threading.Thread(
-        target=_run_publish, args=(project_id, url, evaluations_root), daemon=True
-    )
-    thread.start()
+    try:
+        thread = threading.Thread(
+            target=_run_publish, args=(project_id, url, evaluations_root), daemon=True
+        )
+        thread.start()
+    except Exception as exc:
+        with _STATUS_LOCK:
+            _STATUS.update(state="error", error=str(exc), finished_at=time.time())
+        logger.exception("failed to start publish thread")
+        return False
     return True

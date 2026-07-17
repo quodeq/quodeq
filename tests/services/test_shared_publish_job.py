@@ -1,12 +1,25 @@
 """Publish job state machine (synchronous worker invocation, no sleeps)."""
 from unittest.mock import patch
 
+import pytest
+
 from quodeq.services import shared_publish
 from quodeq.services.shared_publish import (
     PublishError,
     get_publish_status,
     start_publish,
 )
+
+
+@pytest.fixture(autouse=True)
+def _clean_status():
+    """Snapshot and restore _STATUS dict before/after each test."""
+    with shared_publish._STATUS_LOCK:
+        snapshot = dict(shared_publish._STATUS)
+    yield
+    with shared_publish._STATUS_LOCK:
+        shared_publish._STATUS.clear()
+        shared_publish._STATUS.update(snapshot)
 
 
 def _run_inline(monkeypatch):
@@ -43,8 +56,24 @@ def test_publish_job_error_captured(tmp_path, monkeypatch):
 def test_publish_rejected_while_running(tmp_path):
     with shared_publish._STATUS_LOCK:
         shared_publish._STATUS.update({"state": "running", "project": "p0"})
-    try:
-        assert start_publish("p1", "u", evaluations_root=tmp_path) is False
-    finally:
-        with shared_publish._STATUS_LOCK:
-            shared_publish._STATUS.update({"state": "idle", "project": None})
+    assert start_publish("p1", "u", evaluations_root=tmp_path) is False
+
+
+def test_publish_thread_start_failure(tmp_path, monkeypatch):
+    """Thread creation failure leaves state as error, not stuck at running."""
+
+    class FailingThread:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("thread creation failed")
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(shared_publish.threading, "Thread", FailingThread)
+
+    result = start_publish("p1", "u", evaluations_root=tmp_path)
+
+    assert result is False
+    status = get_publish_status()
+    assert status["state"] == "error"
+    assert "thread creation failed" in status["error"]
