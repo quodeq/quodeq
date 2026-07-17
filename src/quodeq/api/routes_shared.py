@@ -43,7 +43,7 @@ def register_shared_routes(app: Flask) -> None:
     @app.put("/api/shared/config")
     def shared_config_put() -> Response | tuple[Response, int]:
         body = request.get_json(silent=True) or {}
-        url = (body.get("url") or "").strip()
+        url = str(body.get("url") or "").strip()
         if not url:
             return jsonify({"error": "url is required"}), 400
         try:

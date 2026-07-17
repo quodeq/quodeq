@@ -84,6 +84,13 @@ def test_put_config_requires_url(client):
     assert resp.status_code == 400
 
 
+def test_put_config_rejects_non_string_url(client, monkeypatch, tmp_path):
+    monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
+    resp = client.put("/api/shared/config", json={"url": 123}, headers=_ORIGIN)
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()
+
+
 def test_put_config_clone_failure_returns_502(client, monkeypatch):
     monkeypatch.setattr("quodeq.api.routes_shared.validate_remote_url", lambda url: None)
     monkeypatch.setattr("quodeq.api.routes_shared.ensure_shared_clone", lambda url: None)
