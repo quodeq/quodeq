@@ -1,6 +1,6 @@
 import { render, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import DashboardPage from './DashboardPage.jsx';
+import DashboardPage, { selectDashboardProjectInfo } from './DashboardPage.jsx';
 
 // First-load flicker guard. On a fresh (uncached) load the dashboard query
 // resolves a beat before the scores query. The Overview renders nothing until
@@ -108,5 +108,48 @@ describe('DashboardPage no-completed-evaluation empty state', () => {
     expect(getByText('No completed evaluation yet')).toBeTruthy();
     expect(getByText('no completed evaluation in this shared project yet')).toBeTruthy();
     expect(queryByText('Start evaluation')).toBeNull();
+  });
+});
+
+// Finding 5 (final whole-branch review): projectInfo for a shared selection
+// must come from the shared-repo fetch (sharedProjectInfo, see useDashboard),
+// never the LOCAL projects list -- a shared selection's id can collide with
+// an unrelated local project (e.g. after a clone-on-add pull), and looking it
+// up locally would bleed the local twin's stats/publishedBy into a shared
+// Overview. Unit-tested against the exported selector directly (mounting the
+// full Overview render needs a SidePaneProvider + more, which is its own
+// integration concern -- AccumulatedHeroSection's own tests already pin the
+// "renders publishedBy given correct projectInfo" half of this contract).
+describe('selectDashboardProjectInfo', () => {
+  const localTwin = { id: 'proj-1', name: 'proj-1', displayName: 'Local Twin', languageStats: { js: 999 } };
+  const sharedInfo = { id: 'proj-1', name: 'proj-1', displayName: 'Shared View', publishedBy: 'ana', languageStats: { py: 5 } };
+
+  it('shared source: returns the shared fetch result, never the id-colliding local twin', () => {
+    const info = selectDashboardProjectInfo({
+      selectedSource: 'shared', projects: [localTwin], selectedProject: 'proj-1', sharedProjectInfo: sharedInfo,
+    });
+    expect(info).toBe(sharedInfo);
+    expect(info.publishedBy).toBe('ana');
+  });
+
+  it('shared source before the fetch resolves: null, not a silent fallback to the local list', () => {
+    const info = selectDashboardProjectInfo({
+      selectedSource: 'shared', projects: [localTwin], selectedProject: 'proj-1', sharedProjectInfo: null,
+    });
+    expect(info).toBeNull();
+  });
+
+  it('local source: unchanged -- looks up the local projects list by id/name', () => {
+    const info = selectDashboardProjectInfo({
+      selectedSource: 'local', projects: [localTwin], selectedProject: 'proj-1', sharedProjectInfo: sharedInfo,
+    });
+    expect(info).toBe(localTwin);
+  });
+
+  it('local source with no match: null', () => {
+    const info = selectDashboardProjectInfo({
+      selectedSource: 'local', projects: [], selectedProject: 'proj-1', sharedProjectInfo: sharedInfo,
+    });
+    expect(info).toBeNull();
   });
 });

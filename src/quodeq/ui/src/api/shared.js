@@ -119,10 +119,18 @@ export async function sharedListProjects({ refresh = false } = {}) {
  * Get detailed info for a shared project.
  * @param {string} projectId
  * @returns {Promise<import('../models/project.js').Project>}
+ *   Like sharedListProjects, publishedBy/publishedAt are passed through
+ *   after createProject() (which only knows the base Project shape and
+ *   would otherwise silently drop them), with publishedAt converted from
+ *   the backend's epoch seconds to epoch-milliseconds.
  */
 export async function sharedGetProjectInfo(projectId) {
   const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/info`);
-  return createProject(data);
+  const project = createProject(data);
+  project.publishedBy = data?.publishedBy ?? null;
+  project.publishedAt = epochSecondsToMs(data?.publishedAt);
+  project.source = data?.source ?? 'shared';
+  return project;
 }
 
 /**

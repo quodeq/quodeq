@@ -32,6 +32,7 @@ export const projectKeys = {
   scores: (projectId, asOf, source = "local") => ["project", projectId, source, "scores", asOf || "latest"],
   dashboard: (projectId, run, source = "local") => ["project", projectId, source, "dashboard", run || "latest"],
   runs: (projectId, source = "local") => ["project", projectId, source, "runs"],
+  info: (projectId, source = "local") => ["project", projectId, source, "info"],
 };
 
 export const systemKeys = {

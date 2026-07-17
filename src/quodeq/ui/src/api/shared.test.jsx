@@ -175,6 +175,40 @@ describe('shared repo API client', () => {
       await shared.sharedGetProjectInfo('proj/with/slashes');
       expect(calls[0].url).toBe('/api/shared/projects/proj%2Fwith%2Fslashes/info');
     });
+
+    // Finding 5 (final whole-branch review): createProject() only knows the
+    // base Project shape and silently drops publishedBy/publishedAt/source --
+    // without passing them through explicitly (same idiom as
+    // sharedListProjects above), the Overview's shared-project hero badge has
+    // no "published by <name>" to show. publishedAt also needs the same
+    // epoch-seconds -> epoch-milliseconds conversion as every other shared
+    // timestamp.
+    it('sharedGetProjectInfo passes through publishedBy and converts publishedAt to epoch milliseconds', async () => {
+      globalThis.fetch = vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          id: 'proj1', name: 'proj1', publishedBy: 'ana', publishedAt: 1752751800, source: 'shared',
+        }),
+      }));
+
+      const result = await shared.sharedGetProjectInfo('proj1');
+
+      expect(result.publishedBy).toBe('ana');
+      expect(result.publishedAt).toBe(1752751800 * 1000);
+      expect(result.source).toBe('shared');
+    });
+
+    it('sharedGetProjectInfo normalizes a missing publishedBy/publishedAt to null', async () => {
+      globalThis.fetch = vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ id: 'proj1', name: 'proj1' }),
+      }));
+
+      const result = await shared.sharedGetProjectInfo('proj1');
+
+      expect(result.publishedBy).toBeNull();
+      expect(result.publishedAt).toBeNull();
+    });
   });
 
   describe('runs & dashboard', () => {

@@ -325,6 +325,50 @@ describe('usePublish', () => {
     expect(result.current.publishErrorProject).toBe('p1');
   });
 
+  // Minor 8 (final whole-branch review): CardFooter keys its inline error
+  // banner on publishErrorProject alone (see ProjectsPage.jsx's CardFooter),
+  // not on publishState. A rejected click on a DIFFERENT project (409, the
+  // single-job guard -- see "does not clobber a genuinely running job" above)
+  // leaves that project's card showing an error for as long as the tracked
+  // job keeps running. Once that job's poll reports 'done', the lock is free
+  // again and the stale error no longer describes reality -- it must clear.
+  it('clears a stale error from a different (rejected) project once a poll reaches "done" for the tracked job', async () => {
+    vi.useFakeTimers();
+    try {
+      const fakeApi = makeFakeApi();
+      const { result } = renderHook(() => usePublish({ enabled: false }), {
+        wrapper: ({ children }) => wrap(fakeApi, children),
+      });
+
+      // p1's publish genuinely starts and begins polling.
+      await act(async () => {
+        await result.current.publish('p1');
+      });
+      expect(result.current.publishState).toBe('running');
+
+      // p2's click hits the backend's single-job guard and gets rejected.
+      fakeApi.publishProject.mockRejectedValueOnce(new Error('a publish is already running'));
+      await act(async () => {
+        await result.current.publish('p2');
+      });
+      expect(result.current.publishError).toBe('a publish is already running');
+      expect(result.current.publishErrorProject).toBe('p2');
+      expect(result.current.publishState).toBe('running');
+
+      // p1's job finishes -- the poll reports done.
+      fakeApi.getSharedStatus.mockResolvedValue({ configured: true, publish: { state: 'done', project: 'p1', runs: 1 } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      expect(result.current.publishState).toBe('done');
+      expect(result.current.publishError).toBeNull();
+      expect(result.current.publishErrorProject).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not leak an interval when unmounted while polling', async () => {
     vi.useFakeTimers();
     try {

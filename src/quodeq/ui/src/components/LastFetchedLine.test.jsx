@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import LastFetchedLine from './LastFetchedLine.jsx';
+import LastFetchedLine, { relativeTime } from './LastFetchedLine.jsx';
 
 describe('LastFetchedLine', () => {
   it('renders nothing when lastFetchedAt is null', () => {
@@ -41,5 +41,27 @@ describe('LastFetchedLine', () => {
   it('renders nothing when given an invalid date string', () => {
     const { container } = render(<LastFetchedLine lastFetchedAt="not-a-date" />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+// Minor 7 (final whole-branch review): `new Date(null)` coerces to epoch 0
+// rather than Invalid Date, so a bare NaN guard let relativeTime(null) render
+// "57 years ago" instead of being treated as absent.
+describe('relativeTime null/undefined guard', () => {
+  it('returns null for null', () => {
+    expect(relativeTime(null)).toBeNull();
+  });
+
+  it('returns null for undefined', () => {
+    expect(relativeTime(undefined)).toBeNull();
+  });
+
+  it('still returns null for a genuinely invalid date string', () => {
+    expect(relativeTime('not-a-date')).toBeNull();
+  });
+
+  it('still computes a real relative time for a valid timestamp', () => {
+    const t = new Date(Date.now() - 3 * 86400 * 1000).toISOString();
+    expect(relativeTime(t)).toBe('3 days ago');
   });
 });

@@ -35,6 +35,7 @@ function makeFakeApi() {
       trend: [],
       availableRuns: [],
     })),
+    sharedGetProjectInfo: vi.fn(async (project) => ({ id: project, name: project, publishedBy: 'ana', publishedAt: 1752710400000 })),
   };
 }
 
@@ -186,6 +187,44 @@ describe("useDashboard source-aware fetch selection", () => {
     expect(fakeApi.sharedGetDashboard).toHaveBeenCalledTimes(1);
     // And flipping didn't re-trigger the local fetch either.
     expect(fakeApi.getDashboard).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Finding 5 (final whole-branch review): DashboardPage's projectInfo for a
+// shared selection must come from the shared project's own info endpoint,
+// not the local projects list (which can collide by id and bleed the local
+// twin's stats/publishedBy into a shared Overview).
+describe("useDashboard shared project info", () => {
+  it("does not fetch sharedGetProjectInfo when selectedSource is 'local' (default)", async () => {
+    const fakeApi = makeFakeApi();
+    const { result } = renderHook(
+      () => useDashboard({ selectedProject: "p1", selectedRun: null }),
+      { wrapper: ({ children }) => wrap(fakeApi, children) },
+    );
+    await waitFor(() => expect(result.current.dashboard).not.toBeNull());
+    expect(fakeApi.sharedGetProjectInfo).not.toHaveBeenCalled();
+    expect(result.current.sharedProjectInfo).toBeNull();
+  });
+
+  it("fetches sharedGetProjectInfo(projectId) and exposes it as sharedProjectInfo when selectedSource is 'shared'", async () => {
+    const fakeApi = makeFakeApi();
+    const { result } = renderHook(
+      () => useDashboard({ selectedProject: "p1", selectedRun: null, selectedSource: "shared" }),
+      { wrapper: ({ children }) => wrap(fakeApi, children) },
+    );
+    await waitFor(() => expect(result.current.sharedProjectInfo).not.toBeNull());
+    expect(fakeApi.sharedGetProjectInfo).toHaveBeenCalledWith("p1");
+    expect(result.current.sharedProjectInfo.publishedBy).toBe("ana");
+  });
+
+  it("does not fetch sharedGetProjectInfo when there is no selected project", async () => {
+    const fakeApi = makeFakeApi();
+    renderHook(
+      () => useDashboard({ selectedProject: "", selectedRun: null, selectedSource: "shared" }),
+      { wrapper: ({ children }) => wrap(fakeApi, children) },
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(fakeApi.sharedGetProjectInfo).not.toHaveBeenCalled();
   });
 });
 

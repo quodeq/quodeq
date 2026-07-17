@@ -119,9 +119,22 @@ function useDashboardHandlers(onNavigate, dashboard) {
   }), [onNavigate, dashboard]);
 }
 
+// Shared projects aren't in the LOCAL projects list, and a shared selection's
+// id can collide with an unrelated local project (e.g. after a clone-on-add
+// pull) -- looking it up in `projects` would silently bleed the local twin's
+// languageStats/publishedBy/etc. into a shared Overview. `sharedProjectInfo`
+// is fetched separately (useDashboard, keyed by source) and is exactly this
+// shared project's own info. Local behavior is unchanged: same lookup, same
+// null fallback. Exported so the source-gating contract is unit-testable
+// without mounting the whole page (which needs a SidePaneProvider and more).
+export function selectDashboardProjectInfo({ selectedSource, projects, selectedProject, sharedProjectInfo }) {
+  const localProjectInfo = (projects || []).find((p) => (p.id || p.name) === selectedProject) || null;
+  return selectedSource === 'shared' ? (sharedProjectInfo || null) : localProjectInfo;
+}
+
 export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
-  const { selectedProject, selectedSource, selectedRun, projects = [], dashboard, accumulated, loading, isFetching, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange } = data;
-  const projectInfo = projects.find((p) => (p.id || p.name) === selectedProject) || null;
+  const { selectedProject, selectedSource, selectedRun, projects = [], sharedProjectInfo = null, dashboard, accumulated, loading, isFetching, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange } = data;
+  const projectInfo = selectDashboardProjectInfo({ selectedSource, projects, selectedProject, sharedProjectInfo });
   const { onNavigate, onRunSelect, onProjectsReload } = callbacks;
   // After a successful clone-on-add migration the project's repository_info.json
   // has been rewritten with location: "local". Refetch the projects list so the

@@ -103,8 +103,14 @@ export function usePublish({ enabled = true } = {}) {
     } else {
       // 'done' (or an unexpected 'idle') -- refresh the shared list once so
       // the card that just finished gets its "published <relative time>"
-      // meta line updated.
+      // meta line updated. Also clear any error left over from a PREVIOUS
+      // failed attempt on this same project (single global job -- only one
+      // publish is ever in flight): without this, a retry that succeeds
+      // still shows the stale error banner under the card, since CardFooter
+      // keys showError on publishErrorProject alone, not on publishState.
       setPublishState('done');
+      setPublishError(null);
+      setPublishErrorProject(null);
       await fetchSharedList();
     }
     setPublishingProjectBoth(null);

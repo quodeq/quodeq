@@ -29,9 +29,21 @@ import { projectKeys } from "../../../api/queryKeys.js";
  * trigger a refetch of the accumulated (cross-run) dashboard payload.
  */
 export function useDashboard({ selectedProject, selectedRun, selectedSource = "local", keepPlaceholder = true } = {}) {
-  const { getDashboard, sharedGetDashboard } = useApi();
+  const { getDashboard, sharedGetDashboard, sharedGetProjectInfo } = useApi();
   const fetchDashboard = selectedSource === "shared" ? sharedGetDashboard : getDashboard;
   const queryClient = useQueryClient();
+
+  // Shared projects aren't in the LOCAL projects list DashboardPage otherwise
+  // reads projectInfo from, and a shared selection's id can collide with an
+  // unrelated local project (e.g. after a clone-on-add pull) -- looking it up
+  // there would silently bleed the local twin's languageStats/publishedBy/etc.
+  // into a shared Overview. Fetch the shared project's own info instead, keyed
+  // by source so switching sources never serves the other source's cache.
+  const sharedProjectInfoQuery = useQuery({
+    queryKey: projectKeys.info(selectedProject || "_none_", selectedSource),
+    queryFn: () => sharedGetProjectInfo(selectedProject),
+    enabled: selectedSource === "shared" && !!selectedProject,
+  });
 
   const {
     scores,
@@ -133,5 +145,6 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     availableRuns,
     refreshDashboard,
     refreshDashboardActive,
+    sharedProjectInfo: sharedProjectInfoQuery.data || null,
   };
 }

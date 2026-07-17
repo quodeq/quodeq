@@ -113,7 +113,7 @@ export function useAppState() {
   // usually nearly identical. The dashboard-refreshing class dims the
   // page during the background refetch so the user sees that something
   // is happening without the jarring full-screen LoadingScreen.
-  const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, refreshDashboard, refreshDashboardActive } = useDashboard({
+  const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, refreshDashboard, refreshDashboardActive, sharedProjectInfo } = useDashboard({
     selectedProject,
     selectedRun: effectiveRun,
     selectedSource,
@@ -156,7 +156,7 @@ export function useAppState() {
     serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navTab,
     projects, projectsLoaded, selectedProject, selectedSource, selectedRun, loadProjects, handleProjectChange, handleNavigate,
     handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject,
-    dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex,
+    dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex, sharedProjectInfo,
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect, prefetchHandlers,
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
     historySelectedRun, setHistorySelectedRun,
