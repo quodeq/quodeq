@@ -58,10 +58,14 @@ def _changed_dimensions(compiled_dir: Path, current: dict, proposed: dict) -> li
     for path in sorted(compiled_dir.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError, UnicodeDecodeError):
+            _, before = dimension_params(data, current)
+            _, after = dimension_params(data, proposed)
+        except (OSError, ValueError, UnicodeDecodeError, AttributeError, TypeError):
+            # A shape-invalid params block (spec not a dict, "params" not a
+            # mapping, etc.) raises AttributeError/TypeError out of
+            # dimension_params -- same degrade-and-skip as an unreadable or
+            # unparseable compiled file, so a bad file never 500s the PUT.
             continue
-        _, before = dimension_params(data, current)
-        _, after = dimension_params(data, proposed)
         if before != after:
             changed.append(data.get("id", path.stem))
     return changed
