@@ -326,14 +326,14 @@ class TestBuildRouterContext:
         """Without a compiled standards dir there is no enrichment context to
         build. Callers fall back to a default-context router (still emits
         markers and writes findings, just no req-ref enrichment)."""
-        assert _build_router_context(None, None, None, None) is None
+        assert _build_router_context(None, None, None, None, None) is None
 
     def test_returns_none_on_load_failure(self):
         """A broken compiled dir must not propagate -- the API runner needs
         to keep writing findings + markers even when enrichment fails."""
         with patch("quodeq.analysis._api_runner.load_compiled_refs",
                    side_effect=OSError("boom")):
-            ctx = _build_router_context(Path("/nonexistent"), "security", None, None)
+            ctx = _build_router_context(Path("/nonexistent"), "security", None, None, None)
         assert ctx is None
 
 

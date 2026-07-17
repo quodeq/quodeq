@@ -56,6 +56,65 @@ def test_build_router_loads_precedent_fingerprints_from_project_dir(tmp_path: Pa
     assert fingerprint("S-CON-1", "password = 'secret'") in router._enricher._precedent_fingerprints
 
 
+def test_build_router_sets_corpus_none_when_flag_off(tmp_path: Path, monkeypatch):
+    monkeypatch.delenv("QUODEQ_SEMANTIC_PRECEDENTS", raising=False)
+
+    findings_path = tmp_path / "run-1" / "evidence" / "security_evidence.jsonl"
+    findings_path.parent.mkdir(parents=True)
+    ctx = CompiledContext()
+
+    _build_router(io.StringIO(), findings_path, ctx, ServerArgs())
+
+    assert ctx.precedent_corpus is None
+
+
+def test_build_router_degrades_when_flag_on_but_no_embedder(tmp_path: Path, monkeypatch):
+    from quodeq.llm_bridge._embeddings import reset_embedding_availability_cache
+
+    reset_embedding_availability_cache()
+    monkeypatch.setenv("QUODEQ_SEMANTIC_PRECEDENTS", "1")
+    monkeypatch.setenv("QUODEQ_EMBEDDING_BASE_URL", "http://127.0.0.1:1")  # nothing listens
+
+    findings_path = tmp_path / "run-1" / "evidence" / "security_evidence.jsonl"
+    findings_path.parent.mkdir(parents=True)
+    ctx = CompiledContext()
+
+    _build_router(io.StringIO(), findings_path, ctx, ServerArgs())
+
+    assert ctx.precedent_corpus is None
+
+
+def test_build_router_wires_load_precedent_corpus_with_project_and_run_dir(
+    tmp_path: Path, monkeypatch,
+):
+    """Proves `_build_router` actually calls load_precedent_corpus with the
+    resolved (project_dir, run_dir) and stores its return value -- the
+    None-when-flag-off tests above pass trivially against the field default,
+    so this closes that gap."""
+    import quodeq.analysis.mcp.findings_server as findings_server_module
+
+    sentinel = object()
+    calls = []
+
+    def fake_load_precedent_corpus(project_dir, run_dir):
+        calls.append((project_dir, run_dir))
+        return sentinel
+
+    monkeypatch.setattr(
+        findings_server_module, "load_precedent_corpus", fake_load_precedent_corpus,
+    )
+
+    project_dir = tmp_path / "project"
+    findings_path = project_dir / "run-1" / "evidence" / "security_evidence.jsonl"
+    findings_path.parent.mkdir(parents=True)
+    ctx = CompiledContext()
+
+    _build_router(io.StringIO(), findings_path, ctx, ServerArgs())
+
+    assert calls == [(project_dir, project_dir / "run-1")]
+    assert ctx.precedent_corpus is sentinel
+
+
 def test_build_router_emits_findings_to_jsonl_and_event_log(tmp_path: Path):
     findings_path = tmp_path / "run-1" / "evidence" / "timeliness_evidence.jsonl"
     findings_path.parent.mkdir(parents=True)
