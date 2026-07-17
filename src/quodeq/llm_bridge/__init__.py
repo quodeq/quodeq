@@ -26,6 +26,11 @@ from quodeq.llm_bridge._omlx import (
     run_concurrency_test as run_omlx_concurrency_test,
 )
 from quodeq.llm_bridge._cloud import check_cloud_connection
+from quodeq.llm_bridge._embeddings import (
+    embed_texts,
+    embedding_model_available,
+    reset_embedding_availability_cache,
+)
 from quodeq.llm_bridge._models import get_known_models
 
 __all__ = [
@@ -44,5 +49,8 @@ __all__ = [
     "list_omlx_models",
     "run_omlx_concurrency_test",
     "check_cloud_connection",
+    "embed_texts",
+    "embedding_model_available",
+    "reset_embedding_availability_cache",
     "get_known_models",
 ]
