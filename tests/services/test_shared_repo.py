@@ -1,7 +1,10 @@
 """Tests for shared repo clone management."""
+import json
 import subprocess
 import time
 from pathlib import Path
+
+import pytest
 
 from quodeq.services.shared_repo import (
     FORMAT_NAME,
@@ -10,10 +13,14 @@ from quodeq.services.shared_repo import (
     bootstrap_repo_layout,
     check_repo_format,
     ensure_shared_clone,
+    published_meta,
+    read_state,
     refresh_shared_clone,
     run_git,
     shared_cache_dir,
+    shared_index_db_path,
     shared_repo_path,
+    sync_shared_index,
 )
 
 
@@ -194,3 +201,32 @@ def test_run_git_does_not_hang_on_credential_prompt(tmp_path):
 
     assert elapsed < 5  # never hit the timeout path
     assert isinstance(ok, bool)
+
+
+def test_readable_and_index_sync_on_published_clone(tmp_path, monkeypatch):
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    # build a real published origin using the Phase 1 publish path
+    from quodeq.services.shared_publish import publish_project
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    url = f"file://{origin}"
+    root = tmp_path / "evaluations"
+    project = root / "proj-a"
+    run = project / "run-1"
+    (run / "evidence").mkdir(parents=True)
+    (project / "repository_info.json").write_text('{"name":"demo"}')
+    (run / "status.json").write_text(json.dumps({"state": "done", "schema_version": 2}))
+    (run / "dimensions.json").write_text("{}")
+    (run / "events.jsonl").write_text("{}\n")
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "anna")
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "a@a")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", "anna")
+    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "a@a")
+    publish_project("proj-a", url, evaluations_root=root)
+
+    assert read_state(url) == "ok"
+    sync_shared_index(url)
+    assert shared_index_db_path(url).exists()
+    meta = published_meta(url)
+    assert meta["proj-a"]["publishedBy"] == "anna"
+    assert meta["proj-a"]["publishedAt"] > 0

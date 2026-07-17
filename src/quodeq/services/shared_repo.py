@@ -158,3 +158,58 @@ def bootstrap_repo_layout(repo_root: Path) -> None:
     evaluations = repo_root / "evaluations"
     evaluations.mkdir(exist_ok=True)
     (evaluations / ".gitkeep").write_text("", encoding="utf-8")
+
+
+def shared_index_db_path(url: str, env: dict | None = None) -> Path:
+    return shared_cache_dir(url, env) / "index.db"
+
+
+def shared_score_cache_path(url: str, env: dict | None = None) -> Path:
+    return shared_cache_dir(url, env) / "score_cache.db"
+
+
+def sync_shared_index(url: str, env: dict | None = None) -> None:
+    from quodeq.services.run_index import open_index, sync_index
+
+    root = shared_evaluations_root(url, env)
+    if not root.is_dir():
+        return
+    db = open_index(shared_index_db_path(url, env))
+    try:
+        sync_index(db, root)
+    finally:
+        db.close()
+
+
+def read_state(url: str, env: dict | None = None) -> str:
+    repo = shared_repo_path(url, env)
+    if not (repo / ".git").exists():
+        return "missing"
+    fmt = check_repo_format(repo)
+    if fmt == "unsupported_version":
+        return "unsupported_version"
+    if fmt == "ok" or shared_evaluations_root(url, env).is_dir():
+        return "ok"
+    return "missing"
+
+
+def published_meta(url: str, env: dict | None = None) -> dict[str, dict]:
+    repo = shared_repo_path(url, env)
+    root = shared_evaluations_root(url, env)
+    result: dict[str, dict] = {}
+    if not root.is_dir():
+        return result
+    for entry in sorted(root.iterdir()):
+        if not entry.is_dir():
+            continue
+        ok, out = run_git(
+            ["log", "-1", "--format=%an|%ct", "--", f"evaluations/{entry.name}"],
+            cwd=repo,
+        )
+        if ok and "|" in out:
+            author, _, ts = out.strip().partition("|")
+            try:
+                result[entry.name] = {"publishedBy": author, "publishedAt": int(ts)}
+            except ValueError:
+                continue
+    return result
