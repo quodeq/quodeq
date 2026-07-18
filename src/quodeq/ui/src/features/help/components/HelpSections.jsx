@@ -501,6 +501,7 @@ export function Standards() {
       <p>Many requirements carry a number: max function lines, max parameters, and so on. You can change these per project without cloning the standard. Select the requirement and edit the value in its <strong>Thresholds</strong> section, which shows the default and the allowed range. Out-of-range values are rejected, and <em>Reset to default</em> removes the override. Custom standards can declare thresholds too.</p>
       <p>The tree marks customized requirements with a dot and shows the value in effect in each label. Standards with overrides get an <em>N thresholds customized</em> badge. Evaluations judge against your values, not the shipped ones.</p>
       <p>Overrides are saved to <code>.quodeq/standards-overrides.json</code> in the project root. Commit the file and the whole team scans with the same numbers. If it is missing or malformed, the defaults apply; a scan never fails because of it.</p>
+      <p>Changing a threshold rewrites the rule for that dimension, so previously analyzed files show as pending until the next scan re-evaluates them. Restoring the previous value brings the earlier results back without a re-scan. Other dimensions are unaffected.</p>
       <Tip title="Not the grade thresholds">
         The boundaries in the <em>Grade Formula</em> editor decide how scores map to letter grades. These thresholds decide when code violates a requirement.
       </Tip>

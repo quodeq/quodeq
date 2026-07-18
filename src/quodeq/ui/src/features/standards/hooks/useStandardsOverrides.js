@@ -7,7 +7,7 @@ import { standardsKeys } from '../../../api/queryKeys.js';
  * Manages per-project standards threshold overrides.
  *
  * @param {string|null|undefined} projectId
- * @returns {{ overrides: Object, counts: Object, loading: boolean, error: string|null, save: (nextOverrides: Object) => Promise<void> }}
+ * @returns {{ overrides: Object, counts: Object, loading: boolean, error: string|null, save: (nextOverrides: Object) => Promise<void>, preview: (nextOverrides: Object) => Promise<{overrides: Object, changedDimensions: string[]}> }}
  */
 export function useStandardsOverrides(projectId) {
   const { getStandardsOverrides, putStandardsOverrides } = useApi();
@@ -34,11 +34,17 @@ export function useStandardsOverrides(projectId) {
     [projectId, putStandardsOverrides, queryClient],
   );
 
+  const preview = useCallback(
+    (nextOverrides) => putStandardsOverrides(projectId, nextOverrides, { dryRun: true }),
+    [projectId, putStandardsOverrides],
+  );
+
   return {
     overrides: data?.overrides ?? {},
     counts: data?.counts ?? {},
     loading: isLoading,
     error: mutationError || (error ? error.message : null),
     save,
+    preview,
   };
 }

@@ -118,10 +118,12 @@ export async function getStandardsOverrides(projectId) {
  * Persist threshold overrides for a project.
  * @param {string} projectId
  * @param {Object} overrides - Map of requirementId → param overrides, e.g. `{ 'M-ANA-2': { max_lines: 60 } }`
- * @returns {Promise<{ overrides: Object }>}
+ * @param {{ dryRun?: boolean }} [opts] - dryRun validates and returns changedDimensions without writing.
+ * @returns {Promise<{ overrides: Object, changedDimensions: string[] }>}
  */
-export async function putStandardsOverrides(projectId, overrides) {
-  return request(`/projects/${encodeURIComponent(projectId)}/standards-overrides`, {
+export async function putStandardsOverrides(projectId, overrides, { dryRun = false } = {}) {
+  const suffix = dryRun ? '?dryRun=true' : '';
+  return request(`/projects/${encodeURIComponent(projectId)}/standards-overrides${suffix}`, {
     method: 'PUT',
     body: JSON.stringify({ overrides }),
   });

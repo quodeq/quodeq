@@ -17,7 +17,11 @@ import json
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
-from quodeq.core.standards.overrides import OVERRIDES_RELPATH, load_project_overrides
+from quodeq.core.standards.overrides import (
+    OVERRIDES_RELPATH,
+    dimension_params,
+    load_project_overrides,
+)
 
 _HASH_CHUNK_SIZE = 1 << 16  # 64 KiB
 
@@ -86,6 +90,58 @@ def _hash_overrides(project_root: Path) -> str:
     if key is None:
         return ""
     return _hash_overrides_by_stat(Path(project_root), *key)
+
+
+@functools.lru_cache(maxsize=None)
+def _dimension_params_by_stat(
+    compiled: Path, c_size: int, c_mtime_ns: int,
+    project_root: Path | None, o_size: int, o_mtime_ns: int,
+) -> tuple[str, dict]:
+    """Memoized (params_hash, effective_params) keyed by the stats of the
+    compiled dimension JSON and the overrides file — same make/pyc-style
+    invalidation as ``_hash_overrides_by_stat``."""
+    _ = (c_size, c_mtime_ns, o_size, o_mtime_ns)
+    try:
+        data = json.loads(compiled.read_text(encoding="utf-8"))
+    except (OSError, ValueError, UnicodeDecodeError):
+        return "", {}
+    overrides = load_project_overrides(project_root) if project_root else {}
+    try:
+        effective, non_default = dimension_params(data, overrides)
+    except (AttributeError, TypeError):
+        # A shape-invalid params block (e.g. a spec that isn't a dict, or a
+        # "params" value that isn't a mapping) raises from effective_params.
+        # Analysis must never abort over a malformed compiled file -- keying
+        # degrades the same way a missing/unparseable file does.
+        return "", {}
+    if not non_default:
+        return "", effective
+    canonical = json.dumps(non_default, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest(), effective
+
+
+def dimension_params_state(
+    standards_dir: Path | None, dimension: str, project_root: Path | None,
+) -> tuple[str, dict]:
+    """(params_hash, effective_params) for *dimension* under *project_root*.
+
+    ``params_hash`` is "" when every effective param equals its declared
+    default, the dimension declares no params, or the compiled file is
+    missing — so default-config projects key byte-identically to keys
+    computed before params existed. ``effective_params`` is the full
+    resolved ``{req_id: {param: value}}`` map for entry provenance.
+
+    The returned dict is shared via memoization — treat it as read-only.
+    """
+    if standards_dir is None:
+        return "", {}
+    compiled = Path(standards_dir) / "compiled" / f"{dimension}.json"
+    ckey = _stat_key(compiled)
+    if ckey is None:
+        return "", {}
+    root = Path(project_root) if project_root else None
+    okey = (_stat_key(root / OVERRIDES_RELPATH) if root else None) or (0, 0)
+    return _dimension_params_by_stat(compiled, *ckey, root, *okey)
 
 
 def _hash_standards(
@@ -165,7 +221,9 @@ def _hash_prompts_map(prompts_dir: Path | None = None) -> dict[str, str]:
 def _clear_hash_caches() -> None:
     _hash_file_by_stat.cache_clear()
     _hash_overrides_by_stat.cache_clear()
+    _dimension_params_by_stat.cache_clear()
 
 
 _hash_standards.cache_clear = _clear_hash_caches  # type: ignore[attr-defined]
 _hash_prompts_map.cache_clear = _clear_hash_caches  # type: ignore[attr-defined]
+dimension_params_state.cache_clear = _clear_hash_caches  # type: ignore[attr-defined]

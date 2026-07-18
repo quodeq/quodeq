@@ -57,6 +57,33 @@ def test_server_args_default_language_is_none():
     assert sa.language is None
 
 
+def test_parse_args_accepts_standards_dir(tmp_path):
+    """--standards-dir is an optional CLI arg parsed into ServerArgs.standards_dir.
+
+    Distinct from --compiled-dir: this is the standards ROOT (parent of
+    compiled/), needed so build_cache_writer's params fingerprint looks in
+    the right place instead of double-appending "compiled".
+    """
+    standards_dir = tmp_path / "standards"
+    args = parse_args([
+        str(tmp_path / "findings.jsonl"),
+        "--standards-dir", str(standards_dir),
+    ])
+    assert args.standards_dir == str(standards_dir)
+
+
+def test_parse_args_standards_dir_defaults_to_none():
+    """When --standards-dir is omitted, ServerArgs.standards_dir is None."""
+    args = parse_args(["/tmp/findings.jsonl"])
+    assert args.standards_dir is None
+
+
+def test_server_args_default_standards_dir_is_none():
+    """ServerArgs() with no overrides exposes standards_dir defaulted to None."""
+    sa = ServerArgs()
+    assert sa.standards_dir is None
+
+
 def test_parse_args_raises_when_dimension_set_without_cache_args():
     """parse_args enforces: --dimension requires --cache-root and --model-id.
 

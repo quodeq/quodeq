@@ -74,6 +74,36 @@ def resolve_requirement_text(req: dict, req_overrides: dict | None = None) -> st
         text)
 
 
+def dimension_params(
+    dimension_data: dict, overrides: dict[str, dict],
+) -> tuple[dict[str, dict[str, int]], dict[str, dict[str, int]]]:
+    """Effective and non-default params for one dimension's requirements.
+
+    ``effective`` maps every requirement that declares params to its full
+    effective values (override wins when valid, else default). ``non_default``
+    is the subset whose effective value differs from the declared default —
+    the exact input that must shift a cache key. Both are ``{}`` when the
+    dimension declares no params.
+    """
+    effective: dict[str, dict[str, int]] = {}
+    non_default: dict[str, dict[str, int]] = {}
+    for principle in dimension_data.get("principles", []):
+        for req in principle.get("requirements", []):
+            req_id = req.get("id")
+            params = req.get("params")
+            if not req_id or not params:
+                continue
+            values = effective_params(req, overrides.get(req_id))
+            effective[req_id] = values
+            diff = {
+                name: value for name, value in values.items()
+                if value != (params.get(name) or {}).get("default")
+            }
+            if diff:
+                non_default[req_id] = diff
+    return effective, non_default
+
+
 def collect_declared_params(compiled_dir: Path) -> dict[str, dict]:
     """Collect ``{req_id: params_spec}`` across every compiled dimension file."""
     declared: dict[str, dict] = {}
