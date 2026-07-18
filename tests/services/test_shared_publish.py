@@ -13,11 +13,14 @@ from quodeq.services.shared_publish import (
 def _make_run(project_dir: Path, run_id: str, state: str) -> Path:
     run = project_dir / run_id
     (run / "evidence").mkdir(parents=True)
+    (run / "evaluation").mkdir(parents=True)
     (run / "status.json").write_text(json.dumps({"state": state, "schema_version": 2}))
     (run / "dimensions.json").write_text("{}")
     (run / "events.jsonl").write_text('{"event_type":"RUN_STARTED"}\n')
     (run / "evidence" / "manifest.json").write_text("{}")
     (run / "evidence" / "security_evidence.jsonl").write_text("{}\n")
+    (run / "evaluation" / "security.json").write_text('{"dimension":"Security"}')
+    (run / "evaluation" / "reliability_eval.md").write_text("# noise")  # must NOT be copied
     (run / "run.log").write_text("noise")            # must NOT be copied
     (run / "evaluation.db").write_text("derived")     # must NOT be copied
     return run
@@ -43,6 +46,20 @@ def test_copy_run_applies_allowlist(tmp_path):
     assert (dest / "evidence" / "security_evidence.jsonl").exists()
     assert not (dest / "run.log").exists()
     assert not (dest / "evaluation.db").exists()
+
+
+def test_copy_run_copies_evaluation_json_only(tmp_path):
+    """The frozen eval-time per-dimension scores (evaluation/<dim>.json) are the
+    source of truth read_run_data() needs to render a dashboard at all; a
+    published clone without them renders an empty dashboard. Only .json files
+    from evaluation/ are copied -- markdown companions and any other junk in
+    that directory are not source-of-truth and must not be copied."""
+    src = _make_run(tmp_path / "src", "r1", "done")
+    dest = tmp_path / "dest" / "r1"
+    copy_run(src, dest)
+    assert (dest / "evaluation" / "security.json").exists()
+    assert (dest / "evaluation" / "security.json").read_text() == '{"dimension":"Security"}'
+    assert not (dest / "evaluation" / "reliability_eval.md").exists()
 
 
 def test_merge_actions_log_unions_and_sorts(tmp_path):
@@ -78,6 +95,32 @@ def test_stage_project_copies_info_actions_and_done_runs(tmp_path):
     assert (dest / "actions.jsonl").exists()
     assert (dest / "r-done" / "status.json").exists()
     assert not (dest / "r-live").exists()
+
+
+def test_stage_project_copies_scan_json_when_present(tmp_path):
+    """Finding 3 regression: _fs_reports._enrich_with_coverage and the
+    project-card coverage reader consume <project>/scan.json (totalFiles
+    etc.); stage_project's allowlist previously dropped it, so a published
+    clone's dashboard/card never showed coverage data."""
+    project = tmp_path / "local" / "proj-uuid"
+    project.mkdir(parents=True)
+    (project / "repository_info.json").write_text('{"name":"x"}')
+    (project / "scan.json").write_text(json.dumps({"total_files": 42, "code_files": 30}))
+    _make_run(project, "r-done", "done")
+    dest = tmp_path / "clone" / "evaluations" / "proj-uuid"
+    stage_project(project, dest)
+    assert (dest / "scan.json").exists()
+    assert json.loads((dest / "scan.json").read_text()) == {"total_files": 42, "code_files": 30}
+
+
+def test_stage_project_leaves_scan_json_absent_when_source_has_none(tmp_path):
+    project = tmp_path / "local" / "proj-uuid"
+    project.mkdir(parents=True)
+    (project / "repository_info.json").write_text('{"name":"x"}')
+    _make_run(project, "r-done", "done")
+    dest = tmp_path / "clone" / "evaluations" / "proj-uuid"
+    stage_project(project, dest)
+    assert not (dest / "scan.json").exists()
 
 
 def test_list_completed_runs_skips_unsupported_schema_version(tmp_path):

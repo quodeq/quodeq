@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextvars
 import json
 import shutil
 from concurrent.futures import ThreadPoolExecutor
@@ -86,8 +87,15 @@ def _build_parent_child_sets(reports_root: Path, dir_names: list[str]) -> tuple[
     return parent_ids, subproject_ids
 
 
-def build_project_list(reports_root: Path) -> list[ProjectEntry]:
-    """Collect eligible project dirs and build entries in parallel."""
+def build_project_list(reports_root: Path, *, backfill: bool = True) -> list[ProjectEntry]:
+    """Collect eligible project dirs and build entries in parallel.
+
+    *backfill* controls the lazy ``onboardingCompletedAt`` backfill below (and
+    the equivalent one inside ``_build_project_entry``): when False, records
+    are read as-is and never rewritten. Local callers keep the default
+    (True); the shared-repo route passes False so listing a clone's projects
+    never dirties its git worktree (see routes_shared.py shared_projects).
+    """
     max_listed = _max_projects_listed()
     dir_names: list[str] = []
     for entry in safe_read_dir(reports_root):
@@ -101,8 +109,9 @@ def build_project_list(reports_root: Path) -> list[ProjectEntry]:
     # ``onboardingCompletedAt`` field. Run before the parent/child sweep so
     # any subsequent reads see the updated file. Idempotent — no-op for
     # records that already have the field. Failures are silently ignored.
-    for name in dir_names:
-        _backfill_onboarding_field(reports_root / name)
+    if backfill:
+        for name in dir_names:
+            _backfill_onboarding_field(reports_root / name)
 
     parent_ids, subproject_ids = _build_parent_child_sets(reports_root, dir_names)
 
@@ -110,10 +119,23 @@ def build_project_list(reports_root: Path) -> list[ProjectEntry]:
         runs = list_runs(reports_root, name)
         if not runs and name not in parent_ids and name not in subproject_ids:
             return None
-        return _build_project_entry(reports_root, name, runs)
+        return _build_project_entry(reports_root, name, runs, backfill=backfill)
 
+    # contextvars do NOT propagate into ThreadPoolExecutor worker threads --
+    # each worker runs with its own default Context, so a caller-side
+    # score_cache_path_override (e.g. from _with_shared_root) would be
+    # invisible inside _build_one and per-project summaries would read/write
+    # the LOCAL score cache DB instead of the scoped one. Copy the calling
+    # context once per task -- a single Context object cannot be entered by
+    # more than one thread concurrently -- so each worker sees the same
+    # contextvar values (including the override, when active) as the caller.
+    # When no override is active this is a no-op: copy_context().run just
+    # calls _build_one with the same (empty) contextvar state.
+    ctxs = [contextvars.copy_context() for _ in dir_names]
     with ThreadPoolExecutor(max_workers=min(_MAX_PROJECT_BUILD_WORKERS, len(dir_names) or 1)) as pool:
-        results = pool.map(_build_one, dir_names)
+        results = pool.map(
+            lambda pair: pair[0].run(_build_one, pair[1]), zip(ctxs, dir_names),
+        )
     projects = [p for p in results if p is not None]
     projects.sort(key=lambda p: p.name)
     return _auto_detect_parents(projects)

@@ -90,14 +90,28 @@ def ensure_shared_clone(url: str, env: dict | None = None) -> Path | None:
     return repo
 
 
-def refresh_shared_clone(url: str, env: dict | None = None) -> bool:
+_DEFAULT_REFRESH_TIMEOUT_S = 30
+
+
+def refresh_shared_clone(url: str, env: dict | None = None, *, timeout: int = _DEFAULT_REFRESH_TIMEOUT_S) -> bool:
+    """Fetch + hard-reset the clone to the remote's HEAD.
+
+    Called in-request (GET /api/shared/projects?refresh=1, POST
+    /api/shared/refresh), so it must not inherit run_git's 300s default --
+    a black-holed connection would otherwise hang the request for up to 5
+    minutes. *timeout* bounds both the fetch (the network call) and the
+    reset (local but kept consistent); a black-holed connection now turns
+    into a stale=true response in ~*timeout* seconds instead. Does not
+    affect ensure_shared_clone's own (still 300s) clone timeout -- an
+    initial clone can legitimately take much longer than a refresh.
+    """
     repo = shared_repo_path(url, env)
     if not (repo / ".git").exists():
         return ensure_shared_clone(url, env) is not None
-    ok, _ = run_git(["fetch", "--depth", "1", "origin", "HEAD"], cwd=repo)
+    ok, _ = run_git(["fetch", "--depth", "1", "origin", "HEAD"], cwd=repo, timeout=timeout)
     if not ok:
         return False
-    ok, _ = run_git(["reset", "--hard", "FETCH_HEAD"], cwd=repo)
+    ok, _ = run_git(["reset", "--hard", "FETCH_HEAD"], cwd=repo, timeout=timeout)
     return ok
 
 
@@ -158,3 +172,58 @@ def bootstrap_repo_layout(repo_root: Path) -> None:
     evaluations = repo_root / "evaluations"
     evaluations.mkdir(exist_ok=True)
     (evaluations / ".gitkeep").write_text("", encoding="utf-8")
+
+
+def shared_index_db_path(url: str, env: dict | None = None) -> Path:
+    return shared_cache_dir(url, env) / "index.db"
+
+
+def shared_score_cache_path(url: str, env: dict | None = None) -> Path:
+    return shared_cache_dir(url, env) / "score_cache.db"
+
+
+def sync_shared_index(url: str, env: dict | None = None) -> None:
+    from quodeq.services.run_index import open_index, sync_index
+
+    root = shared_evaluations_root(url, env)
+    if not root.is_dir():
+        return
+    db = open_index(shared_index_db_path(url, env))
+    try:
+        sync_index(db, root)
+    finally:
+        db.close()
+
+
+def read_state(url: str, env: dict | None = None) -> str:
+    repo = shared_repo_path(url, env)
+    if not (repo / ".git").exists():
+        return "missing"
+    fmt = check_repo_format(repo)
+    if fmt == "unsupported_version":
+        return "unsupported_version"
+    if fmt == "ok" or shared_evaluations_root(url, env).is_dir():
+        return "ok"
+    return "missing"
+
+
+def published_meta(url: str, env: dict | None = None) -> dict[str, dict]:
+    repo = shared_repo_path(url, env)
+    root = shared_evaluations_root(url, env)
+    result: dict[str, dict] = {}
+    if not root.is_dir():
+        return result
+    for entry in sorted(root.iterdir()):
+        if not entry.is_dir():
+            continue
+        ok, out = run_git(
+            ["log", "-1", "--format=%an|%ct", "--", f"evaluations/{entry.name}"],
+            cwd=repo,
+        )
+        if ok and "|" in out:
+            author, _, ts = out.strip().rpartition("|")
+            try:
+                result[entry.name] = {"publishedBy": author, "publishedAt": int(ts)}
+            except ValueError:
+                continue
+    return result

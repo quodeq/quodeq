@@ -44,14 +44,21 @@ def _backfill_onboarding_field(project_dir: Path) -> dict | None:
     return data
 
 
-def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> ProjectEntry:
-    """Build a frozen ProjectEntry from its directory and run list."""
+def _build_project_entry(
+    reports_root: Path, entry_name: str, runs: list[RunInfo], *, backfill: bool = True,
+) -> ProjectEntry:
+    """Build a frozen ProjectEntry from its directory and run list.
+
+    *backfill* mirrors ``build_project_list``'s parameter of the same name:
+    when False, the record is read read-only and never rewritten (used by
+    the shared-repo route so listing a clone never dirties its worktree).
+    """
     # Lazy backfill: ensure legacy project records have an
     # ``onboardingCompletedAt`` field so the wizard never auto-opens for
     # already-onboarded projects. Returns the (possibly updated) info dict
     # so we can pass the field through to the entry without re-reading.
     project_dir = reports_root / entry_name
-    backfilled = _backfill_onboarding_field(project_dir)
+    backfilled = _backfill_onboarding_field(project_dir) if backfill else None
     info = backfilled if backfilled is not None else _read_repo_info(reports_root, entry_name)
     meta = _extract_project_metadata(info, entry_name)
     latest_grade, latest_score, files_count = _read_accumulated_summary(

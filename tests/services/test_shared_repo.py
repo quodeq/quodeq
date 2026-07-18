@@ -1,4 +1,5 @@
 """Tests for shared repo clone management."""
+import json
 import subprocess
 import time
 from pathlib import Path
@@ -10,10 +11,14 @@ from quodeq.services.shared_repo import (
     bootstrap_repo_layout,
     check_repo_format,
     ensure_shared_clone,
+    published_meta,
+    read_state,
     refresh_shared_clone,
     run_git,
     shared_cache_dir,
+    shared_index_db_path,
     shared_repo_path,
+    sync_shared_index,
 )
 
 
@@ -58,6 +63,49 @@ def test_ensure_clone_and_refresh(tmp_path, monkeypatch):
     # second call reuses without error
     assert ensure_shared_clone(url) == repo
     assert refresh_shared_clone(url) is True
+
+
+def test_refresh_shared_clone_passes_explicit_timeout_to_both_git_calls(tmp_path, monkeypatch):
+    """Finding 4 regression: refresh_shared_clone must not inherit run_git's
+    300s default -- it's called in-request (GET /api/shared/projects?refresh=1,
+    POST /api/shared/refresh) and a black-holed connection would otherwise
+    hang the request for up to 5 minutes. A tiny explicit *timeout* must
+    reach BOTH the fetch (network) and reset (local) run_git calls."""
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    url = _make_origin(tmp_path)
+    assert ensure_shared_clone(url) is not None
+
+    seen_timeouts: list[int] = []
+    real_run_git = run_git
+
+    def _spy(args, *, cwd=None, timeout=None):
+        seen_timeouts.append(timeout)
+        return real_run_git(args, cwd=cwd, timeout=timeout)
+
+    monkeypatch.setattr("quodeq.services.shared_repo.run_git", _spy)
+
+    assert refresh_shared_clone(url, timeout=7) is True
+    assert seen_timeouts == [7, 7]
+
+
+def test_refresh_shared_clone_default_timeout_is_bounded_not_300s(tmp_path, monkeypatch):
+    """Without an explicit timeout, refresh_shared_clone must still use a
+    short bounded default (not run_git's 300s general-purpose default)."""
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    url = _make_origin(tmp_path)
+    assert ensure_shared_clone(url) is not None
+
+    seen_timeouts: list[int] = []
+    real_run_git = run_git
+
+    def _spy(args, *, cwd=None, timeout=None):
+        seen_timeouts.append(timeout)
+        return real_run_git(args, cwd=cwd, timeout=timeout)
+
+    monkeypatch.setattr("quodeq.services.shared_repo.run_git", _spy)
+
+    assert refresh_shared_clone(url) is True
+    assert seen_timeouts == [30, 30]
 
 
 def test_ensure_clone_bad_url_returns_none(tmp_path, monkeypatch):
@@ -194,3 +242,126 @@ def test_run_git_does_not_hang_on_credential_prompt(tmp_path):
 
     assert elapsed < 5  # never hit the timeout path
     assert isinstance(ok, bool)
+
+
+def test_readable_and_index_sync_on_published_clone(tmp_path, monkeypatch):
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    # build a real published origin using the Phase 1 publish path
+    from quodeq.services.shared_publish import publish_project
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    url = f"file://{origin}"
+    root = tmp_path / "evaluations"
+    project = root / "proj-a"
+    run = project / "run-1"
+    (run / "evidence").mkdir(parents=True)
+    (project / "repository_info.json").write_text('{"name":"demo"}')
+    (run / "status.json").write_text(json.dumps({"state": "done", "schema_version": 2}))
+    (run / "dimensions.json").write_text("{}")
+    (run / "events.jsonl").write_text("{}\n")
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "anna")
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "a@a")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", "anna")
+    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "a@a")
+    publish_project("proj-a", url, evaluations_root=root)
+
+    assert read_state(url) == "ok"
+    sync_shared_index(url)
+    assert shared_index_db_path(url).exists()
+    meta = published_meta(url)
+    assert meta["proj-a"]["publishedBy"] == "anna"
+    assert meta["proj-a"]["publishedAt"] > 0
+
+
+def test_published_meta_author_name_with_pipe(tmp_path, monkeypatch):
+    """Test that author names containing pipes are correctly parsed."""
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    from quodeq.services.shared_publish import publish_project
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    url = f"file://{origin}"
+    root = tmp_path / "evaluations"
+    project = root / "proj-pipe"
+    run = project / "run-1"
+    (run / "evidence").mkdir(parents=True)
+    (project / "repository_info.json").write_text('{"name":"demo"}')
+    (run / "status.json").write_text(json.dumps({"state": "done", "schema_version": 2}))
+    (run / "dimensions.json").write_text("{}")
+    (run / "events.jsonl").write_text("{}\n")
+    # Author name with pipe character
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "Jane | Marketing")
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "jane@example.com")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", "Jane | Marketing")
+    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "jane@example.com")
+    publish_project("proj-pipe", url, evaluations_root=root)
+
+    meta = published_meta(url)
+    assert "proj-pipe" in meta
+    assert meta["proj-pipe"]["publishedBy"] == "Jane | Marketing"
+    assert isinstance(meta["proj-pipe"]["publishedAt"], int)
+    assert meta["proj-pipe"]["publishedAt"] > 0
+
+
+def test_read_state_missing_clone(tmp_path, monkeypatch):
+    """read_state returns 'missing' when clone does not exist."""
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    url = "file:///nonexistent/repo.git"
+    assert read_state(url) == "missing"
+
+
+def test_read_state_unsupported_version(tmp_path, monkeypatch):
+    """read_state returns 'unsupported_version' when quodeq.json has version > FORMAT_VERSION."""
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    url = "file:///dummy/url"
+    repo = shared_repo_path(url, {"QUODEQ_CACHE_ROOT": str(tmp_path / "cache")})
+    repo.mkdir(parents=True)
+    (repo / ".git").mkdir()
+    (repo / MARKER_FILENAME).write_text(
+        json.dumps({"format": FORMAT_NAME, "version": 99}), encoding="utf-8"
+    )
+    assert read_state(url) == "unsupported_version"
+
+
+def test_read_state_foreign_with_evaluations_dir_ok(tmp_path, monkeypatch):
+    """read_state returns 'ok' when evaluations/ dir exists even if format is foreign."""
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    url = "file:///dummy/url"
+    repo = shared_repo_path(url, {"QUODEQ_CACHE_ROOT": str(tmp_path / "cache")})
+    repo.mkdir(parents=True)
+    (repo / ".git").mkdir()
+    (repo / "README.md").write_text("Some other project")
+    (repo / "evaluations").mkdir()
+    assert read_state(url) == "ok"
+
+
+def test_published_meta_skips_uncommitted_project_dir(tmp_path, monkeypatch):
+    """published_meta skips a project dir with no committed history."""
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    from quodeq.services.shared_publish import publish_project
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    url = f"file://{origin}"
+    root = tmp_path / "evaluations"
+
+    # Create and publish proj-committed
+    project_committed = root / "proj-committed"
+    run = project_committed / "run-1"
+    (run / "evidence").mkdir(parents=True)
+    (project_committed / "repository_info.json").write_text('{"name":"demo"}')
+    (run / "status.json").write_text(json.dumps({"state": "done", "schema_version": 2}))
+    (run / "dimensions.json").write_text("{}")
+    (run / "events.jsonl").write_text("{}\n")
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "alice")
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "a@a")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", "alice")
+    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "a@a")
+    publish_project("proj-committed", url, evaluations_root=root)
+
+    # Create proj-uncommitted dir locally (not committed)
+    project_uncommitted = root / "proj-uncommitted"
+    (project_uncommitted / "run-1").mkdir(parents=True)
+    (project_uncommitted / "repository_info.json").write_text('{"name":"demo"}')
+
+    meta = published_meta(url)
+    assert "proj-committed" in meta
+    assert "proj-uncommitted" not in meta
