@@ -1,4 +1,6 @@
 """Threshold-sweep logic for the golden-set calibration script."""
+# Flat import: precedent_golden.py is a standalone script on the benchmarks/
+# pythonpath entry, intentionally outside the quodeq_bench harness package.
 from precedent_golden import sweep
 
 

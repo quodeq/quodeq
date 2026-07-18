@@ -9,6 +9,10 @@ Include scope-level negatives (same file, different requirement).
 
 Usage (needs a running Ollama with the embedding model pulled):
   uv run python benchmarks/precedent_golden.py
+
+Standalone script, deliberately NOT part of the quodeq_bench package: that
+package is the accuracy-benchmark harness, while this is a one-off Phase B
+calibration CLI for the precedent similarity threshold.
 """
 from __future__ import annotations
 
