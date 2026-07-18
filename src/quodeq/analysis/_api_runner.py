@@ -33,7 +33,7 @@ from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
 
 if TYPE_CHECKING:
     from quodeq.analysis._types import RunConfig
-from quodeq.context.precedent import load_precedent_fingerprints
+from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
 from quodeq.core.standards.refs import load_compiled_requirements
 from quodeq.core.standards.refs import load_compiled_refs
@@ -378,11 +378,15 @@ def _build_router_context(
     dimension: str | None,
     work_dir: Path | None,
     project_dir: Path | None,
+    run_dir: Path | None,
 ) -> CompiledContext | None:
     """Build the CompiledContext that FindingsRouter needs for enrichment.
 
     Returns ``None`` when *compiled_dir* is unset, signalling that the
     caller should write findings without enrichment (legacy behaviour).
+
+    *run_dir* locates the run directory holding the semantic precedent
+    corpus's circuit-breaker marker (see ``load_precedent_corpus``).
     """
     if not compiled_dir:
         return None
@@ -391,6 +395,10 @@ def _build_router_context(
         compiled_reqs = load_compiled_requirements(compiled_dir, dimension) or {}
         project_shape = detect_shape(work_dir) if work_dir is not None else None
         precedents = load_precedent_fingerprints(project_dir) if project_dir else set()
+        corpus = (
+            load_precedent_corpus(project_dir, run_dir)
+            if project_dir and run_dir else None
+        )
         return CompiledContext(
             compiled_refs=compiled_refs,
             compiled_reqs=compiled_reqs,
@@ -398,6 +406,7 @@ def _build_router_context(
             work_dir=work_dir,
             project_shape=project_shape,
             precedent_fingerprints=precedents,
+            precedent_corpus=corpus,
         )
     except Exception as exc:
         _log.warning("Could not build enrichment context: %s -- writing raw", exc)
@@ -476,10 +485,13 @@ def run_api_analysis(
     _infer_end_line(findings)
 
     # jsonl_file is `<project_dir>/<run_id>/evidence/<dim>_evidence.jsonl`,
-    # so the project directory is its great-grandparent. Used by the
-    # context-enricher pipeline to load prior dismissals as precedents.
+    # so the project directory is its great-grandparent and the run
+    # directory its grandparent. Used by the context-enricher pipeline to
+    # load prior dismissals as precedents (fingerprints and, when the
+    # semantic-precedents flag is on, the embedded corpus).
     project_dir = jsonl_file.parent.parent.parent if jsonl_file else None
-    ctx = _build_router_context(compiled_dir, dimension, work_dir, project_dir)
+    run_dir = jsonl_file.parent.parent if jsonl_file else None
+    ctx = _build_router_context(compiled_dir, dimension, work_dir, project_dir, run_dir)
 
     _log.debug(
         "API runner: %d findings, lossy=%s, marking %d file(s) as %s",

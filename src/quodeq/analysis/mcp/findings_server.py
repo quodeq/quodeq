@@ -17,7 +17,7 @@ from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import read_message, dispatch as _dispatch
 from quodeq.core.standards.refs import load_compiled_refs as _load_compiled_refs
-from quodeq.context.precedent import load_precedent_fingerprints
+from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
 from quodeq.core.standards.refs import load_compiled_requirements as _load_compiled_requirements
 from quodeq.core.standards.overrides import load_project_overrides
@@ -112,6 +112,7 @@ def _build_router(
     run_dir = Path(findings_path).parent.parent
     project_dir = run_dir.parent
     ctx.precedent_fingerprints = load_precedent_fingerprints(project_dir)
+    ctx.precedent_corpus = load_precedent_corpus(project_dir, run_dir)
     from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
     event_log = EventLogWriter(run_dir / "events.jsonl")
 

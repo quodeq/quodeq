@@ -179,6 +179,96 @@ def test_precedent_respects_llm_emitted_confidence() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Semantic precedent tier
+# ---------------------------------------------------------------------------
+
+class _FakeCorpus:
+    def __init__(self, score: float | None, threshold: float = 0.85) -> None:
+        self._score = score
+        self.threshold = threshold
+        self.calls: list[str] = []
+
+    def match(self, text: str) -> float | None:
+        self.calls.append(text)
+        return self._score
+
+
+def _violation_args(**over):
+    args = {
+        "t": "violation", "req": "S-CON-1", "file": "auth.py", "line": 42,
+        "reason": "hardcoded secret", "snippet": "password = 'secret'",
+    }
+    args.update(over)
+    return args
+
+
+def test_semantic_match_downweights_on_exact_miss() -> None:
+    ctx = CompiledContext(precedent_fingerprints=set())
+    ctx.precedent_corpus = _FakeCorpus(score=0.91)
+    enricher = FindingEnricher(ctx, file_reader=lambda p: "")
+    finding = enricher.enrich(_violation_args())
+    assert finding["confidence"] == 25
+
+
+def test_semantic_below_threshold_keeps_confidence() -> None:
+    ctx = CompiledContext(precedent_fingerprints=set())
+    ctx.precedent_corpus = _FakeCorpus(score=0.5)
+    enricher = FindingEnricher(ctx, file_reader=lambda p: "")
+    finding = enricher.enrich(_violation_args())
+    assert "confidence" not in finding or finding["confidence"] == 100
+
+
+def test_semantic_skipped_when_exact_matches() -> None:
+    fp = make_fingerprint("S-CON-1", "password = 'secret'")
+    corpus = _FakeCorpus(score=0.99)
+    ctx = CompiledContext(precedent_fingerprints={fp})
+    ctx.precedent_corpus = corpus
+    enricher = FindingEnricher(ctx, file_reader=lambda p: "")
+    finding = enricher.enrich(_violation_args())
+    assert finding["confidence"] == 25
+    assert corpus.calls == []  # exact tier won; no embed call spent
+
+
+def test_semantic_skips_scope_level_findings() -> None:
+    corpus = _FakeCorpus(score=0.99)
+    ctx = CompiledContext(precedent_fingerprints=set())
+    ctx.precedent_corpus = corpus
+    enricher = FindingEnricher(ctx, file_reader=lambda p: "")
+    enricher.enrich(_violation_args(line=0))
+    enricher.enrich(_violation_args(scope="file"))
+    enricher.enrich(_violation_args(snippet=""))
+    assert corpus.calls == []
+
+
+def test_semantic_none_score_keeps_confidence() -> None:
+    ctx = CompiledContext(precedent_fingerprints=set())
+    ctx.precedent_corpus = _FakeCorpus(score=None)
+    enricher = FindingEnricher(ctx, file_reader=lambda p: "")
+    finding = enricher.enrich(_violation_args())
+    assert "confidence" not in finding or finding["confidence"] == 100
+
+
+def test_semantic_score_equal_to_threshold_matches() -> None:
+    """The comparison is `score >= threshold`; an exact tie must still match."""
+    ctx = CompiledContext(precedent_fingerprints=set())
+    ctx.precedent_corpus = _FakeCorpus(score=0.85, threshold=0.85)
+    enricher = FindingEnricher(ctx, file_reader=lambda p: "")
+    finding = enricher.enrich(_violation_args())
+    assert finding["confidence"] == 25
+
+
+def test_semantic_respects_llm_emitted_confidence() -> None:
+    """Mirrors test_precedent_respects_llm_emitted_confidence for the exact
+    tier: the downweight guard only fires on None/100, so a pre-set
+    confidence survives a high-scoring semantic match too."""
+    ctx = CompiledContext(precedent_fingerprints=set())
+    ctx.precedent_corpus = _FakeCorpus(score=0.99)
+    enricher = FindingEnricher(ctx, file_reader=lambda p: "")
+    finding = enricher.enrich(_violation_args(confidence=50))
+    assert finding["confidence"] == 50
+
+
+# ---------------------------------------------------------------------------
 # dedup_key
 # ---------------------------------------------------------------------------
 
