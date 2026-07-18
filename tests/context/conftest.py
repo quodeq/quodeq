@@ -15,14 +15,21 @@ def seed_dismissed(
     snippet: str,
     file: str,
     line: int,
+    scope: str | None = None,
 ) -> Path:
-    """Seed a violation into a run, dismiss it, then project into SQL."""
+    """Seed a violation into a run, dismiss it, then project into SQL.
+
+    *scope* lets a test seed a scope-level finding (excluded from the
+    semantic-precedent tier -- see ``_semantic_eligible`` /
+    ``_collect_dismissed_texts``); defaults to None for a normal,
+    line-level finding.
+    """
     run_dir = project_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     log = run_dir / "events.jsonl"
     EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
         practice_id="P1", verdict="violation", dimension="Security",
-        file=file, line=line, reason="r", req=req, snippet=snippet,
+        file=file, line=line, reason="r", req=req, snippet=snippet, scope=scope,
     )))
     dismiss_finding(project_dir, {"req": req, "file": file, "line": line})
     Projector().ensure_projected(log, run_dir, project_dir=project_dir)

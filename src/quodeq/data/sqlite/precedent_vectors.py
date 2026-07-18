@@ -93,30 +93,47 @@ def open_vector_store(
     """Yield a model-validated connection, or None when the store is unusable.
 
     None means "degrade to no semantic tier this load" — never an exception.
+
+    The setup/probe work (``_init`` / ``_ensure_model``) is fully resolved
+    to a connection (or None) BEFORE the single ``yield`` below runs, and
+    that ``yield`` is not itself wrapped in an ``except sqlite3.DatabaseError``.
+    Previously it was: if the caller's with-body raised a DatabaseError,
+    contextlib.throw() re-raised it into the generator at the yield, which
+    landed back in that same except clause and tried to ``yield None`` a
+    second time -- generators can only yield once per throw(), so Python
+    raised ``RuntimeError("generator didn't stop after throw()")`` instead
+    of letting the caller's original exception propagate, and the
+    connection was never closed. Structuring it this way lets an exception
+    raised in the caller's body propagate untouched, with cleanup still
+    guaranteed by ``finally``.
     """
     path = project_dir / DB_NAME
     conn: sqlite3.Connection | None = None
     try:
-        try:
-            conn = _init(path, busy_timeout_ms)
-        except sqlite3.DatabaseError as exc:
-            if not _is_corruption(exc):
-                _logger.warning("Precedent vector store busy/unreadable: %s", exc)
-                yield None
-                return
+        conn = _init(path, busy_timeout_ms)
+    except sqlite3.DatabaseError as exc:
+        if not _is_corruption(exc):
+            _logger.warning("Precedent vector store busy/unreadable: %s", exc)
+        else:
             _logger.warning("Precedent vector store corrupt; rebuilding: %s", exc)
             try:
                 path.unlink(missing_ok=True)
-            except PermissionError:
-                # Windows: another process holds the file open. Degrade.
-                yield None
-                return
-            conn = _init(path, busy_timeout_ms)
-        _ensure_model(conn, model)
+                conn = _init(path, busy_timeout_ms)
+            except (PermissionError, sqlite3.DatabaseError):
+                # Windows: another process holds the file open, or the
+                # rebuild itself failed. Degrade.
+                conn = None
+
+    if conn is not None:
+        try:
+            _ensure_model(conn, model)
+        except sqlite3.DatabaseError as exc:
+            _logger.warning("Precedent vector store error: %s", exc)
+            conn.close()
+            conn = None
+
+    try:
         yield conn
-    except sqlite3.DatabaseError as exc:
-        _logger.warning("Precedent vector store error: %s", exc)
-        yield None
     finally:
         if conn is not None:
             conn.close()

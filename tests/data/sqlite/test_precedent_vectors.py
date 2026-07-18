@@ -2,6 +2,8 @@
 import sqlite3
 from pathlib import Path
 
+import pytest
+
 from quodeq.data.sqlite.precedent_vectors import (
     DB_NAME,
     insert_vectors,
@@ -83,3 +85,28 @@ def test_lock_contention_yields_none_and_keeps_file(tmp_path: Path) -> None:
         blocker.close()
     with open_vector_store(tmp_path, "m1") as conn:
         assert stored_fingerprints(conn) == {"fp1"}  # data survived
+
+
+def test_caller_body_database_error_propagates_not_runtime_error(tmp_path: Path) -> None:
+    """A DatabaseError raised INSIDE the with-body must propagate as-is.
+
+    Regression test: open_vector_store used to wrap the whole body
+    (including the `yield conn` itself) in `except sqlite3.DatabaseError:
+    yield None`. contextlib.throw()-ing the caller's exception back into
+    the generator at that yield landed in the same except clause and tried
+    to yield a second time, which Python turns into
+    `RuntimeError("generator didn't stop after throw()")` -- masking the
+    real error and leaking the connection (never reached the `finally`
+    close). The fix keeps `yield` outside any except catching
+    DatabaseError, so the caller's exception propagates untouched.
+    """
+    with pytest.raises(sqlite3.DatabaseError):
+        with open_vector_store(tmp_path, "m1") as conn:
+            assert conn is not None
+            raise sqlite3.DatabaseError("simulated caller-body failure")
+
+    # The connection from the failed `with` was closed (not leaked), and a
+    # fresh open still works normally afterward.
+    with open_vector_store(tmp_path, "m1") as conn:
+        assert conn is not None
+        assert stored_fingerprints(conn) == set()

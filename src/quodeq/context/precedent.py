@@ -177,8 +177,24 @@ class PrecedentCorpus:
             return None
 
 
+_SEMANTIC_ELIGIBLE_SQL = (
+    "SELECT requirement, snippet FROM findings WHERE verdict = 'dismissed' "
+    "AND (scope IS NULL OR scope = '') "
+    "AND line > 0 "
+    "AND snippet IS NOT NULL AND TRIM(snippet) <> ''"
+)
+
+
 def _collect_dismissed_texts(project_dir: Path) -> dict[str, str]:
-    """Map fingerprint -> canonical text for every dismissed finding."""
+    """Map fingerprint -> canonical text for every dismissed finding.
+
+    Mirrors ``_semantic_eligible`` in ``analysis/mcp/enricher.py`` on the
+    match side: scope-level and empty-snippet/line<=0 dismissals are
+    excluded here too. Without this, a single empty-snippet dismissal
+    (``fingerprint`` text like ``"REQ\\n\\n"``) would cosine-match every
+    future finding filed under that requirement, and corpus/match-side
+    eligibility would be asymmetric.
+    """
     out: dict[str, str] = {}
     if not project_dir or not project_dir.is_dir():
         return out
@@ -188,9 +204,7 @@ def _collect_dismissed_texts(project_dir: Path) -> dict[str, str]:
         try:
             from quodeq.data.sqlite.connection import open_evaluation_db  # noqa: PLC0415
             with open_evaluation_db(run_dir) as conn:
-                for req, snippet in conn.execute(
-                    "SELECT requirement, snippet FROM findings WHERE verdict = 'dismissed'"
-                ):
+                for req, snippet in conn.execute(_SEMANTIC_ELIGIBLE_SQL):
                     fp = fingerprint(req, snippet)
                     text = precedent_text(req, snippet)
                     if fp is not None and text is not None:

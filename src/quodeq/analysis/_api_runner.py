@@ -384,6 +384,9 @@ def _build_router_context(
 
     Returns ``None`` when *compiled_dir* is unset, signalling that the
     caller should write findings without enrichment (legacy behaviour).
+
+    *run_dir* locates the run directory holding the semantic precedent
+    corpus's circuit-breaker marker (see ``load_precedent_corpus``).
     """
     if not compiled_dir:
         return None

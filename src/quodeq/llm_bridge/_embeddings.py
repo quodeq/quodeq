@@ -99,7 +99,9 @@ def embedding_model_available(
     if cached is not None:
         return cached
     if lister is None:
-        # Narrower than _providers._LOCAL_API_MARKERS on purpose: this gates "/api/tags exists", not "is local" — localhost llama.cpp/omlx must NOT match.
+        # Narrower than _providers._LOCAL_API_MARKERS on purpose: this gates
+        # "/api/tags exists", not "is local" — localhost llama.cpp/omlx must
+        # NOT match.
         if "11434" in base_url or "ollama" in base_url.lower():
             from quodeq.llm_bridge._ollama import list_ollama_models  # noqa: PLC0415
             lister = list_ollama_models

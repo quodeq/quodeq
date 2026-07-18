@@ -46,3 +46,6 @@ def test_threshold_override_and_garbage() -> None:
     assert get_precedent_similarity_threshold(env={"QUODEQ_PRECEDENT_SIMILARITY": "0.9"}) == 0.9
     assert get_precedent_similarity_threshold(env={"QUODEQ_PRECEDENT_SIMILARITY": "nope"}) == 0.85
     assert get_precedent_similarity_threshold(env={"QUODEQ_PRECEDENT_SIMILARITY": "7"}) == 0.85
+    # Boundary: 0.0 is excluded by the `0.0 < val` check, not just non-positive garbage.
+    assert get_precedent_similarity_threshold(env={"QUODEQ_PRECEDENT_SIMILARITY": "0"}) == 0.85
+    assert get_precedent_similarity_threshold(env={"QUODEQ_PRECEDENT_SIMILARITY": "-0.5"}) == 0.85

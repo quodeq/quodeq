@@ -248,6 +248,26 @@ def test_semantic_none_score_keeps_confidence() -> None:
     assert "confidence" not in finding or finding["confidence"] == 100
 
 
+def test_semantic_score_equal_to_threshold_matches() -> None:
+    """The comparison is `score >= threshold`; an exact tie must still match."""
+    ctx = CompiledContext(precedent_fingerprints=set())
+    ctx.precedent_corpus = _FakeCorpus(score=0.85, threshold=0.85)
+    enricher = FindingEnricher(ctx, file_reader=lambda p: "")
+    finding = enricher.enrich(_violation_args())
+    assert finding["confidence"] == 25
+
+
+def test_semantic_respects_llm_emitted_confidence() -> None:
+    """Mirrors test_precedent_respects_llm_emitted_confidence for the exact
+    tier: the downweight guard only fires on None/100, so a pre-set
+    confidence survives a high-scoring semantic match too."""
+    ctx = CompiledContext(precedent_fingerprints=set())
+    ctx.precedent_corpus = _FakeCorpus(score=0.99)
+    enricher = FindingEnricher(ctx, file_reader=lambda p: "")
+    finding = enricher.enrich(_violation_args(confidence=50))
+    assert finding["confidence"] == 50
+
+
 # ---------------------------------------------------------------------------
 # dedup_key
 # ---------------------------------------------------------------------------
