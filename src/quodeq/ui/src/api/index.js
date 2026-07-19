@@ -20,6 +20,14 @@ export {
   createAssistantSession, postAssistantMessage,
   applyAssistantAction, rejectAssistantAction, assistantEventsUrl,
 } from './assistant.js';
+export {
+  getSharedStatus, connectShared, disconnectShared, refreshShared,
+  sharedListProjects, sharedGetProjectInfo, sharedGetRuns,
+  sharedGetDashboard, sharedGetAccumulated, sharedGetProjectScores,
+  sharedGetRunScores, sharedGetDimensionEval, sharedGetViolations,
+  sharedListDismissedFindings, sharedListVerifiedFindings,
+  publishProject, pullSharedProject,
+} from './shared.js';
 
 // ── Health ──────────────────────────────────────────────────────────────
 

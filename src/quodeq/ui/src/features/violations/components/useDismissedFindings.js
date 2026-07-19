@@ -6,13 +6,29 @@ import {
   restoreAllFindings,
   deleteFinding,
   deleteAllFindings,
+  sharedListDismissedFindings,
 } from '../../../api/index.js';
 import { applyMutationDelta } from '../../../api/applyMutationDelta.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
 
-export function useDismissedFindings(selectedProject, onRefresh, setRestoreError, refreshKey = 0) {
+/**
+ * @param {string} selectedProject
+ * @param {Function} [onRefresh]
+ * @param {Function} [setRestoreError]
+ * @param {number} [refreshKey=0]
+ * @param {'local'|'shared'} [selectedSource='local'] - Shared projects have no
+ *   mutation routes on the backend (dismiss/restore/delete are local-only by
+ *   design). When shared, the list reads from the shared-repo mirror endpoint
+ *   and every mutation handler below early-returns as a defense-in-depth
+ *   no-op — the real gate is the caller passing `undefined` instead of these
+ *   handlers to the dismissed sub-tab, but this guard protects against a
+ *   handler slipping through some other path and corrupting the local cache
+ *   with shared-derived deltas (the local id can collide with a shared id).
+ */
+export function useDismissedFindings(selectedProject, onRefresh, setRestoreError, refreshKey = 0, selectedSource = 'local') {
   const [dismissed, setDismissed] = useState([]);
   const queryClient = useQueryClient();
+  const isShared = selectedSource === 'shared';
 
   // Fold the mutation-delta from a restore/delete response into the React Query
   // caches so dimension scores/grades update instantly and the run-detail
@@ -33,10 +49,12 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
   // pages never appeared until the user switched projects.
   useEffect(() => {
     if (!selectedProject) return;
-    listDismissedFindings(selectedProject).then(setDismissed).catch(() => setDismissed([]));
-  }, [selectedProject, refreshKey]);
+    const fetchDismissed = isShared ? sharedListDismissedFindings : listDismissedFindings;
+    fetchDismissed(selectedProject).then(setDismissed).catch(() => setDismissed([]));
+  }, [selectedProject, refreshKey, isShared]);
 
   const handleRestore = useCallback(async (d) => {
+    if (isShared) return;
     try {
       const result = await restoreFinding(selectedProject, { req: d.req, file: d.file, line: d.line });
       applyDelta(result);
@@ -46,9 +64,10 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       console.error('Failed to restore finding:', err);
       setRestoreError?.('Failed to restore finding. Please try again.');
     }
-  }, [selectedProject, onRefresh, setRestoreError, applyDelta]);
+  }, [selectedProject, onRefresh, setRestoreError, applyDelta, isShared]);
 
   const handleRestoreAll = useCallback(async () => {
+    if (isShared) return;
     try {
       const result = await restoreAllFindings(selectedProject);
       applyDelta(result);
@@ -58,9 +77,10 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       console.error('Failed to restore all findings:', err);
       setRestoreError?.('Failed to restore all findings. Please try again.');
     }
-  }, [selectedProject, onRefresh, setRestoreError, applyDelta]);
+  }, [selectedProject, onRefresh, setRestoreError, applyDelta, isShared]);
 
   const handleDelete = useCallback(async (d) => {
+    if (isShared) return;
     try {
       const result = await deleteFinding(selectedProject, {
         dimension: d.dimension,
@@ -80,9 +100,10 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       console.error('Failed to delete finding:', err);
       setRestoreError?.('Failed to delete finding. Please try again.');
     }
-  }, [selectedProject, onRefresh, setRestoreError, applyDelta]);
+  }, [selectedProject, onRefresh, setRestoreError, applyDelta, isShared]);
 
   const handleDeleteAll = useCallback(async () => {
+    if (isShared) return;
     const count = dismissed.length;
     const ok = await confirmDialog({
       title: 'Delete dismissed findings?',
@@ -101,7 +122,7 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       console.error('Failed to delete all findings:', err);
       setRestoreError?.('Failed to delete all findings. Please try again.');
     }
-  }, [selectedProject, onRefresh, setRestoreError, dismissed.length, applyDelta]);
+  }, [selectedProject, onRefresh, setRestoreError, dismissed.length, applyDelta, isShared]);
 
   return { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll };
 }

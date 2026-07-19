@@ -17,15 +17,23 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
-import { getProjectScores } from "../../../api/index.js";
 import { projectKeys } from "../../../api/queryKeys.js";
 
 const STALE_TIME_MS = 60_000;
 export const PREFETCH_DWELL_MS = 150;
 
-export function usePrefetchRun(selectedProject) {
+/**
+ * @param {string} selectedProject
+ * @param {'local'|'shared'} [selectedSource='local'] - picks the shared-repo
+ *   mirror fetchers (sharedGetDashboard/sharedGetProjectScores) instead of
+ *   the local ones, and is folded into the cache keys so a source flip
+ *   never warms/reads the other source's cache slot.
+ */
+export function usePrefetchRun(selectedProject, selectedSource = "local") {
   const queryClient = useQueryClient();
-  const { getDashboard } = useApi();
+  const { getDashboard, sharedGetDashboard, getProjectScores, sharedGetProjectScores } = useApi();
+  const fetchDashboard = selectedSource === "shared" ? sharedGetDashboard : getDashboard;
+  const fetchScores = selectedSource === "shared" ? sharedGetProjectScores : getProjectScores;
   const timerRef = useRef(null);
 
   const cancelPrefetch = useCallback(() => {
@@ -49,20 +57,20 @@ export function usePrefetchRun(selectedProject) {
         const staleTime = runId !== "latest" ? Infinity : STALE_TIME_MS;
         // Dashboard payload (the main render).
         queryClient.prefetchQuery({
-          queryKey: projectKeys.dashboard(selectedProject, runId),
-          queryFn: () => getDashboard(selectedProject, runId),
+          queryKey: projectKeys.dashboard(selectedProject, runId, selectedSource),
+          queryFn: () => fetchDashboard(selectedProject, runId),
           staleTime,
         });
         // Scores payload (drives accumulated + trend).
         const asOf = runId !== "latest" ? runId : null;
         queryClient.prefetchQuery({
-          queryKey: projectKeys.scores(selectedProject, asOf),
-          queryFn: () => getProjectScores(selectedProject, asOf),
+          queryKey: projectKeys.scores(selectedProject, asOf, selectedSource),
+          queryFn: () => fetchScores(selectedProject, asOf),
           staleTime,
         });
       }, PREFETCH_DWELL_MS);
     },
-    [queryClient, getDashboard, selectedProject, cancelPrefetch],
+    [queryClient, fetchDashboard, fetchScores, selectedProject, selectedSource, cancelPrefetch],
   );
 
   return { prefetchRun, cancelPrefetch };

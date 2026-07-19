@@ -102,8 +102,19 @@ async function fetchAndRescore(project, runId, dimension, getDimensionEval, getR
   return data;
 }
 
-export function useExplorerData(project, dimension, runId, refreshSignal) {
-  const { getDimensionEval, getRunScores } = useApi();
+/**
+ * @param {string} project
+ * @param {string} dimension
+ * @param {string} runId
+ * @param {*} refreshSignal
+ * @param {'local'|'shared'} [selectedSource='local'] - picks the shared-repo
+ *   mirror fetchers (sharedGetDimensionEval/sharedGetRunScores) instead of
+ *   the local ones when the selected project is a shared-repo project.
+ */
+export function useExplorerData(project, dimension, runId, refreshSignal, selectedSource = 'local') {
+  const { getDimensionEval, getRunScores, sharedGetDimensionEval, sharedGetRunScores } = useApi();
+  const fetchDimensionEval = selectedSource === 'shared' ? sharedGetDimensionEval : getDimensionEval;
+  const fetchRunScores = selectedSource === 'shared' ? sharedGetRunScores : getRunScores;
   const [evalData, setEvalData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
@@ -115,16 +126,16 @@ export function useExplorerData(project, dimension, runId, refreshSignal) {
     // caller can dim the page during the background refetch (matches
     // the Overview placeholderData behaviour).
     setIsFetching(true);
-    fetchAndRescore(project, runId, dimension, getDimensionEval, getRunScores)
+    fetchAndRescore(project, runId, dimension, fetchDimensionEval, fetchRunScores)
       .then((data) => { setEvalData(data); setLoading(false); setIsFetching(false); })
       .catch((err) => { setError(err.message); setLoading(false); setIsFetching(false); });
-  }, [project, dimension, runId, getDimensionEval, getRunScores]);
+  }, [project, dimension, runId, fetchDimensionEval, fetchRunScores]);
 
   const initialRef = useRef(refreshSignal);
   useEffect(() => {
     if (refreshSignal === initialRef.current) return;
     if (!evalData || !project || !runId) return;
-    getRunScores(project, runId).then((rescored) => {
+    fetchRunScores(project, runId).then((rescored) => {
       const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
       if (dimData) setEvalData((prev) => mergeRescoreIntoEval(prev, dimData));
     }).catch(() => {});

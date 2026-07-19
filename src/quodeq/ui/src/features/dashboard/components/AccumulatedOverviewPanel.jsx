@@ -15,6 +15,7 @@ import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterTrendByVisibleStandardsDaily, filterAccumulatedByVisibleStandards } from '../../../utils/scoreFiltering.js';
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { buildOverviewReport } from '../../../utils/reportBuilder.js';
+import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 
 // Sparkline history length for the per-dimension period series (matches the
 // old DimensionScorePanel SPARKLINE_LIMIT).
@@ -81,7 +82,7 @@ function buildLanguageSub(projectInfo) {
     .join('  ');
 }
 
-function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulatedDimensions, projectName, projectInfo, onCardNavigate }) {
+export function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulatedDimensions, projectName, projectInfo, onCardNavigate, selectedSource }) {
   const summary = accumulated?.summary;
   const scoreNum = parseFloat(summary?.numericAverage);
   const scoreDisplay = isNaN(scoreNum) ? '—' : scoreNum.toFixed(1);
@@ -101,6 +102,7 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulated
         <TermHeader
           name="overview"
           sub={buildLanguageSub(projectInfo) || (lastDate ? `last_evaluated · ${lastDate}` : null)}
+          badge={selectedSource === 'shared' ? <SharedReadOnlyBadge publishedBy={projectInfo?.publishedBy} /> : null}
         />
         <LastFetchedLine lastFetchedAt={projectInfo?.lastFetchedAt} />
       </div>
@@ -278,6 +280,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
         projectName={data.selectedProject}
         projectInfo={data.projectInfo}
         onCardNavigate={onCardNavigate}
+        selectedSource={data.selectedSource}
       />
 
       <div className="history-panels-row">

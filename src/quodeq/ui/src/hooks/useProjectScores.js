@@ -9,24 +9,32 @@
  */
 import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getProjectScores } from "../api/index.js";
+import { useApi } from "../api/ApiContext.jsx";
 import { projectKeys } from "../api/queryKeys.js";
 
 /**
  * @param {{
  *   selectedProject: string,
  *   selectedRun: string,
+ *   selectedSource?: 'local'|'shared',
  *   keepPlaceholder?: boolean,
  * }} opts
  *
+ * selectedSource (default 'local'): picks the shared-repo mirror fetcher
+ * (sharedGetProjectScores) instead of the local one (getProjectScores) when
+ * the selected project is a shared-repo project. Also folded into the query
+ * keys so switching sources never serves the other source's cached payload.
+ *
  * keepPlaceholder (default true): see useDashboard for rationale.
  */
-export function useProjectScores({ selectedProject, selectedRun, keepPlaceholder = true } = {}) {
+export function useProjectScores({ selectedProject, selectedRun, selectedSource = "local", keepPlaceholder = true } = {}) {
+  const { getProjectScores, sharedGetProjectScores } = useApi();
+  const fetchScores = selectedSource === "shared" ? sharedGetProjectScores : getProjectScores;
   const queryClient = useQueryClient();
 
   const latestQuery = useQuery({
-    queryKey: projectKeys.scores(selectedProject || "_none_", null),
-    queryFn: () => getProjectScores(selectedProject),
+    queryKey: projectKeys.scores(selectedProject || "_none_", null, selectedSource),
+    queryFn: () => fetchScores(selectedProject),
     enabled: !!selectedProject,
     staleTime: 60_000,
     // Latest scores are project-wide (no per-run swap), so prev-data
@@ -51,8 +59,8 @@ export function useProjectScores({ selectedProject, selectedRun, keepPlaceholder
   }, [isLatestSelection, selectedRun, latestQuery.data]);
 
   const scoresQuery = useQuery({
-    queryKey: projectKeys.scores(selectedProject || "_none_", asOf),
-    queryFn: () => getProjectScores(selectedProject, asOf),
+    queryKey: projectKeys.scores(selectedProject || "_none_", asOf, selectedSource),
+    queryFn: () => fetchScores(selectedProject, asOf),
     // Wait for the latest run-status list before issuing a scoped fetch —
     // otherwise we'd briefly call with the raw selectedRun and only later
     // correct it, leaking a stale-asOf request.
@@ -81,8 +89,8 @@ export function useProjectScores({ selectedProject, selectedRun, keepPlaceholder
 
   const refreshScores = useCallback(() => {
     if (!selectedProject) return;
-    queryClient.invalidateQueries({ queryKey: projectKeys.project(selectedProject) });
-  }, [queryClient, selectedProject]);
+    queryClient.invalidateQueries({ queryKey: projectKeys.project(selectedProject, selectedSource) });
+  }, [queryClient, selectedProject, selectedSource]);
 
   return {
     scores: scoresQuery.data ?? null,

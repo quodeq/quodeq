@@ -8,6 +8,7 @@ import useMapPageState from './useMapPageState.js';
 import { TermHeader } from '../../../components/terminal/index.js';
 import EmptyState from '../../../components/EmptyState.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
+import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { useThemeIsDark } from '../../../hooks/useThemeIsDark.js';
 
 // data-theme attr for forcing the viz dark while the app is light: keep the
@@ -164,7 +165,7 @@ function MapEmpty({ sub, children }) {
 
 export default function MapPage(props) {
   const { data = {}, callbacks = {} } = props;
-  const { projects = [], projectsLoaded, selectedProject, projectName, loading, isFetching } = data;
+  const { projects = [], projectsLoaded, selectedProject, selectedSource = 'local', projectName, loading, isFetching } = data;
   const { onNavigate } = callbacks;
 
   // Call the hook unconditionally to keep hook order stable across renders.
@@ -173,7 +174,7 @@ export default function MapPage(props) {
   const state = useMapPageState(props);
 
   if (!projectsLoaded) return <LoadingScreen />;
-  if (projects.length === 0) {
+  if (projects.length === 0 && selectedSource !== 'shared') {
     return (
       <MapEmpty sub="no projects yet">
         <EmptyState
@@ -199,6 +200,20 @@ export default function MapPage(props) {
   }
   if (state.allDimensions.length === 0) {
     if (loading || isFetching) return <LoadingScreen />;
+    // Shared projects are read-only in the app -- evaluations only ever run
+    // locally, so "Start evaluation" has nowhere useful to send a
+    // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
+    // precedent this mirrors).
+    if (selectedSource === 'shared') {
+      return (
+        <MapEmpty sub="no evaluations yet">
+          <EmptyState
+            title="No completed evaluation yet"
+            description="no completed evaluation in this shared project yet"
+          />
+        </MapEmpty>
+      );
+    }
     return (
       <MapEmpty sub="no evaluations yet">
         <EmptyState
@@ -220,6 +235,7 @@ export default function MapPage(props) {
         <TermHeader
           name="map"
           sub={`${viol} violation${viol !== 1 ? 's' : ''} · ratio ${ratio}`}
+          badge={selectedSource === 'shared' ? <SharedReadOnlyBadge /> : null}
         />
         <MapControls viewState={state.viewState} galaxyState={state.galaxyState} dimensionState={state.dimensionState} />
       </div>

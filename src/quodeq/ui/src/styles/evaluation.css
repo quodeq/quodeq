@@ -3097,6 +3097,9 @@ button.eval-provider-badge--clickable:focus-visible {
 
 .verified-chip { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; border: none; border-radius: 50%; background: var(--color-accent); color: var(--color-on-accent); cursor: pointer; flex-shrink: 0; }
 .verified-chip:hover { opacity: 0.85; }
+/* Shared-repo findings: same badge, no click affordance (no mutation route). */
+.verified-chip--readonly { cursor: default; }
+.verified-chip--readonly:hover { opacity: 1; }
 /* Right-aligned action cluster: the verified chip (when present), fix plan,
    and dismiss stay together and wrap as one unit. The group carries the auto
    margin, so the inner fix plan yields its own. Rows keep today's layout when

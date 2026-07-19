@@ -6,9 +6,17 @@
  *
  *   evaluationKeys.evaluation('job-1')   // ['evaluation', 'job-1']         (subtree)
  *   evaluationKeys.status('job-1')       // ['evaluation', 'job-1', 'status']
- *   projectKeys.project('p1')            // ['project', 'p1']               (subtree)
- *   projectKeys.scores('p1', 'r1')       // ['project', 'p1', 'scores', 'r1']
+ *   projectKeys.project('p1')            // ['project', 'p1', 'local']      (subtree)
+ *   projectKeys.scores('p1', 'r1')       // ['project', 'p1', 'local', 'scores', 'r1']
  *   systemKeys.health()                  // ['system', 'health']
+ *
+ * projectKeys.* take a trailing `source` ('local' | 'shared', defaults to
+ * 'local') so a project the user has pulled locally never collides in cache
+ * with its shared-repo mirror of the same projectId — switching sources
+ * always misses the other source's cache instead of serving stale data.
+ * The source segment sits right after projectId, so `project(projectId)`
+ * (no source) still prefix-matches every subkey for the *local* source only;
+ * pass the caller's source explicitly if it should also match shared entries.
  */
 export const evaluationKeys = {
   all: () => ["evaluation"],
@@ -20,10 +28,11 @@ export const evaluationKeys = {
 
 export const projectKeys = {
   all: () => ["project"],
-  project: (projectId) => ["project", projectId],
-  scores: (projectId, asOf) => ["project", projectId, "scores", asOf || "latest"],
-  dashboard: (projectId, run) => ["project", projectId, "dashboard", run || "latest"],
-  runs: (projectId) => ["project", projectId, "runs"],
+  project: (projectId, source = "local") => ["project", projectId, source],
+  scores: (projectId, asOf, source = "local") => ["project", projectId, source, "scores", asOf || "latest"],
+  dashboard: (projectId, run, source = "local") => ["project", projectId, source, "dashboard", run || "latest"],
+  runs: (projectId, source = "local") => ["project", projectId, source, "runs"],
+  info: (projectId, source = "local") => ["project", projectId, source, "info"],
 };
 
 export const systemKeys = {
@@ -49,4 +58,9 @@ export const settingsKeys = {
   ollamaModels: () => ["settings", "ollamaModels"],
   llamacppModels: () => ["settings", "llamacppModels"],
   omlxModels: () => ["settings", "omlxModels"],
+};
+
+export const sharedKeys = {
+  all: () => ["shared"],
+  status: () => ["shared", "status"],
 };

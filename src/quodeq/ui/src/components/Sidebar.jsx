@@ -93,6 +93,12 @@ export default function Sidebar({
      Falls back to internal state when the parent doesn't care. */
   isPinned: controlledPinned,
   onPinChange,
+  /* 'local' | 'shared' — evaluation is local-only (there is no shared
+     mutation route on the backend), so the Evaluate nav item is hidden
+     outright for a shared selection. Without this, a shared project's id
+     (which can collide with a local one by design) could start a real
+     evaluation run whose output writes into the LOCAL project's store. */
+  selectedSource = 'local',
 }) {
   const [internalPinned, setInternalPinned] = useState(false);
   const isPinned = controlledPinned != null ? controlledPinned : internalPinned;
@@ -150,9 +156,11 @@ export default function Sidebar({
           </nav>
         )}
 
-        <nav className="sidebar-nav sidebar-block">
-          <NavButton id="evaluate" label="evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={handleNav} />
-        </nav>
+        {selectedSource !== 'shared' && (
+          <nav className="sidebar-nav sidebar-block">
+            <NavButton id="evaluate" label="evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={handleNav} />
+          </nav>
+        )}
 
         <nav className="sidebar-nav sidebar-block">
           <NavButton

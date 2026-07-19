@@ -10,8 +10,10 @@ import HelpHint from '../HelpHint.jsx';
  * @param {React.ReactNode} [props.sub]  Optional second line (e.g. stats, breadcrumb).
  * @param {string} [props.description]   Optional description shown via a click-to-open
  *   `?` popover after the name. Omit (or pass falsy) to hide the trigger.
+ * @param {React.ReactNode} [props.badge]  Optional node rendered inline after
+ *   the name/description (e.g. SharedReadOnlyBadge for a shared project).
  */
-export default function TermHeader({ name, sub, description }) {
+export default function TermHeader({ name, sub, description, badge }) {
   const tip = typeof description === 'string' ? description.trim() : '';
   return (
     <header className="term-header">
@@ -19,6 +21,7 @@ export default function TermHeader({ name, sub, description }) {
         <span className="term-header__glyph" aria-hidden="true">▶</span>
         <span className="term-header__name">{name}</span>
         {tip && <HelpHint label={`About ${name}`}>{tip}</HelpHint>}
+        {badge}
       </div>
       {sub != null && <div className="term-header__sub">{sub}</div>}
     </header>

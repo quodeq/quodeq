@@ -303,6 +303,14 @@ def register_shared_routes(app: Flask) -> None:
         if not info:
             body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
+        # Same publishedBy/publishedAt enrichment as the list route
+        # (shared_projects above) -- without it the UI's shared-project hero
+        # badge has no "published by <name>" to show. `project` here is the
+        # directory name under the clone root, the exact key published_meta
+        # indexes by.
+        meta = published_meta(url)
+        info.update(meta.get(project, {}))
+        info["source"] = "shared"
         return jsonify(info)
 
     @app.get("/api/shared/projects/<project>/runs")

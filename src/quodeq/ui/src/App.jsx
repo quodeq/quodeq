@@ -125,11 +125,12 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onG
  * @param {{ settings: Object }} props
  * @returns {JSX.Element}
  */
-function SettingsCase({ settings, onOpenGradeFormula }) {
+function SettingsCase({ settings, onOpenGradeFormula, onSharedDisconnected }) {
   return (
     <SettingsPage
       theme={{ mode: settings.themeMode, family: settings.themeFamily, onApplyMode: settings.applyMode, onApplyFamily: settings.applyFamily }}
       onOpenGradeFormula={onOpenGradeFormula}
+      onSharedDisconnected={onSharedDisconnected}
     />
   );
 }
@@ -160,8 +161,88 @@ function buildDismissPayload(v, fallbackDimension) {
   };
 }
 
+// Shared projects have no mutation route on the backend (dismiss is
+// local-only by design, and the same project id can exist in both local and
+// shared worlds by design — a dismiss POST for a shared project's id would
+// otherwise silently corrupt the LOCAL project's cache with shared-derived
+// deltas). Every route renderer below that injects onDismiss calls this
+// first: pass `undefined` for shared so the leaf components (EvalCards'
+// EvalViolationCard, FileDetailPage's ViolationCard) self-hide the dismiss
+// button rather than wiring up a handler that must never fire.
+export function isSharedSource(selectedSource) {
+  return selectedSource === 'shared';
+}
+
+// Project-data tabs (overview/violations/map/history) — module scope so both
+// the App component and the exported shouldBounceToEvaluate helper below
+// share one definition.
+const PROJECT_DATA_TABS = ['overview', 'violations', 'map', 'history'];
+
+/**
+ * Whether the "no runs yet" bounce-to-Evaluate effect should fire. Exported
+ * (like isSharedSource/buildEvalPrincipal) so the source-gating contract is
+ * unit-testable without mounting the whole App.
+ *
+ * There is no Evaluate flow for shared projects — the guard must reject any
+ * non-'local' source outright, independent of hasCurrentProjectRuns (which is
+ * computed from the LOCAL project list and can be misleading for a shared
+ * selection whose id collides with a local one — see the call site).
+ */
+export function shouldBounceToEvaluate({ projectsLoaded, projectsCount, selectedProjectInfo, hasCurrentProjectRuns, activeTab, selectedSource }) {
+  if (!projectsLoaded) return false;
+  if (!projectsCount) return false;
+  if (!selectedProjectInfo) return false;
+  if (selectedSource !== 'local') return false;
+  return !hasCurrentProjectRuns && PROJECT_DATA_TABS.includes(activeTab);
+}
+
+/**
+ * Whether the TopBar's Evaluate button should be wired up. Shared projects
+ * have no Evaluate flow (evaluation is local-only), so the button is omitted
+ * outright regardless of project count.
+ */
+export function shouldShowEvaluateButton(projectsCount, selectedSource) {
+  return (projectsCount ?? 0) > 0 && selectedSource !== 'shared';
+}
+
+/**
+ * After the shared repository is disconnected in Settings, a currently
+ * 'shared' selection is left pointing at a project that no longer resolves
+ * anywhere in the app (its source has no config left) -- the user would be
+ * stranded on a broken view. Resolve what handleProjectChange should be
+ * called with to recover: the first local project if one exists, otherwise
+ * the app's own "no project selected" state (empty id, 'local' source, same
+ * as a fresh install / readStoredProject's default -- see useProjectState.js).
+ * Returns null when there's nothing to do (selection wasn't 'shared').
+ * Exported so the recovery contract is unit-testable without mounting the
+ * whole App.
+ */
+export function resolveSelectionAfterSharedDisconnect({ selectedSource, projects }) {
+  if (selectedSource !== 'shared') return null;
+  const first = (projects || [])[0];
+  const id = first ? (first.id || first.name || first) : '';
+  return { id, source: 'local' };
+}
+
+/**
+ * Whether the first-paint onboarding-wizard auto-open effect should fire.
+ * "Zero LOCAL projects" alone is not sufficient: a teammate who has
+ * connected to a shared repo and is viewing a shared project also reads as
+ * zero local projects (state.projects is always the local list per
+ * useProjectState), but they already have a real working view open -- the
+ * wizard must not cover it uninvited. Exported so this contract is
+ * unit-testable without mounting the whole App (which needs ~8 providers).
+ */
+export function shouldAutoOpenOnboardingWizard({ projectsLoaded, projectsCount, selectedSource, isEvaluating }) {
+  if (!projectsLoaded) return false;
+  if ((projectsCount ?? 0) > 0) return false;
+  if (selectedSource === 'shared') return false;
+  if (isEvaluating) return false;
+  return true;
+}
+
 function renderEvalPrincipleDetail(params, props) {
-  const { selectedProject, selectedRun } = props.navigation;
+  const { selectedProject, selectedRun, selectedSource } = props.navigation;
   const evalPrincipal = {
     ...params.evalPrincipal,
     project: params.evalPrincipal?.project || selectedProject || '',
@@ -171,7 +252,7 @@ function renderEvalPrincipleDetail(params, props) {
     <PrincipleDetailPage
       evalPrincipal={evalPrincipal}
       severityFilter={params.severity || null}
-      onDismiss={async (v) => {
+      onDismiss={isSharedSource(selectedSource) ? undefined : async (v) => {
         // POST returns { scores: { dimensions, summary } } — the rescored
         // payload for this run. PrincipleDetailPage applies it to its
         // local liveScore/liveGrade. The dashboard refetch covers the
@@ -259,6 +340,7 @@ function ViolationsRoute({ params, props }) {
         accumulated: acc,
         accumulatedDimensions: dims,
         selectedProject: props.navigation.selectedProject,
+        selectedSource: props.navigation.selectedSource,
         projects: props.navigation.projects,
         projectsLoaded: props.navigation.projectsLoaded,
         projectName: props.dashboardData.selectedDisplayName,
@@ -286,7 +368,12 @@ function ViolationsRoute({ params, props }) {
   );
 }
 
-const ROUTE_RENDERERS = {
+// Exported for the same reason as buildEvalPrincipal — a unit-testable pin
+// on the per-route onDismiss source-gating contract without mounting the
+// whole App (which needs ~8 providers). Calling e.g.
+// ROUTE_RENDERERS.file(params, props) just builds the React element tree; it
+// doesn't render, so the returned element's props can be asserted on directly.
+export const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect, onProjectsReload: props.navigation.loadProjects }} runMode={false} />,
   violations: (params, props) => <ViolationsRoute params={params} props={props} />,
   map: (params, props) => {
@@ -300,6 +387,7 @@ const ROUTE_RENDERERS = {
         projects: props.navigation.projects,
         projectsLoaded: props.navigation.projectsLoaded,
         selectedProject: props.navigation.selectedProject,
+        selectedSource: props.navigation.selectedSource,
         loading: props.dashboardData.loading,
         isFetching: props.dashboardData.isFetching,
       }}
@@ -335,6 +423,7 @@ const ROUTE_RENDERERS = {
         projects={props.navigation.projects}
         projectsLoaded={props.navigation.projectsLoaded}
         selectedProject={props.navigation.selectedProject}
+        selectedSource={props.navigation.selectedSource}
         loading={props.dashboardData.loading}
         isFetching={props.dashboardData.isFetching}
         projectInfo={props.navigation.projects?.find((p) => (p.id || p.name) === props.navigation.selectedProject) || null}
@@ -348,6 +437,7 @@ const ROUTE_RENDERERS = {
       dimension={params.dimension}
       runId={params.runId}
       dateLabel={params.dateLabel}
+      selectedSource={props.navigation.selectedSource}
       onNavigate={props.navigation.handleNavigate}
       refreshSignal={props.dashboardData.dashboard}
       trend={props.dashboardData.dashboard?.trend || []}
@@ -355,14 +445,27 @@ const ROUTE_RENDERERS = {
       onGranularityChange={props.dashboardData.onGranularityChange}
     />
   ),
-  evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} preselectDims={params.preselectDims} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />,
+  evaluate: (params, props) => {
+    // Shared projects have no Evaluate flow (evaluation is local-only) --
+    // shouldShowEvaluateButton already keeps the TopBar's Evaluate button
+    // from ever linking here for a shared selection, but a stale nav-stack
+    // entry (e.g. the user was sitting on Evaluate and switched to a shared
+    // project) could still land the router on this route. Belt-and-braces:
+    // fall back to the Overview, the least-surprising landing spot, rather
+    // than rendering a dead-end evaluate screen with no source-appropriate
+    // action.
+    if (isSharedSource(props.navigation.selectedSource)) {
+      return ROUTE_RENDERERS.overview(params, props);
+    }
+    return <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} preselectDims={params.preselectDims} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />;
+  },
   file: (params, props) => (
     <FileDetailPage
       file={params.file}
       runId={params.runId}
       dateLabel={params.dateLabel}
       severityFilter={params.severityFilter || params.severity || null}
-      onDismiss={async (v) => {
+      onDismiss={isSharedSource(props.navigation.selectedSource) ? undefined : async (v) => {
         const payload = { ...buildDismissPayload(v), run_id: params.runId };
         const result = await props.dismissFinding(props.navigation.selectedProject, payload);
         props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
@@ -379,7 +482,7 @@ const ROUTE_RENDERERS = {
       finding={params.finding}
       principle={params.principle}
       dimension={params.dimension}
-      onDismiss={async (v) => {
+      onDismiss={isSharedSource(props.navigation.selectedSource) ? undefined : async (v) => {
         const payload = { ...buildDismissPayload(v, params.dimension), run_id: params.runId };
         const result = await props.dismissFinding(props.navigation.selectedProject, payload);
         props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
@@ -389,9 +492,19 @@ const ROUTE_RENDERERS = {
       }}
     />
   ),
-  settings: (params, props) => <SettingsCase settings={props.settings} onOpenGradeFormula={() => props.navigation.handleNavigate('grade-formula')} />,
+  settings: (params, props) => <SettingsCase
+    settings={props.settings}
+    onOpenGradeFormula={() => props.navigation.handleNavigate('grade-formula')}
+    onSharedDisconnected={() => {
+      const next = resolveSelectionAfterSharedDisconnect({
+        selectedSource: props.navigation.selectedSource,
+        projects: props.navigation.projects,
+      });
+      if (next) props.navigation.handleProjectChange(next.id, next.source);
+    }}
+  />,
   'grade-formula': (params, props) => <GradeFormulaPage navigation={props.navigation} />,
-  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup }} />,
+  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} sourceTab={params.sourceTab || 'local'} actions={{ onSelect: (id, source) => { props.navigation.handleProjectChange(id, source); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup, onTabChange: (tab) => props.navigation.handleNavigate('projects', { sourceTab: tab }), onProjectsReload: props.navigation.loadProjects }} />,
   standards: (params, props) => <StandardsPage onRescan={(dims) => props.navigation.navTab('evaluate', { preselectDims: dims })} />,
   help: () => <HelpPage />,
 };
@@ -511,7 +624,7 @@ export default function App() {
   // active assistant provider/model.
   const assistantGate = useAssistantProvider();
   const assistantCtx = deriveAssistantContext(state, assistantGate);
-  const { isOpen: assistantOpen, activeTab: drawerTab, startSession: startAssistantSession } = useAssistantDrawer();
+  const { isOpen: assistantOpen, activeTab: drawerTab, startSession: startAssistantSession, close: closeDrawer } = useAssistantDrawer();
   const { provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId } = assistantCtx;
   // Start (or re-start) the assistant session when the drawer is open and on
   // any provider/model/project/run change while it stays open. startSession
@@ -519,10 +632,17 @@ export default function App() {
   // real project/run switch produces a fresh session. We deliberately do NOT
   // start a session while the drawer is closed — sends only originate from the
   // open drawer, so first-open is early enough and avoids needless sessions.
+  // Shared projects have no mutation routes on the backend, so close the drawer
+  // when switching to a shared project to prevent dismiss/verify from writing
+  // to the local store under the shared project's id.
   useEffect(() => {
+    if (state.selectedSource === 'shared' && assistantOpen) {
+      closeDrawer();
+      return;
+    }
     if (!assistantOpen || drawerTab !== 'assistant') return;
     startAssistantSession({ provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId });
-  }, [assistantOpen, drawerTab, asstProvider, asstModel, asstProjectId, asstRunId, startAssistantSession]);
+  }, [assistantOpen, drawerTab, state.selectedSource, asstProvider, asstModel, asstProjectId, asstRunId, startAssistantSession, closeDrawer]);
 
   // Sync the client-side grade-label thresholds with the server formula at
   // boot so every gauge/badge agrees with the applied Q² parameters. The
@@ -546,14 +666,26 @@ export default function App() {
     if (autoOpenedRef.current) return;
     if (!state.projectsLoaded) return;
     if (state.projects.length > 0) { autoOpenedRef.current = true; return; }
-    if (isEvaluating) return;
+    if (!shouldAutoOpenOnboardingWizard({
+      projectsLoaded: state.projectsLoaded,
+      projectsCount: state.projects.length,
+      selectedSource: state.selectedSource,
+      isEvaluating,
+    })) {
+      // Blocked for a transient reason (shared selection, an evaluation in
+      // flight) -- do NOT mark autoOpenedRef: once the block lifts (source
+      // switches back to local, the evaluation finishes) while local
+      // projects are still zero, the decision must be reconsidered rather
+      // than permanently skipped.
+      return;
+    }
     let skipped = false;
     try { skipped = localStorage.getItem('quodeq_onboarding_skipped') === 'true'; } catch { /* ignore */ }
     autoOpenedRef.current = true;
     if (!skipped) {
       setWizardEntry({ startStep: 'welcome', isFirstProject: true });
     }
-  }, [state.projectsLoaded, state.projects.length, isEvaluating]);
+  }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource]);
 
   // Project-data tabs (overview/violations/map/history) only make sense once
   // the selected project has at least one completed evaluation run. Until
@@ -562,16 +694,28 @@ export default function App() {
   // for /api/projects to resolve and for selectedProjectInfo to populate so
   // the bouncer doesn't fire against the transient "no projects loaded yet"
   // state on first paint and strand the user on Evaluate.
-  const PROJECT_DATA_TABS = ['overview', 'violations', 'map', 'history'];
+  //
+  // selectedProjectInfo is always looked up in the LOCAL project list (see
+  // useProjectState — the list `state.projects` holds only ever comes from
+  // the local listProjects API). A shared project's id can collide with a
+  // local one by design (e.g. after a clone-on-add pull); if the local copy
+  // happens to have zero runs while the shared source has plenty, this
+  // bounce would incorrectly fire for a shared selection that has real data
+  // to show. There is no Evaluate for shared projects at all, so it must
+  // never fire outside 'local' — shouldBounceToEvaluate encodes that.
   const hasCurrentProjectRuns = (selectedProjectInfo?.runsCount ?? 0) > 0;
   useEffect(() => {
-    if (!state.projectsLoaded) return;
-    if (state.projects.length === 0) return;
-    if (!selectedProjectInfo) return;
-    if (!hasCurrentProjectRuns && PROJECT_DATA_TABS.includes(state.activeTab)) {
+    if (shouldBounceToEvaluate({
+      projectsLoaded: state.projectsLoaded,
+      projectsCount: state.projects.length,
+      selectedProjectInfo,
+      hasCurrentProjectRuns,
+      activeTab: state.activeTab,
+      selectedSource: state.selectedSource,
+    })) {
       state.navTab('evaluate');
     }
-  }, [state.projectsLoaded, state.projects.length, selectedProjectInfo, hasCurrentProjectRuns, state.activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.projectsLoaded, state.projects.length, selectedProjectInfo, hasCurrentProjectRuns, state.activeTab, state.selectedSource]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sidebarProvider = (typeof localStorage !== 'undefined' && localStorage.getItem(ACTIVE_PROVIDER_KEY)) || null;
   const sidebarModel = sidebarProvider && typeof localStorage !== 'undefined'
@@ -616,15 +760,16 @@ export default function App() {
 
   const contentProps = {
     dashboardData: {
-      selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
+      selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
       projectsLoaded: state.projectsLoaded,
       dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
+      sharedProjectInfo: state.sharedProjectInfo,
       availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
       selectedDisplayName: state.selectedDisplayName,
       granularity: state.granularity, onGranularityChange: state.onGranularityChange,
     },
     navigation: {
-      selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
+      selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
       projectsLoaded: state.projectsLoaded,
       loadProjects: state.loadProjects,
       handleNavigate: state.handleNavigate, handleRunSelect: state.handleRunSelect,
@@ -698,7 +843,7 @@ export default function App() {
         <ServerLogProvider>
           <OllamaLogProvider>
             <LlamaCppLogProvider>
-              <VerifiedFindingsProvider project={state.selectedProject}>
+              <VerifiedFindingsProvider project={state.selectedProject} source={state.selectedSource}>
               <AppShell
           drawer={<BottomDrawer uiState={assistantCtx.uiState} />}
           sidebar={
@@ -707,6 +852,7 @@ export default function App() {
               onNavTab={navTab}
               hasEvaluations={state.projects.length > 0}
               showProjectTabs={hasCurrentProjectRuns}
+              selectedSource={state.selectedSource}
               projectInfo={{
                 displayName: resolvedDisplayName,
                 meta: state.headerMeta,
@@ -727,7 +873,8 @@ export default function App() {
               serverUrl={typeof window !== 'undefined' ? window.location.origin : null}
               provider={sidebarProvider}
               model={sidebarModel}
-              onEvaluate={state.projects?.length > 0 ? (() => navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) })) : null}
+              selectedSource={state.selectedSource}
+              onEvaluate={shouldShowEvaluateButton(state.projects?.length, state.selectedSource) ? (() => navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) })) : null}
               evaluating={state.evalLifecycle?.job?.status === 'running'}
               onProviderClick={() => navTab('settings')}
               onMenuToggle={() => setSidebarPinned((v) => !v)}

@@ -1,6 +1,6 @@
 import { render, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import DashboardPage from './DashboardPage.jsx';
+import DashboardPage, { selectDashboardProjectInfo } from './DashboardPage.jsx';
 
 // First-load flicker guard. On a fresh (uncached) load the dashboard query
 // resolves a beat before the scores query. The Overview renders nothing until
@@ -69,5 +69,87 @@ describe('DashboardPage first-load loading gate', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('DashboardPage no-completed-evaluation empty state', () => {
+  // Project has runs (so the `!dashboard` empty state upstream doesn't
+  // fire) but none terminated cleanly, and none are in progress -- the
+  // NoCompletedEvalPanel branch under test.
+  const baseData = {
+    projectsLoaded: true,
+    projects: [{ id: 'p1', name: 'p1' }],
+    selectedProject: 'p1',
+    dashboard: {
+      dimensions: [],
+      trend: [],
+      selectedRun: { runId: 'r1', dateLabel: '2026-05-01' },
+    },
+    accumulated: { dimensions: [] },
+    loading: false,
+    isFetching: false,
+    error: null,
+    availableRuns: [{ runId: 'r1', status: 'failed' }],
+  };
+
+  it('local project: shows the Start evaluation CTA (existing behavior pinned)', () => {
+    const { getByText, queryByText } = render(
+      <DashboardPage data={{ ...baseData, selectedSource: 'local' }} callbacks={{}} runMode={false} />,
+    );
+    expect(getByText('No completed evaluation yet')).toBeTruthy();
+    expect(getByText('Start evaluation')).toBeTruthy();
+    expect(queryByText('no completed evaluation in this shared project yet')).toBeNull();
+  });
+
+  it('shared project: hides the Start evaluation CTA and shows shared-specific copy', () => {
+    const { getByText, queryByText } = render(
+      <DashboardPage data={{ ...baseData, selectedSource: 'shared' }} callbacks={{}} runMode={false} />,
+    );
+    expect(getByText('No completed evaluation yet')).toBeTruthy();
+    expect(getByText('no completed evaluation in this shared project yet')).toBeTruthy();
+    expect(queryByText('Start evaluation')).toBeNull();
+  });
+});
+
+// Finding 5 (final whole-branch review): projectInfo for a shared selection
+// must come from the shared-repo fetch (sharedProjectInfo, see useDashboard),
+// never the LOCAL projects list -- a shared selection's id can collide with
+// an unrelated local project (e.g. after a clone-on-add pull), and looking it
+// up locally would bleed the local twin's stats/publishedBy into a shared
+// Overview. Unit-tested against the exported selector directly (mounting the
+// full Overview render needs a SidePaneProvider + more, which is its own
+// integration concern -- AccumulatedHeroSection's own tests already pin the
+// "renders publishedBy given correct projectInfo" half of this contract).
+describe('selectDashboardProjectInfo', () => {
+  const localTwin = { id: 'proj-1', name: 'proj-1', displayName: 'Local Twin', languageStats: { js: 999 } };
+  const sharedInfo = { id: 'proj-1', name: 'proj-1', displayName: 'Shared View', publishedBy: 'ana', languageStats: { py: 5 } };
+
+  it('shared source: returns the shared fetch result, never the id-colliding local twin', () => {
+    const info = selectDashboardProjectInfo({
+      selectedSource: 'shared', projects: [localTwin], selectedProject: 'proj-1', sharedProjectInfo: sharedInfo,
+    });
+    expect(info).toBe(sharedInfo);
+    expect(info.publishedBy).toBe('ana');
+  });
+
+  it('shared source before the fetch resolves: null, not a silent fallback to the local list', () => {
+    const info = selectDashboardProjectInfo({
+      selectedSource: 'shared', projects: [localTwin], selectedProject: 'proj-1', sharedProjectInfo: null,
+    });
+    expect(info).toBeNull();
+  });
+
+  it('local source: unchanged -- looks up the local projects list by id/name', () => {
+    const info = selectDashboardProjectInfo({
+      selectedSource: 'local', projects: [localTwin], selectedProject: 'proj-1', sharedProjectInfo: sharedInfo,
+    });
+    expect(info).toBe(localTwin);
+  });
+
+  it('local source with no match: null', () => {
+    const info = selectDashboardProjectInfo({
+      selectedSource: 'local', projects: [], selectedProject: 'proj-1', sharedProjectInfo: sharedInfo,
+    });
+    expect(info).toBeNull();
   });
 });
