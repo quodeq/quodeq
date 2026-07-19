@@ -279,6 +279,42 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
 }
 
 /**
+ * Exit handlers for the onboarding wizard. The wizard registers the project
+ * on its Repo & Scan step (POST /api/projects), well before either exit
+ * fires — so both exits that leave a registered project behind (a saved
+ * close and a launch) must reload the projects list, or the new project
+ * stays invisible in the Projects tab until an evaluation finishes (the
+ * only other path that calls loadProjects). Exported so the reload contract
+ * is testable without mounting the whole App.
+ */
+export function buildWizardHandlers({ state, setWizardEntry, navTab }) {
+  return {
+    onClose: ({ saved, projectId }) => {
+      setWizardEntry(null);
+      if (saved && projectId) {
+        state.loadProjects?.();
+        state.refreshDashboard?.();
+      }
+    },
+    onLaunch: ({ projectId, repo, scopePath, branch, provider, standardIds, totalTimeLimitS }) => {
+      setWizardEntry(null);
+      state.loadProjects?.();
+      const payload = {
+        repo: repo || projectId,
+        dimensions: standardIds,
+      };
+      if (scopePath) payload.scopePath = scopePath;
+      if (branch) payload.branch = branch;
+      if (provider?.id) payload.aiCmd = provider.id;
+      if (provider?.model) payload.aiModel = provider.model;
+      if (totalTimeLimitS) payload.timeLimit = totalTimeLimitS;
+      state.evalLifecycle.handleStartEvaluation(payload);
+      navTab('evaluate');
+    },
+  };
+}
+
+/**
  * After the shared repository is disconnected in Settings, a currently
  * 'shared' selection is left pointing at a project that no longer resolves
  * anywhere in the app (its source has no config left) -- the user would be
@@ -951,26 +987,7 @@ export default function App() {
               {wizardEntry && (
                 <OnboardingWizard
                   entry={wizardEntry}
-                  onClose={({ saved, projectId }) => {
-                    setWizardEntry(null);
-                    if (saved && projectId) {
-                      state.refreshDashboard?.();
-                    }
-                  }}
-                  onLaunch={({ projectId, repo, scopePath, branch, provider, standardIds, totalTimeLimitS }) => {
-                    setWizardEntry(null);
-                    const payload = {
-                      repo: repo || projectId,
-                      dimensions: standardIds,
-                    };
-                    if (scopePath) payload.scopePath = scopePath;
-                    if (branch) payload.branch = branch;
-                    if (provider?.id) payload.aiCmd = provider.id;
-                    if (provider?.model) payload.aiModel = provider.model;
-                    if (totalTimeLimitS) payload.timeLimit = totalTimeLimitS;
-                    state.evalLifecycle.handleStartEvaluation(payload);
-                    navTab('evaluate');
-                  }}
+                  {...buildWizardHandlers({ state, setWizardEntry, navTab })}
                 />
               )}
             </Suspense>

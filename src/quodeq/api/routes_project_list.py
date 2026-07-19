@@ -338,6 +338,11 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             )
             return jsonify(body), status
 
+        # The 5s ProjectsCache would otherwise hide the new project from an
+        # immediately-following GET /api/projects (the wizard refetches the
+        # list as soon as it closes).
+        provider.invalidate_projects_cache()
+
         # scan.json is now always present after _register_project succeeds.
         scan_path = Path(reports_root) / project_uuid / "scan.json"
         try:
