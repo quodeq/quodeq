@@ -1,4 +1,6 @@
 """Tests for the shared-repo settings store."""
+import json
+
 from quodeq.services.shared_settings import (
     SharedSettings,
     read_settings,
@@ -23,4 +25,16 @@ def test_write_then_read_round_trip(tmp_path):
 def test_read_settings_corrupt_file_returns_empty(tmp_path):
     env = {"QUODEQ_DIR": str(tmp_path)}
     (tmp_path / "shared.json").write_text("{not json", encoding="utf-8")
+    assert read_settings(env=env).url is None
+
+
+def test_read_settings_non_string_url_coerced_to_none(tmp_path):
+    env = {"QUODEQ_DIR": str(tmp_path)}
+    (tmp_path / "shared.json").write_text(json.dumps({"url": 123}), encoding="utf-8")
+    assert read_settings(env=env).url is None
+
+
+def test_read_settings_empty_url_coerced_to_none(tmp_path):
+    env = {"QUODEQ_DIR": str(tmp_path)}
+    (tmp_path / "shared.json").write_text(json.dumps({"url": ""}), encoding="utf-8")
     assert read_settings(env=env).url is None

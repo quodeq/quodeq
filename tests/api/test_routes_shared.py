@@ -62,6 +62,25 @@ def test_shared_status_configured(client, tmp_path):
     assert body["url"] == "git@github.com:t/r.git"
 
 
+def test_shared_status_survives_non_string_url_in_settings_file(client, tmp_path):
+    """A hand-edited shared.json with a non-string url must not 500 the status route."""
+    (tmp_path / "shared.json").write_text(json.dumps({"url": 123}))
+    resp = client.get("/api/shared/status")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["configured"] is False
+    assert body["url"] is None
+
+
+def test_shared_status_shape_is_camel_case_with_top_level_error(client):
+    """The phase-2/3 UI binds to this shape: camelCase keys, error always present."""
+    body = client.get("/api/shared/status").get_json()
+    assert body["error"] is None
+    publish = body["publish"]
+    assert "finishedAt" in publish
+    assert "finished_at" not in publish
+
+
 # --- PUT /api/shared/config ---------------------------------------------------
 
 def test_put_config_rejects_invalid_url(client, monkeypatch, tmp_path):
@@ -168,14 +187,26 @@ def test_publish_without_config_400(client, monkeypatch, tmp_path):
 
 def test_publish_conflict_returns_409(client, tmp_path, monkeypatch):
     (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
-    monkeypatch.setattr("quodeq.api.routes_shared.start_publish", lambda *a, **kw: False)
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared.start_publish", lambda *a, **kw: "already_running"
+    )
     resp = client.post("/api/projects/some-proj/publish", headers=_ORIGIN)
     assert resp.status_code == 409
+    assert "already running" in resp.get_json()["error"]
+
+
+def test_publish_thread_start_failure_returns_500_not_409(client, tmp_path, monkeypatch):
+    """A thread-start failure is a server error, not "a publish is already running"."""
+    (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
+    monkeypatch.setattr("quodeq.api.routes_shared.start_publish", lambda *a, **kw: "failed")
+    resp = client.post("/api/projects/some-proj/publish", headers=_ORIGIN)
+    assert resp.status_code == 500
+    assert "already running" not in resp.get_json()["error"]
 
 
 def test_publish_started_returns_202(client, tmp_path, monkeypatch):
     (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
-    monkeypatch.setattr("quodeq.api.routes_shared.start_publish", lambda *a, **kw: True)
+    monkeypatch.setattr("quodeq.api.routes_shared.start_publish", lambda *a, **kw: "started")
     resp = client.post("/api/projects/some-proj/publish", headers=_ORIGIN)
     assert resp.status_code == 202
     assert resp.get_json()["started"] is True
@@ -189,7 +220,7 @@ def test_publish_rejects_path_traversal_project_segment(client, tmp_path, monkey
     called = {"n": 0}
     monkeypatch.setattr(
         "quodeq.api.routes_shared.start_publish",
-        lambda *a, **kw: called.__setitem__("n", called["n"] + 1) or True,
+        lambda *a, **kw: called.__setitem__("n", called["n"] + 1) or "started",
     )
 
     resp = client.post("/api/projects/%2e%2e/publish", headers=_ORIGIN)

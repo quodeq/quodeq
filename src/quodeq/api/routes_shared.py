@@ -118,13 +118,20 @@ def register_shared_routes(app: Flask) -> None:
     def shared_status() -> Response:
         settings = read_settings()
         synced = last_synced_at(settings.url) if settings.url else None
+        # The wire shape is camelCase throughout; the publish status dict is
+        # a service-internal snake_case structure, so rename at the boundary.
+        publish = get_publish_status()
+        publish["finishedAt"] = publish.pop("finished_at", None)
         return jsonify(
             {
                 "configured": settings.url is not None,
                 "url": settings.url,
                 "lastSynced": synced,
                 "syncing": False,
-                "publish": get_publish_status(),
+                # Reserved for sync-level failures; always present so the UI
+                # can bind to it without existence checks.
+                "error": None,
+                "publish": publish,
             }
         )
 
@@ -174,11 +181,16 @@ def register_shared_routes(app: Flask) -> None:
         settings = read_settings()
         if not settings.url:
             return jsonify({"error": "no shared repository configured"}), 400
-        started = start_publish(
+        outcome = start_publish(
             project, settings.url, evaluations_root=Path(reports_dir())
         )
-        if not started:
+        if outcome == "already_running":
             return jsonify({"error": "a publish is already running"}), 409
+        if outcome != "started":
+            return (
+                jsonify({"error": "could not start the publish job, see server logs"}),
+                500,
+            )
         return jsonify({"started": True}), 202
 
     # -- pull a shared project into local evaluations -----------------------

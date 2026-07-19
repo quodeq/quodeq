@@ -329,7 +329,7 @@ describe('ProjectsPage — local tab, publish action', () => {
       getSharedStatus: vi.fn(async () => ({
         configured: true,
         url: 'https://github.com/team/results.git',
-        publish: { state: 'idle', project: null, runs: null, error: null, finished_at: null },
+        publish: { state: 'idle', project: null, runs: null, error: null, finishedAt: null },
       })),
       sharedListProjects: vi.fn(async () => ({ projects: [], lastSynced: null, stale: false })),
       publishProject: vi.fn(async () => ({ started: true })),
@@ -397,7 +397,7 @@ describe('ProjectsPage — local tab, publish action', () => {
     try {
       const getSharedStatus = vi.fn()
         .mockResolvedValueOnce({
-          configured: true, publish: { state: 'idle', project: null, runs: null, error: null, finished_at: null },
+          configured: true, publish: { state: 'idle', project: null, runs: null, error: null, finishedAt: null },
         })
         .mockResolvedValueOnce({ configured: true, publish: { state: 'done', project: 'p1', runs: 2 } });
       const sharedListProjects = vi.fn()

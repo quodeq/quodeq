@@ -37,7 +37,7 @@ def _run_inline(monkeypatch):
 def test_publish_job_success(tmp_path, monkeypatch):
     _run_inline(monkeypatch)
     with patch.object(shared_publish, "publish_project", return_value=3) as pub:
-        assert start_publish("p1", "u", evaluations_root=tmp_path) is True
+        assert start_publish("p1", "u", evaluations_root=tmp_path) == "started"
     status = get_publish_status()
     assert status["state"] == "done"
     assert status["runs"] == 3
@@ -56,7 +56,7 @@ def test_publish_job_error_captured(tmp_path, monkeypatch):
 def test_publish_rejected_while_running(tmp_path):
     with shared_publish._STATUS_LOCK:
         shared_publish._STATUS.update({"state": "running", "project": "p0"})
-    assert start_publish("p1", "u", evaluations_root=tmp_path) is False
+    assert start_publish("p1", "u", evaluations_root=tmp_path) == "already_running"
 
 
 def test_publish_thread_start_failure(tmp_path, monkeypatch):
@@ -73,7 +73,7 @@ def test_publish_thread_start_failure(tmp_path, monkeypatch):
 
     result = start_publish("p1", "u", evaluations_root=tmp_path)
 
-    assert result is False
+    assert result == "failed"
     status = get_publish_status()
     assert status["state"] == "error"
     assert "thread creation failed" in status["error"]

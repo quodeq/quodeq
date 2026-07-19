@@ -10,7 +10,7 @@ function makeFakeApi(overrides = {}) {
     getSharedStatus: vi.fn(async () => ({
       configured: true,
       url: 'https://github.com/team/results.git',
-      publish: { state: 'idle', project: null, runs: null, error: null, finished_at: null },
+      publish: { state: 'idle', project: null, runs: null, error: null, finishedAt: null },
     })),
     sharedListProjects: vi.fn(async () => ({ projects: [], lastSynced: null, stale: false })),
     publishProject: vi.fn(async () => ({ started: true })),
