@@ -223,6 +223,62 @@ export function shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, s
 }
 
 /**
+ * Build the `navigation` prop bundle ROUTE_RENDERERS consume. Every
+ * navigation key a route renderer reads MUST be forwarded here -- a route
+ * consuming a key the bundle lacks fails silently at click time (the
+ * handler throws mid-event and the UI just doesn't respond; that's how the
+ * repositories local/online tab flip broke when handleNavigateReplace was
+ * consumed but never forwarded). Exported so producer and consumer can be
+ * pinned together in tests without mounting the whole App.
+ */
+export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluating, showToast, setWizardEntry }) {
+  return {
+    selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
+    projectsLoaded: state.projectsLoaded,
+    loadProjects: state.loadProjects,
+    handleNavigate: state.handleNavigate, handleNavigateReplace: state.handleNavigateReplace, handleRunSelect: state.handleRunSelect,
+    handleProjectChange: state.handleProjectChange, navTab, navStackLength,
+    handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject, handleImportProject: state.handleImportProject,
+    historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
+    currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
+    prefetchHandlers: state.prefetchHandlers,
+    onAddProject: () => {
+      if (isEvaluating) {
+        showToast('An evaluation is in progress. Cancel it before adding a project.');
+        return;
+      }
+      setWizardEntry({ startStep: 'repo-scan', isFirstProject: state.projects.length === 0 });
+    },
+    onImportProject: () => {
+      if (isEvaluating) {
+        showToast('An evaluation is in progress. Cancel it before importing a project.');
+        return;
+      }
+      state.handleImportProject();
+    },
+    onTakeTour: () => {
+      if (isEvaluating) {
+        showToast('An evaluation is in progress. Cancel it before starting the tour.');
+        return;
+      }
+      setWizardEntry({ startStep: 'welcome', isFirstProject: true });
+    },
+    onResumeSetup: (projectId) => {
+      if (isEvaluating) {
+        showToast('An evaluation is in progress. Cancel it before resuming setup.');
+        return;
+      }
+      setWizardEntry({
+        startStep: 'provider',
+        isFirstProject: false,
+        presetProjectId: projectId,
+      });
+    },
+    isEvaluating,
+  };
+}
+
+/**
  * After the shared repository is disconnected in Settings, a currently
  * 'shared' selection is left pointing at a project that no longer resolves
  * anywhere in the app (its source has no config left) -- the user would be
@@ -785,50 +841,10 @@ export default function App() {
       selectedDisplayName: state.selectedDisplayName,
       granularity: state.granularity, onGranularityChange: state.onGranularityChange,
     },
-    navigation: {
-      selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
-      projectsLoaded: state.projectsLoaded,
-      loadProjects: state.loadProjects,
-      handleNavigate: state.handleNavigate, handleRunSelect: state.handleRunSelect,
-      handleProjectChange: state.handleProjectChange, navTab, navStackLength: navStack.length,
-      handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject, handleImportProject: state.handleImportProject,
-      historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
-      currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
-      prefetchHandlers: state.prefetchHandlers,
-      onAddProject: () => {
-        if (isEvaluating) {
-          showToast('An evaluation is in progress. Cancel it before adding a project.');
-          return;
-        }
-        setWizardEntry({ startStep: 'repo-scan', isFirstProject: state.projects.length === 0 });
-      },
-      onImportProject: () => {
-        if (isEvaluating) {
-          showToast('An evaluation is in progress. Cancel it before importing a project.');
-          return;
-        }
-        state.handleImportProject();
-      },
-      onTakeTour: () => {
-        if (isEvaluating) {
-          showToast('An evaluation is in progress. Cancel it before starting the tour.');
-          return;
-        }
-        setWizardEntry({ startStep: 'welcome', isFirstProject: true });
-      },
-      onResumeSetup: (projectId) => {
-        if (isEvaluating) {
-          showToast('An evaluation is in progress. Cancel it before resuming setup.');
-          return;
-        }
-        setWizardEntry({
-          startStep: 'provider',
-          isFirstProject: false,
-          presetProjectId: projectId,
-        });
-      },
-      isEvaluating,
-    },
+    navigation: buildNavigationBundle({
+      state, navTab, navStackLength: navStack.length,
+      isEvaluating, showToast, setWizardEntry,
+    }),
     evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
     settings: state.settings,

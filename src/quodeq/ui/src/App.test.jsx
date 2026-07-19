@@ -4,6 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import {
   buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
   resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldShowProjectTabs,
+  buildNavigationBundle,
 } from './App.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
@@ -300,6 +301,51 @@ describe('Sidebar project-data tabs for a shared-only selection (component)', ()
     for (const tab of DATA_TABS) {
       expect(screen.queryByTitle(tab)).toBeNull();
     }
+  });
+});
+
+// PR #819 regression class: a route renderer started consuming a navigation
+// key (handleNavigateReplace) that the bundle App builds never forwarded --
+// the repositories local/online tab click threw "handleNavigateReplace is
+// not a function" and the tab never flipped. The bundle producer is exported
+// as buildNavigationBundle so producer and consumer can be pinned together
+// without mounting the whole App.
+describe('buildNavigationBundle', () => {
+  function stubState() {
+    return {
+      selectedProject: 'p1', selectedSource: 'local', selectedRun: 'latest',
+      projects: [{ id: 'p1', name: 'p1' }], projectsLoaded: true,
+      loadProjects: vi.fn(),
+      handleNavigate: vi.fn(), handleNavigateReplace: vi.fn(), handleRunSelect: vi.fn(),
+      handleProjectChange: vi.fn(),
+      handleDeleteProject: vi.fn(), handleExportProject: vi.fn(),
+      handleRelocateProject: vi.fn(), handleImportProject: vi.fn(),
+      historySelectedRun: 'latest', setHistorySelectedRun: vi.fn(),
+      currentOverviewRun: null, handleRunPrev: vi.fn(), handleRunNext: vi.fn(), handleRunLatest: vi.fn(),
+      prefetchHandlers: {},
+    };
+  }
+  const build = (state) => buildNavigationBundle({
+    state, navTab: vi.fn(), navStackLength: 1,
+    isEvaluating: false, showToast: vi.fn(), setWizardEntry: vi.fn(),
+  });
+
+  it('forwards handleNavigateReplace from state (repositories tab flips die without it)', () => {
+    const state = stubState();
+    const bundle = build(state);
+    bundle.handleNavigateReplace('projects', { sourceTab: 'online' });
+    expect(state.handleNavigateReplace).toHaveBeenCalledWith('projects', { sourceTab: 'online' });
+  });
+
+  it("projects route's onTabChange reaches state.handleNavigateReplace through the real bundle", () => {
+    // Producer x consumer: the element ROUTE_RENDERERS.projects builds must
+    // find every navigation key it consumes in the bundle App actually
+    // provides -- this is the seam the #819 regression slipped through.
+    const state = stubState();
+    const el = ROUTE_RENDERERS.projects({}, { navigation: build(state) });
+    el.props.actions.onTabChange('online');
+    expect(state.handleNavigateReplace).toHaveBeenCalledWith('projects', { sourceTab: 'online' });
+    expect(state.handleNavigate).not.toHaveBeenCalled();
   });
 });
 
