@@ -176,7 +176,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
 
   const { projectsLoaded } = data;
   if (!projectsLoaded) return <LoadingScreen />;
-  if (projects.length === 0) {
+  if (projects.length === 0 && selectedSource !== 'shared') {
     return (
       <EmptyState
         title="No projects yet"

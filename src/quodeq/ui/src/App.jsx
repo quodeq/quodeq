@@ -582,24 +582,36 @@ export const ROUTE_RENDERERS = {
   help: () => <HelpPage />,
 };
 
+// The app-level "no local projects" wall in MainContent. Route pages that
+// manage their own empty state (SELF_HANDLED_EMPTY) and the project-free
+// tabs (NO_PROJECT_TABS) are never walled; every other page is walled when
+// the LOCAL projects list is empty. A shared selection is never walled: its
+// data does not live in the local list, and the shared read paths carry
+// their own loading/empty states (teammate persona: zero local projects,
+// drilling from a shared Overview into file/finding/dimension detail).
+// Exported so the source-gating contract is unit-testable without mounting
+// MainContent's route renderers.
+export function shouldWallEmptyProjects({ page, projects, selectedSource }) {
+  if (isSharedSource(selectedSource)) return false;
+  if (NO_PROJECT_TABS.includes(page) || SELF_HANDLED_EMPTY.has(page)) return false;
+  return !projects || projects.length === 0;
+}
+
 /**
  * @param {{ activePage: { page: string }, props: Object }} params
  * @returns {JSX.Element|null}
  */
 function MainContent({ activePage, props }) {
   const { page, ...params } = activePage;
-  if (!NO_PROJECT_TABS.includes(page) && !SELF_HANDLED_EMPTY.has(page)) {
-    const projects = props.navigation?.projects;
-    if (!projects || projects.length === 0) {
-      if (!props.navigation?.projectsLoaded) return <LoadingScreen />;
-      return (
-        <EmptyStateWithTour
-          onAdd={() => props.navigation.onAddProject()}
-          onTour={() => props.navigation.onTakeTour()}
-          isEvaluating={props.navigation.isEvaluating}
-        />
-      );
-    }
+  if (shouldWallEmptyProjects({ page, projects: props.navigation?.projects, selectedSource: props.navigation?.selectedSource })) {
+    if (!props.navigation?.projectsLoaded) return <LoadingScreen />;
+    return (
+      <EmptyStateWithTour
+        onAdd={() => props.navigation.onAddProject()}
+        onTour={() => props.navigation.onTakeTour()}
+        isEvaluating={props.navigation.isEvaluating}
+      />
+    );
   }
   const renderer = ROUTE_RENDERERS[page];
   if (renderer) return renderer(params, props);
