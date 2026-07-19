@@ -253,3 +253,74 @@ describe('useNavStack navTab params', () => {
     expect(result.current.navStack[0].preselectDims).toBeUndefined();
   });
 });
+
+describe('useNavStack navReplace (repositories tab flips must not grow history)', () => {
+  let historyAdapter;
+
+  beforeEach(() => {
+    historyAdapter = {
+      pushState: vi.fn(),
+      replaceState: vi.fn(),
+      back: vi.fn(),
+      go: vi.fn(),
+    };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('replaces the top entry without growing the stack', () => {
+    const { result } = renderHook(
+      () => useNavStack({ historyAdapter }),
+      { wrapper: strictWrapper },
+    );
+
+    act(() => { result.current.navPush({ page: 'projects', sourceTab: 'local' }); });
+    const lengthBefore = result.current.navStack.length;
+
+    act(() => { result.current.navReplace({ page: 'projects', sourceTab: 'shared' }); });
+    act(() => { result.current.navReplace({ page: 'projects', sourceTab: 'local' }); });
+    act(() => { result.current.navReplace({ page: 'projects', sourceTab: 'shared' }); });
+
+    expect(result.current.navStack).toHaveLength(lengthBefore);
+    expect(result.current.navStack.at(-1).sourceTab).toBe('shared');
+  });
+
+  it('uses history.replaceState (never pushState) with the current navIndex', () => {
+    const { result } = renderHook(
+      () => useNavStack({ historyAdapter }),
+      { wrapper: strictWrapper },
+    );
+
+    act(() => { result.current.navPush({ page: 'projects', sourceTab: 'local' }); });
+    historyAdapter.pushState.mockClear();
+    historyAdapter.replaceState.mockClear();
+
+    act(() => { result.current.navReplace({ page: 'projects', sourceTab: 'shared' }); });
+
+    expect(historyAdapter.pushState).not.toHaveBeenCalled();
+    // Exactly once even under StrictMode double-invoke (same purity rule as navPush, #363).
+    expect(historyAdapter.replaceState).toHaveBeenCalledTimes(1);
+    const [state] = historyAdapter.replaceState.mock.calls[0];
+    expect(state.navIndex).toBe(1);
+    expect(state.entry).toEqual({ page: 'projects', sourceTab: 'shared' });
+  });
+
+  it('popstate after replace returns to the entry below, not a stale tab flip', () => {
+    const { result } = renderHook(
+      () => useNavStack({ historyAdapter }),
+      { wrapper: strictWrapper },
+    );
+
+    act(() => { result.current.navPush({ page: 'projects', sourceTab: 'local' }); });
+    act(() => { result.current.navReplace({ page: 'projects', sourceTab: 'shared' }); });
+
+    act(() => {
+      window.dispatchEvent(Object.assign(new Event('popstate'), { state: { navIndex: 0 } }));
+    });
+
+    expect(result.current.navStack).toHaveLength(1);
+    expect(result.current.navStack[0].page).toBe('overview');
+  });
+});

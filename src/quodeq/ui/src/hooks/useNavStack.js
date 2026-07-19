@@ -13,7 +13,7 @@ const defaultHistoryAdapter = {
 /**
  * Manages a browser-history-backed navigation stack.
  *
- * Returns { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab }.
+ * Returns { navStack, activePage, navPush, navPop, navReplace, navGoTo, navReset, navTab }.
  */
 function handlePopState(e, setNavStack) {
   const targetIndex = e.state?.navIndex ?? 0;
@@ -39,6 +39,17 @@ function createNavActions(setNavStack, navStackRef, history) {
     history.back();
   }
 
+  function navReplace(entry) {
+    // Swap the top entry in place (e.g. repositories local/online tab flips):
+    // browser history must NOT grow, or Back has to unwind every flip.
+    // Same purity rule as navPush (#363): state + history as two sequential
+    // statements, never inside the updater.
+    const prev = navStackRef.current;
+    const next = [...prev.slice(0, -1), entry];
+    setNavStack(next);
+    history.replaceState({ navIndex: next.length - 1, entry }, '');
+  }
+
   function navGoTo(index) {
     const steps = navStackRef.current.length - 1 - index;
     if (steps > 0) history.go(-steps);
@@ -61,7 +72,7 @@ function createNavActions(setNavStack, navStackRef, history) {
     if (stepsBack > 0) history.go(-stepsBack);
   }
 
-  return { navPush, navPop, navGoTo, navReset, navTab };
+  return { navPush, navPop, navReplace, navGoTo, navReset, navTab };
 }
 
 export function useNavStack({ historyAdapter } = {}) {
@@ -80,7 +91,7 @@ export function useNavStack({ historyAdapter } = {}) {
     return () => window.removeEventListener('popstate', handler);
   }, []);
 
-  const { navPush, navPop, navGoTo, navReset, navTab } = createNavActions(setNavStack, navStackRef, history);
+  const { navPush, navPop, navReplace, navGoTo, navReset, navTab } = createNavActions(setNavStack, navStackRef, history);
   const activePage = navStack[navStack.length - 1];
 
   useEffect(() => {
@@ -92,5 +103,5 @@ export function useNavStack({ historyAdapter } = {}) {
     else window.scrollTo({ top: 0 });
   }, [activePage]);
 
-  return { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab };
+  return { navStack, activePage, navPush, navPop, navReplace, navGoTo, navReset, navTab };
 }

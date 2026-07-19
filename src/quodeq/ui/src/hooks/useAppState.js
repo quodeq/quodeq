@@ -67,7 +67,7 @@ function useProjects({ onNoProjects }) {
 
 function useAppNavigation() {
   const [serverConnected, setServerConnected, serverVersion] = useServerHealth();
-  const { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab } = useNavStack();
+  const { navStack, activePage, navPush, navPop, navReplace, navGoTo, navReset, navTab } = useNavStack();
   const projectBundle = useProjects({ onNoProjects: () => { /* wizard handles fresh-user UX in App.jsx */ } });
   const { selectedRun, setSelectedRun, handleRunChange } = projectBundle;
   const [historySelectedRun, setHistorySelectedRun] = useState('latest');
@@ -76,7 +76,12 @@ function useAppNavigation() {
     if (page === 'history-run' && params.runId) setHistorySelectedRun(params.runId);
     navPush({ page, ...params });
   }
-  return { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPush, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun };
+  function handleNavigateReplace(page, params = {}) {
+    // In-place variant for view-state changes on the SAME screen (e.g. the
+    // repositories local/online tabs): history must not grow per flip.
+    navReplace({ page, ...params });
+  }
+  return { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPush, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun, setHistorySelectedRun };
 }
 
 export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRunIndex) {
@@ -91,7 +96,7 @@ export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRun
 
 export function useAppState() {
   const nav = useAppNavigation();
-  const { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
+  const { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
   const {
     projects, projectsLoaded, setProjects, selectedProject, selectedSource,
     selectedRun, setSelectedRun, loadProjects, handleProjectChange,
@@ -154,7 +159,7 @@ export function useAppState() {
 
   return {
     serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navTab,
-    projects, projectsLoaded, selectedProject, selectedSource, selectedRun, loadProjects, handleProjectChange, handleNavigate,
+    projects, projectsLoaded, selectedProject, selectedSource, selectedRun, loadProjects, handleProjectChange, handleNavigate, handleNavigateReplace,
     handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject,
     dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex, sharedProjectInfo,
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect, prefetchHandlers,
