@@ -35,7 +35,7 @@ function epochSecondsToMs(seconds) {
  * Get the shared repository connection status.
  * @returns {Promise<{configured: boolean, url: string|null, lastSynced: number|null, publish: Object}>}
  *   lastSynced is epoch-milliseconds (converted from the backend's epoch
- *   seconds; see epochSecondsToMs). `publish.finished_at`, if present, is
+ *   seconds; see epochSecondsToMs). `publish.finishedAt`, if present, is
  *   passed through unconverted (raw epoch seconds) -- no UI consumer currently
  *   formats it as a date.
  */

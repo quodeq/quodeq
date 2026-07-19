@@ -25,6 +25,7 @@ from quodeq.services.shared_repo import (
 )
 from quodeq.shared.dimensions_state import FILENAME as DIMENSIONS_FILENAME
 from quodeq.shared.run_status import STATUS_FILENAME, UnsupportedSchemaError, read_status
+from quodeq.shared.validation import validate_path_segment
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +145,12 @@ def _app_version() -> str:
 def publish_project(
     project_id: str, url: str, *, evaluations_root: Path, env: dict | None = None
 ) -> int:
+    # The route validates too, but this is the last stop before project_id
+    # becomes a filesystem path and a git pathspec, so guard it here as well.
+    try:
+        validate_path_segment(project_id)
+    except ValueError as exc:
+        raise PublishError(str(exc)) from exc
     project_dir = evaluations_root / project_id
     if not project_dir.is_dir():
         raise PublishError(f"project {project_id} not found in local evaluations")
@@ -280,10 +287,17 @@ def _run_publish(project_id: str, url: str, evaluations_root: Path) -> None:
             _STATUS.update(state="error", error=str(exc), finished_at=time.time())
 
 
-def start_publish(project_id: str, url: str, *, evaluations_root: Path) -> bool:
+def start_publish(project_id: str, url: str, *, evaluations_root: Path) -> str:
+    """Kick off a background publish.
+
+    Returns "started", "already_running" (another publish holds the slot),
+    or "failed" (the worker thread could not be started; the status dict
+    carries the error). Callers must not collapse the last two: one is a
+    409-style conflict, the other a server-side failure.
+    """
     with _STATUS_LOCK:
         if _STATUS["state"] == "running":
-            return False
+            return "already_running"
         _STATUS.update(
             state="running", project=project_id, runs=None, error=None, finished_at=None
         )
@@ -296,5 +310,5 @@ def start_publish(project_id: str, url: str, *, evaluations_root: Path) -> bool:
         with _STATUS_LOCK:
             _STATUS.update(state="error", error=str(exc), finished_at=time.time())
         logger.exception("failed to start publish thread")
-        return False
-    return True
+        return "failed"
+    return "started"

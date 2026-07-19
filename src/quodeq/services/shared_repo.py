@@ -33,6 +33,12 @@ def _git_env() -> dict[str, str]:
     GIT_LFS_SKIP_SMUDGE avoids pulling LFS blobs we don't need. GIT_TERMINAL_PROMPT=0
     stops git from blocking on an interactive credential or passphrase prompt, since
     these subprocess calls have stdin closed (see run_git) and nobody is there to answer.
+
+    Known limitation: GIT_TERMINAL_PROMPT only covers prompts issued by git
+    itself. ssh reads from /dev/tty directly, so a first-contact host-key
+    confirmation or a key passphrase without a loaded agent still blocks, and
+    the call only dies at the run_git timeout. ssh remotes need the host in
+    known_hosts and the key in an agent (or use an https remote instead).
     """
     return {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1", "GIT_TERMINAL_PROMPT": "0"}
 

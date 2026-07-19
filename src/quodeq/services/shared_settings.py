@@ -40,7 +40,12 @@ def read_settings(env: dict | None = None) -> SharedSettings:
     if not isinstance(data, dict):
         return SharedSettings()
     known = {f for f in SharedSettings().__dict__}
-    return SharedSettings(**{k: v for k, v in data.items() if k in known})
+    settings = SharedSettings(**{k: v for k, v in data.items() if k in known})
+    # A hand-edited file can hold any JSON type; url is either a usable
+    # string or nothing, callers never see other types (or "").
+    if not isinstance(settings.url, str) or not settings.url:
+        settings.url = None
+    return settings
 
 
 def write_settings(settings: SharedSettings, env: dict | None = None) -> None:
@@ -52,4 +57,7 @@ def write_settings(settings: SharedSettings, env: dict | None = None) -> None:
         tmp.write_text(json.dumps(asdict(settings)), encoding="utf-8")
         os.replace(tmp, path)
     except OSError:
-        pass  # fail-silent: a notice is never worth crashing over
+        # Fail-soft: not worth a 500 on the config routes. A lost write is
+        # not silent, status reads come from this file, so the UI shows
+        # whatever was actually persisted.
+        pass

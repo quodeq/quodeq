@@ -40,6 +40,20 @@ def _git_identity(monkeypatch, tmp_path):
     monkeypatch.setenv("GIT_COMMITTER_EMAIL", "t@t")
 
 
+def test_publish_project_rejects_traversal_project_id(tmp_path, monkeypatch):
+    """The service boundary validates project_id itself, not just the route."""
+    (tmp_path / "evil").mkdir()  # make evaluations/../evil a real directory
+    evals = tmp_path / "evaluations"
+    evals.mkdir()
+    monkeypatch.setattr(
+        shared_publish,
+        "ensure_shared_clone",
+        lambda *a, **kw: pytest.fail("must not reach git with an invalid project id"),
+    )
+    with pytest.raises(PublishError, match="Invalid path segment"):
+        publish_project("../evil", "file:///unused", evaluations_root=evals)
+
+
 def test_publish_bootstraps_and_pushes(tmp_path):
     url = _bare_origin(tmp_path)
     root = _local_project(tmp_path)
