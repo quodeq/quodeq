@@ -111,6 +111,51 @@ describe('DashboardPage no-completed-evaluation empty state', () => {
   });
 });
 
+// Teammate persona (shared-repo onboarding): a teammate with ZERO local
+// projects selects a shared project. The local-list empty-state gate must not
+// wall off the Overview when the selection is shared -- the shared data loads
+// fine and its own loading/empty states take over. Same gate class already
+// fixed on MapPage/HistoryPage/ViolationsPage.
+describe('DashboardPage, teammate persona: shared selection + zero local projects', () => {
+  const sharedNoLocalData = {
+    projectsLoaded: true,
+    projects: [],
+    selectedProject: 'shared-1',
+    selectedSource: 'shared',
+    sharedProjectInfo: { id: 'shared-1', name: 'shared-1', displayName: 'Shared Repo' },
+    dashboard: {
+      dimensions: [],
+      trend: [],
+      selectedRun: { runId: 'r1', dateLabel: '2026-05-01' },
+    },
+    accumulated: { dimensions: [] },
+    loading: false,
+    isFetching: false,
+    error: null,
+    availableRuns: [{ runId: 'r1', status: 'failed' }],
+  };
+
+  it('shared source with an empty LOCAL projects list renders the shared content path, not the Add-a-project wall', () => {
+    const { getByText, queryByText } = render(
+      <DashboardPage data={sharedNoLocalData} callbacks={{}} runMode={false} />,
+    );
+    expect(queryByText('No projects yet')).toBeNull();
+    expect(queryByText('Add a project')).toBeNull();
+    expect(getByText('no completed evaluation in this shared project yet')).toBeTruthy();
+  });
+
+  it('local source with an empty local projects list still shows the Add-a-project wall (unchanged)', () => {
+    const { getByText } = render(
+      <DashboardPage
+        data={{ ...sharedNoLocalData, selectedSource: 'local', selectedProject: '', sharedProjectInfo: null }}
+        callbacks={{}}
+        runMode={false}
+      />,
+    );
+    expect(getByText('No projects yet')).toBeTruthy();
+  });
+});
+
 // Finding 5 (final whole-branch review): projectInfo for a shared selection
 // must come from the shared-repo fetch (sharedProjectInfo, see useDashboard),
 // never the LOCAL projects list -- a shared selection's id can collide with
