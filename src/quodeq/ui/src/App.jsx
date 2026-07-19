@@ -206,6 +206,23 @@ export function shouldShowEvaluateButton(projectsCount, selectedSource) {
 }
 
 /**
+ * Whether the sidebar's project-data tabs (overview/violations/map/history)
+ * should render. The local signal is the run count from the LOCAL project
+ * list -- which is null/zero for a shared selection with no local mirror, so
+ * gating on it alone hides the tabs for shared projects whose pages all work
+ * (and a colliding local twin's zero runs would hide them just the same).
+ * For 'shared', gate on the resolved sharedProjectInfo instead: the shared
+ * info payload carries no runsCount at all, and a project only appears in
+ * the shared repo once published with runs, so its info resolving is the
+ * "has data to show" signal. Exported (like shouldBounceToEvaluate) so the
+ * source-gating contract is testable without mounting the whole App.
+ */
+export function shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, sharedProjectInfo }) {
+  if (selectedSource === 'shared') return !!sharedProjectInfo;
+  return hasCurrentProjectRuns;
+}
+
+/**
  * After the shared repository is disconnected in Settings, a currently
  * 'shared' selection is left pointing at a project that no longer resolves
  * anywhere in the app (its source has no config left) -- the user would be
@@ -851,7 +868,11 @@ export default function App() {
               activeTab={activeTab}
               onNavTab={navTab}
               hasEvaluations={state.projects.length > 0}
-              showProjectTabs={hasCurrentProjectRuns}
+              showProjectTabs={shouldShowProjectTabs({
+                selectedSource: state.selectedSource,
+                hasCurrentProjectRuns,
+                sharedProjectInfo: state.sharedProjectInfo,
+              })}
               selectedSource={state.selectedSource}
               projectInfo={{
                 displayName: resolvedDisplayName,
