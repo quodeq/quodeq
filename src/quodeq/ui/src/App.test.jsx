@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import {
   buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
   resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldShowProjectTabs,
-  buildNavigationBundle,
+  buildNavigationBundle, shouldWallEmptyProjects,
 } from './App.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
@@ -346,6 +346,32 @@ describe('buildNavigationBundle', () => {
     el.props.actions.onTabChange('online');
     expect(state.handleNavigateReplace).toHaveBeenCalledWith('projects', { sourceTab: 'online' });
     expect(state.handleNavigate).not.toHaveBeenCalled();
+  });
+});
+
+// Teammate persona, one click deeper than the data pages: with zero LOCAL
+// projects, drill-in pages (file/finding/dimension detail...) must not wall
+// a shared selection behind the add-a-project tour. Same gate class as the
+// DashboardPage/MapPage/HistoryPage/ViolationsPage empty-state fixes.
+describe('shouldWallEmptyProjects', () => {
+  it('never walls a shared selection, even with zero local projects', () => {
+    expect(shouldWallEmptyProjects({ page: 'file', projects: [], selectedSource: 'shared' })).toBe(false);
+  });
+
+  it('walls drill-in pages for a local source with zero projects (unchanged)', () => {
+    expect(shouldWallEmptyProjects({ page: 'file', projects: [], selectedSource: 'local' })).toBe(true);
+  });
+
+  it('never walls the self-handled data tabs', () => {
+    expect(shouldWallEmptyProjects({ page: 'overview', projects: [], selectedSource: 'local' })).toBe(false);
+  });
+
+  it('never walls the project-free tabs', () => {
+    expect(shouldWallEmptyProjects({ page: 'projects', projects: [], selectedSource: 'local' })).toBe(false);
+  });
+
+  it('does not wall once local projects exist', () => {
+    expect(shouldWallEmptyProjects({ page: 'file', projects: [{ id: 'p1' }], selectedSource: 'local' })).toBe(false);
   });
 });
 
