@@ -159,6 +159,9 @@ class FilesystemActionProvider(ActionProvider):
     def list_projects(self, reports_dir: str) -> dict[str, Any]:
         return self._projects.list(reports_dir)
 
+    def invalidate_projects_cache(self) -> None:
+        self._projects.invalidate()
+
     def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
         return _fs_projects.update_project_path(reports_dir, project, new_path)
 

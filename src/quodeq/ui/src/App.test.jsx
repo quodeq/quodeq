@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import {
   buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
   resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldShowProjectTabs,
-  buildNavigationBundle, shouldWallEmptyProjects,
+  buildNavigationBundle, shouldWallEmptyProjects, buildWizardHandlers,
 } from './App.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
@@ -372,6 +372,63 @@ describe('shouldWallEmptyProjects', () => {
 
   it('does not wall once local projects exist', () => {
     expect(shouldWallEmptyProjects({ page: 'file', projects: [{ id: 'p1' }], selectedSource: 'local' })).toBe(false);
+  });
+});
+
+// The wizard registers a project on its Repo & Scan step, but the projects
+// list in React state is only reloaded at boot and when an evaluation
+// finishes. Both wizard exits that leave a registered project behind (saved
+// close and launch) must reload the list so the new project appears in the
+// Projects tab immediately, before any run exists.
+describe('buildWizardHandlers', () => {
+  function stubState() {
+    return {
+      loadProjects: vi.fn(),
+      refreshDashboard: vi.fn(),
+      evalLifecycle: { handleStartEvaluation: vi.fn() },
+    };
+  }
+
+  it('onClose after a saved exit reloads the projects list', () => {
+    const state = stubState();
+    const setWizardEntry = vi.fn();
+    const { onClose } = buildWizardHandlers({ state, setWizardEntry, navTab: vi.fn() });
+    onClose({ saved: true, projectId: 'proj-1' });
+    expect(setWizardEntry).toHaveBeenCalledWith(null);
+    expect(state.loadProjects).toHaveBeenCalled();
+    expect(state.refreshDashboard).toHaveBeenCalled();
+  });
+
+  it('onClose without a saved project does not reload anything', () => {
+    const state = stubState();
+    const setWizardEntry = vi.fn();
+    const { onClose } = buildWizardHandlers({ state, setWizardEntry, navTab: vi.fn() });
+    onClose({ saved: false });
+    expect(setWizardEntry).toHaveBeenCalledWith(null);
+    expect(state.loadProjects).not.toHaveBeenCalled();
+    expect(state.refreshDashboard).not.toHaveBeenCalled();
+  });
+
+  it('onLaunch reloads the projects list, starts the evaluation, and navigates', () => {
+    const state = stubState();
+    const navTab = vi.fn();
+    const { onLaunch } = buildWizardHandlers({ state, setWizardEntry: vi.fn(), navTab });
+    onLaunch({
+      projectId: 'proj-1', repo: '/x/repo', scopePath: null, branch: null,
+      provider: { id: 'claude', model: 'sonnet' }, standardIds: ['security'], totalTimeLimitS: 60,
+    });
+    expect(state.loadProjects).toHaveBeenCalled();
+    expect(state.evalLifecycle.handleStartEvaluation).toHaveBeenCalledWith(expect.objectContaining({
+      repo: '/x/repo', dimensions: ['security'], aiCmd: 'claude', aiModel: 'sonnet', timeLimit: 60,
+    }));
+    expect(navTab).toHaveBeenCalledWith('evaluate');
+  });
+
+  it('onLaunch falls back to the projectId when no repo path is present', () => {
+    const state = stubState();
+    const { onLaunch } = buildWizardHandlers({ state, setWizardEntry: vi.fn(), navTab: vi.fn() });
+    onLaunch({ projectId: 'proj-1', repo: null, provider: {}, standardIds: [] });
+    expect(state.evalLifecycle.handleStartEvaluation).toHaveBeenCalledWith(expect.objectContaining({ repo: 'proj-1' }));
   });
 });
 

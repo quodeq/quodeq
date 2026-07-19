@@ -102,6 +102,27 @@ def test_post_projects_duplicate_returns_409(app_client, tmp_path):
     assert body.get("existingProjectId") == first_id
 
 
+def test_post_projects_appears_in_projects_list_immediately(app_client):
+    """A freshly registered project must show in GET /api/projects right away.
+
+    The list is fetched once before the POST so the 5-second ProjectsCache is
+    warm — registration must invalidate it, and the zero-run project must not
+    be filtered out of build_project_list.
+    """
+    c, home, _ = app_client
+    repo = _make_local_repo(home, "instant-repo")
+    with _patch_home(home):
+        warm = c.get("/api/projects")
+        assert warm.status_code == 200
+        resp = c.post("/api/projects", json={"repo": str(repo)}, headers=_ORIGIN)
+        assert resp.status_code == 200, resp.get_json()
+        project_id = resp.get_json()["projectId"]
+        listed = c.get("/api/projects").get_json()["projects"]
+    entry = next((p for p in listed if p["id"] == project_id), None)
+    assert entry is not None, "registered project missing from /api/projects"
+    assert entry["runsCount"] == 0
+
+
 def test_post_projects_writes_onboarding_field_null(app_client):
     c, home, _ = app_client
     repo = _make_local_repo(home, "field-repo")

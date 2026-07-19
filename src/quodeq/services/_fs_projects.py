@@ -114,10 +114,18 @@ def build_project_list(reports_root: Path, *, backfill: bool = True) -> list[Pro
             _backfill_onboarding_field(reports_root / name)
 
     parent_ids, subproject_ids = _build_parent_child_sets(reports_root, dir_names)
+    # A registered project (repository_info.json present) is listed even with
+    # zero runs — the onboarding wizard creates projects before any evaluation
+    # exists and the UI shows an empty state for them. Only dirs with neither
+    # runs nor a project record (stray non-project dirs) are dropped.
+    registered_ids = {
+        name for name in dir_names
+        if (reports_root / name / "repository_info.json").exists()
+    }
 
     def _build_one(name: str) -> ProjectEntry | None:
         runs = list_runs(reports_root, name)
-        if not runs and name not in parent_ids and name not in subproject_ids:
+        if not runs and name not in registered_ids and name not in parent_ids and name not in subproject_ids:
             return None
         return _build_project_entry(reports_root, name, runs, backfill=backfill)
 

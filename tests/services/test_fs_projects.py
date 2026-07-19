@@ -11,6 +11,7 @@ import pytest
 from quodeq.services._fs_projects import (
     find_children,
     _build_parent_child_sets,
+    build_project_list,
     update_project_path,
     delete_project,
     get_project_info,
@@ -89,6 +90,36 @@ class TestBuildParentChildSets:
         parents, subs = _build_parent_child_sets(tmp_path, ["bad"])
         assert parents == set()
         assert subs == set()
+
+
+# ---------------------------------------------------------------------------
+# build_project_list
+# ---------------------------------------------------------------------------
+
+
+class TestBuildProjectList:
+    def test_includes_registered_project_with_no_runs(self, tmp_path: Path):
+        # A project registered by the onboarding wizard (POST /api/projects)
+        # has repository_info.json but no runs yet — it must still appear in
+        # the projects list so the UI can show its empty state immediately.
+        proj = tmp_path / "fresh-uuid"
+        proj.mkdir()
+        (proj / "repository_info.json").write_text(json.dumps({
+            "name": "fresh",
+            "path": str(tmp_path),
+            "location": "local",
+            "onboardingCompletedAt": None,
+        }))
+        entries = build_project_list(tmp_path)
+        entry = next((e for e in entries if e.id == "fresh-uuid"), None)
+        assert entry is not None
+        assert entry.runs_count == 0
+        assert entry.latest_run_id is None
+        assert entry.onboarding_completed_at is None
+
+    def test_excludes_dir_without_repo_info_or_runs(self, tmp_path: Path):
+        (tmp_path / "junk-dir").mkdir()
+        assert build_project_list(tmp_path) == []
 
 
 # ---------------------------------------------------------------------------
