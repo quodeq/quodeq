@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
 import {
   buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
-  resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard,
+  resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldShowProjectTabs,
 } from './App.jsx';
+import Sidebar from './components/Sidebar.jsx';
 
 // Pins the contract that App.jsx's ``buildEvalPrincipal`` threads the
 // dimension's run id into ``evalPrincipal.runId``. Without it, the dismiss
@@ -226,6 +229,77 @@ describe('shouldAutoOpenOnboardingWizard', () => {
 
   it('does not open while an evaluation is running', () => {
     expect(shouldAutoOpenOnboardingWizard({ ...base, isEvaluating: true })).toBe(false);
+  });
+});
+
+// Sidebar tab gating must be source-aware. hasCurrentProjectRuns is derived
+// from the LOCAL project list, so a shared selection with no local mirror
+// resolves to null info / zero runs and the four project-data tabs vanish
+// even though every one of those pages works for shared projects. The shared
+// signal is the resolved sharedProjectInfo (already fetched at App level by
+// useDashboard): the shared info payload carries no runsCount at all, and a
+// project only appears in the shared repo once published with runs, so
+// presence of its info is the correct "has data to show" signal.
+describe('shouldShowProjectTabs', () => {
+  it('shows tabs for a local project with runs', () => {
+    expect(shouldShowProjectTabs({
+      selectedSource: 'local', hasCurrentProjectRuns: true, sharedProjectInfo: null,
+    })).toBe(true);
+  });
+
+  it('hides tabs for a local project with zero runs', () => {
+    expect(shouldShowProjectTabs({
+      selectedSource: 'local', hasCurrentProjectRuns: false, sharedProjectInfo: null,
+    })).toBe(false);
+  });
+
+  it('shows tabs for a shared selection once its shared info has resolved, ignoring the local run count', () => {
+    expect(shouldShowProjectTabs({
+      selectedSource: 'shared',
+      hasCurrentProjectRuns: false, // no local mirror -> the local signal reads empty
+      sharedProjectInfo: { id: 'team-proj', name: 'team-proj' },
+    })).toBe(true);
+  });
+
+  it('hides tabs for a shared selection while its shared info has not resolved', () => {
+    expect(shouldShowProjectTabs({
+      selectedSource: 'shared', hasCurrentProjectRuns: false, sharedProjectInfo: null,
+    })).toBe(false);
+  });
+
+  it('ignores a colliding local twin\'s shared info for a local selection', () => {
+    // A shared project's id can collide with a local one by design. When the
+    // LOCAL twin is selected, the gate must read the local run count, not the
+    // leftover shared info object.
+    expect(shouldShowProjectTabs({
+      selectedSource: 'local', hasCurrentProjectRuns: false, sharedProjectInfo: { id: 'team-proj' },
+    })).toBe(false);
+  });
+});
+
+describe('Sidebar project-data tabs for a shared-only selection (component)', () => {
+  const DATA_TABS = ['overview', 'violations', 'map', 'history'];
+
+  it('renders all four data tabs when the shared project info has resolved', () => {
+    const show = shouldShowProjectTabs({
+      selectedSource: 'shared',
+      hasCurrentProjectRuns: false, // shared-only: no local mirror
+      sharedProjectInfo: { id: 'team-proj', name: 'team-proj' },
+    });
+    render(<Sidebar activeTab="overview" onNavTab={vi.fn()} selectedSource="shared" showProjectTabs={show} />);
+    for (const tab of DATA_TABS) {
+      expect(screen.getByTitle(tab)).toBeInTheDocument();
+    }
+  });
+
+  it('hides the data tabs while the shared info is still loading', () => {
+    const show = shouldShowProjectTabs({
+      selectedSource: 'shared', hasCurrentProjectRuns: false, sharedProjectInfo: null,
+    });
+    render(<Sidebar activeTab="overview" onNavTab={vi.fn()} selectedSource="shared" showProjectTabs={show} />);
+    for (const tab of DATA_TABS) {
+      expect(screen.queryByTitle(tab)).toBeNull();
+    }
   });
 });
 
