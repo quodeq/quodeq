@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -119,6 +120,19 @@ def _scan_parent_project(project_dir: Path, reports_path: Path, repo_path: Path)
         pass
 
 
+def _read_origin_remote(repo_dir: Path) -> str | None:
+    """Best-effort ``git remote get-url origin`` for a local working copy."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_dir), "remote", "get-url", "origin"],
+            capture_output=True, text=True, encoding="utf-8", timeout=10,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return None
+    origin = result.stdout.strip()
+    return origin if result.returncode == 0 and origin else None
+
+
 def _register_project(
     repo: str,
     discipline: str | None,
@@ -187,6 +201,9 @@ def _register_project(
     info["path"] = str(target_path.resolve())
     info["location"] = _LOCATION_LOCAL
     info["ephemeral"] = bool(ephemeral)
+    origin_url = repo if is_url else _read_origin_remote(target_path)
+    if origin_url:
+        info["originUrl"] = origin_url
     info_path.write_text(json.dumps(info, indent=2), encoding="utf-8")
 
     # Scan now that files are guaranteed on disk.

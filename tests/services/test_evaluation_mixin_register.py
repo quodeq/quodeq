@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 import pytest
@@ -256,3 +257,49 @@ def test_start_evaluation_preserves_existing_onboarding_stamp(tmp_path):
     _make_mixin().start_evaluation(str(repo), str(reports), EvaluationOptions())
 
     assert _read_info(reports, uuid)["onboardingCompletedAt"] == "2025-12-01T00:00:00Z"
+
+
+def test_register_url_repo_persists_origin_url(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    url = "https://github.com/example/repo.git"
+
+    def fake_clone(u, dest):
+        dest.mkdir(parents=True)
+        (dest / ".git").mkdir()
+        (dest / "main.py").write_text("print('hi')\n")
+
+    with patch("quodeq.services.evaluation_mixin.run_git_clone", side_effect=fake_clone):
+        uuid = _register_project(url, None, str(reports), ephemeral=True)
+
+    assert _read_info(reports, uuid)["originUrl"] == url
+
+
+def test_register_local_repo_persists_origin_remote(tmp_path):
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    (repo / "main.py").write_text("print('hi')\n")
+    subprocess.run(["git", "init", str(repo)], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "remote", "add", "origin", "https://github.com/example/myrepo.git"],
+        check=True, capture_output=True,
+    )
+    reports = tmp_path / "reports"
+    reports.mkdir()
+
+    uuid = _register_project(str(repo), None, str(reports))
+
+    assert _read_info(reports, uuid)["originUrl"] == "https://github.com/example/myrepo.git"
+
+
+def test_register_local_repo_without_remote_omits_origin_url(tmp_path):
+    repo = tmp_path / "plain"
+    repo.mkdir()
+    (repo / "main.py").write_text("print('hi')\n")
+    reports = tmp_path / "reports"
+    reports.mkdir()
+
+    uuid = _register_project(str(repo), None, str(reports))
+
+    assert "originUrl" not in _read_info(reports, uuid)
