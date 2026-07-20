@@ -62,6 +62,28 @@ class TestCreateWorktree:
         wt = _create_worktree(repo, "nonexistent-branch")
         assert wt is None
 
+    def test_fetches_missing_branch_from_origin(self, tmp_path: Path) -> None:
+        """Online repos are registered via a single-branch shallow clone, so a
+        branch evaluation targets a branch the clone doesn't have yet; it must
+        be fetched from origin instead of failing."""
+        from quodeq.cli import _create_worktree
+        origin = tmp_path / "origin"
+        origin.mkdir()
+        _make_git_repo(origin, branches=["feature/other"])
+        clone = tmp_path / "clone"
+        subprocess.run(
+            ["git", "clone", "--single-branch", "--branch", "main", str(origin), str(clone)],
+            capture_output=True, check=True,
+        )
+
+        wt = _create_worktree(clone, "feature/other")
+        try:
+            assert wt is not None
+            assert (wt / "branch_file.txt").read_text() == "from feature/other"
+        finally:
+            if wt is not None:
+                subprocess.run(["git", "-C", str(clone), "worktree", "remove", str(wt), "--force"], capture_output=True)
+
 
 class TestCleanupWorktree:
     def test_removes_worktree(self, tmp_path: Path) -> None:
