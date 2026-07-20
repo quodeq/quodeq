@@ -226,14 +226,18 @@ describe('ProjectsPage — online tab, configured', () => {
     renderWithApi(<ProjectsPage projects={[]} sourceTab="online" actions={{}} />, fakeApi);
 
     await waitFor(() => expect(screen.getByText('demo-repo')).toBeInTheDocument());
-    expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(1);
+    // Let the mount's own background revalidate settle first, then measure
+    // the manual refresh button click in isolation from it.
+    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(2));
+    fakeApi.refreshShared.mockClear();
+    fakeApi.sharedListProjects.mockClear();
 
     // Two "refresh" buttons exist (the sync-status line and each card's
     // footer) -- the sync line's is the first in document order.
     await user.click(screen.getAllByRole('button', { name: 'refresh' })[0]);
 
     await waitFor(() => expect(fakeApi.refreshShared).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(1));
   });
 
   it('online card footer offers "pull local copy"; a 409 shows an inline copy confirm', async () => {
