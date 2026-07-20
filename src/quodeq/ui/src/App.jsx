@@ -31,6 +31,7 @@ import TopBar from './components/TopBar.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey } from './constants.js';
 import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
+import { useNativeNavBridge } from './hooks/useNativeNavBridge.js';
 import { readVisibleStandardIds } from './utils/visibleStandards.js';
 import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
@@ -843,6 +844,9 @@ export default function App() {
     ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
     : null;
   const { activePage, navStack, navPop, navGoTo, navTab, activeTab } = state;
+  // Native-shell bridge: the macOS Help menu opens tabs by dispatching
+  // quodeq:navigate (see _webview_window._install_macos_help_menu).
+  useNativeNavBridge(navTab);
 
   // Reset scroll on project switch — useNavStack handles the same for
   // tab/page changes, but selectedProject lives outside the nav stack.
