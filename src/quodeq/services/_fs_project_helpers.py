@@ -19,13 +19,20 @@ from quodeq.services.ports import RunInfo
 from quodeq.shared.utils import _env_int
 
 
-def _backfill_onboarding_field(project_dir: Path) -> dict | None:
-    """Add ``onboardingCompletedAt`` to ``repository_info.json`` if missing.
+def _backfill_onboarding_field(
+    project_dir: Path, *, heal_completed_at: str | None = None,
+) -> dict | None:
+    """Normalize ``onboardingCompletedAt`` in ``repository_info.json``.
 
     Returns the (possibly modified) data dict, or ``None`` if the file is
     missing or unreadable. Persists the change back to disk when a backfill
     happens. Treats absence of the field as already-onboarded — backfills to
     the project's existing ``createdAt`` timestamp, falling back to "now".
+
+    *heal_completed_at*: when set and the field is present but null, stamp it
+    with this value. Callers pass a timestamp only for projects that have
+    evaluation runs — running an evaluation IS completing setup, so a null
+    left behind by a pre-stamp wizard must not show 'Resume setup' forever.
     """
     info_path = project_dir / "repository_info.json"
     if not info_path.exists():
@@ -35,6 +42,12 @@ def _backfill_onboarding_field(project_dir: Path) -> dict | None:
     except (json.JSONDecodeError, OSError):
         return None
     if "onboardingCompletedAt" in data:
+        if data["onboardingCompletedAt"] is None and heal_completed_at:
+            data["onboardingCompletedAt"] = heal_completed_at
+            try:
+                info_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            except OSError:
+                pass
         return data
     data["onboardingCompletedAt"] = data.get("createdAt") or datetime.now(timezone.utc).isoformat()
     try:
@@ -57,8 +70,12 @@ def _build_project_entry(
     # ``onboardingCompletedAt`` field so the wizard never auto-opens for
     # already-onboarded projects. Returns the (possibly updated) info dict
     # so we can pass the field through to the entry without re-reading.
+    # Projects with runs also heal a null field to the first run's date:
+    # an evaluation happened, so setup is complete (records that predate the
+    # start_evaluation stamp would otherwise show 'Resume setup' forever).
     project_dir = reports_root / entry_name
-    backfilled = _backfill_onboarding_field(project_dir) if backfill else None
+    heal_at = (runs[-1].date_iso or datetime.now(timezone.utc).isoformat()) if runs else None
+    backfilled = _backfill_onboarding_field(project_dir, heal_completed_at=heal_at) if backfill else None
     info = backfilled if backfilled is not None else _read_repo_info(reports_root, entry_name)
     meta = _extract_project_metadata(info, entry_name)
     latest_grade, latest_score, files_count = _read_accumulated_summary(

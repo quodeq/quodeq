@@ -196,3 +196,63 @@ def test_start_evaluation_rejects_url_input(tmp_path):
             str(tmp_path),
             EvaluationOptions(),
         )
+
+
+class _FakeDispatcher:
+    """Records dispatch calls without spawning a subprocess."""
+
+    def __init__(self):
+        self.calls = []
+
+    def dispatch(self, cmd, *, cwd=None, env=None, ai_provider=None, ai_model=None):
+        self.calls.append(cmd)
+        return {"id": "fake-job"}
+
+
+def _make_mixin():
+    from quodeq.services.evaluation_mixin import FsEvaluationMixin
+
+    mixin = FsEvaluationMixin()
+    mixin._jobs = object()  # no set_reports_root attr -> guard skips it
+    mixin._dispatcher = _FakeDispatcher()
+    return mixin
+
+
+def test_start_evaluation_stamps_onboarding_completed(tmp_path):
+    """Starting an evaluation completes onboarding: the null field written at
+    registration time must become a timestamp, otherwise the Projects page
+    shows 'Resume setup' forever for wizard-created projects."""
+    from quodeq.services.base import EvaluationOptions
+
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    (repo / "main.py").write_text("print('hi')\n")
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    uuid = _register_project(str(repo), None, str(reports))
+    assert _read_info(reports, uuid)["onboardingCompletedAt"] is None
+
+    _make_mixin().start_evaluation(str(repo), str(reports), EvaluationOptions())
+
+    stamped = _read_info(reports, uuid)["onboardingCompletedAt"]
+    assert isinstance(stamped, str) and stamped
+
+
+def test_start_evaluation_preserves_existing_onboarding_stamp(tmp_path):
+    """A later evaluation must not move an already-set completion timestamp."""
+    from quodeq.services.base import EvaluationOptions
+
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    (repo / "main.py").write_text("print('hi')\n")
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    uuid = _register_project(str(repo), None, str(reports))
+    info_path = reports / uuid / "repository_info.json"
+    data = json.loads(info_path.read_text())
+    data["onboardingCompletedAt"] = "2025-12-01T00:00:00Z"
+    info_path.write_text(json.dumps(data))
+
+    _make_mixin().start_evaluation(str(repo), str(reports), EvaluationOptions())
+
+    assert _read_info(reports, uuid)["onboardingCompletedAt"] == "2025-12-01T00:00:00Z"
