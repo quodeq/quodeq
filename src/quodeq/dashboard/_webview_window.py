@@ -300,6 +300,8 @@ def _set_macos_app_identity() -> None:
 
 _about_target: object | None = None  # keep delegate alive for the menu item's weak ref
 _about_override_installed = False  # the _AboutHandler ObjC class may only be defined once
+_help_target: object | None = None  # keep the Help-menu handler alive (menu item holds a weak ref)
+_help_menu_installed = False  # the _HelpHandler ObjC class may only be defined once
 _macos_toolbar_installed = False  # the unified toolbar (taller titlebar) is added once
 _macos_fullscreen_observer: object | None = None  # keep the ObjC observer alive
 _macos_fullscreen_observer_installed = False  # register the notifications once
@@ -449,6 +451,98 @@ def _install_about_panel_override() -> None:
         state["timer"] = timer
     except (AttributeError, ValueError) as exc:
         print(f"[quodeq-about] NSTimer schedule failed: {exc}", file=_diag, flush=True)
+
+
+def _install_macos_help_menu(window: object) -> None:
+    """Add a top-level Help menu whose item opens the dashboard help tab.
+
+    pywebview's Cocoa backend builds the main menu lazily during the run
+    loop, so (like the About override) poll with an NSTimer until the menu
+    bar exists, then append a "Help" menu and register it via
+    NSApp.setHelpMenu_ so macOS adds its built-in search field.
+
+    The item can't call into React directly; it dispatches a
+    ``quodeq:navigate`` CustomEvent that useNativeNavBridge routes to
+    ``navTab('help')``.
+
+    Installs at most once: the ObjC classes can only be defined once per
+    process (see _install_about_panel_override).
+    """
+    global _help_target, _help_menu_installed
+    if _help_menu_installed:
+        return
+    try:
+        from AppKit import NSApplication, NSMenu, NSMenuItem, NSObject  # type: ignore[import-untyped]
+        from Foundation import NSTimer  # type: ignore[import-untyped]
+    except ImportError:
+        return
+    _help_menu_installed = True
+
+    js = "window.dispatchEvent(new CustomEvent('quodeq:navigate', { detail: 'help' }))"
+
+    class _HelpHandler(NSObject):
+        def openHelp_(self, sender):  # noqa: ARG002 — ObjC selector signature
+            # Menu actions fire on the AppKit main thread, where evaluate_js
+            # deadlocks (it blocks on the JS engine) — hop to a worker thread.
+            def _run() -> None:
+                try:
+                    window.evaluate_js(js)  # type: ignore[union-attr]
+                except Exception:  # noqa: BLE001 — window may be tearing down
+                    _logger.debug("help-menu navigation failed", exc_info=True)
+            threading.Thread(target=_run, daemon=True).start()
+
+    _help_target = _HelpHandler.alloc().init()
+    state = {"attempts": 0, "timer": None}
+    max_attempts = 25  # ~5 seconds at 200ms
+
+    class _HelpMenuPoller(NSObject):
+        def tryInstall_(self, timer):  # noqa: ARG002
+            state["attempts"] += 1
+            app = NSApplication.sharedApplication()
+            main_menu = app.mainMenu()
+            if main_menu is None or main_menu.numberOfItems() == 0:
+                if state["attempts"] >= max_attempts:
+                    print(f"[quodeq-help] gave up after {state['attempts']} attempts — no main menu",
+                          file=_diag, flush=True)
+                    if state["timer"]:
+                        state["timer"].invalidate()
+                return
+            help_menu = NSMenu.alloc().initWithTitle_("Help")
+            item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+                "quodeq Help", "openHelp:", "?",
+            )
+            item.setTarget_(_help_target)
+            help_menu.addItem_(item)
+            top_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Help", None, "")
+            top_item.setSubmenu_(help_menu)
+            main_menu.addItem_(top_item)
+            # Registering as THE help menu makes macOS append its native
+            # search field and keeps the menu in the canonical last slot.
+            app.setHelpMenu_(help_menu)
+            print(f"[quodeq-help] installed Help menu on attempt {state['attempts']}",
+                  file=_diag, flush=True)
+            if state["timer"]:
+                state["timer"].invalidate()
+
+        def scheduleTimer_(self, arg):  # noqa: ARG002 — ObjC selector signature
+            # `loaded` fires on pywebview's own event-dispatch thread, not
+            # the AppKit main thread, and a repeating NSTimer only fires if
+            # it's scheduled on a run loop that's actually being pumped —
+            # the calling thread's run loop otherwise sits idle forever and
+            # tryInstall_ never ticks. Hop to the main thread to schedule it
+            # (the same hop as openHelp_ above, in the opposite direction).
+            try:
+                timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+                    0.2, self, "tryInstall:", None, True,
+                )
+                state["timer"] = timer
+            except (AttributeError, ValueError) as exc:
+                print(f"[quodeq-help] NSTimer schedule failed: {exc}", file=_diag, flush=True)
+
+    poller = _HelpMenuPoller.alloc().init()
+    # Retain the poller so it isn't GC'd while the timer holds a weak ref
+    state["poller"] = poller
+    poller.performSelectorOnMainThread_withObject_waitUntilDone_("scheduleTimer:", None, False)
 
 
 def _set_macos_titlebar_appearance(window: object, dark: bool) -> None:
@@ -1023,6 +1117,12 @@ def main() -> None:
                 _set_macos_app_identity()
             except Exception:
                 _logger.debug("macOS app-identity setup failed", exc_info=True)
+            # Native Help menu → dashboard help tab. Best-effort like the
+            # identity setup: a failure must never block window chrome.
+            try:
+                _install_macos_help_menu(window)
+            except Exception:
+                _logger.debug("macOS Help menu setup failed", exc_info=True)
         elif sys.platform == "win32":
             _set_windows_titlebar(True)
 
