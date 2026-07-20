@@ -268,3 +268,25 @@ class TestGetProjectInfo:
     def test_traversal_rejected(self, tmp_path: Path):
         result = get_project_info(str(tmp_path), "../escape")
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# ProjectEntry.origin_url
+# ---------------------------------------------------------------------------
+
+
+def test_project_entry_carries_origin_url(tmp_path):
+    from quodeq.core.types import to_camel_dict
+
+    proj = tmp_path / "p1"
+    run = proj / "run-1"
+    run.mkdir(parents=True)
+    (proj / "repository_info.json").write_text(
+        json.dumps({"name": "p1", "originUrl": "https://github.com/example/p1.git"})
+    )
+    (run / "status.json").write_text(json.dumps({"schema_version": 2, "state": "done"}))
+
+    entries = build_project_list(tmp_path)
+    entry = next(e for e in entries if e.id == "p1")
+    assert entry.origin_url == "https://github.com/example/p1.git"
+    assert to_camel_dict(entry)["originUrl"] == "https://github.com/example/p1.git"
