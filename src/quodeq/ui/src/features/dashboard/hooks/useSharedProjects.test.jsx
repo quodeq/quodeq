@@ -235,11 +235,17 @@ describe('useSharedProjects', () => {
 
   it('refresh() ignores a second call while the first refresh is still in flight', async () => {
     const d = deferred();
-    const fakeApi = makeFakeApi({ refreshShared: vi.fn(() => d.promise) });
+    const fakeApi = makeFakeApi();
     const { result } = renderHook(() => useSharedProjects(), {
       wrapper: ({ children }) => wrap(fakeApi, children),
     });
     await waitFor(() => expect(result.current.loading).toBe(false));
+    // Let the mount's own background revalidate settle first, so the
+    // deferred stub below only governs the two manual refresh() calls,
+    // not the mount's in-flight refresh.
+    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(2));
+    fakeApi.refreshShared.mockClear();
+    fakeApi.refreshShared.mockImplementation(() => d.promise);
 
     let p1;
     let p2;
