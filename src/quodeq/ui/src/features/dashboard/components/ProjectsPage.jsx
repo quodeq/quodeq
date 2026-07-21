@@ -706,7 +706,7 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
           name="repositories"
           sub={`${projects.length} ${projects.length === 1 ? 'repository' : 'repositories'} evaluated`}
         />
-        {projects.length > 0 && (
+        {!isEmpty && (
           <div className="projects-page__header-actions">
             {onImportProject && (
               <button

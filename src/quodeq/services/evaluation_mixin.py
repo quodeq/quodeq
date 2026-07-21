@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import time
@@ -32,6 +33,21 @@ _logger = logging.getLogger(__name__)
 
 _LOCATION_ONLINE = "online"
 _LOCATION_LOCAL = "local"
+
+# Mirrors _CREDENTIALS_RE in quodeq.api._evaluation_helpers. Not imported from
+# there: services must not depend on the api layer (no other services module
+# does), so the pattern is duplicated here rather than layered across.
+_CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")
+
+
+def _strip_credentials(url: str) -> str:
+    """Remove embedded userinfo (``user:pass@`` / ``token@``) from *url*.
+
+    Only applies to scheme'd URLs (``https://user@host/...``). scp-style
+    remotes (``git@github.com:org/repo.git``) are left untouched, since the
+    leading ``git@`` there is a username convention, not a credential.
+    """
+    return _CREDENTIALS_RE.sub(r"\1", url)
 
 
 class EvaluationDispatcher(Protocol):
@@ -130,7 +146,9 @@ def _read_origin_remote(repo_dir: Path) -> str | None:
     except (subprocess.SubprocessError, OSError):
         return None
     origin = result.stdout.strip()
-    return origin if result.returncode == 0 and origin else None
+    if result.returncode != 0 or not origin:
+        return None
+    return _strip_credentials(origin)
 
 
 def _register_project(
@@ -203,7 +221,11 @@ def _register_project(
     info["ephemeral"] = bool(ephemeral)
     origin_url = repo if is_url else _read_origin_remote(target_path)
     if origin_url:
-        info["originUrl"] = origin_url
+        # Defense in depth: _read_origin_remote already strips credentials
+        # from the local-remote branch, but strip again here so the
+        # URL-registration branch (raw *repo*) is covered too, and so this
+        # call site stays safe even if the helper's behavior changes.
+        info["originUrl"] = _strip_credentials(origin_url)
     info_path.write_text(json.dumps(info, indent=2), encoding="utf-8")
 
     # Scan now that files are guaranteed on disk.

@@ -7,6 +7,18 @@ const COMPARATORS = {
   score: (a, b) => (b.score ?? -1) - (a.score ?? -1),
 };
 
+/**
+ * useMergedProjects -- merges local + shared project lists into the one
+ * flat list the Projects page renders (no tabs -- see ProjectsPage.jsx).
+ *
+ * Delegates the actual merge/dedup to `mergeProjects` (projectsMerge.js),
+ * then layers in query/location filtering, sorting, and a per-entry
+ * `action` (publish/update/pull) via `deriveAction`. Called at multiple call
+ * sites with different filter subsets -- e.g. the unfiltered call feeding
+ * ProjectsPage's `isEmpty`/`allEntries` vs. the location-filtered call
+ * feeding the visible list -- so filters stay optional and independently
+ * omittable.
+ */
 export function useMergedProjects({ localProjects = [], sharedProjects = [], configured = false, filters } = {}) {
   const { query = '', location = 'all', sort = 'activity' } = filters || {};
   return useMemo(() => {
