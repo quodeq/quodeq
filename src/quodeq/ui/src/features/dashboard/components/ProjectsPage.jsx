@@ -513,12 +513,14 @@ function ProjectsToolbar({ filters = {}, onFiltersChange, configured, lastSynced
         value={query}
         onChange={(e) => set({ query: e.target.value })}
       />
-      <FilterPill
-        label="location"
-        value={location}
-        options={['all', 'local', 'shared']}
-        onChange={(loc) => set({ location: loc })}
-      />
+      {configured && (
+        <FilterPill
+          label="location"
+          value={location}
+          options={['all', 'local', 'shared']}
+          onChange={(loc) => set({ location: loc })}
+        />
+      )}
       <FilterPill
         label="sort"
         value={sort}
@@ -633,12 +635,18 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
 
   // Location-filtered and sorted, but NOT query-filtered yet -- query
   // matching needs subproject-group awareness (see `entries` below), which
-  // useMergedProjects has no notion of.
+  // useMergedProjects has no notion of. With no shared repo configured the
+  // location filter is forced to 'all': the pill to change it is hidden
+  // then, and a leftover location=shared in the nav params would otherwise
+  // blank the page with no visible control to clear it.
   const locationFilteredEntries = useMergedProjects({
     localProjects: projectsWithPublished,
     sharedProjects: shared.projects,
     configured: shared.configured,
-    filters: { location: filters?.location, sort: filters?.sort },
+    filters: {
+      location: shared.configured ? filters?.location : 'all',
+      sort: filters?.sort,
+    },
   });
 
   // Subproject nesting: computed over the same flat local list the merge
@@ -658,13 +666,21 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
   // the current query only matches its parent (or only matches a sibling) --
   // otherwise a matching parent would render children with no chips/button
   // at all the moment a query excluded the child's own entry.
+  // Chips are stripped here (and at the root-card site below) when no
+  // shared repo is configured: every card would read LOCAL, which
+  // distinguishes nothing.
   const localEntryById = useMemo(() => {
     const map = new Map();
     for (const e of allEntries) {
-      if (e.local) map.set(e.local.id || e.local.name || e.local, e);
+      if (e.local) {
+        map.set(
+          e.local.id || e.local.name || e.local,
+          shared.configured ? e : { ...e, chips: null },
+        );
+      }
     }
     return map;
-  }, [allEntries]);
+  }, [allEntries, shared.configured]);
 
   // Group-aware query filter: a name search must not hide a whole
   // parent/child group just because only one side of it matched. A parent
@@ -810,7 +826,7 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
                       }}
                       publishActions={publishActions}
                       action={entry.action}
-                      chips={entry.chips}
+                      chips={shared.configured ? entry.chips : null}
                       publishedAt={entry.local?.publishedAt ?? entry.shared?.publishedAt}
                       entryLookup={localEntryById}
                     />

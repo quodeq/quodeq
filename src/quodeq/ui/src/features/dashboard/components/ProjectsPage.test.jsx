@@ -156,6 +156,40 @@ describe('ProjectsPage — merged list, no tabs', () => {
     expect(onFiltersChange).toHaveBeenCalledWith({ query: '', location: 'all', sort: 'score' });
   });
 
+  it('hides provenance badges and the location pill when no shared repo is configured', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: false, url: null })),
+    });
+    renderWithApi(
+      <ProjectsPage projects={[{ id: 'a', name: 'solo', latestDate: '2026-07-19' }]} actions={{}} />,
+      fakeApi,
+    );
+    await waitFor(() => expect(screen.getByText('solo')).toBeInTheDocument());
+    // Without a shared repo every card would read LOCAL -- pure noise.
+    expect(screen.queryByText('LOCAL')).toBeNull();
+    expect(screen.queryByRole('button', { name: /location:/ })).toBeNull();
+    // Search and sort remain.
+    expect(screen.getByLabelText('filter projects by name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /sort:/ })).toBeInTheDocument();
+  });
+
+  it('ignores a stale location filter when no shared repo is configured', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: false, url: null })),
+    });
+    renderWithApi(
+      <ProjectsPage
+        projects={[{ id: 'a', name: 'solo', latestDate: '2026-07-19' }]}
+        filters={{ query: '', location: 'shared', sort: 'activity' }}
+        actions={{}}
+      />,
+      fakeApi,
+    );
+    // A leftover location=shared from before disconnecting must not blank
+    // the page now that the pill to clear it is hidden.
+    await waitFor(() => expect(screen.getByText('solo')).toBeInTheDocument());
+  });
+
   it('shows LOCAL / PUBLISHED / REMOTE state badges on the cards', async () => {
     const fakeApi = makeFakeApi({
       getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://x/r.git', publish: { state: 'idle' } })),
