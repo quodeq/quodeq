@@ -2,25 +2,29 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 
 /**
- * useSharedProjects — status + project list backing the Projects page
- * "online" sub-tab. Wraps the Task 15 shared-repo API client
- * (getSharedStatus, sharedListProjects, connectShared, refreshShared,
- * pullSharedProject) behind a small local state machine.
+ * useSharedProjects — shared-repo status + project list for the merged
+ * Projects page (one list, no tabs -- see ProjectsPage.jsx). Feeds
+ * shared-only cards, the toolbar's SyncedIndicator, and -- via
+ * useMergedProjects -- every local card's chips/action. Wraps the Task 15
+ * shared-repo API client (getSharedStatus, sharedListProjects,
+ * connectShared, refreshShared, pullSharedProject) behind a small local
+ * state machine.
  *
  * Cached-first mount: the very first project-list fetch always passes
  * `refresh: false` so the UI renders instantly from whatever the server
  * already has cached, never blocking on a synchronous git fetch. Once that
  * cached render lands, a background `refresh()` kicks off automatically
  * (only when a shared repo is configured) to revalidate against the remote,
- * via `refreshShared()`. Every other re-list (after connect, or the explicit
- * refresh button) also passes `refresh: false`; `refreshShared()` is what
- * triggers the real remote fetch.
+ * via `refreshShared()`. Every other re-list (after connect, after a publish
+ * job completes, or the explicit toolbar refresh button) also passes
+ * `refresh: false`; `refreshShared()` is what triggers the real remote
+ * fetch.
  *
  * Error handling has two tiers: a failed *initial* load (status or the
  * first list) surfaces `error` since there's nothing to show yet. A failed
- * *refresh* of an already-loaded tab does NOT blank the view -- it flags
- * `stale` so the page can render the "refresh failed, showing results
- * synced <time> ago" banner over the still-valid last-known listing.
+ * *refresh* of an already-loaded page does NOT blank the view -- it flags
+ * `stale` so the toolbar's SyncedIndicator can show "synced <time> ago ·
+ * stale" over the still-valid last-known listing.
  */
 export function useSharedProjects() {
   const { getSharedStatus, sharedListProjects, connectShared, refreshShared, pullSharedProject } = useApi();

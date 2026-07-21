@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { gradeLabel, gradeLetter, extDisplayName } from '../../../utils/formatters.js';
 import { TermHeader } from '../../../components/terminal/index.js';
@@ -111,7 +111,7 @@ function LocalPublishedMeta({ publishedAt }) {
   return <div className="project-card-published-meta">published {rel}</div>;
 }
 
-function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildren, chips }) {
+function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildren, chips, publishedAt }) {
   const { onSelect, footer, isChild = false, onResumeSetup } = cardProps;
   const id = project.id || project.name || project;
   const name = project.name || project;
@@ -119,6 +119,11 @@ function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildr
   const score = project.latestScore != null ? parseFloat(project.latestScore).toFixed(1) : null;
   const date = formatDate(project.latestDate);
   const discipline = disciplineLabel(project.discipline);
+  // Prefer the caller's resolved publishedAt (which falls back to the
+  // merged entry's `shared.publishedAt` for origin-URL matches -- see
+  // ProjectsPage's per-entry `publishedAt` computation) over the raw
+  // project field, which is only ever populated for id-matched publishes.
+  const resolvedPublishedAt = publishedAt !== undefined ? publishedAt : project.publishedAt;
 
   return (
     <div className={`project-card${isChild ? ' project-card--child' : ''} panel${isSelected ? ' project-card--selected' : ''}`}>
@@ -165,9 +170,9 @@ function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildr
         <div className="project-card-bottom">
           <LanguageNumbers stats={project.languageStats} filesCount={project.filesCount} />
           {chips === 'shared' ? (
-            <PublishedMeta publishedBy={project.publishedBy} publishedAt={project.publishedAt} />
+            <PublishedMeta publishedBy={project.publishedBy} publishedAt={resolvedPublishedAt} />
           ) : (
-            <LocalPublishedMeta publishedAt={project.publishedAt} />
+            <LocalPublishedMeta publishedAt={resolvedPublishedAt} />
           )}
           {cardChildren}
         </div>
@@ -310,12 +315,18 @@ function ProjectChildren({ childList, selectedProject, onSelect, confirmActions,
       {childList.map((child) => {
         const childId = child.id || child.name || child;
         const childEntry = entryLookup?.get(childId);
+        // Origin-URL-matched shared entries never share the child's own id,
+        // so child.publishedAt (only set for id matches, see usePublish's
+        // publishedAtByProject) misses them -- fall back to the merged
+        // entry's shared side.
+        const childPublishedAt = child.publishedAt ?? childEntry?.shared?.publishedAt;
         return (
           <div key={childId} className="project-child-entry">
             <ProjectCard
               project={child}
               isSelected={childId === selectedProject}
               chips={childEntry?.chips}
+              publishedAt={childPublishedAt}
               cardProps={{
                 onSelect, isChild: true, onResumeSetup,
                 footer: <CardFooter name={childId} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} publishActions={publishActions} action={childEntry?.action} />,
@@ -331,7 +342,7 @@ function ProjectChildren({ childList, selectedProject, onSelect, confirmActions,
 // entryLookup (local id/name -> merged entry) lets both this root card and
 // its nested subprojects (see ProjectChildren) show their own derived
 // chips/action instead of one blanket value for the whole group.
-function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, dialogActions, onResumeSetup, publishActions, action, chips, entryLookup }) {
+function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, dialogActions, onResumeSetup, publishActions, action, chips, publishedAt, entryLookup }) {
   const { confirmActions, relocateActions } = dialogActions;
   const { confirming, setConfirming, onDelete, onExport } = confirmActions;
   const id = p.id || p.name || p;
@@ -340,7 +351,7 @@ function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelec
   const childSelected = hasChildren && childProjects[id].some((c) => (c.id || c.name || c) === selectedProject);
   return (
     <div key={id} className={`project-card-group${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}>
-      <ProjectCard project={p} isSelected={isSelected} chips={chips} cardProps={{ onSelect, onResumeSetup, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} publishActions={publishActions} action={action} /> }}>
+      <ProjectCard project={p} isSelected={isSelected} chips={chips} publishedAt={publishedAt} cardProps={{ onSelect, onResumeSetup, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} publishActions={publishActions} action={action} /> }}>
         <ProjectPathContent id={id} p={p} relocateActions={relocateActions} subprojectCount={hasChildren ? childProjects[id].length : 0} />
       </ProjectCard>
       {hasChildren && (
@@ -437,7 +448,7 @@ function OnlineCardFooter({ projectId, onPull, pullConflict, onConfirmCopy, onCa
 // Controlled entirely by the `filters` prop -- state lives one level up in
 // the nav stack (see actions.onFiltersChange), not here.
 
-function ProjectsToolbar({ filters = {}, onFiltersChange, lastSynced, stale, refreshing, onRefresh }) {
+function ProjectsToolbar({ filters = {}, onFiltersChange, configured, lastSynced, stale, refreshing, onRefresh }) {
   const { query = '', location = 'all', sort = 'activity' } = filters;
   const set = (patch) => onFiltersChange?.({ query, location, sort, ...patch });
   return (
@@ -446,6 +457,7 @@ function ProjectsToolbar({ filters = {}, onFiltersChange, lastSynced, stale, ref
         type="text"
         className="projects-toolbar-search"
         placeholder="filter by name"
+        aria-label="filter projects by name"
         value={query}
         onChange={(e) => set({ query: e.target.value })}
       />
@@ -462,24 +474,35 @@ function ProjectsToolbar({ filters = {}, onFiltersChange, lastSynced, stale, ref
           </button>
         ))}
       </div>
-      <select value={sort} onChange={(e) => set({ sort: e.target.value })} aria-label="sort projects">
+      <select
+        className="projects-toolbar-sort"
+        value={sort}
+        onChange={(e) => set({ sort: e.target.value })}
+        aria-label="sort projects"
+      >
         <option value="activity">recent activity</option>
         <option value="name">name</option>
         <option value="score">score</option>
       </select>
-      <SyncedIndicator lastSynced={lastSynced} stale={stale} refreshing={refreshing} onRefresh={onRefresh} />
+      <SyncedIndicator configured={configured} lastSynced={lastSynced} stale={stale} refreshing={refreshing} onRefresh={onRefresh} />
     </div>
   );
 }
 
 // "syncing…" while a background refresh is in flight, else "synced <relative
-// time>" (+ " · stale" when the last refresh failed) -- the merged list's
-// only sync-status surface now that the old online sub-tab (and its
-// "refresh failed, showing results synced..." banner) is gone.
-function SyncedIndicator({ lastSynced, stale, refreshing, onRefresh }) {
+// time>" (+ " · stale" when the last refresh failed), or "not synced yet"
+// before the first list has ever landed -- the merged list's only
+// sync-status surface now that the old online sub-tab (and its "refresh
+// failed, showing results synced..." banner) is gone. Renders nothing at
+// all (refresh button included) when no shared repo is configured -- there
+// is nothing to sync.
+function SyncedIndicator({ configured, lastSynced, stale, refreshing, onRefresh }) {
+  if (!configured) return null;
   const label = refreshing
     ? 'syncing…'
-    : `synced ${relativeTime(lastSynced) || 'just now'}${stale ? ' · stale' : ''}`;
+    : lastSynced == null
+      ? 'not synced yet'
+      : `synced ${relativeTime(lastSynced)}${stale ? ' · stale' : ''}`;
   return (
     <span className="projects-toolbar-sync">
       <span className="projects-toolbar-sync-label">{label}</span>
@@ -524,6 +547,22 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
     publish,
   } = usePublish({ enabled: projects.length > 0 });
 
+  // Important-2 (review): usePublish's own re-fetch on job completion only
+  // updates ITS `publishedAtByProject` map -- useSharedProjects' list (which
+  // useMergedProjects reads to derive each entry's chips/action) is never
+  // re-fetched by a publish completing, so a card would keep showing a live
+  // 'publish'/'update' button with stale chips after the job finishes.
+  // Refresh the shared list exactly once per completion; the ref (not
+  // state) means re-renders while publishState stays 'done' don't re-fire
+  // it.
+  const prevPublishStateRef = useRef(publishState);
+  useEffect(() => {
+    if (publishState === 'done' && prevPublishStateRef.current !== 'done') {
+      shared.refresh();
+    }
+    prevPublishStateRef.current = publishState;
+  }, [publishState, shared.refresh]);
+
   // Local project objects never carry publishedAt on their own (it lives
   // only on the shared list's git-log-derived metadata) -- merge it in by
   // id/name so ProjectCard can read `project.publishedAt` uniformly, and so
@@ -538,15 +577,30 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
     });
   }, [projects, publishedAtByProject, sharedConfigured]);
 
-  const entries = useMergedProjects({
+  // The full merge with no filters applied at all -- the basis for (a) the
+  // id->entry lookup nested subproject cards read chips/action from
+  // regardless of what the current query/location filter out, and (b) the
+  // "is there anything at all" check that decides between the empty-CTA and
+  // the toolbar's own no-matches line (see `localEntryById` and `isEmpty`
+  // below).
+  const allEntries = useMergedProjects({
     localProjects: projectsWithPublished,
     sharedProjects: shared.projects,
     configured: shared.configured,
-    filters,
   });
 
-  // Subproject nesting: computed over the same flat local list `entries`
-  // merges from, so a child project's own derived chips/action (looked up
+  // Location-filtered and sorted, but NOT query-filtered yet -- query
+  // matching needs subproject-group awareness (see `entries` below), which
+  // useMergedProjects has no notion of.
+  const locationFilteredEntries = useMergedProjects({
+    localProjects: projectsWithPublished,
+    sharedProjects: shared.projects,
+    configured: shared.configured,
+    filters: { location: filters?.location, sort: filters?.sort },
+  });
+
+  // Subproject nesting: computed over the same flat local list the merge
+  // draws from, so a child project's own derived chips/action (looked up
   // via `localEntryById`) stay in sync with its parent's.
   const { children } = useMemo(() => computeProjectTree(projectsWithPublished), [projectsWithPublished]);
   const childIdSet = useMemo(() => {
@@ -556,13 +610,40 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
     }
     return set;
   }, [children]);
+
+  // Built from the UNFILTERED merge (not the query-filtered `entries` below)
+  // so a subproject keeps its own chips/publish-or-update action even when
+  // the current query only matches its parent (or only matches a sibling) --
+  // otherwise a matching parent would render children with no chips/button
+  // at all the moment a query excluded the child's own entry.
   const localEntryById = useMemo(() => {
     const map = new Map();
-    for (const e of entries) {
+    for (const e of allEntries) {
       if (e.local) map.set(e.local.id || e.local.name || e.local, e);
     }
     return map;
-  }, [entries]);
+  }, [allEntries]);
+
+  // Group-aware query filter: a name search must not hide a whole
+  // parent/child group just because only one side of it matched. A parent
+  // entry survives the query if its own name matches OR any of its
+  // children's does; children are always excluded from top-level rendering
+  // below regardless of their own match (see `visibleEntries`) since they
+  // render nested under their parent, so their individual match status
+  // doesn't otherwise matter here.
+  const query = (filters?.query || '').trim().toLowerCase();
+  const entries = useMemo(() => {
+    if (!query) return locationFilteredEntries;
+    const matches = (displayName, name) =>
+      (displayName || '').toLowerCase().includes(query) || (name || '').toLowerCase().includes(query);
+    return locationFilteredEntries.filter((e) => {
+      if (matches(e.displayName, e.name)) return true;
+      if (!e.local) return false;
+      const localId = e.local.id || e.local.name || e.local;
+      const childList = children[localId];
+      return !!childList && childList.some((c) => matches(c.displayName, c.name));
+    });
+  }, [locationFilteredEntries, query, children]);
 
   const publishActions = {
     publishState,
@@ -607,7 +688,11 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
     }
   }
 
-  const isEmpty = projects.length === 0 && entries.length === 0;
+  // Based on the UNFILTERED merge -- filtering everything out must never
+  // show the "add your first project" CTA (there's no way to clear a filter
+  // from there); that's the post-filter "no projects match" line below
+  // instead. The CTA is only for a page with truly nothing on it at all.
+  const isEmpty = allEntries.length === 0;
   // Child (subproject) entries render nested under their root via
   // ProjectCardGroup/ProjectChildren, not as their own top-level card.
   const visibleEntries = entries.filter(
@@ -657,6 +742,7 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
           <ProjectsToolbar
             filters={filters}
             onFiltersChange={onFiltersChange}
+            configured={shared.configured}
             lastSynced={shared.lastSynced}
             stale={shared.stale}
             refreshing={shared.refreshing}
@@ -683,6 +769,7 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
                       publishActions={publishActions}
                       action={entry.action}
                       chips={entry.chips}
+                      publishedAt={entry.local?.publishedAt ?? entry.shared?.publishedAt}
                       entryLookup={localEntryById}
                     />
                   );

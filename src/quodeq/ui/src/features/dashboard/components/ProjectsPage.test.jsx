@@ -79,6 +79,9 @@ describe('ProjectsPage — merged list, no tabs', () => {
       fakeApi,
     );
     expect(screen.queryByRole('tablist')).toBeNull();
+    // a11y: the search input names itself for screen readers instead of
+    // relying on the visible placeholder alone.
+    expect(screen.getByLabelText('filter projects by name')).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText('app')).toBeInTheDocument();
       expect(screen.getByText('lib')).toBeInTheDocument();
@@ -417,5 +420,193 @@ describe('ProjectsPage — publish action (local cards)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // Important 2 (final whole-branch review): useSharedProjects' own list is
+  // never re-fetched by usePublish completing on its own (usePublish's
+  // fetchSharedList is a separate call feeding a separate map) -- without
+  // ProjectsPage explicitly refreshing it, a card would keep showing a live
+  // 'publish'/'update' button and stale chips after the job finishes.
+  it('post-publish: a completed job triggers exactly one shared.refresh() call that re-fetches the list', async () => {
+    vi.useFakeTimers();
+    try {
+      let publishDone = false;
+      const getSharedStatus = vi.fn(async () => ({
+        configured: true,
+        publish: publishDone
+          ? { state: 'done', project: 'p1', runs: 2 }
+          : { state: 'idle', project: null, runs: null, error: null, finishedAt: null },
+      }));
+      const sharedListProjects = vi.fn(async () => ({ projects: [], lastSynced: null, stale: false }));
+      const refreshShared = vi.fn(async () => ({ stale: false, lastSynced: '2026-07-19T00:00:00Z' }));
+      const fakeApi = configuredLocalApi({ getSharedStatus, sharedListProjects, refreshShared });
+      renderWithApi(<ProjectsPage projects={localProjects} actions={{}} />, fakeApi);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(screen.getAllByRole('button', { name: 'publish' })).toHaveLength(2);
+
+      // Isolate the post-publish refresh from useSharedProjects' own
+      // mount-time background revalidate, which also calls these mocks.
+      refreshShared.mockClear();
+      sharedListProjects.mockClear();
+
+      fireEvent.click(screen.getAllByRole('button', { name: 'publish' })[0]);
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(fakeApi.publishProject).toHaveBeenCalledWith('p1');
+
+      publishDone = true;
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+      expect(refreshShared).toHaveBeenCalledTimes(1);
+      expect(sharedListProjects).toHaveBeenCalled();
+
+      // A further tick with publishState still 'done' (no new completion)
+      // must not re-fire the refresh -- re-renders alone don't re-trigger it.
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(refreshShared).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+// Review findings 3 & 4 (final whole-branch review): group-aware query
+// filtering for parent/subproject entries, and the empty-CTA filter trap.
+describe('ProjectsPage — group-aware filtering and the empty-filter trap', () => {
+  const subprojectLocals = [
+    { id: 'root-1', name: 'monorepo', latestDate: '2026-07-19T00:00:00Z' },
+    { id: 'child-1', name: 'child-widget', parent: 'root-1', latestDate: '2026-07-18T00:00:00Z' },
+  ];
+
+  function configuredNoSharedApi(overrides = {}) {
+    return makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
+      sharedListProjects: vi.fn(async () => ({ projects: [], lastSynced: '2026-07-17T00:00:00Z', stale: false })),
+      ...overrides,
+    });
+  }
+
+  it('a query matching only a subproject keeps the whole parent/child group visible (no false-negative "no matches")', async () => {
+    const fakeApi = configuredNoSharedApi();
+    renderWithApi(
+      <ProjectsPage
+        projects={subprojectLocals}
+        filters={{ query: 'widget', location: 'all', sort: 'activity' }}
+        actions={{}}
+      />,
+      fakeApi,
+    );
+
+    await waitFor(() => expect(screen.getByText('monorepo')).toBeInTheDocument());
+    expect(screen.getByText('child-widget')).toBeInTheDocument();
+    expect(screen.queryByText('no projects match your filters.')).not.toBeInTheDocument();
+  });
+
+  it('a query matching only the parent leaves the child with its own chips/action intact', async () => {
+    const fakeApi = configuredNoSharedApi();
+    renderWithApi(
+      <ProjectsPage
+        projects={subprojectLocals}
+        filters={{ query: 'monorepo', location: 'all', sort: 'activity' }}
+        actions={{}}
+      />,
+      fakeApi,
+    );
+
+    await waitFor(() => expect(screen.getByText('monorepo')).toBeInTheDocument());
+    expect(screen.getByText('child-widget')).toBeInTheDocument();
+    // Both the parent's and the child's own publish button must still be
+    // present -- before the fix, the child's entry (and its action) was
+    // built from the post-filter list and vanished the moment the query
+    // excluded the child's own name.
+    expect(screen.getAllByRole('button', { name: 'publish' })).toHaveLength(2);
+  });
+
+  it('filtering everything out keeps the toolbar mounted and shows a no-match line, not the empty-CTA', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
+      sharedListProjects: vi.fn(async () => ({
+        projects: [{ id: 'shared-1', name: 'demo-repo', publishedBy: 'ana', publishedAt: '2026-07-16T00:00:00Z' }],
+        lastSynced: '2026-07-17T00:00:00Z',
+        stale: false,
+      })),
+    });
+    renderWithApi(
+      <ProjectsPage
+        projects={[]}
+        filters={{ query: 'nomatch', location: 'all', sort: 'activity' }}
+        actions={{}}
+      />,
+      fakeApi,
+    );
+
+    await waitFor(() => expect(screen.getByText('no projects match your filters.')).toBeInTheDocument());
+    expect(screen.queryByText('Add your first project')).not.toBeInTheDocument();
+    // The toolbar (search input included) must stay mounted so the filter
+    // that caused this can actually be cleared.
+    expect(screen.getByLabelText('filter projects by name')).toBeInTheDocument();
+  });
+});
+
+// Review finding 7 (final whole-branch review): the "published <age>"
+// decoration must also work for shared matches found by originUrl, not just
+// by id (usePublish's own publishedAtByProject is keyed by the SHARED
+// entry's id, which an originUrl match never shares with the local id).
+describe('ProjectsPage — published-age on originUrl-matched cards', () => {
+  it('shows "published <time>" for a local card matched to a shared entry with a different id via originUrl', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
+      sharedListProjects: vi.fn(async () => ({
+        projects: [{
+          id: 'remote-9',
+          name: 'app',
+          originUrl: 'https://github.com/org/app.git',
+          publishedAt: '2026-07-10T00:00:00Z',
+        }],
+        lastSynced: '2026-07-17T00:00:00Z',
+        stale: false,
+      })),
+    });
+    renderWithApi(
+      <ProjectsPage
+        projects={[{
+          id: 'local-1',
+          name: 'app',
+          originUrl: 'https://github.com/org/app',
+          latestDate: '2026-07-19T00:00:00Z',
+        }]}
+        actions={{}}
+      />,
+      fakeApi,
+    );
+
+    await waitFor(() => expect(screen.getByText(/published /)).toBeInTheDocument());
+  });
+});
+
+// Review finding 8 (final whole-branch review): SyncedIndicator wording and
+// visibility.
+describe('ProjectsPage — SyncedIndicator: "not synced yet" and unconfigured hiding', () => {
+  it('shows "not synced yet" (never "just now") when nothing has synced', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
+      sharedListProjects: vi.fn(async () => ({ projects: [], lastSynced: null, stale: false })),
+    });
+    renderWithApi(<ProjectsPage projects={[{ id: 'a', name: 'app' }]} actions={{}} />, fakeApi);
+
+    await waitFor(() => expect(screen.getByText('not synced yet')).toBeInTheDocument());
+    expect(screen.queryByText(/just now/)).not.toBeInTheDocument();
+  });
+
+  it('hides the sync indicator and its refresh button entirely when no shared repo is configured', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: false, url: null })),
+    });
+    renderWithApi(<ProjectsPage projects={[{ id: 'a', name: 'app' }]} actions={{}} />, fakeApi);
+
+    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: 'refresh' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/synced|not synced yet|syncing/)).not.toBeInTheDocument();
   });
 });
