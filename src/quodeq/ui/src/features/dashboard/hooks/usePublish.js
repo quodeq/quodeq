@@ -13,7 +13,8 @@ function buildPublishedAtMap(list) {
 }
 
 /**
- * usePublish -- the LOCAL Projects tab's publish action + job progress.
+ * usePublish -- publish action + job progress for local cards on the merged
+ * Projects page (one list, no tabs -- see ProjectsPage.jsx).
  *
  * Local project cards need two things the plain /api/projects listing never
  * carries: whether a shared repo is configured at all (to decide whether the
@@ -21,11 +22,10 @@ function buildPublishedAtMap(list) {
  * on the SHARED project list (git log of the clone -- see
  * services/shared_repo.py's published_meta()). This hook fetches both with
  * `refresh: false` -- it must never force an actual git fetch of the remote
- * just because the user is looking at their LOCAL projects; that stays
- * exclusively the online sub-tab's job (see useSharedProjects.js's
- * refresh-on-entry contract). `enabled` lets the caller skip this fetch
- * entirely when there is nothing to decorate (e.g. the online sub-tab is
- * active, or there are no local projects yet).
+ * just because a local card is rendering; that stays exclusively
+ * useSharedProjects' background-refresh job (see that hook's own doc
+ * comment). `enabled` lets the caller skip this fetch entirely when there
+ * is nothing to decorate (e.g. there are no local projects yet).
  *
  * The publish trigger and its job-progress polling live here rather than in
  * a component per the Task 20 design: a single publish job is global to the
@@ -161,8 +161,8 @@ export function usePublish({ enabled = true } = {}) {
       mountedRef.current = false;
       stopPolling();
     };
-    // Runs once per mount (or when `enabled` flips true) -- see the
-    // refresh-on-entry-style note above.
+    // Runs once per mount (or when `enabled` flips true) -- see the hook's
+    // own doc comment above for why this always fetches with refresh:false.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled]);
 

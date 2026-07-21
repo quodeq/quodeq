@@ -330,21 +330,22 @@ describe('buildNavigationBundle', () => {
     isEvaluating: false, showToast: vi.fn(), setWizardEntry: vi.fn(),
   });
 
-  it('forwards handleNavigateReplace from state (repositories tab flips die without it)', () => {
+  it('forwards handleNavigateReplace from state (repositories filter flips die without it)', () => {
     const state = stubState();
     const bundle = build(state);
-    bundle.handleNavigateReplace('projects', { sourceTab: 'online' });
-    expect(state.handleNavigateReplace).toHaveBeenCalledWith('projects', { sourceTab: 'online' });
+    bundle.handleNavigateReplace('projects', { filters: { query: '', location: 'shared', sort: 'activity' } });
+    expect(state.handleNavigateReplace).toHaveBeenCalledWith('projects', { filters: { query: '', location: 'shared', sort: 'activity' } });
   });
 
-  it("projects route's onTabChange reaches state.handleNavigateReplace through the real bundle", () => {
+  it("projects route's onFiltersChange reaches state.handleNavigateReplace through the real bundle", () => {
     // Producer x consumer: the element ROUTE_RENDERERS.projects builds must
     // find every navigation key it consumes in the bundle App actually
     // provides -- this is the seam the #819 regression slipped through.
     const state = stubState();
     const el = ROUTE_RENDERERS.projects({}, { navigation: build(state) });
-    el.props.actions.onTabChange('online');
-    expect(state.handleNavigateReplace).toHaveBeenCalledWith('projects', { sourceTab: 'online' });
+    const filters = { query: '', location: 'shared', sort: 'activity' };
+    el.props.actions.onFiltersChange(filters);
+    expect(state.handleNavigateReplace).toHaveBeenCalledWith('projects', { filters });
     expect(state.handleNavigate).not.toHaveBeenCalled();
   });
 });

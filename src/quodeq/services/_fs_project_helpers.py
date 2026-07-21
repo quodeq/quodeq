@@ -99,6 +99,7 @@ def _build_project_entry(
         latest_score=latest_score,
         language_stats=_read_language_stats(reports_root, entry_name, runs),
         onboarding_completed_at=info.get("onboardingCompletedAt"),
+        origin_url=info.get("originUrl"),
     )
 
 

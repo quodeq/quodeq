@@ -39,3 +39,4 @@ class ProjectEntry:
     total_files: int | None = None
     analyzed_files: int | None = None
     onboarding_completed_at: str | None = None
+    origin_url: str | None = None

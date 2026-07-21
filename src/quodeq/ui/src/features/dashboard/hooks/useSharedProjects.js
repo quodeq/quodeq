@@ -2,24 +2,29 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 
 /**
- * useSharedProjects — status + project list backing the Projects page
- * "online" sub-tab. Wraps the Task 15 shared-repo API client
- * (getSharedStatus, sharedListProjects, connectShared, refreshShared,
- * pullSharedProject) behind a small local state machine.
+ * useSharedProjects — shared-repo status + project list for the merged
+ * Projects page (one list, no tabs -- see ProjectsPage.jsx). Feeds
+ * shared-only cards, the toolbar's SyncedIndicator, and -- via
+ * useMergedProjects -- every local card's chips/action. Wraps the Task 15
+ * shared-repo API client (getSharedStatus, sharedListProjects,
+ * connectShared, refreshShared, pullSharedProject) behind a small local
+ * state machine.
  *
- * Refresh-on-entry: the online tab only mounts this hook while it is the
- * active sub-tab (see ProjectsPage.jsx), so a fresh mount really does mean
- * "the user just walked in" -- the very first project-list fetch asks the
- * server to pull the shared repo before listing (`refresh: true`). Every
- * later re-list (after connect, or the explicit refresh button) passes
- * `refresh: false`; the explicit `refresh()` action is what triggers another
- * real remote fetch, via `refreshShared()`.
+ * Cached-first mount: the very first project-list fetch always passes
+ * `refresh: false` so the UI renders instantly from whatever the server
+ * already has cached, never blocking on a synchronous git fetch. Once that
+ * cached render lands, a background `refresh()` kicks off automatically
+ * (only when a shared repo is configured) to revalidate against the remote,
+ * via `refreshShared()`. Every other re-list (after connect, after a publish
+ * job completes, or the explicit toolbar refresh button) also passes
+ * `refresh: false`; `refreshShared()` is what triggers the real remote
+ * fetch.
  *
  * Error handling has two tiers: a failed *initial* load (status or the
  * first list) surfaces `error` since there's nothing to show yet. A failed
- * *refresh* of an already-loaded tab does NOT blank the view -- it flags
- * `stale` so the page can render the "refresh failed, showing results
- * synced <time> ago" banner over the still-valid last-known listing.
+ * *refresh* of an already-loaded page does NOT blank the view -- it flags
+ * `stale` so the toolbar's SyncedIndicator can show "synced <time> ago ·
+ * stale" over the still-valid last-known listing.
  */
 export function useSharedProjects() {
   const { getSharedStatus, sharedListProjects, connectShared, refreshShared, pullSharedProject } = useApi();
@@ -34,11 +39,6 @@ export function useSharedProjects() {
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Guards the refresh-on-entry contract: true once this hook instance has
-  // issued its first list fetch, so a later relist (post-connect, after a
-  // pull) doesn't re-force refresh=1.
-  const enteredRef = useRef(false);
 
   // In-flight guards: aria-disabled on the triggering button does not stop
   // a click in this codebase's convention (buttons stay clickable so their
@@ -68,41 +68,17 @@ export function useSharedProjects() {
       setConfigured(!!data?.configured);
       setUrl(data?.url ?? null);
       if (data?.configured) {
-        const refresh = !enteredRef.current;
-        enteredRef.current = true;
-        await fetchList(refresh);
+        await fetchList(false);
+        return true;
       }
+      return false;
     } catch (err) {
       setError(err?.message || 'failed to load shared repository status');
+      return false;
     } finally {
       setLoading(false);
     }
   }, [getSharedStatus, fetchList]);
-
-  useEffect(() => {
-    loadStatus();
-    // Runs once per mount -- see refresh-on-entry note above.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const connect = useCallback(async (nextUrl) => {
-    if (connectingRef.current) return; // already connecting -- ignore the repeat click/Enter
-    connectingRef.current = true;
-    setConnecting(true);
-    setConnectError(null);
-    try {
-      await connectShared(nextUrl);
-      // A fresh connection is a fresh "entry" -- force the next list fetch
-      // to refresh=1 rather than serving whatever the prior repo's cache was.
-      enteredRef.current = false;
-      await loadStatus();
-    } catch (err) {
-      setConnectError(err?.message || 'failed to connect');
-    } finally {
-      connectingRef.current = false;
-      setConnecting(false);
-    }
-  }, [connectShared, loadStatus]);
 
   const refresh = useCallback(async () => {
     if (refreshingRef.current) return; // already refreshing -- ignore the repeat click
@@ -121,6 +97,35 @@ export function useSharedProjects() {
       setRefreshing(false);
     }
   }, [refreshShared, fetchList]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const configuredNow = await loadStatus();
+      // Background revalidate: the cached list is already on screen; a failed
+      // refresh just flags stale (see refresh()).
+      if (configuredNow && !cancelled) refresh();
+    })();
+    return () => { cancelled = true; };
+    // Runs once per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const connect = useCallback(async (nextUrl) => {
+    if (connectingRef.current) return; // already connecting -- ignore the repeat click/Enter
+    connectingRef.current = true;
+    setConnecting(true);
+    setConnectError(null);
+    try {
+      await connectShared(nextUrl);
+      await loadStatus();
+    } catch (err) {
+      setConnectError(err?.message || 'failed to connect');
+    } finally {
+      connectingRef.current = false;
+      setConnecting(false);
+    }
+  }, [connectShared, loadStatus]);
 
   const pull = useCallback(async (projectId, action) => {
     if (pullingRef.current) return; // a pull is already in flight -- ignore the repeat click

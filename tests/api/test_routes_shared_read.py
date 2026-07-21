@@ -98,7 +98,7 @@ def shared_clone_fixture(tmp_path, monkeypatch):
     (run_dir / "evidence").mkdir(parents=True)
     (run_dir / "evidence" / "manifest.json").write_text("{}", encoding="utf-8")
     (project_dir / "repository_info.json").write_text(
-        json.dumps({"name": "proj-a"}), encoding="utf-8",
+        json.dumps({"name": "proj-a", "originUrl": "https://github.com/example/proj-a.git"}), encoding="utf-8",
     )
     (run_dir / "status.json").write_text(
         json.dumps({"state": "done", "schema_version": 2}), encoding="utf-8",
@@ -486,3 +486,16 @@ def test_shared_verified_findings_empty(client, shared_clone_fixture):
 def test_shared_dismissed_findings_invalid_segment(client, shared_clone_fixture):
     resp = client.get("/api/shared/projects/%2e%2e/findings/dismissed")
     assert resp.status_code == 400
+
+
+def test_shared_projects_expose_origin_url_and_score_fields(client, shared_clone_fixture):
+    resp = client.get("/api/shared/projects")
+    assert resp.status_code == 200
+    proj = next(
+        p for p in resp.get_json()["projects"]
+        if (p.get("id") or p.get("name")) == "proj-a"
+    )
+    assert proj.get("originUrl") == "https://github.com/example/proj-a.git"
+    # Regression lock: shared listings compute scores from the clone-scoped
+    # score cache; the merge UI sorts on this field.
+    assert "latestScore" in proj

@@ -40,20 +40,32 @@ function wrap(fakeApi, children) {
 }
 
 describe('useSharedProjects', () => {
-  it('loads status then lists projects with refresh=1 on mount (refresh-on-entry)', async () => {
+  it('lists from cache on mount and refreshes in the background (never blocks)', async () => {
     const fakeApi = makeFakeApi();
     const { result } = renderHook(() => useSharedProjects(), {
       wrapper: ({ children }) => wrap(fakeApi, children),
     });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(fakeApi.getSharedStatus).toHaveBeenCalledTimes(1);
-    expect(fakeApi.sharedListProjects).toHaveBeenCalledWith({ refresh: true });
-    expect(result.current.configured).toBe(true);
-    expect(result.current.url).toBe('https://github.com/team/results.git');
-    expect(result.current.projects).toHaveLength(1);
-    expect(result.current.lastSynced).toBe('2026-07-16T00:00:00Z');
-    expect(result.current.stale).toBe(false);
+    // First render comes from cache — regression lock for the blocking-load bug.
+    expect(fakeApi.sharedListProjects).toHaveBeenCalledWith({ refresh: false });
+    expect(fakeApi.sharedListProjects).not.toHaveBeenCalledWith({ refresh: true });
+
+    // Background revalidate: refreshShared fires after the cached render, then re-lists.
+    await waitFor(() => expect(fakeApi.refreshShared).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(2));
+  });
+
+  it('does not fire a background refresh when no shared repo is configured', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: false, url: null })),
+    });
+    const { result } = renderHook(() => useSharedProjects(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(fakeApi.sharedListProjects).not.toHaveBeenCalled();
+    expect(fakeApi.refreshShared).not.toHaveBeenCalled();
   });
 
   it('does not list projects when unconfigured', async () => {
@@ -112,14 +124,18 @@ describe('useSharedProjects', () => {
       wrapper: ({ children }) => wrap(fakeApi, children),
     });
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(1);
+    // Let the mount's own background revalidate settle first, then measure
+    // a manual refresh() call in isolation from it.
+    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(2));
+    fakeApi.refreshShared.mockClear();
+    fakeApi.sharedListProjects.mockClear();
 
     await act(async () => {
       await result.current.refresh();
     });
 
     expect(fakeApi.refreshShared).toHaveBeenCalledTimes(1);
-    expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(2);
+    expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(1);
     expect(fakeApi.sharedListProjects).toHaveBeenLastCalledWith({ refresh: false });
     expect(result.current.stale).toBe(false);
   });
@@ -154,6 +170,10 @@ describe('useSharedProjects', () => {
       wrapper: ({ children }) => wrap(fakeApi, children),
     });
     await waitFor(() => expect(result.current.loading).toBe(false));
+    // Let the mount's own background revalidate settle first, so only the
+    // manual refresh() call below is counted.
+    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(2));
+    fakeApi.refreshShared.mockClear();
 
     fakeApi.sharedListProjects.mockRejectedValueOnce(new Error('boom'));
 
@@ -215,11 +235,17 @@ describe('useSharedProjects', () => {
 
   it('refresh() ignores a second call while the first refresh is still in flight', async () => {
     const d = deferred();
-    const fakeApi = makeFakeApi({ refreshShared: vi.fn(() => d.promise) });
+    const fakeApi = makeFakeApi();
     const { result } = renderHook(() => useSharedProjects(), {
       wrapper: ({ children }) => wrap(fakeApi, children),
     });
     await waitFor(() => expect(result.current.loading).toBe(false));
+    // Let the mount's own background revalidate settle first, so the
+    // deferred stub below only governs the two manual refresh() calls,
+    // not the mount's in-flight refresh.
+    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(2));
+    fakeApi.refreshShared.mockClear();
+    fakeApi.refreshShared.mockImplementation(() => d.promise);
 
     let p1;
     let p2;
