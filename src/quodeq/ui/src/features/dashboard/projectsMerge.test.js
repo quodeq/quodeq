@@ -52,6 +52,38 @@ describe('mergeProjects', () => {
     assert.equal(merged[0].lastActivity, Date.parse('2026-07-19T00:00:00Z'));
     assert.equal(merged[0].score, 6.8);
   });
+
+  it('a shared entry merges with at most one local project (id beats URL, no duplicates)', () => {
+    const shared = { id: 's1', name: 'pub', originUrl: 'https://github.com/org/pub', publishedAt: 100 };
+    const localById = { id: 's1', name: 'pub-local', latestDate: 5 };
+    const localByUrl = { id: 'other-id', name: 'pub2', originUrl: 'https://github.com/org/pub' };
+    const merged = mergeProjects([localById, localByUrl], [shared]);
+    assert.equal(merged.length, 2);
+    const byId = merged.find((e) => e.local === localById);
+    const byUrl = merged.find((e) => e.local === localByUrl);
+    assert.equal(byId.chips, 'both');
+    assert.equal(byId.shared, shared);
+    assert.equal(byUrl.chips, 'local');
+    assert.equal(byUrl.shared, null);
+  });
+
+  it('two locals with the same originUrl: first claims, second stays local-only', () => {
+    const shared = { id: 'r1', name: 'lib', originUrl: 'https://github.com/org/lib', publishedAt: 3 };
+    const local1 = { id: 'l1', name: 'lib', originUrl: 'https://github.com/org/lib' };
+    const local2 = { id: 'l2', name: 'lib-fork', originUrl: 'https://github.com/org/lib' };
+    const merged = mergeProjects([local1, local2], [shared]);
+    assert.deepEqual(merged.map((e) => e.chips), ['both', 'local']);
+    const sharedAttachedCount = merged.filter((e) => e.shared === shared).length;
+    assert.equal(sharedAttachedCount, 1);
+  });
+
+  it('lastActivity of exactly 0 is preserved', () => {
+    const localOnly = mergeProjects([{ id: 'a', name: 'app', latestDate: 0 }], []);
+    assert.equal(localOnly[0].lastActivity, 0);
+
+    const sharedOnly = mergeProjects([], [{ id: 'r1', name: 'lib', publishedAt: 0 }]);
+    assert.equal(sharedOnly[0].lastActivity, 0);
+  });
 });
 
 describe('deriveAction', () => {

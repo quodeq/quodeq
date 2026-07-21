@@ -20,6 +20,13 @@ function toMs(value) {
   return Number.isNaN(t) ? null : t;
 }
 
+function lastActivityOf(lastEval, publishedAt) {
+  if (lastEval == null && publishedAt == null) return null;
+  if (lastEval == null) return publishedAt;
+  if (publishedAt == null) return lastEval;
+  return Math.max(lastEval, publishedAt);
+}
+
 function makeEntry(local, shared) {
   const lastEval = toMs(local?.latestDate);
   const publishedAt = toMs(shared?.publishedAt);
@@ -30,7 +37,7 @@ function makeEntry(local, shared) {
     local: local || null,
     shared: shared || null,
     chips: local && shared ? 'both' : local ? 'local' : 'shared',
-    lastActivity: Math.max(lastEval ?? 0, publishedAt ?? 0) || null,
+    lastActivity: lastActivityOf(lastEval, publishedAt),
     score: local?.latestScore ?? shared?.latestScore ?? null,
   };
 }
@@ -43,16 +50,35 @@ export function mergeProjects(localProjects = [], sharedProjects = []) {
     const u = normalizeOriginUrl(s.originUrl);
     if (u && !sharedByUrl.has(u)) sharedByUrl.set(u, s);
   }
+
+  // Each shared entry may be claimed by at most one local project. Pass 1
+  // claims by id; pass 2 claims by normalized origin URL among whatever is
+  // still unclaimed, so a local never double-dips a shared entry that
+  // another local already matched.
   const claimed = new Set();
-  const merged = [];
+  const matchByLocal = new Map();
+
   for (const l of localProjects) {
-    const match =
-      (l.id && sharedById.get(l.id)) ||
-      sharedByUrl.get(normalizeOriginUrl(l.originUrl)) ||
-      null;
-    if (match) claimed.add(match);
-    merged.push(makeEntry(l, match));
+    if (!l.id) continue;
+    const s = sharedById.get(l.id);
+    if (s && !claimed.has(s)) {
+      claimed.add(s);
+      matchByLocal.set(l, s);
+    }
   }
+
+  for (const l of localProjects) {
+    if (matchByLocal.has(l)) continue;
+    const u = normalizeOriginUrl(l.originUrl);
+    if (!u) continue;
+    const s = sharedByUrl.get(u);
+    if (s && !claimed.has(s)) {
+      claimed.add(s);
+      matchByLocal.set(l, s);
+    }
+  }
+
+  const merged = localProjects.map((l) => makeEntry(l, matchByLocal.get(l) || null));
   for (const s of sharedProjects) {
     if (!claimed.has(s)) merged.push(makeEntry(null, s));
   }
