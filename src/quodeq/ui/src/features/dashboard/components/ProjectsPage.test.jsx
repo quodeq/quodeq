@@ -7,14 +7,13 @@ import ProjectsPage from './ProjectsPage.jsx';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 
-// Task 18: local/online sub-tabs + shared-repo browse states.
-// Task 20: publish action -- the local tab now fetches shared status/list
-// on mount too (see usePublish.js), so every render with a non-empty local
-// project list needs an ApiProvider from here on (previously the local tab
-// never touched the API at all).
+// Task 7: one merged local+shared list, no tabs. The local list renders
+// unconditionally; the shared list layers in once useSharedProjects resolves
+// (cached-first, see that hook's own tests), so every render touches the API
+// -- an ApiProvider is required from here on regardless of project count.
 function makeFakeApi(overrides = {}) {
   return {
-    getSharedStatus: vi.fn(async () => ({ configured: false, url: null, publish: { state: 'idle' } })),
+    getSharedStatus: vi.fn(async () => ({ configured: true, url: null, publish: { state: 'idle' } })),
     sharedListProjects: vi.fn(async () => ({ projects: [], lastSynced: null, stale: false })),
     connectShared: vi.fn(async (url) => ({ configured: true, url })),
     refreshShared: vi.fn(async () => ({ stale: false, lastSynced: '2026-07-17T00:00:00Z' })),
@@ -58,97 +57,86 @@ describe('ProjectsPage', () => {
   });
 });
 
-describe('ProjectsPage — local/online tab row', () => {
-  it('renders both tabs, with local active by default', () => {
-    render(<ProjectsPage projects={[]} actions={{}} />);
-    const local = screen.getByRole('tab', { name: 'local' });
-    const online = screen.getByRole('tab', { name: 'online' });
-    expect(local).toHaveAttribute('aria-selected', 'true');
-    expect(online).toHaveAttribute('aria-selected', 'false');
-  });
-
-  it('marks the online tab active when sourceTab="online"', () => {
-    const fakeApi = makeFakeApi();
-    renderWithApi(<ProjectsPage projects={[]} sourceTab="online" actions={{}} />, fakeApi);
-    expect(screen.getByRole('tab', { name: 'online' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: 'local' })).toHaveAttribute('aria-selected', 'false');
-  });
-
-  it('clicking the online tab calls actions.onTabChange("online") — nav-param driven, not local state', async () => {
-    const user = userEvent.setup();
-    const onTabChange = vi.fn();
-    render(<ProjectsPage projects={[]} actions={{ onTabChange }} />);
-    await user.click(screen.getByRole('tab', { name: 'online' }));
-    expect(onTabChange).toHaveBeenCalledWith('online');
-  });
-
-  it('clicking the local tab calls actions.onTabChange("local")', async () => {
-    const user = userEvent.setup();
-    const onTabChange = vi.fn();
-    const fakeApi = makeFakeApi();
-    renderWithApi(<ProjectsPage projects={[]} sourceTab="online" actions={{ onTabChange }} />, fakeApi);
-    await user.click(screen.getByRole('tab', { name: 'local' }));
-    expect(onTabChange).toHaveBeenCalledWith('local');
-  });
-
-  it('re-clicking the already-active tab is a no-op -- does not call onTabChange (nav-stack dedup guard)', async () => {
-    const user = userEvent.setup();
-    const onTabChange = vi.fn();
-    render(<ProjectsPage projects={[]} actions={{ onTabChange }} />);
-
-    const local = screen.getByRole('tab', { name: 'local' });
-    await user.click(local);
-    await user.click(local);
-    expect(onTabChange).not.toHaveBeenCalled();
-
-    const online = screen.getByRole('tab', { name: 'online' });
-    await user.click(online);
-    expect(onTabChange).toHaveBeenCalledTimes(1);
-    expect(onTabChange).toHaveBeenCalledWith('online');
-  });
-
-  it('local tab body (cards/empty-state) is unaffected by the new tab row', async () => {
-    const projects = [{ id: 'a', name: 'one', location: 'local' }];
-    const fakeApi = makeFakeApi();
-    renderWithApi(<ProjectsPage projects={projects} actions={{}} />, fakeApi);
-    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
-    expect(screen.getByText('one')).toBeInTheDocument();
-  });
-});
-
-describe('ProjectsPage — online tab, unconfigured', () => {
-  it('shows the connect empty state and calls connectShared(url) on submit', async () => {
-    const user = userEvent.setup();
-    const fakeApi = makeFakeApi();
-    renderWithApi(<ProjectsPage projects={[]} sourceTab="online" actions={{}} />, fakeApi);
-
-    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
-    expect(screen.getByText('Connect a shared results repository')).toBeInTheDocument();
-
-    const input = screen.getByRole('textbox');
-    await user.type(input, 'https://github.com/team/results.git');
-    await user.click(screen.getByRole('button', { name: 'connect' }));
-
-    await waitFor(() => expect(fakeApi.connectShared).toHaveBeenCalledWith('https://github.com/team/results.git'));
-  });
-
-  it('shows an inline error from the API on a failed connect', async () => {
-    const user = userEvent.setup();
+// Task 7: tabs are gone. Local and shared projects render together in one
+// list, filtered/sorted via a controlled toolbar (state lives in the nav
+// stack, see actions.onFiltersChange).
+describe('ProjectsPage — merged list, no tabs', () => {
+  it('renders local and shared projects in one list without tabs', async () => {
     const fakeApi = makeFakeApi({
-      connectShared: vi.fn(async () => { throw new Error('not a valid git repository'); }),
+      sharedListProjects: vi.fn(async () => ({
+        projects: [
+          { id: 'p-local', name: 'app', publishedAt: 1 },
+          { id: 'p-cloud', name: 'lib', publishedAt: 2 },
+        ],
+        lastSynced: 1, stale: false,
+      })),
     });
-    renderWithApi(<ProjectsPage projects={[]} sourceTab="online" actions={{}} />, fakeApi);
-    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
+    renderWithApi(
+      <ProjectsPage
+        projects={[{ id: 'p-local', name: 'app', latestDate: '2026-07-19' }]}
+        actions={{}}
+      />,
+      fakeApi,
+    );
+    expect(screen.queryByRole('tablist')).toBeNull();
+    await waitFor(() => {
+      expect(screen.getByText('app')).toBeInTheDocument();
+      expect(screen.getByText('lib')).toBeInTheDocument();
+    });
+  });
 
-    const input = screen.getByRole('textbox');
-    await user.type(input, 'not-a-url');
-    await user.click(screen.getByRole('button', { name: 'connect' }));
+  it('shows update for published-behind cards, publish for unpublished, pull for shared-only', async () => {
+    const fakeApi = makeFakeApi({
+      sharedListProjects: vi.fn(async () => ({
+        projects: [
+          { id: 'p-behind', name: 'app', publishedAt: 1 },
+          { id: 'p-cloud', name: 'lib', publishedAt: 2 },
+        ],
+        lastSynced: 1, stale: false,
+      })),
+    });
+    renderWithApi(
+      <ProjectsPage
+        projects={[
+          { id: 'p-behind', name: 'app', latestDate: '2026-07-19' },
+          { id: 'p-new', name: 'tool', latestDate: '2026-07-18' },
+        ]}
+        actions={{}}
+      />,
+      fakeApi,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'update' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'publish' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'pull local copy' })).toBeInTheDocument();
+    });
+  });
 
-    await waitFor(() => expect(screen.getByText('not a valid git repository')).toBeInTheDocument());
+  it('filters by location chip', async () => {
+    const fakeApi = makeFakeApi({
+      sharedListProjects: vi.fn(async () => ({
+        projects: [{ id: 'p-cloud', name: 'lib', publishedAt: 2 }],
+        lastSynced: 1, stale: false,
+      })),
+    });
+    const onFiltersChange = vi.fn();
+    renderWithApi(
+      <ProjectsPage
+        projects={[{ id: 'p-local', name: 'app', latestDate: '2026-07-19' }]}
+        actions={{ onFiltersChange }}
+      />,
+      fakeApi,
+    );
+    await waitFor(() => expect(screen.getByText('lib')).toBeInTheDocument());
+    // Chips are controlled by the `filters` prop: clicking emits onFiltersChange.
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'local' }));
+    expect(screen.getByRole('button', { name: 'local' })).toBeInTheDocument();
+    expect(onFiltersChange).toHaveBeenCalledWith({ query: '', location: 'local', sort: 'activity' });
   });
 });
 
-describe('ProjectsPage — online tab, configured', () => {
+describe('ProjectsPage — shared entries (configured)', () => {
   function configuredApi(overrides = {}) {
     return makeFakeApi({
       getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
@@ -163,21 +151,19 @@ describe('ProjectsPage — online tab, configured', () => {
     });
   }
 
-  it('renders the repo shorthand + project count and cards with "published by"', async () => {
+  it('renders shared-only cards with "published by"', async () => {
     const fakeApi = configuredApi();
-    renderWithApi(<ProjectsPage projects={[]} sourceTab="online" actions={{}} />, fakeApi);
+    renderWithApi(<ProjectsPage projects={[]} actions={{}} />, fakeApi);
 
     await waitFor(() => expect(screen.getByText('demo-repo')).toBeInTheDocument());
-    expect(screen.getByText(/github\.com\/team\/results/)).toBeInTheDocument();
-    expect(screen.getByText(/1 shared project/)).toBeInTheDocument();
     expect(screen.getByText(/published by ana/)).toBeInTheDocument();
   });
 
-  it('clicking an online card calls onSelect(id, "shared")', async () => {
+  it('clicking a shared-only card calls onSelect(id, "shared")', async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     const fakeApi = configuredApi();
-    renderWithApi(<ProjectsPage projects={[]} sourceTab="online" actions={{ onSelect }} />, fakeApi);
+    renderWithApi(<ProjectsPage projects={[]} actions={{ onSelect }} />, fakeApi);
 
     await waitFor(() => expect(screen.getByText('demo-repo')).toBeInTheDocument());
     await user.click(screen.getByText('demo-repo'));
@@ -185,7 +171,7 @@ describe('ProjectsPage — online tab, configured', () => {
     expect(onSelect).toHaveBeenCalledWith('shared-1', 'shared');
   });
 
-  it('shows the stale banner (no em-dash) when the listing is stale', async () => {
+  it('shows "· stale" in the toolbar sync indicator when the listing is stale (no em-dash)', async () => {
     const fakeApi = configuredApi({
       sharedListProjects: vi.fn(async () => ({
         projects: [{ id: 'shared-1', name: 'demo-repo', publishedBy: 'ana', publishedAt: '2026-07-16T00:00:00Z' }],
@@ -193,20 +179,17 @@ describe('ProjectsPage — online tab, configured', () => {
         stale: true,
       })),
     });
-    renderWithApi(<ProjectsPage projects={[]} sourceTab="online" actions={{}} />, fakeApi);
+    renderWithApi(<ProjectsPage projects={[]} actions={{}} />, fakeApi);
 
-    await waitFor(() => expect(screen.getByText(/refresh failed, showing results synced/)).toBeInTheDocument());
-    const banner = screen.getByText(/refresh failed, showing results synced/);
-    expect(banner.textContent).not.toMatch(/—/);
+    await waitFor(() => expect(screen.getByText(/synced .* · stale/)).toBeInTheDocument());
+    const label = screen.getByText(/synced .* · stale/);
+    expect(label.textContent).not.toMatch(/—/);
   });
 
   // relativeTime() returns 'today'/'yesterday' with no trailing "ago" for a
-  // same-day/one-day-old timestamp (see components/LastFetchedLine.jsx).
-  // Per the controller ruling, that copy is acceptable as-is -- the banner
-  // just has to reuse the identical label the sync line shows. This locks
-  // in the exact "synced today" rendering alongside the existing
-  // day(s)-old "ago" case above.
-  it('renders "refresh failed, showing results synced today" when lastSynced is same-day, using the same label as the sync line', async () => {
+  // same-day/one-day-old timestamp (see components/LastFetchedLine.jsx). This
+  // locks in the exact "synced today · stale" rendering in the toolbar.
+  it('renders "synced today · stale" when lastSynced is same-day', async () => {
     const fakeApi = configuredApi({
       sharedListProjects: vi.fn(async () => ({
         projects: [{ id: 'shared-1', name: 'demo-repo', publishedBy: 'ana', publishedAt: '2026-07-16T00:00:00Z' }],
@@ -214,16 +197,15 @@ describe('ProjectsPage — online tab, configured', () => {
         stale: true,
       })),
     });
-    renderWithApi(<ProjectsPage projects={[]} sourceTab="online" actions={{}} />, fakeApi);
+    renderWithApi(<ProjectsPage projects={[]} actions={{}} />, fakeApi);
 
-    await waitFor(() => expect(screen.getByText('refresh failed, showing results synced today')).toBeInTheDocument());
-    expect(screen.getByText('synced today')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('synced today · stale')).toBeInTheDocument());
   });
 
-  it('refresh button calls refreshShared() and re-lists', async () => {
+  it('toolbar refresh button calls refreshShared() and re-lists', async () => {
     const user = userEvent.setup();
     const fakeApi = configuredApi();
-    renderWithApi(<ProjectsPage projects={[]} sourceTab="online" actions={{}} />, fakeApi);
+    renderWithApi(<ProjectsPage projects={[]} actions={{}} />, fakeApi);
 
     await waitFor(() => expect(screen.getByText('demo-repo')).toBeInTheDocument());
     // Let the mount's own background revalidate settle first, then measure
@@ -232,15 +214,13 @@ describe('ProjectsPage — online tab, configured', () => {
     fakeApi.refreshShared.mockClear();
     fakeApi.sharedListProjects.mockClear();
 
-    // Two "refresh" buttons exist (the sync-status line and each card's
-    // footer) -- the sync line's is the first in document order.
-    await user.click(screen.getAllByRole('button', { name: 'refresh' })[0]);
+    await user.click(screen.getByRole('button', { name: 'refresh' }));
 
     await waitFor(() => expect(fakeApi.refreshShared).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(1));
   });
 
-  it('online card footer offers "pull local copy"; a 409 shows an inline copy confirm', async () => {
+  it('shared card footer offers "pull local copy"; a 409 shows an inline copy confirm', async () => {
     const user = userEvent.setup();
     const pullSharedProject = vi.fn(async (id, action) => {
       if (!action) {
@@ -252,7 +232,7 @@ describe('ProjectsPage — online tab, configured', () => {
       return { imported: true, projectId: id };
     });
     const fakeApi = configuredApi({ pullSharedProject });
-    renderWithApi(<ProjectsPage projects={[]} sourceTab="online" actions={{}} />, fakeApi);
+    renderWithApi(<ProjectsPage projects={[]} actions={{}} />, fakeApi);
 
     await waitFor(() => expect(screen.getByText('demo-repo')).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: 'pull local copy' }));
@@ -264,16 +244,16 @@ describe('ProjectsPage — online tab, configured', () => {
   });
 
   // Important 2 (final whole-branch review): a plain (non-conflicting) pull
-  // must refresh the LOCAL project list (so the local tab is current) and
-  // give the user visible feedback that it landed, not silently succeed with
-  // no observable change until some unrelated action reloads the list.
+  // must refresh the LOCAL project list (so it shows up merged) and give the
+  // user visible feedback that it landed, not silently succeed with no
+  // observable change until some unrelated action reloads the list.
   it('a plain pull calls onProjectsReload and shows "pulled to local" on that card', async () => {
     const user = userEvent.setup();
     const pullSharedProject = vi.fn(async (id) => ({ imported: true, projectId: id }));
     const onProjectsReload = vi.fn(async () => {});
     const fakeApi = configuredApi({ pullSharedProject });
     renderWithApi(
-      <ProjectsPage projects={[]} sourceTab="online" actions={{ onProjectsReload }} />,
+      <ProjectsPage projects={[]} actions={{ onProjectsReload }} />,
       fakeApi,
     );
 
@@ -283,7 +263,7 @@ describe('ProjectsPage — online tab, configured', () => {
     await waitFor(() => expect(pullSharedProject).toHaveBeenCalledWith('shared-1', undefined));
     await waitFor(() => expect(onProjectsReload).toHaveBeenCalledTimes(1));
     expect(screen.getByText('pulled to local')).toBeInTheDocument();
-    // The pull/refresh buttons for that card are replaced by the confirmation.
+    // The pull button for that card is replaced by the confirmation.
     expect(screen.queryByRole('button', { name: 'pull local copy' })).not.toBeInTheDocument();
   });
 
@@ -300,7 +280,7 @@ describe('ProjectsPage — online tab, configured', () => {
     const onProjectsReload = vi.fn(async () => {});
     const fakeApi = configuredApi({ pullSharedProject });
     renderWithApi(
-      <ProjectsPage projects={[]} sourceTab="online" actions={{ onProjectsReload }} />,
+      <ProjectsPage projects={[]} actions={{ onProjectsReload }} />,
       fakeApi,
     );
 
@@ -314,8 +294,8 @@ describe('ProjectsPage — online tab, configured', () => {
   });
 });
 
-// Task 20: publish action on LOCAL cards.
-describe('ProjectsPage — local tab, publish action', () => {
+// Task 20: publish action on local cards.
+describe('ProjectsPage — publish action (local cards)', () => {
   const localProjects = [
     { id: 'p1', name: 'demo-one', location: 'local' },
     { id: 'p2', name: 'demo-two', location: 'local' },
@@ -397,20 +377,29 @@ describe('ProjectsPage — local tab, publish action', () => {
     // this uses fireEvent (synchronous, no internal timers) for the click,
     // and `advanceTimersByTimeAsync` (which also flushes microtasks between
     // ticks) instead of `waitFor` to progress past each async step.
+    //
+    // Both useSharedProjects (always mounted) and usePublish (mounted since
+    // there are local projects) independently call getSharedStatus /
+    // sharedListProjects now, so exact call counts are no longer a stable
+    // thing to assert on -- a mutable flag drives both mocks' responses
+    // instead of a fixed once/once sequence, so this holds regardless of
+    // how many times either hook happens to call them before the flip.
     vi.useFakeTimers();
     try {
-      const getSharedStatus = vi.fn()
-        .mockResolvedValueOnce({
-          configured: true, publish: { state: 'idle', project: null, runs: null, error: null, finishedAt: null },
-        })
-        .mockResolvedValueOnce({ configured: true, publish: { state: 'done', project: 'p1', runs: 2 } });
-      const sharedListProjects = vi.fn()
-        .mockResolvedValueOnce({ projects: [], lastSynced: null, stale: false })
-        .mockResolvedValueOnce({
+      let publishDone = false;
+      const getSharedStatus = vi.fn(async () => ({
+        configured: true,
+        publish: publishDone
+          ? { state: 'done', project: 'p1', runs: 2 }
+          : { state: 'idle', project: null, runs: null, error: null, finishedAt: null },
+      }));
+      const sharedListProjects = vi.fn(async () => (publishDone
+        ? {
           projects: [{ id: 'p1', name: 'demo-one', publishedAt: '2026-07-16T00:00:00Z' }],
           lastSynced: '2026-07-17T00:00:00Z',
           stale: false,
-        });
+        }
+        : { projects: [], lastSynced: null, stale: false }));
       const fakeApi = configuredLocalApi({ getSharedStatus, sharedListProjects });
       renderWithApi(<ProjectsPage projects={localProjects} actions={{}} />, fakeApi);
 
@@ -421,10 +410,10 @@ describe('ProjectsPage — local tab, publish action', () => {
       await act(async () => { await vi.advanceTimersByTimeAsync(0); });
       expect(fakeApi.publishProject).toHaveBeenCalledWith('p1');
 
+      publishDone = true;
       await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
 
       expect(screen.getByText(/published /)).toBeInTheDocument();
-      expect(sharedListProjects).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }

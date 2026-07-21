@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { gradeLabel, gradeLetter, extDisplayName } from '../../../utils/formatters.js';
-import { TermHeader, TermInput } from '../../../components/terminal/index.js';
+import { TermHeader } from '../../../components/terminal/index.js';
 import { relativeTime } from '../../../components/LastFetchedLine.jsx';
 import { useSharedProjects } from '../hooks/useSharedProjects.js';
 import { usePublish } from '../hooks/usePublish.js';
+import { useMergedProjects } from '../hooks/useMergedProjects.js';
 
 const DISCIPLINE_LABEL = {
   frontend_nextjs: 'Next.js',
@@ -47,25 +48,6 @@ function formatPath(path) {
   return path;
 }
 
-// "https://github.com/team/results.git" -> "github.com/team/results"
-// "git@github.com:team/results.git"      -> "github.com/team/results"
-// Handles any host (not just the three formatPath() special-cases above) —
-// the shared results repo can point anywhere.
-function repoShorthand(url) {
-  if (!url) return '';
-  let s = String(url).trim();
-  const hadScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(s);
-  s = s.replace(/^[a-z][a-z0-9+.-]*:\/\//i, ''); // strip scheme://
-  s = s.replace(/^[^/@]+@/, ''); // strip user@ (credentials / scp-shorthand form)
-  // "host:path" -> "host/path" only for true scp-like shorthand (no scheme).
-  // A scheme'd URL's colon is a port separator (e.g. "example.com:8080/x")
-  // and must be left alone.
-  if (!hadScheme) s = s.replace(/^([^/]+):(?!\/)/, '$1/');
-  s = s.replace(/\.git$/i, '');
-  s = s.replace(/\/+$/, '');
-  return s;
-}
-
 function GradeChip({ grade, score }) {
   if (!grade && score == null) return null;
   const cls = grade ? `projects-grade--${grade.toLowerCase()}` : 'projects-grade--x';
@@ -93,19 +75,20 @@ function LanguageNumbers({ stats, filesCount }) {
   );
 }
 
-// Small top-right marker distinguishing where a card's data came from: the
-// user's own local evaluations vs. a shared team results repository. Shown
-// on every card regardless of which Projects sub-tab it's listed under —
-// the online tab's cards are ProjectCards too, just with source="online".
-function ProjectCardSource({ source }) {
+// Small top-right marker showing where a card's data lives: the user's own
+// local evaluations, a shared team results repository, or both (this local
+// project has also been published). Shown on every card in the merged list
+// — `chips` comes straight from the merged entry (see useMergedProjects).
+function ProjectCardChips({ chips }) {
+  if (!chips) return null;
   return (
-    <span className={`project-card-source project-card-source--${source}`}>
-      {source === 'online' ? '☁ online' : '⌂ local'}
+    <span className={`project-card-source${chips === 'local' ? '' : ' project-card-source--online'}`}>
+      {chips === 'both' ? 'local+shared' : chips}
     </span>
   );
 }
 
-// "published by <name> · <relative time>" — online-source cards only.
+// "published by <name> · <relative time>" — shared-only cards.
 function PublishedMeta({ publishedBy, publishedAt }) {
   if (!publishedBy) return null;
   const rel = relativeTime(publishedAt);
@@ -128,7 +111,7 @@ function LocalPublishedMeta({ publishedAt }) {
   return <div className="project-card-published-meta">published {rel}</div>;
 }
 
-function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildren, source = 'local' }) {
+function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildren, chips }) {
   const { onSelect, footer, isChild = false, onResumeSetup } = cardProps;
   const id = project.id || project.name || project;
   const name = project.name || project;
@@ -173,7 +156,7 @@ function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildr
             <GradeChip grade={grade} score={score} />
           </div>
           <div className="project-card-top-right">
-            <ProjectCardSource source={source} />
+            <ProjectCardChips chips={chips} />
             {discipline && <span className="project-meta-tag">{discipline}</span>}
             <span className="project-meta-item">{project.runsCount} {project.runsCount === 1 ? 'run' : 'runs'}</span>
             {date && <span className="project-meta-date">{date}</span>}
@@ -181,8 +164,11 @@ function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildr
         </div>
         <div className="project-card-bottom">
           <LanguageNumbers stats={project.languageStats} filesCount={project.filesCount} />
-          {source === 'online' && <PublishedMeta publishedBy={project.publishedBy} publishedAt={project.publishedAt} />}
-          {source === 'local' && <LocalPublishedMeta publishedAt={project.publishedAt} />}
+          {chips === 'shared' ? (
+            <PublishedMeta publishedBy={project.publishedBy} publishedAt={project.publishedAt} />
+          ) : (
+            <LocalPublishedMeta publishedAt={project.publishedAt} />
+          )}
           {cardChildren}
         </div>
       </div>
@@ -235,10 +221,11 @@ function computeProjectTree(projects) {
   return { children, roots };
 }
 
-// publishActions is undefined for child/subproject cards where the caller
-// hasn't wired publish support (e.g. no shared repo configured), and for
-// online cards which never render this footer at all.
-function CardFooter({ name, confirming, setConfirming, onDelete, onExport, publishActions }) {
+// `action` ('publish' | 'update' | null) comes from the merged entry (see
+// useMergedProjects/deriveAction) -- null for entries that need no publish
+// button (unconfigured, already up to date). Shared-only cards never render
+// this footer at all (they get the pull footer instead).
+function CardFooter({ name, confirming, setConfirming, onDelete, onExport, publishActions, action }) {
   if (confirming === name) {
     return (
       <div className="project-card-actions">
@@ -249,7 +236,6 @@ function CardFooter({ name, confirming, setConfirming, onDelete, onExport, publi
     );
   }
   const {
-    configured = false,
     publishState = 'idle',
     publishingProject = null,
     publishError = null,
@@ -264,14 +250,14 @@ function CardFooter({ name, confirming, setConfirming, onDelete, onExport, publi
   return (
     <>
       <div className="project-card-actions">
-        {configured && (
+        {action && (
           <button
             type="button"
             className={`project-delete-btn project-delete-btn--accent${isThisPublishing ? ' project-delete-btn--pending' : ''}`}
             aria-disabled={publishDisabled || undefined}
             onClick={(e) => { e.stopPropagation(); onPublish?.(name); }}
           >
-            {isThisPublishing ? 'publishing...' : 'publish'}
+            {isThisPublishing ? 'publishing...' : action}
           </button>
         )}
         <button type="button" className="project-delete-btn" title="Download project reports" aria-label="Download project reports" onClick={(e) => { e.stopPropagation(); onExport?.(name); }}><DownloadIcon /></button>
@@ -317,15 +303,24 @@ function ProjectPathContent({ id, p, relocateActions, subprojectCount = 0 }) {
   );
 }
 
-function ProjectChildren({ childList, selectedProject, onSelect, confirmActions, onResumeSetup, publishActions }) {
+function ProjectChildren({ childList, selectedProject, onSelect, confirmActions, onResumeSetup, publishActions, entryLookup }) {
   const { confirming, setConfirming, onDelete, onExport } = confirmActions;
   return (
     <div className="project-children-outer">
       {childList.map((child) => {
         const childId = child.id || child.name || child;
+        const childEntry = entryLookup?.get(childId);
         return (
           <div key={childId} className="project-child-entry">
-            <ProjectCard project={child} isSelected={childId === selectedProject} cardProps={{ onSelect, isChild: true, onResumeSetup, footer: <CardFooter name={childId} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} publishActions={publishActions} /> }} />
+            <ProjectCard
+              project={child}
+              isSelected={childId === selectedProject}
+              chips={childEntry?.chips}
+              cardProps={{
+                onSelect, isChild: true, onResumeSetup,
+                footer: <CardFooter name={childId} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} publishActions={publishActions} action={childEntry?.action} />,
+              }}
+            />
           </div>
         );
       })}
@@ -333,7 +328,10 @@ function ProjectChildren({ childList, selectedProject, onSelect, confirmActions,
   );
 }
 
-function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, dialogActions, onResumeSetup, publishActions }) {
+// entryLookup (local id/name -> merged entry) lets both this root card and
+// its nested subprojects (see ProjectChildren) show their own derived
+// chips/action instead of one blanket value for the whole group.
+function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, dialogActions, onResumeSetup, publishActions, action, chips, entryLookup }) {
   const { confirmActions, relocateActions } = dialogActions;
   const { confirming, setConfirming, onDelete, onExport } = confirmActions;
   const id = p.id || p.name || p;
@@ -342,10 +340,20 @@ function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelec
   const childSelected = hasChildren && childProjects[id].some((c) => (c.id || c.name || c) === selectedProject);
   return (
     <div key={id} className={`project-card-group${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}>
-      <ProjectCard project={p} isSelected={isSelected} cardProps={{ onSelect, onResumeSetup, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} publishActions={publishActions} /> }}>
+      <ProjectCard project={p} isSelected={isSelected} chips={chips} cardProps={{ onSelect, onResumeSetup, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} publishActions={publishActions} action={action} /> }}>
         <ProjectPathContent id={id} p={p} relocateActions={relocateActions} subprojectCount={hasChildren ? childProjects[id].length : 0} />
       </ProjectCard>
-      {hasChildren && <ProjectChildren childList={childProjects[id]} selectedProject={selectedProject} onSelect={onSelect} confirmActions={confirmActions} onResumeSetup={onResumeSetup} publishActions={publishActions} />}
+      {hasChildren && (
+        <ProjectChildren
+          childList={childProjects[id]}
+          selectedProject={selectedProject}
+          onSelect={onSelect}
+          confirmActions={confirmActions}
+          onResumeSetup={onResumeSetup}
+          publishActions={publishActions}
+          entryLookup={entryLookup}
+        />
+      )}
     </div>
   );
 }
@@ -396,85 +404,12 @@ function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
   );
 }
 
-// ── Online tab: local | online sub-tab row ────────────────────────────────
+// ── Shared entries: pull-local-copy footer (409-conflict inline confirm) ──
+// Mirrors CardFooter's inline delete-confirm idiom for the collision case
+// instead of the global chooseDialog modal used by manual import. Global
+// refresh lives in the toolbar (SyncedIndicator) now, not per card.
 
-function ProjectsTabs({ activeTab, onTabChange }) {
-  // Re-clicking the already-active tab is a no-op: onTabChange drives a
-  // navPush (see App.jsx's onTabChange wiring), and pushing an identical
-  // history entry on every repeat click grows the nav stack with
-  // duplicates, making Back appear dead until they unwind. Guarded here
-  // at the component level so every caller (App.jsx and tests) benefits,
-  // not just one wiring site. Genuine local<->online switches still push.
-  const handleClick = (tab) => {
-    if (tab === activeTab) return;
-    onTabChange?.(tab);
-  };
-  return (
-    <div className="projects-tabs" role="tablist">
-      <button
-        type="button"
-        role="tab"
-        aria-selected={activeTab === 'local'}
-        className={`projects-tab${activeTab === 'local' ? ' projects-tab--active' : ''}`}
-        onClick={() => handleClick('local')}
-      >
-        local
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={activeTab === 'online'}
-        className={`projects-tab${activeTab === 'online' ? ' projects-tab--active' : ''}`}
-        onClick={() => handleClick('online')}
-      >
-        online
-      </button>
-    </div>
-  );
-}
-
-// ── Online tab: unconfigured (connect) state ──────────────────────────────
-
-function ConnectSharedForm({ connecting, connectError, onConnect }) {
-  const [url, setUrl] = useState('');
-  const submit = () => {
-    const trimmed = url.trim();
-    if (trimmed) onConnect(trimmed);
-  };
-  return (
-    <div className="projects-connect">
-      <h3 className="projects-connect__title">Connect a shared results repository</h3>
-      <p className="projects-connect__hint">
-        Point quodeq at a git repository your team publishes evaluation results to.
-      </p>
-      <div className="projects-connect__form">
-        <TermInput
-          command="connect"
-          placeholder="https://github.com/team/results.git"
-          value={url}
-          onChange={setUrl}
-          onSubmit={submit}
-          ariaLabel="shared repository url"
-        />
-        <button
-          type="button"
-          className={`term-btn term-btn--primary term-btn--filled${connecting ? ' is-disabled' : ''}`}
-          onClick={submit}
-          aria-disabled={connecting || undefined}
-        >
-          connect
-        </button>
-      </div>
-      {connectError && <p className="inline-error">{connectError}</p>}
-    </div>
-  );
-}
-
-// ── Online tab: per-card footer (pull local copy / refresh) ───────────────
-// Mirrors CardFooter's inline delete-confirm idiom for the 409 collision
-// case instead of the global chooseDialog modal used by manual import.
-
-function OnlineCardFooter({ projectId, onPull, onRefresh, pullConflict, onConfirmCopy, onCancelConflict, pulled }) {
+function OnlineCardFooter({ projectId, onPull, pullConflict, onConfirmCopy, onCancelConflict, pulled }) {
   if (pullConflict) {
     return (
       <div className="project-card-actions">
@@ -484,10 +419,8 @@ function OnlineCardFooter({ projectId, onPull, onRefresh, pullConflict, onConfir
       </div>
     );
   }
-  // Inline confirmation replacing the pull/refresh buttons for this one card,
-  // for the lifetime of the OnlineProjectsTab mount -- it only mounts while
-  // the online sub-tab is active (see the comment above OnlineProjectsTab),
-  // so switching to the local tab and back naturally clears it.
+  // Inline confirmation replacing the pull button for this one card, for the
+  // lifetime of the ProjectsPage mount.
   if (pulled) {
     return (
       <div className="project-card-actions">
@@ -496,36 +429,160 @@ function OnlineCardFooter({ projectId, onPull, onRefresh, pullConflict, onConfir
     );
   }
   return (
-    <>
-      <button type="button" className="project-delete-btn" onClick={(e) => { e.stopPropagation(); onPull(projectId); }}>pull local copy</button>
-      <button type="button" className="project-delete-btn" onClick={(e) => { e.stopPropagation(); onRefresh(); }}>refresh</button>
-    </>
+    <button type="button" className="project-delete-btn" onClick={(e) => { e.stopPropagation(); onPull(projectId); }}>pull local copy</button>
   );
 }
 
-// ── Online tab body ─────────────────────────────────────────────────────
-// Only mounted while sourceTab === 'online' (see ProjectsPage below), so
-// useSharedProjects()'s refresh-on-entry mount effect fires exactly when
-// the user actually walks into this tab, not on every ProjectsPage render.
+// ── Toolbar: name search, location chips, sort, sync status ───────────────
+// Controlled entirely by the `filters` prop -- state lives one level up in
+// the nav stack (see actions.onFiltersChange), not here.
 
-function OnlineProjectsTab({ onSelect, onProjectsReload }) {
+function ProjectsToolbar({ filters = {}, onFiltersChange, lastSynced, stale, refreshing, onRefresh }) {
+  const { query = '', location = 'all', sort = 'activity' } = filters;
+  const set = (patch) => onFiltersChange?.({ query, location, sort, ...patch });
+  return (
+    <div className="projects-toolbar">
+      <input
+        type="text"
+        className="projects-toolbar-search"
+        placeholder="filter by name"
+        value={query}
+        onChange={(e) => set({ query: e.target.value })}
+      />
+      <div className="projects-toolbar-chips" role="group" aria-label="location filter">
+        {['all', 'local', 'shared'].map((loc) => (
+          <button
+            key={loc}
+            type="button"
+            aria-pressed={location === loc}
+            className={`projects-tab${location === loc ? ' projects-tab--active' : ''}`}
+            onClick={() => set({ location: loc })}
+          >
+            {loc}
+          </button>
+        ))}
+      </div>
+      <select value={sort} onChange={(e) => set({ sort: e.target.value })} aria-label="sort projects">
+        <option value="activity">recent activity</option>
+        <option value="name">name</option>
+        <option value="score">score</option>
+      </select>
+      <SyncedIndicator lastSynced={lastSynced} stale={stale} refreshing={refreshing} onRefresh={onRefresh} />
+    </div>
+  );
+}
+
+// "syncing…" while a background refresh is in flight, else "synced <relative
+// time>" (+ " · stale" when the last refresh failed) -- the merged list's
+// only sync-status surface now that the old online sub-tab (and its
+// "refresh failed, showing results synced..." banner) is gone.
+function SyncedIndicator({ lastSynced, stale, refreshing, onRefresh }) {
+  const label = refreshing
+    ? 'syncing…'
+    : `synced ${relativeTime(lastSynced) || 'just now'}${stale ? ' · stale' : ''}`;
+  return (
+    <span className="projects-toolbar-sync">
+      <span className="projects-toolbar-sync-label">{label}</span>
+      <button
+        type="button"
+        className="projects-page__import-btn"
+        aria-label="refresh"
+        onClick={onRefresh}
+        aria-disabled={refreshing || undefined}
+      >
+        ⟳
+      </button>
+    </span>
+  );
+}
+
+export default function ProjectsPage({ projects = [], selectedProject, isEvaluating = false, filters, actions }) {
   const {
-    configured, url, projects, lastSynced, stale,
-    loading, error, connecting, connectError, connect,
-    refreshing, refresh, pull,
-  } = useSharedProjects();
+    onSelect, onDelete, onExport, onRelocate, onAddProject, onImportProject,
+    onResumeSetup, onFiltersChange, onProjectsReload,
+  } = actions;
+  const [confirming, setConfirming] = useState(null);
+  const relocateActions = useRelocateDialog(onRelocate);
+
+  // Cached-first: renders instantly from whatever's cached, then revalidates
+  // against the remote in the background (see useSharedProjects.js's own
+  // doc comment for the full contract).
+  const shared = useSharedProjects();
+
+  // Publish action + job-progress polling for local cards (Task 20). Only
+  // fetches shared status/the shared list (both with refresh:false, so this
+  // never forces a real git fetch) when there's actually something to
+  // decorate: at least one local card. Hooks run unconditionally either way;
+  // only the internal effect is gated.
+  const {
+    configured: sharedConfigured,
+    publishedAtByProject,
+    publishState,
+    publishingProject,
+    publishError,
+    publishErrorProject,
+    publish,
+  } = usePublish({ enabled: projects.length > 0 });
+
+  // Local project objects never carry publishedAt on their own (it lives
+  // only on the shared list's git-log-derived metadata) -- merge it in by
+  // id/name so ProjectCard can read `project.publishedAt` uniformly, and so
+  // a publish that just completed is reflected immediately even though
+  // useSharedProjects' own list isn't re-fetched by it.
+  const projectsWithPublished = useMemo(() => {
+    if (!sharedConfigured || Object.keys(publishedAtByProject).length === 0) return projects;
+    return projects.map((p) => {
+      const id = p.id || p.name || p;
+      const publishedAt = publishedAtByProject[id];
+      return publishedAt ? { ...p, publishedAt } : p;
+    });
+  }, [projects, publishedAtByProject, sharedConfigured]);
+
+  const entries = useMergedProjects({
+    localProjects: projectsWithPublished,
+    sharedProjects: shared.projects,
+    configured: shared.configured,
+    filters,
+  });
+
+  // Subproject nesting: computed over the same flat local list `entries`
+  // merges from, so a child project's own derived chips/action (looked up
+  // via `localEntryById`) stay in sync with its parent's.
+  const { children } = useMemo(() => computeProjectTree(projectsWithPublished), [projectsWithPublished]);
+  const childIdSet = useMemo(() => {
+    const set = new Set();
+    for (const list of Object.values(children)) {
+      for (const c of list) set.add(c.id || c.name || c);
+    }
+    return set;
+  }, [children]);
+  const localEntryById = useMemo(() => {
+    const map = new Map();
+    for (const e of entries) {
+      if (e.local) map.set(e.local.id || e.local.name || e.local, e);
+    }
+    return map;
+  }, [entries]);
+
+  const publishActions = {
+    publishState,
+    publishingProject,
+    publishError,
+    publishErrorProject,
+    onPublish: publish,
+  };
+
+  // Pull-to-local (shared-only cards): mirrors the delete-confirm idiom for
+  // the 409 same-uuid collision case.
   const [pullConflictId, setPullConflictId] = useState(null);
-  // Cards the user has successfully pulled this mount -- shows "pulled to
-  // local" in place of the pull/refresh buttons until the tab is switched
-  // (see OnlineCardFooter's `pulled` branch).
   const [pulledIds, setPulledIds] = useState(() => new Set());
 
   async function handlePull(id) {
     try {
-      await pull(id);
+      await shared.pull(id);
       setPullConflictId(null);
       setPulledIds((prev) => new Set(prev).add(id));
-      // Without this, a project pulled here never appears on the local tab
+      // Without this, a project pulled here never appears in the merged list
       // until some unrelated action happens to reload the project list --
       // the user has no way to tell the pull actually landed a local copy.
       await onProjectsReload?.();
@@ -540,7 +597,7 @@ function OnlineProjectsTab({ onSelect, onProjectsReload }) {
 
   async function handleConfirmCopy(id) {
     try {
-      await pull(id, 'copy');
+      await shared.pull(id, 'copy');
       setPulledIds((prev) => new Set(prev).add(id));
       await onProjectsReload?.();
     } catch (err) {
@@ -550,120 +607,12 @@ function OnlineProjectsTab({ onSelect, onProjectsReload }) {
     }
   }
 
-  if (loading) {
-    return <div className="projects-empty">loading shared repository status...</div>;
-  }
-
-  if (!configured) {
-    return <ConnectSharedForm connecting={connecting} connectError={connectError} onConnect={connect} />;
-  }
-
-  const shorthand = repoShorthand(url);
-  const syncedLabel = relativeTime(lastSynced) || 'just now';
-
-  return (
-    <div className="projects-online">
-      <div className="projects-online__status">
-        <div className="projects-online__sub">
-          {shorthand} · {projects.length} shared {projects.length === 1 ? 'project' : 'projects'}
-        </div>
-        <div className="projects-online__sync">
-          <span className="projects-online__sync-label">synced {syncedLabel}</span>
-          <button
-            type="button"
-            className={`projects-page__import-btn${refreshing ? ' is-disabled' : ''}`}
-            onClick={refresh}
-            aria-disabled={refreshing || undefined}
-          >
-            refresh
-          </button>
-        </div>
-      </div>
-      {stale && (
-        <div className="projects-stale-banner">
-          refresh failed, showing results synced {syncedLabel}
-        </div>
-      )}
-      {error && <p className="inline-error">{error}</p>}
-      {projects.length === 0 ? (
-        <div className="projects-empty">no shared projects yet.</div>
-      ) : (
-        <div className="projects-cards">
-          {projects.map((p) => {
-            const id = p.id || p.name || p;
-            return (
-              <ProjectCard
-                key={id}
-                project={p}
-                source="online"
-                cardProps={{
-                  onSelect: (pid) => onSelect?.(pid, 'shared'),
-                  footer: (
-                    <OnlineCardFooter
-                      projectId={id}
-                      onPull={handlePull}
-                      onRefresh={refresh}
-                      pullConflict={pullConflictId === id}
-                      onConfirmCopy={handleConfirmCopy}
-                      onCancelConflict={() => setPullConflictId(null)}
-                      pulled={pulledIds.has(id)}
-                    />
-                  ),
-                }}
-              />
-            );
-          })}
-        </div>
-      )}
-    </div>
+  const isEmpty = projects.length === 0 && entries.length === 0;
+  // Child (subproject) entries render nested under their root via
+  // ProjectCardGroup/ProjectChildren, not as their own top-level card.
+  const visibleEntries = entries.filter(
+    (e) => !(e.local && childIdSet.has(e.local.id || e.local.name || e.local)),
   );
-}
-
-export default function ProjectsPage({ projects = [], selectedProject, isEvaluating = false, sourceTab = 'local', actions }) {
-  const { onSelect, onDelete, onExport, onRelocate, onAddProject, onImportProject, onResumeSetup, onTabChange, onProjectsReload } = actions;
-  const [confirming, setConfirming] = useState(null);
-  const relocateActions = useRelocateDialog(onRelocate);
-  const activeTab = sourceTab === 'online' ? 'online' : 'local';
-
-  // Publish action + job-progress polling for LOCAL cards (Task 20). Only
-  // fetches shared status/the shared list (both with refresh:false, so this
-  // never forces a real git fetch -- that stays the online sub-tab's job)
-  // when there's actually something to decorate: the local tab is active
-  // and has at least one card. Hooks run unconditionally either way; only
-  // the internal effect is gated.
-  const {
-    configured: sharedConfigured,
-    publishedAtByProject,
-    publishState,
-    publishingProject,
-    publishError,
-    publishErrorProject,
-    publish,
-  } = usePublish({ enabled: activeTab === 'local' && projects.length > 0 });
-
-  // Local project objects never carry publishedAt on their own (it lives
-  // only on the shared list's git-log-derived metadata) -- merge it in by
-  // id/name so ProjectCard can read `project.publishedAt` uniformly for
-  // both local and online sources.
-  const projectsWithPublished = useMemo(() => {
-    if (!sharedConfigured || Object.keys(publishedAtByProject).length === 0) return projects;
-    return projects.map((p) => {
-      const id = p.id || p.name || p;
-      const publishedAt = publishedAtByProject[id];
-      return publishedAt ? { ...p, publishedAt } : p;
-    });
-  }, [projects, publishedAtByProject, sharedConfigured]);
-
-  const { children, roots } = useMemo(() => computeProjectTree(projectsWithPublished), [projectsWithPublished]);
-
-  const publishActions = {
-    configured: sharedConfigured,
-    publishState,
-    publishingProject,
-    publishError,
-    publishErrorProject,
-    onPublish: publish,
-  };
 
   return (
     <section className="projects-page projects-page--terminal">
@@ -672,7 +621,7 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
           name="repositories"
           sub={`${projects.length} ${projects.length === 1 ? 'repository' : 'repositories'} evaluated`}
         />
-        {activeTab === 'local' && projects.length > 0 && (
+        {projects.length > 0 && (
           <div className="projects-page__header-actions">
             {onImportProject && (
               <button
@@ -701,29 +650,68 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
           </div>
         )}
       </div>
-      <ProjectsTabs activeTab={activeTab} onTabChange={onTabChange} />
-      {activeTab === 'online' ? (
-        <OnlineProjectsTab onSelect={onSelect} onProjectsReload={onProjectsReload} />
-      ) : projects.length === 0 ? (
+      {isEmpty ? (
         <EmptyProjectsCTA onAddProject={onAddProject} onImportProject={onImportProject} isEvaluating={isEvaluating} />
       ) : (
-        <div className="projects-cards">
-          {roots.map((p) => (
-            <ProjectCardGroup
-              key={p.id || p.name || p}
-              p={p}
-              children={children}
-              selectedProject={selectedProject}
-              onSelect={onSelect}
-              onResumeSetup={onResumeSetup}
-              dialogActions={{
-                confirmActions: { confirming, setConfirming, onDelete, onExport },
-                relocateActions,
-              }}
-              publishActions={publishActions}
-            />
-          ))}
-        </div>
+        <>
+          <ProjectsToolbar
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            lastSynced={shared.lastSynced}
+            stale={shared.stale}
+            refreshing={shared.refreshing}
+            onRefresh={shared.refresh}
+          />
+          {visibleEntries.length === 0 ? (
+            <div className="projects-empty">no projects match your filters.</div>
+          ) : (
+            <div className="projects-cards">
+              {visibleEntries.map((entry) => {
+                if (entry.local) {
+                  return (
+                    <ProjectCardGroup
+                      key={entry.key}
+                      p={entry.local}
+                      children={children}
+                      selectedProject={selectedProject}
+                      onSelect={onSelect}
+                      onResumeSetup={onResumeSetup}
+                      dialogActions={{
+                        confirmActions: { confirming, setConfirming, onDelete, onExport },
+                        relocateActions,
+                      }}
+                      publishActions={publishActions}
+                      action={entry.action}
+                      chips={entry.chips}
+                      entryLookup={localEntryById}
+                    />
+                  );
+                }
+                const sharedId = entry.shared.id || entry.shared.name || entry.shared;
+                return (
+                  <ProjectCard
+                    key={entry.key}
+                    project={entry.shared}
+                    chips="shared"
+                    cardProps={{
+                      onSelect: (pid) => onSelect?.(pid, 'shared'),
+                      footer: (
+                        <OnlineCardFooter
+                          projectId={sharedId}
+                          onPull={handlePull}
+                          pullConflict={pullConflictId === sharedId}
+                          onConfirmCopy={handleConfirmCopy}
+                          onCancelConflict={() => setPullConflictId(null)}
+                          pulled={pulledIds.has(sharedId)}
+                        />
+                      ),
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </section>
   );
