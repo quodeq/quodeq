@@ -115,7 +115,7 @@ describe('ProjectsPage — merged list, no tabs', () => {
     });
   });
 
-  it('filters by location chip', async () => {
+  it('filters by location via the dropdown pill', async () => {
     const fakeApi = makeFakeApi({
       sharedListProjects: vi.fn(async () => ({
         projects: [{ id: 'p-cloud', name: 'lib', publishedAt: 2 }],
@@ -131,11 +131,57 @@ describe('ProjectsPage — merged list, no tabs', () => {
       fakeApi,
     );
     await waitFor(() => expect(screen.getByText('lib')).toBeInTheDocument());
-    // Chips are controlled by the `filters` prop: clicking emits onFiltersChange.
+    // Pills are controlled by the `filters` prop: picking a menu option
+    // emits onFiltersChange; the menu closes after the pick.
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'local' }));
-    expect(screen.getByRole('button', { name: 'local' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /location: all/ }));
+    await user.click(screen.getByRole('menuitemradio', { name: 'local' }));
     expect(onFiltersChange).toHaveBeenCalledWith({ query: '', location: 'local', sort: 'activity' });
+    expect(screen.queryByRole('menuitemradio', { name: 'local' })).toBeNull();
+  });
+
+  it('changes sort via the dropdown pill', async () => {
+    const onFiltersChange = vi.fn();
+    renderWithApi(
+      <ProjectsPage
+        projects={[{ id: 'p-local', name: 'app', latestDate: '2026-07-19' }]}
+        actions={{ onFiltersChange }}
+      />,
+      makeFakeApi(),
+    );
+    await waitFor(() => expect(screen.getByText('app')).toBeInTheDocument());
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /sort: recent activity/ }));
+    await user.click(screen.getByRole('menuitemradio', { name: 'score' }));
+    expect(onFiltersChange).toHaveBeenCalledWith({ query: '', location: 'all', sort: 'score' });
+  });
+
+  it('shows LOCAL / PUBLISHED / REMOTE state badges on the cards', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://x/r.git', publish: { state: 'idle' } })),
+      sharedListProjects: vi.fn(async () => ({
+        projects: [
+          { id: 'p-both', name: 'app', publishedAt: 2 },
+          { id: 'p-cloud', name: 'lib', publishedAt: 3 },
+        ],
+        lastSynced: 1, stale: false,
+      })),
+    });
+    renderWithApi(
+      <ProjectsPage
+        projects={[
+          { id: 'p-both', name: 'app', latestDate: '2026-07-19' },
+          { id: 'p-solo', name: 'tool', latestDate: '2026-07-18' },
+        ]}
+        actions={{}}
+      />,
+      fakeApi,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('PUBLISHED')).toBeInTheDocument();
+      expect(screen.getByText('LOCAL')).toBeInTheDocument();
+      expect(screen.getByText('REMOTE')).toBeInTheDocument();
+    });
   });
 });
 

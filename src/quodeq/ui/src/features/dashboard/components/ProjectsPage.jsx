@@ -75,15 +75,18 @@ function LanguageNumbers({ stats, filesCount }) {
   );
 }
 
-// Small top-right marker showing where a card's data lives: the user's own
-// local evaluations, a shared team results repository, or both (this local
-// project has also been published). Shown on every card in the merged list
-// — `chips` comes straight from the merged entry (see useMergedProjects).
+// Small top-right pill stating a card's sync state rather than its raw
+// location: LOCAL (only on this machine), PUBLISHED (local and in the
+// shared repo), REMOTE (shared repo only). `chips` comes straight from the
+// merged entry (see useMergedProjects), which still speaks in locations —
+// the state wording is purely presentational.
+const BADGE_LABELS = { local: 'LOCAL', both: 'PUBLISHED', shared: 'REMOTE' };
+
 function ProjectCardChips({ chips }) {
   if (!chips) return null;
   return (
-    <span className={`project-card-source${chips === 'local' ? '' : ' project-card-source--online'}`}>
-      {chips === 'both' ? 'local+shared' : chips}
+    <span className={`project-card-badge project-card-badge--${chips}`}>
+      {BADGE_LABELS[chips]}
     </span>
   );
 }
@@ -444,9 +447,58 @@ function OnlineCardFooter({ projectId, onPull, pullConflict, onConfirmCopy, onCa
   );
 }
 
-// ── Toolbar: name search, location chips, sort, sync status ───────────────
+// ── Toolbar: name search, filter pills, sync status ────────────────────────
 // Controlled entirely by the `filters` prop -- state lives one level up in
 // the nav stack (see actions.onFiltersChange), not here.
+
+// One dropdown filter pill ("location: all ▾"). The first option is the
+// default; the pill lights up whenever a non-default value is picked so an
+// active filter is visible at a glance. Menu closes on pick, outside
+// mousedown, or Escape.
+function FilterPill({ label, value, options, valueLabels = {}, onChange }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (!rootRef.current?.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  const display = (v) => valueLabels[v] || v;
+  const isSet = value !== options[0];
+  return (
+    <span className={`projects-filter-pill${isSet ? ' projects-filter-pill--set' : ''}`} ref={rootRef}>
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {label}: <b>{display(value)}</b> <span className="projects-filter-pill-caret">▾</span>
+      </button>
+      {open && (
+        <div className="projects-filter-pill-menu" role="menu" aria-label={`${label} filter`}>
+          {options.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              role="menuitemradio"
+              aria-checked={opt === value}
+              onClick={() => { onChange(opt); setOpen(false); }}
+            >
+              {display(opt)}
+            </button>
+          ))}
+        </div>
+      )}
+    </span>
+  );
+}
 
 function ProjectsToolbar({ filters = {}, onFiltersChange, configured, lastSynced, stale, refreshing, onRefresh }) {
   const { query = '', location = 'all', sort = 'activity' } = filters;
@@ -461,29 +513,19 @@ function ProjectsToolbar({ filters = {}, onFiltersChange, configured, lastSynced
         value={query}
         onChange={(e) => set({ query: e.target.value })}
       />
-      <div className="projects-toolbar-chips" role="group" aria-label="location filter">
-        {['all', 'local', 'shared'].map((loc) => (
-          <button
-            key={loc}
-            type="button"
-            aria-pressed={location === loc}
-            className={`projects-tab${location === loc ? ' projects-tab--active' : ''}`}
-            onClick={() => set({ location: loc })}
-          >
-            {loc}
-          </button>
-        ))}
-      </div>
-      <select
-        className="projects-toolbar-sort"
+      <FilterPill
+        label="location"
+        value={location}
+        options={['all', 'local', 'shared']}
+        onChange={(loc) => set({ location: loc })}
+      />
+      <FilterPill
+        label="sort"
         value={sort}
-        onChange={(e) => set({ sort: e.target.value })}
-        aria-label="sort projects"
-      >
-        <option value="activity">recent activity</option>
-        <option value="name">name</option>
-        <option value="score">score</option>
-      </select>
+        options={['activity', 'name', 'score']}
+        valueLabels={{ activity: 'recent activity' }}
+        onChange={(s) => set({ sort: s })}
+      />
       <SyncedIndicator configured={configured} lastSynced={lastSynced} stale={stale} refreshing={refreshing} onRefresh={onRefresh} />
     </div>
   );

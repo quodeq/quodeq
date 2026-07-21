@@ -2329,14 +2329,12 @@
   width: 100%;
 }
 
-/* ── Toolbar: name search, location chips, sort, sync status ──
-   Sits above the merged card list (ProjectsToolbar/SyncedIndicator in
-   ProjectsPage.jsx). The search field mirrors TermInput's terminal-input
-   look (see .term-input below in terminal.css); the location chips reuse
-   .projects-tab's accent-underline idiom just below -- same idiom as
-   .drawer-tab in assistant.css (the Assistant/Terminal drawer's tab strip):
-   transparent by default, a 2px accent underline + tinted color when
-   active. */
+/* ── Toolbar: name search, filter pills, sync status ──
+   Sits above the merged card list (ProjectsToolbar/FilterPill/
+   SyncedIndicator in ProjectsPage.jsx). The search field mirrors
+   TermInput's terminal-input look (see .term-input in terminal.css); the
+   location and sort selectors are dropdown pills that light up with the
+   accent whenever a non-default value is active. */
 
 .projects-toolbar {
   display: flex;
@@ -2367,28 +2365,86 @@
   border-color: var(--color-border-focus);
 }
 
-.projects-toolbar-chips {
-  display: flex;
-  gap: var(--space-2);
-  border-bottom: 1px solid var(--color-border);
+.projects-filter-pill {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
 }
 
-.projects-toolbar-sort {
-  padding: 4px 8px;
+.projects-filter-pill > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
   min-height: 28px;
   box-sizing: border-box;
   border: 1px solid var(--color-border);
-  border-radius: var(--term-radius);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+
+.projects-filter-pill > button b {
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+}
+
+.projects-filter-pill > button:hover {
+  border-color: var(--color-text-muted);
+}
+
+.projects-filter-pill--set > button {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+}
+
+.projects-filter-pill--set > button b {
+  color: var(--color-accent);
+}
+
+.projects-filter-pill-caret {
+  font-size: 9px;
+  line-height: 1;
+}
+
+.projects-filter-pill-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 6px);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--color-text) 12%, transparent);
+}
+
+.projects-filter-pill-menu button {
+  text-align: left;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 4px;
   background: transparent;
   color: var(--color-text-muted);
-  font-family: inherit;
-  font-size: 12px;
+  font-family: var(--term-font-mono);
+  font-size: 11.5px;
   cursor: pointer;
 }
 
-.projects-toolbar-sort:hover {
-  border-color: var(--color-text-muted);
+.projects-filter-pill-menu button:hover {
+  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
   color: var(--color-text);
+}
+
+.projects-filter-pill-menu button[aria-checked='true'] {
+  color: var(--color-accent);
+  font-weight: var(--weight-medium);
 }
 
 .projects-toolbar-sync {
@@ -2410,29 +2466,6 @@
   .projects-toolbar-sync {
     margin-left: 0;
   }
-}
-
-.projects-tab {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--color-text-muted);
-  font-family: var(--term-font-mono);
-  font-size: 0.8125rem;
-  line-height: 1.4;
-  padding: 6px 4px;
-  cursor: pointer;
-  transition: color 0.12s ease, border-color 0.12s ease;
-}
-
-.projects-tab:hover {
-  color: var(--color-text);
-}
-
-.projects-tab--active {
-  color: var(--color-accent);
-  border-bottom-color: var(--color-accent);
-  font-weight: var(--weight-medium);
 }
 
 /* ── Project card ── */
@@ -2501,15 +2534,27 @@
   gap: var(--space-3);
 }
 
-/* Origin marker (which Projects sub-tab this card is listed under) —
-   shown on every card, local and online alike. */
-.project-card-source {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
+/* Sync-state badge (top-right of every card): LOCAL / PUBLISHED / REMOTE.
+   Soft-filled pill; muted for local-only, success-tinted once published,
+   accent-tinted for remote-only entries. */
+.project-card-badge {
   flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.06em;
+  background: color-mix(in srgb, var(--color-text-muted) 12%, transparent);
+  color: var(--color-text-muted);
 }
 
-.project-card-source--online {
+.project-card-badge--both {
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: var(--color-success);
+}
+
+.project-card-badge--shared {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
   color: var(--color-accent);
 }
 
