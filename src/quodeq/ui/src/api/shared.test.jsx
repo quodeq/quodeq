@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as shared from './shared.js';
+import { createProject } from '../models/project.js';
 
 let calls;
 
@@ -89,6 +90,11 @@ describe('shared repo API client', () => {
   });
 
   describe('project listing & info', () => {
+    it('createProject carries originUrl through, defaulting to null when absent', () => {
+      expect(createProject({ name: 'x', originUrl: 'u' }).originUrl).toBe('u');
+      expect(createProject({ name: 'x' }).originUrl).toBeNull();
+    });
+
     it('sharedListProjects GETs /shared/projects with refresh=0 by default', async () => {
       await shared.sharedListProjects();
       expect(calls[0].url).toBe('/api/shared/projects?refresh=0');
@@ -115,6 +121,7 @@ describe('shared repo API client', () => {
                 id: 'proj1',
                 name: 'Test Project',
                 runsCount: undefined, // createProject should normalize to 0
+                originUrl: 'https://github.com/org/app.git',
                 publishedBy: 'alice',
                 publishedAt: publishedAtSeconds,
                 source: 'shared',
@@ -142,6 +149,7 @@ describe('shared repo API client', () => {
       expect(result.projects).toHaveLength(1);
       expect(result.projects[0].runsCount).toBe(0); // createProject normalizes missing runsCount to 0
       expect(result.projects[0].name).toBe('Test Project');
+      expect(result.projects[0].originUrl).toBe('https://github.com/org/app.git');
 
       // Assert shared-specific metadata is preserved, publishedAt converted to milliseconds
       expect(result.projects[0].publishedBy).toBe('alice');
