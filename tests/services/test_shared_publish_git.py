@@ -66,9 +66,18 @@ def test_publish_bootstraps_and_pushes(tmp_path):
     assert (verify / "evaluations" / "proj-uuid-1" / "run-1" / "status.json").exists()
 
 
-def test_publish_is_idempotent_no_empty_commit(tmp_path):
+def test_publish_is_idempotent_no_empty_commit(tmp_path, monkeypatch):
+    """Republishing unchanged project content must never commit, regardless
+    of wall-clock ticks between the two publishes. stage_project always
+    rewrites published.json with a fresh publishedAt, so without the fix
+    this only "passed" when both publishes happened to land in the same
+    wall-clock second -- forcing distinct timestamps here makes that flake
+    a deterministic failure.
+    """
     url = _bare_origin(tmp_path)
     root = _local_project(tmp_path)
+    times = iter([1_000_000.0, 1_000_050.0])
+    monkeypatch.setattr(shared_publish.time, "time", lambda: next(times))
     publish_project("proj-uuid-1", url, evaluations_root=root)
     publish_project("proj-uuid-1", url, evaluations_root=root)  # must not raise
     repo = shared_repo_path(url)
@@ -76,6 +85,38 @@ def test_publish_is_idempotent_no_empty_commit(tmp_path):
         ["git", "log", "--oneline"], cwd=repo, capture_output=True, text=True, check=True
     ).stdout.strip().splitlines()
     assert len(log) == 1  # second publish added no commit
+
+
+def test_publish_after_real_change_commits_and_advances_published_at(tmp_path, monkeypatch):
+    """Contrast case: when project content genuinely changes between two
+    publishes, a new commit IS created and published.json's publishedAt
+    advances -- the idempotency fix must not suppress real updates."""
+    url = _bare_origin(tmp_path)
+    root = _local_project(tmp_path)
+    times = iter([1_000_000.0, 1_000_100.0])
+    monkeypatch.setattr(shared_publish.time, "time", lambda: next(times))
+
+    publish_project("proj-uuid-1", url, evaluations_root=root)
+    repo = shared_repo_path(url)
+    meta_path = repo / "evaluations" / "proj-uuid-1" / "published.json"
+    first_meta = json.loads(meta_path.read_text(encoding="utf-8"))
+
+    # A genuinely new completed run appears locally before the second publish.
+    run2 = root / "proj-uuid-1" / "run-2"
+    (run2 / "evidence").mkdir(parents=True)
+    (run2 / "status.json").write_text(json.dumps({"state": "done", "schema_version": 2}))
+    (run2 / "dimensions.json").write_text("{}")
+    (run2 / "events.jsonl").write_text("{}\n")
+
+    publish_project("proj-uuid-1", url, evaluations_root=root)
+
+    log = subprocess.run(
+        ["git", "log", "--oneline"], cwd=repo, capture_output=True, text=True, check=True
+    ).stdout.strip().splitlines()
+    assert len(log) == 2  # real content change produced a second commit
+
+    second_meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    assert second_meta["publishedAt"] > first_meta["publishedAt"]
 
 
 def test_publish_into_foreign_repo_refused(tmp_path):

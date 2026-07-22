@@ -229,6 +229,25 @@ def publish_project(
         if not ok:
             raise PublishError(f"git add failed, {out.strip()[:300]}")
 
+        # stage_project unconditionally rewrites published.json with a fresh
+        # publishedAt/publishedBy (needed so those fields DO advance when
+        # content really changes). That means an otherwise-unchanged
+        # republish still stages a one-line diff on that file alone once the
+        # wall clock ticks to a new second. Detect that "staged set is only
+        # published.json" case and revert it to HEAD before the nothing-staged
+        # check below, so attribution only updates when real project content
+        # changed. A project's first-ever publish can never hit this
+        # incorrectly: published.json isn't in HEAD yet, so the staged set
+        # always includes the new runs/info files alongside it too. If it
+        # somehow doesn't, the checkout below simply fails against a
+        # nonexistent HEAD path; that failure is ignored and the normal
+        # commit path proceeds as if nothing special happened.
+        published_rel = f"evaluations/{project_id}/{PUBLISHED_META_FILENAME}"
+        ok_names, names_out = run_git(["diff", "--cached", "--name-only"], cwd=repo)
+        staged_names = [line.strip() for line in names_out.splitlines() if line.strip()]
+        if ok_names and staged_names == [published_rel]:
+            run_git(["checkout", "HEAD", "--", published_rel], cwd=repo)
+
         # A clean `diff --cached` only means nothing NEW was staged this
         # call; it does not mean the remote already has our commits. A
         # prior publish can have committed locally and then failed to push
