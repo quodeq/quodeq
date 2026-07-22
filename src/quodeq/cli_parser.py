@@ -139,7 +139,11 @@ def build_parser() -> argparse.ArgumentParser:
     report_parser.add_argument("--owner", required=True, help="GitHub repository owner")
     report_parser.add_argument("--repo", required=True, help="GitHub repository name")
     report_parser.add_argument("--pr", type=int, required=True, help="Pull request number")
-    report_parser.add_argument("--token", help="GitHub token (default: GITHUB_TOKEN env var)")
+    report_parser.add_argument(
+        "--token",
+        help="GitHub token. Prefer the GITHUB_TOKEN env var: a token passed "
+             "here is visible in shell history and process listings.",
+    )
     report_parser.add_argument("--duration", type=int, help="Evaluation duration in seconds")
     report_parser.add_argument(
         "--baseline-dir",

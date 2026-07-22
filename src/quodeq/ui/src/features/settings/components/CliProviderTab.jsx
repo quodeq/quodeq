@@ -72,7 +72,7 @@ export default function CliProviderTab({ providerId, state, update }) {
 
   function persistPower(level) {
     setPower(level);
-    try { localStorage.setItem(POWER_KEY, String(level)); } catch { /* */ }
+    try { localStorage.setItem(POWER_KEY, String(level)); } catch (e) { console.warn('localStorage unavailable:', e); }
   }
 
   const hint = MODEL_HINTS[providerId];

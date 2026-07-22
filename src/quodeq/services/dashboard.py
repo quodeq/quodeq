@@ -249,11 +249,13 @@ def _make_status_aware_fetcher(
         # without that anchor we'd evict every test stub that pre-seeds
         # the cache without creating disk state.
         key = (reports_root, project, run_id, version)
-        if key in resolved_cache:
+        with resolved_lock:
+            cached_dims = resolved_cache.get(key)
+        if cached_dims is not None:
             eval_dir = reports_root / project / run_id / "evaluation"
             if eval_dir.is_dir():
                 on_disk = _count_eval_files(reports_root, project, run_id)
-                if len(resolved_cache[key]) != on_disk:
+                if len(cached_dims) != on_disk:
                     with resolved_lock:
                         resolved_cache.pop(key, None)
         return cached(run_id)

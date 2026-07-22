@@ -64,6 +64,22 @@ def test_resilience_to_corruption(writer: EventLogWriter, reader: EventLogReader
     assert events[1].payload.practice_id == "after_corruption"
 
 
+def test_malformed_json_hits_json_specific_handler(
+    writer: EventLogWriter, reader: EventLogReader, log_path: Path, caplog,
+):
+    """Regression: json.JSONDecodeError subclasses ValueError, so the JSON
+    branch must come first or malformed JSON is logged as 'Invalid event
+    structure' instead of 'Malformed JSON'."""
+    with open(log_path, "a") as f:
+        f.write("NOT_A_JSON_LINE\n")
+
+    with caplog.at_level("ERROR"):
+        assert list(reader.stream()) == []
+
+    assert any("Malformed JSON" in r.message for r in caplog.records)
+    assert not any("Invalid event structure" in r.message for r in caplog.records)
+
+
 def test_latest_timestamp(writer: EventLogWriter, reader: EventLogReader):
     payload = JudgmentPayload(practice_id="p1", verdict="compliance", dimension="D1", file="f1", line=1, reason="r1")
     writer.emit(JudgmentCreatedEvent(payload=payload))

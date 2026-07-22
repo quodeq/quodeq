@@ -45,6 +45,10 @@ _OLLAMA_DEFAULT_BASE = "http://localhost:11434/v1"
 _OLLAMA_DEFAULT_API_KEY = "ollama"
 _OPENAI_API_HOST = "api.openai.com"
 _LOCAL_TIMEOUT = httpx.Timeout(connect=10.0, read=500.0, write=30.0, pool=10.0)
+# Cloud calls get a finite timeout too: with max_retries=0 a stalled response
+# would otherwise block the analysis worker forever. Read budget matches the
+# SDK's own 600s default; a timeout lands in the existing lossy-file branch.
+_CLOUD_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=30.0, pool=10.0)
 _SYSTEM_PROMPT = (
     "You are a code quality evaluator. Quote the offending code into "
     "`snippet` VERBATIM from the source, one or a few contiguous lines, "
@@ -284,7 +288,7 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     if config.max_tokens is not None:
         create_kwargs["max_tokens"] = config.max_tokens
 
-    timeout = None if is_openai else _LOCAL_TIMEOUT
+    timeout = _CLOUD_TIMEOUT if is_openai else _LOCAL_TIMEOUT
     _log.debug("Calling %s model=%s (per-finding parse)", config.api_base, config.model)
     start = time.monotonic()
     with openai.OpenAI(

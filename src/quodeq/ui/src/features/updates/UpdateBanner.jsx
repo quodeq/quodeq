@@ -10,7 +10,7 @@ export default function UpdateBanner() {
   // First-run disclosure: record that the user has been informed.
   useEffect(() => {
     if (status && status.disclosed === false) {
-      markUpdateDisclosed().catch(() => {});
+      markUpdateDisclosed().catch((e) => console.warn('update-state persist failed:', e));
     }
   }, [status]);
 
@@ -18,7 +18,9 @@ export default function UpdateBanner() {
 
   const onDismiss = () => {
     setDismissed(true);
-    dismissUpdate(status.latest).catch(() => {});
+    // Optimistic dismiss: the banner simply reappears next launch if the
+    // request failed, but log the failure so it is diagnosable.
+    dismissUpdate(status.latest).catch((e) => console.warn('update-state persist failed:', e));
   };
 
   return (

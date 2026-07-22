@@ -25,6 +25,14 @@ def _coerce_req_refs(raw: Any) -> list[ReqRef]:
     return refs
 
 
+def _safe_int(value: Any, default: int) -> int:
+    """Coerce a wire value to int, falling back to *default* on junk input."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def wire_dict_to_judgment(d: dict[str, Any]) -> Judgment:
     """Lift a short-key LLM/FindingsRouter wire dict into a Judgment.
 
@@ -38,7 +46,7 @@ def wire_dict_to_judgment(d: dict[str, Any]) -> Judgment:
         verdict=d.get("t") or "",
         dimension=d.get("d") or "",
         file=d.get("file") or "",
-        line=int(d.get("line") or 0),
+        line=_safe_int(d.get("line") or 0, 0),
         end_line=d.get("end_line"),
         snippet=d.get("snippet"),
         severity=d.get("severity") or "medium",
@@ -49,7 +57,7 @@ def wire_dict_to_judgment(d: dict[str, Any]) -> Judgment:
         title=d.get("w"),
         context=d.get("context"),
         scope=d.get("scope"),
-        confidence=int(d.get("confidence") if d.get("confidence") is not None else 100),
+        confidence=_safe_int(d.get("confidence") if d.get("confidence") is not None else 100, 100),
         req=d.get("req"),
         req_refs=_coerce_req_refs(d.get("req_refs")),
         cwe=d.get("cwe"),

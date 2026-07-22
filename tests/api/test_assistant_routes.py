@@ -714,3 +714,43 @@ def test_stop_cancels_running_turn_and_frees_the_token(client, monkeypatch):
         pytest.fail("cancel token not cleaned up after the turn ended")
     assert client.post(f"/api/assistant/sessions/{sid}/messages",
                        json={"text": "again"}).status_code == 202
+
+
+# ---------------------------------------------------------------------------
+# SEC-00 -- each open SSE stream pins a worker thread and GETs bypass the
+# global rate limiter, so the events endpoint caps concurrently open streams.
+# ---------------------------------------------------------------------------
+
+def test_events_stream_returns_429_above_cap(client, monkeypatch):
+    from quodeq.api import assistant_routes
+
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
+    monkeypatch.setattr(assistant_routes, "_open_sse_streams",
+                        assistant_routes._MAX_SSE_STREAMS)
+    resp = client.get(f"/api/assistant/sessions/{sid}/events?after=0")
+    assert resp.status_code == 429
+    assert "error" in resp.get_json()
+
+
+def test_events_stream_releases_slot_when_stream_ends(client, monkeypatch):
+    from quodeq.api import assistant_routes
+
+    monkeypatch.setattr("quodeq.api._assistant_helpers._POLL_SECONDS", 0.001)
+    monkeypatch.setattr("quodeq.api._assistant_helpers._IDLE_LIMIT", 5)
+    sid = client.post("/api/assistant/sessions",
+                      json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
+    stream = client.get(f"/api/assistant/sessions/{sid}/events?after=0")
+    assert stream.status_code == 200
+    stream.get_data(as_text=True)  # drain to completion
+    stream.close()
+    assert assistant_routes._open_sse_streams == 0
+
+
+def test_events_stream_404_does_not_consume_slot(client):
+    from quodeq.api import assistant_routes
+
+    before = assistant_routes._open_sse_streams
+    resp = client.get("/api/assistant/sessions/nope/events?after=0")
+    assert resp.status_code == 404
+    assert assistant_routes._open_sse_streams == before

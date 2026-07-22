@@ -60,6 +60,28 @@ class TestWireDictToJudgment:
         )
         assert j.confidence == 50
 
+    def test_malformed_line_falls_back_to_zero(self):
+        """Regression: a non-numeric wire line must not raise -- the function
+        documents that it never raises on malformed input."""
+        j = wire_dict_to_judgment(
+            {"p": "P1", "t": "violation", "line": "not-a-number"})
+        assert j.line == 0
+
+    def test_numeric_string_line_coerced(self):
+        j = wire_dict_to_judgment({"p": "P1", "t": "violation", "line": "7"})
+        assert j.line == 7
+
+    def test_malformed_confidence_falls_back_to_100(self):
+        j = wire_dict_to_judgment(
+            {"p": "P1", "t": "violation", "confidence": "high"})
+        assert j.confidence == 100
+
+    def test_non_scalar_line_and_confidence_fall_back(self):
+        j = wire_dict_to_judgment(
+            {"p": "P1", "t": "violation", "line": [1, 2], "confidence": {"x": 1}})
+        assert j.line == 0
+        assert j.confidence == 100
+
     def test_violation_type_read_from_short_vt_key(self):
         """Regression: the JSONL wire format carries the taxonomy as 'vt'
         (see core/evidence/_jsonl.py); this reader must not silently drop it

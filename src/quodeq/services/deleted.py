@@ -11,7 +11,9 @@ guarded by the same kind of POSIX file lock used by ``dismissed.py``.
 from __future__ import annotations
 
 import json
+import logging
 import os
+import sqlite3
 from contextlib import contextmanager
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -26,6 +28,8 @@ from quodeq.data._file_lock import lock_file, unlock_file
 from quodeq.data.actions_log import ActionLogWriter
 from quodeq.services.dismissed import recount_totals
 
+
+_logger = logging.getLogger(__name__)
 
 _FILENAME = "deleted.json"
 
@@ -175,7 +179,11 @@ def _sweep_dismissed_matching(project_dir: Path, key: tuple) -> int:
                     (dimension, principle, file),
                 ):
                     matching.append((row[0] or "", row[1] or "", int(row[2] or 0)))
-        except Exception:
+        except (sqlite3.Error, OSError):
+            _logger.warning(
+                "Skipping unreadable evaluation.db while undismissing in %s",
+                run_dir, exc_info=True,
+            )
             continue
 
     if not matching:

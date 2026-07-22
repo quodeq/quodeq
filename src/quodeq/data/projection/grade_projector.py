@@ -139,9 +139,12 @@ def recompute_grades(run_dir: Path, params: ScoringParams | None = None) -> None
     # dimension label, dimensions.json carries the dimension id.
     from quodeq.shared.dimensions_state import read_dimensions  # noqa: PLC0415
     dim_states = read_dimensions(run_dir).get("dimensions", {})
+    if not isinstance(dim_states, dict):
+        dim_states = {}
     exit_by_dim = {
         str(name).lower(): entry.get("exit_reason")
         for name, entry in dim_states.items()
+        if isinstance(entry, dict)
     }
     for row in dimension_rows:
         row["exit_reason"] = exit_by_dim.get(str(row["dimension"]).lower())

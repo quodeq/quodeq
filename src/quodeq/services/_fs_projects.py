@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextvars
 import json
+import logging
 import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -22,6 +23,8 @@ from quodeq.services._fs_project_helpers import (
 from quodeq.services.ports import list_runs, safe_read_dir
 from quodeq.shared.repo_handler import is_valid_repo_url
 from quodeq.shared.utils import is_repo_url
+
+_logger = logging.getLogger(__name__)
 
 _MAX_PROJECT_BUILD_WORKERS = 8
 
@@ -202,14 +205,20 @@ def delete_project(reports_dir: str, project: str) -> bool:
         return False
 
     # Cascade: find and delete children first
+    children_removed = True
     for child_id in find_children(reports_root, project):
-        shutil.rmtree(reports_root / child_id, ignore_errors=True)
+        child_path = reports_root / child_id
+        try:
+            shutil.rmtree(child_path)
+        except OSError:
+            _logger.warning("Could not remove child project directory %s", child_path)
+            children_removed = False
 
     try:
         shutil.rmtree(project_path)
     except OSError:
         return False
-    return True
+    return children_removed
 
 
 def get_project_info(reports_dir: str, project: str) -> dict[str, Any] | None:

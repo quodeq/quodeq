@@ -43,6 +43,13 @@ class TestParseJsonlLine:
     def test_invalid_json(self):
         assert _parse_jsonl_line("not json") is None
 
+    def test_non_object_json_skipped(self):
+        """Regression: valid JSON that is not an object (array, string,
+        number) must be skipped, not raise AttributeError at obj.get."""
+        assert _parse_jsonl_line('["p", "t"]') is None
+        assert _parse_jsonl_line('"just a string"') is None
+        assert _parse_jsonl_line("42") is None
+
 
 class TestProvenanceDowngradeRoundTrip:
     """Issue #656: the provenance_downgrade marker must survive the

@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, lazy, Suspense } from 'react';
+import React, { useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';
 import { AssistantPane } from '../assistant/AssistantDrawer.jsx';
 import { ChevronDownIcon, GlobeIcon, MaximizeIcon, MinimizeIcon, PencilIcon, RotateCcwIcon } from '../../components/CopyButton.jsx';
@@ -54,6 +54,12 @@ export function BottomDrawer({ uiState }) {
     window.addEventListener('pointermove', handleDragMove);
     window.addEventListener('pointerup', handleDragEnd);
   }, [height, maximized, setMaximized, handleDragMove, handleDragEnd]);
+  // Unmounting mid-drag would leave the window listeners registered and the
+  // stale handlers calling setHeight until the next pointerup; drop them.
+  useEffect(() => () => {
+    window.removeEventListener('pointermove', handleDragMove);
+    window.removeEventListener('pointerup', handleDragEnd);
+  }, [handleDragMove, handleDragEnd]);
 
   if (!isOpen) return null;
   // Guard against a transient render where activeTab isn't (yet) an open panel.

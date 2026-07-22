@@ -370,5 +370,14 @@ describe('shared repo API client', () => {
         projectName: 'demo-repo',
       });
     });
+
+    it('pullSharedProject passes an abort signal and maps a timeout to a clear error', async () => {
+      await shared.pullSharedProject('proj1');
+      expect(calls[0].opts.signal).toBeInstanceOf(AbortSignal);
+      const timeoutErr = new Error('signal timed out');
+      timeoutErr.name = 'TimeoutError';
+      globalThis.fetch = vi.fn(async () => { throw timeoutErr; });
+      await expect(shared.pullSharedProject('proj1')).rejects.toThrow(/timed out/i);
+    });
   });
 });

@@ -9,10 +9,11 @@ import subprocess as _subprocess
 from pathlib import Path
 
 from quodeq.services.shared_repo import remove_clone_dir
+from quodeq.shared._env import env_int
 
 _logger = logging.getLogger(__name__)
 
-_GIT_CLONE_TIMEOUT_S = int(os.environ.get("QUODEQ_GIT_CLONE_TIMEOUT_S", "300"))
+_GIT_CLONE_TIMEOUT_S = env_int("QUODEQ_GIT_CLONE_TIMEOUT_S", 300, minimum=1)
 
 # One month of slack over the default git churn lookback (git_lookback_months,
 # 3) so the boundary commit is never cut off. Raise QUODEQ_CLONE_SHALLOW_MONTHS

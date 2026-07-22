@@ -308,9 +308,11 @@ export function getOmlxStatus(baseUrl) {
 export async function getOmlxModels(baseUrl, apiKey) {
   const params = new URLSearchParams();
   if (baseUrl) params.set('base_url', baseUrl);
-  if (apiKey) params.set('api_key', apiKey);
   const qs = params.toString() ? `?${params}` : '';
-  const data = await request(`/omlx/models${qs}`);
+  // The API key travels in a header, never the query string: query strings
+  // end up in server access logs and browser history.
+  const options = apiKey ? { headers: { 'X-Api-Key': apiKey } } : {};
+  const data = await request(`/omlx/models${qs}`, options);
   return data?.models ?? [];
 }
 
@@ -414,11 +416,22 @@ export function markUpdateDisclosed() {
  * @throws {Error & { status: number, code?: string, existingProjectId?: string }} on non-2xx
  */
 export async function registerProject(payload) {
-  const res = await fetch('/api/projects', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  let res;
+  try {
+    res = await fetch('/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      // Generous: registration may clone a large repository server-side,
+      // but a hung backend must not leave onboarding pending forever.
+      signal: AbortSignal.timeout(600000), // 10 min
+    });
+  } catch (e) {
+    if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+      throw new Error('Project registration timed out. The server may be unresponsive or the clone is taking too long; try again.');
+    }
+    throw e;
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(body.error || `registerProject failed (${res.status})`);

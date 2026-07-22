@@ -10,12 +10,16 @@ delegates to an instance of this class.
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 from pathlib import Path
 
 from quodeq.core.types.job import JobSnapshot
 from quodeq.services import run_index as _run_index
+from quodeq.services._external_jobs import is_safe_run_segment
 from quodeq.services.jobs import JobManager
+
+_logger = logging.getLogger(__name__)
 
 _TERMINAL_STATUS_STATES = {"complete", "completed", "done", "cancelled", "failed", "lost"}
 
@@ -108,13 +112,17 @@ class EvaluationsIndex:
             candidate = reports_dir / snapshot.output_project / run_uuid
             if candidate.is_dir():
                 shutil.rmtree(candidate, ignore_errors=True)
-                removed_dir = True
+                removed_dir = not candidate.exists()
+                if not removed_dir:
+                    _logger.warning("Could not remove run directory %s", candidate)
         if not removed_dir and reports_dir.is_dir():
             for project_dir in reports_dir.iterdir():
                 candidate = project_dir / run_uuid
                 if candidate.is_dir():
                     shutil.rmtree(candidate, ignore_errors=True)
-                    removed_dir = True
+                    removed_dir = not candidate.exists()
+                    if not removed_dir:
+                        _logger.warning("Could not remove run directory %s", candidate)
                     break
         # Remove from index regardless so stale rows get cleaned up. The same
         # on-disk run can be indexed under "ext-<run_uuid>" even when the
@@ -154,6 +162,8 @@ class EvaluationsIndex:
         try:
             if job_id.startswith("ext-"):
                 run_id = job_id[len("ext-"):]
+                if not is_safe_run_segment(run_id):
+                    return None
                 for project_dir in (reports_dir.iterdir() if reports_dir.is_dir() else []):
                     candidate = project_dir / run_id
                     if candidate.is_dir():

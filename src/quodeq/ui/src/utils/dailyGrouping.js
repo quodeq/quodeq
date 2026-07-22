@@ -35,6 +35,10 @@ export function isoWeekKey(dateISO) {
   const [y, m, d] = datePart.split('-').map(Number);
   if (!y || !m || !d) return '';
   const date = new Date(Date.UTC(y, m - 1, d));
+  // Date.UTC normalizes impossible components (2026-02-31 becomes March);
+  // reject anything that does not round-trip so a malformed date is not
+  // grouped under a week it never specified.
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return '';
   const dayNum = date.getUTCDay() || 7;           // Mon=1 .. Sun=7
   date.setUTCDate(date.getUTCDate() + 4 - dayNum); // shift to this week's Thursday
   const isoYear = date.getUTCFullYear();

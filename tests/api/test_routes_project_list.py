@@ -42,6 +42,9 @@ class _FakeProvider:
     def get_project_info(self, reports_dir: str, project: str) -> dict:
         return self.project_info or {}
 
+    def invalidate_projects_cache(self) -> None:
+        self.cache_invalidated = True
+
 
 @pytest.fixture()
 def provider():
@@ -241,3 +244,51 @@ class TestScanPath:
              patch("pathlib.Path.home", return_value=tmp_path):
             resp = client.post("/api/scan", json={"path": str(target)})
             assert resp.status_code == 200
+
+
+class TestCreateProjectLocalPathValidation:
+    """SEC-24: the local-repo branch of create_project enforces the same
+    allowlist as /api/scan (home or evaluations dir, no system paths)."""
+
+    def test_local_repo_outside_home_rejected(self, client, tmp_path_factory):
+        # Pin home to its own temp dir: the candidate repo must be outside it
+        # on every platform (on Windows the pytest tmp root lives UNDER the
+        # real home, so relying on the real Path.home() would pass the
+        # allowlist and return 200).
+        fake_home = tmp_path_factory.mktemp("fake-home")
+        outside = tmp_path_factory.mktemp("outside-home-repo")
+        with patch("pathlib.Path.home", return_value=fake_home):
+            resp = client.post("/api/projects", json={"repo": str(outside)})
+        assert resp.status_code == 403
+        assert resp.get_json()["code"] == "FORBIDDEN"
+
+    @pytest.mark.skipif(
+        os.name == "nt",
+        reason="blocked paths are POSIX system dirs; /etc does not exist on "
+        "Windows so the existence check 400s before the allowlist",
+    )
+    def test_local_repo_system_dir_rejected(self, client):
+        # Widen home to "/" so the allowlist passes and the blocked-path
+        # check is the branch under test.
+        with patch("pathlib.Path.home", return_value=Path("/")):
+            resp = client.post("/api/projects", json={"repo": "/etc"})
+        assert resp.status_code == 403
+        assert resp.get_json()["code"] == "FORBIDDEN"
+
+    def test_local_repo_under_evaluations_root_accepted(self, client, tmp_path):
+        repo_dir = tmp_path / "myrepo"
+        repo_dir.mkdir()
+        with patch(
+            "quodeq.services.evaluation_mixin._register_project",
+            return_value="uuid-1",
+        ):
+            resp = client.post("/api/projects", json={"repo": str(repo_dir)})
+        assert resp.status_code == 200
+        assert resp.get_json()["projectId"] == "uuid-1"
+
+    def test_nonexistent_local_repo_still_400(self, client, tmp_path):
+        resp = client.post(
+            "/api/projects", json={"repo": str(tmp_path / "does-not-exist")}
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_REPO"
