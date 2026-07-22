@@ -92,7 +92,7 @@ def create_app(
 
     from pathlib import Path
     from quodeq.services._ephemeral_cleanup import sweep_orphaned_clones
-    from quodeq.shared._env import get_clones_dir, get_evaluations_dir
+    from quodeq.shared._env import get_clones_dir, get_evaluations_dir, get_quodeq_dir
 
     try:
         sweep_orphaned_clones(get_clones_dir(), Path(get_evaluations_dir()))
@@ -110,7 +110,9 @@ def create_app(
         app.config["STANDARDS_DIMENSIONS_FILE"] = str(paths.dimensions_file)
 
     if "ASSISTANT_DB_PATH" not in app.config:
-        app.config["ASSISTANT_DB_PATH"] = str(Path.home() / ".quodeq" / "assistant.db")
+        # QUODEQ_DIR must redirect this like every other state path, else
+        # env-isolated servers write sessions into the real ~/.quodeq store.
+        app.config["ASSISTANT_DB_PATH"] = str(get_quodeq_dir() / "assistant.db")
 
     if api_key is None:
         _logger.warning(
