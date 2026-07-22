@@ -121,7 +121,14 @@ def _create_project(
     try:
         (project_dir / _REPO_INFO_FILENAME).write_text(json.dumps(info, indent=2), encoding="utf-8")
     except OSError as exc:
-        logging.getLogger(__name__).warning("Could not write repository_info.json: %s", exc)
+        # Fail creation cleanly: indexing a project without its metadata file
+        # would leave a permanently broken entry. The registration route rolls
+        # back the new directory when this propagates.
+        logging.getLogger(__name__).error(
+            "Could not write repository_info.json for %s: %s; aborting project creation",
+            project_dir, exc,
+        )
+        raise
     index = load_fn(reports_dir)
     index[_index_key(identity)] = project_uuid
     save_fn(reports_dir, index)

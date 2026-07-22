@@ -20,8 +20,9 @@ from quodeq.services.run_index import (
 _INDEX_STATE_TO_UI_STATUS = {
     "done": "complete", "complete": "complete", "finished": "complete",
     "running": "in_progress", "in_progress": "in_progress",
+    "pending": "in_progress", "finalizing": "in_progress",
     "cancelled": "cancelled", "canceled": "cancelled",
-    "failed": "failed", "error": "failed",
+    "failed": "failed", "error": "failed", "lost": "failed",
 }
 
 

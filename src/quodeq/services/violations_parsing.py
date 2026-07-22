@@ -6,7 +6,6 @@ modules are re-exported here for backward compatibility.
 """
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -131,7 +130,8 @@ def parse_violations_from_evidence(evidence_path: Path, ctx: ViolationContext) -
     """Extract violations from a completed evidence JSON file."""
     try:
         data = read_json(evidence_path)
-    except (OSError, json.JSONDecodeError):
+    except (OSError, ValueError):
+        # read_json wraps JSONDecodeError and non-object payloads in ValueError.
         return None
     violations = _extract_violations_from_principles(data.get("principles") or {})
     return _build_violation_response(ctx, violations, [], _ResponseOptions(partial=True))

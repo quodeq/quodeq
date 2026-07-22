@@ -18,6 +18,7 @@ import subprocess
 from quodeq.core.types import JobSnapshot
 
 from quodeq.analysis._process import _kill_tree, _terminate_process
+from quodeq.shared._env import env_float
 from quodeq.shared.run_log import RunLogWriter
 from quodeq.services._job_model import (
     Job,
@@ -179,8 +180,10 @@ class JobManager:
 
     def _cancel_external(self, job_id: str, reports_root: Path) -> bool:
         """Send SIGTERM to an external run's process."""
-        from quodeq.services._external_jobs import cancel_external_run
+        from quodeq.services._external_jobs import cancel_external_run, is_safe_run_segment
         run_id = job_id[len("ext-"):]
+        if not is_safe_run_segment(run_id):
+            return False
         for project_dir in reports_root.iterdir():
             if not project_dir.is_dir():
                 continue
@@ -398,7 +401,7 @@ class JobManager:
         re-enable a wall-clock cap. Otherwise the watchdog only enforces
         the user-set ``deadline_at`` (with a grace window).
         """
-        return float(os.environ.get("QUODEQ_JOB_TIMEOUT_S", "0"))
+        return env_float("QUODEQ_JOB_TIMEOUT_S", 0.0, minimum=0.0)
 
     def _watchdog_should_kill(self, job_id: str, started_at: float) -> bool:
         """Return True when the watchdog should SIGKILL the job process now."""

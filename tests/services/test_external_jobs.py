@@ -268,3 +268,52 @@ def test_cancel_external_run_kills_child_processes_in_same_group(tmp_path):
     finally:
         reaper_stop.set()
         _force_cleanup(proc)
+
+
+# ---------------------------------------------------------------------------
+# Path-segment validation for externally-supplied run/project ids
+# ---------------------------------------------------------------------------
+
+from quodeq.services._external_jobs import is_safe_run_segment, resolve_external_pid  # noqa: E402
+
+
+class TestIsSafeRunSegment:
+    def test_accepts_uuid(self):
+        assert is_safe_run_segment("d5b8a421-8c9f-4e11-9b7a-1f2e3d4c5b6a")
+
+    def test_accepts_dotted_and_underscored_names(self):
+        assert is_safe_run_segment("run_1.backup-2")
+
+    def test_rejects_dot_and_dotdot(self):
+        assert not is_safe_run_segment(".")
+        assert not is_safe_run_segment("..")
+
+    def test_rejects_empty(self):
+        assert not is_safe_run_segment("")
+
+    def test_rejects_separators(self):
+        assert not is_safe_run_segment("a/b")
+        assert not is_safe_run_segment("a\\b")
+        assert not is_safe_run_segment("../etc")
+
+    def test_rejects_other_charset(self):
+        assert not is_safe_run_segment("run id")
+        assert not is_safe_run_segment("run\x00id")
+
+
+class TestResolveExternalPidValidation:
+    def test_traversal_run_id_returns_none(self, tmp_path):
+        # A '..' run_id would otherwise resolve to reports_root/<proj>/../.pid
+        (tmp_path / ".pid").write_text("12345")
+        assert resolve_external_pid("proj", "..", tmp_path) is None
+
+    def test_traversal_project_uuid_returns_none(self, tmp_path):
+        assert resolve_external_pid("..", "run", tmp_path) is None
+
+
+class TestCancelExternalValidation:
+    def test_cancel_job_rejects_traversal_ext_id(self, tmp_path):
+        from quodeq.services.jobs import JobManager
+
+        (tmp_path / ".pid").write_text("12345")
+        assert JobManager().cancel_job("ext-..", reports_root=tmp_path) is False

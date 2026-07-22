@@ -17,6 +17,8 @@ its own module-level references so its monkeypatch-based tests keep working;
 """
 from __future__ import annotations
 
+import logging
+import sqlite3
 from collections import OrderedDict
 from pathlib import Path
 from threading import Lock
@@ -30,6 +32,8 @@ from quodeq.services.dismissed import dismissed_keys as _default_dismissed_keys
 from quodeq.services.ports import read_run_scalars as _default_read_run_scalars
 from quodeq.services.rescore import _rescore_dimension
 from quodeq.services.score_cache import make_cache_backed_fetcher
+
+_logger = logging.getLogger(__name__)
 
 _Fetcher = Callable[[str], list[DimensionResult]]
 
@@ -114,7 +118,8 @@ def make_trend_fetcher(
         try:
             with open_score_cache() as _conn:
                 _keys = load_run_keys(_conn, project)
-        except Exception:
+        except (OSError, sqlite3.Error):
+            _logger.debug("Could not load run keys from score cache for %s", project, exc_info=True)
             _keys = {}
 
         def version_for(run_id: str) -> str:
@@ -126,8 +131,11 @@ def make_trend_fetcher(
                     try:
                         with open_score_cache() as _c:
                             store_run_keys(_c, project, run_id, keys[0], keys[1])
-                    except Exception:
-                        pass
+                    except (OSError, sqlite3.Error):
+                        _logger.debug(
+                            "Could not store run keys in score cache for %s/%s",
+                            project, run_id, exc_info=True,
+                        )
             return run_scoped_version(params, keys[0], keys[1], dismissed, deleted)
 
         is_cacheable = (

@@ -209,3 +209,23 @@ def test_judgment_to_row_optional_fields_default():
     assert row["req_refs_json"] == "[]"
     assert row["confidence"] == 100
     assert row["severity"] == "medium"
+
+
+def test_row_to_finding_malformed_refs_json_falls_back_to_empty():
+    row = {
+        "practice_id": "P-TIM-1",
+        "verdict": "violation",
+        "req_refs_json": "{not valid json",
+    }
+    finding = row_to_finding(row)
+    assert finding.req_refs == []
+
+
+def test_row_to_finding_valid_refs_json_still_parses():
+    row = {
+        "practice_id": "P-TIM-1",
+        "verdict": "violation",
+        "req_refs_json": '[{"label": "R1", "url": "https://x"}]',
+    }
+    finding = row_to_finding(row)
+    assert [(r.label, r.url) for r in finding.req_refs] == [("R1", "https://x")]
