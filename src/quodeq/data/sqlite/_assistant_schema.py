@@ -1,9 +1,9 @@
 """DDL for the assistant conversation store (~/.quodeq/assistant.db)."""
 
-ASSISTANT_SCHEMA_VERSION = 3
+ASSISTANT_SCHEMA_VERSION = 4
 
 ASSISTANT_DDL = """
-PRAGMA user_version = 3;
+PRAGMA user_version = 4;
 
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     run_id TEXT,
     project_id TEXT,
     cli_session_id TEXT,
+    source TEXT NOT NULL DEFAULT 'local',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -74,4 +75,6 @@ ASSISTANT_MIGRATIONS: list[tuple[int, str]] = [
         "    created_at TEXT NOT NULL DEFAULT (datetime('now'))\n"
         ");\n"
         "PRAGMA user_version = 3;"),
+    (4, "ALTER TABLE sessions ADD COLUMN source TEXT NOT NULL DEFAULT 'local';\n"
+        "PRAGMA user_version = 4;"),
 ]

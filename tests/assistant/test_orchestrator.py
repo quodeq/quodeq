@@ -364,3 +364,21 @@ def test_run_turn_threads_cancel_token_to_adapter(setup):
     run_turn(_request(), repository=repo, tool_ctx=ctx, turn_fn=fake_turn2,
              capability_fn=lambda *a, **k: True, cancel=token)
     assert seen["explicit"] is token
+
+
+def test_mcp_args_carry_read_only_and_cache_override(tmp_path):
+    from quodeq.assistant import AssistantRepository
+    from quodeq.assistant.orchestrator import TurnRequest, _mcp_server_args
+    from quodeq.assistant.tools import ToolContext
+    ctx = ToolContext(
+        repository=AssistantRepository(tmp_path / "assistant.db"),
+        session_id="s", run_dir=None, repo_root=None,
+        evaluators_dir=tmp_path, compiled_dir=tmp_path,
+        dimensions_file=tmp_path / "dims.json",
+        read_only=True, score_cache_path=tmp_path / "score_cache.db")
+    req = TurnRequest(session_id="s", text="hi", ui_state=None, api_base="",
+                      api_key=None, provider="claude", model="m")
+    args = _mcp_server_args(req, ctx)
+    assert "--read-only" in args
+    assert "--score-cache-override" in args
+    assert str(tmp_path / "score_cache.db") in args

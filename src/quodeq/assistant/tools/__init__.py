@@ -18,5 +18,8 @@ def build_registry(ctx: ToolContext) -> ToolRegistry:
     register_read_tools(registry, ctx)
     register_overview_tools(registry, ctx)
     register_repo_tools(registry, ctx)
-    register_action_tools(registry, ctx)
+    # Read-only (shared) sessions get NO mutation primitive: draft_action is
+    # absent from the registry, so there is nothing to gate downstream.
+    if not ctx.read_only:
+        register_action_tools(registry, ctx)
     return registry

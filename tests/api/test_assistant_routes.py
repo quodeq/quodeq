@@ -754,3 +754,128 @@ def test_events_stream_404_does_not_consume_slot(client):
     resp = client.get("/api/assistant/sessions/nope/events?after=0")
     assert resp.status_code == 404
     assert assistant_routes._open_sse_streams == before
+
+
+# ---- source-aware create route ---------------------------------------------
+
+def test_create_session_rejects_unknown_source(client):
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "source": "cloud"})
+    assert resp.status_code == 400
+
+
+def test_create_session_shared_409_when_unconfigured(client, monkeypatch):
+    from quodeq.services.shared_settings import SharedSettings
+    monkeypatch.setattr("quodeq.api.assistant_routes.read_settings",
+                        lambda: SharedSettings(url=None))
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "source": "shared"})
+    assert resp.status_code == 409
+
+
+def test_create_session_shared_409_when_clone_state_bad(client, monkeypatch):
+    from quodeq.services.shared_settings import SharedSettings
+    monkeypatch.setattr("quodeq.api.assistant_routes.read_settings",
+                        lambda: SharedSettings(url="file:///tmp/fake.git"))
+    monkeypatch.setattr("quodeq.api.assistant_routes.read_state", lambda url: "foreign")
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "source": "shared"})
+    assert resp.status_code == 409
+    assert "foreign" in resp.get_json()["error"]
+
+
+def test_create_session_shared_persists_source_and_read_only(client, app, monkeypatch):
+    from quodeq.services.shared_settings import SharedSettings
+    monkeypatch.setattr("quodeq.api.assistant_routes.read_settings",
+                        lambda: SharedSettings(url="file:///tmp/fake.git"))
+    monkeypatch.setattr("quodeq.api.assistant_routes.read_state", lambda url: "ok")
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "source": "shared",
+                             "projectId": "proj-a"})
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["readOnly"] is True
+    assert body["writeAvailable"] is False
+    assert body["repoAttached"] is False
+    assert body["repoReason"] == "online_project"
+    row = _repo(app).get_session(body["sessionId"])
+    assert row["source"] == "shared"
+
+
+def test_create_session_local_reports_read_only_false(client, app):
+    resp = client.post("/api/assistant/sessions", json={"provider": "ollama"})
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["readOnly"] is False
+    assert _repo(app).get_session(body["sessionId"])["source"] == "local"
+
+
+def test_message_on_shared_session_without_repo_409s_and_frees_the_slot(client, app, monkeypatch):
+    from quodeq.services.shared_settings import SharedSettings
+    # The session was created while a shared repo was configured; it has
+    # since been disconnected. build_tool_context must surface this as a
+    # 409, and the running-turn slot must be released so the session is
+    # not permanently locked out.
+    _repo(app).create_session(session_id="s-gone", provider="ollama", source="shared")
+    monkeypatch.setattr("quodeq.api._assistant_helpers.read_settings",
+                        lambda: SharedSettings(url=None))
+    first = client.post("/api/assistant/sessions/s-gone/messages", json={"text": "hi"})
+    assert first.status_code == 409
+    assert "shared repository" in first.get_json()["error"]
+    # Slot freed: the next POST must hit the same 409, NOT "a turn is
+    # already running".
+    second = client.post("/api/assistant/sessions/s-gone/messages", json={"text": "hi"})
+    assert second.status_code == 409
+    assert "already running" not in second.get_json()["error"]
+
+
+def test_message_on_shared_session_with_bad_clone_state_409s_and_frees_the_slot(client, app, monkeypatch):
+    from quodeq.services.shared_settings import SharedSettings
+    # The session was created while the shared clone was in a servable state;
+    # a background refresh has since pulled a foreign/unsupported clone.
+    # build_tool_context must surface this as a 409, and the running-turn
+    # slot must be released so the session is not permanently locked out.
+    _repo(app).create_session(session_id="s-foreign", provider="ollama", source="shared")
+    monkeypatch.setattr("quodeq.api._assistant_helpers.read_settings",
+                        lambda: SharedSettings(url="file:///tmp/fake.git"))
+    monkeypatch.setattr("quodeq.api._assistant_helpers.read_state", lambda url: "foreign")
+    first = client.post("/api/assistant/sessions/s-foreign/messages", json={"text": "hi"})
+    assert first.status_code == 409
+    assert "foreign" in first.get_json()["error"]
+    # Slot freed: the next POST must hit the same 409, NOT "a turn is
+    # already running".
+    second = client.post("/api/assistant/sessions/s-foreign/messages", json={"text": "hi"})
+    assert second.status_code == 409
+    assert "already running" not in second.get_json()["error"]
+
+
+def _drafted_action_on_shared_session(app):
+    repo = _repo(app)
+    repo.create_session(session_id="s-ro", provider="ollama", source="shared")
+    return repo.create_action(
+        action_id="a-ro", session_id="s-ro", action_type="dismiss_finding",
+        payload={"project": "proj", "req": "R1", "file": "a.py", "line": 1, "reason": "false positive"}, content_hash="h")
+
+
+def test_apply_refuses_shared_session_action(client, app):
+    _drafted_action_on_shared_session(app)
+    resp = client.post("/api/assistant/actions/a-ro/apply")
+    assert resp.status_code == 403
+    # And the action was NOT claimed: still drafted.
+    assert _repo(app).get_action("a-ro")["status"] == "drafted"
+
+
+def test_reject_refuses_shared_session_action(client, app):
+    _drafted_action_on_shared_session(app)
+    resp = client.post("/api/assistant/actions/a-ro/reject")
+    assert resp.status_code == 403
+    assert _repo(app).get_action("a-ro")["status"] == "drafted"
+
+
+def test_catalog_marks_write_shaped_skills(client):
+    body = client.get("/api/assistant/skills").get_json()
+    flags = {s["name"]: s["requiresWrite"] for s in body["skills"]}
+    assert flags["verify-finding"] is True
+    assert flags["create-standard"] is True
+    assert flags["explain-score"] is False
+    assert flags["explain-finding"] is False

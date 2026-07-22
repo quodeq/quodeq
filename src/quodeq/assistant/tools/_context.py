@@ -23,3 +23,13 @@ class ToolContext:
     # Set only for write-granted turns: the session's fix worktree. When set,
     # repo reads AND writes are jailed here so the model sees its own edits.
     worktree_dir: Path | None = None
+    # Read-only (shared/remote) session: mutating tools are never registered
+    # and the write grant can never activate. reports_dir/run_dir point at
+    # the shared clone.
+    read_only: bool = False
+    # When set, any code path that DISPATCHES tools must wrap execution in
+    # score_cache_path_override(score_cache_path) so rescoring hits the
+    # per-clone cache DB, never the local one (the routes_shared
+    # _with_shared_root mechanism). Wrapped in the messages-route worker and
+    # the MCP server main.
+    score_cache_path: Path | None = None
