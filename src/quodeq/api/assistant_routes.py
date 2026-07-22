@@ -152,7 +152,8 @@ def register_assistant_routes(app: Flask) -> None:
             "commands": [{"name": n, "description": d} for n, d in RESERVED_COMMANDS],
             "skills": [
                 {"name": s.name, "description": s.description,
-                 "argumentHint": s.argument_hint, "views": list(s.views)}
+                 "argumentHint": s.argument_hint, "views": list(s.views),
+                 "requiresWrite": s.requires_write}
                 for s in load_skills().values()
             ],
             "actions": [

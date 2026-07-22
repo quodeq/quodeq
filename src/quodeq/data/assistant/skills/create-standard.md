@@ -3,6 +3,7 @@ name: create-standard
 description: Draft a new custom standard from a plain-language description
 argument_hint: [what the standard should enforce]
 views: standards
+requires_write: true
 ---
 The user wants a new standard. Work in this order:
 1. Ask (or infer from the conversation) the standard's goal, and check

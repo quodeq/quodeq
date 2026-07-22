@@ -839,3 +839,12 @@ def test_reject_refuses_shared_session_action(client, app):
     resp = client.post("/api/assistant/actions/a-ro/reject")
     assert resp.status_code == 403
     assert _repo(app).get_action("a-ro")["status"] == "drafted"
+
+
+def test_catalog_marks_write_shaped_skills(client):
+    body = client.get("/api/assistant/skills").get_json()
+    flags = {s["name"]: s["requiresWrite"] for s in body["skills"]}
+    assert flags["verify-finding"] is True
+    assert flags["create-standard"] is True
+    assert flags["explain-score"] is False
+    assert flags["explain-finding"] is False

@@ -32,6 +32,7 @@ class Skill:
     instructions: str
     argument_hint: str = ""
     views: tuple[str, ...] = ()
+    requires_write: bool = False
 
 
 def _parse(text: str) -> Skill | None:
@@ -49,7 +50,8 @@ def _parse(text: str) -> Skill | None:
         return None
     views = tuple(v.strip() for v in meta.get("views", "").split(",") if v.strip())
     return Skill(meta["name"], meta["description"], body.strip(),
-                 argument_hint=meta.get("argument_hint", ""), views=views)
+                 argument_hint=meta.get("argument_hint", ""), views=views,
+                 requires_write=meta.get("requires_write", "").strip().lower() == "true")
 
 
 def load_skills(skills_dir: Path | None = None) -> dict[str, Skill]:

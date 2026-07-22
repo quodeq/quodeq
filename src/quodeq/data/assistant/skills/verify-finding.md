@@ -3,6 +3,7 @@ name: verify-finding
 description: Adversarially verify a finding, then dismiss it or mark it verified
 argument_hint: [file:line or search terms]
 views: violations
+requires_write: true
 ---
 The user wants to know whether one finding (usually the one selected in
 `[ui-state]`) is a real defect or a false positive. Work in this order:
