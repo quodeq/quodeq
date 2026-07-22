@@ -20,14 +20,34 @@ from quodeq.services.shared_repo import shared_evaluations_root, shared_score_ca
 
 
 @pytest.fixture()
-def app():
-    return create_app(test_config={"TESTING": True})
+def app(tmp_path):
+    # create_app only defaults ASSISTANT_DB_PATH when absent from
+    # test_config -- to the developer's REAL ~/.quodeq/assistant.db (see
+    # api/app.py). This suite POSTs to /api/assistant/sessions, so without
+    # an explicit override those calls write real rows into (and migrate)
+    # the developer's actual assistant store. Always pin it to an isolated
+    # tmp path; see test_app_fixture_isolates_assistant_db below for the
+    # regression lock.
+    return create_app(test_config={
+        "TESTING": True,
+        "ASSISTANT_DB_PATH": str(tmp_path / "assistant.db"),
+    })
 
 
 @pytest.fixture()
 def client(app):
     with app.test_client() as c:
         yield c
+
+
+def test_app_fixture_isolates_assistant_db(app, tmp_path):
+    # create_app defaults ASSISTANT_DB_PATH to the developer's real
+    # ~/.quodeq/assistant.db; tests must always override it. `app` and this
+    # test both request the (function-scoped) `tmp_path` fixture within the
+    # same test node, so pytest hands them the identical directory -- the
+    # `app` fixture's override is provably rooted under this test's own
+    # `tmp_path`, not just "somewhere outside home".
+    assert Path(app.config["ASSISTANT_DB_PATH"]).is_relative_to(tmp_path)
 
 
 def _create_shared_session(client, run_id=None):
