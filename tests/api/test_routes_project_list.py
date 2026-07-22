@@ -251,13 +251,22 @@ class TestCreateProjectLocalPathValidation:
     allowlist as /api/scan (home or evaluations dir, no system paths)."""
 
     def test_local_repo_outside_home_rejected(self, client, tmp_path_factory):
-        # A pytest temp dir is outside the real home and outside the
-        # evaluations root the app fixture points at.
+        # Pin home to its own temp dir: the candidate repo must be outside it
+        # on every platform (on Windows the pytest tmp root lives UNDER the
+        # real home, so relying on the real Path.home() would pass the
+        # allowlist and return 200).
+        fake_home = tmp_path_factory.mktemp("fake-home")
         outside = tmp_path_factory.mktemp("outside-home-repo")
-        resp = client.post("/api/projects", json={"repo": str(outside)})
+        with patch("pathlib.Path.home", return_value=fake_home):
+            resp = client.post("/api/projects", json={"repo": str(outside)})
         assert resp.status_code == 403
         assert resp.get_json()["code"] == "FORBIDDEN"
 
+    @pytest.mark.skipif(
+        os.name == "nt",
+        reason="blocked paths are POSIX system dirs; /etc does not exist on "
+        "Windows so the existence check 400s before the allowlist",
+    )
     def test_local_repo_system_dir_rejected(self, client):
         # Widen home to "/" so the allowlist passes and the blocked-path
         # check is the branch under test.
