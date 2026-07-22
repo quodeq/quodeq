@@ -204,7 +204,7 @@ def publish_project(
             raise PublishError(
                 f"could not reach the shared repository, check that git can access {url}"
             )
-        refresh_shared_clone(url, env)  # best effort, publish is still guarded by push
+        ok, _ = refresh_shared_clone(url, env)  # best effort, publish is still guarded by push
 
         fmt = check_repo_format(repo)
         if fmt == "unsupported_version":

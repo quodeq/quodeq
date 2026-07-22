@@ -64,7 +64,9 @@ def test_ensure_clone_and_refresh(tmp_path, monkeypatch):
     assert (repo / "hello.txt").exists()
     # second call reuses without error
     assert ensure_shared_clone(url) == repo
-    assert refresh_shared_clone(url) is True
+    ok, reason = refresh_shared_clone(url)
+    assert ok is True
+    assert reason == ""
 
 
 def test_clone_and_refresh_are_not_shallow(tmp_path, monkeypatch):
@@ -78,7 +80,8 @@ def test_clone_and_refresh_are_not_shallow(tmp_path, monkeypatch):
     repo = ensure_shared_clone(url)
     assert repo is not None
     assert not (repo / ".git" / "shallow").exists()
-    assert refresh_shared_clone(url) is True
+    ok, _ = refresh_shared_clone(url)
+    assert ok is True
     assert not (repo / ".git" / "shallow").exists()
 
 
@@ -101,7 +104,8 @@ def test_refresh_shared_clone_passes_explicit_timeout_to_both_git_calls(tmp_path
 
     monkeypatch.setattr("quodeq.services.shared_repo.run_git", _spy)
 
-    assert refresh_shared_clone(url, timeout=7) is True
+    ok, _ = refresh_shared_clone(url, timeout=7)
+    assert ok is True
     assert seen_timeouts == [7, 7]
 
 
@@ -121,7 +125,8 @@ def test_refresh_shared_clone_default_timeout_is_bounded_not_300s(tmp_path, monk
 
     monkeypatch.setattr("quodeq.services.shared_repo.run_git", _spy)
 
-    assert refresh_shared_clone(url) is True
+    ok, _ = refresh_shared_clone(url)
+    assert ok is True
     assert seen_timeouts == [30, 30]
 
 
@@ -604,7 +609,8 @@ def test_refresh_shared_clone_unshallows_legacy_cache(tmp_path, monkeypatch):
     )
     assert (repo / ".git" / "shallow").exists()
 
-    assert refresh_shared_clone(url) is True
+    ok, _ = refresh_shared_clone(url)
+    assert ok is True
     assert not (repo / ".git" / "shallow").exists()
 
     # Force the legacy git-log fallback for proj-a, AFTER refresh (refresh's
@@ -614,3 +620,38 @@ def test_refresh_shared_clone_unshallows_legacy_cache(tmp_path, monkeypatch):
 
     meta = published_meta(url)
     assert meta["proj-a"]["publishedBy"] == "alice"
+
+
+def test_refresh_shared_clone_returns_reason_on_fetch_failure(tmp_path, monkeypatch, caplog):
+    """Audit finding B3: refresh_shared_clone must surface WHY a refresh
+    failed (the git stderr tail), not just False -- without it, the UI can
+    only render "Request failed: 502" for DNS failure vs auth failure vs a
+    deleted origin. The failure must also be logged via logger.warning so a
+    caller that discards the reason (e.g. publish_project's best-effort
+    refresh) still leaves a diagnosable server-side trail."""
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    url = _make_origin(tmp_path)
+    assert ensure_shared_clone(url) is not None
+
+    # The origin becomes unreachable, as if it had been deleted.
+    origin_path = Path(url.removeprefix("file://"))
+    origin_path.rename(tmp_path / "origin-gone.git")
+
+    with caplog.at_level("WARNING"):
+        ok, reason = refresh_shared_clone(url)
+
+    assert ok is False
+    assert reason  # non-empty
+    assert len(reason) <= 200
+    assert caplog.text  # logged via logger.warning, not silently swallowed
+
+
+def test_refresh_shared_clone_success_returns_empty_reason(tmp_path, monkeypatch):
+    """The reason string is "" on a successful refresh (no error to report)."""
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    url = _make_origin(tmp_path)
+    assert ensure_shared_clone(url) is not None
+
+    ok, reason = refresh_shared_clone(url)
+    assert ok is True
+    assert reason == ""

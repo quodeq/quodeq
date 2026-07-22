@@ -135,8 +135,20 @@ def ensure_shared_clone(url: str, env: dict | None = None) -> Path | None:
 _DEFAULT_REFRESH_TIMEOUT_S = 30
 
 
-def refresh_shared_clone(url: str, env: dict | None = None, *, timeout: int = _DEFAULT_REFRESH_TIMEOUT_S) -> bool:
+def refresh_shared_clone(
+    url: str, env: dict | None = None, *, timeout: int = _DEFAULT_REFRESH_TIMEOUT_S
+) -> tuple[bool, str]:
     """Fetch + hard-reset the clone to the remote's HEAD.
+
+    Returns ``(ok, reason)``: *reason* is ``""`` on success, else the
+    failing git command's stderr/stdout tail (<=200 chars) -- callers (the
+    refresh route, the ?refresh=1 listing branch) surface this so a failed
+    refresh reads as "could not resolve host" or "authentication failed"
+    instead of a bare "Request failed: 502" that can't distinguish DNS vs
+    auth vs a deleted origin (audit finding B3). Every failure is ALSO
+    logged via logger.warning, so a background/best-effort caller that
+    discards *reason* (e.g. publish_project's internal refresh) still gets
+    a diagnosable server-side trail.
 
     Called in-request (GET /api/shared/projects?refresh=1, POST
     /api/shared/refresh), so it must not inherit run_git's 300s default --
@@ -164,14 +176,24 @@ def refresh_shared_clone(url: str, env: dict | None = None, *, timeout: int = _D
     with clone_lock(url, env):
         repo = shared_repo_path(url, env)
         if not (repo / ".git").exists():
-            return ensure_shared_clone(url, env) is not None
+            if ensure_shared_clone(url, env) is not None:
+                return True, ""
+            reason = f"could not clone the repository, check that git can access {url}"
+            logger.warning("refresh_shared_clone: %s", reason)
+            return False, reason
         if (repo / ".git" / "shallow").exists():
             run_git(["fetch", "--unshallow", "origin"], cwd=repo, timeout=timeout)
-        ok, _ = run_git(["fetch", "origin", "HEAD"], cwd=repo, timeout=timeout)
+        ok, out = run_git(["fetch", "origin", "HEAD"], cwd=repo, timeout=timeout)
         if not ok:
-            return False
-        ok, _ = run_git(["reset", "--hard", "FETCH_HEAD"], cwd=repo, timeout=timeout)
-        return ok
+            reason = out.strip()[:200]
+            logger.warning("refresh_shared_clone: fetch failed for %s: %s", url, reason)
+            return False, reason
+        ok, out = run_git(["reset", "--hard", "FETCH_HEAD"], cwd=repo, timeout=timeout)
+        if not ok:
+            reason = out.strip()[:200]
+            logger.warning("refresh_shared_clone: reset failed for %s: %s", url, reason)
+            return False, reason
+        return True, ""
 
 
 def last_synced_at(url: str, env: dict | None = None) -> float | None:

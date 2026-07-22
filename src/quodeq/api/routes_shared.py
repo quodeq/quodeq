@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import shutil
 import zipfile
 from http import HTTPStatus
 from pathlib import Path
@@ -34,6 +35,7 @@ from quodeq.services.shared_repo import (
     published_meta,
     read_state,
     refresh_shared_clone,
+    shared_cache_dir,
     shared_evaluations_root,
     shared_index_db_path,
     shared_score_cache_path,
@@ -171,6 +173,14 @@ def register_shared_routes(app: Flask) -> None:
             validate_remote_url(url)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
+        # Audit finding A4: reconnecting to a URL whose cache dir is already
+        # on disk (a prior connect, possibly stale) must not silently keep
+        # serving whatever was last fetched -- ensure_shared_clone below
+        # early-returns an existing clone without fetching, so the freshness
+        # check has to happen here, before it. refresh_shared_clone acquires
+        # clone_lock itself (RLock, so nesting would be safe too, but there
+        # is nothing else in this route that needs the lock held around it).
+        pre_existing = read_state(url) != "missing"
         repo = ensure_shared_clone(url)
         if repo is None:
             return (
@@ -179,6 +189,8 @@ def register_shared_routes(app: Flask) -> None:
                 ),
                 502,
             )
+        if pre_existing:
+            ok, _ = refresh_shared_clone(url)  # best effort; failure just leaves the pre-existing clone as-is, reason already logged internally
         # Format validation only makes sense once the clone actually exists,
         # so it runs AFTER ensure_shared_clone, not before -- a foreign or
         # too-new repo must never reach write_settings (that would connect
@@ -203,7 +215,18 @@ def register_shared_routes(app: Flask) -> None:
 
     @app.delete("/api/shared/config")
     def shared_config_delete() -> Response:
+        # Audit finding A4: disconnecting must not leave the clone's cache
+        # dir (repo + index.db + score_cache.db, all under shared_cache_dir)
+        # behind on disk forever. Read the url BEFORE clearing settings (it's
+        # gone from settings after write_settings), then remove it AFTER --
+        # so a crash between the two leaves the (still-usable) clone in
+        # place rather than an orphaned dir with no settings pointing at it.
+        # ignore_errors=True: a half-removed or permission-denied cache dir
+        # must not turn a disconnect into a 500.
+        settings = read_settings()
         write_settings(SharedSettings(url=None))
+        if settings.url is not None:
+            shutil.rmtree(shared_cache_dir(settings.url), ignore_errors=True)
         return jsonify({"configured": False})
 
     @app.post("/api/shared/refresh")
@@ -211,9 +234,16 @@ def register_shared_routes(app: Flask) -> None:
         settings = read_settings()
         if not settings.url:
             return jsonify({"error": "no shared repository configured"}), 400
-        if not refresh_shared_clone(settings.url):
+        ok, reason = refresh_shared_clone(settings.url)
+        if not ok:
             return (
-                jsonify({"stale": True, "lastSynced": last_synced_at(settings.url)}),
+                jsonify(
+                    {
+                        "stale": True,
+                        "lastSynced": last_synced_at(settings.url),
+                        "error": reason,
+                    }
+                ),
                 502,
             )
         return jsonify({"stale": False, "lastSynced": last_synced_at(settings.url)})
@@ -329,7 +359,8 @@ def register_shared_routes(app: Flask) -> None:
             # clone contents, just flag it. The index is only re-synced
             # after a successful refresh; there is nothing new to index
             # when the fetch itself failed.
-            if refresh_shared_clone(url):
+            ok, _ = refresh_shared_clone(url)
+            if ok:
                 sync_shared_index(url)
                 stale = False
             else:

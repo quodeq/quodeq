@@ -12,7 +12,12 @@ import pytest
 
 from quodeq.api.app import create_app
 from quodeq.services import shared_publish
-from quodeq.services.shared_repo import FORMAT_NAME
+from quodeq.services.shared_repo import (
+    FORMAT_NAME,
+    ensure_shared_clone,
+    shared_cache_dir,
+    shared_repo_path,
+)
 
 _ORIGIN = {"Origin": "http://localhost"}
 
@@ -232,6 +237,60 @@ def test_put_config_happy_path(client, monkeypatch, tmp_path):
     assert status["url"] == "https://github.com/example/repo.git"
 
 
+def test_put_config_reconnect_refreshes_pre_existing_clone(client, monkeypatch, tmp_path):
+    """Audit A4: reconnecting to a URL whose clone already exists in the
+    cache must fetch fresh content before returning, not silently keep
+    serving whatever was last fetched. Regression: a project is published
+    directly to origin AFTER the first connect, then the same URL is
+    reconnected (second PUT) -- the listing must already show it, with no
+    separate POST /api/shared/refresh in between."""
+    monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
+    monkeypatch.setattr("quodeq.api.routes_shared.validate_remote_url", lambda url: None)
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    url = f"file://{origin}"
+    work = tmp_path / "origin-work"
+    subprocess.run(["git", "clone", str(origin), str(work)], check=True, capture_output=True)
+    (work / "quodeq.json").write_text(
+        json.dumps({"format": FORMAT_NAME, "version": 1}), encoding="utf-8"
+    )
+    for cmd in (
+        ["git", "add", "."],
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "init"],
+        ["git", "push", "origin", "HEAD"],
+    ):
+        subprocess.run(cmd, cwd=work, check=True, capture_output=True)
+
+    # First connect clones the (currently project-less) repo.
+    resp = client.put("/api/shared/config", json={"url": url}, headers=_ORIGIN)
+    assert resp.status_code == 200
+    listing = client.get("/api/shared/projects").get_json()
+    assert listing["projects"] == []
+
+    # A new project is published directly to origin, bypassing this
+    # process's clone entirely (e.g. a teammate publishing from another
+    # machine).
+    project_dir = work / "evaluations" / "proj-new"
+    project_dir.mkdir(parents=True)
+    (project_dir / "repository_info.json").write_text('{"name":"proj-new"}', encoding="utf-8")
+    for cmd in (
+        ["git", "add", "."],
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "publish proj-new"],
+        ["git", "push", "origin", "HEAD"],
+    ):
+        subprocess.run(cmd, cwd=work, check=True, capture_output=True)
+
+    # Reconnect the SAME url -- the cache dir from the first PUT already
+    # exists on disk. Before this fix, ensure_shared_clone early-returns it
+    # unfetched, so proj-new would only appear after a manual refresh.
+    resp = client.put("/api/shared/config", json={"url": url}, headers=_ORIGIN)
+    assert resp.status_code == 200
+
+    listing = client.get("/api/shared/projects").get_json()
+    ids = [p.get("id") or p.get("name") for p in listing["projects"]]
+    assert "proj-new" in ids
+
+
 # --- DELETE /api/shared/config -----------------------------------------------
 
 def test_delete_config_clears(client, monkeypatch, tmp_path):
@@ -240,6 +299,33 @@ def test_delete_config_clears(client, monkeypatch, tmp_path):
     resp = client.delete("/api/shared/config", headers=_ORIGIN)
     assert resp.status_code == 200
     assert client.get("/api/shared/status").get_json()["configured"] is False
+
+
+def test_delete_config_removes_cache_dir(client, monkeypatch, tmp_path):
+    """Audit A4: disconnect must remove the clone's cache dir from disk, not
+    just clear settings -- otherwise a stale clone sits around forever."""
+    monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    url = f"file://{origin}"
+    assert ensure_shared_clone(url) is not None
+    cache_dir = shared_cache_dir(url)
+    assert cache_dir.is_dir()
+    assert shared_repo_path(url).is_dir()
+
+    (tmp_path / "shared.json").write_text(json.dumps({"url": url}))
+    resp = client.delete("/api/shared/config", headers=_ORIGIN)
+    assert resp.status_code == 200
+    assert not cache_dir.exists()
+
+
+def test_delete_config_when_unconfigured_does_not_crash(client, monkeypatch, tmp_path):
+    """Guard for url=None: disconnecting when nothing is configured must be
+    a no-op, not attempt shutil.rmtree on a None-derived path."""
+    monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
+    resp = client.delete("/api/shared/config", headers=_ORIGIN)
+    assert resp.status_code == 200
+    assert resp.get_json()["configured"] is False
 
 
 # --- POST /api/shared/refresh -------------------------------------------------
@@ -251,16 +337,36 @@ def test_refresh_without_config_400(client):
 
 def test_refresh_failure_returns_502(client, tmp_path, monkeypatch):
     (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
-    monkeypatch.setattr("quodeq.api.routes_shared.refresh_shared_clone", lambda url: False)
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared.refresh_shared_clone",
+        lambda url: (False, "Could not resolve host"),
+    )
     resp = client.post("/api/shared/refresh", headers=_ORIGIN)
     assert resp.status_code == 502
     body = resp.get_json()
     assert body["stale"] is True
 
 
+def test_refresh_failure_body_carries_error_reason(client, tmp_path, monkeypatch):
+    """Audit B3: the 502 body must carry the failure reason so the UI can
+    distinguish DNS vs auth vs a deleted origin, instead of only ever being
+    able to render "Request failed: 502"."""
+    (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared.refresh_shared_clone",
+        lambda url: (False, "Could not resolve host github.com"),
+    )
+    resp = client.post("/api/shared/refresh", headers=_ORIGIN)
+    assert resp.status_code == 502
+    body = resp.get_json()
+    assert body["error"] == "Could not resolve host github.com"
+
+
 def test_refresh_success_200(client, tmp_path, monkeypatch):
     (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
-    monkeypatch.setattr("quodeq.api.routes_shared.refresh_shared_clone", lambda url: True)
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared.refresh_shared_clone", lambda url: (True, "")
+    )
     resp = client.post("/api/shared/refresh", headers=_ORIGIN)
     assert resp.status_code == 200
     body = resp.get_json()

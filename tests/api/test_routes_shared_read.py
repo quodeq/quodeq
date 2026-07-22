@@ -261,7 +261,7 @@ def test_shared_projects_refresh_success_reports_fresh_and_syncs_index(
     calls: list[str] = []
     monkeypatch.setattr(
         "quodeq.api.routes_shared.refresh_shared_clone",
-        lambda url: calls.append(f"refresh:{url}") or True,
+        lambda url: (calls.append(f"refresh:{url}") or True, ""),
     )
     monkeypatch.setattr(
         "quodeq.api.routes_shared.sync_shared_index",
@@ -279,7 +279,9 @@ def test_shared_projects_refresh_failure_reports_stale_and_skips_sync(
     """When refresh_shared_clone fails, the response gains "stale": True and
     sync_shared_index is never called (nothing new was fetched to index)."""
     sync_calls: list[str] = []
-    monkeypatch.setattr("quodeq.api.routes_shared.refresh_shared_clone", lambda url: False)
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared.refresh_shared_clone", lambda url: (False, "network unreachable")
+    )
     monkeypatch.setattr(
         "quodeq.api.routes_shared.sync_shared_index",
         lambda url: sync_calls.append(url),
