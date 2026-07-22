@@ -11,6 +11,7 @@ from flask import Flask, Response, current_app, jsonify, request
 from quodeq.api import _assistant_helpers
 from quodeq.api._assistant_helpers import (
     _LOCAL_PROVIDERS as _FIXED_ENDPOINT_PROVIDERS,
+    SharedSourceUnavailable,
     build_tool_context,
     event_frames,
     get_repository,
@@ -23,6 +24,7 @@ from quodeq.assistant.cancel import CancelToken
 from quodeq.assistant.orchestrator import TurnRequest, run_turn, write_safe_provider
 from quodeq.assistant.skills import RESERVED_COMMANDS, load_skills
 from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES, ACTIONS, ActionConflict
+from quodeq.services.score_cache import score_cache_path_override
 from quodeq.services.shared_repo import read_state
 from quodeq.services.shared_settings import read_settings
 
@@ -210,19 +212,29 @@ def register_assistant_routes(app: Flask) -> None:
                 api_key=api_key, provider=session["provider"],
                 model=body.get("model") or session.get("model") or provider_cfg.get("model", ""),
                 web_enabled=bool(body.get("webEnabled", False)),
-                write_enabled=bool(body.get("writeEnabled", False)),
+                write_enabled=(bool(body.get("writeEnabled", False))
+                               and (session.get("source") or "local") == "local"),
             )
             tool_ctx = build_tool_context(app, session)
 
             def _worker():
                 try:
-                    run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
+                    if tool_ctx.score_cache_path is not None:
+                        with score_cache_path_override(tool_ctx.score_cache_path):
+                            run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
+                    else:
+                        run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
                 finally:
                     with _running_lock:
                         _running_turns.discard(sid)
                         _cancel_tokens.pop(sid, None)
 
             threading.Thread(target=_worker, daemon=True).start()
+        except SharedSourceUnavailable as exc:
+            with _running_lock:
+                _running_turns.discard(sid)
+                _cancel_tokens.pop(sid, None)
+            return jsonify({"error": str(exc)}), 409
         except Exception:
             with _running_lock:
                 _running_turns.discard(sid)

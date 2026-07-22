@@ -18,6 +18,10 @@ from quodeq.shared._env import get_evaluations_dir
 
 _logger = logging.getLogger(__name__)
 
+
+class SharedSourceUnavailable(RuntimeError):
+    """A shared-source session's clone is gone (repo disconnected)."""
+
 # ~/.quodeq/assistant.db is never pruned otherwise; a session older than this
 # is effectively dead (its worktree, if any, was reaped long before). 0
 # disables. Whole-session delete cascades to its messages/events/actions.
@@ -172,8 +176,21 @@ def build_tool_context(app: Flask, session: dict) -> ToolContext:
     ``runDir`` and ``project_uuid`` holds the UI's ``repoRoot`` — the
     create-session route maps those request fields onto these columns.
     Plan 3 revisits this naming with a schema v2 if needed.
+    Shared-source sessions resolve reports_dir against the shared clone and
+    carry read_only + the per-clone score-cache path.
     """
     run_dir = session.get("run_id")
+    source = session.get("source") or "local"
+    reports_dir = Path(get_evaluations_dir())
+    score_cache_path: Path | None = None
+    if source == "shared":
+        settings = read_settings()
+        if not settings.url:
+            # The session outlived the shared-repo connection; the messages
+            # route maps this to a 409 rather than a 500.
+            raise SharedSourceUnavailable("shared repository not configured")
+        reports_dir = shared_evaluations_root(settings.url)
+        score_cache_path = shared_score_cache_path(settings.url)
     return ToolContext(
         repository=get_repository(app),
         session_id=session["id"],
@@ -183,7 +200,9 @@ def build_tool_context(app: Flask, session: dict) -> ToolContext:
         compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
         dimensions_file=Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
         project_id=session.get("project_id"),
-        reports_dir=Path(get_evaluations_dir()),
+        reports_dir=reports_dir,
+        read_only=(source == "shared"),
+        score_cache_path=score_cache_path,
     )
 
 
