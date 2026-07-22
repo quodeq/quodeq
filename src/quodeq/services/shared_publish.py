@@ -23,6 +23,7 @@ from quodeq.services.shared_repo import (
     PUBLISHED_META_FILENAME,
     bootstrap_repo_layout,
     check_repo_format,
+    clone_lock,
     ensure_shared_clone,
     refresh_shared_clone,
     run_git,
@@ -190,67 +191,77 @@ def publish_project(
     if not project_dir.is_dir():
         raise PublishError(f"project {project_id} not found in local evaluations")
 
-    repo = ensure_shared_clone(url, env)
-    if repo is None:
-        raise PublishError(
-            f"could not reach the shared repository, check that git can access {url}"
-        )
-    refresh_shared_clone(url, env)  # best effort, publish is still guarded by push
+    # Everything from here through the final push/rebase runs under one
+    # process-wide clone lock (audit finding C2): a background refresh
+    # racing this stage/commit/push on the same clone directory can tear a
+    # commit or contend on .git/index.lock. clone_lock is an RLock, so the
+    # ensure_shared_clone / refresh_shared_clone calls below (each of which
+    # acquires it again internally) reenter on this same thread instead of
+    # deadlocking.
+    with clone_lock(url, env):
+        repo = ensure_shared_clone(url, env)
+        if repo is None:
+            raise PublishError(
+                f"could not reach the shared repository, check that git can access {url}"
+            )
+        refresh_shared_clone(url, env)  # best effort, publish is still guarded by push
 
-    fmt = check_repo_format(repo)
-    if fmt == "unsupported_version":
-        raise PublishError("this shared repository requires a newer version of quodeq")
-    if fmt == "foreign":
-        raise PublishError(
-            "the configured repository does not look like a quodeq results repository, "
-            "refusing to publish into it"
-        )
-    try:
-        if fmt == "empty":
-            bootstrap_repo_layout(repo)
+        fmt = check_repo_format(repo)
+        if fmt == "unsupported_version":
+            raise PublishError("this shared repository requires a newer version of quodeq")
+        if fmt == "foreign":
+            raise PublishError(
+                "the configured repository does not look like a quodeq results repository, "
+                "refusing to publish into it"
+            )
+        try:
+            if fmt == "empty":
+                bootstrap_repo_layout(repo)
 
-        count = stage_project(project_dir, repo / "evaluations" / project_id)
-    except (OSError, ValueError) as exc:
-        raise PublishError(f"failed to stage project files, {exc}") from exc
+            count = stage_project(project_dir, repo / "evaluations" / project_id)
+        except (OSError, ValueError) as exc:
+            raise PublishError(f"failed to stage project files, {exc}") from exc
 
-    add_paths = [MARKER_FILENAME, ".gitignore", f"evaluations/{project_id}"]
-    if (repo / "evaluations" / ".gitkeep").exists():
-        add_paths.append("evaluations/.gitkeep")
-    ok, out = run_git(["add", "--", *add_paths], cwd=repo)
-    if not ok:
-        raise PublishError(f"git add failed, {out.strip()[:300]}")
-
-    # A clean `diff --cached` only means nothing NEW was staged this call; it
-    # does not mean the remote already has our commits. A prior publish can
-    # have committed locally and then failed to push (transient network
-    # error), leaving a local commit the remote never received. Retrying
-    # with unchanged project files hits this exact "nothing staged" state,
-    # so we must still fall through to the push below rather than returning
-    # early. A push with nothing new to send exits 0 ("Everything
-    # up-to-date"), so this stays a no-op for the true idempotent case.
-    nothing_staged, _ = run_git(["diff", "--cached", "--quiet"], cwd=repo)
-    if not nothing_staged:
-        message = f"Publish {project_id} ({count} runs) via quodeq {_app_version()}"
-        ok, out = run_git(["commit", "-m", message], cwd=repo)
+        add_paths = [MARKER_FILENAME, ".gitignore", f"evaluations/{project_id}"]
+        if (repo / "evaluations" / ".gitkeep").exists():
+            add_paths.append("evaluations/.gitkeep")
+        ok, out = run_git(["add", "--", *add_paths], cwd=repo)
         if not ok:
-            raise PublishError(f"git commit failed, {out.strip()[:300]}")
+            raise PublishError(f"git add failed, {out.strip()[:300]}")
 
-    ok, out = _push(repo)
-    if not ok:
-        ok_rebase, out_rebase = run_git(["pull", "--rebase", "origin", "HEAD"], cwd=repo)
-        if ok_rebase:
-            ok, out = _push(repo)
-        else:
-            # A real conflict wedges the persistent clone with a lingering
-            # .git/rebase-merge directory, breaking every future publish.
-            # The clone is reused across calls, so always leave it clean.
-            run_git(["rebase", "--abort"], cwd=repo)
-            out = out_rebase
-    if not ok:
-        raise PublishError(
-            f"push to the shared repository failed, try again. {out.strip()[:300]}"
-        )
-    return count
+        # A clean `diff --cached` only means nothing NEW was staged this
+        # call; it does not mean the remote already has our commits. A
+        # prior publish can have committed locally and then failed to push
+        # (transient network error), leaving a local commit the remote never
+        # received. Retrying with unchanged project files hits this exact
+        # "nothing staged" state, so we must still fall through to the push
+        # below rather than returning early. A push with nothing new to
+        # send exits 0 ("Everything up-to-date"), so this stays a no-op for
+        # the true idempotent case.
+        nothing_staged, _ = run_git(["diff", "--cached", "--quiet"], cwd=repo)
+        if not nothing_staged:
+            message = f"Publish {project_id} ({count} runs) via quodeq {_app_version()}"
+            ok, out = run_git(["commit", "-m", message], cwd=repo)
+            if not ok:
+                raise PublishError(f"git commit failed, {out.strip()[:300]}")
+
+        ok, out = _push(repo)
+        if not ok:
+            ok_rebase, out_rebase = run_git(["pull", "--rebase", "origin", "HEAD"], cwd=repo)
+            if ok_rebase:
+                ok, out = _push(repo)
+            else:
+                # A real conflict wedges the persistent clone with a
+                # lingering .git/rebase-merge directory, breaking every
+                # future publish. The clone is reused across calls, so
+                # always leave it clean.
+                run_git(["rebase", "--abort"], cwd=repo)
+                out = out_rebase
+        if not ok:
+            raise PublishError(
+                f"push to the shared repository failed, try again. {out.strip()[:300]}"
+            )
+        return count
 
 
 def _push(repo: Path) -> tuple[bool, str]:

@@ -6,6 +6,17 @@ results repos are small; a shallow clone made git-log-based attribution
 misattribute every project to whoever pushed last -- audit finding C1)
 under ~/.quodeq/cache/shared/<url-hash>/repo (QUODEQ_CACHE_ROOT overrides
 the base).
+
+Git-mutation serialization (audit finding C2): background refreshes and an
+in-flight publish share one clone directory, so an unserialized fetch +
+hard-reset racing a stage/commit/push can tear a commit or contend on
+.git/index.lock. `clone_lock()` gives every mutator (refresh_shared_clone,
+ensure_shared_clone, publish_project) one process-wide lock per clone path.
+Readers (published_meta, sync_shared_index, the read-only /api/shared/*
+route mirrors) are deliberately NOT serialized against this lock -- full
+reader serialization is deferred. Torn reads are bounded instead by Task 2's
+atomic meta writes (published.json via tmp+rename): a reader can see a
+project that is one publish stale, never a half-written published.json.
 """
 from __future__ import annotations
 
@@ -15,6 +26,7 @@ import logging
 import os
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 
 # Re-exported so the api layer can validate a shared-repo URL without
@@ -86,17 +98,38 @@ def shared_evaluations_root(url: str, env: dict | None = None) -> Path:
     return shared_repo_path(url, env) / "evaluations"
 
 
+_CLONE_LOCKS: dict[str, threading.RLock] = {}
+_CLONE_LOCKS_GUARD = threading.Lock()
+
+
+def clone_lock(url: str, env: dict | None = None) -> threading.RLock:
+    """Process-wide reentrant lock serializing git mutations on one clone.
+
+    Keyed by the clone's resolved path (shared_repo_path), so any two
+    callers that resolve to the same cache directory share one lock
+    regardless of how they spelled the url. RLock, not Lock: publish_project
+    holds this lock across its own internal refresh_shared_clone call, and
+    refresh_shared_clone / ensure_shared_clone each acquire it again inside
+    their own bodies -- a plain Lock would deadlock a thread against itself.
+    See the module docstring for what this does and does not serialize.
+    """
+    key = str(shared_repo_path(url, env))
+    with _CLONE_LOCKS_GUARD:
+        return _CLONE_LOCKS.setdefault(key, threading.RLock())
+
+
 def ensure_shared_clone(url: str, env: dict | None = None) -> Path | None:
-    repo = shared_repo_path(url, env)
-    if (repo / ".git").exists():
+    with clone_lock(url, env):
+        repo = shared_repo_path(url, env)
+        if (repo / ".git").exists():
+            return repo
+        repo.parent.mkdir(parents=True, exist_ok=True)
+        ok, out = run_git(["clone", "--", url, str(repo)])
+        if not ok:
+            logger.warning("shared clone failed for %s: %s", url, out.strip()[:500])
+            shutil.rmtree(repo, ignore_errors=True)
+            return None
         return repo
-    repo.parent.mkdir(parents=True, exist_ok=True)
-    ok, out = run_git(["clone", "--", url, str(repo)])
-    if not ok:
-        logger.warning("shared clone failed for %s: %s", url, out.strip()[:500])
-        shutil.rmtree(repo, ignore_errors=True)
-        return None
-    return repo
 
 
 _DEFAULT_REFRESH_TIMEOUT_S = 30
@@ -122,17 +155,23 @@ def refresh_shared_clone(url: str, env: dict | None = None, *, timeout: int = _D
     `.git/shallow` is present, try `git fetch --unshallow origin` first; a
     failure there (network hiccup, odd remote) is not fatal -- fall through
     to the plain fetch below, and a later refresh call retries the unshallow.
+
+    Runs entirely under clone_lock (audit finding C2): without it, this
+    fetch + hard-reset can interleave with an in-flight publish_project's
+    stage/commit/push on the same clone directory, tearing a commit or
+    contending on .git/index.lock.
     """
-    repo = shared_repo_path(url, env)
-    if not (repo / ".git").exists():
-        return ensure_shared_clone(url, env) is not None
-    if (repo / ".git" / "shallow").exists():
-        run_git(["fetch", "--unshallow", "origin"], cwd=repo, timeout=timeout)
-    ok, _ = run_git(["fetch", "origin", "HEAD"], cwd=repo, timeout=timeout)
-    if not ok:
-        return False
-    ok, _ = run_git(["reset", "--hard", "FETCH_HEAD"], cwd=repo, timeout=timeout)
-    return ok
+    with clone_lock(url, env):
+        repo = shared_repo_path(url, env)
+        if not (repo / ".git").exists():
+            return ensure_shared_clone(url, env) is not None
+        if (repo / ".git" / "shallow").exists():
+            run_git(["fetch", "--unshallow", "origin"], cwd=repo, timeout=timeout)
+        ok, _ = run_git(["fetch", "origin", "HEAD"], cwd=repo, timeout=timeout)
+        if not ok:
+            return False
+        ok, _ = run_git(["reset", "--hard", "FETCH_HEAD"], cwd=repo, timeout=timeout)
+        return ok
 
 
 def last_synced_at(url: str, env: dict | None = None) -> float | None:
