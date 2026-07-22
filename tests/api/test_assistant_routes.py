@@ -816,3 +816,26 @@ def test_message_on_shared_session_without_repo_409s_and_frees_the_slot(client, 
     second = client.post("/api/assistant/sessions/s-gone/messages", json={"text": "hi"})
     assert second.status_code == 409
     assert "already running" not in second.get_json()["error"]
+
+
+def _drafted_action_on_shared_session(app):
+    repo = _repo(app)
+    repo.create_session(session_id="s-ro", provider="ollama", source="shared")
+    return repo.create_action(
+        action_id="a-ro", session_id="s-ro", action_type="dismiss_finding",
+        payload={"project": "proj", "req": "R1", "file": "a.py", "line": 1, "reason": "false positive"}, content_hash="h")
+
+
+def test_apply_refuses_shared_session_action(client, app):
+    _drafted_action_on_shared_session(app)
+    resp = client.post("/api/assistant/actions/a-ro/apply")
+    assert resp.status_code == 403
+    # And the action was NOT claimed: still drafted.
+    assert _repo(app).get_action("a-ro")["status"] == "drafted"
+
+
+def test_reject_refuses_shared_session_action(client, app):
+    _drafted_action_on_shared_session(app)
+    resp = client.post("/api/assistant/actions/a-ro/reject")
+    assert resp.status_code == 403
+    assert _repo(app).get_action("a-ro")["status"] == "drafted"

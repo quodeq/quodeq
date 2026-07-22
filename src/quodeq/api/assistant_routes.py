@@ -326,6 +326,13 @@ def register_assistant_routes(app: Flask) -> None:
         action = repo.get_action(action_id)
         if action is None:
             return jsonify({"error": "unknown action"}), 404
+        owner = repo.get_session(action["session_id"])
+        if owner is not None and (owner.get("source") or "local") == "shared":
+            # Defense in depth: read-only sessions never draft actions
+            # (draft_action is not registered), so nothing legitimate reaches
+            # here. Refuse rather than mutate the local store under a shared
+            # project id.
+            return jsonify({"error": "read-only session"}), 403
         if action["status"] != "drafted":
             return jsonify({"error": f"action already {action['status']}"}), 409
         spec = ACTIONS.get(action["action_type"])
@@ -356,6 +363,13 @@ def register_assistant_routes(app: Flask) -> None:
         action = repo.get_action(action_id)
         if action is None:
             return jsonify({"error": "unknown action"}), 404
+        owner = repo.get_session(action["session_id"])
+        if owner is not None and (owner.get("source") or "local") == "shared":
+            # Defense in depth: read-only sessions never draft actions
+            # (draft_action is not registered), so nothing legitimate reaches
+            # here. Refuse rather than mutate the local store under a shared
+            # project id.
+            return jsonify({"error": "read-only session"}), 403
         # Same replay guard as apply, made atomic: an applied action must
         # not flip to rejected on a stale card click, SSE replay, or a race
         # with a concurrent apply. The compare-and-set wins at most once.
