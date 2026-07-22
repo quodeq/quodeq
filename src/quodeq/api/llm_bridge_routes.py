@@ -37,6 +37,21 @@ def _json_body() -> dict | None:
 _BODY_NOT_OBJECT = {"error": "request body must be a JSON object", "code": "INVALID_PARAM"}
 
 
+def _invalid_base_url(base_url: str | None) -> tuple[Response, int] | None:
+    """Return a 400 response when *base_url* fails SSRF validation, else None.
+
+    Same policy as /api/provider/test: http(s) scheme only, private/LAN
+    addresses allowed (self-hosted omlx servers are the normal case).
+    """
+    if base_url is None:
+        return None
+    try:
+        validate_url_safe(base_url, allow_private=True)
+    except ValueError as exc:
+        return jsonify({"error": str(exc), "code": "INVALID_URL"}), 400
+    return None
+
+
 def register_llm_bridge_routes(app: Flask) -> None:
     """Register all llm_bridge API routes."""
 
@@ -98,11 +113,17 @@ def register_llm_bridge_routes(app: Flask) -> None:
     @app.get("/api/omlx/status")
     def omlx_status() -> Response:
         base_url = request.args.get("base_url", "").strip() or None
+        err = _invalid_base_url(base_url)
+        if err is not None:
+            return err
         return jsonify(get_omlx_status(base_url=base_url))
 
     @app.get("/api/omlx/models")
     def omlx_models() -> Response:
         base_url = request.args.get("base_url", "").strip() or None
+        err = _invalid_base_url(base_url)
+        if err is not None:
+            return err
         # The key rides in a header, never the query string: query params leak
         # through access logs, browser history, and referrers.
         api_key = (request.headers.get("X-Api-Key") or "").strip() or None
@@ -124,6 +145,9 @@ def register_llm_bridge_routes(app: Flask) -> None:
             return jsonify({"error": "base_url and api_key must be strings", "code": "INVALID_PARAM"}), 400
         base_url = base_url.strip() or None
         api_key = api_key.strip() or None
+        err = _invalid_base_url(base_url)
+        if err is not None:
+            return err
         result = run_omlx_concurrency_test(model, base_url=base_url, api_key=api_key)
         return jsonify(result)
 

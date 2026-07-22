@@ -230,3 +230,42 @@ class TestJsonObjectBodyRequired:
             )
         assert resp.status_code == 200
         mock.assert_called_once_with("m", base_url="http://x", api_key=None)
+
+
+# ---------------------------------------------------------------------------
+# base_url on the omlx routes must pass the same SSRF validation as
+# /api/provider/test: http(s) scheme only (private/LAN hosts stay allowed
+# for self-hosted servers).
+# ---------------------------------------------------------------------------
+
+class TestOmlxBaseUrlValidation:
+    def _get(self, client, route, base_url):
+        return client.get(f"{route}?base_url={base_url}")
+
+    @pytest.mark.parametrize("route", ["/api/omlx/status", "/api/omlx/models"])
+    def test_non_http_scheme_rejected(self, client, route):
+        resp = self._get(client, route, "ftp://internal-host/models")
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_URL"
+
+    @pytest.mark.parametrize("route", ["/api/omlx/status", "/api/omlx/models"])
+    def test_missing_hostname_rejected(self, client, route):
+        resp = self._get(client, route, "http://")
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_URL"
+
+    def test_post_route_rejects_non_http_scheme(self, client):
+        resp = client.post(
+            "/api/omlx/test-concurrency",
+            json={"model": "m", "base_url": "file:///etc/passwd"},
+            headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_URL"
+
+    def test_localhost_base_url_accepted(self, client):
+        with patch("quodeq.api.llm_bridge_routes.get_omlx_status") as mock:
+            mock.return_value = {"running": True}
+            resp = self._get(client, "/api/omlx/status", "http://127.0.0.1:10240")
+        assert resp.status_code == 200
+        mock.assert_called_once_with(base_url="http://127.0.0.1:10240")
