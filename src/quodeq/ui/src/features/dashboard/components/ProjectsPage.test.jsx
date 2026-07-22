@@ -520,12 +520,21 @@ describe('ProjectsPage — publish action (local cards)', () => {
     }
   });
 
-  // Important 2 (final whole-branch review): useSharedProjects' own list is
-  // never re-fetched by usePublish completing on its own (usePublish's
-  // fetchSharedList is a separate call feeding a separate map) -- without
-  // ProjectsPage explicitly refreshing it, a card would keep showing a live
-  // 'publish'/'update' button and stale chips after the job finishes.
-  it('post-publish: a completed job triggers exactly one shared.refresh() call that re-fetches the list', async () => {
+  // Audit C4 regression lock (final whole-branch review + Task 6): the old
+  // fix routed post-publish completion through ProjectsPage's own effect
+  // calling shared.refresh() -- a full remote git fetch that can take up to
+  // 30s -- so the PUBLISHED badge/no-button state lagged behind the
+  // "published <relative time>" meta line (which updated off usePublish's
+  // own cheap refetch) by however long that fetch took. usePublish now owns
+  // completion end to end: it optimistically upserts the published id into
+  // the shared list cache the instant the job reports 'done' (see
+  // usePublish.js's applyOptimisticPublish), synchronously before its own
+  // authoritative re-list call even starts. Since useSharedProjects reads
+  // that SAME cache entry (sharedKeys.list(), unified in Task 5), the badge
+  // and the button both flip in that same render -- proven here by holding
+  // the authoritative re-list open and asserting the card has already
+  // flipped before it resolves.
+  it('post-publish: the card flips to PUBLISHED with no publish button immediately, before the authoritative refresh resolves (C4 regression lock)', async () => {
     vi.useFakeTimers();
     try {
       let publishDone = false;
@@ -535,28 +544,23 @@ describe('ProjectsPage — publish action (local cards)', () => {
           ? { state: 'done', project: 'p1', runs: 2 }
           : { state: 'idle', project: null, runs: null, error: null, finishedAt: null },
       }));
-      const sharedListProjects = vi.fn(async () => ({ projects: [], lastSynced: null, stale: false }));
-      const refreshShared = vi.fn(async () => ({ stale: false, lastSynced: '2026-07-19T00:00:00Z' }));
-      const fakeApi = configuredLocalApi({ getSharedStatus, sharedListProjects, refreshShared });
+      let resolveList;
+      const sharedListProjects = vi.fn(() => {
+        if (!publishDone) return Promise.resolve({ projects: [], lastSynced: null, stale: false });
+        // Held pending once the job is done -- the card must already show
+        // PUBLISHED/no-button from the optimistic patch alone, before this
+        // authoritative call ever resolves.
+        return new Promise((resolve) => { resolveList = resolve; });
+      });
+      const fakeApi = configuredLocalApi({ getSharedStatus, sharedListProjects });
       renderWithApi(<ProjectsPage projects={localProjects} actions={{}} />, fakeApi);
 
-      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
-      expect(screen.getAllByRole('button', { name: 'publish' })).toHaveLength(2);
-
-      // Isolate the post-publish refresh from useSharedProjects' own
-      // mount-time background revalidate, which also calls these mocks.
-      // react-query's notifyManager schedules cache-update notifications
-      // via a real setTimeout(fn, 0) (see @tanstack/query-core's
-      // timeoutManager), which fake timers intercept -- and the mount
-      // revalidate is a multi-hop cascade (status settles -> list enables
-      // -> list settles -> refresh() -> re-invalidate), each hop its own
-      // scheduled timer. runOnlyPendingTimersAsync drains the whole
-      // cascade (including timers newly scheduled by ones it just ran),
-      // where a fixed number of advanceTimersByTimeAsync(0) calls isn't
-      // guaranteed to reach the end of the chain.
+      // Drain the mount-time cascade (status -> list -> background
+      // revalidate) before touching the publish flow -- see the sibling
+      // test above for why runOnlyPendingTimersAsync is needed here instead
+      // of a fixed number of advanceTimersByTimeAsync(0) calls.
       await act(async () => { await vi.runOnlyPendingTimersAsync(); });
-      refreshShared.mockClear();
-      sharedListProjects.mockClear();
+      expect(screen.getAllByRole('button', { name: 'publish' })).toHaveLength(2);
 
       fireEvent.click(screen.getAllByRole('button', { name: 'publish' })[0]);
       await act(async () => { await vi.advanceTimersByTimeAsync(0); });
@@ -564,15 +568,26 @@ describe('ProjectsPage — publish action (local cards)', () => {
 
       publishDone = true;
       await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
-      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
 
-      expect(refreshShared).toHaveBeenCalledTimes(1);
-      expect(sharedListProjects).toHaveBeenCalled();
+      // The authoritative refresh is still pending (captured but not yet
+      // resolved) -- the card must already reflect completion regardless.
+      expect(resolveList).toBeDefined();
+      expect(screen.getByText('PUBLISHED')).toBeInTheDocument();
+      // p1's own publish button is gone; p2 (never published) still has one.
+      expect(screen.getAllByRole('button', { name: 'publish' })).toHaveLength(1);
 
-      // A further tick with publishState still 'done' (no new completion)
-      // must not re-fire the refresh -- re-renders alone don't re-trigger it.
-      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
-      expect(refreshShared).toHaveBeenCalledTimes(1);
+      // Resolving the refresh with authoritative data must not regress the
+      // card -- it only overwrites the optimistic entry.
+      await act(async () => {
+        resolveList({
+          projects: [{ id: 'p1', name: 'demo-one', publishedAt: '2026-07-19T00:00:00Z' }],
+          lastSynced: '2026-07-19T00:00:00Z',
+          stale: false,
+        });
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByText('PUBLISHED')).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'publish' })).toHaveLength(1);
     } finally {
       vi.useRealTimers();
     }

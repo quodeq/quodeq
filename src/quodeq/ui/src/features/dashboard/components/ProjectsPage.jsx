@@ -597,27 +597,14 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
     publish,
   } = usePublish({ enabled: projects.length > 0 });
 
-  // Important-2 (review): usePublish's own re-fetch on job completion only
-  // updates ITS `publishedAtByProject` map -- useSharedProjects' list (which
-  // useMergedProjects reads to derive each entry's chips/action) is never
-  // re-fetched by a publish completing, so a card would keep showing a live
-  // 'publish'/'update' button with stale chips after the job finishes.
-  // Refresh the shared list exactly once per completion; the ref (not
-  // state) means re-renders while publishState stays 'done' don't re-fire
-  // it.
-  const prevPublishStateRef = useRef(publishState);
-  useEffect(() => {
-    if (publishState === 'done' && prevPublishStateRef.current !== 'done') {
-      shared.refresh();
-    }
-    prevPublishStateRef.current = publishState;
-  }, [publishState, shared.refresh]);
-
   // Local project objects never carry publishedAt on their own (it lives
   // only on the shared list's git-log-derived metadata) -- merge it in by
-  // id/name so ProjectCard can read `project.publishedAt` uniformly, and so
-  // a publish that just completed is reflected immediately even though
-  // useSharedProjects' own list isn't re-fetched by it.
+  // id/name so ProjectCard can read `project.publishedAt` uniformly. Belt
+  // and suspenders with `entry.shared?.publishedAt` below (the merged
+  // entry already carries it too, since usePublish and useSharedProjects
+  // share the same sharedKeys.list() cache entry -- see Task 5) but this
+  // keeps LocalPublishedMeta's prop stable even for callers that only ever
+  // look at `project.publishedAt` directly.
   const projectsWithPublished = useMemo(() => {
     if (!sharedConfigured || Object.keys(publishedAtByProject).length === 0) return projects;
     return projects.map((p) => {
@@ -714,7 +701,12 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
     publishingProject,
     publishError,
     publishErrorProject,
-    onPublish: publish,
+    // Passes the local project object alongside its id -- usePublish's own
+    // done-branch optimistic cache patch (audit C3/C4) needs
+    // originUrl/latestRunId/latestDoneRunId to attribute the completed
+    // publish to the right merged entry, and CardFooter's onClick only ever
+    // hands back the bare id/name string.
+    onPublish: (id) => publish(id, localEntryById.get(id)?.local),
   };
 
   // Pull-to-local (shared-only cards): mirrors the delete-confirm idiom for

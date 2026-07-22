@@ -218,6 +218,91 @@ describe('usePublish', () => {
     }
   });
 
+  // Audit C3/C4: the "published <relative time>" meta, the PUBLISHED badge,
+  // and the publish/update button used to update at different speeds --
+  // the meta from usePublish's own cheap refetch, the badge/button only once
+  // the (possibly-coalesced, possibly-slow) authoritative refresh landed.
+  // The fix optimistically upserts the published id into the shared list
+  // cache the instant the job reports 'done', synchronously before the
+  // authoritative refresh's network round trip even starts -- so every
+  // consumer of sharedKeys.list() flips in the same render. This test holds
+  // the authoritative refresh open to prove the cache is patched BEFORE it
+  // resolves, then resolves it to prove the optimistic entry gets
+  // overwritten by real server data rather than left stale.
+  it('optimistically patches the list cache with the published id before the authoritative refresh resolves, then the refresh overwrites it', async () => {
+    vi.useFakeTimers();
+    try {
+      const getSharedStatus = vi.fn(async () => ({
+        configured: true,
+        publish: { state: 'done', project: 'p1', runs: 1 },
+      }));
+      let resolveList;
+      const sharedListProjects = vi.fn(() => new Promise((resolve) => { resolveList = resolve; }));
+      const fakeApi = makeFakeApi({ getSharedStatus, sharedListProjects });
+
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const { result } = renderHook(() => usePublish({ enabled: false }), {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>
+            <ApiProvider value={fakeApi}>{children}</ApiProvider>
+          </QueryClientProvider>
+        ),
+      });
+
+      const local = {
+        id: 'p1',
+        name: 'demo',
+        latestRunId: 'run-9',
+        latestDoneRunId: 'run-9',
+        originUrl: 'https://github.com/org/demo',
+      };
+      await act(async () => {
+        await result.current.publish('p1', local);
+      });
+      expect(result.current.publishState).toBe('running');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      // The poll saw 'done' and the optimistic patch landed synchronously --
+      // the authoritative refresh (sharedListProjects) is still pending
+      // (resolveList captured but not yet called).
+      expect(resolveList).toBeDefined();
+      const midFlight = client.getQueryData(sharedKeys.list());
+      const optimisticEntry = midFlight.projects.find((p) => p.id === 'p1');
+      expect(optimisticEntry).toMatchObject({
+        id: 'p1',
+        name: 'demo',
+        publishedBy: null,
+        source: 'shared',
+        latestRunId: 'run-9',
+        latestDoneRunId: 'run-9',
+        originUrl: 'https://github.com/org/demo',
+      });
+      expect(optimisticEntry.publishedAt).toEqual(expect.any(Number));
+      expect(result.current.publishState).toBe('done');
+
+      // Now let the authoritative refresh resolve with real server data --
+      // it must overwrite the optimistic entry, not merely coexist with it.
+      resolveList({
+        projects: [{ id: 'p1', name: 'demo', publishedAt: '2026-07-19T00:00:00Z', publishedBy: 'alice' }],
+        lastSynced: '2026-07-19T00:00:00Z',
+        stale: false,
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      const settled = client.getQueryData(sharedKeys.list());
+      const finalEntry = settled.projects.find((p) => p.id === 'p1');
+      expect(finalEntry.publishedBy).toBe('alice');
+      expect(finalEntry.publishedAt).toBe('2026-07-19T00:00:00Z');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a 409 from the POST itself surfaces the message inline without crashing', async () => {
     const err = new Error('a publish is already running');
     const fakeApi = makeFakeApi({ publishProject: vi.fn(async () => { throw err; }) });
