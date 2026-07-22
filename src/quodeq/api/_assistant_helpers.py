@@ -12,7 +12,11 @@ from quodeq.assistant import AssistantRepository
 from quodeq.assistant.tools import ToolContext
 from quodeq.assistant import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
 from quodeq.services._fs_projects import get_project_info
-from quodeq.services.shared_repo import shared_evaluations_root, shared_score_cache_path
+from quodeq.services.shared_repo import (
+    read_state,
+    shared_evaluations_root,
+    shared_score_cache_path,
+)
 from quodeq.services.shared_settings import read_settings
 from quodeq.shared._env import get_evaluations_dir
 
@@ -189,6 +193,12 @@ def build_tool_context(app: Flask, session: dict) -> ToolContext:
             # The session outlived the shared-repo connection; the messages
             # route maps this to a 409 rather than a 500.
             raise SharedSourceUnavailable("shared repository not configured")
+        # A format-version bump or a foreign clone pulled in by a background
+        # refresh must stop an already-open session's reads too, same as
+        # every /api/shared/* route enforces at request time.
+        state = read_state(settings.url)
+        if state not in ("ok", "empty"):
+            raise SharedSourceUnavailable(f"shared repository unavailable: {state}")
         reports_dir = shared_evaluations_root(settings.url)
         score_cache_path = shared_score_cache_path(settings.url)
     return ToolContext(

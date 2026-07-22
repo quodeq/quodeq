@@ -773,6 +773,17 @@ def test_create_session_shared_409_when_unconfigured(client, monkeypatch):
     assert resp.status_code == 409
 
 
+def test_create_session_shared_409_when_clone_state_bad(client, monkeypatch):
+    from quodeq.services.shared_settings import SharedSettings
+    monkeypatch.setattr("quodeq.api.assistant_routes.read_settings",
+                        lambda: SharedSettings(url="file:///tmp/fake.git"))
+    monkeypatch.setattr("quodeq.api.assistant_routes.read_state", lambda url: "foreign")
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "source": "shared"})
+    assert resp.status_code == 409
+    assert "foreign" in resp.get_json()["error"]
+
+
 def test_create_session_shared_persists_source_and_read_only(client, app, monkeypatch):
     from quodeq.services.shared_settings import SharedSettings
     monkeypatch.setattr("quodeq.api.assistant_routes.read_settings",
@@ -814,6 +825,26 @@ def test_message_on_shared_session_without_repo_409s_and_frees_the_slot(client, 
     # Slot freed: the next POST must hit the same 409, NOT "a turn is
     # already running".
     second = client.post("/api/assistant/sessions/s-gone/messages", json={"text": "hi"})
+    assert second.status_code == 409
+    assert "already running" not in second.get_json()["error"]
+
+
+def test_message_on_shared_session_with_bad_clone_state_409s_and_frees_the_slot(client, app, monkeypatch):
+    from quodeq.services.shared_settings import SharedSettings
+    # The session was created while the shared clone was in a servable state;
+    # a background refresh has since pulled a foreign/unsupported clone.
+    # build_tool_context must surface this as a 409, and the running-turn
+    # slot must be released so the session is not permanently locked out.
+    _repo(app).create_session(session_id="s-foreign", provider="ollama", source="shared")
+    monkeypatch.setattr("quodeq.api._assistant_helpers.read_settings",
+                        lambda: SharedSettings(url="file:///tmp/fake.git"))
+    monkeypatch.setattr("quodeq.api._assistant_helpers.read_state", lambda url: "foreign")
+    first = client.post("/api/assistant/sessions/s-foreign/messages", json={"text": "hi"})
+    assert first.status_code == 409
+    assert "foreign" in first.get_json()["error"]
+    # Slot freed: the next POST must hit the same 409, NOT "a turn is
+    # already running".
+    second = client.post("/api/assistant/sessions/s-foreign/messages", json={"text": "hi"})
     assert second.status_code == 409
     assert "already running" not in second.get_json()["error"]
 

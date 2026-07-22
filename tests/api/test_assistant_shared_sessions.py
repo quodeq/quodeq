@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import pytest
 
+from pathlib import Path
+
 from quodeq.api._assistant_helpers import build_tool_context, get_repository
 from quodeq.api.app import create_app
 from quodeq.assistant.tools import build_registry
-from quodeq.services.score_cache import score_cache_path_override
+from quodeq.services.score_cache import get_score_cache_path, score_cache_path_override
 from quodeq.services.shared_repo import shared_evaluations_root, shared_score_cache_path
 
 
@@ -91,6 +93,7 @@ def test_shared_get_scores_matches_shared_route(client, app, shared_clone_fixtur
     # Score-cache isolation: rescoring under the override hits the per-clone
     # cache DB, and nothing appears at the local default cache location.
     assert shared_score_cache_path(shared_clone_fixture).exists()
+    assert not Path(get_score_cache_path()).exists()
 
 
 def test_shared_search_findings_builds_projection_in_clone(client, app, shared_clone_fixture):

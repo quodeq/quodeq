@@ -86,7 +86,8 @@ def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:
         read_only=bool(getattr(ns, "read_only", False)),
     )
     registry = build_registry(ctx)
-    if getattr(ns, "enable_write", False) and ctx.worktree_dir is not None:
+    if (getattr(ns, "enable_write", False) and ctx.worktree_dir is not None
+            and not ctx.read_only):
         register_write_tools(registry, ctx)
     return registry
 
