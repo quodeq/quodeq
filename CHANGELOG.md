@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1] - 2026-07-23
+
+Same features as 1.7.0 (see below). 1.7.0 did not reach PyPI or Homebrew because a publish-time test was flaky under a git race; pip and Homebrew users should install 1.7.1.
+
+### Fixes
+- **Release plumbing**: a shared-publish idempotency test monkeypatched the clock with a fixed two-value iterator, which a legitimate rebase-retry under a git push/fetch race could exhaust (StopIteration), failing the publish workflow non-deterministically. The test now uses a monotonic clock. No change to shipped code from 1.7.0.
+
 ## [1.7.0] - 2026-07-23
 
 ### Features
