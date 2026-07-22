@@ -282,9 +282,14 @@ class QuodeqApp(rumps.App):
         except OSError:
             err = "unknown error"
         sanitized = err[:_ERROR_DISPLAY_MAX].replace("\n", " ").strip()
+        if sanitized:
+            # Keep the crash detail in the local log for troubleshooting, but
+            # do not surface raw dashboard stderr (which may include tokens or
+            # filesystem paths) in the always-visible menu.
+            _logging.getLogger(__name__).warning(
+                "Dashboard crashed (exit code %s): %s", self._process.returncode, sanitized,
+            )
         self._set_error(
-            f"Dashboard stopped unexpectedly (exit code {self._process.returncode}). "
-            f"Try restarting. Details: {sanitized}" if sanitized else
             f"Dashboard stopped unexpectedly (exit code {self._process.returncode}). Try restarting."
         )
         self._status_item.title = "Stopped"
