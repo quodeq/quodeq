@@ -104,9 +104,9 @@ export default function TopBar({
      next click will flip to dark). */
   effectiveDark = false,
   onToggleTheme,
-  /* 'local' | 'shared' — shared projects are read-only: the assistant
-     launcher renders disabled with an explanatory tooltip for them since
-     the assistant can take write actions like dismiss/verify. */
+  /* 'local' | 'shared' — shared projects get read-only assistant sessions
+     server-side, so this no longer gates the assistant launcher; it still
+     gates the Evaluate button (see App.jsx's shouldShowEvaluateButton). */
   selectedSource = 'local',
 }) {
   return (
@@ -166,7 +166,7 @@ export default function TopBar({
           </button>
         )}
 
-        <AssistantLauncherButton sharedSource={selectedSource === 'shared'} />
+        <AssistantLauncherButton />
         <TerminalLauncherButton />
 
         {(provider || model) && (

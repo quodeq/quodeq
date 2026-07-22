@@ -9,29 +9,6 @@ const DEFAULT_HEIGHT = 320;
 const MIN_HEIGHT = 160;
 const MAX_HEIGHT = 640;
 
-// useProjectState's SOURCE_STORAGE_KEY (hooks/useProjectState.js). Not
-// imported directly: this provider mounts at the app root (main.jsx), above
-// App and the useProjectState hook that owns `selectedSource`, so it has no
-// React state to read the current source from. Every source change is
-// paired with a synchronous write to this key (persistSource), which makes
-// it the synchronous source of truth available at keydown time.
-const SOURCE_STORAGE_KEY = 'quodeq_selected_source';
-
-// True when the persisted project source is the read-only shared-repo
-// mirror. The assistant's dismiss/verify tools mutate the local store, and a
-// shared project can collide with a local project id, so the drawer must not
-// open (via shortcut or programmatic open()) while a shared project is
-// selected. Reads default to 'local' (i.e. this returns false) on any storage
-// failure (private browsing, disabled storage), matching the app's other
-// defensive storage reads.
-function isSharedSourceActive() {
-  try {
-    return localStorage.getItem(SOURCE_STORAGE_KEY) === 'shared';
-  } catch {
-    return false;
-  }
-}
-
 function clampHeight(px) {
   return Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, px));
 }
@@ -200,7 +177,6 @@ export function AssistantDrawerProvider({ children }) {
   // Defense in depth: open() is exposed on the context value, so a future
   // caller besides the keydown handler below could invoke it directly.
   const open = useCallback(() => {
-    if (isSharedSourceActive()) return;
     setOpenPanels((prev) => (prev.length ? prev : [activeTabRef.current]));
   }, []);
   const close = useCallback(() => setOpenPanels([]), []);          // close ALL panels
@@ -215,10 +191,9 @@ export function AssistantDrawerProvider({ children }) {
     });
   }, []);
 
-  // Close one SPECIFIC panel, active or not (App uses this to shut only the
-  // assistant when a shared project is selected — the terminal must survive).
-  // If it was the active one, fall back to the most recent remaining panel,
-  // same rule as closeActiveTab.
+  // Close one SPECIFIC panel, active or not, leaving any other open panel
+  // alone. If it was the active one, fall back to the most recent remaining
+  // panel, same rule as closeActiveTab.
   const closePanel = useCallback((tab) => {
     setOpenPanels((prev) => {
       if (!prev.includes(tab)) return prev;
@@ -251,18 +226,13 @@ export function AssistantDrawerProvider({ children }) {
       if (e.code !== 'Backquote' || !(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
       // Terminal shortcut (Ctrl+Shift+`) is always available, regardless of
-      // project source. Only the assistant shortcut (Ctrl+`) is gated by source.
+      // project source.
       if (e.shiftKey) {
         if (terminalEnabled) toggleTopbar('terminal');
         return;
       }
-      // This provider mounts above App/useProjectState, so it can't read
-      // `selectedSource` as React state; the persisted key is the
-      // synchronous authority instead (see isSharedSourceActive above). The
-      // assistant's dismiss/verify tools act on the local store, which can
-      // collide with a shared project's id, so the shortcut must not open
-      // the drawer while a shared project is selected.
-      if (isSharedSourceActive()) return;
+      // Shared projects get read-only sessions server-side, so the shortcut
+      // opens the drawer for any source.
       if (assistantEnabled) toggleTopbar('assistant');
       else if (terminalEnabled) toggleTopbar('terminal');
     };

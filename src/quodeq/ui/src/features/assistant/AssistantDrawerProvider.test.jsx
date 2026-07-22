@@ -74,12 +74,10 @@ it('toggle flips visibility', () => {
   expect(screen.getByTestId('open').textContent).toBe('true');
 });
 
-describe('Ctrl+` shortcut — source gating', () => {
-  // The provider mounts above App/useProjectState and reads the persisted
-  // 'quodeq_selected_source' key synchronously at keydown time (it can't
-  // read App's state). The assistant's dismiss/verify tools act on the
-  // local store, which can collide with a shared project's id, so the
-  // shortcut must not open the drawer while a shared project is selected.
+describe('Ctrl+` shortcut', () => {
+  // Shared projects get read-only sessions server-side: the backend roots
+  // reads in the shared clone and registers no mutating tools, so the
+  // shortcut opens the drawer for any persisted source.
   const fireCtrlBacktick = () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backquote', ctrlKey: true, cancelable: true }));
   };
@@ -87,11 +85,11 @@ describe('Ctrl+` shortcut — source gating', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backquote', ctrlKey: true, shiftKey: true, cancelable: true }));
   };
 
-  it('does not open the drawer when the persisted source is shared', () => {
+  it('Ctrl+` opens the assistant even when the persisted source is shared (read-only sessions handle safety)', () => {
     localStorage.setItem('quodeq_selected_source', 'shared');
     render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
     act(() => fireCtrlBacktick());
-    expect(screen.getByTestId('open').textContent).toBe('false');
+    expect(screen.getByTestId('open').textContent).toBe('true');
   });
 
   it('opens the drawer when the persisted source is local', () => {
@@ -121,19 +119,6 @@ describe('Ctrl+` shortcut — source gating', () => {
     localStorage.setItem('cc-assistant-enabled', 'true');
     localStorage.setItem('cc-terminal-enabled', 'true');
     render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
-    act(() => fireCtrlShiftBacktick());
-    expect(screen.getByTestId('open').textContent).toBe('true');
-  });
-
-  it('assistant shortcut (Ctrl+`) does not open for shared but terminal shortcut still works', () => {
-    localStorage.setItem('quodeq_selected_source', 'shared');
-    localStorage.setItem('cc-assistant-enabled', 'true');
-    localStorage.setItem('cc-terminal-enabled', 'true');
-    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
-    // Ctrl+` (assistant) should not open
-    act(() => fireCtrlBacktick());
-    expect(screen.getByTestId('open').textContent).toBe('false');
-    // Ctrl+Shift+` (terminal) should open
     act(() => fireCtrlShiftBacktick());
     expect(screen.getByTestId('open').textContent).toBe('true');
   });
