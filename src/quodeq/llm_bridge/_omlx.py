@@ -67,6 +67,8 @@ def get_omlx_status(base_url: str | None = None) -> dict:
         req = _safe_request(f"{root}/health")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
             data = json.loads(resp.read() or b"{}")
+            if not isinstance(data, dict):
+                data = {}
             return {
                 "running": True,
                 "status": data.get("status", "ok"),
@@ -105,11 +107,11 @@ def list_omlx_models(base_url: str | None = None, api_key: str | None = None) ->
             req.add_header("Authorization", f"Bearer {key}")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
-            entries = data.get("data", []) or []
+            entries = (data.get("data") or []) if isinstance(data, dict) else []
             models = [
                 {"name": m.get("id", ""), "size": 0, "quantization": "", "family": ""}
                 for m in entries
-                if m.get("id")
+                if isinstance(m, dict) and m.get("id")
             ]
             if models:
                 return models

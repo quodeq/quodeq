@@ -35,6 +35,28 @@ class TestGetOllamaStatus:
         assert result["running"] is False
         assert "error" in result
 
+    def test_malformed_body_reports_not_running(self):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b"<html>gateway error</html>"
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        with patch("quodeq.llm_bridge._ollama.urllib.request.urlopen", return_value=mock_resp):
+            result = get_ollama_status()
+
+        assert result["running"] is False
+
+    def test_non_object_body_reports_not_running(self):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b'["not", "a", "dict"]'
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        with patch("quodeq.llm_bridge._ollama.urllib.request.urlopen", return_value=mock_resp):
+            result = get_ollama_status()
+
+        assert result["running"] is False
+
 
 class TestListOllamaModels:
     def test_returns_models(self):
@@ -61,6 +83,30 @@ class TestListOllamaModels:
 
     def test_server_offline(self):
         with patch("quodeq.llm_bridge._ollama.urllib.request.urlopen", side_effect=ConnectionRefusedError):
+            models = list_ollama_models()
+
+        assert models == []
+
+    def test_malformed_body_returns_empty_list(self):
+        """Regression: an invalid /api/tags body used to escape the handler
+        and 500 the models route instead of returning the documented []."""
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b"not json at all"
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        with patch("quodeq.llm_bridge._ollama.urllib.request.urlopen", return_value=mock_resp):
+            models = list_ollama_models()
+
+        assert models == []
+
+    def test_entry_missing_name_returns_empty_list(self):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps({"models": [{"size": 1}]}).encode()
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        with patch("quodeq.llm_bridge._ollama.urllib.request.urlopen", return_value=mock_resp):
             models = list_ollama_models()
 
         assert models == []

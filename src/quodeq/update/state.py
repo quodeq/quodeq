@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -53,10 +54,20 @@ def read_state(env: dict[str, str] | None = None) -> UpdateState:
 
 def write_state(state: UpdateState, env: dict[str, str] | None = None) -> None:
     path = Path(get_update_state_path(env))
+    # Write a fresh unique temp file then os.replace() onto the target so
+    # concurrent writers (dashboard, menubar, CLI) never share a temp path
+    # and a reader never sees a half-written file.
+    tmp_name: str | None = None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(asdict(state), indent=2), encoding="utf-8")
-        os.replace(tmp, path)
+        tmp_fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(asdict(state), indent=2))
+        os.replace(tmp_name, path)
     except OSError:
-        pass  # fail-silent: a notice is never worth crashing over
+        # fail-silent: a notice is never worth crashing over
+        if tmp_name is not None:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass

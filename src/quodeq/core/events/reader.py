@@ -74,15 +74,17 @@ class EventLogReader:
 
                     yield event
 
+                except json.JSONDecodeError:
+                    # Must precede (ValueError, KeyError): JSONDecodeError is a
+                    # ValueError subclass and would otherwise never match here.
+                    _logger.error(f"Malformed JSON in {self.log_path} at line {line_num}")
+                    continue
                 except (ValueError, KeyError) as e:
                     # Handles invalid Enum values or missing keys in raw_data
                     _logger.error(f"Invalid event structure in {self.log_path} at line {line_num}: {e}")
                     continue
                 except ValidationError as e:
                     _logger.error(f"Schema mismatch in {self.log_path} at line {line_num}: {e}")
-                    continue
-                except json.JSONDecodeError:
-                    _logger.error(f"Malformed JSON in {self.log_path} at line {line_num}")
                     continue
                 except Exception as e:
                     _logger.error(f"Unexpected error reading {self.log_path} at line {line_num}: {e}")

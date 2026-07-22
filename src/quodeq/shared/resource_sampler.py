@@ -112,7 +112,11 @@ class ResourceSampler:
         thread = self._thread
         if thread is not None and thread.is_alive():
             thread.join(timeout=timeout)
-        self._thread = None
+        # Only forget the thread once it actually stopped: dropping a
+        # still-alive thread would let a later start() clear _stop and revive
+        # the old loop alongside the new one (duplicate [resources] lines).
+        if thread is None or not thread.is_alive():
+            self._thread = None
 
     def sample_once(self) -> str:
         """Compute and return a snapshot line without logging it. Useful for tests."""

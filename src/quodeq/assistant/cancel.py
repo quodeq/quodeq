@@ -8,8 +8,11 @@ instead of waiting for the next chunk that may never come.
 """
 from __future__ import annotations
 
+import logging
 import threading
 from typing import Callable
+
+_logger = logging.getLogger(__name__)
 
 
 class TurnCancelled(Exception):
@@ -43,7 +46,7 @@ class CancelToken:
             try:
                 hook()
             except Exception:  # noqa: BLE001 - kill hooks are best-effort
-                pass
+                _logger.warning("kill hook failed", exc_info=True)
 
     def register_kill(self, hook: Callable[[], None]) -> None:
         """Run `hook` when cancelled; immediately if already cancelled (a stop
@@ -56,4 +59,4 @@ class CancelToken:
         try:
             hook()
         except Exception:  # noqa: BLE001 - kill hooks are best-effort
-            pass
+            _logger.warning("kill hook failed", exc_info=True)

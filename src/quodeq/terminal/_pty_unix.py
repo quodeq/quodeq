@@ -110,7 +110,7 @@ class UnixPty:
             # sends SIGKILL, so this returns promptly; bound it regardless).
             try:
                 self._proc.wait(timeout=2)
-            except Exception:
+            except subprocess.TimeoutExpired:
                 pass
         if self._master_fd is not None:
             try:

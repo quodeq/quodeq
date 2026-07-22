@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
+import re
 
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
@@ -13,6 +15,20 @@ from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.scoring import rescore_accumulated, scored_run_dimensions
 from quodeq.services.standards import StandardsService
+
+_logger = logging.getLogger(__name__)
+
+# Dimension ids are simple slugs. The tool-call `dimension` argument is
+# model-controlled text used to build a file path, so anything outside this
+# charset (path separators, dots, absolute paths) is rejected outright.
+_DIMENSION_RE = re.compile(r"[a-z0-9_-]+")
+
+
+def _validate_dimension(dimension: str) -> str:
+    if not isinstance(dimension, str) or not _DIMENSION_RE.fullmatch(dimension):
+        raise ToolError(f"invalid dimension: {dimension!r}")
+    return dimension
+
 
 def _require_run(ctx: ToolContext):
     if ctx.run_dir is None or not ctx.run_dir.exists():
@@ -182,7 +198,9 @@ def finding_keys_in_scope(ctx: ToolContext) -> set[tuple]:
                 for f in SqliteFindingsRepository(ctx.run_dir).list_all():
                     keys.add((str(f.req or ""), str(f.file or ""), _coerce_line(f.line)))
             except Exception:  # noqa: BLE001 - a corrupt db must not block the read
-                pass
+                _logger.warning(
+                    "evaluation.db unreadable in %s; finding keys may be incomplete",
+                    ctx.run_dir, exc_info=True)
     else:
         try:
             # rescored=False: the identity check must keep seeing every finding
@@ -242,6 +260,7 @@ def _get_scores(ctx: ToolContext) -> dict:
 
 
 def _get_report(ctx: ToolContext, dimension: str) -> dict:
+    _validate_dimension(dimension)
     if _has_run(ctx):
         path = ctx.run_dir / "evaluation" / f"{dimension}.json"
         if not path.is_file():
@@ -320,6 +339,7 @@ def _get_violations(ctx: ToolContext, dimension: str | None = None,
 def _violations_from_run(ctx: ToolContext, dimension: str | None):
     eval_dir = ctx.run_dir / "evaluation"
     if dimension:
+        _validate_dimension(dimension)
         path = eval_dir / f"{dimension}.json"
         if not path.is_file():
             raise ToolError(

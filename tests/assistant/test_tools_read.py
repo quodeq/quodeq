@@ -206,6 +206,25 @@ def test_get_violations_aggregates_across_dimensions_when_omitted(ctx):
     assert res.get("dimension") in (None, "*")
 
 
+def test_get_report_rejects_traversal_dimension(ctx):
+    """The model-controlled `dimension` argument must never reach the
+    filesystem: traversal and absolute paths are rejected up front."""
+    # Plant a JSON file OUTSIDE the evaluation dir that a traversal would hit.
+    (ctx.run_dir / "secret.json").write_text(json.dumps({"stolen": True}))
+    reg = build_registry(ctx)
+    for evil in ("../secret", "../../other/secrets", "/etc/passwd", "a/b", "UPPER"):
+        out = reg.dispatch("get_report", {"dimension": evil})
+        assert out["ok"] is False
+        assert "invalid dimension" in out["error"]
+
+
+def test_get_violations_rejects_traversal_dimension(ctx):
+    reg = build_registry(ctx)
+    out = reg.dispatch("get_violations", {"dimension": "../secret"})
+    assert out["ok"] is False
+    assert "invalid dimension" in out["error"]
+
+
 def test_get_violations_missing_dimension_errors_helpfully(ctx):
     out = build_registry(ctx).dispatch("get_violations", {"dimension": "nope"})
     assert out["ok"] is False
