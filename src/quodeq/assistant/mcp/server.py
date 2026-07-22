@@ -61,7 +61,10 @@ def serve(registry: ToolRegistry, *, stdin: TextIO, stdout: TextIO, stderr: Text
             stderr.write(f"assistant mcp dispatch error: {exc}\n")
             stderr.flush()
             if req_id is not None:  # notifications have no id and expect no response
-                _jsonrpc.send(_jsonrpc.err(req_id, -32603, f"internal error: {exc}"), stdout)
+                # The exception detail is written to stderr above; the client
+                # frame carries only a generic message so internal failure
+                # detail is not exposed to MCP callers.
+                _jsonrpc.send(_jsonrpc.err(req_id, -32603, "internal error"), stdout)
 
 
 def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:

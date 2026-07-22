@@ -114,4 +114,7 @@ def test_dispatch_exception_answers_with_error_frame():
     assert len(frames) == 1
     assert frames[0]["id"] == 7
     assert frames[0]["error"]["code"] == -32603
-    assert "kaboom" in frames[0]["error"]["message"]
+    # Client frame carries only a generic message; the raw exception detail
+    # must not leak to MCP callers, but is still written to stderr for ops.
+    assert "kaboom" not in frames[0]["error"]["message"]
+    assert "kaboom" in stderr.getvalue()
