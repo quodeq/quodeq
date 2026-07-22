@@ -134,7 +134,7 @@ describe('HistoryPage — evaluate CTA gating for shared (Critical 1)', () => {
   it('shared source, no evaluations yet: no Start evaluation CTA, shared-specific copy', () => {
     renderHistoryPageWithData();
     expect(screen.getByText('No completed evaluation yet')).toBeInTheDocument();
-    expect(screen.getByText('no completed evaluation in this shared project yet')).toBeInTheDocument();
+    expect(screen.getByText('no completed evaluation in this remote project yet')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Start evaluation' })).toBeNull();
   });
 
@@ -162,7 +162,7 @@ describe('HistoryPage — teammate persona: shared selection + zero local projec
 describe('HistoryPage — shared read-only chip (Finding 6)', () => {
   it('shows the chip for a shared project with data', () => {
     renderHistoryPageWithData({ trend, availableRuns, selection: { selectedRunId: 'r1' } });
-    expect(screen.getByText('shared · read-only')).toBeInTheDocument();
+    expect(screen.getByText('remote · read-only')).toBeInTheDocument();
   });
 
   it('omits the chip for a local project', () => {
@@ -170,6 +170,6 @@ describe('HistoryPage — shared read-only chip (Finding 6)', () => {
       trend, availableRuns, selection: { selectedRunId: 'r1' },
       selectedSource: 'local', selectedProject: 'p1', projects: [{ id: 'p1', name: 'p1' }],
     });
-    expect(screen.queryByText('shared · read-only')).toBeNull();
+    expect(screen.queryByText('remote · read-only')).toBeNull();
   });
 });

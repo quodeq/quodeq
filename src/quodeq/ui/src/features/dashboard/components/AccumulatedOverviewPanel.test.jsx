@@ -68,7 +68,7 @@ describe('useAccumulatedComputations selectedDayDimNames (multi-run day)', () =>
   });
 });
 
-// Task 19 — the Overview page header shows a "shared · read-only" chip
+// Task 19 — the Overview page header shows a "remote · read-only" chip
 // (+ publisher sub line where available) for shared projects, and nothing
 // extra for local ones.
 describe('AccumulatedHeroSection shared read-only chip', () => {
@@ -84,12 +84,12 @@ describe('AccumulatedHeroSection shared read-only chip', () => {
 
   it('shows the chip for a shared project', () => {
     render(<AccumulatedHeroSection {...baseProps} selectedSource="shared" />);
-    expect(screen.getByText('shared · read-only')).toBeInTheDocument();
+    expect(screen.getByText('remote · read-only')).toBeInTheDocument();
   });
 
   it('omits the chip for a local project', () => {
     render(<AccumulatedHeroSection {...baseProps} selectedSource="local" />);
-    expect(screen.queryByText('shared · read-only')).toBeNull();
+    expect(screen.queryByText('remote · read-only')).toBeNull();
   });
 
   it('shows the publisher sub line when projectInfo.publishedBy is available', () => {

@@ -209,7 +209,7 @@ export default function MapPage(props) {
         <MapEmpty sub="no evaluations yet">
           <EmptyState
             title="No completed evaluation yet"
-            description="no completed evaluation in this shared project yet"
+            description="no completed evaluation in this remote project yet"
           />
         </MapEmpty>
       );

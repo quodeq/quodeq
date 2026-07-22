@@ -343,6 +343,7 @@
 
   /* Warning */
   --color-warning:      var(--primitive-amber-700);
+  --color-info:         var(--primitive-cyan-700);
   --color-warning-text: var(--primitive-amber-700);
   --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-700) 8%, transparent);
 
@@ -410,6 +411,7 @@
     --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-200) 4%, transparent);
 
     --color-warning:      var(--primitive-amber-400);
+    --color-info:         var(--primitive-cyan-400);
     --color-warning-text: var(--primitive-amber-400);
     --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-400) 10%, transparent);
 
@@ -493,6 +495,7 @@ html[data-theme="dark"]:root, [data-theme="dark"] {
   --color-grade-bottom-bg:   color-mix(in srgb, #e6182a 12%, transparent);
 
   --color-warning:      var(--primitive-amber-400);
+  --color-info:         var(--primitive-cyan-400);
   --color-warning-text: var(--primitive-amber-400);
   --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-400) 10%, transparent);
 
@@ -580,6 +583,7 @@ html[data-theme="light"]:root, [data-theme="light"] {
 
   /* Warning */
   --color-warning:      var(--primitive-amber-700);
+  --color-info:         var(--primitive-cyan-700);
   --color-warning-text: var(--primitive-amber-700);
   --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-700) 10%, transparent);
 
@@ -668,6 +672,7 @@ html[data-theme="ifrit-dark"]:root, [data-theme="ifrit-dark"] {
   --color-grade-bottom-bg:   color-mix(in srgb, #ff2820 4%, transparent);
 
   --color-warning:      var(--primitive-amber-400);
+  --color-info:         var(--primitive-cyan-400);
   --color-warning-text: var(--primitive-amber-400);
   --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-400) 10%, transparent);
 
@@ -758,6 +763,7 @@ html[data-theme="galadriel-light"]:root, [data-theme="galadriel-light"] {
   --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-600) 12%, transparent);
 
   --color-warning:      var(--primitive-brown-500);
+  --color-info:         var(--primitive-cyan-700);
   --color-warning-text: var(--primitive-brown-500);
   --color-warning-bg:   color-mix(in srgb, var(--primitive-brown-500) 8%, transparent);
 
@@ -836,6 +842,7 @@ html[data-theme="neo-dark"]:root, [data-theme="neo-dark"] {
   --color-grade-bottom-text: #ff2020;
   --color-grade-bottom-bg:   color-mix(in srgb, #ff2020 4%, transparent);
   --color-warning:      var(--primitive-amber-400);
+  --color-info:         var(--primitive-cyan-400);
   --color-warning-text: var(--primitive-amber-400);
   --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-400) 10%, transparent);
   --color-danger-text:   #ff4040;
@@ -911,6 +918,7 @@ html[data-theme="neo-light"]:root, [data-theme="neo-light"] {
   --color-grade-bottom-text: var(--primitive-crimson-600);
   --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-600) 12%, transparent);
   --color-warning:      var(--primitive-amber-700);
+  --color-info:         var(--primitive-cyan-700);
   --color-warning-text: var(--primitive-amber-700);
   --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-700) 8%, transparent);
   --color-danger-text:   var(--color-danger);
@@ -984,6 +992,7 @@ html[data-theme="galadriel-dark"]:root, [data-theme="galadriel-dark"] {
   --color-grade-bottom-text: var(--primitive-crimson-200);
   --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-200) 4%, transparent);
   --color-warning:      var(--primitive-amber-400);
+  --color-info:         var(--primitive-cyan-400);
   --color-warning-text: var(--primitive-amber-400);
   --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-400) 10%, transparent);
   --color-danger-text:   var(--primitive-crimson-200);
@@ -1066,6 +1075,7 @@ html[data-theme="ifrit-light"]:root, [data-theme="ifrit-light"] {
   --color-grade-bottom-bg:   color-mix(in srgb, #a01008 12%, transparent);
 
   --color-warning:      var(--primitive-amber-700);
+  --color-info:         var(--primitive-cyan-700);
   --color-warning-text: var(--primitive-amber-700);
   --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-700) 8%, transparent);
 
@@ -1156,6 +1166,8 @@ html[data-theme="deckard-dark"]:root, [data-theme="deckard-dark"] {
   --color-compliance-border: color-mix(in srgb, #00dce0 38%, transparent);
 
   --color-warning:      #f0b428;
+  /* Info is blue here: cyan is deckard's success color. */
+  --color-info:         #6ea8fe;
   --color-warning-text: #f0b428;
   --color-warning-bg:   color-mix(in srgb, #f0b428 10%, transparent);
 
@@ -1244,6 +1256,8 @@ html[data-theme="deckard-light"]:root, [data-theme="deckard-light"] {
   --color-compliance-border: color-mix(in srgb, #0098a8 38%, transparent);
 
   --color-warning:      var(--primitive-amber-700);
+  /* Info is blue here: cyan is deckard's success color. */
+  --color-info:         #2f6fd0;
   --color-warning-text: var(--primitive-amber-700);
   --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-700) 8%, transparent);
 

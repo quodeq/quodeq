@@ -31,7 +31,7 @@ describe('MapPage — evaluate CTA gating for shared (Critical 1)', () => {
   it('shared source, no evaluations yet: no Start evaluation CTA, shared-specific copy', () => {
     renderPage(baseData());
     expect(screen.getByText('No completed evaluation yet')).toBeInTheDocument();
-    expect(screen.getByText('no completed evaluation in this shared project yet')).toBeInTheDocument();
+    expect(screen.getByText('no completed evaluation in this remote project yet')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Start evaluation' })).toBeNull();
   });
 
@@ -59,11 +59,11 @@ describe('MapPage — shared read-only chip (Finding 6)', () => {
 
   it('shows the chip for a shared project with data', () => {
     renderPage(baseData({ accumulated: { dimensions: DIMS } }));
-    expect(screen.getByText('shared · read-only')).toBeInTheDocument();
+    expect(screen.getByText('remote · read-only')).toBeInTheDocument();
   });
 
   it('omits the chip for a local project', () => {
     renderPage(baseData({ selectedSource: 'local', selectedProject: 'p1', accumulated: { dimensions: DIMS } }));
-    expect(screen.queryByText('shared · read-only')).toBeNull();
+    expect(screen.queryByText('remote · read-only')).toBeNull();
   });
 });

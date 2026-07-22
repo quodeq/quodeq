@@ -107,7 +107,7 @@ describe('ViolationsPage — evaluate CTA gating for shared (Critical 1)', () =>
   it('shared source, no evaluations yet: no Start evaluation CTA, shared-specific copy', () => {
     renderPage(baseData());
     expect(screen.getByText('No completed evaluation yet')).toBeInTheDocument();
-    expect(screen.getByText('no completed evaluation in this shared project yet')).toBeInTheDocument();
+    expect(screen.getByText('no completed evaluation in this remote project yet')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Start evaluation' })).toBeNull();
   });
 
@@ -139,7 +139,7 @@ describe('ViolationsPage — shared read-only chip (Finding 6)', () => {
     renderPage(baseData({
       accumulatedDimensions: [{ dimension: 'security', violations: [], compliance: [] }],
     }));
-    expect(screen.getByText('shared · read-only')).toBeInTheDocument();
+    expect(screen.getByText('remote · read-only')).toBeInTheDocument();
   });
 
   it('omits the chip for a local project', () => {
@@ -147,6 +147,6 @@ describe('ViolationsPage — shared read-only chip (Finding 6)', () => {
       selectedSource: 'local', selectedProject: 'p1', projects: [{ id: 'p1', name: 'p1' }],
       accumulatedDimensions: [{ dimension: 'security', violations: [], compliance: [] }],
     }));
-    expect(screen.queryByText('shared · read-only')).toBeNull();
+    expect(screen.queryByText('remote · read-only')).toBeNull();
   });
 });

@@ -4,14 +4,16 @@ import '@testing-library/jest-dom/vitest';
 import SharedReadOnlyBadge from './SharedReadOnlyBadge.jsx';
 
 describe('SharedReadOnlyBadge', () => {
-  it('renders the exact "shared · read-only" chip text', () => {
+  it('renders the exact "remote · read-only" chip as an info Badge', () => {
     render(<SharedReadOnlyBadge />);
-    expect(screen.getByText('shared · read-only')).toBeInTheDocument();
+    const el = screen.getByText('remote · read-only');
+    expect(el).toBeInTheDocument();
+    expect(el).toHaveClass('badge', 'badge--tag', 'badge--info');
   });
 
   it('uses a middle dot, not an em-dash', () => {
     render(<SharedReadOnlyBadge />);
-    const text = screen.getByText('shared · read-only').textContent;
+    const text = screen.getByText('remote · read-only').textContent;
     expect(text).not.toMatch(/—|--/);
     expect(text).toContain('·'); // ·
   });

@@ -1,0 +1,44 @@
+/* ── Badge: the one status pill/tag recipe ─────────────────────────────────
+   One tint recipe for every tone: text in the tone color, ~12% tinted fill,
+   ~35% tinted border (the pill variant drops the border: it is a soft fill).
+   Tones reference SEMANTIC tokens only, never a raw hex. Hex fallbacks are
+   exactly the drift this file replaces (the old setup-incomplete and
+   read-only badges pointed at tokens that didn't exist and rendered
+   hardcoded amber/cyan in every theme). */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  color: var(--badge-tone);
+  background: color-mix(in srgb, var(--badge-tone) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--badge-tone) 35%, transparent);
+}
+
+/* Project-card corner style: round, micro, uppercase, borderless. */
+.badge--pill {
+  border: none;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 9.5px;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Header/drawer style: squared mono tag. Labels keep their authored case. */
+.badge--tag {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  line-height: 1.4;
+  border-radius: var(--term-radius, 2px);
+  padding: 2px 8px;
+}
+
+.badge--neutral { --badge-tone: var(--color-text-muted); }
+.badge--accent  { --badge-tone: var(--color-accent); }
+.badge--info    { --badge-tone: var(--color-info); }
+.badge--success { --badge-tone: var(--color-success); }
+.badge--warning { --badge-tone: var(--color-warning); }
+.badge--danger  { --badge-tone: var(--color-danger); }

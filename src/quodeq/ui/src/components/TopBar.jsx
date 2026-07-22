@@ -104,9 +104,9 @@ export default function TopBar({
      next click will flip to dark). */
   effectiveDark = false,
   onToggleTheme,
-  /* 'local' | 'shared' — shared projects are read-only in this app (no
-     mutation routes exist on the backend), so the assistant (which can take
-     write actions like dismiss/verify) is not offered for them. */
+  /* 'local' | 'shared' — shared projects are read-only: the assistant
+     launcher renders disabled with an explanatory tooltip for them since
+     the assistant can take write actions like dismiss/verify. */
   selectedSource = 'local',
 }) {
   return (
@@ -166,7 +166,7 @@ export default function TopBar({
           </button>
         )}
 
-        {selectedSource !== 'shared' && <AssistantLauncherButton />}
+        <AssistantLauncherButton sharedSource={selectedSource === 'shared'} />
         <TerminalLauncherButton />
 
         {(provider || model) && (
