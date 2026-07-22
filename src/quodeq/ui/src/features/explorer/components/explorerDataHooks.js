@@ -138,7 +138,11 @@ export function useExplorerData(project, dimension, runId, refreshSignal, select
     fetchRunScores(project, runId).then((rescored) => {
       const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
       if (dimData) setEvalData((prev) => mergeRescoreIntoEval(prev, dimData));
-    }).catch(() => {});
+    }).catch((err) => {
+      // Non-blocking: the explorer keeps the previous scores on screen, but
+      // log the failure so the silent-stale state is diagnosable.
+      console.warn('Rescore refresh failed:', err);
+    });
   }, [refreshSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Live updates after a dismiss arrive synchronously in the dismiss HTTP

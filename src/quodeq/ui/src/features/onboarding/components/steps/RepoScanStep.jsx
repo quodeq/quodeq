@@ -41,7 +41,11 @@ export default function RepoScanStep({ state, actions, createProject, getProject
     try {
       const info = await getProjectInfo(existingProjectId);
       if (info.runsCount > 0) return false;
-      const scanRes = await fetch(`/api/projects/${encodeURIComponent(existingProjectId)}/scan`);
+      // Timeout so a backend that accepts but never responds cannot stall
+      // the resume flow; the catch below falls back to the normal error UI.
+      const scanRes = await fetch(`/api/projects/${encodeURIComponent(existingProjectId)}/scan`, {
+        signal: AbortSignal.timeout(120000),
+      });
       if (!scanRes.ok) return false;
       const scanData = await scanRes.json();
       actions.succeedScan(existingProjectId, scanData);

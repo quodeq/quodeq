@@ -156,10 +156,15 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBa
   const suffix = GRANULARITY_SUFFIX[granularity] || 'd';
   let stats = null;
   if (hasChart) {
-    const min = Math.min(...data.map((d) => d.numericAverage).filter((n) => !Number.isNaN(n)));
-    const max = Math.max(...data.map((d) => d.numericAverage).filter((n) => !Number.isNaN(n)));
-    const avg = data.reduce((s, d) => s + (Number.isNaN(d.numericAverage) ? 0 : d.numericAverage), 0) / data.length;
-    stats = `MIN ${min.toFixed(1)} / MAX ${max.toFixed(1)} / AVG ${avg.toFixed(1)}`;
+    // All-NaN buckets would make Math.min/max over an empty array yield
+    // Infinity/-Infinity; skip the stats line entirely in that case.
+    const valid = data.map((d) => d.numericAverage).filter((n) => !Number.isNaN(n));
+    if (valid.length > 0) {
+      const min = Math.min(...valid);
+      const max = Math.max(...valid);
+      const avg = valid.reduce((s, n) => s + n, 0) / valid.length;
+      stats = `MIN ${min.toFixed(1)} / MAX ${max.toFixed(1)} / AVG ${avg.toFixed(1)}`;
+    }
   }
 
   return (

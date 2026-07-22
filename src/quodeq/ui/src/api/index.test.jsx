@@ -1,8 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { registerProject } from './index.js';
+import { registerProject, getOmlxModels } from './index.js';
 
 beforeEach(() => {
   global.fetch = vi.fn();
+});
+
+describe('getOmlxModels', () => {
+  it('sends the API key as X-Api-Key header, never in the query string', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: async () => ({ models: [] }) });
+    await getOmlxModels('http://localhost:1234', 'sk-secret');
+    const [url, opts] = global.fetch.mock.calls[0];
+    expect(url).toContain('base_url=');
+    expect(url).not.toContain('api_key');
+    expect(url).not.toContain('sk-secret');
+    expect(opts.headers['X-Api-Key']).toBe('sk-secret');
+  });
+
+  it('omits the header when no key is given', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: async () => ({ models: [{ id: 'm' }] }) });
+    const models = await getOmlxModels('', '');
+    const [url, opts] = global.fetch.mock.calls[0];
+    expect(url).not.toContain('api_key');
+    expect(opts.headers['X-Api-Key']).toBeUndefined();
+    expect(models).toEqual([{ id: 'm' }]);
+  });
 });
 
 describe('registerProject', () => {
@@ -56,6 +77,20 @@ describe('registerProject', () => {
     expect(caught).toBeDefined();
     expect(caught.code).toBe('MISSING_CLONE_DEST');
     expect(caught.status).toBe(400);
+  });
+
+  it('passes an abort signal so a hung backend cannot stall onboarding', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: async () => ({ projectId: 'u', scanData: {} }) });
+    await registerProject({ repo: '/tmp/repo' });
+    const [, opts] = global.fetch.mock.calls[0];
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('maps a timeout to a clear user-facing error', async () => {
+    const timeoutErr = new Error('signal timed out');
+    timeoutErr.name = 'TimeoutError';
+    global.fetch.mockRejectedValue(timeoutErr);
+    await expect(registerProject({ repo: '/tmp/repo' })).rejects.toThrow(/timed out/i);
   });
 });
 

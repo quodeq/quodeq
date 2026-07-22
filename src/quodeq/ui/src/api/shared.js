@@ -287,11 +287,22 @@ export function publishProject(projectId) {
  */
 export async function pullSharedProject(projectId, action) {
   const body = action ? { action } : {};
-  const res = await fetch(`${BASE}/shared/projects/${encodeURIComponent(projectId)}/pull`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(`${BASE}/shared/projects/${encodeURIComponent(projectId)}/pull`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      // Generous: a pull imports a zip stream from the shared repository,
+      // but a stalled connection must not leave the pull pending forever.
+      signal: AbortSignal.timeout(600000), // 10 min
+    });
+  } catch (e) {
+    if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+      throw new Error('Pull timed out. Check the shared repository connection and try again.');
+    }
+    throw e;
+  }
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(payload.error || `pullSharedProject failed (${res.status})`);

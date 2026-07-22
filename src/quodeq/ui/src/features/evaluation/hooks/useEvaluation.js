@@ -142,7 +142,12 @@ export function useEvaluation() {
         job.dimensions.map((d) =>
           api.getDimensionEval(job.outputProject, job.outputRunId, d)
             .then((data) => (data?.violations || []).map((v) => ({ ...v, dimension: d })))
-            .catch(() => []),
+            // Tolerate not-yet-written dimension evals during live polling,
+            // but leave a diagnostic so a real fetch failure is visible.
+            .catch((err) => {
+              console.warn(`Failed to fetch ${d} evaluation:`, err);
+              return [];
+            }),
         ),
       );
       return results.flat();
