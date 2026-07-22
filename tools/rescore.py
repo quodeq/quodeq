@@ -25,7 +25,7 @@ sys.path.insert(0, str(repo_root / "src"))
 
 from quodeq.evaluate.lib.scoring import run_scoring
 from quodeq.evaluate.lib.report_json import write_report_json
-from quodeq.shared.validation import validate_path_segment
+from quodeq.shared.validation import validate_path_segment, validate_resolved_within
 
 # Content hashes that identify prompt versions — used to select the correct
 # scoring mode for evidence produced by different prompt revisions.
@@ -157,7 +157,9 @@ def main():
     try:
         dry_run = not args.apply_
         evals_dir = Path(args.evaluations_dir) if args.evaluations_dir else repo_root / "evaluations"
+        validate_path_segment(args.project)
         project_dir = evals_dir / args.project
+        validate_resolved_within(project_dir, evals_dir)
 
         if not project_dir.exists():
             print(f"Project dir not found: {project_dir}")

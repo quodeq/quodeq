@@ -11,17 +11,17 @@ named by UUID (``import_project.py``'s ``_validate_archive`` requires the
 zip's single top-level directory to be a valid UUID), and ``publish_project``
 mirrors the source directory name as-is into the shared repo -- so a
 realistic pull target is UUID-named too. This intentionally differs from
-``tests/api/test_routes_shared_read.py``'s ``shared_clone_fixture``, which
+``tests/api/conftest.py``'s canonical ``shared_clone_fixture``, which
 publishes under the human-friendly slug ``"proj-a"`` purely for readability
-across its read-endpoint tests; that slug is not a valid zip top-level
+across the read-endpoint tests; that slug is not a valid zip top-level
 directory name for ``import_zip_stream`` (it fails the UUID check with
-``BAD_LAYOUT``), so these pull tests use their own UUID-named fixture to
-exercise the real success and collision paths.
+``BAD_LAYOUT``), so these pull tests use their own UUID-named fixture
+(``uuid_named_shared_clone_fixture``, distinctly named so it never shadows
+the conftest fixture) to exercise the real success and collision paths.
 """
 from __future__ import annotations
 
 import json
-import subprocess
 import uuid as _uuid
 from pathlib import Path
 
@@ -30,14 +30,9 @@ import pytest
 from quodeq.api.app import create_app
 from quodeq.services.shared_publish import publish_project
 from quodeq.services.shared_settings import SharedSettings, write_settings
+from tests.api.conftest import _make_origin
 
 _ORIGIN = {"Origin": "http://localhost"}
-
-
-def _make_origin(tmp_path: Path) -> str:
-    origin = tmp_path / "origin.git"
-    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
-    return f"file://{origin}"
 
 
 @pytest.fixture()
@@ -61,17 +56,17 @@ def local_eval_dir(tmp_path, monkeypatch) -> Path:
 
 
 @pytest.fixture()
-def shared_clone_fixture(tmp_path, monkeypatch):
+def uuid_named_shared_clone_fixture(tmp_path, monkeypatch):
     """A real published shared-repo clone containing one UUID-named project.
 
     Follows the same bare-origin + publish_project recipe as
-    tests/services/test_shared_repo.py and
-    tests/api/test_routes_shared_read.py, but publishes a UUID-named project
-    (see module docstring) with a complete repository_info.json so the
-    import-side validation (_validate_repository_info requires 'name' and
-    'path') succeeds.
+    tests/api/conftest.py's canonical ``shared_clone_fixture``, but publishes
+    a UUID-named project (see module docstring) with a complete
+    repository_info.json so the import-side validation
+    (_validate_repository_info requires 'name' and 'path') succeeds.
 
-    Returns (url, project_uuid).
+    Returns (url, project_uuid) -- unlike the conftest fixture, which
+    publishes the slug "proj-a" and returns only the url.
     """
     monkeypatch.setenv("GIT_AUTHOR_NAME", "tester")
     monkeypatch.setenv("GIT_AUTHOR_EMAIL", "t@t")
@@ -108,10 +103,10 @@ def shared_clone_fixture(tmp_path, monkeypatch):
 
 
 @pytest.fixture()
-def local_eval_dir_with_collision(local_eval_dir, shared_clone_fixture) -> Path:
+def local_eval_dir_with_collision(local_eval_dir, uuid_named_shared_clone_fixture) -> Path:
     """local_eval_dir, pre-seeded with a project at the same UUID the shared
     clone publishes -- forces the same-uuid 409 collision path."""
-    _, project_uuid = shared_clone_fixture
+    _, project_uuid = uuid_named_shared_clone_fixture
     existing = local_eval_dir / project_uuid
     existing.mkdir()
     (existing / "repository_info.json").write_text(
@@ -137,8 +132,8 @@ def _pull(client, project: str, action: str | None = None):
 
 # --- happy path ---------------------------------------------------------------
 
-def test_pull_materializes_local_copy(client, shared_clone_fixture, local_eval_dir):
-    _, project_uuid = shared_clone_fixture
+def test_pull_materializes_local_copy(client, uuid_named_shared_clone_fixture, local_eval_dir):
+    _, project_uuid = uuid_named_shared_clone_fixture
     resp = _pull(client, project_uuid)
     assert resp.status_code in (200, 201), resp.get_json()
     assert (local_eval_dir / project_uuid / "repository_info.json").exists()
@@ -150,8 +145,8 @@ def test_pull_materializes_local_copy(client, shared_clone_fixture, local_eval_d
 
 # --- collision handling --------------------------------------------------------
 
-def test_pull_collision_returns_409(client, shared_clone_fixture, local_eval_dir_with_collision):
-    _, project_uuid = shared_clone_fixture
+def test_pull_collision_returns_409(client, uuid_named_shared_clone_fixture, local_eval_dir_with_collision):
+    _, project_uuid = uuid_named_shared_clone_fixture
     resp = _pull(client, project_uuid)
     assert resp.status_code == 409  # caller retries with {"action": "copy"}
     body = resp.get_json()
@@ -159,8 +154,8 @@ def test_pull_collision_returns_409(client, shared_clone_fixture, local_eval_dir
     assert body["kind"] == "same_uuid"
 
 
-def test_pull_collision_replace_overwrites(client, shared_clone_fixture, local_eval_dir_with_collision):
-    _, project_uuid = shared_clone_fixture
+def test_pull_collision_replace_overwrites(client, uuid_named_shared_clone_fixture, local_eval_dir_with_collision):
+    _, project_uuid = uuid_named_shared_clone_fixture
     existing = local_eval_dir_with_collision / project_uuid
     (existing / "old-marker.txt").write_text("stale", encoding="utf-8")
 
@@ -174,8 +169,8 @@ def test_pull_collision_replace_overwrites(client, shared_clone_fixture, local_e
     assert info["name"] == "proj-a"
 
 
-def test_pull_collision_copy_creates_new_uuid(client, shared_clone_fixture, local_eval_dir_with_collision):
-    _, project_uuid = shared_clone_fixture
+def test_pull_collision_copy_creates_new_uuid(client, uuid_named_shared_clone_fixture, local_eval_dir_with_collision):
+    _, project_uuid = uuid_named_shared_clone_fixture
     resp = _pull(client, project_uuid, action="copy")
     assert resp.status_code == 200, resp.get_json()
     body = resp.get_json()
@@ -187,15 +182,15 @@ def test_pull_collision_copy_creates_new_uuid(client, shared_clone_fixture, loca
     assert (local_eval_dir_with_collision / body["projectId"]).exists()
 
 
-def test_pull_invalid_action_returns_400(client, shared_clone_fixture, local_eval_dir):
-    _, project_uuid = shared_clone_fixture
+def test_pull_invalid_action_returns_400(client, uuid_named_shared_clone_fixture, local_eval_dir):
+    _, project_uuid = uuid_named_shared_clone_fixture
     resp = _pull(client, project_uuid, action="nuke")
     assert resp.status_code == 400
     assert resp.get_json()["code"] == "INVALID_ACTION"
 
 
-def test_pull_non_string_action_returns_400(client, shared_clone_fixture, local_eval_dir):
-    _, project_uuid = shared_clone_fixture
+def test_pull_non_string_action_returns_400(client, uuid_named_shared_clone_fixture, local_eval_dir):
+    _, project_uuid = uuid_named_shared_clone_fixture
     resp = client.post(
         f"/api/shared/projects/{project_uuid}/pull",
         json={"action": ["copy"]},
@@ -207,12 +202,12 @@ def test_pull_non_string_action_returns_400(client, shared_clone_fixture, local_
 
 # --- not-found / validation ------------------------------------------------
 
-def test_pull_project_not_found_in_shared_repo_returns_404(client, shared_clone_fixture, local_eval_dir):
+def test_pull_project_not_found_in_shared_repo_returns_404(client, uuid_named_shared_clone_fixture, local_eval_dir):
     resp = _pull(client, "does-not-exist")
     assert resp.status_code == 404
 
 
-def test_pull_invalid_project_segment_returns_400(client, shared_clone_fixture, local_eval_dir):
+def test_pull_invalid_project_segment_returns_400(client, uuid_named_shared_clone_fixture, local_eval_dir):
     resp = client.post(
         "/api/shared/projects/%2e%2e/pull",
         json={},
@@ -221,8 +216,8 @@ def test_pull_invalid_project_segment_returns_400(client, shared_clone_fixture, 
     assert resp.status_code == 400
 
 
-def test_pull_without_body_defaults_to_no_action(client, shared_clone_fixture, local_eval_dir):
+def test_pull_without_body_defaults_to_no_action(client, uuid_named_shared_clone_fixture, local_eval_dir):
     """A POST with no JSON body at all (not even {}) must not 400/500."""
-    _, project_uuid = shared_clone_fixture
+    _, project_uuid = uuid_named_shared_clone_fixture
     resp = client.post(f"/api/shared/projects/{project_uuid}/pull", headers=_ORIGIN)
     assert resp.status_code in (200, 201), resp.get_json()

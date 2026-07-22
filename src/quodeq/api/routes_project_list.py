@@ -362,8 +362,11 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             # handler would have logged; record it before converting.
             _logger.exception("Registration failed for repo=%r", repo)
             _rollback_new_dirs(reports_root, before)
+            # Return a generic message; the exception detail (which can carry
+            # filesystem paths or backend internals) is logged above, not sent
+            # to the remote caller.
             body, status = error_response(
-                f"Registration failed: {exc}",
+                "Registration failed due to an internal error.",
                 HTTPStatus.INTERNAL_SERVER_ERROR,
                 "REGISTRATION_FAILED",
             )

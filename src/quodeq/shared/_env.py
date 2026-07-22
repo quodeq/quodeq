@@ -204,6 +204,18 @@ def score_cache_disabled(env: dict[str, str] | None = None) -> bool:
     return environ.get("QUODEQ_DISABLE_SCORE_CACHE", "").strip().lower() in _SQLITE_DISABLE_TRUTHY
 
 
+def get_quodeq_dir(env: dict[str, str] | None = None) -> Path:
+    """Return the base Quodeq state directory.
+
+    Resolution order: QUODEQ_DIR env var, then ~/.quodeq. Recomputes the
+    default on each call so test monkeypatches of ``Path.home`` are honored.
+    """
+    from_env = (env or os.environ).get("QUODEQ_DIR")
+    if from_env:
+        return Path(from_env)
+    return Path.home() / ".quodeq"
+
+
 _DEFAULT_CLONES_DIR = Path.home() / ".quodeq" / "clones"
 
 
