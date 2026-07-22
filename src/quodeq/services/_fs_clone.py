@@ -5,9 +5,10 @@ from __future__ import annotations
 import errno
 import logging
 import os
-import shutil
 import subprocess as _subprocess
 from pathlib import Path
+
+from quodeq.services.shared_repo import remove_clone_dir
 
 _logger = logging.getLogger(__name__)
 
@@ -142,6 +143,5 @@ def run_git_clone(url: str, clone_dest: Path) -> None:
         # git usually removes the dest it created on failure, but not when
         # killed or on checkout-phase errors; a leftover partial dir would
         # turn the retry into a bogus dest_exists failure.
-        if clone_dest.exists():
-            shutil.rmtree(clone_dest, ignore_errors=True)
+        remove_clone_dir(clone_dest)
         _clone_once(url, clone_dest, [])

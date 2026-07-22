@@ -4,15 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
-import shutil
 from pathlib import Path
 
+from quodeq.services.shared_repo import remove_clone_dir
+
 _logger = logging.getLogger(__name__)
-
-
-def _log_rmtree_error(func, path, exc):
-    """rmtree onexc callback that logs failures instead of swallowing them."""
-    _logger.warning("Failed to remove %s: %s", path, exc)
 
 
 def delete_ephemeral_clone(clones_root: Path, project_uuid: str) -> None:
@@ -30,9 +26,7 @@ def delete_ephemeral_clone(clones_root: Path, project_uuid: str) -> None:
         return
     if target == clones_root:
         return
-    if not target.exists():
-        return
-    shutil.rmtree(target, onexc=_log_rmtree_error)
+    remove_clone_dir(target)
 
 
 def maybe_cleanup_after_job(
@@ -78,4 +72,4 @@ def sweep_orphaned_clones(clones_root: Path, reports_root: Path) -> None:
         registered = set()
     for entry in clones_root.iterdir():
         if entry.is_dir() and entry.name not in registered:
-            shutil.rmtree(entry, onexc=_log_rmtree_error)
+            remove_clone_dir(entry)
