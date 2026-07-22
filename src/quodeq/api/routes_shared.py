@@ -30,6 +30,7 @@ from quodeq.services.scoring import get_project_scores, get_scores_slim
 from quodeq.services.shared_publish import get_publish_status, start_publish
 from quodeq.services.shared_repo import (
     check_repo_format,
+    clone_lock,
     ensure_shared_clone,
     last_synced_at,
     published_meta,
@@ -223,10 +224,17 @@ def register_shared_routes(app: Flask) -> None:
         # place rather than an orphaned dir with no settings pointing at it.
         # ignore_errors=True: a half-removed or permission-denied cache dir
         # must not turn a disconnect into a 500.
+        #
+        # Review finding: rmtree must run under clone_lock(url), same as
+        # every other clone mutator (ensure_shared_clone, refresh_shared_clone,
+        # publish_project) -- otherwise a concurrent publish/refresh holding
+        # the lock can have its clone directory removed mid-operation,
+        # potentially leaving a partially-deleted .git that doesn't self-heal.
         settings = read_settings()
         write_settings(SharedSettings(url=None))
         if settings.url is not None:
-            shutil.rmtree(shared_cache_dir(settings.url), ignore_errors=True)
+            with clone_lock(settings.url):
+                shutil.rmtree(shared_cache_dir(settings.url), ignore_errors=True)
         return jsonify({"configured": False})
 
     @app.post("/api/shared/refresh")
