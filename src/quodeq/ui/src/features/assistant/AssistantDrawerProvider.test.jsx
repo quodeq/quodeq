@@ -3,7 +3,7 @@ import { render, screen, act } from '@testing-library/react';
 import { AssistantDrawerProvider, useAssistantDrawer } from './AssistantDrawerProvider.jsx';
 
 vi.mock('../../api/assistant.js', () => ({
-  createAssistantSession: vi.fn(async () => ({ sessionId: 's1' })),
+  createAssistantSession: vi.fn(async (payload) => ({ sessionId: 's1', readOnly: payload?.source === 'shared' })),
   postAssistantMessage: vi.fn(async () => ({ accepted: true })),
   stopAssistantTurn: vi.fn(async () => ({ stopping: true })),
   assistantEventsUrl: (id, a) => `/api/assistant/sessions/${id}/events?after=${a}`,
@@ -32,10 +32,12 @@ function Probe() {
       <span data-testid="messages">{JSON.stringify(d.messages)}</span>
       <span data-testid="panels">{JSON.stringify(d.openPanels)}</span>
       <span data-testid="active">{d.activeTab}</span>
+      <span data-testid="readonly">{String(d.readOnly)}</span>
       <button onClick={d.toggleWebEnabled}>web</button>
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'p', runId: 'r' })}>start</button>
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'pA', runId: 'r' })}>startA</button>
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'pB', runId: 'r' })}>startB</button>
+      <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'p', runId: 'r', source: 'shared' })}>startShared</button>
       <button onClick={d.toggle}>toggle</button>
       <button onClick={() => d.openTab('assistant')}>openAssistant</button>
       <button onClick={() => d.openTab('terminal')}>openTerminal</button>
@@ -165,6 +167,15 @@ it('exposes the active session provider/model for the drawer header', async () =
   await act(async () => { screen.getByText('start').click(); });
   expect(screen.getByTestId('provider').textContent).toBe('claude');
   expect(screen.getByTestId('model').textContent).toBe('sonnet');
+});
+
+it('same project id local vs shared creates DISTINCT sessions and readOnly tracks the response', async () => {
+  render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+  await act(async () => { screen.getByText('start').click(); });
+  expect(screen.getByTestId('readonly').textContent).toBe('false');
+  await act(async () => { screen.getByText('startShared').click(); });
+  expect(createAssistantSession).toHaveBeenCalledTimes(2); // source in the key → no dedupe
+  expect(screen.getByTestId('readonly').textContent).toBe('true');
 });
 
 it('surfaces an error when sendMessage POST fails (not silent)', async () => {
