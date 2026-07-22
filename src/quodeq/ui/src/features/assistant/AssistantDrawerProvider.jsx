@@ -174,8 +174,8 @@ export function AssistantDrawerProvider({ children }) {
   const [maximized, setMaximized] = useState(false);
   const toggleMaximized = useCallback(() => setMaximized((m) => !m), []);
 
-  // Defense in depth: open() is exposed on the context value, so a future
-  // caller besides the keydown handler below could invoke it directly.
+  // Open the drawer with the previously active tab; exposed on the context
+  // for programmatic callers besides the keydown handler below.
   const open = useCallback(() => {
     setOpenPanels((prev) => (prev.length ? prev : [activeTabRef.current]));
   }, []);
@@ -285,6 +285,10 @@ export function AssistantDrawerProvider({ children }) {
 
   const startSession = useCallback(async (ctx) => {
     const key = `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}:${ctx?.source || 'local'}`;
+    // Re-claim the latest-requested key even when deduping: a superseded
+    // in-flight commit for a DIFFERENT context must not land after the user
+    // returned to this one (rapid source flip-flop race).
+    latestKeyRef.current = key;
     if (key === sessionCtxKey && sessionId) return;
     await commitSession(ctx, key);
   }, [sessionCtxKey, sessionId, commitSession]);

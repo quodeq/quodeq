@@ -22,27 +22,30 @@ export function parseMetaCommand(text) {
   return META_COMMANDS.some((c) => c.name === name) ? name : null;
 }
 
-export function matchCommands(catalog, draft) {
+export function matchCommands(catalog, draft, { readOnly = false } = {}) {
   if (!draft.startsWith('/') || /\s/.test(draft)) return [];
   const prefix = draft.slice(1).toLowerCase();
-  const skills = (catalog?.skills ?? []).map((s) => ({
-    name: s.name, description: s.description, argumentHint: s.argumentHint || '',
-  }));
+  // Read-only (remote) sessions have no draft_action server-side, so
+  // write-shaped skills would dead-end; hide them from autocomplete too,
+  // same rule as pillsForView.
+  const skills = (catalog?.skills ?? [])
+    .filter((s) => !readOnly || !s.requiresWrite)
+    .map((s) => ({ name: s.name, description: s.description, argumentHint: s.argumentHint || '' }));
   return [...VISIBLE_META_COMMANDS.map((c) => ({ ...c, argumentHint: '' })), ...skills]
     .filter((c) => c.name.startsWith(prefix));
 }
 
-function commandLines(catalog) {
-  const skills = catalog?.skills ?? [];
+function commandLines(catalog, readOnly) {
+  const skills = (catalog?.skills ?? []).filter((s) => !readOnly || !s.requiresWrite);
   return [
     ...VISIBLE_META_COMMANDS.map((c) => `- \`/${c.name}\` ${c.description}`),
     ...skills.map((s) => `- \`/${s.name}${s.argumentHint ? ` ${s.argumentHint}` : ''}\` ${s.description}`),
   ].join('\n');
 }
 
-export function buildMetaResponse(kind, catalog) {
+export function buildMetaResponse(kind, catalog, { readOnly = false } = {}) {
   if (kind === 'skills') {
-    const skills = catalog?.skills ?? [];
+    const skills = (catalog?.skills ?? []).filter((s) => !readOnly || !s.requiresWrite);
     if (!skills.length) return 'No skill packs are installed.';
     return `**Skills**\n${skills.map((s) => `- \`/${s.name}${s.argumentHint ? ` ${s.argumentHint}` : ''}\` ${s.description}`).join('\n')}`;
   }
@@ -51,7 +54,10 @@ export function buildMetaResponse(kind, catalog) {
     if (!actions.length) return 'No draftable actions are available.';
     return `**Actions** (drafted as preview cards, applied only after you approve)\n${actions.map((a) => `- \`${a.type}\` ${a.description}`).join('\n')}`;
   }
-  return `I can explain scores, dig into findings, and draft standards for this project.\n\n**Commands**\n${commandLines(catalog)}`;
+  const intro = readOnly
+    ? 'I can explain scores and dig into findings for this remote project.'
+    : 'I can explain scores, dig into findings, and draft standards for this project.';
+  return `${intro}\n\n**Commands**\n${commandLines(catalog, readOnly)}`;
 }
 
 export function pillsForView(catalog, view, { readOnly = false } = {}) {

@@ -634,6 +634,12 @@ export function shouldWallEmptyProjects({ page, projects, selectedSource }) {
   return !projects || projects.length === 0;
 }
 
+// Exported for tests: the session-start payload must carry the selected
+// source so remote projects get read-only sessions server-side.
+export function buildAssistantSessionPayload({ provider, model, projectId, runId, source }) {
+  return { provider, model, projectId, runId, source };
+}
+
 /**
  * @param {{ activePage: { page: string }, props: Object }} params
  * @returns {JSX.Element|null}
@@ -759,7 +765,9 @@ export default function App() {
   // closes on a source switch; the source-keyed session context re-keys instead.
   useEffect(() => {
     if (!assistantOpen || drawerTab !== 'assistant') return;
-    startAssistantSession({ provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId, source: asstSource });
+    startAssistantSession(buildAssistantSessionPayload({
+      provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId, source: asstSource,
+    }));
   }, [assistantOpen, drawerTab, asstProvider, asstModel, asstProjectId, asstRunId, asstSource, startAssistantSession]);
 
   // Sync the client-side grade-label thresholds with the server formula at

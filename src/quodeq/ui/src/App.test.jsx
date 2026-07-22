@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import {
   buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
   resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldShowProjectTabs,
-  buildNavigationBundle, shouldWallEmptyProjects, buildWizardHandlers,
+  buildNavigationBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
 } from './App.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
@@ -373,6 +373,30 @@ describe('shouldWallEmptyProjects', () => {
 
   it('does not wall once local projects exist', () => {
     expect(shouldWallEmptyProjects({ page: 'file', projects: [{ id: 'p1' }], selectedSource: 'local' })).toBe(false);
+  });
+});
+
+// Pins the session-start effect's payload shape: `source` must reach
+// startAssistantSession so remote (shared) projects get read-only sessions
+// server-side. Regression: this used to be an inline object literal in the
+// effect with no test coverage of the `source` field specifically.
+describe('buildAssistantSessionPayload', () => {
+  it('passes source through unchanged', () => {
+    expect(buildAssistantSessionPayload({ provider: 'p', source: 'shared' }).source).toBe('shared');
+  });
+
+  it('includes all five keys', () => {
+    const payload = buildAssistantSessionPayload({
+      provider: 'claude', model: 'sonnet', projectId: 'p1', runId: 'r1', source: 'local',
+    });
+    expect(Object.keys(payload).sort()).toEqual(['model', 'projectId', 'provider', 'runId', 'source'].sort());
+    expect(payload).toEqual({ provider: 'claude', model: 'sonnet', projectId: 'p1', runId: 'r1', source: 'local' });
+  });
+
+  it('leaves an absent source as undefined (API applies its own local default)', () => {
+    const payload = buildAssistantSessionPayload({ provider: 'p' });
+    expect(payload.source).toBeUndefined();
+    expect('source' in payload).toBe(true);
   });
 });
 

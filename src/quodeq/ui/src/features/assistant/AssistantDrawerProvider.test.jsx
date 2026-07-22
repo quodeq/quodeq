@@ -206,6 +206,47 @@ it('startSession race: the latest requested context wins even if it resolves fir
   expect(postAssistantMessage).toHaveBeenCalledWith('sess-pB', { text: 'x', uiState: {}, webEnabled: false, writeEnabled: false });
 });
 
+it('a superseded in-flight commit does not land after the user re-selects the original context (source flip-flop race)', async () => {
+  // Regression for the dedupe early-return NOT re-claiming latestKeyRef:
+  // start A (commits) -> start B (leave create pending) -> start A again
+  // (hits the dedupe path) -> resolve B's stale create. B's resolution must
+  // be invalidated and the committed session must still be A's.
+  const deferred = {};
+  createAssistantSession.mockImplementation((ctx) => new Promise((resolve) => {
+    const key = `${ctx.provider}:${ctx.model}:${ctx.projectId}:${ctx.runId}:${ctx.source || 'local'}`;
+    deferred[key] = () => resolve({ sessionId: `sess-${key}`, readOnly: ctx.source === 'shared' });
+  }));
+  let hookRef;
+  const Grab = () => { hookRef = useAssistantDrawer(); return null; };
+  render(<AssistantDrawerProvider><Probe /><Grab /></AssistantDrawerProvider>);
+
+  const ctxA = { provider: 'claude', model: 'sonnet', projectId: 'p', runId: 'r' };
+  const ctxB = { provider: 'claude', model: 'sonnet', projectId: 'p', runId: 'r', source: 'shared' };
+  const keyA = 'claude:sonnet:p:r:local';
+  const keyB = 'claude:sonnet:p:r:shared';
+
+  // Start A and let it commit.
+  await act(async () => { hookRef.startSession(ctxA); });
+  await act(async () => { deferred[keyA](); await Promise.resolve(); });
+  expect(screen.getByTestId('readonly').textContent).toBe('false');
+
+  // Start B; its create is left pending.
+  await act(async () => { hookRef.startSession(ctxB); });
+
+  // The user flips back to A. Same key as the already-committed session, so
+  // this hits the dedupe early-return — but it must still re-claim
+  // latestKeyRef so B's later resolution can't win.
+  await act(async () => { hookRef.startSession(ctxA); });
+
+  // Now let B's stale create resolve.
+  await act(async () => { deferred[keyB](); await Promise.resolve(); });
+
+  // B's resolution must have been ignored: still on A's session.
+  expect(screen.getByTestId('readonly').textContent).toBe('false');
+  await act(async () => { hookRef.sendMessage('x', {}); });
+  expect(postAssistantMessage).toHaveBeenCalledWith(`sess-${keyA}`, expect.objectContaining({ text: 'x' }));
+});
+
 it('webEnabled toggles, rides the POST body, and resets on a new session', async () => {
   // the race test above swapped in a deferred implementation; clearAllMocks
   // clears calls, not implementations, so restore the default here.

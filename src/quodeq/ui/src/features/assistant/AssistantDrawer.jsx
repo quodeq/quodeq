@@ -26,8 +26,8 @@ export function AssistantPane({ uiState }) {
   const [menuDismissed, setMenuDismissed] = useState(false);
 
   const suggestions = useMemo(
-    () => (streaming ? [] : matchCommands(catalog, draft)),
-    [catalog, draft, streaming],
+    () => (streaming ? [] : matchCommands(catalog, draft, { readOnly })),
+    [catalog, draft, streaming, readOnly],
   );
   const menuVisible = suggestions.length > 0 && !menuDismissed;
 
@@ -41,10 +41,10 @@ export function AssistantPane({ uiState }) {
     if (!text || streaming) return;
     const meta = parseMetaCommand(text);
     if (meta === 'clear') { resetConversation(); setDraft(''); return; }
-    if (meta) { addLocalExchange(text, buildMetaResponse(meta, catalog)); setDraft(''); return; }
+    if (meta) { addLocalExchange(text, buildMetaResponse(meta, catalog, { readOnly })); setDraft(''); return; }
     sendMessage(text, uiState);
     setDraft('');
-  }, [draft, streaming, sendMessage, uiState, catalog, addLocalExchange, resetConversation]);
+  }, [draft, streaming, sendMessage, uiState, catalog, addLocalExchange, resetConversation, readOnly]);
 
   const handleKeyDown = useCallback((event) => {
     if (menuVisible) {
