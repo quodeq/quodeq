@@ -32,7 +32,7 @@ jobs:
     # UTC nightly.
     timeout-minutes: 600
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
       - name: Install uv
         uses: astral-sh/setup-uv@v8.3.2
       - name: Set up Python
