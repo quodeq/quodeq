@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import {
   buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
   resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldShowProjectTabs,
-  buildNavigationBundle, shouldWallEmptyProjects, buildWizardHandlers, shouldCloseAssistantForSource,
+  buildNavigationBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
 } from './App.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
@@ -376,6 +376,30 @@ describe('shouldWallEmptyProjects', () => {
   });
 });
 
+// Pins the session-start effect's payload shape: `source` must reach
+// startAssistantSession so remote (shared) projects get read-only sessions
+// server-side. Regression: this used to be an inline object literal in the
+// effect with no test coverage of the `source` field specifically.
+describe('buildAssistantSessionPayload', () => {
+  it('passes source through unchanged', () => {
+    expect(buildAssistantSessionPayload({ provider: 'p', source: 'shared' }).source).toBe('shared');
+  });
+
+  it('includes all five keys', () => {
+    const payload = buildAssistantSessionPayload({
+      provider: 'claude', model: 'sonnet', projectId: 'p1', runId: 'r1', source: 'local',
+    });
+    expect(Object.keys(payload).sort()).toEqual(['model', 'projectId', 'provider', 'runId', 'source'].sort());
+    expect(payload).toEqual({ provider: 'claude', model: 'sonnet', projectId: 'p1', runId: 'r1', source: 'local' });
+  });
+
+  it('leaves an absent source as undefined (API applies its own local default)', () => {
+    const payload = buildAssistantSessionPayload({ provider: 'p' });
+    expect(payload.source).toBeUndefined();
+    expect('source' in payload).toBe(true);
+  });
+});
+
 // The wizard registers a project on its Repo & Scan step, but the projects
 // list in React state is only reloaded at boot and when an evaluation
 // finishes. Both wizard exits that leave a registered project behind (saved
@@ -449,23 +473,5 @@ describe('resolveSelectionAfterSharedDisconnect', () => {
   it('clears the selection to the app\'s no-project state when there are no local projects', () => {
     expect(resolveSelectionAfterSharedDisconnect({ selectedSource: 'shared', projects: [] }))
       .toEqual({ id: '', source: 'local' });
-  });
-});
-
-// Regression lock for the shared-project drawer guard: it must close ONLY the
-// assistant panel. The old guard closed the whole drawer, which made the
-// terminal unopenable on shared projects (it closed itself the instant the
-// launcher opened it).
-describe('shouldCloseAssistantForSource', () => {
-  it('closes the assistant panel on a shared project', () => {
-    expect(shouldCloseAssistantForSource('shared', ['assistant'])).toBe(true);
-    expect(shouldCloseAssistantForSource('shared', ['assistant', 'terminal'])).toBe(true);
-  });
-  it('leaves a terminal-only drawer alone on a shared project', () => {
-    expect(shouldCloseAssistantForSource('shared', ['terminal'])).toBe(false);
-    expect(shouldCloseAssistantForSource('shared', [])).toBe(false);
-  });
-  it('never fires for local projects', () => {
-    expect(shouldCloseAssistantForSource('local', ['assistant', 'terminal'])).toBe(false);
   });
 });

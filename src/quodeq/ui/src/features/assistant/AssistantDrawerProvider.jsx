@@ -9,29 +9,6 @@ const DEFAULT_HEIGHT = 320;
 const MIN_HEIGHT = 160;
 const MAX_HEIGHT = 640;
 
-// useProjectState's SOURCE_STORAGE_KEY (hooks/useProjectState.js). Not
-// imported directly: this provider mounts at the app root (main.jsx), above
-// App and the useProjectState hook that owns `selectedSource`, so it has no
-// React state to read the current source from. Every source change is
-// paired with a synchronous write to this key (persistSource), which makes
-// it the synchronous source of truth available at keydown time.
-const SOURCE_STORAGE_KEY = 'quodeq_selected_source';
-
-// True when the persisted project source is the read-only shared-repo
-// mirror. The assistant's dismiss/verify tools mutate the local store, and a
-// shared project can collide with a local project id, so the drawer must not
-// open (via shortcut or programmatic open()) while a shared project is
-// selected. Reads default to 'local' (i.e. this returns false) on any storage
-// failure (private browsing, disabled storage), matching the app's other
-// defensive storage reads.
-function isSharedSourceActive() {
-  try {
-    return localStorage.getItem(SOURCE_STORAGE_KEY) === 'shared';
-  } catch {
-    return false;
-  }
-}
-
 function clampHeight(px) {
   return Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, px));
 }
@@ -130,6 +107,10 @@ export function AssistantDrawerProvider({ children }) {
   writeEnabledRef.current = writeEnabled;
   const [repoInfo, setRepoInfo] = useState(null);   // {attached, reason, writeAvailable}
   const [workspace, setWorkspace] = useState(null); // status route's `worktree` object
+  // Whether the active session is read-only (source: 'shared'), from the
+  // create-session response. Reset on every context switch via commitSession,
+  // same as repoInfo — never sticky across sessions.
+  const [readOnly, setReadOnly] = useState(false);
 
   // Tracks the most recently *requested* session context key, set
   // synchronously at startSession call time. Because startSession awaits a
@@ -193,10 +174,9 @@ export function AssistantDrawerProvider({ children }) {
   const [maximized, setMaximized] = useState(false);
   const toggleMaximized = useCallback(() => setMaximized((m) => !m), []);
 
-  // Defense in depth: open() is exposed on the context value, so a future
-  // caller besides the keydown handler below could invoke it directly.
+  // Open the drawer with the previously active tab; exposed on the context
+  // for programmatic callers besides the keydown handler below.
   const open = useCallback(() => {
-    if (isSharedSourceActive()) return;
     setOpenPanels((prev) => (prev.length ? prev : [activeTabRef.current]));
   }, []);
   const close = useCallback(() => setOpenPanels([]), []);          // close ALL panels
@@ -211,10 +191,9 @@ export function AssistantDrawerProvider({ children }) {
     });
   }, []);
 
-  // Close one SPECIFIC panel, active or not (App uses this to shut only the
-  // assistant when a shared project is selected — the terminal must survive).
-  // If it was the active one, fall back to the most recent remaining panel,
-  // same rule as closeActiveTab.
+  // Close one SPECIFIC panel, active or not, leaving any other open panel
+  // alone. If it was the active one, fall back to the most recent remaining
+  // panel, same rule as closeActiveTab.
   const closePanel = useCallback((tab) => {
     setOpenPanels((prev) => {
       if (!prev.includes(tab)) return prev;
@@ -247,18 +226,13 @@ export function AssistantDrawerProvider({ children }) {
       if (e.code !== 'Backquote' || !(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
       // Terminal shortcut (Ctrl+Shift+`) is always available, regardless of
-      // project source. Only the assistant shortcut (Ctrl+`) is gated by source.
+      // project source.
       if (e.shiftKey) {
         if (terminalEnabled) toggleTopbar('terminal');
         return;
       }
-      // This provider mounts above App/useProjectState, so it can't read
-      // `selectedSource` as React state; the persisted key is the
-      // synchronous authority instead (see isSharedSourceActive above). The
-      // assistant's dismiss/verify tools act on the local store, which can
-      // collide with a shared project's id, so the shortcut must not open
-      // the drawer while a shared project is selected.
-      if (isSharedSourceActive()) return;
+      // Shared projects get read-only sessions server-side, so the shortcut
+      // opens the drawer for any source.
       if (assistantEnabled) toggleTopbar('assistant');
       else if (terminalEnabled) toggleTopbar('terminal');
     };
@@ -301,6 +275,7 @@ export function AssistantDrawerProvider({ children }) {
     setWriteEnabled(false);
     setRepoInfo({ attached: !!created.repoAttached, reason: created.repoReason || null,
                   writeAvailable: !!created.writeAvailable });
+    setReadOnly(!!created.readOnly);
     setWorkspace(null);
     setSessionCtxKey(key);
     setSessionId(created.sessionId);
@@ -309,7 +284,11 @@ export function AssistantDrawerProvider({ children }) {
   }, []);
 
   const startSession = useCallback(async (ctx) => {
-    const key = `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}`;
+    const key = `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}:${ctx?.source || 'local'}`;
+    // Re-claim the latest-requested key even when deduping: a superseded
+    // in-flight commit for a DIFFERENT context must not land after the user
+    // returned to this one (rapid source flip-flop race).
+    latestKeyRef.current = key;
     if (key === sessionCtxKey && sessionId) return;
     await commitSession(ctx, key);
   }, [sessionCtxKey, sessionId, commitSession]);
@@ -321,7 +300,12 @@ export function AssistantDrawerProvider({ children }) {
   const resetConversation = useCallback(async () => {
     const ctx = lastCtxRef.current;
     if (!ctx || turnActive) return;
-    const key = `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}`;
+    // Must match startSession's key format exactly: sessionCtxKey is shared
+    // state between the two, and a mismatched format here would make a
+    // subsequent startSession for the SAME context fail its dedupe check
+    // (stale-format key !== freshly-computed key) and mint a spurious extra
+    // session.
+    const key = `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}:${ctx?.source || 'local'}`;
     await commitSession(ctx, key);
   }, [turnActive, commitSession]);
 
@@ -374,11 +358,11 @@ export function AssistantDrawerProvider({ children }) {
     sessionReady: sessionId != null,
     provider: sessionMeta.provider, model: sessionMeta.model,
     webEnabled, toggleWebEnabled,
-    writeEnabled, toggleWriteEnabled, repoInfo, workspace, refreshWorkspace,
+    writeEnabled, toggleWriteEnabled, repoInfo, readOnly, workspace, refreshWorkspace,
     sessionId,
     catalog, addLocalExchange,
     startSession, sendMessage, stopTurn, resetConversation,
-  }), [isOpen, open, close, toggle, closeActiveTab, closePanel, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled, repoInfo, workspace, refreshWorkspace, catalog, addLocalExchange, startSession, sendMessage, stopTurn, resetConversation]);
+  }), [isOpen, open, close, toggle, closeActiveTab, closePanel, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled, repoInfo, readOnly, workspace, refreshWorkspace, catalog, addLocalExchange, startSession, sendMessage, stopTurn, resetConversation]);
 
   return (
     <AssistantDrawerContext.Provider value={value}>
