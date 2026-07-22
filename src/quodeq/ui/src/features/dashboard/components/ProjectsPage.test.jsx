@@ -545,6 +545,16 @@ describe('ProjectsPage — publish action (local cards)', () => {
 
       // Isolate the post-publish refresh from useSharedProjects' own
       // mount-time background revalidate, which also calls these mocks.
+      // react-query's notifyManager schedules cache-update notifications
+      // via a real setTimeout(fn, 0) (see @tanstack/query-core's
+      // timeoutManager), which fake timers intercept -- and the mount
+      // revalidate is a multi-hop cascade (status settles -> list enables
+      // -> list settles -> refresh() -> re-invalidate), each hop its own
+      // scheduled timer. runOnlyPendingTimersAsync drains the whole
+      // cascade (including timers newly scheduled by ones it just ran),
+      // where a fixed number of advanceTimersByTimeAsync(0) calls isn't
+      // guaranteed to reach the end of the chain.
+      await act(async () => { await vi.runOnlyPendingTimersAsync(); });
       refreshShared.mockClear();
       sharedListProjects.mockClear();
 
@@ -618,7 +628,7 @@ describe('ProjectsPage — group-aware filtering and the empty-filter trap', () 
     // present -- before the fix, the child's entry (and its action) was
     // built from the post-filter list and vanished the moment the query
     // excluded the child's own name.
-    expect(screen.getAllByRole('button', { name: 'publish' })).toHaveLength(2);
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'publish' })).toHaveLength(2));
   });
 
   it('filtering everything out keeps the toolbar mounted and shows a no-match line, not the empty-CTA', async () => {
@@ -695,6 +705,31 @@ describe('ProjectsPage — SyncedIndicator: "not synced yet" and unconfigured hi
 
     await waitFor(() => expect(screen.getByText('not synced yet')).toBeInTheDocument());
     expect(screen.queryByText(/just now/)).not.toBeInTheDocument();
+  });
+
+  // Audit A2: a list that never loads used to render "not synced yet" with
+  // no error and no working recovery control. It now renders a distinct
+  // error state, and the same button that used to just say "refresh" is
+  // the retry affordance -- clicking it calls the refresh endpoint (which
+  // useSharedProjects' refresh() also uses to re-check status, see that
+  // hook's own tests).
+  it('shows "sync failed · retry" (no em-dash) when the shared list fails to load, and the button retries via refreshShared()', async () => {
+    const refreshShared = vi.fn(async () => ({ stale: false, lastSynced: '2026-07-19T00:00:00Z' }));
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
+      sharedListProjects: vi.fn(async () => { throw new Error('list failed'); }),
+      refreshShared,
+    });
+    const user = userEvent.setup();
+    renderWithApi(<ProjectsPage projects={[{ id: 'a', name: 'app' }]} actions={{}} />, fakeApi);
+
+    await waitFor(() => expect(screen.getByText('sync failed · retry')).toBeInTheDocument());
+    expect(screen.getByText('sync failed · retry').textContent).not.toMatch(/—/);
+    expect(screen.queryByText('not synced yet')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'refresh' }));
+
+    await waitFor(() => expect(refreshShared).toHaveBeenCalled());
   });
 
   it('hides the sync indicator and its refresh button entirely when no shared repo is configured', async () => {

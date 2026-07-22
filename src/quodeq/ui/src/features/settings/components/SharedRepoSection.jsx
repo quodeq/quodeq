@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useEffect } from 'react';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { useApi } from '../../../api/ApiContext.jsx';
@@ -6,6 +6,7 @@ import { sharedKeys } from '../../../api/queryKeys.js';
 
 export default function SharedRepoSection({ onDisconnected }) {
   const { getSharedStatus, connectShared, disconnectShared } = useApi();
+  const queryClient = useQueryClient();
 
   const [newUrl, setNewUrl] = useState('');
   const [confirming, setConfirming] = useState(false);
@@ -52,6 +53,14 @@ export default function SharedRepoSection({ onDisconnected }) {
         savingRef.current = false;
       }
     },
+    onSuccess: () => {
+      // Everything "shared"-prefixed, not just status: ProjectsPage's
+      // useSharedProjects and usePublish read the SAME cache entries (audit
+      // C6), so a connect made here must reach them too, not just this
+      // section's own settings-detail status query (refetchStatus below
+      // already covers that one specifically, for the inline UI).
+      queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
+    },
   });
 
   const disconnectMutation = useMutation({
@@ -76,6 +85,9 @@ export default function SharedRepoSection({ onDisconnected }) {
       } finally {
         disconnectingRef.current = false;
       }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
     },
   });
 

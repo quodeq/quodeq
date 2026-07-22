@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import React from 'react';
 import { usePublish } from './usePublish.js';
+import { useSharedProjects } from './useSharedProjects.js';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 
@@ -210,12 +211,10 @@ describe('usePublish', () => {
       wrapper: ({ children }) => wrap(fakeApi, children),
     });
 
-    await act(async () => {});
-
+    await waitFor(() => expect(result.current.configured).toBe(true));
+    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledWith({ refresh: false }));
     expect(fakeApi.getSharedStatus).toHaveBeenCalledTimes(1);
-    expect(fakeApi.sharedListProjects).toHaveBeenCalledWith({ refresh: false });
-    expect(result.current.configured).toBe(true);
-    expect(result.current.publishedAtByProject.p1).toBe('2026-07-10T00:00:00Z');
+    await waitFor(() => expect(result.current.publishedAtByProject.p1).toBe('2026-07-10T00:00:00Z'));
   });
 
   it('does not call sharedListProjects on mount when unconfigured', async () => {
@@ -252,9 +251,8 @@ describe('usePublish', () => {
       }
     );
 
-    // Mount enabled: loadStatus sees the running job and tracks it.
-    await act(async () => {});
-    expect(result.current.publishState).toBe('running');
+    // Mount enabled: the fresh status shows the running job; it's adopted.
+    await waitFor(() => expect(result.current.publishState).toBe('running'));
     expect(result.current.publishingProject).toBe('p1');
 
     // User switches to the online tab: hook disabled, polling stops,
@@ -270,20 +268,21 @@ describe('usePublish', () => {
       configured: true,
       publish: { state: 'done', project: 'p1' },
     }));
+    await waitFor(() => expect(sharedListProjects.mock.calls.length).toBeGreaterThan(0));
     const listCallsBefore = sharedListProjects.mock.calls.length;
 
-    // User returns to the local tab: hook re-enabled, loadStatus refetches.
+    // User returns to the local tab: hook re-enabled, status refetches.
     await act(async () => {
       rerender({ enabled: true });
     });
 
     // The wedge: without reconciliation, state stays 'running' forever.
-    expect(result.current.publishState).not.toBe('running');
-    expect(result.current.publishState).toBe('done');
+    await waitFor(() => expect(result.current.publishState).toBe('done'));
     expect(result.current.publishingProject).toBeNull();
     // The done transition triggered the shared-list re-fetch (on top of the
-    // configured-path fetch loadStatus always does): exactly 2 new calls.
-    expect(sharedListProjects.mock.calls.length).toBe(listCallsBefore + 2);
+    // configured-path fetch re-enabling the list query always does): exactly
+    // 2 new calls.
+    await waitFor(() => expect(sharedListProjects.mock.calls.length).toBe(listCallsBefore + 2));
     expect(sharedListProjects).toHaveBeenCalledWith({ refresh: false });
   });
 
@@ -301,8 +300,7 @@ describe('usePublish', () => {
       }
     );
 
-    await act(async () => {});
-    expect(result.current.publishState).toBe('running');
+    await waitFor(() => expect(result.current.publishState).toBe('running'));
     expect(result.current.publishingProject).toBe('p1');
 
     await act(async () => {
@@ -319,7 +317,7 @@ describe('usePublish', () => {
       rerender({ enabled: true });
     });
 
-    expect(result.current.publishState).toBe('error');
+    await waitFor(() => expect(result.current.publishState).toBe('error'));
     expect(result.current.publishingProject).toBeNull();
     expect(result.current.publishError).toBe('permission denied');
     expect(result.current.publishErrorProject).toBe('p1');
@@ -398,5 +396,36 @@ describe('usePublish', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // Audit C6: useSharedProjects and usePublish used to each fetch status
+  // and list independently -- two of every request per Projects mount.
+  // Both hooks now read `sharedKeys.status()`/`sharedKeys.list()`, so
+  // react-query dedupes: mounting them together issues exactly one status
+  // fetch and one list fetch, not one pair per hook.
+  it('mounting alongside useSharedProjects issues exactly one status fetch and one list fetch (react-query dedup)', async () => {
+    // Held open so the background revalidate useSharedProjects fires after
+    // its own first successful list never completes during this test --
+    // otherwise its own re-list would add a second, legitimate list fetch
+    // and muddy the "exactly one" assertion this test is making.
+    const refreshShared = vi.fn(() => new Promise(() => {}));
+    const fakeApi = makeFakeApi({ refreshShared });
+
+    function BothHooks() {
+      useSharedProjects();
+      return usePublish({ enabled: true });
+    }
+
+    renderHook(() => BothHooks(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+
+    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(1));
+    // Give a would-be duplicate fetch (the bug this locks in against) a
+    // chance to show up before asserting the counts hold steady.
+    await act(async () => {});
+    expect(fakeApi.getSharedStatus).toHaveBeenCalledTimes(1);
+    expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(1);
   });
 });
