@@ -30,12 +30,16 @@ function Probe() {
       <span data-testid="web">{String(d.webEnabled)}</span>
       <span data-testid="catalog">{JSON.stringify(d.catalog)}</span>
       <span data-testid="messages">{JSON.stringify(d.messages)}</span>
+      <span data-testid="panels">{JSON.stringify(d.openPanels)}</span>
+      <span data-testid="active">{d.activeTab}</span>
       <button onClick={d.toggleWebEnabled}>web</button>
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'p', runId: 'r' })}>start</button>
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'pA', runId: 'r' })}>startA</button>
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'pB', runId: 'r' })}>startB</button>
       <button onClick={d.toggle}>toggle</button>
       <button onClick={() => d.openTab('assistant')}>openAssistant</button>
+      <button onClick={() => d.openTab('terminal')}>openTerminal</button>
+      <button onClick={() => d.closePanel('assistant')}>closeAssistantPanel</button>
       <button onClick={() => d.sendMessage('hi', { activeTab: 'overview' })}>send</button>
       <button onClick={d.stopTurn}>stop</button>
       <button onClick={d.resetConversation}>reset</button>
@@ -310,4 +314,35 @@ it('stopTurn failure surfaces an error instead of dying silently', async () => {
   await act(async () => { screen.getByText('send').click(); });
   await act(async () => { screen.getByText('stop').click(); });
   expect(screen.getByTestId('error').textContent).toContain('stop failed');
+});
+
+describe('closePanel', () => {
+  it('closes only the named panel; the terminal stays open and becomes active', () => {
+    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+    act(() => screen.getByText('openAssistant').click());
+    act(() => screen.getByText('openTerminal').click());
+    act(() => screen.getByText('openAssistant').click()); // assistant active again
+    expect(screen.getByTestId('panels').textContent).toBe('["assistant","terminal"]');
+    expect(screen.getByTestId('active').textContent).toBe('assistant');
+    act(() => screen.getByText('closeAssistantPanel').click());
+    expect(screen.getByTestId('panels').textContent).toBe('["terminal"]');
+    expect(screen.getByTestId('active').textContent).toBe('terminal');
+    expect(screen.getByTestId('open').textContent).toBe('true'); // drawer stays open
+  });
+
+  it('closing a non-active panel does not steal the active tab', () => {
+    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+    act(() => screen.getByText('openAssistant').click());
+    act(() => screen.getByText('openTerminal').click()); // terminal is active
+    act(() => screen.getByText('closeAssistantPanel').click());
+    expect(screen.getByTestId('panels').textContent).toBe('["terminal"]');
+    expect(screen.getByTestId('active').textContent).toBe('terminal');
+  });
+
+  it('no-ops when the panel is not open', () => {
+    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+    act(() => screen.getByText('openTerminal').click());
+    act(() => screen.getByText('closeAssistantPanel').click());
+    expect(screen.getByTestId('panels').textContent).toBe('["terminal"]');
+  });
 });

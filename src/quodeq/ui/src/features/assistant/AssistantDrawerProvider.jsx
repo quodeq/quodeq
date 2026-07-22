@@ -211,6 +211,19 @@ export function AssistantDrawerProvider({ children }) {
     });
   }, []);
 
+  // Close one SPECIFIC panel, active or not (App uses this to shut only the
+  // assistant when a shared project is selected — the terminal must survive).
+  // If it was the active one, fall back to the most recent remaining panel,
+  // same rule as closeActiveTab.
+  const closePanel = useCallback((tab) => {
+    setOpenPanels((prev) => {
+      if (!prev.includes(tab)) return prev;
+      const next = prev.filter((t) => t !== tab);
+      if (next.length && activeTabRef.current === tab) setActiveTab(next[next.length - 1]);
+      return next;
+    });
+  }, []);
+
   // A closed drawer is never "maximized".
   useEffect(() => { if (openPanels.length === 0 && maximized) setMaximized(false); }, [openPanels.length, maximized]);
 
@@ -354,7 +367,7 @@ export function AssistantDrawerProvider({ children }) {
   );
 
   const value = useMemo(() => ({
-    isOpen, open, close, toggle, closeActiveTab,
+    isOpen, open, close, toggle, closeActiveTab, closePanel,
     openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled,
     height, setHeight, maximized, toggleMaximized, setMaximized,
     messages, streaming: turnActive, error: localError || stream.error,
@@ -365,7 +378,7 @@ export function AssistantDrawerProvider({ children }) {
     sessionId,
     catalog, addLocalExchange,
     startSession, sendMessage, stopTurn, resetConversation,
-  }), [isOpen, open, close, toggle, closeActiveTab, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled, repoInfo, workspace, refreshWorkspace, catalog, addLocalExchange, startSession, sendMessage, stopTurn, resetConversation]);
+  }), [isOpen, open, close, toggle, closeActiveTab, closePanel, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled, repoInfo, workspace, refreshWorkspace, catalog, addLocalExchange, startSession, sendMessage, stopTurn, resetConversation]);
 
   return (
     <AssistantDrawerContext.Provider value={value}>
