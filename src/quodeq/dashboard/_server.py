@@ -31,6 +31,22 @@ from quodeq.shared.utils import IS_WIN32
 _HTTP_SCHEME = "http"
 
 
+def _guard_plaintext_http(host: str, allow_plaintext: bool | None = None) -> None:
+    """Refuse plaintext HTTP to a non-local host unless explicitly opted in."""
+    if host in _local_hosts():
+        return
+    if _allow_plaintext_http(allow_plaintext):
+        logging.getLogger(__name__).warning(
+            "API traffic to %s uses plaintext HTTP; use a TLS reverse proxy for remote hosts", host,
+        )
+    else:
+        raise RuntimeError(
+            f"Plaintext HTTP to non-localhost host {host!r} is not allowed. "
+            "Set QUODEQ_ALLOW_PLAINTEXT_HTTP=1 to explicitly opt in, "
+            "or use a TLS reverse proxy."
+        )
+
+
 def _ensure_action_api(
     host: str,
     start_port: int,
@@ -38,17 +54,7 @@ def _ensure_action_api(
     api_config: ApiConfig | None = None,
 ) -> tuple[str, subprocess.Popen | None]:
     cfg = api_config or ApiConfig()
-    if host not in _local_hosts():
-        if _allow_plaintext_http(cfg.allow_plaintext):
-            logging.getLogger(__name__).warning(
-                "API traffic to %s uses plaintext HTTP; use a TLS reverse proxy for remote hosts", host,
-            )
-        else:
-            raise RuntimeError(
-                f"Plaintext HTTP to non-localhost host {host!r} is not allowed. "
-                "Set QUODEQ_ALLOW_PLAINTEXT_HTTP=1 to explicitly opt in, "
-                "or use a TLS reverse proxy."
-            )
+    _guard_plaintext_http(host, cfg.allow_plaintext)
     for port in range(start_port, start_port + max_tries):
         base_url = f"{_HTTP_SCHEME}://{host}:{port}"
         if _is_port_open(host, port):
@@ -65,6 +71,7 @@ def _ensure_action_api_forced(
     static_dist: Path | None = None,
     evaluations_dir: str | None = None,
 ) -> tuple[str, subprocess.Popen | None]:
+    _guard_plaintext_http(host)
     base_url = f"http://{host}:{port}"
     if _is_port_open(host, port):
         if action_api_healthy(base_url):

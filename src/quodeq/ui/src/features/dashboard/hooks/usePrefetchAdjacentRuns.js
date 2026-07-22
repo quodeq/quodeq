@@ -11,8 +11,8 @@
 import { useCallback } from "react";
 import { usePrefetchRun } from "./usePrefetchRun.js";
 
-export function usePrefetchAdjacentRuns({ selectedProject, availableRuns, overviewRunIndex }) {
-  const { prefetchRun } = usePrefetchRun(selectedProject);
+export function usePrefetchAdjacentRuns({ selectedProject, selectedSource = "local", availableRuns, overviewRunIndex }) {
+  const { prefetchRun } = usePrefetchRun(selectedProject, selectedSource);
 
   const onPrevHover = useCallback(() => {
     const idx = Math.min(overviewRunIndex + 1, availableRuns.length - 1);

@@ -16,6 +16,7 @@ import { TermHeader } from '../../../components/terminal/index.js';
 import EmptyState from '../../../components/EmptyState.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import FittedText from '../../../components/FittedText.jsx';
+import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { abbrevDim } from '../utils/dimAbbrev.js';
 
 const TOAST_DISMISS_MS = 2600;
@@ -329,7 +330,7 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
   );
 }
 
-function HistoryContent({ data, callbacks, runNav, languageSub }) {
+function HistoryContent({ data, callbacks, runNav, languageSub, selectedSource }) {
   const { trend, selectedRunId, availableRuns } = data;
   const { onRunClick, onRunHover, onRunHoverEnd, onRunChange, onDeleteRun } = callbacks;
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
@@ -362,6 +363,7 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
         <TermHeader
           name="history"
           sub={`${trend.length} eval${trend.length !== 1 ? 's' : ''}${languageSub ? ` · ${languageSub}` : ''}`}
+          badge={selectedSource === 'shared' ? <SharedReadOnlyBadge /> : null}
         />
         {availableRuns && availableRuns.length > 0 && (
           <div className="history-run-nav">
@@ -407,20 +409,26 @@ function HistoryContent({ data, callbacks, runNav, languageSub }) {
   );
 }
 
-export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, loading, isFetching }) {
+export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, selectedSource = 'local', loading, isFetching }) {
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
   const { deleteEvaluation } = useApi();
   // Background refresh while a run is alive so the running row flips
   // to "complete" without the user manually reloading. Scoped to this
   // page only — other tabs don't poll.
-  useRunningRunsRefresh({ selectedProject, availableRuns });
+  useRunningRunsRefresh({ selectedProject, selectedSource, availableRuns });
   // Warm the run-detail cache on row hover so clicking through is instant.
-  const { prefetchRun, cancelPrefetch } = usePrefetchRun(selectedProject);
+  const { prefetchRun, cancelPrefetch } = usePrefetchRun(selectedProject, selectedSource);
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
   const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet), [rawTrend, visibleSet]);
 
   async function handleDeleteRun(runId, dateLabel) {
+    // Defense in depth: shared-repo runs have no delete route on the backend
+    // (mutation is local-only by design, same as dismiss/restore/verify). The
+    // real gate is the wiring below (onDeleteRun is undefined when source is
+    // 'shared', so the row never renders a delete button), but this early
+    // return covers any caller that reaches the handler directly.
+    if (selectedSource !== 'local') return;
     const label = dateLabel || runId;
     const ok = await confirmDialog({
       title: 'Delete run?',
@@ -467,7 +475,11 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   }, [projectInfo]);
 
   if (!projectsLoaded) return <LoadingScreen />;
-  if (projects.length === 0) {
+  // The LOCAL projects list can legitimately be empty while a teammate is
+  // viewing a shared project (they may have never added a local project of
+  // their own) -- gate this wall on the local list only for local selections,
+  // so a shared selection falls through to the normal shared data flow below.
+  if (projects.length === 0 && selectedSource !== 'shared') {
     return (
       <HistoryEmptyShell sub="no projects yet">
         <EmptyState
@@ -497,6 +509,20 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   // its scores already show on the Overview.
   if (visibleHistoryRows(availableRuns, trend).length === 0) {
     if (loading || isFetching) return <LoadingScreen />;
+    // Shared projects are read-only in the app -- evaluations only ever run
+    // locally, so "Start evaluation" has nowhere useful to send a
+    // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
+    // precedent this mirrors).
+    if (selectedSource === 'shared') {
+      return (
+        <HistoryEmptyShell sub="no evaluations yet">
+          <EmptyState
+            title="No completed evaluation yet"
+            description="no completed evaluation in this remote project yet"
+          />
+        </HistoryEmptyShell>
+      );
+    }
     const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
     return (
       <HistoryEmptyShell sub="no evaluations yet">
@@ -513,9 +539,17 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   return (
     <HistoryContent
       data={{ trend, selectedRunId, availableRuns }}
-      callbacks={{ onRunClick, onRunHover: prefetchRun, onRunHoverEnd: cancelPrefetch, onRunChange, onDeleteRun: handleDeleteRun }}
+      callbacks={{
+        onRunClick, onRunHover: prefetchRun, onRunHoverEnd: cancelPrefetch, onRunChange,
+        // Shared-repo runs have no delete route on the backend (mutation is
+        // local-only by design). Passing undefined here — rather than always
+        // handleDeleteRun — is what makes the row's delete button vanish,
+        // since HistoryRow already gates on `{onDelete && ...}`.
+        onDeleteRun: selectedSource === 'local' ? handleDeleteRun : undefined,
+      }}
       runNav={{ runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest }}
       languageSub={languageSub}
+      selectedSource={selectedSource}
     />
   );
 }

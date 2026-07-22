@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
 // ── module mocks ──────────────────────────────────────────────────────────────
@@ -76,12 +76,13 @@ function makeDetail(extra = {}) {
   };
 }
 
-function setup({ projectId = 'proj-1', savedOverrides = {} } = {}) {
+function setup({ projectId = 'proj-1', savedOverrides = {}, previewResult = { changedDimensions: [] } } = {}) {
   const saveOverrides = vi.fn().mockResolvedValue(undefined);
+  const previewOverrides = vi.fn().mockResolvedValue(previewResult);
   useAppState.mockReturnValue({ selectedProject: projectId });
-  useStandardsOverrides.mockReturnValue({ overrides: savedOverrides, counts: {}, loading: false, error: null, save: saveOverrides });
+  useStandardsOverrides.mockReturnValue({ overrides: savedOverrides, counts: {}, loading: false, error: null, save: saveOverrides, preview: previewOverrides });
   useStandardDetail.mockReturnValue(makeDetail());
-  return { saveOverrides };
+  return { saveOverrides, previewOverrides };
 }
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -201,8 +202,9 @@ describe('StandardEditor — override state wiring', () => {
 
   it('failed saveOverrides shows an inline error and keeps the Save button (draft preserved)', async () => {
     const saveOverrides = vi.fn().mockRejectedValue(new Error('Network error'));
+    const previewOverrides = vi.fn().mockResolvedValue({ changedDimensions: [] });
     useAppState.mockReturnValue({ selectedProject: 'proj-1' });
-    useStandardsOverrides.mockReturnValue({ overrides: {}, counts: {}, loading: false, error: null, save: saveOverrides });
+    useStandardsOverrides.mockReturnValue({ overrides: {}, counts: {}, loading: false, error: null, save: saveOverrides, preview: previewOverrides });
     useStandardDetail.mockReturnValue(makeDetail());
 
     render(<StandardEditor standardId="iso-25010" onBack={() => {}} />);
@@ -223,9 +225,10 @@ describe('StandardEditor — override state wiring', () => {
 
   it('onSaved is NOT called when saveOverrides rejects', async () => {
     const saveOverrides = vi.fn().mockRejectedValue(new Error('Server error'));
+    const previewOverrides = vi.fn().mockResolvedValue({ changedDimensions: [] });
     const onSaved = vi.fn();
     useAppState.mockReturnValue({ selectedProject: 'proj-1' });
-    useStandardsOverrides.mockReturnValue({ overrides: {}, counts: {}, loading: false, error: null, save: saveOverrides });
+    useStandardsOverrides.mockReturnValue({ overrides: {}, counts: {}, loading: false, error: null, save: saveOverrides, preview: previewOverrides });
     useStandardDetail.mockReturnValue(makeDetail());
 
     render(<StandardEditor standardId="iso-25010" onBack={() => {}} onSaved={onSaved} />);
@@ -240,5 +243,84 @@ describe('StandardEditor — override state wiring', () => {
       expect(screen.getByText(/Server error/i)).toBeInTheDocument();
     });
     expect(onSaved).not.toHaveBeenCalled();
+  });
+});
+
+describe('threshold impact dialog', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('shows the dialog when the dry run reports changed dimensions, and saves on confirm', async () => {
+    const { saveOverrides, previewOverrides } = setup({ previewResult: { changedDimensions: ['maintainability'] } });
+    render(<StandardEditor standardId="iso-25010" onBack={() => {}} />);
+
+    const input = screen.getByLabelText('Max function lines');
+    fireEvent.change(input, { target: { value: '60' } });
+    const toolbarSaveBtn = await screen.findByRole('button', { name: /^save$/i });
+    fireEvent.click(toolbarSaveBtn);
+
+    await waitFor(() => expect(previewOverrides).toHaveBeenCalledOnce());
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/maintainability/i)).toBeInTheDocument();
+    expect(saveOverrides).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(saveOverrides).toHaveBeenCalledOnce();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  it('saves directly when the dry run reports no changed dimensions', async () => {
+    const { saveOverrides, previewOverrides } = setup({ previewResult: { changedDimensions: [] } });
+    render(<StandardEditor standardId="iso-25010" onBack={() => {}} />);
+
+    const input = screen.getByLabelText('Max function lines');
+    fireEvent.change(input, { target: { value: '60' } });
+    const saveBtn = await screen.findByRole('button', { name: /^save$/i });
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => expect(previewOverrides).toHaveBeenCalledOnce());
+    await waitFor(() => expect(saveOverrides).toHaveBeenCalledOnce());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('cancel keeps the draft and does not save', async () => {
+    const { saveOverrides } = setup({ previewResult: { changedDimensions: ['maintainability'] } });
+    render(<StandardEditor standardId="iso-25010" onBack={() => {}} />);
+
+    const input = screen.getByLabelText('Max function lines');
+    fireEvent.change(input, { target: { value: '60' } });
+    const toolbarSaveBtn = await screen.findByRole('button', { name: /^save$/i });
+    fireEvent.click(toolbarSaveBtn);
+
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: /^cancel$/i }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(saveOverrides).not.toHaveBeenCalled();
+    // draft still dirty: toolbar Save button remains and is enabled
+    const savedBtn = screen.getByRole('button', { name: /^save$/i });
+    expect(savedBtn).toBeInTheDocument();
+    expect(savedBtn).not.toBeDisabled();
+  });
+
+  it('save-and-rescan saves then calls onRescan with the changed dimensions', async () => {
+    const { saveOverrides } = setup({ previewResult: { changedDimensions: ['maintainability'] } });
+    const onRescan = vi.fn();
+    render(<StandardEditor standardId="iso-25010" onBack={() => {}} onRescan={onRescan} />);
+
+    const input = screen.getByLabelText('Max function lines');
+    fireEvent.change(input, { target: { value: '60' } });
+    const toolbarSaveBtn = await screen.findByRole('button', { name: /^save$/i });
+    fireEvent.click(toolbarSaveBtn);
+
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: /save and re-scan now/i }));
+
+    await waitFor(() => {
+      expect(saveOverrides).toHaveBeenCalledOnce();
+      expect(onRescan).toHaveBeenCalledWith(['maintainability']);
+    });
   });
 });

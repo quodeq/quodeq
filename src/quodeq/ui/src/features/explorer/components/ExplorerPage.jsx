@@ -63,6 +63,7 @@ export default function ExplorerPage({
   dimension,
   runId,
   dateLabel,
+  selectedSource = 'local',
   onNavigate,
   refreshSignal,
   trend = [],
@@ -78,7 +79,7 @@ export default function ExplorerPage({
   const [activeDateLabel, setActiveDateLabel] = useState(dateLabel);
   useEffect(() => { setActiveRunId(runId); }, [runId]);
   useEffect(() => { setActiveDateLabel(dateLabel); }, [dateLabel]);
-  const d = useExplorerData(project, dimension, activeRunId, refreshSignal);
+  const d = useExplorerData(project, dimension, activeRunId, refreshSignal, selectedSource);
   const { standardDescription } = useStandardDescriptions(dimension);
 
   const buildEvalPrincipal = useMemo(

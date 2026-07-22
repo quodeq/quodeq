@@ -6,7 +6,7 @@ import IncompleteSetupCard from './IncompleteSetupCard.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
 
-function NoCompletedEvalPanel({ availableRuns = [], onNavigate }) {
+function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }) {
   const hasRunning = availableRuns.some((r) => r?.status === 'in_progress');
   if (hasRunning) {
     // First-ever evaluation is still running. There's no prior data to
@@ -21,6 +21,19 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate }) {
       />
     );
   }
+  // Shared projects are read-only in the app -- evaluations only ever run
+  // locally (see api/shared.js's read-only-mirrors note), so the "Start
+  // evaluation" CTA has nowhere useful to send a shared-project viewer. Show
+  // the same empty shell without the button and with copy that doesn't imply
+  // there's an action to take here.
+  if (selectedSource === 'shared') {
+    return (
+      <EmptyState
+        title="No completed evaluation yet"
+        description="no completed evaluation in this remote project yet"
+      />
+    );
+  }
   return (
     <EmptyState
       title="No completed evaluation yet"
@@ -32,7 +45,7 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate }) {
 }
 
 function DashboardContent({ runMode, data, focus, callbacks }) {
-  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity } = data;
+  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource } = data;
   const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
   const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick, onNavigate, onGranularityChange } = callbacks;
   if (runMode) {
@@ -57,7 +70,7 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
     // cancelled/failed. Render a clear waiting-for-results state in
     // place of the empty stat strip and dim cards (the page header
     // above still shows project name, language mix, file count).
-    return <NoCompletedEvalPanel availableRuns={availableRuns} onNavigate={onNavigate} />;
+    return <NoCompletedEvalPanel availableRuns={availableRuns} onNavigate={onNavigate} selectedSource={selectedSource} />;
   }
   if (focusedDimension) {
     return (
@@ -77,7 +90,7 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
       data={{
         accumulated: accumulated ? { ...accumulated, dimensions: accumulatedDimensions } : accumulated,
         accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex,
-        trend: dashboard?.trend || [], selectedRunId, selectedProject, projectInfo, granularity,
+        trend: dashboard?.trend || [], selectedRunId, selectedProject, projectInfo, granularity, selectedSource,
       }}
       callbacks={{
         onRunClick: onRunSelect, onDimensionClick: onAccumulatedDimensionClick, onNavigate, onGranularityChange,
@@ -106,9 +119,22 @@ function useDashboardHandlers(onNavigate, dashboard) {
   }), [onNavigate, dashboard]);
 }
 
+// Shared projects aren't in the LOCAL projects list, and a shared selection's
+// id can collide with an unrelated local project (e.g. after a clone-on-add
+// pull) -- looking it up in `projects` would silently bleed the local twin's
+// languageStats/publishedBy/etc. into a shared Overview. `sharedProjectInfo`
+// is fetched separately (useDashboard, keyed by source) and is exactly this
+// shared project's own info. Local behavior is unchanged: same lookup, same
+// null fallback. Exported so the source-gating contract is unit-testable
+// without mounting the whole page (which needs a SidePaneProvider and more).
+export function selectDashboardProjectInfo({ selectedSource, projects, selectedProject, sharedProjectInfo }) {
+  const localProjectInfo = (projects || []).find((p) => (p.id || p.name) === selectedProject) || null;
+  return selectedSource === 'shared' ? (sharedProjectInfo || null) : localProjectInfo;
+}
+
 export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
-  const { selectedProject, selectedRun, projects = [], dashboard, accumulated, loading, isFetching, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange } = data;
-  const projectInfo = projects.find((p) => (p.id || p.name) === selectedProject) || null;
+  const { selectedProject, selectedSource, selectedRun, projects = [], sharedProjectInfo = null, dashboard, accumulated, loading, isFetching, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange } = data;
+  const projectInfo = selectDashboardProjectInfo({ selectedSource, projects, selectedProject, sharedProjectInfo });
   const { onNavigate, onRunSelect, onProjectsReload } = callbacks;
   // After a successful clone-on-add migration the project's repository_info.json
   // has been rewritten with location: "local". Refetch the projects list so the
@@ -150,7 +176,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
 
   const { projectsLoaded } = data;
   if (!projectsLoaded) return <LoadingScreen />;
-  if (projects.length === 0) {
+  if (projects.length === 0 && selectedSource !== 'shared') {
     return (
       <EmptyState
         title="No projects yet"
@@ -208,7 +234,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       {dashboard && (
         <DashboardContent
           runMode={runMode}
-          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity }}
+          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource }}
           focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
           callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onNavigate, onGranularityChange }}
         />

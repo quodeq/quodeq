@@ -8,8 +8,15 @@ import { projectKeys } from "../../../api/queryKeys.js";
  * @param {{
  *   selectedProject: string,
  *   selectedRun: string,
+ *   selectedSource?: 'local'|'shared',
  *   keepPlaceholder?: boolean,
  * }} opts
+ *
+ * selectedSource (default 'local'): picks the shared-repo mirror fetcher
+ * (sharedGetDashboard) instead of the local one (getDashboard) when the
+ * selected project is a shared-repo project. Threaded through to
+ * useProjectScores and folded into every query key here so switching
+ * sources never serves the other source's cached payload.
  *
  * keepPlaceholder (default true): when switching runs, keep the previous
  * run's data on screen during the background fetch. Great for Overview
@@ -21,9 +28,22 @@ import { projectKeys } from "../../../api/queryKeys.js";
  * not via SSE. ``refreshDashboard`` is what the dismiss handlers call to
  * trigger a refetch of the accumulated (cross-run) dashboard payload.
  */
-export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = true } = {}) {
-  const { getDashboard } = useApi();
+export function useDashboard({ selectedProject, selectedRun, selectedSource = "local", keepPlaceholder = true } = {}) {
+  const { getDashboard, sharedGetDashboard, sharedGetProjectInfo } = useApi();
+  const fetchDashboard = selectedSource === "shared" ? sharedGetDashboard : getDashboard;
   const queryClient = useQueryClient();
+
+  // Shared projects aren't in the LOCAL projects list DashboardPage otherwise
+  // reads projectInfo from, and a shared selection's id can collide with an
+  // unrelated local project (e.g. after a clone-on-add pull) -- looking it up
+  // there would silently bleed the local twin's languageStats/publishedBy/etc.
+  // into a shared Overview. Fetch the shared project's own info instead, keyed
+  // by source so switching sources never serves the other source's cache.
+  const sharedProjectInfoQuery = useQuery({
+    queryKey: projectKeys.info(selectedProject || "_none_", selectedSource),
+    queryFn: () => sharedGetProjectInfo(selectedProject),
+    enabled: selectedSource === "shared" && !!selectedProject,
+  });
 
   const {
     scores,
@@ -31,7 +51,7 @@ export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = t
     loading: scoresLoading,
     error: scoresError,
     availableRuns,
-  } = useProjectScores({ selectedProject, selectedRun, keepPlaceholder });
+  } = useProjectScores({ selectedProject, selectedRun, selectedSource, keepPlaceholder });
 
   // A completed historical run is immutable on disk: its payload only changes
   // through explicit user actions (dismiss, delete, verify, grade formula,
@@ -46,8 +66,8 @@ export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = t
   const isFrozenRun = !!selectedRun && selectedRun !== "latest" && runStatus !== "in_progress";
 
   const dashboardQuery = useQuery({
-    queryKey: projectKeys.dashboard(selectedProject || "_none_", selectedRun),
-    queryFn: () => getDashboard(selectedProject, selectedRun),
+    queryKey: projectKeys.dashboard(selectedProject || "_none_", selectedRun, selectedSource),
+    queryFn: () => fetchDashboard(selectedProject, selectedRun),
     enabled: !!selectedProject,
     staleTime: isFrozenRun ? Infinity : 60_000,
     // Keep showing the previous run's data while a new run loads — instant
@@ -88,10 +108,10 @@ export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = t
     // ``refetchType: 'none'`` marks the cache stale, the next mount
     // refetches naturally on navigation.
     queryClient.invalidateQueries({
-      queryKey: projectKeys.project(selectedProject),
+      queryKey: projectKeys.project(selectedProject, selectedSource),
       refetchType: 'none',
     });
-  }, [queryClient, selectedProject]);
+  }, [queryClient, selectedProject, selectedSource]);
 
   // Force-refresh variant for when fresh data is genuinely expected NOW and the
   // user is parked on a mounted observer that won't otherwise refetch — namely
@@ -105,9 +125,9 @@ export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = t
   const refreshDashboardActive = useCallback(() => {
     if (!selectedProject) return;
     queryClient.invalidateQueries({
-      queryKey: projectKeys.project(selectedProject),
+      queryKey: projectKeys.project(selectedProject, selectedSource),
     });
-  }, [queryClient, selectedProject]);
+  }, [queryClient, selectedProject, selectedSource]);
 
   return {
     dashboard: dashboardWithTrend,
@@ -125,5 +145,6 @@ export function useDashboard({ selectedProject, selectedRun, keepPlaceholder = t
     availableRuns,
     refreshDashboard,
     refreshDashboardActive,
+    sharedProjectInfo: sharedProjectInfoQuery.data || null,
   };
 }

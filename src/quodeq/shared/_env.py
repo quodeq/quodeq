@@ -36,14 +36,66 @@ def get_ai_model(env: dict[str, str] | None = None) -> str | None:
 
 def _env_int(var: str, default: int, env: dict[str, str] | None = None) -> int:
     """Read an environment variable as an int, warn and return *default* on failure."""
+    return env_int(var, default, env=env)
+
+
+def env_int(
+    var: str,
+    default: int,
+    *,
+    minimum: int | None = None,
+    env: dict[str, str] | None = None,
+) -> int:
+    """Read an env var as an int; warn and return *default* on parse failure.
+
+    When *minimum* is given, parsed values below it also fall back to *default*.
+    """
     raw = (env or os.environ).get(var)
     if raw is not None:
         try:
-            return int(raw)
+            value = int(raw)
         except ValueError:
             logging.getLogger(__name__).warning(
-                "Invalid %s=%r (expected integer), using default", var, raw,
+                "Invalid %s=%r (expected integer), using default %r", var, raw, default,
             )
+        else:
+            if minimum is not None and value < minimum:
+                logging.getLogger(__name__).warning(
+                    "Out-of-range %s=%r (minimum %r), using default %r",
+                    var, raw, minimum, default,
+                )
+            else:
+                return value
+    return default
+
+
+def env_float(
+    var: str,
+    default: float,
+    *,
+    minimum: float | None = None,
+    env: dict[str, str] | None = None,
+) -> float:
+    """Read an env var as a float; warn and return *default* on parse failure.
+
+    When *minimum* is given, parsed values below it also fall back to *default*.
+    """
+    raw = (env or os.environ).get(var)
+    if raw is not None:
+        try:
+            value = float(raw)
+        except ValueError:
+            logging.getLogger(__name__).warning(
+                "Invalid %s=%r (expected number), using default %r", var, raw, default,
+            )
+        else:
+            if minimum is not None and value < minimum:
+                logging.getLogger(__name__).warning(
+                    "Out-of-range %s=%r (minimum %r), using default %r",
+                    var, raw, minimum, default,
+                )
+            else:
+                return value
     return default
 
 
@@ -152,6 +204,18 @@ def score_cache_disabled(env: dict[str, str] | None = None) -> bool:
     return environ.get("QUODEQ_DISABLE_SCORE_CACHE", "").strip().lower() in _SQLITE_DISABLE_TRUTHY
 
 
+def get_quodeq_dir(env: dict[str, str] | None = None) -> Path:
+    """Return the base Quodeq state directory.
+
+    Resolution order: QUODEQ_DIR env var, then ~/.quodeq. Recomputes the
+    default on each call so test monkeypatches of ``Path.home`` are honored.
+    """
+    from_env = (env or os.environ).get("QUODEQ_DIR")
+    if from_env:
+        return Path(from_env)
+    return Path.home() / ".quodeq"
+
+
 _DEFAULT_CLONES_DIR = Path.home() / ".quodeq" / "clones"
 
 
@@ -179,3 +243,55 @@ def sqlite_disabled() -> bool:
     """
     raw = os.environ.get("QUODEQ_DISABLE_SQLITE", "")
     return raw.strip().lower() in _SQLITE_DISABLE_TRUTHY
+
+
+_DEFAULT_EMBEDDING_MODEL = "nomic-embed-text"
+_DEFAULT_EMBEDDING_BASE_URL = "http://localhost:11434"
+_DEFAULT_PRECEDENT_SIMILARITY = 0.85
+
+
+def get_embedding_model(env: dict[str, str] | None = None) -> str:
+    """Embedding model for semantic precedent matching (QUODEQ_EMBEDDING_MODEL).
+
+    Independent of the chat provider: CLI providers have no HTTP endpoint and
+    llama.cpp serves one model per process, so embeddings get their own model.
+    """
+    return (env if env is not None else os.environ).get(
+        "QUODEQ_EMBEDDING_MODEL", _DEFAULT_EMBEDDING_MODEL
+    )
+
+
+def get_embedding_base_url(env: dict[str, str] | None = None) -> str:
+    """Base URL of the embeddings server.
+
+    Resolution: QUODEQ_EMBEDDING_BASE_URL, then OLLAMA_BASE_URL, then localhost.
+    """
+    environ = env if env is not None else os.environ
+    return (
+        environ.get("QUODEQ_EMBEDDING_BASE_URL")
+        or environ.get("OLLAMA_BASE_URL")
+        or _DEFAULT_EMBEDDING_BASE_URL
+    )
+
+
+def semantic_precedents_enabled(env: dict[str, str] | None = None) -> bool:
+    """True when QUODEQ_SEMANTIC_PRECEDENTS is truthy. Default OFF in v1."""
+    environ = env if env is not None else os.environ
+    raw = environ.get("QUODEQ_SEMANTIC_PRECEDENTS", "")
+    return raw.strip().lower() in _SQLITE_DISABLE_TRUTHY
+
+
+def get_precedent_similarity_threshold(env: dict[str, str] | None = None) -> float:
+    """Cosine threshold for a semantic precedent match (QUODEQ_PRECEDENT_SIMILARITY).
+
+    Default 0.85 is a placeholder until Phase B golden-set calibration.
+    Out-of-range or unparsable values fall back to the default.
+    """
+    raw = (env if env is not None else os.environ).get("QUODEQ_PRECEDENT_SIMILARITY", "")
+    try:
+        val = float(raw)
+    except ValueError:
+        return _DEFAULT_PRECEDENT_SIMILARITY
+    if not 0.0 < val <= 1.0:
+        return _DEFAULT_PRECEDENT_SIMILARITY
+    return val

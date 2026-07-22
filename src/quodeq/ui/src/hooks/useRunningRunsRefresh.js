@@ -28,17 +28,25 @@ import { pollIntervalForRuns } from '../utils/runPolling.js';
 
 const SSE_ENABLED = () => import.meta.env?.VITE_USE_SSE_EVENTS === 'true';
 
-function invalidateHistoryScope(queryClient, selectedProject, availableRuns) {
-  queryClient.invalidateQueries({ queryKey: projectKeys.scores(selectedProject, null) });
-  queryClient.invalidateQueries({ queryKey: projectKeys.dashboard(selectedProject, null) });
+function invalidateHistoryScope(queryClient, selectedProject, availableRuns, selectedSource) {
+  queryClient.invalidateQueries({ queryKey: projectKeys.scores(selectedProject, null, selectedSource) });
+  queryClient.invalidateQueries({ queryKey: projectKeys.dashboard(selectedProject, null, selectedSource) });
   for (const r of availableRuns || []) {
     if (r?.status === 'in_progress' && r.runId) {
-      queryClient.invalidateQueries({ queryKey: projectKeys.dashboard(selectedProject, r.runId) });
+      queryClient.invalidateQueries({ queryKey: projectKeys.dashboard(selectedProject, r.runId, selectedSource) });
     }
   }
 }
 
-export function useRunningRunsRefresh({ selectedProject, availableRuns }) {
+/**
+ * @param {{ selectedProject: string, selectedSource?: 'local'|'shared', availableRuns: Array }} opts
+ *
+ * selectedSource (default 'local') is folded into every key this hook
+ * invalidates so a refresh scoped to one source never marks the other
+ * source's cache stale (only local projects ever have in_progress runs, but
+ * History can be viewing either source's data when this fires).
+ */
+export function useRunningRunsRefresh({ selectedProject, selectedSource = 'local', availableRuns }) {
   const queryClient = useQueryClient();
   const interval = pollIntervalForRuns(availableRuns);
 
@@ -47,10 +55,10 @@ export function useRunningRunsRefresh({ selectedProject, availableRuns }) {
   // signal that they want fresh data; don't wait for the polling tick.
   useEffect(() => {
     if (!selectedProject) return;
-    invalidateHistoryScope(queryClient, selectedProject, availableRuns);
+    invalidateHistoryScope(queryClient, selectedProject, availableRuns, selectedSource);
     // availableRuns is intentionally not a dependency: this refresh fires on
     // navigation (mount) and project switch, not on every runs-list update.
-  }, [queryClient, selectedProject]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [queryClient, selectedProject, selectedSource]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // (2) Background polling: only while in_progress runs exist AND SSE is off.
   // With SSE on, terminal-status events drive the running -> terminal flip
@@ -59,8 +67,8 @@ export function useRunningRunsRefresh({ selectedProject, availableRuns }) {
     if (!selectedProject || !interval) return undefined;
     if (SSE_ENABLED()) return undefined;
     const id = setInterval(() => {
-      invalidateHistoryScope(queryClient, selectedProject, availableRuns);
+      invalidateHistoryScope(queryClient, selectedProject, availableRuns, selectedSource);
     }, interval);
     return () => clearInterval(id);
-  }, [queryClient, selectedProject, interval, availableRuns]);
+  }, [queryClient, selectedProject, interval, availableRuns, selectedSource]);
 }

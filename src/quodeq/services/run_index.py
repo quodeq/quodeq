@@ -181,18 +181,18 @@ def _sync_one_run(
             try:
                 _upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
             except Exception as exc:
-                _logger.warning("skipping run %s: %s", run_dir, exc)
+                _logger.warning("skipping run %s: %s", run_dir, exc, exc_info=True)
                 return
         # Always check staleness, even on mtime-unchanged runs.
         try:
             _check_stale_and_promote(db, run_dir, project_uuid=project_uuid, run_id=run_id)
         except Exception as exc:
-            _logger.warning("stale-check failed for %s: %s", run_dir, exc)
+            _logger.warning("stale-check failed for %s: %s", run_dir, exc, exc_info=True)
     else:
         try:
             _sync_legacy_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
         except Exception as exc:
-            _logger.warning("legacy sync failed for %s: %s", run_dir, exc)
+            _logger.warning("legacy sync failed for %s: %s", run_dir, exc, exc_info=True)
 
 
 # ---------------------------------------------------------------------------

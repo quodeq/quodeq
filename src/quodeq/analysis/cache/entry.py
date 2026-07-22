@@ -37,18 +37,21 @@ def quodeq_version() -> str:
 
 def build_provenance(
     *, model_id: str | None, prompts_hash: str | None, standards_hash: str | None,
-    version: str | None = None,
+    version: str | None = None, effective_params: dict | None = None,
 ) -> dict:
     """Assemble the provenance block recorded on a cache entry.
 
     Single source of truth for the provenance shape, so the three cache-write
     sites (cache_writer, persist_dispatch_results, runner.analyze_unit) stay
-    identical. ``version`` defaults to the current quodeq version."""
+    identical. ``version`` defaults to the current quodeq version.
+    ``effective_params`` records the resolved threshold params the findings
+    were judged under (``{req_id: {param: value}}``; ``{}`` when unknown)."""
     return {
         "model_id": model_id or "",
         "prompts_hash": prompts_hash or "",
         "standards_hash": standards_hash or "",
         "quodeq_version": version if version is not None else quodeq_version(),
+        "effective_params": dict(effective_params) if effective_params else {},
     }
 
 

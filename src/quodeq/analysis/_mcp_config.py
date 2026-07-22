@@ -36,6 +36,8 @@ def _create_mcp_config(
     mcp_args = [mcp_script, str(jsonl_file.resolve())]
     if compiled_dir and dimension:
         mcp_args.extend(["--compiled-dir", str(compiled_dir.resolve()), "--dimension", dimension])
+    if ap.standards_dir:
+        mcp_args.extend(["--standards-dir", str(ap.standards_dir.resolve())])
     if ap.queue_path:
         mcp_args.extend(["--queue", str(ap.queue_path.resolve())])
     if ap.agent_id:
@@ -82,6 +84,8 @@ def _codex_mcp_config_arg(
     args = [*_SERVER_MODULE, str(jsonl_file.resolve())]
     if compiled_dir and dimension:
         args.extend(["--compiled-dir", str(compiled_dir.resolve()), "--dimension", dimension])
+    if ap.standards_dir:
+        args.extend(["--standards-dir", str(ap.standards_dir.resolve())])
     if ap.queue_path:
         args.extend(["--queue", str(ap.queue_path.resolve())])
     if ap.agent_id:

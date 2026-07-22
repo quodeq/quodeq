@@ -84,7 +84,9 @@ def maybe_emit_cli_notice(stream=None, env: dict[str, str] | None = None) -> Non
                 file=out,
             )
     except Exception:  # pragma: no cover - defensive
-        pass
+        import logging
+
+        logging.getLogger(__name__).debug("update notice failed", exc_info=True)
 
 
 def _install_broken_pipe_guard() -> None:

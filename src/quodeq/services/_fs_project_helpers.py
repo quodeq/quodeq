@@ -19,13 +19,20 @@ from quodeq.services.ports import RunInfo
 from quodeq.shared.utils import _env_int
 
 
-def _backfill_onboarding_field(project_dir: Path) -> dict | None:
-    """Add ``onboardingCompletedAt`` to ``repository_info.json`` if missing.
+def _backfill_onboarding_field(
+    project_dir: Path, *, heal_completed_at: str | None = None,
+) -> dict | None:
+    """Normalize ``onboardingCompletedAt`` in ``repository_info.json``.
 
     Returns the (possibly modified) data dict, or ``None`` if the file is
     missing or unreadable. Persists the change back to disk when a backfill
     happens. Treats absence of the field as already-onboarded — backfills to
     the project's existing ``createdAt`` timestamp, falling back to "now".
+
+    *heal_completed_at*: when set and the field is present but null, stamp it
+    with this value. Callers pass a timestamp only for projects that have
+    evaluation runs — running an evaluation IS completing setup, so a null
+    left behind by a pre-stamp wizard must not show 'Resume setup' forever.
     """
     info_path = project_dir / "repository_info.json"
     if not info_path.exists():
@@ -35,6 +42,12 @@ def _backfill_onboarding_field(project_dir: Path) -> dict | None:
     except (json.JSONDecodeError, OSError):
         return None
     if "onboardingCompletedAt" in data:
+        if data["onboardingCompletedAt"] is None and heal_completed_at:
+            data["onboardingCompletedAt"] = heal_completed_at
+            try:
+                info_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            except OSError:
+                pass
         return data
     data["onboardingCompletedAt"] = data.get("createdAt") or datetime.now(timezone.utc).isoformat()
     try:
@@ -44,19 +57,38 @@ def _backfill_onboarding_field(project_dir: Path) -> dict | None:
     return data
 
 
-def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> ProjectEntry:
-    """Build a frozen ProjectEntry from its directory and run list."""
+def _build_project_entry(
+    reports_root: Path, entry_name: str, runs: list[RunInfo], *, backfill: bool = True,
+) -> ProjectEntry:
+    """Build a frozen ProjectEntry from its directory and run list.
+
+    *backfill* mirrors ``build_project_list``'s parameter of the same name:
+    when False, the record is read read-only and never rewritten (used by
+    the shared-repo route so listing a clone never dirties its worktree).
+    """
     # Lazy backfill: ensure legacy project records have an
     # ``onboardingCompletedAt`` field so the wizard never auto-opens for
     # already-onboarded projects. Returns the (possibly updated) info dict
     # so we can pass the field through to the entry without re-reading.
+    # Projects with runs also heal a null field to the first run's date:
+    # an evaluation happened, so setup is complete (records that predate the
+    # start_evaluation stamp would otherwise show 'Resume setup' forever).
     project_dir = reports_root / entry_name
-    backfilled = _backfill_onboarding_field(project_dir)
+    heal_at = (runs[-1].date_iso or datetime.now(timezone.utc).isoformat()) if runs else None
+    backfilled = _backfill_onboarding_field(project_dir, heal_completed_at=heal_at) if backfill else None
     info = backfilled if backfilled is not None else _read_repo_info(reports_root, entry_name)
     meta = _extract_project_metadata(info, entry_name)
     latest_grade, latest_score, files_count = _read_accumulated_summary(
         reports_root, entry_name, runs,
     )
+    # runs is sorted newest-first (list_runs); status is already read there
+    # (cancelled/failed/in_progress detection), so no extra per-run read is
+    # needed here. "Done" == the "complete" bucket list_runs assigns to
+    # anything that isn't a live/cancelled/failed run -- this is what the
+    # update-vs-in-sync comparison needs: the newest run a republish would
+    # actually move forward, skipping a newer run that failed or was
+    # cancelled after the last successful one.
+    latest_done_run_id = next((run.run_id for run in runs if run.status == "complete"), None)
     return ProjectEntry(
         id=entry_name,
         name=meta["name"],
@@ -68,6 +100,7 @@ def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo
         scope_path=meta.get("scopePath"),
         runs_count=len(runs),
         latest_run_id=runs[0].run_id if runs else None,
+        latest_done_run_id=latest_done_run_id,
         latest_date=runs[0].date_iso if runs else None,
         path_exists=_check_path_exists(meta["path"], meta["location"]),
         files_count=files_count,
@@ -75,6 +108,7 @@ def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo
         latest_score=latest_score,
         language_stats=_read_language_stats(reports_root, entry_name, runs),
         onboarding_completed_at=info.get("onboardingCompletedAt"),
+        origin_url=info.get("originUrl"),
     )
 
 

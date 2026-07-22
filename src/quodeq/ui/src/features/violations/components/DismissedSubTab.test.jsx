@@ -54,6 +54,21 @@ describe('DismissedSubTab', () => {
     expect(handlers.onDeleteAll).toHaveBeenCalledTimes(1);
   });
 
+  it('omits Restore/Delete per-card when onRestore/onDelete are undefined (shared, read-only)', () => {
+    render(<DismissedSubTab dismissed={[sampleA, sampleB]} onRestore={undefined} onRestoreAll={undefined} onDelete={undefined} onDeleteAll={undefined} />);
+    expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+    // The list itself must stay visible — read-only means no actions, not no list.
+    expect(screen.getAllByText('dismissed')).toHaveLength(2);
+    expect(screen.getByText('a.py:10')).toBeInTheDocument();
+  });
+
+  it('omits Restore all/Delete all when onRestoreAll/onDeleteAll are undefined even with 2+ findings', () => {
+    render(<DismissedSubTab dismissed={[sampleA, sampleB]} onRestore={undefined} onRestoreAll={undefined} onDelete={undefined} onDeleteAll={undefined} />);
+    expect(screen.queryByRole('button', { name: 'Restore all' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete all' })).toBeNull();
+  });
+
   it('renders the empty state when there are no findings', () => {
     render(
       <DismissedSubTab

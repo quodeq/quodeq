@@ -17,6 +17,9 @@ def test_ui_status_mapping():
     assert _ui_status("in_progress") == "in_progress"
     assert _ui_status("cancelled") == "cancelled"
     assert _ui_status("failed") == "failed"
+    assert _ui_status("lost") == "failed"
+    assert _ui_status("pending") == "in_progress"
+    assert _ui_status("finalizing") == "in_progress"
     assert _ui_status("weird-unknown") == "complete"
 
 def test_row_to_run_entry_shape_is_camel_and_score_placeholders():

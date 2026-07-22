@@ -15,12 +15,19 @@ from quodeq.context.online_cache import (
     wipe_cache,
 )
 from quodeq.context.path_role import NON_PROD_ROLES, Role, path_role
-from quodeq.context.precedent import fingerprint, load_precedent_fingerprints
+from quodeq.context.precedent import (
+    PrecedentCorpus,
+    fingerprint,
+    load_precedent_corpus,
+    load_precedent_fingerprints,
+    precedent_text,
+)
 from quodeq.context.project_shape import Deployment, ProjectShape, detect_shape
 
 __all__ = [
     "Deployment",
     "NON_PROD_ROLES",
+    "PrecedentCorpus",
     "ProjectShape",
     "Role",
     "cache_disabled",
@@ -30,8 +37,10 @@ __all__ = [
     "ensure_clone",
     "fingerprint",
     "is_inside_cache",
+    "load_precedent_corpus",
     "load_precedent_fingerprints",
     "path_role",
+    "precedent_text",
     "repo_path_for_url",
     "wipe_cache",
 ]

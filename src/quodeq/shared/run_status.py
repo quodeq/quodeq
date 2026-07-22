@@ -142,6 +142,9 @@ def read_status(run_dir: Path) -> dict[str, Any] | None:
     except (json.JSONDecodeError, ValueError):
         _logger.warning("corrupt status.json at %s", path)
         return None
+    if not isinstance(data, dict):
+        _logger.warning("status.json contains non-dict JSON at %s", path)
+        return None
     schema = data.get("schema_version", 0)
     if isinstance(schema, int) and schema > SCHEMA_VERSION:
         raise UnsupportedSchemaError(f"status.json schema_version={schema} newer than supported ({SCHEMA_VERSION})")

@@ -3,7 +3,7 @@ import { render, screen, act } from '@testing-library/react';
 import { AssistantDrawerProvider, useAssistantDrawer } from './AssistantDrawerProvider.jsx';
 
 vi.mock('../../api/assistant.js', () => ({
-  createAssistantSession: vi.fn(async () => ({ sessionId: 's1' })),
+  createAssistantSession: vi.fn(async (payload) => ({ sessionId: 's1', readOnly: payload?.source === 'shared' })),
   postAssistantMessage: vi.fn(async () => ({ accepted: true })),
   stopAssistantTurn: vi.fn(async () => ({ stopping: true })),
   assistantEventsUrl: (id, a) => `/api/assistant/sessions/${id}/events?after=${a}`,
@@ -30,12 +30,18 @@ function Probe() {
       <span data-testid="web">{String(d.webEnabled)}</span>
       <span data-testid="catalog">{JSON.stringify(d.catalog)}</span>
       <span data-testid="messages">{JSON.stringify(d.messages)}</span>
+      <span data-testid="panels">{JSON.stringify(d.openPanels)}</span>
+      <span data-testid="active">{d.activeTab}</span>
+      <span data-testid="readonly">{String(d.readOnly)}</span>
       <button onClick={d.toggleWebEnabled}>web</button>
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'p', runId: 'r' })}>start</button>
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'pA', runId: 'r' })}>startA</button>
       <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'pB', runId: 'r' })}>startB</button>
+      <button onClick={() => d.startSession({ provider: 'claude', model: 'sonnet', projectId: 'p', runId: 'r', source: 'shared' })}>startShared</button>
       <button onClick={d.toggle}>toggle</button>
       <button onClick={() => d.openTab('assistant')}>openAssistant</button>
+      <button onClick={() => d.openTab('terminal')}>openTerminal</button>
+      <button onClick={() => d.closePanel('assistant')}>closeAssistantPanel</button>
       <button onClick={() => d.sendMessage('hi', { activeTab: 'overview' })}>send</button>
       <button onClick={d.stopTurn}>stop</button>
       <button onClick={d.resetConversation}>reset</button>
@@ -68,6 +74,56 @@ it('toggle flips visibility', () => {
   expect(screen.getByTestId('open').textContent).toBe('true');
 });
 
+describe('Ctrl+` shortcut', () => {
+  // Shared projects get read-only sessions server-side: the backend roots
+  // reads in the shared clone and registers no mutating tools, so the
+  // shortcut opens the drawer for any persisted source.
+  const fireCtrlBacktick = () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backquote', ctrlKey: true, cancelable: true }));
+  };
+  const fireCtrlShiftBacktick = () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backquote', ctrlKey: true, shiftKey: true, cancelable: true }));
+  };
+
+  it('Ctrl+` opens the assistant even when the persisted source is shared (read-only sessions handle safety)', () => {
+    localStorage.setItem('quodeq_selected_source', 'shared');
+    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+    act(() => fireCtrlBacktick());
+    expect(screen.getByTestId('open').textContent).toBe('true');
+  });
+
+  it('opens the drawer when the persisted source is local', () => {
+    localStorage.setItem('quodeq_selected_source', 'local');
+    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+    act(() => fireCtrlBacktick());
+    expect(screen.getByTestId('open').textContent).toBe('true');
+  });
+
+  it('opens the drawer when no source is persisted (defaults to local)', () => {
+    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+    act(() => fireCtrlBacktick());
+    expect(screen.getByTestId('open').textContent).toBe('true');
+  });
+
+  it('terminal shortcut (Ctrl+Shift+`) opens terminal for shared projects', () => {
+    localStorage.setItem('quodeq_selected_source', 'shared');
+    localStorage.setItem('cc-assistant-enabled', 'true');
+    localStorage.setItem('cc-terminal-enabled', 'true');
+    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+    act(() => fireCtrlShiftBacktick());
+    expect(screen.getByTestId('open').textContent).toBe('true');
+  });
+
+  it('terminal shortcut (Ctrl+Shift+`) opens terminal for local projects', () => {
+    localStorage.setItem('quodeq_selected_source', 'local');
+    localStorage.setItem('cc-assistant-enabled', 'true');
+    localStorage.setItem('cc-terminal-enabled', 'true');
+    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+    act(() => fireCtrlShiftBacktick());
+    expect(screen.getByTestId('open').textContent).toBe('true');
+  });
+});
+
 it('exposes activeTab defaulting to assistant; openTab switches the active tab', () => {
   // Both features enabled so the per-tab disable-fallback effect doesn't
   // reroute the initial tab.
@@ -96,6 +152,15 @@ it('exposes the active session provider/model for the drawer header', async () =
   await act(async () => { screen.getByText('start').click(); });
   expect(screen.getByTestId('provider').textContent).toBe('claude');
   expect(screen.getByTestId('model').textContent).toBe('sonnet');
+});
+
+it('same project id local vs shared creates DISTINCT sessions and readOnly tracks the response', async () => {
+  render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+  await act(async () => { screen.getByText('start').click(); });
+  expect(screen.getByTestId('readonly').textContent).toBe('false');
+  await act(async () => { screen.getByText('startShared').click(); });
+  expect(createAssistantSession).toHaveBeenCalledTimes(2); // source in the key → no dedupe
+  expect(screen.getByTestId('readonly').textContent).toBe('true');
 });
 
 it('surfaces an error when sendMessage POST fails (not silent)', async () => {
@@ -139,6 +204,47 @@ it('startSession race: the latest requested context wins even if it resolves fir
   expect(postAssistantMessage).not.toHaveBeenCalled();
   await act(async () => { hookRef.sendMessage('x', {}); });
   expect(postAssistantMessage).toHaveBeenCalledWith('sess-pB', { text: 'x', uiState: {}, webEnabled: false, writeEnabled: false });
+});
+
+it('a superseded in-flight commit does not land after the user re-selects the original context (source flip-flop race)', async () => {
+  // Regression for the dedupe early-return NOT re-claiming latestKeyRef:
+  // start A (commits) -> start B (leave create pending) -> start A again
+  // (hits the dedupe path) -> resolve B's stale create. B's resolution must
+  // be invalidated and the committed session must still be A's.
+  const deferred = {};
+  createAssistantSession.mockImplementation((ctx) => new Promise((resolve) => {
+    const key = `${ctx.provider}:${ctx.model}:${ctx.projectId}:${ctx.runId}:${ctx.source || 'local'}`;
+    deferred[key] = () => resolve({ sessionId: `sess-${key}`, readOnly: ctx.source === 'shared' });
+  }));
+  let hookRef;
+  const Grab = () => { hookRef = useAssistantDrawer(); return null; };
+  render(<AssistantDrawerProvider><Probe /><Grab /></AssistantDrawerProvider>);
+
+  const ctxA = { provider: 'claude', model: 'sonnet', projectId: 'p', runId: 'r' };
+  const ctxB = { provider: 'claude', model: 'sonnet', projectId: 'p', runId: 'r', source: 'shared' };
+  const keyA = 'claude:sonnet:p:r:local';
+  const keyB = 'claude:sonnet:p:r:shared';
+
+  // Start A and let it commit.
+  await act(async () => { hookRef.startSession(ctxA); });
+  await act(async () => { deferred[keyA](); await Promise.resolve(); });
+  expect(screen.getByTestId('readonly').textContent).toBe('false');
+
+  // Start B; its create is left pending.
+  await act(async () => { hookRef.startSession(ctxB); });
+
+  // The user flips back to A. Same key as the already-committed session, so
+  // this hits the dedupe early-return — but it must still re-claim
+  // latestKeyRef so B's later resolution can't win.
+  await act(async () => { hookRef.startSession(ctxA); });
+
+  // Now let B's stale create resolve.
+  await act(async () => { deferred[keyB](); await Promise.resolve(); });
+
+  // B's resolution must have been ignored: still on A's session.
+  expect(screen.getByTestId('readonly').textContent).toBe('false');
+  await act(async () => { hookRef.sendMessage('x', {}); });
+  expect(postAssistantMessage).toHaveBeenCalledWith(`sess-${keyA}`, expect.objectContaining({ text: 'x' }));
 });
 
 it('webEnabled toggles, rides the POST body, and resets on a new session', async () => {
@@ -245,4 +351,35 @@ it('stopTurn failure surfaces an error instead of dying silently', async () => {
   await act(async () => { screen.getByText('send').click(); });
   await act(async () => { screen.getByText('stop').click(); });
   expect(screen.getByTestId('error').textContent).toContain('stop failed');
+});
+
+describe('closePanel', () => {
+  it('closes only the named panel; the terminal stays open and becomes active', () => {
+    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+    act(() => screen.getByText('openAssistant').click());
+    act(() => screen.getByText('openTerminal').click());
+    act(() => screen.getByText('openAssistant').click()); // assistant active again
+    expect(screen.getByTestId('panels').textContent).toBe('["assistant","terminal"]');
+    expect(screen.getByTestId('active').textContent).toBe('assistant');
+    act(() => screen.getByText('closeAssistantPanel').click());
+    expect(screen.getByTestId('panels').textContent).toBe('["terminal"]');
+    expect(screen.getByTestId('active').textContent).toBe('terminal');
+    expect(screen.getByTestId('open').textContent).toBe('true'); // drawer stays open
+  });
+
+  it('closing a non-active panel does not steal the active tab', () => {
+    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+    act(() => screen.getByText('openAssistant').click());
+    act(() => screen.getByText('openTerminal').click()); // terminal is active
+    act(() => screen.getByText('closeAssistantPanel').click());
+    expect(screen.getByTestId('panels').textContent).toBe('["terminal"]');
+    expect(screen.getByTestId('active').textContent).toBe('terminal');
+  });
+
+  it('no-ops when the panel is not open', () => {
+    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
+    act(() => screen.getByText('openTerminal').click());
+    act(() => screen.getByText('closeAssistantPanel').click());
+    expect(screen.getByTestId('panels').textContent).toBe('["terminal"]');
+  });
 });

@@ -8,6 +8,7 @@ import { TermHeader, SevBadge, FlagPill } from '../../../components/terminal/ind
 import { useDismissedFindings } from './useDismissedFindings.js';
 import EmptyState from '../../../components/EmptyState.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
+import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 
 const MAX_TREE_DEPTH = 64;
 
@@ -97,7 +98,7 @@ function FileSubTab({ dimensions, onFileClick, currentPath, setCurrentPath }) {
   );
 }
 
-function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, initialSubTab, initialFilePath, dismissRefreshKey }) {
+function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, initialSubTab, initialFilePath, dismissRefreshKey, selectedSource }) {
   const [activeSubTab, _setActiveSubTab] = useState(initialSubTab);
   const setActiveSubTab = (v) => {
     writeCachedState('violations', selectedProject, { activeSubTab: v });
@@ -115,7 +116,7 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, 
   // sub-tab reflects new entries without needing the user to re-open the
   // page or switch projects.
   const { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll } =
-    useDismissedFindings(selectedProject, onRefresh, setRestoreError, dismissRefreshKey);
+    useDismissedFindings(selectedProject, onRefresh, setRestoreError, dismissRefreshKey, selectedSource);
 
   const visibleDimensions = useMemo(() => {
     const visibleSet = new Set(readVisibleStandardIds());
@@ -155,11 +156,12 @@ function SevInline({ severity }) {
   );
 }
 
-function ViolationsSubTabContent(props) {
+export function ViolationsSubTabContent(props) {
   const {
     activeSubTab, visibleDimensions, dismissed, callbacks,
     fileCurrentPath, setFileCurrentPath,
     handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
+    selectedSource,
   } = props;
   if (activeSubTab === 'file') {
     return <FileSubTab dimensions={visibleDimensions} onFileClick={callbacks.onFileClick} currentPath={fileCurrentPath} setCurrentPath={setFileCurrentPath} />;
@@ -168,14 +170,20 @@ function ViolationsSubTabContent(props) {
     return <DimensionHeatGridView dimensions={visibleDimensions} onDimensionClick={callbacks.onDimensionClick} onPrincipleClick={callbacks.onPrincipleClick} onCellClick={callbacks.onCellClick} />;
   }
   if (activeSubTab === 'dismissed') {
+    // Shared projects have no mutation route on the backend — pass undefined
+    // instead of the real handlers so DismissedSubTab hides the actions and
+    // the list stays visible read-only. useDismissedFindings' own handlers
+    // also no-op as defense in depth (see that hook), but the button must not
+    // even render here.
+    const isShared = selectedSource === 'shared';
     return dismissed.length > 0
       ? (
         <DismissedSubTab
           dismissed={dismissed}
-          onRestore={handleRestore}
-          onRestoreAll={handleRestoreAll}
-          onDelete={handleDelete}
-          onDeleteAll={handleDeleteAll}
+          onRestore={isShared ? undefined : handleRestore}
+          onRestoreAll={isShared ? undefined : handleRestoreAll}
+          onDelete={isShared ? undefined : handleDelete}
+          onDeleteAll={isShared ? undefined : handleDeleteAll}
         />
       )
       : <p className="empty-state">No dismissed violations.</p>;
@@ -184,7 +192,7 @@ function ViolationsSubTabContent(props) {
 }
 
 export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
-  const { accumulatedDimensions = [], selectedProject, dismissRefreshKey = 0 } = data;
+  const { accumulatedDimensions = [], selectedProject, dismissRefreshKey = 0, selectedSource = 'local' } = data;
   const { projects = [], projectsLoaded, projectName, loading, isFetching } = data;
   const { onNavigate, onRefresh } = callbacks;
 
@@ -220,10 +228,15 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
     initialSubTab: cached.activeSubTab,
     initialFilePath: cached.fileCurrentPath,
     dismissRefreshKey,
+    selectedSource,
   });
 
   if (!projectsLoaded) return <LoadingScreen />;
-  if (projects.length === 0) {
+  // The LOCAL projects list can legitimately be empty while a teammate is
+  // viewing a shared project (they may have never added a local project of
+  // their own) -- gate this wall on the local list only for local selections,
+  // so a shared selection falls through to the normal shared data flow below.
+  if (projects.length === 0 && selectedSource !== 'shared') {
     return (
       <div className="violations-page violations-page--terminal">
         <TermHeader name="violations" sub="no projects yet" />
@@ -252,6 +265,21 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
   const hasAnyDimensionData = (accumulatedDimensions || []).length > 0;
   if (!hasAnyDimensionData) {
     if (loading || isFetching) return <LoadingScreen />;
+    // Shared projects are read-only in the app -- evaluations only ever run
+    // locally, so "Start evaluation" has nowhere useful to send a
+    // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
+    // precedent this mirrors).
+    if (selectedSource === 'shared') {
+      return (
+        <div className="violations-page violations-page--terminal">
+          <TermHeader name="violations" sub="no evaluations yet" />
+          <EmptyState
+            title="No completed evaluation yet"
+            description="no completed evaluation in this remote project yet"
+          />
+        </div>
+      );
+    }
     return (
       <div className="violations-page violations-page--terminal">
         <TermHeader name="violations" sub="no evaluations yet" />
@@ -283,7 +311,11 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
     <div className="violations-page violations-page--terminal">
       {restoreError && <div className="error-banner">{restoreError}</div>}
       <div className="violations-page__top">
-        <TermHeader name="violations" sub={subLine} />
+        <TermHeader
+          name="violations"
+          sub={subLine}
+          badge={selectedSource === 'shared' ? <SharedReadOnlyBadge /> : null}
+        />
         <div className="violations-flag-row">
           <FlagPill flag="by-dimension" active={activeSubTab === 'dimension'} onClick={() => setActiveSubTab('dimension')} />
           <FlagPill flag="by-file"      active={activeSubTab === 'file'}      onClick={() => setActiveSubTab('file')} />
@@ -295,6 +327,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
         callbacks={callbacks} fileCurrentPath={fileCurrentPath} setFileCurrentPath={setFileCurrentPath}
         handleRestore={handleRestore} handleRestoreAll={handleRestoreAll}
         handleDelete={handleDelete} handleDeleteAll={handleDeleteAll}
+        selectedSource={selectedSource}
       />
     </div>
   );

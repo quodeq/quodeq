@@ -10,13 +10,13 @@
 | `services/` | Business logic: dashboard, accumulated views, dismissals, standards CRUD | core/, data/ (via `services/ports.py`) |
 | `assistant/` | Embedded LLM assistant: sessions, tool registry, provider turn adapters, guard | core/, data/, services/, llm_bridge/ |
 | `api/` | HTTP layer: Flask routes, security, rate limiting | core/, services/, update/, assistant/ |
-| `analysis/` | Evaluation pipeline: AI orchestration, subagents, prompts, MCP | core/, engine/, data/, services/ |
+| `analysis/` | Evaluation pipeline: AI orchestration, subagents, prompts, MCP | core/, engine/, data/, services/, context/ |
 | `dashboard/` | Server/process management: build UI, start API, health checks | services/, api/, update/ |
 | `llm_bridge/` | LLM provider bridge: Ollama, OpenRouter, CLI-tool providers | (not yet covered by import checker) |
 | `terminal/` | Embedded-terminal PTY backends (Unix pty / Windows ConPTY) + manager | core/ |
 | `update/` | Update-notification subsystem (notify-only; never self-replaces the binary) | None |
 | `ci/` | CI integration: report posting, evidence reading, SARIF export | (not yet covered by import checker) |
-| `context/` | Context enrichment: path-role classification, project shape, precedent fingerprinting | (not yet covered by import checker) |
+| `context/` | Context enrichment: path-role classification, project shape, precedent fingerprinting | core/, data/, llm_bridge/ |
 | `ui/` | React + Vite dashboard frontend (npm project, served by the Flask API) | n/a (JavaScript) |
 | `shared/` | Cross-cutting utilities: config, logging, env helpers | None (stdlib only) |
 | `config/` | Configuration: paths, discipline detection, standards fetching | shared/ |
@@ -30,15 +30,16 @@ data/          -> core/
 services/      -> core/, data/ (by convention via services/ports.py)
 assistant/     -> core/, data/, services/, llm_bridge/
 api/           -> core/, services/, update/, assistant/, terminal/
-analysis/      -> core/, engine/, data/, services/
+analysis/      -> core/, engine/, data/, services/, context/
 dashboard/     -> services/, api/, update/
 terminal/      -> core/
 update/        -> (nothing)
+context/       -> core/, data/, llm_bridge/
 ```
 
 Every checked layer may additionally import stdlib plus the cross-cutting
 `shared/` and `config/` packages. Layers not listed (`llm_bridge/`, `ci/`,
-`context/`, `ui/`) are not yet covered by the checker.
+`ui/`) are not yet covered by the checker.
 
 These rules are enforced in CI by `tools/check_imports.py` via `tests/tools/test_import_layers.py`.
 Pre-existing violations are grandfathered in `tools/import_baseline.txt` (a burn-down list: fix

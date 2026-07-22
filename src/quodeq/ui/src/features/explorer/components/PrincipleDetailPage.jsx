@@ -19,7 +19,7 @@ function filterTitleSuffix(filter) {
 // "Show all" pagination is needed. Rows render naturally inside the app's
 // existing scroll container.
 
-function ViolationListSection({ violationsBySeverity, principle, onDismiss }) {
+export function ViolationListSection({ violationsBySeverity, principle, onDismiss }) {
   return EVAL_SEVERITY_ORDER.map((sev) => {
     const vs = violationsBySeverity[sev];
     if (!vs || vs.length === 0) return null;
@@ -249,7 +249,15 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
         <ViolationListSection
           violationsBySeverity={displayedBySeverity}
           principle={principle}
-          onDismiss={handleDismiss}
+          // handleDismiss (from usePrincipleData) is always a stable, callable
+          // no-op-safe function regardless of whether the caller passed a
+          // real onDismiss — that contract lets callers omit onDismiss without
+          // usePrincipleData throwing. But EvalViolationCard's dismiss button
+          // gates on *this* prop being truthy, so passing handleDismiss
+          // unconditionally would keep the button visible for shared projects
+          // (where App.jsx passes onDismiss={undefined}). Gate on the
+          // original onDismiss here so the button actually vanishes.
+          onDismiss={onDismiss ? handleDismiss : undefined}
         />
       )}
       {(!activeSevFilter || activeSevFilter === 'all' || activeSevFilter === 'compliance') && (

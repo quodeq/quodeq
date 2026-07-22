@@ -63,6 +63,13 @@ class _AgentParams:
     # ``"unknown"`` / ``""`` at emit time.
     model_id: str | None = None
     language: str | None = None
+    # Final-review fix (params-fingerprint cross-boundary bug): the standards
+    # ROOT (``RunConfig.standards_dir``, parent of ``compiled/``) -- NOT
+    # ``compiled_dir`` above, which is already the ``compiled/`` subdirectory.
+    # Emitted as ``--standards-dir`` so the subprocess's cache writer keys
+    # under the same params_hash as ``build_cache_key_for_file``. ``None``
+    # when no ``RunConfig`` is carried (no params fingerprint folded in).
+    standards_dir: Path | None = None
 
 
 @dataclass(frozen=True)

@@ -15,7 +15,11 @@ from quodeq.analysis.mcp.enrichment import enrich_code
 from quodeq.analysis.mcp.provenance_gate import apply_provenance_gate
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
 from quodeq.context.path_role import NON_PROD_ROLES, path_role
-from quodeq.context.precedent import fingerprint as _precedent_fingerprint
+from quodeq.context.precedent import (
+    PrecedentCorpus,
+    fingerprint as _precedent_fingerprint,
+    precedent_text as _precedent_text,
+)
 from quodeq.context.project_shape import Deployment, ProjectShape
 
 _logger = logging.getLogger(__name__)
@@ -58,6 +62,7 @@ class CompiledContext:
     work_dir: Path | None = None
     project_shape: ProjectShape | None = None
     precedent_fingerprints: set[str] = field(default_factory=set)
+    precedent_corpus: PrecedentCorpus | None = None
 
 
 def _apply_path_role_downweight(finding: dict[str, object]) -> None:
@@ -108,21 +113,54 @@ def _apply_shape_downweight(
         finding["confidence"] = _SHAPE_DOWNWEIGHT
 
 
+def _semantic_eligible(finding: dict[str, object]) -> bool:
+    """Scope-level and empty-snippet findings are excluded from the semantic
+    tier: their enriched snippet is the first ~40 lines of the file regardless
+    of the issue (enrichment.py), so any two scope-level findings on the same
+    file embed near-identical texts and would cross-match across requirements.
+    The exact tier still covers them."""
+    line = finding.get("line")
+    if not isinstance(line, int) or line <= 0:
+        return False
+    if finding.get("scope"):
+        return False
+    snippet = finding.get("snippet")
+    return isinstance(snippet, str) and bool(snippet.strip())
+
+
 def _apply_precedent_downweight(
-    finding: dict[str, object], fingerprints: set[str] | None,
+    finding: dict[str, object],
+    fingerprints: set[str] | None,
+    corpus: PrecedentCorpus | None = None,
 ) -> None:
-    """Drop confidence to ~25 when this finding's fingerprint matches a prior dismissal."""
-    if not fingerprints:
-        return
+    """Drop confidence to ~25 when this finding matches a prior dismissal.
+
+    Tier 1: exact fingerprint (unchanged, SARIF-compatible). Tier 2: semantic
+    similarity via the corpus, only on exact miss and only for eligible
+    findings. Same effect, same guard for both tiers.
+    """
     if finding.get("t") != "violation":
         return
     req = finding.get("req")
     snippet = finding.get("snippet")
-    fp = _precedent_fingerprint(
-        req if isinstance(req, str) else None,
-        snippet if isinstance(snippet, str) else None,
-    )
-    if fp is None or fp not in fingerprints:
+    req_s = req if isinstance(req, str) else None
+    snippet_s = snippet if isinstance(snippet, str) else None
+
+    fp = _precedent_fingerprint(req_s, snippet_s)
+    matched = fp is not None and fingerprints is not None and fp in fingerprints
+
+    if not matched and corpus is not None and _semantic_eligible(finding):
+        text = _precedent_text(req_s, snippet_s)
+        if text is not None:
+            score = corpus.match(text)
+            if score is not None and score >= corpus.threshold:
+                matched = True
+                _logger.debug(
+                    "Semantic precedent match (%.3f) for %s:%s",
+                    score, finding.get("file"), finding.get("line"),
+                )
+
+    if not matched:
         return
     existing = finding.get("confidence")
     if existing is None or existing == 100:
@@ -153,6 +191,7 @@ class FindingEnricher:
         self._work_dir = context.work_dir
         self._project_shape = context.project_shape
         self._precedent_fingerprints = context.precedent_fingerprints
+        self._precedent_corpus = context.precedent_corpus
         self._read_file: Callable[[Path], str] = file_reader or _default_read_file
 
     def dedup_key(self, args: dict) -> tuple:
@@ -202,7 +241,9 @@ class FindingEnricher:
         enrich_code(finding, self._work_dir, self._read_file)
         _apply_path_role_downweight(finding)
         _apply_shape_downweight(finding, self._project_shape)
-        _apply_precedent_downweight(finding, self._precedent_fingerprints)
+        _apply_precedent_downweight(
+            finding, self._precedent_fingerprints, self._precedent_corpus,
+        )
         apply_provenance_gate(finding)  # deterministic critical-severity gate (#639)
 
         return finding

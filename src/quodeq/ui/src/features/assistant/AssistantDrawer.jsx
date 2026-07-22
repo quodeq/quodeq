@@ -19,15 +19,15 @@ import { StopIcon } from '../../components/CopyButton.jsx';
 export function AssistantPane({ uiState }) {
   const {
     messages, streaming, error, sendMessage, stopTurn,
-    catalog, addLocalExchange, resetConversation,
+    catalog, addLocalExchange, resetConversation, readOnly,
   } = useAssistantDrawer();
   const [draft, setDraft] = useState('');
   const [menuIndex, setMenuIndex] = useState(0);
   const [menuDismissed, setMenuDismissed] = useState(false);
 
   const suggestions = useMemo(
-    () => (streaming ? [] : matchCommands(catalog, draft)),
-    [catalog, draft, streaming],
+    () => (streaming ? [] : matchCommands(catalog, draft, { readOnly })),
+    [catalog, draft, streaming, readOnly],
   );
   const menuVisible = suggestions.length > 0 && !menuDismissed;
 
@@ -41,10 +41,10 @@ export function AssistantPane({ uiState }) {
     if (!text || streaming) return;
     const meta = parseMetaCommand(text);
     if (meta === 'clear') { resetConversation(); setDraft(''); return; }
-    if (meta) { addLocalExchange(text, buildMetaResponse(meta, catalog)); setDraft(''); return; }
+    if (meta) { addLocalExchange(text, buildMetaResponse(meta, catalog, { readOnly })); setDraft(''); return; }
     sendMessage(text, uiState);
     setDraft('');
-  }, [draft, streaming, sendMessage, uiState, catalog, addLocalExchange, resetConversation]);
+  }, [draft, streaming, sendMessage, uiState, catalog, addLocalExchange, resetConversation, readOnly]);
 
   const handleKeyDown = useCallback((event) => {
     if (menuVisible) {
@@ -69,7 +69,7 @@ export function AssistantPane({ uiState }) {
   return (
     <>
       {messages.length === 0
-        ? <AssistantWelcome catalog={catalog} view={uiState?.view} onPick={setDraft} />
+        ? <AssistantWelcome catalog={catalog} view={uiState?.view} onPick={setDraft} readOnly={readOnly} />
         : <MessageList messages={messages} streaming={streaming} />}
       {error && <div className="assistant-drawer-error" role="alert">{error}</div>}
       <div className="assistant-drawer-input-row">

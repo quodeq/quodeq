@@ -9,6 +9,8 @@ boundaries is surfaced, not silently re-evaluated.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
+import json
 
 from quodeq.analysis.cache.key import CacheKey, compute_key
 
@@ -37,6 +39,7 @@ class TestPermissiveFieldSet:
             "file_path",
             "dimension",
             "language",
+            "params_hash",
         }
 
 
@@ -90,3 +93,35 @@ class TestKeyShape:
         h = compute_key(_base_key())
         assert len(h) == 64
         assert all(c in "0123456789abcdef" for c in h)
+
+
+class TestParamsHash:
+    def test_empty_params_hash_is_byte_identical_to_legacy_key(self):
+        # The legacy canonical form has NO params_hash member at all. An
+        # empty params_hash must serialize identically, so pre-existing
+        # cache entries stay reachable after upgrade.
+        key = _base_key()
+        legacy_canonical = json.dumps(
+            {
+                "dimension": "security",
+                "file_content_hash": "aa" * 32,
+                "file_path": "src/auth.py",
+                "language": "python",
+                "schema_version": 3,
+            },
+            sort_keys=True, separators=(",", ":"),
+        )
+        legacy = hashlib.sha256(legacy_canonical.encode("utf-8")).hexdigest()
+        assert compute_key(key) == legacy
+
+    def test_non_empty_params_hash_changes_key(self):
+        assert compute_key(_base_key(params_hash="ff" * 32)) != compute_key(_base_key())
+
+    def test_distinct_params_hashes_yield_distinct_keys(self):
+        a = compute_key(_base_key(params_hash="aa" * 32))
+        b = compute_key(_base_key(params_hash="bb" * 32))
+        assert a != b
+
+    def test_reverting_params_hash_restores_original_key(self):
+        original = compute_key(_base_key())
+        assert compute_key(_base_key(params_hash="")) == original

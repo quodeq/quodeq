@@ -19,7 +19,7 @@ it('derives provider/model/project/run/uiState from app + settings', () => {
   const ctx = deriveAssistantContext(appState, gate);
   expect(ctx).toEqual({
     provider: 'claude', model: 'sonnet',
-    projectId: 'selectives', runId: 'run-9',
+    projectId: 'selectives', runId: 'run-9', source: 'local',
     uiState: {
       view: 'overview', activeTab: 'overview', selectedProject: 'selectives',
       selectedRun: 'run-9', currentOverviewRun: 'run-9',
@@ -98,4 +98,11 @@ it('omits grouping, overviewDate and dimension when absent', () => {
   expect('grouping' in ctx.uiState).toBe(false);
   expect('overviewDate' in ctx.uiState).toBe(false);
   expect('dimension' in ctx.uiState).toBe(false);
+});
+
+it('emits the selected source, defaulting to local', () => {
+  const gate = { activeProvider: 'ollama', model: 'm' };
+  expect(deriveAssistantContext({ selectedSource: 'shared' }, gate).source).toBe('shared');
+  expect(deriveAssistantContext({ selectedSource: 'local' }, gate).source).toBe('local');
+  expect(deriveAssistantContext({}, gate).source).toBe('local');
 });

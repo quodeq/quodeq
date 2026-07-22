@@ -6,7 +6,7 @@
 </p>
 
 <h2 align="center">AI-powered code quality and security scanner</h2>
-<p align="center"><strong>v1.6.1</strong></p>
+<p align="center"><strong>v1.7.0</strong></p>
 <p align="center">
   <a href="https://github.com/quodeq/quodeq/actions/workflows/test.yml"><img src="https://github.com/quodeq/quodeq/actions/workflows/test.yml/badge.svg" alt="Tests" /></a>
   <a href="https://github.com/quodeq/quodeq/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=C9feqpR5BMI&list=PLJjpl8sE7W-U1HMePWdGis7w834NPYD3R">Watch the 2-min demo</a> · <a href="https://quodeq.ai">Website</a> · <a href="https://quodeq.ai/blog/">Blog</a> · <a href="https://github.com/quodeq/quodeq/releases/latest">Releases</a>
+  <a href="https://www.youtube.com/watch?v=Ie7rAiPBDQE&list=PLJjpl8sE7W-U1HMePWdGis7w834NPYD3R&index=1">Watch the demo</a> · <a href="https://quodeq.ai">Website</a> · <a href="https://quodeq.ai/blog/">Blog</a> · <a href="https://github.com/quodeq/quodeq/releases/latest">Releases</a>
 </p>
 
 ---

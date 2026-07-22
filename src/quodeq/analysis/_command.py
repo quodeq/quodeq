@@ -95,6 +95,9 @@ def _build_mcp_args(
         # from classify_files_via_cache keys.
         model_id=_resolve_model_id(config),
         language=_resolve_language(config),
+        # Final-review fix: the standards ROOT, not compiled_dir -- see
+        # _resolve_standards_dir and _AgentParams.standards_dir.
+        standards_dir=_resolve_standards_dir(config),
     )
     if mcp_style == "config-arg":
         return [
@@ -207,6 +210,9 @@ def _build_mcp_server_args(
             "--compiled-dir", str(config.compiled_dir.resolve()),
             "--dimension", config.dimension,
         ])
+    standards_dir = _resolve_standards_dir(config)
+    if standards_dir:
+        mcp_args.extend(["--standards-dir", str(standards_dir.resolve())])
     if config.queue_path:
         mcp_args.extend(["--queue", str(config.queue_path.resolve())])
     if config.agent_id and not skip_agent_id:
@@ -256,6 +262,26 @@ def _resolve_language(config: AnalysisConfig) -> str:
     if rc is not None:
         return getattr(rc, "language", "") or ""
     return ""
+
+
+def _resolve_standards_dir(config: AnalysisConfig) -> Path | None:
+    """Return the standards ROOT (``RunConfig.standards_dir``) for the
+    subprocess's cache-writer keying, or None when no RunConfig is carried.
+
+    This is deliberately NOT ``config.compiled_dir``: that field is already
+    ``standards_dir / "compiled"`` (see ``_dimension_steps.py`` /
+    ``_pool_launcher.py``), and ``build_cache_writer`` /
+    ``dimension_params_state`` append ``"compiled/<dim>.json"`` themselves.
+    Passing ``compiled_dir`` here would double the ``compiled`` segment,
+    silently missing the params fingerprint (see final-review fix notes on
+    ``findings_server.main``).
+    """
+    rc = config.run_config
+    if rc is not None:
+        sd = getattr(rc, "standards_dir", None)
+        if sd is not None:
+            return Path(sd)
+    return None
 
 
 def _is_known_cli_provider(cmd: str) -> bool:

@@ -19,7 +19,6 @@ change.
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
@@ -48,13 +47,14 @@ from quodeq.services.score_cache import (
 )
 from quodeq.services.ports import RunInfo, list_runs, read_run_data, read_run_scalars
 from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
+from quodeq.shared._env import env_int
 from quodeq.shared.validation import validate_path_segment
 from quodeq.services.scoring._summary import recompute_summary
 
 
 def _max_history_runs() -> int:
     """Read max history runs from env at call time for lazy configuration."""
-    return int(os.environ.get("QUODEQ_MAX_HISTORY_RUNS", "100"))
+    return env_int("QUODEQ_MAX_HISTORY_RUNS", 100, minimum=1)
 
 
 # ---------------------------------------------------------------------------

@@ -33,7 +33,7 @@ from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
 
 if TYPE_CHECKING:
     from quodeq.analysis._types import RunConfig
-from quodeq.context.precedent import load_precedent_fingerprints
+from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
 from quodeq.core.standards.refs import load_compiled_requirements
 from quodeq.core.standards.refs import load_compiled_refs
@@ -45,6 +45,10 @@ _OLLAMA_DEFAULT_BASE = "http://localhost:11434/v1"
 _OLLAMA_DEFAULT_API_KEY = "ollama"
 _OPENAI_API_HOST = "api.openai.com"
 _LOCAL_TIMEOUT = httpx.Timeout(connect=10.0, read=500.0, write=30.0, pool=10.0)
+# Cloud calls get a finite timeout too: with max_retries=0 a stalled response
+# would otherwise block the analysis worker forever. Read budget matches the
+# SDK's own 600s default; a timeout lands in the existing lossy-file branch.
+_CLOUD_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=30.0, pool=10.0)
 _SYSTEM_PROMPT = (
     "You are a code quality evaluator. Quote the offending code into "
     "`snippet` VERBATIM from the source, one or a few contiguous lines, "
@@ -284,7 +288,7 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     if config.max_tokens is not None:
         create_kwargs["max_tokens"] = config.max_tokens
 
-    timeout = None if is_openai else _LOCAL_TIMEOUT
+    timeout = _CLOUD_TIMEOUT if is_openai else _LOCAL_TIMEOUT
     _log.debug("Calling %s model=%s (per-finding parse)", config.api_base, config.model)
     start = time.monotonic()
     with openai.OpenAI(
@@ -378,11 +382,15 @@ def _build_router_context(
     dimension: str | None,
     work_dir: Path | None,
     project_dir: Path | None,
+    run_dir: Path | None,
 ) -> CompiledContext | None:
     """Build the CompiledContext that FindingsRouter needs for enrichment.
 
     Returns ``None`` when *compiled_dir* is unset, signalling that the
     caller should write findings without enrichment (legacy behaviour).
+
+    *run_dir* locates the run directory holding the semantic precedent
+    corpus's circuit-breaker marker (see ``load_precedent_corpus``).
     """
     if not compiled_dir:
         return None
@@ -391,6 +399,10 @@ def _build_router_context(
         compiled_reqs = load_compiled_requirements(compiled_dir, dimension) or {}
         project_shape = detect_shape(work_dir) if work_dir is not None else None
         precedents = load_precedent_fingerprints(project_dir) if project_dir else set()
+        corpus = (
+            load_precedent_corpus(project_dir, run_dir)
+            if project_dir and run_dir else None
+        )
         return CompiledContext(
             compiled_refs=compiled_refs,
             compiled_reqs=compiled_reqs,
@@ -398,6 +410,7 @@ def _build_router_context(
             work_dir=work_dir,
             project_shape=project_shape,
             precedent_fingerprints=precedents,
+            precedent_corpus=corpus,
         )
     except Exception as exc:
         _log.warning("Could not build enrichment context: %s -- writing raw", exc)
@@ -476,10 +489,13 @@ def run_api_analysis(
     _infer_end_line(findings)
 
     # jsonl_file is `<project_dir>/<run_id>/evidence/<dim>_evidence.jsonl`,
-    # so the project directory is its great-grandparent. Used by the
-    # context-enricher pipeline to load prior dismissals as precedents.
+    # so the project directory is its great-grandparent and the run
+    # directory its grandparent. Used by the context-enricher pipeline to
+    # load prior dismissals as precedents (fingerprints and, when the
+    # semantic-precedents flag is on, the embedded corpus).
     project_dir = jsonl_file.parent.parent.parent if jsonl_file else None
-    ctx = _build_router_context(compiled_dir, dimension, work_dir, project_dir)
+    run_dir = jsonl_file.parent.parent if jsonl_file else None
+    ctx = _build_router_context(compiled_dir, dimension, work_dir, project_dir, run_dir)
 
     _log.debug(
         "API runner: %d findings, lossy=%s, marking %d file(s) as %s",

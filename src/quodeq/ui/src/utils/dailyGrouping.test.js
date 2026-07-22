@@ -283,6 +283,15 @@ test('isoWeekKey: year-boundary week belongs to the ISO year of its Thursday', (
   assert.equal(isoWeekKey('2026-01-04T00:00:00'), '2026-W01'); // Sunday, still W01
 });
 
+test('isoWeekKey: impossible calendar components are rejected, not normalized', () => {
+  // Date.UTC would normalize 2026-02-31 to 2026-03-03; the entry must not
+  // be grouped under a week it never specified.
+  assert.equal(isoWeekKey('2026-02-31'), '');
+  assert.equal(isoWeekKey('2026-13-01'), '');
+  // A valid edge day (leap day) still produces a week key.
+  assert.notEqual(isoWeekKey('2028-02-29'), '');
+});
+
 test('isoWeekKey: missing/empty date returns empty string', () => {
   assert.equal(isoWeekKey(''), '');
   assert.equal(isoWeekKey(null), '');

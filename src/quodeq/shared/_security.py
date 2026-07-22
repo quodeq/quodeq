@@ -4,7 +4,10 @@ from __future__ import annotations
 import re
 
 SENSITIVE_PATTERNS = re.compile(
-    r"(api[_-]?key|token|secret|password|authorization)[=:\s]+\S+",
+    # The optional quote after the keyword catches JSON-shaped credentials
+    # such as `"token": "abc"`; the [=:\s]+ separator keeps the existing
+    # `token=abc` / `token: abc` / `token abc` forms matching.
+    r"(api[_-]?key|token|secret|password|authorization)[\"']?[=:\s]+\S+",
     re.IGNORECASE,
 )
 """Compiled regex for detecting secrets in log/error output."""

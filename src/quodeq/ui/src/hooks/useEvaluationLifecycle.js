@@ -23,6 +23,13 @@ export function useEvaluationLifecycle({ settings, navigation, projects, selecte
   // (older) evaluation was the one they just launched.
   const [blockedStartError, setBlockedStartError] = useState(null);
 
+  // Storage reads degrade to '' when the backing store throws (private
+  // mode, disabled storage) instead of crashing the caller, matching the
+  // guarded reads below.
+  const safeGetItem = (key) => {
+    try { return storage.getItem(key) || ''; } catch (e) { console.warn('localStorage unavailable:', e); return ''; }
+  };
+
   const [analysisPower, setAnalysisPower] = useState(() => {
     try { return Number(storage.getItem(POWER_KEY)) || DEFAULT_ANALYSIS_POWER; } catch (e) { console.warn('localStorage unavailable:', e); return DEFAULT_ANALYSIS_POWER; }
   });
@@ -69,8 +76,8 @@ export function useEvaluationLifecycle({ settings, navigation, projects, selecte
       return false;
     }
     setBlockedStartError(null);
-    const activeProvider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
-    const get = (key) => storage.getItem(providerKey(activeProvider, key));
+    const activeProvider = safeGetItem(ACTIVE_PROVIDER_KEY);
+    const get = (key) => safeGetItem(providerKey(activeProvider, key));
     // Ollama uses a single analysis model; CLI providers use tier-based selection.
     // Falls back to the orchestrator model if no analysis-specific model is set.
     const analysisModel = get('model-analysis');
@@ -96,7 +103,7 @@ export function useEvaluationLifecycle({ settings, navigation, projects, selecte
     clearJob();
   }
 
-  const activeProvider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  const activeProvider = safeGetItem(ACTIVE_PROVIDER_KEY);
   const isLocalApi = LOCAL_API_PROVIDERS.has(activeProvider);
 
   return {

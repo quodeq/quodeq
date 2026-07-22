@@ -7,14 +7,16 @@ import { useAssistantProvider } from '../settings/hooks/useAssistantProvider.js'
  * memoized without mounting the whole app.
  *
  * @param {Object} appState  from useAppState(): activeTab, selectedProject, selectedRun, projects,
- *                            currentOverviewRun, granularity, dailyRuns, overviewRunIndex, activePage
+ *                            currentOverviewRun, granularity, dailyRuns, overviewRunIndex, activePage,
+ *                            selectedSource
  * @param {Object} gate      from useAssistantProvider(): activeProvider, model
- * @returns {{ provider: string, model: string, projectId: string|undefined, runId: string|undefined, uiState: { activeTab: string, selectedProject: string, selectedRun: string, dimension?: string, grouping?: string, overviewDate?: string } }}
+ * @returns {{ provider: string, model: string, projectId: string|undefined, runId: string|undefined, source: 'local'|'shared', uiState: { activeTab: string, selectedProject: string, selectedRun: string, dimension?: string, grouping?: string, overviewDate?: string } }}
  */
 export function deriveAssistantContext(appState, gate) {
   const {
     activeTab, selectedProject, selectedRun, projects,
     currentOverviewRun, granularity, dailyRuns, overviewRunIndex, activePage,
+    selectedSource,
   } = appState || {};
   const dimension = activePage?.dimension;
 
@@ -51,6 +53,7 @@ export function deriveAssistantContext(appState, gate) {
     model: gate?.model,
     projectId,
     runId,
+    source: selectedSource || 'local',
     uiState,
   };
 }

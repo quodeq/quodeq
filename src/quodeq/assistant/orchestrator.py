@@ -85,6 +85,10 @@ def _mcp_server_args(request: TurnRequest, tool_ctx: ToolContext) -> list[str]:
         args += ["--reports-dir", str(tool_ctx.reports_dir)]
     if tool_ctx.worktree_dir is not None:
         args += ["--enable-write", "--worktree-dir", str(tool_ctx.worktree_dir)]
+    if tool_ctx.read_only:
+        args += ["--read-only"]
+    if tool_ctx.score_cache_path is not None:
+        args += ["--score-cache-override", str(tool_ctx.score_cache_path)]
     return args
 
 
@@ -113,7 +117,8 @@ def run_turn(request: TurnRequest, *, repository: AssistantRepository,
         # Server-derived write grant, mirror of web_tools_on: the client flag
         # alone is never enough. Requires an attached LOCAL git repo and a
         # provider whose tool wiring is per-invocation isolated.
-        write_on = (request.write_enabled and tool_ctx.repo_root is not None
+        write_on = (request.write_enabled and not tool_ctx.read_only
+                    and tool_ctx.repo_root is not None
                     and (tool_ctx.repo_root / ".git").exists()
                     and write_safe_provider(request.provider))
         if write_on:

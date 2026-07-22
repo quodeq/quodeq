@@ -10,6 +10,7 @@ class ServerArgs:
     """Parsed CLI arguments for the MCP server."""
     findings_file: str = ""
     compiled_dir: str | None = None
+    standards_dir: str | None = None
     dimension: str | None = None
     queue_path: str | None = None
     agent_id: str = ""
@@ -28,6 +29,7 @@ class ServerArgs:
 
 _FLAG_MAP = {
     "--compiled-dir": "compiled_dir",
+    "--standards-dir": "standards_dir",
     "--dimension": "dimension",
     "--queue": "queue_path",
     "--agent-id": "agent_id",
@@ -42,6 +44,12 @@ Usage: mcp_findings.py <findings_file> [OPTIONS]
 
 Options:
   --compiled-dir DIR   Directory containing compiled standards
+  --standards-dir DIR  Standards root (parent of compiled-dir) used to key
+                       the per-file cache -- MUST be config.standards_dir,
+                       not compiled-dir, or the params fingerprint looks in
+                       the wrong place and silently keys under the
+                       default-thresholds key. Falls back to None (no
+                       params fingerprint folded into the key) when absent.
   --dimension DIM      Dimension to evaluate
   --queue PATH         Path to the file queue JSON
   --agent-id ID        Agent identifier

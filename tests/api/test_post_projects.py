@@ -102,6 +102,27 @@ def test_post_projects_duplicate_returns_409(app_client, tmp_path):
     assert body.get("existingProjectId") == first_id
 
 
+def test_post_projects_appears_in_projects_list_immediately(app_client):
+    """A freshly registered project must show in GET /api/projects right away.
+
+    The list is fetched once before the POST so the 5-second ProjectsCache is
+    warm — registration must invalidate it, and the zero-run project must not
+    be filtered out of build_project_list.
+    """
+    c, home, _ = app_client
+    repo = _make_local_repo(home, "instant-repo")
+    with _patch_home(home):
+        warm = c.get("/api/projects")
+        assert warm.status_code == 200
+        resp = c.post("/api/projects", json={"repo": str(repo)}, headers=_ORIGIN)
+        assert resp.status_code == 200, resp.get_json()
+        project_id = resp.get_json()["projectId"]
+        listed = c.get("/api/projects").get_json()["projects"]
+    entry = next((p for p in listed if p["id"] == project_id), None)
+    assert entry is not None, "registered project missing from /api/projects"
+    assert entry["runsCount"] == 0
+
+
 def test_post_projects_writes_onboarding_field_null(app_client):
     c, home, _ = app_client
     repo = _make_local_repo(home, "field-repo")
@@ -158,3 +179,72 @@ def test_get_projects_backfills_onboarding_field_for_legacy_projects(app_client,
     )
     assert target is not None, f"legacy project not in response: {projects}"
     assert target.get("onboardingCompletedAt") == "2025-12-01T00:00:00Z"
+
+
+def _write_project_record(reports_root: Path, project_id: str, *, onboarding=None) -> Path:
+    """Create a minimal registered project (repository_info.json) on disk."""
+    project_dir = reports_root / project_id
+    project_dir.mkdir(parents=True)
+    info = project_dir / "repository_info.json"
+    info.write_text(json.dumps({
+        "name": project_id,
+        "repository": f"/some/path/{project_id}",
+        "createdAt": "2025-12-01T00:00:00Z",
+        "location": "local",
+        "onboardingCompletedAt": onboarding,
+    }))
+    return info
+
+
+def _write_minimal_run(project_dir: Path, run_name: str = "2025-12-02_00-00-00") -> None:
+    run_dir = project_dir / run_name
+    (run_dir / "evidence").mkdir(parents=True)
+    (run_dir / "evidence" / "manifest.json").write_text(json.dumps({"language_stats": {}}))
+
+
+def test_get_projects_heals_null_onboarding_field_when_runs_exist(app_client):
+    """A wizard-created project whose setup was never explicitly finished but
+    that has evaluation runs must stop showing 'Resume setup': the list read
+    heals the null field to a timestamp (evaluating IS completing setup)."""
+    c, home, _ = app_client
+    reports_root = home / "evaluations"
+    info = _write_project_record(reports_root, "stuck-uuid-1234", onboarding=None)
+    _write_minimal_run(reports_root / "stuck-uuid-1234")
+
+    with _patch_home(home):
+        resp = c.get("/api/projects", headers=_ORIGIN)
+    assert resp.status_code == 200
+
+    healed = json.loads(info.read_text())["onboardingCompletedAt"]
+    assert isinstance(healed, str) and healed
+
+    body = resp.get_json()
+    projects = body["projects"] if isinstance(body, dict) else body
+    target = next((p for p in projects if p.get("id") == "stuck-uuid-1234"), None)
+    assert target is not None, f"project not in response: {projects}"
+    assert target.get("onboardingCompletedAt") == healed
+
+
+def test_get_projects_keeps_null_onboarding_field_without_runs(app_client):
+    """A registered project with no runs is genuinely mid-setup: the null
+    field must survive the list read so 'Resume setup' keeps showing.
+
+    Note: zero-run projects may or may not surface in the listing itself
+    (that gate is a separate concern, see PR #823); what this test pins is
+    that the read never stamps a run-less record, on disk or in the payload.
+    """
+    c, home, _ = app_client
+    reports_root = home / "evaluations"
+    info = _write_project_record(reports_root, "midsetup-uuid-1234", onboarding=None)
+
+    with _patch_home(home):
+        resp = c.get("/api/projects", headers=_ORIGIN)
+    assert resp.status_code == 200
+
+    assert json.loads(info.read_text())["onboardingCompletedAt"] is None
+
+    body = resp.get_json()
+    projects = body["projects"] if isinstance(body, dict) else body
+    target = next((p for p in projects if p.get("id") == "midsetup-uuid-1234"), None)
+    if target is not None:
+        assert target.get("onboardingCompletedAt") is None

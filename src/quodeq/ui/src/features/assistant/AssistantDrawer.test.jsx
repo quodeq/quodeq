@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
@@ -13,7 +13,7 @@ const state = {
     { role: 'tool', name: 'get_report', argsSummary: '{"dimension":"security"}' },
   ],
   streaming: false, error: null, sendMessage: vi.fn(), stopTurn: vi.fn(),
-  catalog: null, addLocalExchange: vi.fn(), resetConversation: vi.fn(),
+  catalog: null, addLocalExchange: vi.fn(), resetConversation: vi.fn(), readOnly: false,
 };
 vi.mock('./AssistantDrawerProvider.jsx', () => ({ useAssistantDrawer: () => state }));
 vi.mock('./ActionPreviewCard.jsx', () => ({ ActionPreviewCard: ({ action }) => <div>card:{action.actionId}</div> }));
@@ -104,4 +104,71 @@ it('shows a Stop control while a turn is streaming and it stops the turn', () =>
 it('hides the Stop control when no turn is running', () => {
   render(<AssistantPane uiState={{}} />);
   expect(screen.queryByRole('button', { name: /stop/i })).toBeNull();
+});
+
+describe('read-only sessions (source: shared)', () => {
+  const writeCatalog = {
+    commands: [],
+    skills: [
+      { name: 'explain-score', description: 'Explain a dimension score', argumentHint: '' },
+      { name: 'verify-finding', description: 'Verify a finding', argumentHint: '', requiresWrite: true },
+      { name: 'create-standard', description: 'Draft a custom standard', argumentHint: '', requiresWrite: true },
+    ],
+    actions: [],
+  };
+  const prevCatalog = state.catalog;
+
+  beforeEach(() => { state.catalog = writeCatalog; state.readOnly = true; });
+  afterEach(() => { state.catalog = prevCatalog; state.readOnly = false; });
+
+  it('autocomplete hides requiresWrite skills', () => {
+    render(<AssistantPane uiState={{}} />);
+    const input = screen.getByPlaceholderText(/ask/i);
+    fireEvent.change(input, { target: { value: '/' } });
+    expect(screen.getByText('/explain-score')).toBeInTheDocument();
+    expect(screen.queryByText('/verify-finding')).toBeNull();
+    expect(screen.queryByText('/create-standard')).toBeNull();
+  });
+
+  it('/skills hides requiresWrite skills and /help uses the read-only line', () => {
+    render(<AssistantPane uiState={{}} />);
+    const input = screen.getByPlaceholderText(/ask/i);
+    fireEvent.change(input, { target: { value: '/skills' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    let response = state.addLocalExchange.mock.calls.at(-1)[1];
+    expect(response).toContain('/explain-score');
+    expect(response).not.toContain('/verify-finding');
+    expect(response).not.toContain('/create-standard');
+
+    fireEvent.change(input, { target: { value: '/help' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    response = state.addLocalExchange.mock.calls.at(-1)[1];
+    expect(response).toContain('I can explain scores and dig into findings for this remote project.');
+    expect(response).not.toContain('draft standards');
+  });
+});
+
+describe('default (non-read-only) sessions', () => {
+  it('autocomplete still offers write-shaped skills', () => {
+    const prevCatalog = state.catalog;
+    state.catalog = {
+      commands: [],
+      skills: [{ name: 'create-standard', description: 'Draft a custom standard', argumentHint: '', requiresWrite: true }],
+      actions: [],
+    };
+    render(<AssistantPane uiState={{}} />);
+    const input = screen.getByPlaceholderText(/ask/i);
+    fireEvent.change(input, { target: { value: '/' } });
+    expect(screen.getByText('/create-standard')).toBeInTheDocument();
+    state.catalog = prevCatalog;
+  });
+
+  it('/help keeps the default "draft standards" line', () => {
+    render(<AssistantPane uiState={{}} />);
+    const input = screen.getByPlaceholderText(/ask/i);
+    fireEvent.change(input, { target: { value: '/help' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    const response = state.addLocalExchange.mock.calls.at(-1)[1];
+    expect(response).toContain('I can explain scores, dig into findings, and draft standards for this project.');
+  });
 });

@@ -17,7 +17,7 @@ from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import read_message, dispatch as _dispatch
 from quodeq.core.standards.refs import load_compiled_refs as _load_compiled_refs
-from quodeq.context.precedent import load_precedent_fingerprints
+from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
 from quodeq.core.standards.refs import load_compiled_requirements as _load_compiled_requirements
 from quodeq.core.standards.overrides import load_project_overrides
@@ -112,6 +112,7 @@ def _build_router(
     run_dir = Path(findings_path).parent.parent
     project_dir = run_dir.parent
     ctx.precedent_fingerprints = load_precedent_fingerprints(project_dir)
+    ctx.precedent_corpus = load_precedent_corpus(project_dir, run_dir)
     from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
     event_log = EventLogWriter(run_dir / "events.jsonl")
 
@@ -125,7 +126,14 @@ def _build_router(
             )
         from quodeq.analysis.cache.cache_writer import build_cache_writer  # noqa: PLC0415
         src_root = Path(server_args.work_dir) if server_args.work_dir else Path.cwd()
-        standards_dir = Path(server_args.compiled_dir) if server_args.compiled_dir else None
+        # NOTE: standards_dir must be the standards ROOT (parent of
+        # "compiled/"), not server_args.compiled_dir. build_cache_writer /
+        # dimension_params_state append "compiled/<dim>.json" themselves;
+        # passing compiled_dir here double-appends "compiled" and the
+        # params-fingerprint lookup silently misses, keying every entry
+        # under the default-thresholds key. --standards-dir is None when
+        # not supplied by the caller (back-compat: no params fingerprint).
+        standards_dir = Path(server_args.standards_dir) if server_args.standards_dir else None
         cache_writer = build_cache_writer(
             cache_root=Path(server_args.cache_root),
             src_root=src_root,

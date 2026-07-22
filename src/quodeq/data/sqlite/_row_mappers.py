@@ -7,11 +7,14 @@ module is the only place that knows about both naming conventions.
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from quodeq.core.events.models import Judgment
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.req_ref import ReqRef
+
+_logger = logging.getLogger(__name__)
 
 
 def _dedup_key(practice_id: str, file: str, line: int, verdict: str) -> str:
@@ -98,7 +101,14 @@ def judgment_to_row(j: Judgment) -> dict[str, Any]:
 def row_to_finding(row: dict[str, Any]) -> Finding:
     """Reconstruct a Finding from a SQL row dict."""
     refs_json = row.get("req_refs_json")
-    raw_refs: list[dict] = json.loads(refs_json) if refs_json else []
+    try:
+        raw_refs: list[dict] = json.loads(refs_json) if refs_json else []
+    except json.JSONDecodeError:
+        _logger.warning(
+            "Malformed req_refs_json for finding %s (%s); dropping references",
+            row.get("practice_id"), row.get("file"),
+        )
+        raw_refs = []
     req_refs = [ReqRef(label=r.get("label", ""), url=r.get("url", "")) for r in raw_refs if isinstance(r, dict)]
     return Finding(
         practice_id=row["practice_id"],

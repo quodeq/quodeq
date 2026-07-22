@@ -31,6 +31,7 @@ import TopBar from './components/TopBar.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey } from './constants.js';
 import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
+import { useNativeNavBridge } from './hooks/useNativeNavBridge.js';
 import { readVisibleStandardIds } from './utils/visibleStandards.js';
 import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
@@ -125,11 +126,12 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onG
  * @param {{ settings: Object }} props
  * @returns {JSX.Element}
  */
-function SettingsCase({ settings, onOpenGradeFormula }) {
+function SettingsCase({ settings, onOpenGradeFormula, onSharedDisconnected }) {
   return (
     <SettingsPage
       theme={{ mode: settings.themeMode, family: settings.themeFamily, onApplyMode: settings.applyMode, onApplyFamily: settings.applyFamily }}
       onOpenGradeFormula={onOpenGradeFormula}
+      onSharedDisconnected={onSharedDisconnected}
     />
   );
 }
@@ -160,8 +162,220 @@ function buildDismissPayload(v, fallbackDimension) {
   };
 }
 
+// Shared projects have no mutation route on the backend (dismiss is
+// local-only by design, and the same project id can exist in both local and
+// shared worlds by design — a dismiss POST for a shared project's id would
+// otherwise silently corrupt the LOCAL project's cache with shared-derived
+// deltas). Every route renderer below that injects onDismiss calls this
+// first: pass `undefined` for shared so the leaf components (EvalCards'
+// EvalViolationCard, FileDetailPage's ViolationCard) self-hide the dismiss
+// button rather than wiring up a handler that must never fire.
+export function isSharedSource(selectedSource) {
+  return selectedSource === 'shared';
+}
+
+// Project-data tabs (overview/violations/map/history) — module scope so both
+// the App component and the exported shouldBounceToEvaluate helper below
+// share one definition.
+const PROJECT_DATA_TABS = ['overview', 'violations', 'map', 'history'];
+
+/**
+ * Whether the "no runs yet" bounce-to-Evaluate effect should fire. Exported
+ * (like isSharedSource/buildEvalPrincipal) so the source-gating contract is
+ * unit-testable without mounting the whole App.
+ *
+ * There is no Evaluate flow for shared projects — the guard must reject any
+ * non-'local' source outright, independent of hasCurrentProjectRuns (which is
+ * computed from the LOCAL project list and can be misleading for a shared
+ * selection whose id collides with a local one — see the call site).
+ */
+export function shouldBounceToEvaluate({ projectsLoaded, projectsCount, selectedProjectInfo, hasCurrentProjectRuns, activeTab, selectedSource }) {
+  if (!projectsLoaded) return false;
+  if (!projectsCount) return false;
+  if (!selectedProjectInfo) return false;
+  if (selectedSource !== 'local') return false;
+  return !hasCurrentProjectRuns && PROJECT_DATA_TABS.includes(activeTab);
+}
+
+/**
+ * Whether the TopBar's Evaluate button should be wired up. Shared projects
+ * have no Evaluate flow (evaluation is local-only), so the button is omitted
+ * outright regardless of project count.
+ */
+export function shouldShowEvaluateButton(projectsCount, selectedSource) {
+  return (projectsCount ?? 0) > 0 && selectedSource !== 'shared';
+}
+
+/**
+ * The project's friendly name for the topbar/sidebar. A LOCAL selection
+ * resolves from the local projects list (selectedProjectInfo / the
+ * list-derived selectedDisplayName). A SHARED (remote) selection is NOT in
+ * that list, so selectedProjectInfo is null and selectedDisplayName stays
+ * equal to the raw UUID -- the anti-UUID guard below would then blank the
+ * title entirely. For 'shared', fall back to the resolved sharedProjectInfo
+ * payload's name (the same "has data to show" signal shouldShowProjectTabs
+ * uses). Returns null while the lists are still unresolved so the UUID never
+ * flashes. Exported so the source-gating contract is testable without
+ * mounting the whole App.
+ */
+export function resolveProjectDisplayName({
+  selectedProjectInfo, selectedSource, sharedProjectInfo, selectedDisplayName, selectedProject,
+}) {
+  return selectedProjectInfo?.displayName
+    || selectedProjectInfo?.name
+    || (selectedSource === 'shared' ? sharedProjectInfo?.name : null)
+    || (selectedDisplayName && selectedDisplayName !== selectedProject
+          ? selectedDisplayName
+          : null);
+}
+
+/**
+ * Whether the sidebar's project-data tabs (overview/violations/map/history)
+ * should render. The local signal is the run count from the LOCAL project
+ * list -- which is null/zero for a shared selection with no local mirror, so
+ * gating on it alone hides the tabs for shared projects whose pages all work
+ * (and a colliding local twin's zero runs would hide them just the same).
+ * For 'shared', gate on the resolved sharedProjectInfo instead: the shared
+ * info payload carries no runsCount at all, and a project only appears in
+ * the shared repo once published with runs, so its info resolving is the
+ * "has data to show" signal. Exported (like shouldBounceToEvaluate) so the
+ * source-gating contract is testable without mounting the whole App.
+ */
+export function shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, sharedProjectInfo }) {
+  if (selectedSource === 'shared') return !!sharedProjectInfo;
+  return hasCurrentProjectRuns;
+}
+
+/**
+ * Build the `navigation` prop bundle ROUTE_RENDERERS consume. Every
+ * navigation key a route renderer reads MUST be forwarded here -- a route
+ * consuming a key the bundle lacks fails silently at click time (the
+ * handler throws mid-event and the UI just doesn't respond; that's how the
+ * repositories local/online tab flip broke when handleNavigateReplace was
+ * consumed but never forwarded). Exported so producer and consumer can be
+ * pinned together in tests without mounting the whole App.
+ */
+export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluating, showToast, setWizardEntry }) {
+  return {
+    selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
+    projectsLoaded: state.projectsLoaded,
+    loadProjects: state.loadProjects,
+    handleNavigate: state.handleNavigate, handleNavigateReplace: state.handleNavigateReplace, handleRunSelect: state.handleRunSelect,
+    handleProjectChange: state.handleProjectChange, navTab, navStackLength,
+    handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject, handleImportProject: state.handleImportProject,
+    historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
+    currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
+    prefetchHandlers: state.prefetchHandlers,
+    onAddProject: () => {
+      if (isEvaluating) {
+        showToast('An evaluation is in progress. Cancel it before adding a project.');
+        return;
+      }
+      setWizardEntry({ startStep: 'repo-scan', isFirstProject: state.projects.length === 0 });
+    },
+    onImportProject: () => {
+      if (isEvaluating) {
+        showToast('An evaluation is in progress. Cancel it before importing a project.');
+        return;
+      }
+      state.handleImportProject();
+    },
+    onTakeTour: () => {
+      if (isEvaluating) {
+        showToast('An evaluation is in progress. Cancel it before starting the tour.');
+        return;
+      }
+      setWizardEntry({ startStep: 'welcome', isFirstProject: true });
+    },
+    onResumeSetup: (projectId) => {
+      if (isEvaluating) {
+        showToast('An evaluation is in progress. Cancel it before resuming setup.');
+        return;
+      }
+      setWizardEntry({
+        startStep: 'provider',
+        isFirstProject: false,
+        presetProjectId: projectId,
+      });
+    },
+    isEvaluating,
+  };
+}
+
+/**
+ * Exit handlers for the onboarding wizard. The wizard registers the project
+ * on its Repo & Scan step (POST /api/projects), well before either exit
+ * fires — so both exits that leave a registered project behind (a saved
+ * close and a launch) must reload the projects list, or the new project
+ * stays invisible in the Projects tab until an evaluation finishes (the
+ * only other path that calls loadProjects). Exported so the reload contract
+ * is testable without mounting the whole App.
+ */
+export function buildWizardHandlers({ state, setWizardEntry, navTab }) {
+  return {
+    onClose: ({ saved, projectId }) => {
+      setWizardEntry(null);
+      if (saved && projectId) {
+        state.loadProjects?.();
+        state.refreshDashboard?.();
+      }
+    },
+    onLaunch: ({ projectId, repo, scopePath, branch, provider, standardIds, totalTimeLimitS }) => {
+      setWizardEntry(null);
+      state.loadProjects?.();
+      const payload = {
+        repo: repo || projectId,
+        dimensions: standardIds,
+      };
+      if (scopePath) payload.scopePath = scopePath;
+      if (branch) payload.branch = branch;
+      if (provider?.id) payload.aiCmd = provider.id;
+      if (provider?.model) payload.aiModel = provider.model;
+      if (totalTimeLimitS) payload.timeLimit = totalTimeLimitS;
+      state.evalLifecycle.handleStartEvaluation(payload);
+      navTab('evaluate');
+    },
+  };
+}
+
+/**
+ * After the shared repository is disconnected in Settings, a currently
+ * 'shared' selection is left pointing at a project that no longer resolves
+ * anywhere in the app (its source has no config left) -- the user would be
+ * stranded on a broken view. Resolve what handleProjectChange should be
+ * called with to recover: the first local project if one exists, otherwise
+ * the app's own "no project selected" state (empty id, 'local' source, same
+ * as a fresh install / readStoredProject's default -- see useProjectState.js).
+ * Returns null when there's nothing to do (selection wasn't 'shared').
+ * Exported so the recovery contract is unit-testable without mounting the
+ * whole App.
+ */
+export function resolveSelectionAfterSharedDisconnect({ selectedSource, projects }) {
+  if (selectedSource !== 'shared') return null;
+  const first = (projects || [])[0];
+  const id = first ? (first.id || first.name || first) : '';
+  return { id, source: 'local' };
+}
+
+/**
+ * Whether the first-paint onboarding-wizard auto-open effect should fire.
+ * "Zero LOCAL projects" alone is not sufficient: a teammate who has
+ * connected to a shared repo and is viewing a shared project also reads as
+ * zero local projects (state.projects is always the local list per
+ * useProjectState), but they already have a real working view open -- the
+ * wizard must not cover it uninvited. Exported so this contract is
+ * unit-testable without mounting the whole App (which needs ~8 providers).
+ */
+export function shouldAutoOpenOnboardingWizard({ projectsLoaded, projectsCount, selectedSource, isEvaluating }) {
+  if (!projectsLoaded) return false;
+  if ((projectsCount ?? 0) > 0) return false;
+  if (selectedSource === 'shared') return false;
+  if (isEvaluating) return false;
+  return true;
+}
+
 function renderEvalPrincipleDetail(params, props) {
-  const { selectedProject, selectedRun } = props.navigation;
+  const { selectedProject, selectedRun, selectedSource } = props.navigation;
   const evalPrincipal = {
     ...params.evalPrincipal,
     project: params.evalPrincipal?.project || selectedProject || '',
@@ -171,7 +385,7 @@ function renderEvalPrincipleDetail(params, props) {
     <PrincipleDetailPage
       evalPrincipal={evalPrincipal}
       severityFilter={params.severity || null}
-      onDismiss={async (v) => {
+      onDismiss={isSharedSource(selectedSource) ? undefined : async (v) => {
         // POST returns { scores: { dimensions, summary } } — the rescored
         // payload for this run. PrincipleDetailPage applies it to its
         // local liveScore/liveGrade. The dashboard refetch covers the
@@ -259,6 +473,7 @@ function ViolationsRoute({ params, props }) {
         accumulated: acc,
         accumulatedDimensions: dims,
         selectedProject: props.navigation.selectedProject,
+        selectedSource: props.navigation.selectedSource,
         projects: props.navigation.projects,
         projectsLoaded: props.navigation.projectsLoaded,
         projectName: props.dashboardData.selectedDisplayName,
@@ -286,7 +501,12 @@ function ViolationsRoute({ params, props }) {
   );
 }
 
-const ROUTE_RENDERERS = {
+// Exported for the same reason as buildEvalPrincipal — a unit-testable pin
+// on the per-route onDismiss source-gating contract without mounting the
+// whole App (which needs ~8 providers). Calling e.g.
+// ROUTE_RENDERERS.file(params, props) just builds the React element tree; it
+// doesn't render, so the returned element's props can be asserted on directly.
+export const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect, onProjectsReload: props.navigation.loadProjects }} runMode={false} />,
   violations: (params, props) => <ViolationsRoute params={params} props={props} />,
   map: (params, props) => {
@@ -300,6 +520,7 @@ const ROUTE_RENDERERS = {
         projects: props.navigation.projects,
         projectsLoaded: props.navigation.projectsLoaded,
         selectedProject: props.navigation.selectedProject,
+        selectedSource: props.navigation.selectedSource,
         loading: props.dashboardData.loading,
         isFetching: props.dashboardData.isFetching,
       }}
@@ -335,6 +556,7 @@ const ROUTE_RENDERERS = {
         projects={props.navigation.projects}
         projectsLoaded={props.navigation.projectsLoaded}
         selectedProject={props.navigation.selectedProject}
+        selectedSource={props.navigation.selectedSource}
         loading={props.dashboardData.loading}
         isFetching={props.dashboardData.isFetching}
         projectInfo={props.navigation.projects?.find((p) => (p.id || p.name) === props.navigation.selectedProject) || null}
@@ -348,6 +570,7 @@ const ROUTE_RENDERERS = {
       dimension={params.dimension}
       runId={params.runId}
       dateLabel={params.dateLabel}
+      selectedSource={props.navigation.selectedSource}
       onNavigate={props.navigation.handleNavigate}
       refreshSignal={props.dashboardData.dashboard}
       trend={props.dashboardData.dashboard?.trend || []}
@@ -355,14 +578,27 @@ const ROUTE_RENDERERS = {
       onGranularityChange={props.dashboardData.onGranularityChange}
     />
   ),
-  evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} preselectDims={params.preselectDims} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />,
+  evaluate: (params, props) => {
+    // Shared projects have no Evaluate flow (evaluation is local-only) --
+    // shouldShowEvaluateButton already keeps the TopBar's Evaluate button
+    // from ever linking here for a shared selection, but a stale nav-stack
+    // entry (e.g. the user was sitting on Evaluate and switched to a shared
+    // project) could still land the router on this route. Belt-and-braces:
+    // fall back to the Overview, the least-surprising landing spot, rather
+    // than rendering a dead-end evaluate screen with no source-appropriate
+    // action.
+    if (isSharedSource(props.navigation.selectedSource)) {
+      return ROUTE_RENDERERS.overview(params, props);
+    }
+    return <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} preselectDims={params.preselectDims} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />;
+  },
   file: (params, props) => (
     <FileDetailPage
       file={params.file}
       runId={params.runId}
       dateLabel={params.dateLabel}
       severityFilter={params.severityFilter || params.severity || null}
-      onDismiss={async (v) => {
+      onDismiss={isSharedSource(props.navigation.selectedSource) ? undefined : async (v) => {
         const payload = { ...buildDismissPayload(v), run_id: params.runId };
         const result = await props.dismissFinding(props.navigation.selectedProject, payload);
         props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
@@ -379,7 +615,7 @@ const ROUTE_RENDERERS = {
       finding={params.finding}
       principle={params.principle}
       dimension={params.dimension}
-      onDismiss={async (v) => {
+      onDismiss={isSharedSource(props.navigation.selectedSource) ? undefined : async (v) => {
         const payload = { ...buildDismissPayload(v, params.dimension), run_id: params.runId };
         const result = await props.dismissFinding(props.navigation.selectedProject, payload);
         props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
@@ -389,12 +625,43 @@ const ROUTE_RENDERERS = {
       }}
     />
   ),
-  settings: (params, props) => <SettingsCase settings={props.settings} onOpenGradeFormula={() => props.navigation.handleNavigate('grade-formula')} />,
+  settings: (params, props) => <SettingsCase
+    settings={props.settings}
+    onOpenGradeFormula={() => props.navigation.handleNavigate('grade-formula')}
+    onSharedDisconnected={() => {
+      const next = resolveSelectionAfterSharedDisconnect({
+        selectedSource: props.navigation.selectedSource,
+        projects: props.navigation.projects,
+      });
+      if (next) props.navigation.handleProjectChange(next.id, next.source);
+    }}
+  />,
   'grade-formula': (params, props) => <GradeFormulaPage navigation={props.navigation} />,
-  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup }} />,
-  standards: () => <StandardsPage />,
+  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} filters={params.filters} actions={{ onSelect: (id, source) => { props.navigation.handleProjectChange(id, source); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup, onFiltersChange: (filters) => props.navigation.handleNavigateReplace('projects', { filters }), onProjectsReload: props.navigation.loadProjects }} />,
+  standards: (params, props) => <StandardsPage onRescan={(dims) => props.navigation.navTab('evaluate', { preselectDims: dims })} />,
   help: () => <HelpPage />,
 };
+
+// The app-level "no local projects" wall in MainContent. Route pages that
+// manage their own empty state (SELF_HANDLED_EMPTY) and the project-free
+// tabs (NO_PROJECT_TABS) are never walled; every other page is walled when
+// the LOCAL projects list is empty. A shared selection is never walled: its
+// data does not live in the local list, and the shared read paths carry
+// their own loading/empty states (teammate persona: zero local projects,
+// drilling from a shared Overview into file/finding/dimension detail).
+// Exported so the source-gating contract is unit-testable without mounting
+// MainContent's route renderers.
+export function shouldWallEmptyProjects({ page, projects, selectedSource }) {
+  if (isSharedSource(selectedSource)) return false;
+  if (NO_PROJECT_TABS.includes(page) || SELF_HANDLED_EMPTY.has(page)) return false;
+  return !projects || projects.length === 0;
+}
+
+// Exported for tests: the session-start payload must carry the selected
+// source so remote projects get read-only sessions server-side.
+export function buildAssistantSessionPayload({ provider, model, projectId, runId, source }) {
+  return { provider, model, projectId, runId, source };
+}
 
 /**
  * @param {{ activePage: { page: string }, props: Object }} params
@@ -402,18 +669,15 @@ const ROUTE_RENDERERS = {
  */
 function MainContent({ activePage, props }) {
   const { page, ...params } = activePage;
-  if (!NO_PROJECT_TABS.includes(page) && !SELF_HANDLED_EMPTY.has(page)) {
-    const projects = props.navigation?.projects;
-    if (!projects || projects.length === 0) {
-      if (!props.navigation?.projectsLoaded) return <LoadingScreen />;
-      return (
-        <EmptyStateWithTour
-          onAdd={() => props.navigation.onAddProject()}
-          onTour={() => props.navigation.onTakeTour()}
-          isEvaluating={props.navigation.isEvaluating}
-        />
-      );
-    }
+  if (shouldWallEmptyProjects({ page, projects: props.navigation?.projects, selectedSource: props.navigation?.selectedSource })) {
+    if (!props.navigation?.projectsLoaded) return <LoadingScreen />;
+    return (
+      <EmptyStateWithTour
+        onAdd={() => props.navigation.onAddProject()}
+        onTour={() => props.navigation.onTakeTour()}
+        isEvaluating={props.navigation.isEvaluating}
+      />
+    );
   }
   const renderer = ROUTE_RENDERERS[page];
   if (renderer) return renderer(params, props);
@@ -512,17 +776,22 @@ export default function App() {
   const assistantGate = useAssistantProvider();
   const assistantCtx = deriveAssistantContext(state, assistantGate);
   const { isOpen: assistantOpen, activeTab: drawerTab, startSession: startAssistantSession } = useAssistantDrawer();
-  const { provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId } = assistantCtx;
+  const { provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId, source: asstSource } = assistantCtx;
   // Start (or re-start) the assistant session when the drawer is open and on
   // any provider/model/project/run change while it stays open. startSession
   // dedupes by context key, so re-runs with an unchanged context no-op; a
   // real project/run switch produces a fresh session. We deliberately do NOT
   // start a session while the drawer is closed — sends only originate from the
   // open drawer, so first-open is early enough and avoids needless sessions.
+  // Shared projects get READ-ONLY sessions: the backend roots their reads in
+  // the shared clone and registers no mutating tools, so the drawer no longer
+  // closes on a source switch; the source-keyed session context re-keys instead.
   useEffect(() => {
     if (!assistantOpen || drawerTab !== 'assistant') return;
-    startAssistantSession({ provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId });
-  }, [assistantOpen, drawerTab, asstProvider, asstModel, asstProjectId, asstRunId, startAssistantSession]);
+    startAssistantSession(buildAssistantSessionPayload({
+      provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId, source: asstSource,
+    }));
+  }, [assistantOpen, drawerTab, asstProvider, asstModel, asstProjectId, asstRunId, asstSource, startAssistantSession]);
 
   // Sync the client-side grade-label thresholds with the server formula at
   // boot so every gauge/badge agrees with the applied Q² parameters. The
@@ -546,14 +815,26 @@ export default function App() {
     if (autoOpenedRef.current) return;
     if (!state.projectsLoaded) return;
     if (state.projects.length > 0) { autoOpenedRef.current = true; return; }
-    if (isEvaluating) return;
+    if (!shouldAutoOpenOnboardingWizard({
+      projectsLoaded: state.projectsLoaded,
+      projectsCount: state.projects.length,
+      selectedSource: state.selectedSource,
+      isEvaluating,
+    })) {
+      // Blocked for a transient reason (shared selection, an evaluation in
+      // flight) -- do NOT mark autoOpenedRef: once the block lifts (source
+      // switches back to local, the evaluation finishes) while local
+      // projects are still zero, the decision must be reconsidered rather
+      // than permanently skipped.
+      return;
+    }
     let skipped = false;
     try { skipped = localStorage.getItem('quodeq_onboarding_skipped') === 'true'; } catch { /* ignore */ }
     autoOpenedRef.current = true;
     if (!skipped) {
       setWizardEntry({ startStep: 'welcome', isFirstProject: true });
     }
-  }, [state.projectsLoaded, state.projects.length, isEvaluating]);
+  }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource]);
 
   // Project-data tabs (overview/violations/map/history) only make sense once
   // the selected project has at least one completed evaluation run. Until
@@ -562,22 +843,37 @@ export default function App() {
   // for /api/projects to resolve and for selectedProjectInfo to populate so
   // the bouncer doesn't fire against the transient "no projects loaded yet"
   // state on first paint and strand the user on Evaluate.
-  const PROJECT_DATA_TABS = ['overview', 'violations', 'map', 'history'];
+  //
+  // selectedProjectInfo is always looked up in the LOCAL project list (see
+  // useProjectState — the list `state.projects` holds only ever comes from
+  // the local listProjects API). A shared project's id can collide with a
+  // local one by design (e.g. after a clone-on-add pull); if the local copy
+  // happens to have zero runs while the shared source has plenty, this
+  // bounce would incorrectly fire for a shared selection that has real data
+  // to show. There is no Evaluate for shared projects at all, so it must
+  // never fire outside 'local' — shouldBounceToEvaluate encodes that.
   const hasCurrentProjectRuns = (selectedProjectInfo?.runsCount ?? 0) > 0;
   useEffect(() => {
-    if (!state.projectsLoaded) return;
-    if (state.projects.length === 0) return;
-    if (!selectedProjectInfo) return;
-    if (!hasCurrentProjectRuns && PROJECT_DATA_TABS.includes(state.activeTab)) {
+    if (shouldBounceToEvaluate({
+      projectsLoaded: state.projectsLoaded,
+      projectsCount: state.projects.length,
+      selectedProjectInfo,
+      hasCurrentProjectRuns,
+      activeTab: state.activeTab,
+      selectedSource: state.selectedSource,
+    })) {
       state.navTab('evaluate');
     }
-  }, [state.projectsLoaded, state.projects.length, selectedProjectInfo, hasCurrentProjectRuns, state.activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.projectsLoaded, state.projects.length, selectedProjectInfo, hasCurrentProjectRuns, state.activeTab, state.selectedSource]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sidebarProvider = (typeof localStorage !== 'undefined' && localStorage.getItem(ACTIVE_PROVIDER_KEY)) || null;
   const sidebarModel = sidebarProvider && typeof localStorage !== 'undefined'
     ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
     : null;
   const { activePage, navStack, navPop, navGoTo, navTab, activeTab } = state;
+  // Native-shell bridge: the macOS Help menu opens tabs by dispatching
+  // quodeq:navigate (see _webview_window._install_macos_help_menu).
+  useNativeNavBridge(navTab);
 
   // Reset scroll on project switch — useNavStack handles the same for
   // tab/page changes, but selectedProject lives outside the nav stack.
@@ -616,57 +912,18 @@ export default function App() {
 
   const contentProps = {
     dashboardData: {
-      selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
+      selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
       projectsLoaded: state.projectsLoaded,
       dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
+      sharedProjectInfo: state.sharedProjectInfo,
       availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
       selectedDisplayName: state.selectedDisplayName,
       granularity: state.granularity, onGranularityChange: state.onGranularityChange,
     },
-    navigation: {
-      selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
-      projectsLoaded: state.projectsLoaded,
-      loadProjects: state.loadProjects,
-      handleNavigate: state.handleNavigate, handleRunSelect: state.handleRunSelect,
-      handleProjectChange: state.handleProjectChange, navTab, navStackLength: navStack.length,
-      handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject, handleImportProject: state.handleImportProject,
-      historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
-      currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
-      prefetchHandlers: state.prefetchHandlers,
-      onAddProject: () => {
-        if (isEvaluating) {
-          showToast('An evaluation is in progress. Cancel it before adding a project.');
-          return;
-        }
-        setWizardEntry({ startStep: 'repo-scan', isFirstProject: state.projects.length === 0 });
-      },
-      onImportProject: () => {
-        if (isEvaluating) {
-          showToast('An evaluation is in progress. Cancel it before importing a project.');
-          return;
-        }
-        state.handleImportProject();
-      },
-      onTakeTour: () => {
-        if (isEvaluating) {
-          showToast('An evaluation is in progress. Cancel it before starting the tour.');
-          return;
-        }
-        setWizardEntry({ startStep: 'welcome', isFirstProject: true });
-      },
-      onResumeSetup: (projectId) => {
-        if (isEvaluating) {
-          showToast('An evaluation is in progress. Cancel it before resuming setup.');
-          return;
-        }
-        setWizardEntry({
-          startStep: 'provider',
-          isFirstProject: false,
-          presetProjectId: projectId,
-        });
-      },
-      isEvaluating,
-    },
+    navigation: buildNavigationBundle({
+      state, navTab, navStackLength: navStack.length,
+      isEvaluating, showToast, setWizardEntry,
+    }),
     evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
     settings: state.settings,
@@ -681,16 +938,17 @@ export default function App() {
     dismissRefreshKey,
   };
 
-  // Resolve the project's friendly name. Until the /api/projects response
-  // has populated the projects array, selectedDisplayName falls back to the
-  // raw project id (a UUID) — we explicitly filter that case out so the
-  // sidebar and topbar show nothing rather than flashing the UUID.
-  const resolvedDisplayName =
-    selectedProjectInfo?.displayName
-    || selectedProjectInfo?.name
-    || (state.selectedDisplayName && state.selectedDisplayName !== state.selectedProject
-          ? state.selectedDisplayName
-          : null);
+  // Resolve the project's friendly name (see resolveProjectDisplayName): local
+  // selections read the local projects list; shared/remote selections (absent
+  // from that list) fall back to the resolved sharedProjectInfo name. Until the
+  // lists populate this stays null so the raw UUID never flashes.
+  const resolvedDisplayName = resolveProjectDisplayName({
+    selectedProjectInfo,
+    selectedSource: state.selectedSource,
+    sharedProjectInfo: state.sharedProjectInfo,
+    selectedDisplayName: state.selectedDisplayName,
+    selectedProject: state.selectedProject,
+  });
 
   return (
     <>
@@ -698,7 +956,7 @@ export default function App() {
         <ServerLogProvider>
           <OllamaLogProvider>
             <LlamaCppLogProvider>
-              <VerifiedFindingsProvider project={state.selectedProject}>
+              <VerifiedFindingsProvider project={state.selectedProject} source={state.selectedSource}>
               <AppShell
           drawer={<BottomDrawer uiState={assistantCtx.uiState} />}
           sidebar={
@@ -706,7 +964,12 @@ export default function App() {
               activeTab={activeTab}
               onNavTab={navTab}
               hasEvaluations={state.projects.length > 0}
-              showProjectTabs={hasCurrentProjectRuns}
+              showProjectTabs={shouldShowProjectTabs({
+                selectedSource: state.selectedSource,
+                hasCurrentProjectRuns,
+                sharedProjectInfo: state.sharedProjectInfo,
+              })}
+              selectedSource={state.selectedSource}
               projectInfo={{
                 displayName: resolvedDisplayName,
                 meta: state.headerMeta,
@@ -727,7 +990,8 @@ export default function App() {
               serverUrl={typeof window !== 'undefined' ? window.location.origin : null}
               provider={sidebarProvider}
               model={sidebarModel}
-              onEvaluate={state.projects?.length > 0 ? (() => navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) })) : null}
+              selectedSource={state.selectedSource}
+              onEvaluate={shouldShowEvaluateButton(state.projects?.length, state.selectedSource) ? (() => navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) })) : null}
               evaluating={state.evalLifecycle?.job?.status === 'running'}
               onProviderClick={() => navTab('settings')}
               onMenuToggle={() => setSidebarPinned((v) => !v)}
@@ -755,26 +1019,7 @@ export default function App() {
               {wizardEntry && (
                 <OnboardingWizard
                   entry={wizardEntry}
-                  onClose={({ saved, projectId }) => {
-                    setWizardEntry(null);
-                    if (saved && projectId) {
-                      state.refreshDashboard?.();
-                    }
-                  }}
-                  onLaunch={({ projectId, repo, scopePath, branch, provider, standardIds, totalTimeLimitS }) => {
-                    setWizardEntry(null);
-                    const payload = {
-                      repo: repo || projectId,
-                      dimensions: standardIds,
-                    };
-                    if (scopePath) payload.scopePath = scopePath;
-                    if (branch) payload.branch = branch;
-                    if (provider?.id) payload.aiCmd = provider.id;
-                    if (provider?.model) payload.aiModel = provider.model;
-                    if (totalTimeLimitS) payload.timeLimit = totalTimeLimitS;
-                    state.evalLifecycle.handleStartEvaluation(payload);
-                    navTab('evaluate');
-                  }}
+                  {...buildWizardHandlers({ state, setWizardEntry, navTab })}
                 />
               )}
             </Suspense>

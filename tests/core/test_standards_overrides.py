@@ -3,6 +3,7 @@ import json
 from quodeq.core.standards.overrides import (
     OVERRIDES_RELPATH,
     collect_declared_params,
+    dimension_params,
     effective_params,
     load_project_overrides,
     resolve_requirement_text,
@@ -131,3 +132,43 @@ def test_extract_requirements_applies_overrides():
     tuned = extract_requirements(data, overrides={"M-ANA-2": {"max_lines": 60}})
     assert plain["M-ANA-2"]["text"] == "Functions MUST NOT exceed 50 lines"
     assert tuned["M-ANA-2"]["text"] == "Functions MUST NOT exceed 60 lines"
+
+
+class TestDimensionParams:
+    DIM = {
+        "id": "maintainability",
+        "principles": [{"name": "Analyzability", "requirements": [
+            {"id": "M-ANA-2", "text": "Functions MUST NOT exceed {max_lines} lines",
+             "params": {"max_lines": {"default": 50, "min": 10, "max": 500}}},
+            {"id": "M-ANA-3", "text": "No params here"},
+            {"id": "M-MOD-1", "text": "Max {max_deps} deps",
+             "params": {"max_deps": {"default": 8, "min": 1, "max": 50}}},
+        ]}],
+    }
+
+    def test_no_overrides_effective_is_defaults_and_diff_empty(self):
+        effective, non_default = dimension_params(self.DIM, {})
+        assert effective == {"M-ANA-2": {"max_lines": 50}, "M-MOD-1": {"max_deps": 8}}
+        assert non_default == {}
+
+    def test_override_appears_in_both_maps(self):
+        effective, non_default = dimension_params(self.DIM, {"M-ANA-2": {"max_lines": 60}})
+        assert effective["M-ANA-2"] == {"max_lines": 60}
+        assert non_default == {"M-ANA-2": {"max_lines": 60}}
+
+    def test_override_equal_to_default_is_not_a_diff(self):
+        _, non_default = dimension_params(self.DIM, {"M-ANA-2": {"max_lines": 50}})
+        assert non_default == {}
+
+    def test_override_for_foreign_requirement_is_ignored(self):
+        _, non_default = dimension_params(self.DIM, {"S-SEC-1": {"max_depth": 3}})
+        assert non_default == {}
+
+    def test_invalid_override_falls_back_to_default(self):
+        effective, non_default = dimension_params(self.DIM, {"M-ANA-2": {"max_lines": 99999}})
+        assert effective["M-ANA-2"] == {"max_lines": 50}
+        assert non_default == {}
+
+    def test_requirements_without_params_are_absent(self):
+        effective, _ = dimension_params(self.DIM, {})
+        assert "M-ANA-3" not in effective

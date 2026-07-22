@@ -240,4 +240,43 @@ describe('useRunningRunsRefresh', () => {
     });
     expect(refreshCount(invalidateSpy)).toBe(2);
   });
+
+  // Task 17: source-aware cache keys. selectedSource must be folded into
+  // every key this hook invalidates, so a refresh scoped to one source never
+  // marks the other source's cache stale.
+  describe('source-aware cache keys', () => {
+    it("scopes invalidation to the 'local' keys by default", () => {
+      const { Wrapper, invalidateSpy } = makeWrapper();
+      renderHook(
+        () =>
+          useRunningRunsRefresh({
+            selectedProject: 'p1',
+            availableRuns: [{ runId: 'r1', status: 'complete' }],
+          }),
+        { wrapper: Wrapper },
+      );
+      const keys = keysCalled(invalidateSpy);
+      expect(keys).toContainEqual(projectKeys.scores('p1', null, 'local'));
+      expect(keys).toContainEqual(projectKeys.dashboard('p1', null, 'local'));
+    });
+
+    it("scopes invalidation to the 'shared' keys when selectedSource is 'shared'", () => {
+      const { Wrapper, invalidateSpy } = makeWrapper();
+      renderHook(
+        () =>
+          useRunningRunsRefresh({
+            selectedProject: 'p1',
+            selectedSource: 'shared',
+            availableRuns: [{ runId: 'r1', status: 'complete' }],
+          }),
+        { wrapper: Wrapper },
+      );
+      const keys = keysCalled(invalidateSpy);
+      expect(keys).toContainEqual(projectKeys.scores('p1', null, 'shared'));
+      expect(keys).toContainEqual(projectKeys.dashboard('p1', null, 'shared'));
+      // Never touches the local source's cache slot.
+      expect(keys).not.toContainEqual(projectKeys.scores('p1', null, 'local'));
+      expect(keys).not.toContainEqual(projectKeys.dashboard('p1', null, 'local'));
+    });
+  });
 });

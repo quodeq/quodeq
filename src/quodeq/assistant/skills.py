@@ -32,6 +32,7 @@ class Skill:
     instructions: str
     argument_hint: str = ""
     views: tuple[str, ...] = ()
+    requires_write: bool = False
 
 
 def _parse(text: str) -> Skill | None:
@@ -49,7 +50,8 @@ def _parse(text: str) -> Skill | None:
         return None
     views = tuple(v.strip() for v in meta.get("views", "").split(",") if v.strip())
     return Skill(meta["name"], meta["description"], body.strip(),
-                 argument_hint=meta.get("argument_hint", ""), views=views)
+                 argument_hint=meta.get("argument_hint", ""), views=views,
+                 requires_write=meta.get("requires_write", "").strip().lower() == "true")
 
 
 def load_skills(skills_dir: Path | None = None) -> dict[str, Skill]:
@@ -58,7 +60,12 @@ def load_skills(skills_dir: Path | None = None) -> dict[str, Skill]:
     if not directory.is_dir():
         return skills
     for path in sorted(directory.glob("*.md")):
-        skill = _parse(path.read_text(encoding="utf-8"))
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            _logger.warning("skipping malformed skill file: %s", path)
+            continue
+        skill = _parse(text)
         if skill is None:
             _logger.warning("skipping malformed skill file: %s", path)
             continue

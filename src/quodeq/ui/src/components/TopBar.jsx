@@ -104,6 +104,10 @@ export default function TopBar({
      next click will flip to dark). */
   effectiveDark = false,
   onToggleTheme,
+  /* 'local' | 'shared' — shared projects get read-only assistant sessions
+     server-side, so this no longer gates the assistant launcher; it still
+     gates the Evaluate button (see App.jsx's shouldShowEvaluateButton). */
+  selectedSource = 'local',
 }) {
   return (
     <header className="topbar pywebview-drag-region">

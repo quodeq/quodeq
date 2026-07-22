@@ -107,6 +107,10 @@ export function AssistantDrawerProvider({ children }) {
   writeEnabledRef.current = writeEnabled;
   const [repoInfo, setRepoInfo] = useState(null);   // {attached, reason, writeAvailable}
   const [workspace, setWorkspace] = useState(null); // status route's `worktree` object
+  // Whether the active session is read-only (source: 'shared'), from the
+  // create-session response. Reset on every context switch via commitSession,
+  // same as repoInfo — never sticky across sessions.
+  const [readOnly, setReadOnly] = useState(false);
 
   // Tracks the most recently *requested* session context key, set
   // synchronously at startSession call time. Because startSession awaits a
@@ -170,7 +174,11 @@ export function AssistantDrawerProvider({ children }) {
   const [maximized, setMaximized] = useState(false);
   const toggleMaximized = useCallback(() => setMaximized((m) => !m), []);
 
-  const open = useCallback(() => setOpenPanels((prev) => (prev.length ? prev : [activeTabRef.current])), []);
+  // Open the drawer with the previously active tab; exposed on the context
+  // for programmatic callers besides the keydown handler below.
+  const open = useCallback(() => {
+    setOpenPanels((prev) => (prev.length ? prev : [activeTabRef.current]));
+  }, []);
   const close = useCallback(() => setOpenPanels([]), []);          // close ALL panels
   const toggle = useCallback(() => setOpenPanels((prev) => (prev.length ? [] : [activeTabRef.current])), []);
   // Close just the ACTIVE tab: if another panel is still open the drawer stays
@@ -179,6 +187,18 @@ export function AssistantDrawerProvider({ children }) {
     setOpenPanels((prev) => {
       const next = prev.filter((t) => t !== activeTabRef.current);
       if (next.length) setActiveTab(next[next.length - 1]);
+      return next;
+    });
+  }, []);
+
+  // Close one SPECIFIC panel, active or not, leaving any other open panel
+  // alone. If it was the active one, fall back to the most recent remaining
+  // panel, same rule as closeActiveTab.
+  const closePanel = useCallback((tab) => {
+    setOpenPanels((prev) => {
+      if (!prev.includes(tab)) return prev;
+      const next = prev.filter((t) => t !== tab);
+      if (next.length && activeTabRef.current === tab) setActiveTab(next[next.length - 1]);
       return next;
     });
   }, []);
@@ -205,7 +225,14 @@ export function AssistantDrawerProvider({ children }) {
     const handleKeyDown = (e) => {
       if (e.code !== 'Backquote' || !(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
-      if (e.shiftKey) { if (terminalEnabled) toggleTopbar('terminal'); return; }
+      // Terminal shortcut (Ctrl+Shift+`) is always available, regardless of
+      // project source.
+      if (e.shiftKey) {
+        if (terminalEnabled) toggleTopbar('terminal');
+        return;
+      }
+      // Shared projects get read-only sessions server-side, so the shortcut
+      // opens the drawer for any source.
       if (assistantEnabled) toggleTopbar('assistant');
       else if (terminalEnabled) toggleTopbar('terminal');
     };
@@ -248,6 +275,7 @@ export function AssistantDrawerProvider({ children }) {
     setWriteEnabled(false);
     setRepoInfo({ attached: !!created.repoAttached, reason: created.repoReason || null,
                   writeAvailable: !!created.writeAvailable });
+    setReadOnly(!!created.readOnly);
     setWorkspace(null);
     setSessionCtxKey(key);
     setSessionId(created.sessionId);
@@ -256,7 +284,11 @@ export function AssistantDrawerProvider({ children }) {
   }, []);
 
   const startSession = useCallback(async (ctx) => {
-    const key = `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}`;
+    const key = `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}:${ctx?.source || 'local'}`;
+    // Re-claim the latest-requested key even when deduping: a superseded
+    // in-flight commit for a DIFFERENT context must not land after the user
+    // returned to this one (rapid source flip-flop race).
+    latestKeyRef.current = key;
     if (key === sessionCtxKey && sessionId) return;
     await commitSession(ctx, key);
   }, [sessionCtxKey, sessionId, commitSession]);
@@ -268,7 +300,12 @@ export function AssistantDrawerProvider({ children }) {
   const resetConversation = useCallback(async () => {
     const ctx = lastCtxRef.current;
     if (!ctx || turnActive) return;
-    const key = `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}`;
+    // Must match startSession's key format exactly: sessionCtxKey is shared
+    // state between the two, and a mismatched format here would make a
+    // subsequent startSession for the SAME context fail its dedupe check
+    // (stale-format key !== freshly-computed key) and mint a spurious extra
+    // session.
+    const key = `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}:${ctx?.source || 'local'}`;
     await commitSession(ctx, key);
   }, [turnActive, commitSession]);
 
@@ -314,18 +351,18 @@ export function AssistantDrawerProvider({ children }) {
   );
 
   const value = useMemo(() => ({
-    isOpen, open, close, toggle, closeActiveTab,
+    isOpen, open, close, toggle, closeActiveTab, closePanel,
     openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled,
     height, setHeight, maximized, toggleMaximized, setMaximized,
     messages, streaming: turnActive, error: localError || stream.error,
     sessionReady: sessionId != null,
     provider: sessionMeta.provider, model: sessionMeta.model,
     webEnabled, toggleWebEnabled,
-    writeEnabled, toggleWriteEnabled, repoInfo, workspace, refreshWorkspace,
+    writeEnabled, toggleWriteEnabled, repoInfo, readOnly, workspace, refreshWorkspace,
     sessionId,
     catalog, addLocalExchange,
     startSession, sendMessage, stopTurn, resetConversation,
-  }), [isOpen, open, close, toggle, closeActiveTab, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled, repoInfo, workspace, refreshWorkspace, catalog, addLocalExchange, startSession, sendMessage, stopTurn, resetConversation]);
+  }), [isOpen, open, close, toggle, closeActiveTab, closePanel, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled, repoInfo, readOnly, workspace, refreshWorkspace, catalog, addLocalExchange, startSession, sendMessage, stopTurn, resetConversation]);
 
   return (
     <AssistantDrawerContext.Provider value={value}>

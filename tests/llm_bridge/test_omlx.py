@@ -58,6 +58,31 @@ class TestGetOmlxStatus:
         assert result["running"] is False
         assert "error" in result
 
+    def test_non_object_body_still_reports_running(self):
+        """A health body that is valid JSON but not an object must not raise;
+        the server responded, so it is running with the default status."""
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b'["ok"]'
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp):
+            result = get_omlx_status("http://localhost:8000")
+
+        assert result["running"] is True
+        assert result["status"] == "ok"
+
+    def test_malformed_body_reports_not_running(self):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b"<html>bad gateway</html>"
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp):
+            result = get_omlx_status("http://localhost:8000")
+
+        assert result["running"] is False
+
 
 class TestListOmlxModels:
     def test_returns_models(self):
@@ -125,6 +150,32 @@ class TestListOmlxModels:
         with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", side_effect=ConnectionRefusedError), \
              patch("quodeq.llm_bridge._omlx._list_model_dirs", return_value=dir_models):
             assert list_omlx_models() == dir_models
+
+    def test_non_object_body_falls_back_to_dirs(self):
+        """Regression: a non-object /v1/models body raised AttributeError
+        instead of falling back to the local model directories."""
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b'["not", "an", "object"]'
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        dir_models = [{"name": "my-model", "size": 0, "quantization": "", "family": ""}]
+
+        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp), \
+             patch("quodeq.llm_bridge._omlx._list_model_dirs", return_value=dir_models):
+            assert list_omlx_models() == dir_models
+
+    def test_non_dict_entries_skipped(self):
+        mock_data = {"data": ["a-bare-string", {"id": "mlx-community/valid-model"}]}
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(mock_data).encode()
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp):
+            models = list_omlx_models()
+
+        assert len(models) == 1
+        assert models[0]["name"] == "mlx-community/valid-model"
 
     def test_sends_auth_header_when_key_available(self):
         mock_data = {"object": "list", "data": [{"id": "gemma-4-26B", "object": "model"}]}

@@ -253,8 +253,12 @@ import time
 from typing import Iterator
 
 from quodeq.api._sse_log_helpers import sse_line
+from quodeq.shared._env import env_float
 
-_HEARTBEAT_S = float(os.environ.get("QUODEQ_SSE_HEARTBEAT_S", "15"))
+# env_float never raises, so a malformed QUODEQ_SSE_HEARTBEAT_S can't abort
+# module import (it logs and falls back to 15s). minimum=0.1 keeps a bogus
+# tiny/negative value from turning every tick into a keepalive frame.
+_HEARTBEAT_S = env_float("QUODEQ_SSE_HEARTBEAT_S", 15.0, minimum=0.1)
 
 
 def _tick_ms() -> int:

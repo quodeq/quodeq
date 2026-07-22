@@ -58,7 +58,6 @@ def check_cloud_connection(
             latency = int((time.monotonic() - start) * 1000)
             return {"success": True, "model": model, "latency_ms": latency}
     except Exception as exc:
-        _log.debug("Cloud connection check failed: %s", exc)
         # Surface the exception type and HTTP status codes without leaking
         # internal details like file paths, stack traces, or server headers.
         error_type = type(exc).__name__
@@ -66,5 +65,8 @@ def check_cloud_connection(
         # Strip potential API key fragments from error messages
         if api_key and len(api_key) > _MIN_KEY_LEN_FOR_REDACTION and api_key in raw:
             raw = raw.replace(api_key, "***")
+        # Log the redacted message, not the raw exception, so the key never
+        # lands in application logs either.
+        _log.debug("Cloud connection check failed: %s: %s", error_type, raw)
         brief = raw[:_MAX_ERROR_BRIEF_LEN] if raw else "unknown error"
         return {"success": False, "error": f"{error_type}: {brief}"}

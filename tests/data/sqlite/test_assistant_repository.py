@@ -146,3 +146,35 @@ def test_prune_sessions_ttl_zero_is_a_noop(tmp_path):
     repo.create_session(session_id="s1", provider="ollama")
     assert repo.prune_sessions_older_than(days=0) == 0
     assert repo.get_session("s1") is not None
+
+
+def test_create_session_persists_source(tmp_path):
+    repo = _repo(tmp_path)
+    row = repo.create_session(session_id="s-shared", provider="ollama", source="shared")
+    assert row["source"] == "shared"
+
+
+def test_create_session_source_defaults_to_local(tmp_path):
+    repo = _repo(tmp_path)
+    row = repo.create_session(session_id="s-local", provider="ollama")
+    assert row["source"] == "local"
+
+
+def test_v3_db_migrates_to_v4_with_local_source(tmp_path):
+    import sqlite3
+    db = tmp_path / "assistant.db"
+    conn = sqlite3.connect(db)
+    conn.executescript(
+        "PRAGMA user_version = 3;"
+        "CREATE TABLE sessions (id TEXT PRIMARY KEY, provider TEXT NOT NULL,"
+        " model TEXT, project_uuid TEXT, run_id TEXT, project_id TEXT,"
+        " cli_session_id TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));"
+        "INSERT INTO sessions (id, provider) VALUES ('old', 'ollama');"
+    )
+    conn.commit(); conn.close()
+    repo = AssistantRepository(db)
+    row = repo.get_session("old")
+    assert row["source"] == "local"
+    conn = sqlite3.connect(db)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
+    conn.close()

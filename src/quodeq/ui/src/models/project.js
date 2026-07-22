@@ -8,10 +8,12 @@
  * @property {string|null}  displayName
  * @property {string|null}  discipline
  * @property {string|null}  path
+ * @property {string|null}  originUrl   - git remote URL the project was registered from, if any
  * @property {string|null}  location    - 'local' | 'online'
  * @property {boolean|null} pathExists
  * @property {string|null}  latestDate
  * @property {string|null}  latestRunId
+ * @property {string|null}  latestDoneRunId - id of the newest run that finished (not cancelled/failed/in-progress), or null
  * @property {string|null}  latestGrade
  * @property {number|null}  latestScore
  * @property {number}       runsCount
@@ -37,10 +39,12 @@ export function createProject(raw) {
     displayName:  raw.displayName ?? null,
     discipline:   raw.discipline ?? null,
     path:         raw.path ?? null,
+    originUrl:    raw.originUrl ?? null,
     location:     raw.location ?? null,
     pathExists:   raw.pathExists ?? null,
     latestDate:   raw.latestDate ?? null,
     latestRunId:  raw.latestRunId ?? null,
+    latestDoneRunId: raw.latestDoneRunId ?? null,
     latestGrade:  raw.latestGrade ?? null,
     latestScore:  raw.latestScore ?? null,
     runsCount:    raw.runsCount ?? 0,

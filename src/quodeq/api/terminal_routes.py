@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import atexit
 import json
+import logging
 import os
 import struct
 import threading
@@ -15,6 +16,8 @@ from flask_sock import Sock
 
 from quodeq.terminal.gate import terminal_env_reason, terminal_gate_reason
 from quodeq.terminal.manager import TerminalManager
+
+_logger = logging.getLogger(__name__)
 
 
 def _env_reason() -> str | None:
@@ -111,7 +114,10 @@ def register_terminal_routes(app: Flask, manager: TerminalManager | None = None)
                     ws.send("0" + sb)
             except Exception:
                 # Spawn failure or early disconnect must not propagate past
-                # flask-sock (would surface as a 500). Don't close here:
+                # flask-sock (would surface as a 500), but leave a trace for
+                # operators — the client only sees a silently closed terminal.
+                _logger.warning("terminal session setup failed", exc_info=True)
+                # Don't close here:
                 # flask-sock sends the close frame after this handler returns,
                 # i.e. after the outer finally has released _conn_lock, so a
                 # client that reconnects the instant it sees the close finds

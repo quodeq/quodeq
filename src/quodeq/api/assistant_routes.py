@@ -11,6 +11,7 @@ from flask import Flask, Response, current_app, jsonify, request
 from quodeq.api import _assistant_helpers
 from quodeq.api._assistant_helpers import (
     _LOCAL_PROVIDERS as _FIXED_ENDPOINT_PROVIDERS,
+    SharedSourceUnavailable,
     build_tool_context,
     event_frames,
     get_repository,
@@ -23,6 +24,9 @@ from quodeq.assistant.cancel import CancelToken
 from quodeq.assistant.orchestrator import TurnRequest, run_turn, write_safe_provider
 from quodeq.assistant.skills import RESERVED_COMMANDS, load_skills
 from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES, ACTIONS, ActionConflict
+from quodeq.services.score_cache import score_cache_path_override
+from quodeq.services.shared_repo import read_state
+from quodeq.services.shared_settings import read_settings
 
 _running_turns: set[str] = set()
 # Cancel token per session with a /messages turn in flight; the /stop route
@@ -30,6 +34,14 @@ _running_turns: set[str] = set()
 # stoppable, so they never appear here.
 _cancel_tokens: dict[str, CancelToken] = {}
 _running_lock = threading.Lock()
+
+# Each open assistant SSE stream pins a server worker thread for its whole
+# lifetime, and the global rate limiter exempts GETs — without a cap an
+# authenticated caller can exhaust every worker with idle streams. 16 is
+# generous for the real UI (one stream per open drawer/tab).
+_MAX_SSE_STREAMS = 16
+_open_sse_streams = 0
+_sse_lock = threading.Lock()
 
 
 def _try_claim_turn(sid: str) -> bool:
@@ -76,6 +88,17 @@ def register_assistant_routes(app: Flask) -> None:
         provider_cfg = _known_provider(str(body.get("provider", "")))
         if provider_cfg is None:
             return jsonify({"error": "unknown or unsupported provider"}), 400
+        source = str(body.get("source") or "local")
+        if source not in ("local", "shared"):
+            return jsonify({"error": "invalid source"}), 400
+        if source == "shared":
+            settings = read_settings()
+            if not settings.url:
+                return jsonify({"error": "no shared repository configured"}), 409
+            state = read_state(settings.url)
+            if state not in ("ok", "empty"):
+                return jsonify(
+                    {"error": f"shared repository unavailable: {state}"}), 409
         session_id = uuid.uuid4().hex
         # Plan 1 mapping: runDir → run_id column, repoRoot → project_uuid column.
         # Client-supplied runDir/repoRoot are NOT honored: they'd flow to the
@@ -84,7 +107,15 @@ def register_assistant_routes(app: Flask) -> None:
         # never sends these — it sends {projectId, runId} and the server
         # resolves run_dir/repo_root itself via the jailed resolver.
         run_dir, repo_root, repo_reason = None, None, "no_project"
-        if body.get("projectId"):
+        if source == "shared":
+            # Shared sessions never attach a repo (the clone has no working
+            # copy); data reads resolve against the clone's evaluations root
+            # in build_tool_context.
+            repo_reason = "online_project"
+            if body.get("projectId") and body.get("runId"):
+                run_dir = _assistant_helpers.resolve_shared_run_location(
+                    str(body["projectId"]), str(body["runId"]))
+        elif body.get("projectId"):
             repo_root, repo_reason = _assistant_helpers.repo_attach_info(
                 str(body["projectId"]))
             # Only bind a single run when the UI selected a SPECIFIC run. On
@@ -101,13 +132,16 @@ def register_assistant_routes(app: Flask) -> None:
             model=body.get("model"), project_uuid=repo_root,
             run_id=run_dir,
             project_id=str(project_id) if project_id else None,
+            source=source,
         )
-        write_available = (bool(repo_root)
+        write_available = (source == "local"
+                           and bool(repo_root)
                            and (Path(repo_root) / ".git").exists()
                            and write_safe_provider(str(body["provider"])))
         return jsonify({"sessionId": session_id,
                         "repoAttached": repo_root is not None,
                         "repoReason": repo_reason,
+                        "readOnly": source == "shared",
                         "writeAvailable": write_available}), 201
 
     @app.get("/api/assistant/skills")
@@ -118,7 +152,8 @@ def register_assistant_routes(app: Flask) -> None:
             "commands": [{"name": n, "description": d} for n, d in RESERVED_COMMANDS],
             "skills": [
                 {"name": s.name, "description": s.description,
-                 "argumentHint": s.argument_hint, "views": list(s.views)}
+                 "argumentHint": s.argument_hint, "views": list(s.views),
+                 "requiresWrite": s.requires_write}
                 for s in load_skills().values()
             ],
             "actions": [
@@ -178,19 +213,29 @@ def register_assistant_routes(app: Flask) -> None:
                 api_key=api_key, provider=session["provider"],
                 model=body.get("model") or session.get("model") or provider_cfg.get("model", ""),
                 web_enabled=bool(body.get("webEnabled", False)),
-                write_enabled=bool(body.get("writeEnabled", False)),
+                write_enabled=(bool(body.get("writeEnabled", False))
+                               and (session.get("source") or "local") == "local"),
             )
             tool_ctx = build_tool_context(app, session)
 
             def _worker():
                 try:
-                    run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
+                    if tool_ctx.score_cache_path is not None:
+                        with score_cache_path_override(tool_ctx.score_cache_path):
+                            run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
+                    else:
+                        run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
                 finally:
                     with _running_lock:
                         _running_turns.discard(sid)
                         _cancel_tokens.pop(sid, None)
 
             threading.Thread(target=_worker, daemon=True).start()
+        except SharedSourceUnavailable as exc:
+            with _running_lock:
+                _running_turns.discard(sid)
+                _cancel_tokens.pop(sid, None)
+            return jsonify({"error": str(exc)}), 409
         except Exception:
             with _running_lock:
                 _running_turns.discard(sid)
@@ -224,6 +269,27 @@ def register_assistant_routes(app: Flask) -> None:
         except ValueError:
             after = 0
 
+        global _open_sse_streams
+        with _sse_lock:
+            if _open_sse_streams >= _MAX_SSE_STREAMS:
+                return jsonify({"error": "too many open event streams"}), 429
+            _open_sse_streams += 1
+
+        released = False
+
+        def _release_stream():
+            # Idempotent: runs from both the generator's finally and the
+            # response's on-close callback (the callback covers the case where
+            # the client drops before the generator is ever started, in which
+            # case a generator finally never executes).
+            nonlocal released
+            global _open_sse_streams
+            with _sse_lock:
+                if released:
+                    return
+                released = True
+                _open_sse_streams -= 1
+
         def _generate():
             # SSE comments (":keepalive") are invisible to EventSource — only
             # DATA frames fire onmessage and reset the browser's inactivity
@@ -232,21 +298,25 @@ def register_assistant_routes(app: Flask) -> None:
             # frame, not just comments. Throttled to ~every 20th idle tick
             # (20 * _POLL_SECONDS == ~5s) so we don't spam a data frame every
             # 0.25s; cheap ":keepalive" comments fill the gaps in between.
-            yield ":keepalive\n\n"
-            idle_ticks = 0
-            for item in event_frames(repo, sid, after):
-                if item is None:
-                    idle_ticks += 1
-                    if idle_ticks % 20 == 0:
-                        yield sse_line(json.dumps({"type": "heartbeat"}))
+            try:
+                yield ":keepalive\n\n"
+                idle_ticks = 0
+                for item in event_frames(repo, sid, after):
+                    if item is None:
+                        idle_ticks += 1
+                        if idle_ticks % 20 == 0:
+                            yield sse_line(json.dumps({"type": "heartbeat"}))
+                        else:
+                            yield ":keepalive\n\n"
                     else:
-                        yield ":keepalive\n\n"
-                else:
-                    idle_ticks = 0
-                    seq, frame = item
-                    yield sse_line(json.dumps(frame, ensure_ascii=False), event_id=seq)
+                        idle_ticks = 0
+                        seq, frame = item
+                        yield sse_line(json.dumps(frame, ensure_ascii=False), event_id=seq)
+            finally:
+                _release_stream()
 
         resp = Response(_generate(), mimetype="text/event-stream")
+        resp.call_on_close(_release_stream)
         resp.headers["Cache-Control"] = "no-cache"
         resp.headers["X-Accel-Buffering"] = "no"
         return resp
@@ -257,6 +327,13 @@ def register_assistant_routes(app: Flask) -> None:
         action = repo.get_action(action_id)
         if action is None:
             return jsonify({"error": "unknown action"}), 404
+        owner = repo.get_session(action["session_id"])
+        if owner is not None and (owner.get("source") or "local") == "shared":
+            # Defense in depth: read-only sessions never draft actions
+            # (draft_action is not registered), so nothing legitimate reaches
+            # here. Refuse rather than mutate the local store under a shared
+            # project id.
+            return jsonify({"error": "read-only session"}), 403
         if action["status"] != "drafted":
             return jsonify({"error": f"action already {action['status']}"}), 409
         spec = ACTIONS.get(action["action_type"])
@@ -287,6 +364,13 @@ def register_assistant_routes(app: Flask) -> None:
         action = repo.get_action(action_id)
         if action is None:
             return jsonify({"error": "unknown action"}), 404
+        owner = repo.get_session(action["session_id"])
+        if owner is not None and (owner.get("source") or "local") == "shared":
+            # Defense in depth: read-only sessions never draft actions
+            # (draft_action is not registered), so nothing legitimate reaches
+            # here. Refuse rather than mutate the local store under a shared
+            # project id.
+            return jsonify({"error": "read-only session"}), 403
         # Same replay guard as apply, made atomic: an applied action must
         # not flip to rejected on a stale card click, SSE replay, or a race
         # with a concurrent apply. The compare-and-set wins at most once.

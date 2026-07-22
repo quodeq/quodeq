@@ -12,6 +12,7 @@ pytest.importorskip("openai", reason="requires the openai SDK")
 
 from quodeq.analysis._api_runner import (
     run_api_analysis, ApiRunnerConfig,
+    _build_router_context,
     _call_api, _parse_findings, _Finding, _FindingType, _Severity, _LOCAL_TIMEOUT,
 )
 
@@ -466,3 +467,55 @@ class TestApiRunnerConfig:
         )
         assert cfg.temperature == 0.0
         assert cfg.max_tokens == 4096
+
+
+class TestBuildRouterContextCorpus:
+    """`_build_router_context` wires precedent_corpus (env-gated, never raises)."""
+
+    def test_corpus_none_when_flag_off(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("QUODEQ_SEMANTIC_PRECEDENTS", raising=False)
+
+        ctx = _build_router_context(
+            tmp_path, "security", None, tmp_path, tmp_path / "run-1",
+        )
+
+        assert ctx is not None
+        assert ctx.precedent_corpus is None
+
+    def test_corpus_degrades_when_flag_on_but_no_embedder(self, tmp_path, monkeypatch):
+        from quodeq.llm_bridge._embeddings import reset_embedding_availability_cache
+
+        reset_embedding_availability_cache()
+        monkeypatch.setenv("QUODEQ_SEMANTIC_PRECEDENTS", "1")
+        monkeypatch.setenv("QUODEQ_EMBEDDING_BASE_URL", "http://127.0.0.1:1")  # nothing listens
+
+        ctx = _build_router_context(
+            tmp_path, "security", None, tmp_path, tmp_path / "run-1",
+        )
+
+        assert ctx is not None
+        assert ctx.precedent_corpus is None
+
+    def test_wires_load_precedent_corpus_with_project_and_run_dir(self, tmp_path, monkeypatch):
+        """Proves `_build_router_context` actually calls load_precedent_corpus
+        with (project_dir, run_dir) and stores its return value -- the
+        None-when-flag-off test above passes trivially against the
+        CompiledContext field default, so this closes that gap."""
+        import quodeq.analysis._api_runner as api_runner_module
+
+        sentinel = object()
+        calls = []
+
+        def fake_load_precedent_corpus(project_dir, run_dir):
+            calls.append((project_dir, run_dir))
+            return sentinel
+
+        monkeypatch.setattr(
+            api_runner_module, "load_precedent_corpus", fake_load_precedent_corpus,
+        )
+
+        run_dir = tmp_path / "run-1"
+        ctx = _build_router_context(tmp_path, "security", None, tmp_path, run_dir)
+
+        assert calls == [(tmp_path, run_dir)]
+        assert ctx.precedent_corpus is sentinel

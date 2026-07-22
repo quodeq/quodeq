@@ -11,6 +11,7 @@ import pytest
 from quodeq.services._fs_projects import (
     find_children,
     _build_parent_child_sets,
+    build_project_list,
     update_project_path,
     delete_project,
     get_project_info,
@@ -89,6 +90,36 @@ class TestBuildParentChildSets:
         parents, subs = _build_parent_child_sets(tmp_path, ["bad"])
         assert parents == set()
         assert subs == set()
+
+
+# ---------------------------------------------------------------------------
+# build_project_list
+# ---------------------------------------------------------------------------
+
+
+class TestBuildProjectList:
+    def test_includes_registered_project_with_no_runs(self, tmp_path: Path):
+        # A project registered by the onboarding wizard (POST /api/projects)
+        # has repository_info.json but no runs yet — it must still appear in
+        # the projects list so the UI can show its empty state immediately.
+        proj = tmp_path / "fresh-uuid"
+        proj.mkdir()
+        (proj / "repository_info.json").write_text(json.dumps({
+            "name": "fresh",
+            "path": str(tmp_path),
+            "location": "local",
+            "onboardingCompletedAt": None,
+        }))
+        entries = build_project_list(tmp_path)
+        entry = next((e for e in entries if e.id == "fresh-uuid"), None)
+        assert entry is not None
+        assert entry.runs_count == 0
+        assert entry.latest_run_id is None
+        assert entry.onboarding_completed_at is None
+
+    def test_excludes_dir_without_repo_info_or_runs(self, tmp_path: Path):
+        (tmp_path / "junk-dir").mkdir()
+        assert build_project_list(tmp_path) == []
 
 
 # ---------------------------------------------------------------------------
@@ -237,3 +268,71 @@ class TestGetProjectInfo:
     def test_traversal_rejected(self, tmp_path: Path):
         result = get_project_info(str(tmp_path), "../escape")
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# ProjectEntry.origin_url
+# ---------------------------------------------------------------------------
+
+
+def test_project_entry_carries_origin_url(tmp_path):
+    from quodeq.core.types import to_camel_dict
+
+    proj = tmp_path / "p1"
+    run = proj / "run-1"
+    run.mkdir(parents=True)
+    (proj / "repository_info.json").write_text(
+        json.dumps({"name": "p1", "originUrl": "https://github.com/example/p1.git"})
+    )
+    (run / "status.json").write_text(json.dumps({"schema_version": 2, "state": "done"}))
+
+    entries = build_project_list(tmp_path)
+    entry = next(e for e in entries if e.id == "p1")
+    assert entry.origin_url == "https://github.com/example/p1.git"
+    assert to_camel_dict(entry)["originUrl"] == "https://github.com/example/p1.git"
+
+
+# ---------------------------------------------------------------------------
+# ProjectEntry.latest_done_run_id
+# ---------------------------------------------------------------------------
+
+
+def _make_run(proj: Path, run_id: str, *, state: str | None) -> None:
+    """Create a manifest-bearing run directory, optionally with a status.json state."""
+    run = proj / run_id
+    (run / "evidence").mkdir(parents=True)
+    (run / "evidence" / "manifest.json").write_text("{}")
+    if state is not None:
+        (run / "status.json").write_text(json.dumps({"schema_version": 2, "state": state}))
+
+
+def test_latest_done_run_id_is_newest_done_run_not_newest_run(tmp_path: Path):
+    # Publish run A (done). Run B is newer but cancelled. latestRunId must
+    # still reflect B (any status), but latestDoneRunId must fall back to A --
+    # otherwise the shared-vs-local comparison could never converge once a
+    # later run fails or is cancelled.
+    proj = tmp_path / "p1"
+    proj.mkdir()
+    (proj / "repository_info.json").write_text(json.dumps({"name": "p1"}))
+    _make_run(proj, "20260301", state="done")
+    _make_run(proj, "20260302", state="cancelled")
+
+    entries = build_project_list(tmp_path)
+    entry = next(e for e in entries if e.id == "p1")
+    assert entry.latest_run_id == "20260302"
+    assert entry.latest_done_run_id == "20260301"
+
+
+def test_latest_done_run_id_absent_when_no_done_runs(tmp_path: Path):
+    from quodeq.core.types import to_camel_dict
+
+    proj = tmp_path / "p2"
+    proj.mkdir()
+    (proj / "repository_info.json").write_text(json.dumps({"name": "p2"}))
+    _make_run(proj, "20260301", state="cancelled")
+
+    entries = build_project_list(tmp_path)
+    entry = next(e for e in entries if e.id == "p2")
+    assert entry.latest_run_id == "20260301"
+    assert entry.latest_done_run_id is None
+    assert "latestDoneRunId" not in to_camel_dict(entry)

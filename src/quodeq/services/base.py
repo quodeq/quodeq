@@ -53,6 +53,14 @@ class ProjectActions(Protocol):
         """Remove a project and all its report data. Return True on success."""
         ...
 
+    def invalidate_projects_cache(self) -> None:
+        """Drop any cached project list so the next listing re-reads from disk.
+
+        Default is a no-op; providers that cache ``list_projects`` results
+        (see ``ProjectsCache``) override this so registration is visible in
+        an immediately-following listing.
+        """
+
 
 class ReportActions(Protocol):
     """Methods for reading evaluation reports and dashboards."""

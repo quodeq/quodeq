@@ -3,14 +3,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { usePrefetchRun, PREFETCH_DWELL_MS } from './usePrefetchRun.js';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { getProjectScores } from '../../../api/index.js';
 import { projectKeys } from '../../../api/queryKeys.js';
 
 vi.mock('../../../api/ApiContext.jsx', () => ({
   useApi: vi.fn(),
-}));
-vi.mock('../../../api/index.js', () => ({
-  getProjectScores: vi.fn(),
 }));
 
 function makeWrapper(queryClient) {
@@ -22,14 +18,19 @@ function makeWrapper(queryClient) {
 describe('usePrefetchRun', () => {
   let queryClient;
   let getDashboard;
+  let sharedGetDashboard;
+  let getProjectScores;
+  let sharedGetProjectScores;
 
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     getDashboard = vi.fn().mockResolvedValue({ dimensions: [] });
-    useApi.mockReturnValue({ getDashboard });
-    getProjectScores.mockResolvedValue({ trend: [] });
+    sharedGetDashboard = vi.fn().mockResolvedValue({ dimensions: [], marker: 'shared' });
+    getProjectScores = vi.fn().mockResolvedValue({ trend: [] });
+    sharedGetProjectScores = vi.fn().mockResolvedValue({ trend: [], marker: 'shared' });
+    useApi.mockReturnValue({ getDashboard, sharedGetDashboard, getProjectScores, sharedGetProjectScores });
   });
 
   afterEach(() => {
@@ -121,5 +122,40 @@ describe('usePrefetchRun', () => {
     await vi.advanceTimersByTimeAsync(PREFETCH_DWELL_MS * 4);
     expect(getDashboard).not.toHaveBeenCalled();
     expect(getProjectScores).not.toHaveBeenCalled();
+  });
+
+  // Task 17: source-aware fetch selection.
+  describe('source-aware fetch selection', () => {
+    it("warms the LOCAL cache slot and calls the local fetchers when source is 'local' (default)", async () => {
+      const { result } = renderHook(() => usePrefetchRun('p1', 'local'), { wrapper: makeWrapper(queryClient) });
+      result.current.prefetchRun('r1');
+
+      await vi.advanceTimersByTimeAsync(PREFETCH_DWELL_MS);
+      vi.useRealTimers();
+
+      await waitFor(() => {
+        expect(queryClient.getQueryData(projectKeys.dashboard('p1', 'r1', 'local'))).toBeTruthy();
+      });
+      expect(getDashboard).toHaveBeenCalledWith('p1', 'r1');
+      expect(getProjectScores).toHaveBeenCalledWith('p1', 'r1');
+      expect(sharedGetDashboard).not.toHaveBeenCalled();
+      expect(sharedGetProjectScores).not.toHaveBeenCalled();
+    });
+
+    it("warms the SHARED cache slot and calls the shared fetchers when source is 'shared'", async () => {
+      const { result } = renderHook(() => usePrefetchRun('p1', 'shared'), { wrapper: makeWrapper(queryClient) });
+      result.current.prefetchRun('r1');
+
+      await vi.advanceTimersByTimeAsync(PREFETCH_DWELL_MS);
+      vi.useRealTimers();
+
+      await waitFor(() => {
+        expect(queryClient.getQueryData(projectKeys.dashboard('p1', 'r1', 'shared'))).toBeTruthy();
+      });
+      expect(sharedGetDashboard).toHaveBeenCalledWith('p1', 'r1');
+      expect(sharedGetProjectScores).toHaveBeenCalledWith('p1', 'r1');
+      expect(getDashboard).not.toHaveBeenCalled();
+      expect(getProjectScores).not.toHaveBeenCalled();
+    });
   });
 });

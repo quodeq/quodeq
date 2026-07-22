@@ -1,8 +1,9 @@
-import React, { useCallback, useRef, lazy, Suspense } from 'react';
+import React, { useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';
 import { AssistantPane } from '../assistant/AssistantDrawer.jsx';
 import { ChevronDownIcon, GlobeIcon, MaximizeIcon, MinimizeIcon, PencilIcon, RotateCcwIcon } from '../../components/CopyButton.jsx';
 import { useSidePane, workspaceDiffSpec } from '../side-pane/index.js';
+import Badge from '../../components/Badge.jsx';
 
 const TerminalPane = lazy(() => import('../terminal/TerminalPane.jsx'));
 
@@ -27,7 +28,7 @@ export function BottomDrawer({ uiState }) {
           maximized, toggleMaximized, setMaximized, provider, model,
           streaming, webEnabled, toggleWebEnabled,
           writeEnabled, toggleWriteEnabled, repoInfo, workspace, refreshWorkspace,
-          sessionId, sessionReady, resetConversation } = useAssistantDrawer();
+          sessionId, sessionReady, resetConversation, readOnly } = useAssistantDrawer();
   const { addWindow } = useSidePane();
   const dragRef = useRef(null);
 
@@ -53,6 +54,12 @@ export function BottomDrawer({ uiState }) {
     window.addEventListener('pointermove', handleDragMove);
     window.addEventListener('pointerup', handleDragEnd);
   }, [height, maximized, setMaximized, handleDragMove, handleDragEnd]);
+  // Unmounting mid-drag would leave the window listeners registered and the
+  // stale handlers calling setHeight until the next pointerup; drop them.
+  useEffect(() => () => {
+    window.removeEventListener('pointermove', handleDragMove);
+    window.removeEventListener('pointerup', handleDragEnd);
+  }, [handleDragMove, handleDragEnd]);
 
   if (!isOpen) return null;
   // Guard against a transient render where activeTab isn't (yet) an open panel.
@@ -79,19 +86,27 @@ export function BottomDrawer({ uiState }) {
           ))}
         </div>
         {active === 'assistant' && modelLabel && (
-          <span className="drawer-model-chip" title={modelLabel}>
+          <Badge variant="tag" tone="accent" className="drawer-model-chip" title={modelLabel}>
             {modelLabel}
-          </span>
+          </Badge>
         )}
-        {active === 'assistant' && repoInfo && (
-          <span className={`drawer-repo-chip${repoInfo.attached ? '' : ' drawer-repo-chip--off'}`}
-            title={repoInfo.attached ? 'Repository attached'
-              : `Repository not attached: ${repoInfo.reason || 'unknown'}`}>
-            {repoInfo.attached ? 'repo' : 'no repo'}
-          </span>
+        {active === 'assistant' && readOnly && (
+          <Badge variant="tag" tone="info" title="Remote project session: read tools only">
+            read-only
+          </Badge>
+        )}
+        {/* Repo attachment is the NORMAL case — only the exception is worth a
+            chip. When the session has no repo the assistant's code-reading
+            tools are dead, so surface that as a warning with the server's
+            reason; stay silent when everything is fine. */}
+        {active === 'assistant' && repoInfo && !repoInfo.attached && (
+          <Badge variant="tag" tone="warning"
+            title={`Repository not attached: ${repoInfo.reason || 'unknown'}`}>
+            no repo access
+          </Badge>
         )}
         {active === 'assistant' && workspace?.filesChanged > 0 && (
-          <button type="button" className="drawer-changes-chip"
+          <button type="button" className="badge badge--tag badge--danger drawer-changes-chip"
             onClick={() => addWindow(workspaceDiffSpec({ sessionId, key: workspace.createdAt, onChanged: refreshWorkspace }))}
             title="Review pending changes">
             {workspace.filesChanged} file{workspace.filesChanged === 1 ? '' : 's'} changed

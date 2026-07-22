@@ -12,9 +12,19 @@ from quodeq.assistant import AssistantRepository
 from quodeq.assistant.tools import ToolContext
 from quodeq.assistant import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
 from quodeq.services._fs_projects import get_project_info
+from quodeq.services.shared_repo import (
+    read_state,
+    shared_evaluations_root,
+    shared_score_cache_path,
+)
+from quodeq.services.shared_settings import read_settings
 from quodeq.shared._env import get_evaluations_dir
 
 _logger = logging.getLogger(__name__)
+
+
+class SharedSourceUnavailable(RuntimeError):
+    """A shared-source session's clone is gone (repo disconnected)."""
 
 # ~/.quodeq/assistant.db is never pruned otherwise; a session older than this
 # is effectively dead (its worktree, if any, was reaped long before). 0
@@ -98,6 +108,28 @@ def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str 
     return str(run_dir), resolve_repo_root(project_id)
 
 
+def resolve_shared_run_location(project_id: str, run_id: str) -> str | None:
+    """Shared-clone sibling of resolve_run_location: the run dir under the
+    shared repo's evaluations root, jailed the same way (a crafted
+    project_id/run_id must not escape the clone). Returns None when no shared
+    repo is configured or the directory does not exist. Shared sessions never
+    attach a repo root: the clone stores results, not a working copy, so
+    unlike the local resolver this returns only the run dir.
+    """
+    settings = read_settings()
+    if not settings.url:
+        return None
+    root = shared_evaluations_root(settings.url).resolve()
+    run_dir = (root / project_id / run_id).resolve()
+    try:
+        run_dir.relative_to(root)
+    except ValueError:
+        return None
+    if not run_dir.is_dir():
+        return None
+    return str(run_dir)
+
+
 def repo_attach_info(project_id: str | None) -> tuple[str | None, str]:
     """(repo_root, reason) for the UI's attachment chip and write gate.
 
@@ -148,8 +180,27 @@ def build_tool_context(app: Flask, session: dict) -> ToolContext:
     ``runDir`` and ``project_uuid`` holds the UI's ``repoRoot`` — the
     create-session route maps those request fields onto these columns.
     Plan 3 revisits this naming with a schema v2 if needed.
+    Shared-source sessions resolve reports_dir against the shared clone and
+    carry read_only + the per-clone score-cache path.
     """
     run_dir = session.get("run_id")
+    source = session.get("source") or "local"
+    reports_dir = Path(get_evaluations_dir())
+    score_cache_path: Path | None = None
+    if source == "shared":
+        settings = read_settings()
+        if not settings.url:
+            # The session outlived the shared-repo connection; the messages
+            # route maps this to a 409 rather than a 500.
+            raise SharedSourceUnavailable("shared repository not configured")
+        # A format-version bump or a foreign clone pulled in by a background
+        # refresh must stop an already-open session's reads too, same as
+        # every /api/shared/* route enforces at request time.
+        state = read_state(settings.url)
+        if state not in ("ok", "empty"):
+            raise SharedSourceUnavailable(f"shared repository unavailable: {state}")
+        reports_dir = shared_evaluations_root(settings.url)
+        score_cache_path = shared_score_cache_path(settings.url)
     return ToolContext(
         repository=get_repository(app),
         session_id=session["id"],
@@ -159,7 +210,9 @@ def build_tool_context(app: Flask, session: dict) -> ToolContext:
         compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
         dimensions_file=Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
         project_id=session.get("project_id"),
-        reports_dir=Path(get_evaluations_dir()),
+        reports_dir=reports_dir,
+        read_only=(source == "shared"),
+        score_cache_path=score_cache_path,
     )
 
 

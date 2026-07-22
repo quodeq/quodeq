@@ -32,4 +32,14 @@ describe('RunHistoryPanel', () => {
     expect(screen.getByLabelText('Group score history by')).toBeInTheDocument();
     expect(screen.queryByText(/MIN /)).not.toBeInTheDocument();
   });
+
+  it('hides the stats line instead of rendering Infinity when no bucket has a numeric score', () => {
+    const nanTrend = [
+      { runId: 'r1', dateISO: '2026-03-25T14:00:00', dateLabel: '25 Mar 2026', numericAverage: 'n/a', overallGrade: 'Good' },
+      { runId: 'r2', dateISO: '2026-03-24T10:00:00', dateLabel: '24 Mar 2026', numericAverage: 'n/a', overallGrade: 'Good' },
+    ];
+    render(<RunHistoryPanel trend={nanTrend} selectedRunId="r1" granularity="day" onGranularityChange={() => {}} />);
+    expect(screen.queryByText(/MIN /)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Infinity/)).not.toBeInTheDocument();
+  });
 });

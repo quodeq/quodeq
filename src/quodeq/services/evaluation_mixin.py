@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Protocol
 
@@ -30,6 +33,21 @@ _logger = logging.getLogger(__name__)
 
 _LOCATION_ONLINE = "online"
 _LOCATION_LOCAL = "local"
+
+# Mirrors _CREDENTIALS_RE in quodeq.api._evaluation_helpers. Not imported from
+# there: services must not depend on the api layer (no other services module
+# does), so the pattern is duplicated here rather than layered across.
+_CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")
+
+
+def _strip_credentials(url: str) -> str:
+    """Remove embedded userinfo (``user:pass@`` / ``token@``) from *url*.
+
+    Only applies to scheme'd URLs (``https://user@host/...``). scp-style
+    remotes (``git@github.com:org/repo.git``) are left untouched, since the
+    leading ``git@`` there is a username convention, not a credential.
+    """
+    return _CREDENTIALS_RE.sub(r"\1", url)
 
 
 class EvaluationDispatcher(Protocol):
@@ -118,6 +136,21 @@ def _scan_parent_project(project_dir: Path, reports_path: Path, repo_path: Path)
         pass
 
 
+def _read_origin_remote(repo_dir: Path) -> str | None:
+    """Best-effort ``git remote get-url origin`` for a local working copy."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_dir), "remote", "get-url", "origin"],
+            capture_output=True, text=True, encoding="utf-8", timeout=10,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return None
+    origin = result.stdout.strip()
+    if result.returncode != 0 or not origin:
+        return None
+    return _strip_credentials(origin)
+
+
 def _register_project(
     repo: str,
     discipline: str | None,
@@ -186,6 +219,13 @@ def _register_project(
     info["path"] = str(target_path.resolve())
     info["location"] = _LOCATION_LOCAL
     info["ephemeral"] = bool(ephemeral)
+    origin_url = repo if is_url else _read_origin_remote(target_path)
+    if origin_url:
+        # Defense in depth: _read_origin_remote already strips credentials
+        # from the local-remote branch, but strip again here so the
+        # URL-registration branch (raw *repo*) is covered too, and so this
+        # call site stays safe even if the helper's behavior changes.
+        info["originUrl"] = _strip_credentials(origin_url)
     info_path.write_text(json.dumps(info, indent=2), encoding="utf-8")
 
     # Scan now that files are guaranteed on disk.
@@ -214,6 +254,28 @@ def _ensure_onboarding_field(project_dir: Path) -> None:
         return
     data["onboardingCompletedAt"] = None
     info_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def _mark_onboarding_complete(project_dir: Path) -> None:
+    """Stamp `onboardingCompletedAt` in repository_info.json if not already set.
+
+    An existing timestamp is left untouched so re-evaluations don't move the
+    original completion time.
+    """
+    info_path = project_dir / "repository_info.json"
+    if not info_path.exists():
+        return
+    try:
+        data = json.loads(info_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return
+    if data.get("onboardingCompletedAt"):
+        return
+    data["onboardingCompletedAt"] = datetime.now(timezone.utc).isoformat()
+    try:
+        info_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    except OSError:
+        pass
 
 
 class FsEvaluationMixin:
@@ -296,7 +358,12 @@ class FsEvaluationMixin:
             )
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
-        _register_project(repo, options.discipline, reports_dir, scope_path=options.scope_path)
+        project_uuid = _register_project(repo, options.discipline, reports_dir, scope_path=options.scope_path)
+        # Launching an evaluation is the terminal step of project setup, so
+        # the 'Resume setup' badge must clear here. Without this stamp the
+        # null written at registration persists forever (the lazy backfill
+        # only fills in a *missing* field, never a null one).
+        _mark_onboarding_complete(Path(reports_dir) / project_uuid)
         # Keep JobManager aware of the current reports root so _tee_run_log
         # can resolve run.log paths for dashboard-spawned evaluations.
         # Guard with hasattr so custom/stub job managers remain compatible.

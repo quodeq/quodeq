@@ -42,3 +42,26 @@ describe('TopBar mobile project label', () => {
     expect(screen.getByText('violations')).toBeInTheDocument();
   });
 });
+
+// Shared projects get read-only assistant sessions server-side (the backend
+// roots reads in the shared clone and registers no mutating tools), so the
+// launcher is never disabled here. The Evaluate button's own gating lives in
+// App.jsx (shouldShowEvaluateButton), not here — TopBar just renders
+// whatever onEvaluate it's handed.
+describe('TopBar source gating', () => {
+  it('renders the assistant launcher when selectedSource is local (default)', () => {
+    renderTopBar({ selectedSource: 'local' });
+    expect(screen.getByRole('button', { name: /Assistant/i })).toBeInTheDocument();
+  });
+
+  it('renders the assistant launcher enabled when selectedSource is shared (read-only session)', () => {
+    renderTopBar({ selectedSource: 'shared' });
+    const btn = screen.getByRole('button', { name: /^Assistant \(Ctrl\+`\)$/ });
+    expect(btn).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('defaults to local (assistant shown) when selectedSource is not passed', () => {
+    renderTopBar({});
+    expect(screen.getByRole('button', { name: /Assistant/i })).toBeInTheDocument();
+  });
+});

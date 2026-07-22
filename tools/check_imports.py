@@ -20,10 +20,13 @@ LAYER_RULES = {
     # Empty rule + the implicit self/cross-cutting allowances keep it a leaf.
     "update": set(),
     "api": {"core", "services", "update", "assistant", "terminal"},
-    "analysis": {"core", "engine", "data", "services"},
+    "analysis": {"core", "engine", "data", "services", "context"},
     "dashboard": {"services", "api", "update"},
     "assistant": {"core", "data", "services", "llm_bridge"},
     "terminal": {"core"},
+    # context/ compiles cross-run knowledge (precedents, project shape) for the
+    # analysis pipeline; llm_bridge access is for the embeddings client only.
+    "context": {"core", "data", "llm_bridge"},
 }
 CROSS_CUTTING = {"shared", "config"}
 IMPORT_RE = re.compile(

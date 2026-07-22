@@ -22,6 +22,27 @@ _logger = logging.getLogger(__name__)
 _BLOCKED_SCAN_PATHS = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
 
 
+def _scan_target_error(target_path: Path, reports_root: str) -> tuple[dict, int] | None:
+    """Validate a resolved directory path against the scan allowlist.
+
+    Shared by /api/scan and create_project's local-repo branch so both enforce
+    the same rules: the path must live under the user's home or the
+    evaluations directory, and must not be a blocked system path. Returns an
+    ``error_response`` tuple on rejection, or None when the path is allowed.
+    """
+    _home = Path.home().resolve()
+    _eval_dir = Path(reports_root).resolve()
+    _allowed_roots = (_home, _eval_dir)
+    if not any(target_path == root or target_path.is_relative_to(root) for root in _allowed_roots):
+        return error_response(
+            "Scan path must be under home directory", HTTPStatus.FORBIDDEN, "FORBIDDEN",
+        )
+    # Block scanning system directories to prevent information disclosure
+    if any(str(target_path).startswith(b) for b in _BLOCKED_SCAN_PATHS):
+        return error_response("Cannot scan system directories", HTTPStatus.FORBIDDEN, "FORBIDDEN")
+    return None
+
+
 def _find_existing_project(reports_root: str, repo: str, scope_path: str | None) -> str | None:
     """Return an existing project UUID matching the given repo identity, or None.
 
@@ -284,6 +305,13 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
                     "INVALID_REPO",
                 )
                 return jsonify(body), status
+            # Same allowlist as /api/scan: registering a project scans it and
+            # persists the file tree, so an unvalidated path here would leak
+            # arbitrary readable directories through project endpoints.
+            err = _scan_target_error(local_candidate.resolve(), reports_root)
+            if err is not None:
+                body, status = err
+                return jsonify(body), status
 
         # Pre-flight: detect duplicates by walking existing project
         # directories. Returns None if no match.
@@ -330,13 +358,24 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             body, _ = error_response(str(exc), status, code)
             return jsonify(body), status
         except Exception as exc:  # pragma: no cover — unexpected scan/clone failure
+            # error_response swallows the traceback that Flask's own 500
+            # handler would have logged; record it before converting.
+            _logger.exception("Registration failed for repo=%r", repo)
             _rollback_new_dirs(reports_root, before)
+            # Return a generic message; the exception detail (which can carry
+            # filesystem paths or backend internals) is logged above, not sent
+            # to the remote caller.
             body, status = error_response(
-                f"Registration failed: {exc}",
+                "Registration failed due to an internal error.",
                 HTTPStatus.INTERNAL_SERVER_ERROR,
                 "REGISTRATION_FAILED",
             )
             return jsonify(body), status
+
+        # The 5s ProjectsCache would otherwise hide the new project from an
+        # immediately-following GET /api/projects (the wizard refetches the
+        # list as soon as it closes).
+        provider.invalidate_projects_cache()
 
         # scan.json is now always present after _register_project succeeds.
         scan_path = Path(reports_root) / project_uuid / "scan.json"
@@ -365,17 +404,9 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
         target_path = Path(target).resolve()
         # Allowlist: only permit paths under user home or the evaluations directory
-        _home = Path.home().resolve()
-        _eval_dir = Path(reports_dir()).resolve()
-        _allowed_roots = (_home, _eval_dir)
-        if not any(target_path == root or target_path.is_relative_to(root) for root in _allowed_roots):
-            body, status = error_response(
-                "Scan path must be under home directory", HTTPStatus.FORBIDDEN, "FORBIDDEN",
-            )
-            return jsonify(body), status
-        # Block scanning system directories to prevent information disclosure
-        if any(str(target_path).startswith(b) for b in _BLOCKED_SCAN_PATHS):
-            body, status = error_response("Cannot scan system directories", HTTPStatus.FORBIDDEN, "FORBIDDEN")
+        err = _scan_target_error(target_path, reports_dir())
+        if err is not None:
+            body, status = err
             return jsonify(body), status
         if not target_path.is_dir():
             body, status = error_response("Path is not a directory", HTTPStatus.BAD_REQUEST, "NOT_DIR")

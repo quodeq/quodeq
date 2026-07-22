@@ -1,12 +1,13 @@
 """CLI handler for the `quodeq ci` subcommand."""
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 from pathlib import Path
 
 
-def handle_ci(args) -> int:
+def handle_ci(args: argparse.Namespace) -> int:
     """Handle the `quodeq ci` subcommand. Returns exit code."""
     if args.ci_action == "report":
         return _handle_report(args)
@@ -14,7 +15,7 @@ def handle_ci(args) -> int:
     return 1
 
 
-def _handle_report(args) -> int:
+def _handle_report(args: argparse.Namespace) -> int:
     """Post evaluation results as a GitHub PR review."""
     from quodeq.ci._evidence_reader import load_violations_from_evidence
     from quodeq.ci.reporter import (
@@ -25,6 +26,12 @@ def _handle_report(args) -> int:
     )
     from quodeq.ci.review_builder import classify_violations
 
+    if args.token:
+        print(
+            "Warning: --token exposes the credential in shell history and "
+            "process listings; prefer the GITHUB_TOKEN environment variable.",
+            file=sys.stderr,
+        )
     token = args.token or os.environ.get("GITHUB_TOKEN")
     if not token:
         print("Error: --token or GITHUB_TOKEN environment variable required", file=sys.stderr)

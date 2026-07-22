@@ -11,6 +11,7 @@ import json
 import logging
 import sqlite3
 from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Callable, Iterator
 
@@ -37,6 +38,31 @@ _BUSY_TIMEOUT_MS = 5000
 # forever; the gate now persists only terminal runs, and this bump purges the
 # non-version-keyed run_keys table once so stranded partial snapshots rebuild.
 _CACHE_WRITER_EPOCH = "4"
+
+# Shared-root isolation seam (Phase 2): when serving read endpoints from a
+# second (shared) clone, the score cache must not mix rows with the local
+# clone's cache. Unset (None) in every normal code path, so the default
+# behavior below is byte-identical to before this seam existed.
+_CACHE_PATH_OVERRIDE: ContextVar[str | None] = ContextVar(
+    "score_cache_path_override", default=None
+)
+
+
+@contextmanager
+def score_cache_path_override(path: str | Path) -> Iterator[None]:
+    """Route score-cache reads/writes to *path* instead of the default DB.
+
+    Active only for the duration of the ``with`` block (and any code it
+    calls, via contextvars' task-local propagation); always restored,
+    including when the block raises.
+    """
+    token = _CACHE_PATH_OVERRIDE.set(str(path))
+    try:
+        yield
+    finally:
+        _CACHE_PATH_OVERRIDE.reset(token)
+
+
 _SCHEMA = (
     "CREATE TABLE IF NOT EXISTS run_scalars ("
     " project TEXT NOT NULL, run_id TEXT NOT NULL, version TEXT NOT NULL,"
@@ -101,7 +127,8 @@ def _init(path: Path) -> sqlite3.Connection:
 @contextmanager
 def open_score_cache() -> Iterator[sqlite3.Connection]:
     """Open the score cache DB (WAL). Rebuilds from scratch if corrupt/older-schema."""
-    path = Path(get_score_cache_path())
+    override = _CACHE_PATH_OVERRIDE.get()
+    path = Path(override) if override else Path(get_score_cache_path())
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         conn = _init(path)

@@ -61,7 +61,10 @@ def serve(registry: ToolRegistry, *, stdin: TextIO, stdout: TextIO, stderr: Text
             stderr.write(f"assistant mcp dispatch error: {exc}\n")
             stderr.flush()
             if req_id is not None:  # notifications have no id and expect no response
-                _jsonrpc.send(_jsonrpc.err(req_id, -32603, f"internal error: {exc}"), stdout)
+                # The exception detail is written to stderr above; the client
+                # frame carries only a generic message so internal failure
+                # detail is not exposed to MCP callers.
+                _jsonrpc.send(_jsonrpc.err(req_id, -32603, "internal error"), stdout)
 
 
 def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:
@@ -83,9 +86,11 @@ def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:
         project_id=ns.project_id or None,
         reports_dir=reports_dir,
         worktree_dir=Path(ns.worktree_dir) if getattr(ns, "worktree_dir", "") else None,
+        read_only=bool(getattr(ns, "read_only", False)),
     )
     registry = build_registry(ctx)
-    if getattr(ns, "enable_write", False) and ctx.worktree_dir is not None:
+    if (getattr(ns, "enable_write", False) and ctx.worktree_dir is not None
+            and not ctx.read_only):
         register_write_tools(registry, ctx)
     return registry
 
@@ -103,8 +108,16 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--reports-dir", default="")
     parser.add_argument("--enable-write", action="store_true")
     parser.add_argument("--worktree-dir", default="")
+    parser.add_argument("--read-only", action="store_true")
+    parser.add_argument("--score-cache-override", default="")
     ns = parser.parse_args(argv)
-    serve(_build_registry_from_args(ns), stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+    registry = _build_registry_from_args(ns)
+    if ns.score_cache_override:
+        from quodeq.services.score_cache import score_cache_path_override  # noqa: PLC0415
+        with score_cache_path_override(Path(ns.score_cache_override)):
+            serve(registry, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+    else:
+        serve(registry, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
 
 
 if __name__ == "__main__":
