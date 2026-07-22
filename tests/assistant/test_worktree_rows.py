@@ -1,6 +1,7 @@
 import sqlite3
 import time
 
+from quodeq.data.sqlite._assistant_schema import ASSISTANT_SCHEMA_VERSION
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 
@@ -41,7 +42,7 @@ def test_get_worktree_missing(tmp_path):
     assert _store(tmp_path).get_worktree("nope") is None
 
 
-def test_migration_v2_to_v3(tmp_path):
+def test_migration_from_v2_reaches_current_schema(tmp_path):
     # simulate an on-disk v2 db (sessions only is enough for the migration path)
     db = tmp_path / "assistant.db"
     conn = sqlite3.connect(db)
@@ -51,10 +52,15 @@ def test_migration_v2_to_v3(tmp_path):
         " model TEXT, project_uuid TEXT, run_id TEXT, project_id TEXT,"
         " cli_session_id TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));"
     )
+    conn.execute("INSERT INTO sessions (id, provider) VALUES ('old', 'ollama')")
     conn.commit()
     conn.close()
     store = AssistantRepository(db)
     assert store.get_worktree("x") is None  # forces connect + migration
     conn = sqlite3.connect(db)
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+    # migration chain should reach current schema version
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == ASSISTANT_SCHEMA_VERSION
+    # v2 db should have source column backfilled with 'local'
+    row = conn.execute("SELECT source FROM sessions WHERE id = 'old'").fetchone()
+    assert row[0] == 'local'
     conn.close()
