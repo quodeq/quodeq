@@ -754,3 +754,46 @@ def test_events_stream_404_does_not_consume_slot(client):
     resp = client.get("/api/assistant/sessions/nope/events?after=0")
     assert resp.status_code == 404
     assert assistant_routes._open_sse_streams == before
+
+
+# ---- source-aware create route ---------------------------------------------
+
+def test_create_session_rejects_unknown_source(client):
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "source": "cloud"})
+    assert resp.status_code == 400
+
+
+def test_create_session_shared_409_when_unconfigured(client, monkeypatch):
+    from quodeq.services.shared_settings import SharedSettings
+    monkeypatch.setattr("quodeq.api.assistant_routes.read_settings",
+                        lambda: SharedSettings(url=None))
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "source": "shared"})
+    assert resp.status_code == 409
+
+
+def test_create_session_shared_persists_source_and_read_only(client, app, monkeypatch):
+    from quodeq.services.shared_settings import SharedSettings
+    monkeypatch.setattr("quodeq.api.assistant_routes.read_settings",
+                        lambda: SharedSettings(url="file:///tmp/fake.git"))
+    monkeypatch.setattr("quodeq.api.assistant_routes.read_state", lambda url: "ok")
+    resp = client.post("/api/assistant/sessions",
+                       json={"provider": "ollama", "source": "shared",
+                             "projectId": "proj-a"})
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["readOnly"] is True
+    assert body["writeAvailable"] is False
+    assert body["repoAttached"] is False
+    assert body["repoReason"] == "online_project"
+    row = _repo(app).get_session(body["sessionId"])
+    assert row["source"] == "shared"
+
+
+def test_create_session_local_reports_read_only_false(client, app):
+    resp = client.post("/api/assistant/sessions", json={"provider": "ollama"})
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["readOnly"] is False
+    assert _repo(app).get_session(body["sessionId"])["source"] == "local"

@@ -23,6 +23,8 @@ from quodeq.assistant.cancel import CancelToken
 from quodeq.assistant.orchestrator import TurnRequest, run_turn, write_safe_provider
 from quodeq.assistant.skills import RESERVED_COMMANDS, load_skills
 from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES, ACTIONS, ActionConflict
+from quodeq.services.shared_repo import read_state
+from quodeq.services.shared_settings import read_settings
 
 _running_turns: set[str] = set()
 # Cancel token per session with a /messages turn in flight; the /stop route
@@ -84,6 +86,17 @@ def register_assistant_routes(app: Flask) -> None:
         provider_cfg = _known_provider(str(body.get("provider", "")))
         if provider_cfg is None:
             return jsonify({"error": "unknown or unsupported provider"}), 400
+        source = str(body.get("source") or "local")
+        if source not in ("local", "shared"):
+            return jsonify({"error": "invalid source"}), 400
+        if source == "shared":
+            settings = read_settings()
+            if not settings.url:
+                return jsonify({"error": "no shared repository configured"}), 409
+            state = read_state(settings.url)
+            if state not in ("ok", "empty"):
+                return jsonify(
+                    {"error": f"shared repository unavailable: {state}"}), 409
         session_id = uuid.uuid4().hex
         # Plan 1 mapping: runDir → run_id column, repoRoot → project_uuid column.
         # Client-supplied runDir/repoRoot are NOT honored: they'd flow to the
@@ -92,7 +105,15 @@ def register_assistant_routes(app: Flask) -> None:
         # never sends these — it sends {projectId, runId} and the server
         # resolves run_dir/repo_root itself via the jailed resolver.
         run_dir, repo_root, repo_reason = None, None, "no_project"
-        if body.get("projectId"):
+        if source == "shared":
+            # Shared sessions never attach a repo (the clone has no working
+            # copy); data reads resolve against the clone's evaluations root
+            # in build_tool_context.
+            repo_reason = "online_project"
+            if body.get("projectId") and body.get("runId"):
+                run_dir = _assistant_helpers.resolve_shared_run_location(
+                    str(body["projectId"]), str(body["runId"]))
+        elif body.get("projectId"):
             repo_root, repo_reason = _assistant_helpers.repo_attach_info(
                 str(body["projectId"]))
             # Only bind a single run when the UI selected a SPECIFIC run. On
@@ -109,13 +130,16 @@ def register_assistant_routes(app: Flask) -> None:
             model=body.get("model"), project_uuid=repo_root,
             run_id=run_dir,
             project_id=str(project_id) if project_id else None,
+            source=source,
         )
-        write_available = (bool(repo_root)
+        write_available = (source == "local"
+                           and bool(repo_root)
                            and (Path(repo_root) / ".git").exists()
                            and write_safe_provider(str(body["provider"])))
         return jsonify({"sessionId": session_id,
                         "repoAttached": repo_root is not None,
                         "repoReason": repo_reason,
+                        "readOnly": source == "shared",
                         "writeAvailable": write_available}), 201
 
     @app.get("/api/assistant/skills")

@@ -12,6 +12,8 @@ from quodeq.assistant import AssistantRepository
 from quodeq.assistant.tools import ToolContext
 from quodeq.assistant import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
 from quodeq.services._fs_projects import get_project_info
+from quodeq.services.shared_repo import shared_evaluations_root, shared_score_cache_path
+from quodeq.services.shared_settings import read_settings
 from quodeq.shared._env import get_evaluations_dir
 
 _logger = logging.getLogger(__name__)
@@ -96,6 +98,28 @@ def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str 
     if not run_dir.is_dir():
         return None, None
     return str(run_dir), resolve_repo_root(project_id)
+
+
+def resolve_shared_run_location(project_id: str, run_id: str) -> str | None:
+    """Shared-clone sibling of resolve_run_location: the run dir under the
+    shared repo's evaluations root, jailed the same way (a crafted
+    project_id/run_id must not escape the clone). Returns None when no shared
+    repo is configured or the directory does not exist. Shared sessions never
+    attach a repo root: the clone stores results, not a working copy, so
+    unlike the local resolver this returns only the run dir.
+    """
+    settings = read_settings()
+    if not settings.url:
+        return None
+    root = shared_evaluations_root(settings.url).resolve()
+    run_dir = (root / project_id / run_id).resolve()
+    try:
+        run_dir.relative_to(root)
+    except ValueError:
+        return None
+    if not run_dir.is_dir():
+        return None
+    return str(run_dir)
 
 
 def repo_attach_info(project_id: str | None) -> tuple[str | None, str]:
