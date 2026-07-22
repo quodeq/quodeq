@@ -13,6 +13,15 @@ import termios
 from quodeq.shared._process_kill import kill_proc_tree
 
 _ALLOWED_SHELL_BASENAMES = frozenset({"zsh", "bash", "fish", "sh", "dash", "tcsh", "ksh"})
+# $SHELL must live in a system-managed bin directory. Validating the basename
+# alone lets `SHELL=/tmp/bash` through; requiring a trusted parent directory
+# blocks an attacker-planted binary while preserving standard locations
+# (system paths + Homebrew).
+_TRUSTED_SHELL_DIRS = frozenset({
+    "/bin", "/sbin", "/usr/bin", "/usr/sbin",
+    "/usr/local/bin", "/usr/local/sbin",
+    "/opt/homebrew/bin", "/opt/homebrew/sbin",
+})
 _READ_TIMEOUT_S = 0.5
 # May be absent on unusual builds; guarded at the call site.
 _TIOCSCTTY = getattr(termios, "TIOCSCTTY", None)
@@ -40,7 +49,12 @@ def resolve_shell(env: dict[str, str] | None = None) -> list[str]:
     src = env if env is not None else os.environ
     shell = src.get("SHELL", "")
     default = "/bin/zsh" if sys.platform == "darwin" else "/bin/bash"
-    if not shell or not os.path.isabs(shell) or os.path.basename(shell) not in _ALLOWED_SHELL_BASENAMES:
+    if (
+        not shell
+        or not os.path.isabs(shell)
+        or os.path.basename(shell) not in _ALLOWED_SHELL_BASENAMES
+        or os.path.dirname(shell) not in _TRUSTED_SHELL_DIRS
+    ):
         shell = default
     return [shell, "-il"]
 
