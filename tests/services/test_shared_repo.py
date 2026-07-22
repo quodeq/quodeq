@@ -322,8 +322,13 @@ def test_read_state_unsupported_version(tmp_path, monkeypatch):
     assert read_state(url) == "unsupported_version"
 
 
-def test_read_state_foreign_with_evaluations_dir_ok(tmp_path, monkeypatch):
-    """read_state returns 'ok' when evaluations/ dir exists even if format is foreign."""
+def test_read_state_foreign_with_evaluations_dir_still_foreign(tmp_path, monkeypatch):
+    """Audit A1: read_state must not treat "has an evaluations/ dir" as a
+    proxy for "ok" -- that let a real foreign repo (someone else's git repo
+    that happens to contain a directory named evaluations/) serve as if it
+    were a quodeq clone. A foreign repo is foreign regardless of its
+    contents; only the quodeq.json marker (checked by check_repo_format)
+    decides "ok"."""
     monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
     url = "file:///dummy/url"
     repo = shared_repo_path(url, {"QUODEQ_CACHE_ROOT": str(tmp_path / "cache")})
@@ -331,7 +336,51 @@ def test_read_state_foreign_with_evaluations_dir_ok(tmp_path, monkeypatch):
     (repo / ".git").mkdir()
     (repo / "README.md").write_text("Some other project")
     (repo / "evaluations").mkdir()
-    assert read_state(url) == "ok"
+    assert read_state(url) == "foreign"
+
+
+def test_read_state_distinguishes_empty_and_foreign(tmp_path, monkeypatch):
+    """Audit A1: read_state must surface all four check_repo_format outcomes
+    instead of collapsing "empty" and "foreign" down to "missing" -- real
+    clones of real local bare origins, not hand-built directories, so the
+    full ensure_shared_clone -> read_state path is exercised end to end."""
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+
+    # missing: no clone at all.
+    missing_url = "file:///nonexistent/repo-for-state-test.git"
+    assert read_state(missing_url) == "missing"
+
+    # empty: a real clone of a bare origin with zero commits.
+    empty_origin = tmp_path / "empty-origin.git"
+    subprocess.run(["git", "init", "--bare", str(empty_origin)], check=True, capture_output=True)
+    empty_url = f"file://{empty_origin}"
+    assert ensure_shared_clone(empty_url) is not None
+    assert read_state(empty_url) == "empty"
+
+    # foreign: a real clone of a bare origin holding a README but no marker.
+    foreign_origin = tmp_path / "foreign-origin.git"
+    subprocess.run(["git", "init", "--bare", str(foreign_origin)], check=True, capture_output=True)
+    foreign_seed = tmp_path / "foreign-seed"
+    subprocess.run(["git", "clone", str(foreign_origin), str(foreign_seed)], check=True, capture_output=True)
+    (foreign_seed / "README.md").write_text("some other project", encoding="utf-8")
+    for cmd in (
+        ["git", "add", "."],
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "seed"],
+        ["git", "push", "origin", "HEAD"],
+    ):
+        subprocess.run(cmd, cwd=foreign_seed, check=True, capture_output=True)
+    foreign_url = f"file://{foreign_origin}"
+    assert ensure_shared_clone(foreign_url) is not None
+    assert read_state(foreign_url) == "foreign"
+
+    # ok: marker present via bootstrap_repo_layout on a real clone.
+    ok_origin = tmp_path / "ok-origin.git"
+    subprocess.run(["git", "init", "--bare", str(ok_origin)], check=True, capture_output=True)
+    ok_url = f"file://{ok_origin}"
+    ok_repo = ensure_shared_clone(ok_url)
+    assert ok_repo is not None
+    bootstrap_repo_layout(ok_repo)
+    assert read_state(ok_url) == "ok"
 
 
 def test_published_meta_skips_uncommitted_project_dir(tmp_path, monkeypatch):

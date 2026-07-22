@@ -5,11 +5,14 @@ under /api/shared/* or /api/projects/<project>/publish.
 from __future__ import annotations
 
 import json
+import subprocess
+from pathlib import Path
 
 import pytest
 
 from quodeq.api.app import create_app
 from quodeq.services import shared_publish
+from quodeq.services.shared_repo import FORMAT_NAME
 
 _ORIGIN = {"Origin": "http://localhost"}
 
@@ -50,6 +53,7 @@ def test_shared_status_unconfigured(client, monkeypatch, tmp_path):
     assert body["configured"] is False
     assert body["url"] is None
     assert body["lastSynced"] is None
+    assert body["repoState"] is None
     assert "publish" in body
 
 
@@ -60,6 +64,15 @@ def test_shared_status_configured(client, tmp_path):
     body = resp.get_json()
     assert body["configured"] is True
     assert body["url"] == "git@github.com:t/r.git"
+
+
+def test_shared_status_repo_state_reflects_read_state(client, tmp_path):
+    """Audit A1: /status must report the real clone state, not just whether
+    a URL is configured -- a configured-but-never-cloned URL is "missing"."""
+    (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
+    resp = client.get("/api/shared/status")
+    assert resp.status_code == 200
+    assert resp.get_json()["repoState"] == "missing"
 
 
 def test_shared_status_survives_non_string_url_in_settings_file(client, tmp_path):
@@ -120,6 +133,83 @@ def test_put_config_clone_failure_returns_502(client, monkeypatch):
     )
     assert resp.status_code == 502
     assert "error" in resp.get_json()
+
+
+def _push_seed_file(origin: Path, name: str, content: str) -> None:
+    work = origin.parent / f"{origin.stem}-seed"
+    subprocess.run(["git", "clone", str(origin), str(work)], check=True, capture_output=True)
+    (work / name).write_text(content, encoding="utf-8")
+    for cmd in (
+        ["git", "add", "."],
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "seed"],
+        ["git", "push", "origin", "HEAD"],
+    ):
+        subprocess.run(cmd, cwd=work, check=True, capture_output=True)
+
+
+def test_put_config_rejects_foreign_repo_after_clone(client, monkeypatch, tmp_path):
+    """Audit A1: PUT must validate format AFTER a real clone succeeds --
+    a real, clonable git repo that isn't a quodeq results repo (no
+    quodeq.json marker) is rejected, and settings are never written for it.
+    """
+    monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
+    # validate_remote_url legitimately rejects file:// (SSRF guard scopes
+    # accepted schemes to https/ssh); bypass just that check so the local
+    # bare origin below can exercise the real clone + format-check path.
+    monkeypatch.setattr("quodeq.api.routes_shared.validate_remote_url", lambda url: None)
+    origin = tmp_path / "foreign-origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    _push_seed_file(origin, "README.md", "some other project")
+    url = f"file://{origin}"
+
+    resp = client.put("/api/shared/config", json={"url": url}, headers=_ORIGIN)
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == (
+        "the repository exists but does not look like a quodeq results repository"
+    )
+
+    status = client.get("/api/shared/status").get_json()
+    assert status["configured"] is False
+    assert status["url"] is None
+
+
+def test_put_config_rejects_unsupported_version_after_clone(client, monkeypatch, tmp_path):
+    """Audit A1: same AFTER-clone validation for a repo whose quodeq.json
+    marker declares a format version newer than this build understands."""
+    monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
+    monkeypatch.setattr("quodeq.api.routes_shared.validate_remote_url", lambda url: None)
+    origin = tmp_path / "future-origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    _push_seed_file(
+        origin, "quodeq.json", json.dumps({"format": FORMAT_NAME, "version": 99}),
+    )
+    url = f"file://{origin}"
+
+    resp = client.put("/api/shared/config", json={"url": url}, headers=_ORIGIN)
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "this shared repository requires a newer version of quodeq"
+
+    status = client.get("/api/shared/status").get_json()
+    assert status["configured"] is False
+    assert status["url"] is None
+
+
+def test_put_config_accepts_empty_repo(client, monkeypatch, tmp_path):
+    """Audit A1: a real clone of a bare origin with zero commits ("empty",
+    never published into) must be accepted, not rejected as foreign."""
+    monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
+    monkeypatch.setattr("quodeq.api.routes_shared.validate_remote_url", lambda url: None)
+    origin = tmp_path / "empty-origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    url = f"file://{origin}"
+
+    resp = client.put("/api/shared/config", json={"url": url}, headers=_ORIGIN)
+    assert resp.status_code == 200
+    assert resp.get_json()["configured"] is True
+
+    status = client.get("/api/shared/status").get_json()
+    assert status["configured"] is True
+    assert status["url"] == url
 
 
 def test_put_config_happy_path(client, monkeypatch, tmp_path):

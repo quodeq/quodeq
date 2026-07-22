@@ -28,6 +28,7 @@ from quodeq.services.shared_publish import publish_project
 from quodeq.services.shared_repo import (
     FORMAT_NAME,
     MARKER_FILENAME,
+    ensure_shared_clone,
     shared_evaluations_root,
     shared_repo_path,
     sync_shared_index,
@@ -121,6 +122,21 @@ def shared_clone_fixture(tmp_path, monkeypatch):
     return url
 
 
+@pytest.fixture()
+def empty_shared_clone_fixture(tmp_path):
+    """A cloned-but-never-published shared repo (audit A1's "empty" case).
+
+    The clone exists for real (a real `git clone` of a real local bare
+    origin) but nothing has ever been published into it, so read_state
+    reports "empty" rather than "missing". Mirrors shared_clone_fixture
+    minus the publish_project step.
+    """
+    url = _make_origin(tmp_path)
+    assert ensure_shared_clone(url) is not None
+    write_settings(SharedSettings(url=url))
+    return url
+
+
 # --- _with_shared_root decorator ---------------------------------------------
 
 def test_shared_routes_409_when_unconfigured(client, monkeypatch, tmp_path):
@@ -139,7 +155,9 @@ def test_shared_routes_503_when_clone_missing(client):
     write_settings(SharedSettings(url="file:///nonexistent/repo.git"))
     resp = client.get("/api/shared/projects")
     assert resp.status_code == 503
-    assert resp.get_json()["error"] == "shared repository has not been cloned yet"
+    assert resp.get_json()["error"] == (
+        "the shared repository has not been cloned yet — reconnect it in Settings"
+    )
 
 
 def test_shared_routes_409_when_unsupported_version(client):
@@ -154,6 +172,31 @@ def test_shared_routes_409_when_unsupported_version(client):
     resp = client.get("/api/shared/projects")
     assert resp.status_code == 409
     assert "newer version" in resp.get_json()["error"]
+
+
+def test_shared_routes_409_when_foreign(client):
+    """Audit A1: a foreign repo (real content, no quodeq.json marker) must
+    be rejected at read time with a distinct 409, not silently 503'd or
+    served as if it were a real quodeq clone."""
+    url = "file:///dummy/foreign.git"
+    repo = shared_repo_path(url)
+    repo.mkdir(parents=True)
+    (repo / ".git").mkdir()
+    (repo / "README.md").write_text("some other project", encoding="utf-8")
+    write_settings(SharedSettings(url=url))
+    resp = client.get("/api/shared/projects")
+    assert resp.status_code == 409
+    body = resp.get_json()
+    assert body["error"] == "the configured repository does not look like a quodeq results repository"
+    assert body["code"] == "FOREIGN_REPO"
+
+
+def test_empty_repo_lists_zero_projects_not_503(client, empty_shared_clone_fixture):
+    """Audit A1: first connect to an empty (never-published) repo must be
+    servable -- an empty projects list, not a false "not cloned yet" 503."""
+    resp = client.get("/api/shared/projects")
+    assert resp.status_code == 200
+    assert resp.get_json()["projects"] == []
 
 
 # --- read-only sweep ----------------------------------------------------------

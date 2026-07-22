@@ -202,15 +202,13 @@ def sync_shared_index(url: str, env: dict | None = None) -> None:
 
 
 def read_state(url: str, env: dict | None = None) -> str:
+    """State of the local shared clone: ok | empty | foreign |
+    unsupported_version | missing. "empty" (cloned, never published into)
+    is servable -- routes return an empty listing for it."""
     repo = shared_repo_path(url, env)
     if not (repo / ".git").exists():
         return "missing"
-    fmt = check_repo_format(repo)
-    if fmt == "unsupported_version":
-        return "unsupported_version"
-    if fmt == "ok" or shared_evaluations_root(url, env).is_dir():
-        return "ok"
-    return "missing"
+    return check_repo_format(repo)
 
 
 def published_meta(url: str, env: dict | None = None) -> dict[str, dict]:

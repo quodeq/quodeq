@@ -28,6 +28,7 @@ from quodeq.services.score_cache import score_cache_path_override
 from quodeq.services.scoring import get_project_scores, get_scores_slim
 from quodeq.services.shared_publish import get_publish_status, start_publish
 from quodeq.services.shared_repo import (
+    check_repo_format,
     ensure_shared_clone,
     last_synced_at,
     published_meta,
@@ -59,13 +60,18 @@ _MAX_DISMISSED_LIMIT = 5000
 def _with_shared_root(fn):
     """Resolve the configured clone; inject eval_root; scope the score cache.
 
-    Every decorated route becomes: 409 when unconfigured, 409 when the clone's
-    format is newer than this build understands, 503 when the clone hasn't
-    been fetched yet (or is otherwise unreadable), else the wrapped view runs
-    with ``eval_root`` (the shared clone's evaluations directory) and ``url``
-    (the configured remote) injected as keyword arguments, with the score
-    cache transparently scoped to this clone's own cache DB (Task 9) so its
-    rows never mix with the local clone's cache.
+    Every decorated route becomes: 409 when unconfigured, 409 when the
+    clone's format is foreign or newer than this build understands, 503 when
+    the clone hasn't been fetched yet at all, else the wrapped view runs with
+    ``eval_root`` (the shared clone's evaluations directory) and ``url`` (the
+    configured remote) injected as keyword arguments, with the score cache
+    transparently scoped to this clone's own cache DB (Task 9) so its rows
+    never mix with the local clone's cache.
+
+    "ok" and "empty" (cloned, never published into) both proceed: an empty
+    clone is a legitimate first-connect state, not an error, and every
+    wrapped list-shaped route already tolerates a missing evaluations dir by
+    returning an empty result (see build_project_list) rather than raising.
     """
 
     @functools.wraps(fn)
@@ -79,8 +85,23 @@ def _with_shared_root(fn):
                 jsonify({"error": "this shared repository requires a newer version of quodeq"}),
                 409,
             )
-        if state != "ok":
-            return jsonify({"error": "shared repository has not been cloned yet"}), 503
+        if state == "foreign":
+            return (
+                jsonify(
+                    {
+                        "error": "the configured repository does not look like a quodeq results repository",
+                        "code": "FOREIGN_REPO",
+                    }
+                ),
+                409,
+            )
+        if state == "missing":
+            return (
+                jsonify(
+                    {"error": "the shared repository has not been cloned yet — reconnect it in Settings"}
+                ),
+                503,
+            )
         root = shared_evaluations_root(settings.url)
         with score_cache_path_override(shared_score_cache_path(settings.url)):
             return fn(*args, eval_root=root, url=settings.url, **kwargs)
@@ -132,6 +153,11 @@ def register_shared_routes(app: Flask) -> None:
                 # can bind to it without existence checks.
                 "error": None,
                 "publish": publish,
+                # ok | empty | foreign | unsupported_version | missing | None
+                # (unconfigured) -- lets the UI distinguish "healthy but
+                # never published into" from the failure states instead of
+                # inferring clone health from configured+lastSynced alone.
+                "repoState": read_state(settings.url) if settings.url else None,
             }
         )
 
@@ -145,12 +171,32 @@ def register_shared_routes(app: Flask) -> None:
             validate_remote_url(url)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
-        if ensure_shared_clone(url) is None:
+        repo = ensure_shared_clone(url)
+        if repo is None:
             return (
                 jsonify(
                     {"error": f"could not clone the repository, check that git can access {url}"}
                 ),
                 502,
+            )
+        # Format validation only makes sense once the clone actually exists,
+        # so it runs AFTER ensure_shared_clone, not before -- a foreign or
+        # too-new repo must never reach write_settings (that would connect
+        # the UI to a repo every subsequent /api/shared/* route then 409s
+        # on). "empty" (never published into) is a legitimate first-connect
+        # state and is accepted here same as "ok".
+        fmt = check_repo_format(repo)
+        if fmt == "foreign":
+            return (
+                jsonify(
+                    {"error": "the repository exists but does not look like a quodeq results repository"}
+                ),
+                400,
+            )
+        if fmt == "unsupported_version":
+            return (
+                jsonify({"error": "this shared repository requires a newer version of quodeq"}),
+                400,
             )
         write_settings(SharedSettings(url=url))
         return jsonify({"configured": True, "url": url})
