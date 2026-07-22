@@ -519,6 +519,7 @@ function ProjectsToolbar({ filters = {}, onFiltersChange, configured, lastSynced
           label="location"
           value={location}
           options={['all', 'local', 'shared']}
+          valueLabels={{ shared: 'remote' }}
           onChange={(loc) => set({ location: loc })}
         />
       )}

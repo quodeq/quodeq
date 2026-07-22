@@ -59,11 +59,11 @@ describe('MapPage — shared read-only chip (Finding 6)', () => {
 
   it('shows the chip for a shared project with data', () => {
     renderPage(baseData({ accumulated: { dimensions: DIMS } }));
-    expect(screen.getByText('shared · read-only')).toBeInTheDocument();
+    expect(screen.getByText('remote · read-only')).toBeInTheDocument();
   });
 
   it('omits the chip for a local project', () => {
     renderPage(baseData({ selectedSource: 'local', selectedProject: 'p1', accumulated: { dimensions: DIMS } }));
-    expect(screen.queryByText('shared · read-only')).toBeNull();
+    expect(screen.queryByText('remote · read-only')).toBeNull();
   });
 });

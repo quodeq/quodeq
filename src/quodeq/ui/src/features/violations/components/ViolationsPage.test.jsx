@@ -139,7 +139,7 @@ describe('ViolationsPage — shared read-only chip (Finding 6)', () => {
     renderPage(baseData({
       accumulatedDimensions: [{ dimension: 'security', violations: [], compliance: [] }],
     }));
-    expect(screen.getByText('shared · read-only')).toBeInTheDocument();
+    expect(screen.getByText('remote · read-only')).toBeInTheDocument();
   });
 
   it('omits the chip for a local project', () => {
@@ -147,6 +147,6 @@ describe('ViolationsPage — shared read-only chip (Finding 6)', () => {
       selectedSource: 'local', selectedProject: 'p1', projects: [{ id: 'p1', name: 'p1' }],
       accumulatedDimensions: [{ dimension: 'security', violations: [], compliance: [] }],
     }));
-    expect(screen.queryByText('shared · read-only')).toBeNull();
+    expect(screen.queryByText('remote · read-only')).toBeNull();
   });
 });
