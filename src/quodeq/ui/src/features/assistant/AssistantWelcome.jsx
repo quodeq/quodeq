@@ -7,12 +7,14 @@ import { VISIBLE_META_COMMANDS, pillsForView } from './commands.js';
  * only as pills, never as text lines. Pure UI, never persisted, never sent
  * to the model; reappears on every fresh session.
  */
-export function AssistantWelcome({ catalog, view, onPick }) {
-  const pills = pillsForView(catalog, view);
+export function AssistantWelcome({ catalog, view, onPick, readOnly = false }) {
+  const pills = pillsForView(catalog, view, { readOnly });
   return (
     <div className="assistant-welcome">
       <p className="assistant-welcome-intro">
-        I can explain scores, dig into findings, and draft standards for this project.
+        {readOnly
+          ? 'I can explain scores and dig into findings for this remote project.'
+          : 'I can explain scores, dig into findings, and draft standards for this project.'}
       </p>
       <ul className="assistant-welcome-commands">
         {VISIBLE_META_COMMANDS.map((c) => (

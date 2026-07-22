@@ -34,3 +34,24 @@ it('renders without a catalog (fetch failed)', () => {
   expect(screen.getByText('/help')).toBeInTheDocument();
   expect(screen.queryByRole('button')).toBeNull(); // no pills without catalog
 });
+
+const RO_CATALOG = { skills: [
+  { name: 'explain-score', description: 'd', views: ['overview'], requiresWrite: false },
+  { name: 'verify-finding', description: 'd', views: ['violations'], requiresWrite: true },
+  { name: 'create-standard', description: 'd', views: ['standards'], requiresWrite: true },
+] };
+
+it('read-only mode hides write-shaped pills and drops the draft-standards line', () => {
+  render(<AssistantWelcome catalog={RO_CATALOG} view="violations" onPick={() => {}} readOnly />);
+  expect(screen.queryByRole('button', { name: /verify finding/i })).toBeNull();
+  expect(screen.queryByRole('button', { name: /create standard/i })).toBeNull();
+  expect(screen.getByRole('button', { name: /explain score/i })).toBeInTheDocument();
+  expect(screen.getByText(/dig into findings for this remote project/i)).toBeInTheDocument();
+  expect(screen.queryByText(/draft standards/i)).toBeNull();
+});
+
+it('default mode keeps every pill and the standard intro', () => {
+  render(<AssistantWelcome catalog={RO_CATALOG} view="violations" onPick={() => {}} />);
+  expect(screen.getByRole('button', { name: /verify finding/i })).toBeInTheDocument();
+  expect(screen.getByText(/draft standards for this project/i)).toBeInTheDocument();
+});

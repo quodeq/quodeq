@@ -54,11 +54,11 @@ export function buildMetaResponse(kind, catalog) {
   return `I can explain scores, dig into findings, and draft standards for this project.\n\n**Commands**\n${commandLines(catalog)}`;
 }
 
-export function pillsForView(catalog, view) {
+export function pillsForView(catalog, view, { readOnly = false } = {}) {
   if (!view) return [];
-  const skills = catalog?.skills ?? [];
-  // View-relevant skills lead; the rest follow so any view with context
-  // offers every skill as a pill (skills appear only here, not as text).
+  // Read-only (remote) sessions have no draft_action server-side, so
+  // write-shaped skills would dead-end; hide their pills entirely.
+  const skills = (catalog?.skills ?? []).filter((s) => !readOnly || !s.requiresWrite);
   const matching = skills.filter((s) => (s.views ?? []).includes(view));
   const rest = skills.filter((s) => !(s.views ?? []).includes(view));
   return [...matching, ...rest]

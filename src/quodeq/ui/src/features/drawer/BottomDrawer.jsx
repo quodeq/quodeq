@@ -28,7 +28,7 @@ export function BottomDrawer({ uiState }) {
           maximized, toggleMaximized, setMaximized, provider, model,
           streaming, webEnabled, toggleWebEnabled,
           writeEnabled, toggleWriteEnabled, repoInfo, workspace, refreshWorkspace,
-          sessionId, sessionReady, resetConversation } = useAssistantDrawer();
+          sessionId, sessionReady, resetConversation, readOnly } = useAssistantDrawer();
   const { addWindow } = useSidePane();
   const dragRef = useRef(null);
 
@@ -88,6 +88,11 @@ export function BottomDrawer({ uiState }) {
         {active === 'assistant' && modelLabel && (
           <Badge variant="tag" tone="accent" className="drawer-model-chip" title={modelLabel}>
             {modelLabel}
+          </Badge>
+        )}
+        {active === 'assistant' && readOnly && (
+          <Badge variant="tag" tone="info" title="Remote project session: read tools only">
+            read-only
           </Badge>
         )}
         {/* Repo attachment is the NORMAL case — only the exception is worth a

@@ -19,7 +19,7 @@ import { StopIcon } from '../../components/CopyButton.jsx';
 export function AssistantPane({ uiState }) {
   const {
     messages, streaming, error, sendMessage, stopTurn,
-    catalog, addLocalExchange, resetConversation,
+    catalog, addLocalExchange, resetConversation, readOnly,
   } = useAssistantDrawer();
   const [draft, setDraft] = useState('');
   const [menuIndex, setMenuIndex] = useState(0);
@@ -69,7 +69,7 @@ export function AssistantPane({ uiState }) {
   return (
     <>
       {messages.length === 0
-        ? <AssistantWelcome catalog={catalog} view={uiState?.view} onPick={setDraft} />
+        ? <AssistantWelcome catalog={catalog} view={uiState?.view} onPick={setDraft} readOnly={readOnly} />
         : <MessageList messages={messages} streaming={streaming} />}
       {error && <div className="assistant-drawer-error" role="alert">{error}</div>}
       <div className="assistant-drawer-input-row">

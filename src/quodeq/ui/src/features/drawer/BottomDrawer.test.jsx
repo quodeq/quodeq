@@ -9,7 +9,7 @@ const drawer = {
   provider: 'ollama', model: 'm', messages: [], streaming: false, error: null, sendMessage: vi.fn(),
   webEnabled: false, toggleWebEnabled: vi.fn(),
   sessionReady: true, resetConversation: vi.fn(),
-  repoInfo: null,
+  repoInfo: null, readOnly: false,
 };
 vi.mock('../assistant/AssistantDrawerProvider.jsx', () => ({ useAssistantDrawer: () => drawer }));
 vi.mock('../terminal/TerminalPane.jsx', () => ({ default: () => <div data-testid="tty" /> }));
@@ -151,4 +151,18 @@ it('warns with "no repo access" and the server reason when not attached', () => 
 it('the model chip is an accent Badge', () => {
   render(<BottomDrawer uiState={{}} />);
   expect(screen.getByTitle('Ollama · m')).toHaveClass('badge', 'badge--tag', 'badge--accent', 'drawer-model-chip');
+});
+
+it('shows a read-only info badge when the session is read-only', () => {
+  drawer.readOnly = true;
+  render(<BottomDrawer uiState={{}} />);
+  const chip = screen.getByText('read-only');
+  expect(chip).toHaveClass('badge', 'badge--tag', 'badge--info');
+  expect(chip).toHaveAttribute('title', 'Remote project session: read tools only');
+  drawer.readOnly = false;
+});
+
+it('shows NO read-only badge for normal sessions', () => {
+  render(<BottomDrawer uiState={{}} />);
+  expect(screen.queryByText('read-only')).toBeNull();
 });
