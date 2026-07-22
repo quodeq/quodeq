@@ -216,6 +216,9 @@ describe('ProjectsPage — merged list, no tabs', () => {
       expect(screen.getByText('LOCAL')).toBeInTheDocument();
       expect(screen.getByText('REMOTE')).toBeInTheDocument();
     });
+    expect(screen.getByText('LOCAL')).toHaveClass('badge', 'badge--pill', 'badge--neutral');
+    expect(screen.getByText('PUBLISHED')).toHaveClass('badge--success');
+    expect(screen.getByText('REMOTE')).toHaveClass('badge--info');
   });
 });
 

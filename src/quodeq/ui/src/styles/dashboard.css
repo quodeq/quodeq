@@ -2534,30 +2534,6 @@
   gap: var(--space-3);
 }
 
-/* Sync-state badge (top-right of every card): LOCAL / PUBLISHED / REMOTE.
-   Soft-filled pill; muted for local-only, success-tinted once published,
-   accent-tinted for remote-only entries. */
-.project-card-badge {
-  flex-shrink: 0;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 9.5px;
-  font-weight: var(--weight-medium);
-  letter-spacing: 0.06em;
-  background: color-mix(in srgb, var(--color-text-muted) 12%, transparent);
-  color: var(--color-text-muted);
-}
-
-.project-card-badge--both {
-  background: color-mix(in srgb, var(--color-success) 12%, transparent);
-  color: var(--color-success);
-}
-
-.project-card-badge--shared {
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-  color: var(--color-accent);
-}
-
 .project-card-name {
   font-family: var(--term-font-mono);
   font-size: var(--text-base);
@@ -2746,21 +2722,9 @@
   color: var(--color-text-muted);
 }
 
+/* Layout-only; visual identity comes from .badge--pill. */
 .project-subprojects-tag {
   margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.65rem;
-  font-weight: var(--weight-medium);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-border);
-  padding: 1px 6px;
-  border-radius: var(--radius-sm);
-  white-space: nowrap;
 }
 
 .project-subprojects-tag-count {

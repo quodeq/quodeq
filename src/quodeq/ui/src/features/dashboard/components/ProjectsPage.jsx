@@ -6,6 +6,7 @@ import { relativeTime } from '../../../components/LastFetchedLine.jsx';
 import { useSharedProjects } from '../hooks/useSharedProjects.js';
 import { usePublish } from '../hooks/usePublish.js';
 import { useMergedProjects } from '../hooks/useMergedProjects.js';
+import Badge from '../../../components/Badge.jsx';
 
 const DISCIPLINE_LABEL = {
   frontend_nextjs: 'Next.js',
@@ -81,13 +82,12 @@ function LanguageNumbers({ stats, filesCount }) {
 // merged entry (see useMergedProjects), which still speaks in locations —
 // the state wording is purely presentational.
 const BADGE_LABELS = { local: 'LOCAL', both: 'PUBLISHED', shared: 'REMOTE' };
+const BADGE_TONES = { local: 'neutral', both: 'success', shared: 'info' };
 
 function ProjectCardChips({ chips }) {
   if (!chips) return null;
   return (
-    <span className={`project-card-badge project-card-badge--${chips}`}>
-      {BADGE_LABELS[chips]}
-    </span>
+    <Badge variant="pill" tone={BADGE_TONES[chips]}>{BADGE_LABELS[chips]}</Badge>
   );
 }
 
@@ -303,9 +303,9 @@ function ProjectPathContent({ id, p, relocateActions, subprojectCount = 0 }) {
         <button type="button" className="project-path-action project-path-action--warn" onClick={(e) => { e.stopPropagation(); startRelocate(id, p.path); }}>Relocate</button>
       )}
       {subprojectCount > 0 && (
-        <span className="project-subprojects-tag">
+        <Badge variant="pill" tone="neutral" className="project-subprojects-tag">
           subprojects <span className="project-subprojects-tag-count">{subprojectCount}</span>
-        </span>
+        </Badge>
       )}
     </div>
   );
