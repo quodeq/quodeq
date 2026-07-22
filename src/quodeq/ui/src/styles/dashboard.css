@@ -3068,7 +3068,7 @@
 }
 
 /* "shared · read-only" chip on a shared project's page header (Overview).
-   Same shape as .badge-setup-incomplete but in the cyan/accent-info family
+   Same squared-tag shape as the Badge tag variant but in the cyan/accent-info family
    so it doesn't read as a warning — a shared project isn't a problem state,
    just a different (read-only) one. */
 .badge-shared-readonly-group {
@@ -3093,7 +3093,7 @@
 }
 
 /* "Complete setup" CTA card on the project view for legacy online projects.
-   Same warning-tinted palette as .badge-setup-incomplete; a banner above
+   Warning-tinted palette matching the setup-incomplete badge; a banner above
    the dashboard panels nudges users to clone the repo locally. */
 .incomplete-setup-card {
   background: color-mix(in srgb, var(--color-warning) 10%, transparent);

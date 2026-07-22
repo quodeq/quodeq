@@ -1166,8 +1166,8 @@ button.term-sev-badge--clickable:focus-visible {
 .history-row__partial-chip {
   margin-left: 6px;
   background: transparent;
-  border: 1px solid var(--color-warn, #d29922);
-  color: var(--color-warn, #d29922);
+  border: 1px solid var(--color-warning);
+  color: var(--color-warning);
   text-transform: uppercase;
   font-size: 10px;
   letter-spacing: 0.05em;
@@ -1182,7 +1182,7 @@ button.term-sev-badge--clickable:focus-visible {
    without showing the (ugly) raw run UUID that we used to fall back to when
    no dateISO was available yet. */
 .history-table .history-row--in-progress {
-  background: color-mix(in srgb, var(--color-warn, #d29922) 6%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 6%, transparent);
 }
 
 /* Running run with no dimensions scored yet — clicking would land on an
@@ -1194,13 +1194,13 @@ button.term-sev-badge--clickable:focus-visible {
 }
 .history-table .history-row--not-ready:hover {
   /* Don't add the usual hover lift — the row isn't actionable. */
-  background: color-mix(in srgb, var(--color-warn, #d29922) 6%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 6%, transparent);
 }
 .history-row__running {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--color-warn, #d29922);
+  color: var(--color-warning);
   text-transform: lowercase;
   font-size: 12px;
   letter-spacing: 0.04em;
@@ -1209,14 +1209,14 @@ button.term-sev-badge--clickable:focus-visible {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--color-warn, #d29922);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-warn, #d29922) 50%, transparent);
+  background: var(--color-warning);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-warning) 50%, transparent);
   animation: history-row-running-pulse 1.4s ease-out infinite;
 }
 @keyframes history-row-running-pulse {
-  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-warn, #d29922) 55%, transparent); }
-  70%  { box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-warn, #d29922) 0%,  transparent); }
-  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-warn, #d29922) 0%,  transparent); }
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-warning) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-warning) 0%,  transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-warning) 0%,  transparent); }
 }
 @media (prefers-reduced-motion: reduce) {
   .history-row__running-dot { animation: none; }
