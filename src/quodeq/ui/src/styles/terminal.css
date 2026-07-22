@@ -2105,6 +2105,14 @@ button.term-sev-badge--clickable:focus-visible {
   color: var(--color-text);
   background: var(--color-surface-alt);
 }
+.topbar-btn--icon[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+.topbar-btn--icon[aria-disabled='true']:hover {
+  background: transparent;
+  border-color: var(--color-border);
+}
 .topbar-btn--icon svg {
   display: block;
 }

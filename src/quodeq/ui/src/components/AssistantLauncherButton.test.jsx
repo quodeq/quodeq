@@ -56,3 +56,18 @@ it('is NOT highlighted when only the terminal panel is open', () => {
   expect(btn).not.toHaveClass('topbar-btn--assistant--open');
   expect(btn).toHaveAttribute('aria-pressed', 'false');
 });
+
+it('on a remote project: visible but disabled, tooltip explains why, click is a no-op', () => {
+  render(<AssistantLauncherButton sharedSource />);
+  const btn = screen.getByRole('button', { name: /assistant is unavailable on remote projects/i });
+  expect(btn).toHaveAttribute('aria-disabled', 'true');
+  expect(btn).toHaveAttribute('title', 'Assistant is unavailable on remote projects (read-only)');
+  fireEvent.click(btn);
+  expect(toggleTopbar).not.toHaveBeenCalled();
+});
+
+it('sharedSource does not override the Settings kill switch', () => {
+  localStorage.setItem('cc-assistant-enabled', 'false');
+  const { container } = render(<AssistantLauncherButton sharedSource />);
+  expect(container).toBeEmptyDOMElement();
+});
