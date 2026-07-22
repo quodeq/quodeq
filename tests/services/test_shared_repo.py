@@ -1,5 +1,6 @@
 """Tests for shared repo clone management."""
 import json
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -16,6 +17,7 @@ from quodeq.services.shared_repo import (
     refresh_shared_clone,
     run_git,
     shared_cache_dir,
+    shared_evaluations_root,
     shared_index_db_path,
     shared_repo_path,
     sync_shared_index,
@@ -63,6 +65,21 @@ def test_ensure_clone_and_refresh(tmp_path, monkeypatch):
     # second call reuses without error
     assert ensure_shared_clone(url) == repo
     assert refresh_shared_clone(url) is True
+
+
+def test_clone_and_refresh_are_not_shallow(tmp_path, monkeypatch):
+    """Audit finding C1: a permanently-shallow (--depth 1) clone means
+    `git log -1 -- path` on the shallow root commit attributes EVERY path
+    to the tip commit, misattributing every project except the most
+    recently pushed one. Both the initial clone and the refresh fetch must
+    pull full history -- neither leaves a .git/shallow marker behind."""
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    url = _make_origin(tmp_path)
+    repo = ensure_shared_clone(url)
+    assert repo is not None
+    assert not (repo / ".git" / "shallow").exists()
+    assert refresh_shared_clone(url) is True
+    assert not (repo / ".git" / "shallow").exists()
 
 
 def test_refresh_shared_clone_passes_explicit_timeout_to_both_git_calls(tmp_path, monkeypatch):
@@ -263,6 +280,15 @@ def test_readable_and_index_sync_on_published_clone(tmp_path, monkeypatch):
     monkeypatch.setenv("GIT_AUTHOR_EMAIL", "a@a")
     monkeypatch.setenv("GIT_COMMITTER_NAME", "anna")
     monkeypatch.setenv("GIT_COMMITTER_EMAIL", "a@a")
+    # publishedBy (published.json) comes from `git config user.name` in the
+    # clone, not from GIT_AUTHOR_NAME/GIT_COMMITTER_NAME (those only affect a
+    # commit's recorded identity) -- pin it explicitly, on the clone's LOCAL
+    # config, so this assertion is deterministic regardless of the machine
+    # running the test.
+    assert ensure_shared_clone(url) is not None
+    subprocess.run(
+        ["git", "config", "user.name", "anna"], cwd=shared_repo_path(url), check=True, capture_output=True,
+    )
     publish_project("proj-a", url, evaluations_root=root)
 
     assert read_state(url) == "ok"
@@ -274,7 +300,14 @@ def test_readable_and_index_sync_on_published_clone(tmp_path, monkeypatch):
 
 
 def test_published_meta_author_name_with_pipe(tmp_path, monkeypatch):
-    """Test that author names containing pipes are correctly parsed."""
+    """Test that author names containing pipes are correctly parsed.
+
+    published_meta now prefers published.json, which round-trips a "|" in a
+    JSON string trivially -- so this test drops published.json after
+    publishing to force the legacy git-log fallback, which is what this
+    test actually targets: `rpartition("|")` in published_meta's git-log
+    branch must not misparse a `%an|%ct` line when %an itself contains "|".
+    """
     monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
     from quodeq.services.shared_publish import publish_project
     origin = tmp_path / "origin.git"
@@ -294,6 +327,9 @@ def test_published_meta_author_name_with_pipe(tmp_path, monkeypatch):
     monkeypatch.setenv("GIT_COMMITTER_NAME", "Jane | Marketing")
     monkeypatch.setenv("GIT_COMMITTER_EMAIL", "jane@example.com")
     publish_project("proj-pipe", url, evaluations_root=root)
+
+    # Force the legacy git-log fallback (see docstring).
+    (shared_evaluations_root(url) / "proj-pipe" / "published.json").unlink()
 
     meta = published_meta(url)
     assert "proj-pipe" in meta
@@ -414,3 +450,117 @@ def test_published_meta_skips_uncommitted_project_dir(tmp_path, monkeypatch):
     meta = published_meta(url)
     assert "proj-committed" in meta
     assert "proj-uncommitted" not in meta
+
+
+def _publish_project_as(
+    monkeypatch, url: str, root: Path, project_id: str, author: str
+) -> None:
+    """Publish project_id into the shared repo at url, attributed to author.
+
+    Pre-clones (if needed) and pins the clone's LOCAL git config user.name to
+    author before publishing, so published.json's publishedBy (sourced from
+    `git config user.name`, not GIT_AUTHOR_NAME/GIT_COMMITTER_NAME) is
+    deterministic. Also sets GIT_AUTHOR_NAME/EMAIL and GIT_COMMITTER_NAME/EMAIL
+    (via monkeypatch, so they don't leak into other tests) so the underlying
+    `git commit` succeeds without needing any git identity configured on the
+    machine running the tests.
+    """
+    from quodeq.services.shared_publish import publish_project
+
+    monkeypatch.setenv("GIT_AUTHOR_NAME", author)
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", f"{author}@example.com")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", author)
+    monkeypatch.setenv("GIT_COMMITTER_EMAIL", f"{author}@example.com")
+
+    assert ensure_shared_clone(url) is not None
+    subprocess.run(
+        ["git", "config", "user.name", author], cwd=shared_repo_path(url), check=True, capture_output=True,
+    )
+    publish_project(project_id, url, evaluations_root=root)
+
+
+def _make_minimal_project(root: Path, project_id: str) -> None:
+    project = root / project_id
+    run = project / "run-1"
+    (run / "evidence").mkdir(parents=True)
+    (project / "repository_info.json").write_text('{"name":"demo"}')
+    (run / "status.json").write_text(json.dumps({"state": "done", "schema_version": 2}))
+    (run / "dimensions.json").write_text("{}")
+    (run / "events.jsonl").write_text("{}\n")
+
+
+def test_published_meta_two_authors_each_keeps_own_attribution(tmp_path, monkeypatch):
+    """Regression for audit C1: publishing project B (by a different author,
+    later) must not change what published_meta reports for project A. Before
+    this fix, the clone was permanently shallow (--depth 1), so `git log -1
+    -- path` on project A's path returned the LATEST commit (project B's,
+    authored by bob) rather than project A's own commit -- misattributing
+    every project except the most recently published one. published.json,
+    written at publish time, makes each project's attribution independent of
+    any later commit anywhere else in the clone."""
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    url = f"file://{origin}"
+    root = tmp_path / "evaluations"
+
+    _make_minimal_project(root, "proj-a")
+    _publish_project_as(monkeypatch, url, root, "proj-a", "alice")
+
+    _make_minimal_project(root, "proj-b")
+    _publish_project_as(monkeypatch, url, root, "proj-b", "bob")
+
+    meta = published_meta(url)
+    assert meta["proj-a"]["publishedBy"] == "alice"
+    assert meta["proj-b"]["publishedBy"] == "bob"
+
+
+def test_published_meta_legacy_fallback_correct_per_path_author_with_full_history(tmp_path, monkeypatch):
+    """THE regression test for audit finding C1, verified experimentally:
+
+    `git clone --depth 1` of a remote already holding multiple commits keeps
+    only the tip commit, as a parentless ("grafted") commit. A parentless
+    commit is diffed against the empty tree, so `git log -- path` treats it
+    as having introduced EVERY path present in its snapshot -- including
+    paths that were really added by earlier, now-truncated commits. So on a
+    shallow clone, `git log -1 -- evaluations/proj-a` incorrectly returns
+    whoever authored the LATEST commit (bob, via proj-b), not proj-a's real
+    author (alice), for any legacy dir lacking published.json.
+
+    This reproduces that exact scenario: publish proj-a (alice) then proj-b
+    (bob) on one clone, force a FRESH re-clone (simulating a cache-recreate
+    or a different machine's first connect against the now-multi-commit
+    remote -- the only situation where clone shallow-ness actually matters,
+    since a single continuously-reused clone's own `git commit` calls always
+    keep a genuine full parent chain regardless of the original clone's
+    depth), then drop proj-a's published.json from the fresh clone's working
+    tree to simulate it predating the published.json feature. Before this
+    fix (ensure_shared_clone's `--depth 1`), the fresh clone is shallow and
+    proj-a incorrectly resolves to bob. With the fix (full clone), it
+    resolves to its true author, alice.
+    """
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    url = f"file://{origin}"
+    root = tmp_path / "evaluations"
+
+    _make_minimal_project(root, "proj-a")
+    _publish_project_as(monkeypatch, url, root, "proj-a", "alice")
+
+    _make_minimal_project(root, "proj-b")
+    _publish_project_as(monkeypatch, url, root, "proj-b", "bob")
+
+    # Force a fresh re-clone from origin, which now holds both commits.
+    shutil.rmtree(shared_repo_path(url))
+    assert ensure_shared_clone(url) is not None
+
+    # Simulate a legacy dir published before published.json existed: drop
+    # the file from proj-a's (freshly re-cloned) working tree.
+    # published_meta reads it straight off disk, not from git history, so no
+    # re-commit is needed to exercise the fallback; proj-b keeps its file.
+    (shared_evaluations_root(url) / "proj-a" / "published.json").unlink()
+
+    meta = published_meta(url)
+    assert meta["proj-a"]["publishedBy"] == "alice"
+    assert meta["proj-b"]["publishedBy"] == "bob"

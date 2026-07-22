@@ -1,8 +1,11 @@
 """Shared results repository: clone, refresh, and path management.
 
 The shared repo is a git remote holding an evaluations/ tree in the same
-layout as the local evaluations dir. We keep a shallow clone under
-~/.quodeq/cache/shared/<url-hash>/repo (QUODEQ_CACHE_ROOT overrides the base).
+layout as the local evaluations dir. We keep a full clone (no --depth,
+results repos are small; a shallow clone made git-log-based attribution
+misattribute every project to whoever pushed last -- audit finding C1)
+under ~/.quodeq/cache/shared/<url-hash>/repo (QUODEQ_CACHE_ROOT overrides
+the base).
 """
 from __future__ import annotations
 
@@ -88,7 +91,7 @@ def ensure_shared_clone(url: str, env: dict | None = None) -> Path | None:
     if (repo / ".git").exists():
         return repo
     repo.parent.mkdir(parents=True, exist_ok=True)
-    ok, out = run_git(["clone", "--depth", "1", "--", url, str(repo)])
+    ok, out = run_git(["clone", "--", url, str(repo)])
     if not ok:
         logger.warning("shared clone failed for %s: %s", url, out.strip()[:500])
         shutil.rmtree(repo, ignore_errors=True)
@@ -114,7 +117,7 @@ def refresh_shared_clone(url: str, env: dict | None = None, *, timeout: int = _D
     repo = shared_repo_path(url, env)
     if not (repo / ".git").exists():
         return ensure_shared_clone(url, env) is not None
-    ok, _ = run_git(["fetch", "--depth", "1", "origin", "HEAD"], cwd=repo, timeout=timeout)
+    ok, _ = run_git(["fetch", "origin", "HEAD"], cwd=repo, timeout=timeout)
     if not ok:
         return False
     ok, _ = run_git(["reset", "--hard", "FETCH_HEAD"], cwd=repo, timeout=timeout)
@@ -135,6 +138,7 @@ def last_synced_at(url: str, env: dict | None = None) -> float | None:
 MARKER_FILENAME = "quodeq.json"
 FORMAT_NAME = "quodeq-shared-evaluations"
 FORMAT_VERSION = 1
+PUBLISHED_META_FILENAME = "published.json"
 
 _GITIGNORE_CONTENT = "**/evaluation.db\n*.log\n"
 
@@ -211,7 +215,38 @@ def read_state(url: str, env: dict | None = None) -> str:
     return check_repo_format(repo)
 
 
+def _read_published_json(entry: Path) -> dict | None:
+    """Read <entry>/published.json, validating both keys.
+
+    Returns None on any failure (missing file, bad JSON, wrong shape) so the
+    caller can fall back to the git-log-derived legacy path -- never raises.
+    """
+    try:
+        data = json.loads((entry / PUBLISHED_META_FILENAME).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    by = data.get("publishedBy")
+    at = data.get("publishedAt")
+    if not isinstance(by, str) or not by:
+        return None
+    if not isinstance(at, int) or isinstance(at, bool):
+        return None
+    return {"publishedBy": by, "publishedAt": at}
+
+
 def published_meta(url: str, env: dict | None = None) -> dict[str, dict]:
+    """Attribution per published project: who published it, and when.
+
+    Prefers the published.json written by stage_project at publish time
+    (see shared_publish.py). Falls back to the legacy git-log-derived
+    lookup for project dirs published before that file existed. The
+    fallback is only correct because the clone is full history (no
+    --depth) -- a shallow clone made `git log -1 -- path` return the tip
+    commit for every path, misattributing every project except the most
+    recently pushed one (audit finding C1).
+    """
     repo = shared_repo_path(url, env)
     root = shared_evaluations_root(url, env)
     result: dict[str, dict] = {}
@@ -219,6 +254,10 @@ def published_meta(url: str, env: dict | None = None) -> dict[str, dict]:
         return result
     for entry in sorted(root.iterdir()):
         if not entry.is_dir():
+            continue
+        meta = _read_published_json(entry)
+        if meta is not None:
+            result[entry.name] = meta
             continue
         ok, out = run_git(
             ["log", "-1", "--format=%an|%ct", "--", f"evaluations/{entry.name}"],

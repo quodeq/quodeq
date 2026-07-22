@@ -93,6 +93,16 @@ def shared_clone_fixture(tmp_path, monkeypatch):
     monkeypatch.setenv("GIT_COMMITTER_EMAIL", "t@t")
 
     url = _make_origin(tmp_path)
+    # published.json's publishedBy comes from `git config user.name` in the
+    # clone (GIT_AUTHOR_NAME/GIT_COMMITTER_NAME above only affect a commit's
+    # recorded identity, not `git config` lookups) -- pin it on the clone's
+    # LOCAL config so the "tester" assertion below is deterministic
+    # regardless of the machine running the test.
+    assert ensure_shared_clone(url) is not None
+    subprocess.run(
+        ["git", "config", "user.name", "tester"],
+        cwd=shared_repo_path(url), check=True, capture_output=True,
+    )
     local_root = tmp_path / "local-evaluations"
     project_dir = local_root / "proj-a"
     run_dir = project_dir / "run-1"

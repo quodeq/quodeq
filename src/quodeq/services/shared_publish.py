@@ -1,6 +1,8 @@
 """Staging logic for publishing a project into the shared results repo.
 
-Pure file operations, no git. Invariants (spec):
+Mostly pure file operations; the one exception is a `git config user.name`
+read (stage_project writes published.json, see audit finding C1). Invariants
+(spec):
 - only completed runs (state == "done") are published
 - explicit allowlist of source-of-truth files, never derived artifacts
 - actions.jsonl is union-merged with the remote copy, never overwritten
@@ -9,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import threading
 import time
@@ -17,6 +20,7 @@ from pathlib import Path
 from quodeq.data.actions_log import ACTIONS_LOG_FILENAME
 from quodeq.services.shared_repo import (
     MARKER_FILENAME,
+    PUBLISHED_META_FILENAME,
     bootstrap_repo_layout,
     check_repo_format,
     ensure_shared_clone,
@@ -108,6 +112,20 @@ def merge_actions_log(ours: Path, theirs: Path, dest: Path) -> None:
 _SCAN_FILENAME = "scan.json"
 
 
+def _publish_attribution(clone_root: Path) -> str:
+    """Who is publishing, per `git config user.name` in the shared clone.
+
+    Reads git config rather than GIT_AUTHOR_NAME/GIT_COMMITTER_NAME: those
+    env vars only affect a new commit's recorded author/committer identity,
+    not `git config` lookups. Falls back to "unknown" (never raises) so a
+    missing git identity never blocks a publish -- audit finding C1 is about
+    truthful attribution when it IS known, not about requiring one.
+    """
+    ok, out = run_git(["config", "user.name"], cwd=clone_root)
+    author = out.strip() if ok else ""
+    return author or "unknown"
+
+
 def stage_project(project_dir: Path, dest_project_dir: Path) -> int:
     dest_project_dir.mkdir(parents=True, exist_ok=True)
     info = project_dir / "repository_info.json"
@@ -129,6 +147,23 @@ def stage_project(project_dir: Path, dest_project_dir: Path) -> int:
     runs = list_completed_runs(project_dir)
     for run_dir in runs:
         copy_run(run_dir, dest_project_dir / run_dir.name)
+
+    # Record who published and when at publish time (audit finding C1),
+    # rather than relying solely on git-log against the shared clone, which
+    # published_meta() still falls back to for dirs published before this
+    # file existed. dest_project_dir is <clone>/evaluations/<project_id>, so
+    # its grandparent is the clone root -- the same root publish_project's
+    # own `repo` variable points at.
+    clone_root = dest_project_dir.parent.parent
+    meta = {
+        "publishedBy": _publish_attribution(clone_root),
+        "publishedAt": int(time.time()),
+    }
+    meta_path = dest_project_dir / PUBLISHED_META_FILENAME
+    tmp = meta_path.with_suffix(meta_path.suffix + ".tmp")
+    tmp.write_text(json.dumps(meta), encoding="utf-8")
+    os.replace(tmp, meta_path)
+
     return len(runs)
 
 
@@ -221,8 +256,8 @@ def publish_project(
 def _push(repo: Path) -> tuple[bool, str]:
     """Push HEAD to the remote's default branch.
 
-    A fresh --depth 1 clone of a brand-new empty bare repo has no commits
-    and no origin/HEAD symref yet, so plain ``push origin HEAD`` has nothing
+    A fresh clone of a brand-new empty bare repo has no commits and no
+    origin/HEAD symref yet, so plain ``push origin HEAD`` has nothing
     to compare against. Detect that case and push with an explicit refspec
     instead, deriving the target branch name from the remote's symref (or
     falling back to the local clone's current branch name).
