@@ -5,6 +5,7 @@ import {
   buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
   resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldShowProjectTabs,
   buildNavigationBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
+  resolveProjectDisplayName,
 } from './App.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
@@ -301,6 +302,44 @@ describe('Sidebar project-data tabs for a shared-only selection (component)', ()
     for (const tab of DATA_TABS) {
       expect(screen.queryByTitle(tab)).toBeNull();
     }
+  });
+});
+
+// A shared/remote project is NOT in the LOCAL projects list, so
+// selectedProjectInfo (a local-list lookup) is null and selectedDisplayName
+// stays equal to the raw UUID -- the anti-UUID guard then suppressed the
+// topbar/sidebar title entirely for remote projects. The name lives in the
+// resolved sharedProjectInfo payload; resolveProjectDisplayName must fall back
+// to it for shared sources.
+describe('resolveProjectDisplayName', () => {
+  it('uses the local project name when the selection is local', () => {
+    expect(resolveProjectDisplayName({
+      selectedProjectInfo: { name: 'growstuff' }, selectedSource: 'local',
+      sharedProjectInfo: null, selectedDisplayName: 'growstuff', selectedProject: 'uuid-1',
+    })).toBe('growstuff');
+  });
+
+  it('falls back to the shared project name for a remote selection not in the local list', () => {
+    expect(resolveProjectDisplayName({
+      selectedProjectInfo: null, selectedSource: 'shared',
+      sharedProjectInfo: { name: 'selectives-ios' },
+      selectedDisplayName: 'b6e548aa', selectedProject: 'b6e548aa',
+    })).toBe('selectives-ios');
+  });
+
+  it('does not borrow a stale shared name for a local selection', () => {
+    expect(resolveProjectDisplayName({
+      selectedProjectInfo: null, selectedSource: 'local',
+      sharedProjectInfo: { name: 'stale-remote' },
+      selectedDisplayName: 'uuid-2', selectedProject: 'uuid-2',
+    })).toBeNull();
+  });
+
+  it('still suppresses the raw UUID while the lists are unresolved', () => {
+    expect(resolveProjectDisplayName({
+      selectedProjectInfo: null, selectedSource: 'shared', sharedProjectInfo: null,
+      selectedDisplayName: 'uuid-3', selectedProject: 'uuid-3',
+    })).toBeNull();
   });
 });
 
