@@ -57,12 +57,14 @@ class AssistantRepository:
     def create_session(self, *, session_id: str, provider: str,
                        model: str | None = None, project_uuid: str | None = None,
                        run_id: str | None = None,
-                       project_id: str | None = None) -> dict:
+                       project_id: str | None = None,
+                       source: str = "local") -> dict:
         with self._connect() as conn:
             conn.execute(
                 "INSERT INTO sessions (id, provider, model, project_uuid, run_id,"
-                " project_id) VALUES (?, ?, ?, ?, ?, ?)",
-                (session_id, provider, model, project_uuid, run_id, project_id),
+                " project_id, source) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (session_id, provider, model, project_uuid, run_id, project_id,
+                 source),
             )
         return self.get_session(session_id)  # type: ignore[return-value]
 
