@@ -797,3 +797,22 @@ def test_create_session_local_reports_read_only_false(client, app):
     body = resp.get_json()
     assert body["readOnly"] is False
     assert _repo(app).get_session(body["sessionId"])["source"] == "local"
+
+
+def test_message_on_shared_session_without_repo_409s_and_frees_the_slot(client, app, monkeypatch):
+    from quodeq.services.shared_settings import SharedSettings
+    # The session was created while a shared repo was configured; it has
+    # since been disconnected. build_tool_context must surface this as a
+    # 409, and the running-turn slot must be released so the session is
+    # not permanently locked out.
+    _repo(app).create_session(session_id="s-gone", provider="ollama", source="shared")
+    monkeypatch.setattr("quodeq.api._assistant_helpers.read_settings",
+                        lambda: SharedSettings(url=None))
+    first = client.post("/api/assistant/sessions/s-gone/messages", json={"text": "hi"})
+    assert first.status_code == 409
+    assert "shared repository" in first.get_json()["error"]
+    # Slot freed: the next POST must hit the same 409, NOT "a turn is
+    # already running".
+    second = client.post("/api/assistant/sessions/s-gone/messages", json={"text": "hi"})
+    assert second.status_code == 409
+    assert "already running" not in second.get_json()["error"]
