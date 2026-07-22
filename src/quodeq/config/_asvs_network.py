@@ -10,6 +10,8 @@ import urllib.error
 import urllib.request
 import os
 
+from quodeq.shared.url_validation import validate_url_safe
+
 _logger = logging.getLogger(__name__)
 
 _ASVS_SHA256_ENV = "QUODEQ_ASVS_SHA256"
@@ -27,6 +29,8 @@ def fetch_with_retry(url: str, timeout: int = _DEFAULT_FETCH_TIMEOUT_S, max_retr
     """
     if not url.startswith("https://"):
         raise ValueError(f"Only https:// URLs are allowed, got: {url!r}")
+    # Reject private/loopback/link-local/metadata targets (SSRF).
+    validate_url_safe(url)
     last_exc: Exception | None = None
     for attempt in range(max_retries):
         _logger.info("Fetching %s (attempt %d/%d)", url, attempt + 1, max_retries)

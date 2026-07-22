@@ -19,6 +19,11 @@ import urllib.error
 from datetime import date
 from pathlib import Path
 
+# Allow running from repo root without installing the package (mirrors tools/rescore.py).
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from quodeq.shared.url_validation import validate_url_safe
+
 _PROGRESS_LOG_INTERVAL = 20
 _RATE_LIMIT_SLEEP_S = 0.1
 _TERMINAL_WIDTH = 80
@@ -63,7 +68,9 @@ def _fetch_cwe_endpoint(
 ) -> dict | None:
     """Fetch a CWE entity from *endpoint* and return the first item under *collection_key*."""
     url = f"{api_base}/{endpoint}/{cwe_id}"
-    if not url.startswith(("http://", "https://")):
+    try:
+        validate_url_safe(url)
+    except ValueError:
         return None
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})

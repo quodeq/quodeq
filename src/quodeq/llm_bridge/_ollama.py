@@ -9,6 +9,8 @@ import subprocess
 import urllib.request
 import urllib.error
 
+from quodeq.shared.url_validation import validate_url_safe
+
 _log = logging.getLogger(__name__)
 
 _OLLAMA_BASE = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -19,10 +21,21 @@ _NVIDIA_SMI_TIMEOUT_S = 5
 _MIB_TO_BYTES = 1024 * 1024
 
 
+def _safe_request(url: str) -> urllib.request.Request:
+    """Build a Request for *url* after an SSRF check.
+
+    Ollama normally runs on localhost, so loopback is allowed. Private-range
+    IPs (10.x, 192.168.x) and link-local/metadata addresses (169.254.x) are
+    rejected. Raises ``ValueError`` for unsafe URLs.
+    """
+    validate_url_safe(url, allow_loopback=True)
+    return urllib.request.Request(url)
+
+
 def get_ollama_status(base_url: str = _OLLAMA_BASE) -> dict:
     """Check if the Ollama server is running."""
     try:
-        req = urllib.request.Request(f"{base_url}/api/version")
+        req = _safe_request(f"{base_url}/api/version")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             return {
@@ -39,7 +52,7 @@ def get_ollama_status(base_url: str = _OLLAMA_BASE) -> dict:
 def list_ollama_models(base_url: str = _OLLAMA_BASE) -> list[dict]:
     """List installed Ollama models."""
     try:
-        req = urllib.request.Request(f"{base_url}/api/tags")
+        req = _safe_request(f"{base_url}/api/tags")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             models = data.get("models", [])
@@ -61,7 +74,7 @@ def list_ollama_models(base_url: str = _OLLAMA_BASE) -> list[dict]:
 def get_running_model_info(base_url: str = _OLLAMA_BASE) -> dict | None:
     """Get info about the currently loaded model (from /api/ps)."""
     try:
-        req = urllib.request.Request(f"{base_url}/api/ps")
+        req = _safe_request(f"{base_url}/api/ps")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             models = data.get("models", [])
