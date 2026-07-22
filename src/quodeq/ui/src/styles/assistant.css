@@ -450,6 +450,10 @@
 /* Model tag in the drawer header (Assistant tab): a compact squared accent
    tag next to the tabs, integrating the provider/model without a subtitle. */
 .drawer-model-chip {
+  display: inline-block;   /* Badge's base class sets inline-flex, and
+                               text-overflow: ellipsis is inert on a flex
+                               container; inline-block here restores the
+                               ellipsis truncation below over that default */
   align-self: center;
   max-width: 14rem;   /* px-based cap so short model names show in full (a %
                          would resolve against a content-sized flex box and

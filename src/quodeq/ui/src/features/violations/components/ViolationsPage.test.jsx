@@ -107,7 +107,7 @@ describe('ViolationsPage — evaluate CTA gating for shared (Critical 1)', () =>
   it('shared source, no evaluations yet: no Start evaluation CTA, shared-specific copy', () => {
     renderPage(baseData());
     expect(screen.getByText('No completed evaluation yet')).toBeInTheDocument();
-    expect(screen.getByText('no completed evaluation in this shared project yet')).toBeInTheDocument();
+    expect(screen.getByText('no completed evaluation in this remote project yet')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Start evaluation' })).toBeNull();
   });
 

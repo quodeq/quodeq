@@ -43,6 +43,7 @@ describe('ProjectsPage', () => {
     await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
     const badges = screen.queryAllByText(/setup incomplete/i);
     expect(badges).toHaveLength(1);
+    expect(badges[0]).toHaveClass('badge', 'badge--tag', 'badge--warning');
   });
 
   it('renders no badge when all projects are local', async () => {

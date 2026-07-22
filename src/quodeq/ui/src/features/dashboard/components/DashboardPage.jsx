@@ -30,7 +30,7 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }
     return (
       <EmptyState
         title="No completed evaluation yet"
-        description="no completed evaluation in this shared project yet"
+        description="no completed evaluation in this remote project yet"
       />
     );
   }

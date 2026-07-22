@@ -275,7 +275,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
           <TermHeader name="violations" sub="no evaluations yet" />
           <EmptyState
             title="No completed evaluation yet"
-            description="no completed evaluation in this shared project yet"
+            description="no completed evaluation in this remote project yet"
           />
         </div>
       );

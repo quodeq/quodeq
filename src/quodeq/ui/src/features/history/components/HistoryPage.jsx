@@ -518,7 +518,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
         <HistoryEmptyShell sub="no evaluations yet">
           <EmptyState
             title="No completed evaluation yet"
-            description="no completed evaluation in this shared project yet"
+            description="no completed evaluation in this remote project yet"
           />
         </HistoryEmptyShell>
       );

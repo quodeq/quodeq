@@ -98,7 +98,7 @@ describe('DashboardPage no-completed-evaluation empty state', () => {
     );
     expect(getByText('No completed evaluation yet')).toBeTruthy();
     expect(getByText('Start evaluation')).toBeTruthy();
-    expect(queryByText('no completed evaluation in this shared project yet')).toBeNull();
+    expect(queryByText('no completed evaluation in this remote project yet')).toBeNull();
   });
 
   it('shared project: hides the Start evaluation CTA and shows shared-specific copy', () => {
@@ -106,7 +106,7 @@ describe('DashboardPage no-completed-evaluation empty state', () => {
       <DashboardPage data={{ ...baseData, selectedSource: 'shared' }} callbacks={{}} runMode={false} />,
     );
     expect(getByText('No completed evaluation yet')).toBeTruthy();
-    expect(getByText('no completed evaluation in this shared project yet')).toBeTruthy();
+    expect(getByText('no completed evaluation in this remote project yet')).toBeTruthy();
     expect(queryByText('Start evaluation')).toBeNull();
   });
 });
@@ -141,7 +141,7 @@ describe('DashboardPage, teammate persona: shared selection + zero local project
     );
     expect(queryByText('No projects yet')).toBeNull();
     expect(queryByText('Add a project')).toBeNull();
-    expect(getByText('no completed evaluation in this shared project yet')).toBeTruthy();
+    expect(getByText('no completed evaluation in this remote project yet')).toBeTruthy();
   });
 
   it('local source with an empty local projects list still shows the Add-a-project wall (unchanged)', () => {
