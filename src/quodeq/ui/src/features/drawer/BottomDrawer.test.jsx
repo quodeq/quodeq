@@ -9,6 +9,7 @@ const drawer = {
   provider: 'ollama', model: 'm', messages: [], streaming: false, error: null, sendMessage: vi.fn(),
   webEnabled: false, toggleWebEnabled: vi.fn(),
   sessionReady: true, resetConversation: vi.fn(),
+  repoInfo: null,
 };
 vi.mock('../assistant/AssistantDrawerProvider.jsx', () => ({ useAssistantDrawer: () => drawer }));
 vi.mock('../terminal/TerminalPane.jsx', () => ({ default: () => <div data-testid="tty" /> }));
@@ -128,4 +129,26 @@ it('hides the new-conversation control while the terminal tab is active', () => 
   render(<BottomDrawer uiState={{}} />);
   expect(screen.queryByRole('button', { name: /new conversation/i })).toBeNull();
   drawer.activeTab = 'assistant';
+});
+
+it('shows NO repo chip when the repo is attached (exception-only signal)', () => {
+  drawer.repoInfo = { attached: true, reason: null, writeAvailable: false };
+  render(<BottomDrawer uiState={{}} />);
+  expect(screen.queryByText('repo')).toBeNull();
+  expect(screen.queryByText(/no repo/)).toBeNull();
+  drawer.repoInfo = null;
+});
+
+it('warns with "no repo access" and the server reason when not attached', () => {
+  drawer.repoInfo = { attached: false, reason: 'online_project', writeAvailable: false };
+  render(<BottomDrawer uiState={{}} />);
+  const chip = screen.getByText('no repo access');
+  expect(chip).toHaveClass('badge', 'badge--tag', 'badge--warning');
+  expect(chip).toHaveAttribute('title', 'Repository not attached: online_project');
+  drawer.repoInfo = null;
+});
+
+it('the model chip is an accent Badge', () => {
+  render(<BottomDrawer uiState={{}} />);
+  expect(screen.getByTitle('Ollama · m')).toHaveClass('badge', 'badge--tag', 'badge--accent', 'drawer-model-chip');
 });

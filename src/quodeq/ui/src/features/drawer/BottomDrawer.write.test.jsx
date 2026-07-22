@@ -33,10 +33,10 @@ vi.mock('../side-pane/index.js', () => ({
 import { BottomDrawer } from './BottomDrawer.jsx';
 
 describe('drawer write affordances', () => {
-  it('renders write toggle, repo chip and pending-changes chip', () => {
+  it('renders write toggle and pending-changes chip; no repo chip when attached (exception-only)', () => {
     render(<BottomDrawer uiState={{}} />);
     expect(screen.getByLabelText('Allow repository edits for this conversation')).toBeTruthy();
-    expect(screen.getByTitle('Repository attached')).toBeTruthy();
+    expect(screen.queryByText('no repo access')).toBeNull();
     expect(screen.getByText('3 files changed')).toBeTruthy();
   });
 

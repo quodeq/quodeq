@@ -454,15 +454,6 @@
   max-width: 14rem;   /* px-based cap so short model names show in full (a %
                          would resolve against a content-sized flex box and
                          ellipsize even short names) */
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  line-height: 1.4;
-  color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
-  border-radius: 4px;
-  padding: 1px 8px;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
