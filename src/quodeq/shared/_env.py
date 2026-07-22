@@ -36,14 +36,66 @@ def get_ai_model(env: dict[str, str] | None = None) -> str | None:
 
 def _env_int(var: str, default: int, env: dict[str, str] | None = None) -> int:
     """Read an environment variable as an int, warn and return *default* on failure."""
+    return env_int(var, default, env=env)
+
+
+def env_int(
+    var: str,
+    default: int,
+    *,
+    minimum: int | None = None,
+    env: dict[str, str] | None = None,
+) -> int:
+    """Read an env var as an int; warn and return *default* on parse failure.
+
+    When *minimum* is given, parsed values below it also fall back to *default*.
+    """
     raw = (env or os.environ).get(var)
     if raw is not None:
         try:
-            return int(raw)
+            value = int(raw)
         except ValueError:
             logging.getLogger(__name__).warning(
-                "Invalid %s=%r (expected integer), using default", var, raw,
+                "Invalid %s=%r (expected integer), using default %r", var, raw, default,
             )
+        else:
+            if minimum is not None and value < minimum:
+                logging.getLogger(__name__).warning(
+                    "Out-of-range %s=%r (minimum %r), using default %r",
+                    var, raw, minimum, default,
+                )
+            else:
+                return value
+    return default
+
+
+def env_float(
+    var: str,
+    default: float,
+    *,
+    minimum: float | None = None,
+    env: dict[str, str] | None = None,
+) -> float:
+    """Read an env var as a float; warn and return *default* on parse failure.
+
+    When *minimum* is given, parsed values below it also fall back to *default*.
+    """
+    raw = (env or os.environ).get(var)
+    if raw is not None:
+        try:
+            value = float(raw)
+        except ValueError:
+            logging.getLogger(__name__).warning(
+                "Invalid %s=%r (expected number), using default %r", var, raw, default,
+            )
+        else:
+            if minimum is not None and value < minimum:
+                logging.getLogger(__name__).warning(
+                    "Out-of-range %s=%r (minimum %r), using default %r",
+                    var, raw, minimum, default,
+                )
+            else:
+                return value
     return default
 
 
