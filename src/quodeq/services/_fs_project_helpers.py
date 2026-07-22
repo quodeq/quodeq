@@ -81,6 +81,14 @@ def _build_project_entry(
     latest_grade, latest_score, files_count = _read_accumulated_summary(
         reports_root, entry_name, runs,
     )
+    # runs is sorted newest-first (list_runs); status is already read there
+    # (cancelled/failed/in_progress detection), so no extra per-run read is
+    # needed here. "Done" == the "complete" bucket list_runs assigns to
+    # anything that isn't a live/cancelled/failed run -- this is what the
+    # update-vs-in-sync comparison needs: the newest run a republish would
+    # actually move forward, skipping a newer run that failed or was
+    # cancelled after the last successful one.
+    latest_done_run_id = next((run.run_id for run in runs if run.status == "complete"), None)
     return ProjectEntry(
         id=entry_name,
         name=meta["name"],
@@ -92,6 +100,7 @@ def _build_project_entry(
         scope_path=meta.get("scopePath"),
         runs_count=len(runs),
         latest_run_id=runs[0].run_id if runs else None,
+        latest_done_run_id=latest_done_run_id,
         latest_date=runs[0].date_iso if runs else None,
         path_exists=_check_path_exists(meta["path"], meta["location"]),
         files_count=files_count,

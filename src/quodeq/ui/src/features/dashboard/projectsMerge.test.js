@@ -106,24 +106,42 @@ describe('deriveAction', () => {
     );
     assert.equal(deriveAction(e, { configured: true }), null);
   });
-  it('both sides same latestRunId -> in sync even if local eval is "newer" by date', () => {
+  it('both sides same latestDoneRunId -> in sync even if local eval is "newer" by date', () => {
     const e = entry(
-      { id: 'a', latestDate: '2026-07-19T00:00:00Z', latestRunId: 'run-1' },
+      { id: 'a', latestDate: '2026-07-19T00:00:00Z', latestRunId: 'run-1', latestDoneRunId: 'run-1' },
       { id: 'a', publishedAt: 1, latestRunId: 'run-1' },
     );
     assert.equal(deriveAction(e, { configured: true }), null);
   });
-  it('differing latestRunId -> update, even same-day (the midnight-UTC bug)', () => {
+  it('differing latestDoneRunId -> update, even same-day (the midnight-UTC bug)', () => {
     // Local's date-only eval parses to midnight UTC; shared published later
     // the same day. Old timestamp comparison would say "not newer" -> null.
-    // Run identity must still win: different ids -> update.
+    // Done-run identity must still win: different ids -> update.
     const e = entry(
-      { id: 'a', latestDate: '2026-07-19', latestRunId: 'run-2' },
+      { id: 'a', latestDate: '2026-07-19', latestRunId: 'run-2', latestDoneRunId: 'run-2' },
       { id: 'a', publishedAt: Date.parse('2026-07-19T14:00:00Z'), latestRunId: 'run-1' },
     );
     assert.equal(deriveAction(e, { configured: true }), 'update');
   });
-  it('shared entry without latestRunId falls back to timestamp comparison', () => {
+  it('local latest run failed/cancelled after a done publish -> stays in sync', () => {
+    // Publish run A (done). Run B fails or is cancelled afterwards. Local's
+    // raw latestRunId moves to B, but latestDoneRunId still points at A --
+    // the comparison must use the done id, not the raw latest run, or this
+    // is a permanent false 'update' that republishing can never clear.
+    const e = entry(
+      { id: 'a', latestRunId: 'B', latestDoneRunId: 'A' },
+      { id: 'a', latestRunId: 'A' },
+    );
+    assert.equal(deriveAction(e, { configured: true }), null);
+  });
+  it('local has no done runs but shared has a published one -> nothing to publish, in sync', () => {
+    const e = entry(
+      { id: 'a', latestRunId: 'B', latestDoneRunId: null },
+      { id: 'a', latestRunId: 'A' },
+    );
+    assert.equal(deriveAction(e, { configured: true }), null);
+  });
+  it('shared entry without any run identity falls back to timestamp comparison', () => {
     const e = entry(
       { id: 'a', latestDate: '2026-07-19T00:00:00Z', latestRunId: 'run-1' },
       { id: 'a', publishedAt: 1 },
