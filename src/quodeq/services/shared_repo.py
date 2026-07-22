@@ -25,6 +25,7 @@ import json
 import logging
 import os
 import shutil
+import stat
 import subprocess
 import threading
 from pathlib import Path
@@ -40,6 +41,29 @@ logger = logging.getLogger(__name__)
 
 _CACHE_ENV = "QUODEQ_CACHE_ROOT"
 _DEFAULT_GIT_TIMEOUT_S = 300
+
+
+def _clear_readonly_and_retry(func, path, exc):  # noqa: ARG001
+    """rmtree onexc callback for git trees. Git marks object files read-only,
+    and on Windows deleting a read-only file raises PermissionError (POSIX
+    deletion only checks the parent dir). Clear the bit and retry once; if
+    that also fails, log instead of raising so cleanup stays best-effort."""
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except OSError as retry_exc:
+        logger.warning("failed to remove %s: %s", path, retry_exc)
+
+
+def remove_clone_dir(path: Path | str) -> None:
+    """Best-effort recursive delete that tolerates git's read-only files.
+
+    Missing paths are a no-op. Never raises: a half-removed or
+    permission-denied dir must not turn cleanup into a 500.
+    """
+    if not os.path.lexists(path):
+        return
+    shutil.rmtree(path, onexc=_clear_readonly_and_retry)
 
 
 def _git_env() -> dict[str, str]:
@@ -127,7 +151,7 @@ def ensure_shared_clone(url: str, env: dict | None = None) -> Path | None:
         ok, out = run_git(["clone", "--", url, str(repo)])
         if not ok:
             logger.warning("shared clone failed for %s: %s", url, out.strip()[:500])
-            shutil.rmtree(repo, ignore_errors=True)
+            remove_clone_dir(repo)
             return None
         return repo
 

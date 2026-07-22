@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import functools
 import logging
-import shutil
 import zipfile
 from http import HTTPStatus
 from pathlib import Path
@@ -36,6 +35,7 @@ from quodeq.services.shared_repo import (
     published_meta,
     read_state,
     refresh_shared_clone,
+    remove_clone_dir,
     shared_cache_dir,
     shared_evaluations_root,
     shared_index_db_path,
@@ -222,8 +222,10 @@ def register_shared_routes(app: Flask) -> None:
         # gone from settings after write_settings), then remove it AFTER --
         # so a crash between the two leaves the (still-usable) clone in
         # place rather than an orphaned dir with no settings pointing at it.
-        # ignore_errors=True: a half-removed or permission-denied cache dir
-        # must not turn a disconnect into a 500.
+        # remove_clone_dir handles git's read-only object files (plain
+        # rmtree leaves them behind on Windows, corrupting a later
+        # reconnect's adopted clone) and never raises: a half-removed or
+        # permission-denied cache dir must not turn a disconnect into a 500.
         #
         # Review finding: rmtree must run under clone_lock(url), same as
         # every other clone mutator (ensure_shared_clone, refresh_shared_clone,
@@ -234,7 +236,7 @@ def register_shared_routes(app: Flask) -> None:
         write_settings(SharedSettings(url=None))
         if settings.url is not None:
             with clone_lock(settings.url):
-                shutil.rmtree(shared_cache_dir(settings.url), ignore_errors=True)
+                remove_clone_dir(shared_cache_dir(settings.url))
         return jsonify({"configured": False})
 
     @app.post("/api/shared/refresh")

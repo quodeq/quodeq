@@ -1,6 +1,5 @@
 """Tests for shared repo clone management."""
 import json
-import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -15,6 +14,7 @@ from quodeq.services.shared_repo import (
     published_meta,
     read_state,
     refresh_shared_clone,
+    remove_clone_dir,
     run_git,
     shared_cache_dir,
     shared_evaluations_root,
@@ -557,7 +557,9 @@ def test_published_meta_legacy_fallback_correct_per_path_author_with_full_histor
     _publish_project_as(monkeypatch, url, root, "proj-b", "bob")
 
     # Force a fresh re-clone from origin, which now holds both commits.
-    shutil.rmtree(shared_repo_path(url))
+    # remove_clone_dir, not plain rmtree: git object files are read-only,
+    # which makes rmtree fail with PermissionError on Windows.
+    remove_clone_dir(shared_repo_path(url))
     assert ensure_shared_clone(url) is not None
 
     # Simulate a legacy dir published before published.json existed: drop
@@ -655,3 +657,51 @@ def test_refresh_shared_clone_success_returns_empty_reason(tmp_path, monkeypatch
     ok, reason = refresh_shared_clone(url)
     assert ok is True
     assert reason == ""
+
+
+# --- remove_clone_dir: Windows-safe deletion of git trees ---------------
+# Git marks object files read-only. POSIX deletion only checks the parent
+# dir, but on Windows rmtree raises PermissionError on them, so plain
+# rmtree fails (test suite) or silently leaves .git debris behind
+# (ignore_errors=True in disconnect, corrupting a later reconnect).
+
+
+def test_remove_clone_dir_deletes_tree_with_readonly_files(tmp_path):
+    """A tree holding read-only files (git objects) is fully removed."""
+    tree = tmp_path / "repo"
+    objects = tree / ".git" / "objects" / "09"
+    objects.mkdir(parents=True)
+    blob = objects / "abc123"
+    blob.write_bytes(b"x")
+    blob.chmod(0o444)
+
+    remove_clone_dir(tree)
+
+    assert not tree.exists()
+
+
+def test_remove_clone_dir_missing_path_is_noop(tmp_path):
+    remove_clone_dir(tmp_path / "never-created")
+
+
+def test_remove_clone_dir_never_raises_on_persistent_failure(tmp_path, caplog, monkeypatch):
+    """If chmod+retry also fails, the error is logged, not raised (a
+    permission-denied cache dir must not turn a disconnect into a 500)."""
+    import os as _os
+
+    tree = tmp_path / "repo"
+    tree.mkdir()
+    (tree / "f").write_bytes(b"x")
+
+    real_unlink = _os.unlink
+
+    def deny_unlink(path, *a, **kw):
+        if Path(path).name == "f":
+            raise PermissionError(5, "Access is denied", str(path))
+        return real_unlink(path, *a, **kw)
+
+    monkeypatch.setattr(_os, "unlink", deny_unlink)
+    with caplog.at_level("WARNING"):
+        remove_clone_dir(tree)  # must not raise
+
+    assert "failed to remove" in caplog.text
