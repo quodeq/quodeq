@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import {
   buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
   resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldShowProjectTabs,
-  buildNavigationBundle, shouldWallEmptyProjects, buildWizardHandlers,
+  buildNavigationBundle, shouldWallEmptyProjects, buildWizardHandlers, shouldCloseAssistantForSource,
 } from './App.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
@@ -449,5 +449,23 @@ describe('resolveSelectionAfterSharedDisconnect', () => {
   it('clears the selection to the app\'s no-project state when there are no local projects', () => {
     expect(resolveSelectionAfterSharedDisconnect({ selectedSource: 'shared', projects: [] }))
       .toEqual({ id: '', source: 'local' });
+  });
+});
+
+// Regression lock for the shared-project drawer guard: it must close ONLY the
+// assistant panel. The old guard closed the whole drawer, which made the
+// terminal unopenable on shared projects (it closed itself the instant the
+// launcher opened it).
+describe('shouldCloseAssistantForSource', () => {
+  it('closes the assistant panel on a shared project', () => {
+    expect(shouldCloseAssistantForSource('shared', ['assistant'])).toBe(true);
+    expect(shouldCloseAssistantForSource('shared', ['assistant', 'terminal'])).toBe(true);
+  });
+  it('leaves a terminal-only drawer alone on a shared project', () => {
+    expect(shouldCloseAssistantForSource('shared', ['terminal'])).toBe(false);
+    expect(shouldCloseAssistantForSource('shared', [])).toBe(false);
+  });
+  it('never fires for local projects', () => {
+    expect(shouldCloseAssistantForSource('local', ['assistant', 'terminal'])).toBe(false);
   });
 });
