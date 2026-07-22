@@ -106,4 +106,28 @@ describe('deriveAction', () => {
     );
     assert.equal(deriveAction(e, { configured: true }), null);
   });
+  it('both sides same latestRunId -> in sync even if local eval is "newer" by date', () => {
+    const e = entry(
+      { id: 'a', latestDate: '2026-07-19T00:00:00Z', latestRunId: 'run-1' },
+      { id: 'a', publishedAt: 1, latestRunId: 'run-1' },
+    );
+    assert.equal(deriveAction(e, { configured: true }), null);
+  });
+  it('differing latestRunId -> update, even same-day (the midnight-UTC bug)', () => {
+    // Local's date-only eval parses to midnight UTC; shared published later
+    // the same day. Old timestamp comparison would say "not newer" -> null.
+    // Run identity must still win: different ids -> update.
+    const e = entry(
+      { id: 'a', latestDate: '2026-07-19', latestRunId: 'run-2' },
+      { id: 'a', publishedAt: Date.parse('2026-07-19T14:00:00Z'), latestRunId: 'run-1' },
+    );
+    assert.equal(deriveAction(e, { configured: true }), 'update');
+  });
+  it('shared entry without latestRunId falls back to timestamp comparison', () => {
+    const e = entry(
+      { id: 'a', latestDate: '2026-07-19T00:00:00Z', latestRunId: 'run-1' },
+      { id: 'a', publishedAt: 1 },
+    );
+    assert.equal(deriveAction(e, { configured: true }), 'update');
+  });
 });

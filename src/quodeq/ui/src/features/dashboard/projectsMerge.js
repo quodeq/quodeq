@@ -89,6 +89,13 @@ export function deriveAction(entry, { configured }) {
   const { local, shared } = entry;
   if (local && !shared) return configured ? 'publish' : null;
   if (!local && shared) return 'pull';
+  // Both sides present. Prefer run identity: it's exact and immune to the
+  // date-only-vs-epoch skew a same-day timestamp comparison can't resolve.
+  // Legacy shared entries omit latestRunId (a project with zero runs), so
+  // fall back to the old timestamp comparison whenever either id is absent.
+  if (local?.latestRunId && shared?.latestRunId) {
+    return local.latestRunId !== shared.latestRunId ? 'update' : null;
+  }
   const lastEval = toMs(local?.latestDate);
   const publishedAt = toMs(shared?.publishedAt);
   if (lastEval != null && (publishedAt == null || lastEval > publishedAt)) return 'update';
