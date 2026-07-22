@@ -113,10 +113,21 @@ def refresh_shared_clone(url: str, env: dict | None = None, *, timeout: int = _D
     into a stale=true response in ~*timeout* seconds instead. Does not
     affect ensure_shared_clone's own (still 300s) clone timeout -- an
     initial clone can legitimately take much longer than a refresh.
+
+    Unshallowing only applies to NEW clones: ensure_shared_clone stopped
+    passing --depth 1 in a prior fix, but a shared-clone cache directory
+    created back when it still did stays shallow forever otherwise --
+    ensure_shared_clone early-returns because `.git` already exists, and a
+    plain `fetch origin HEAD` does not unshallow a repo on its own. If
+    `.git/shallow` is present, try `git fetch --unshallow origin` first; a
+    failure there (network hiccup, odd remote) is not fatal -- fall through
+    to the plain fetch below, and a later refresh call retries the unshallow.
     """
     repo = shared_repo_path(url, env)
     if not (repo / ".git").exists():
         return ensure_shared_clone(url, env) is not None
+    if (repo / ".git" / "shallow").exists():
+        run_git(["fetch", "--unshallow", "origin"], cwd=repo, timeout=timeout)
     ok, _ = run_git(["fetch", "origin", "HEAD"], cwd=repo, timeout=timeout)
     if not ok:
         return False

@@ -564,3 +564,53 @@ def test_published_meta_legacy_fallback_correct_per_path_author_with_full_histor
     meta = published_meta(url)
     assert meta["proj-a"]["publishedBy"] == "alice"
     assert meta["proj-b"]["publishedBy"] == "bob"
+
+
+def test_refresh_shared_clone_unshallows_legacy_cache(tmp_path, monkeypatch):
+    """Review finding on commit 09c3dd71: unshallowing only helps NEW clones
+    (ensure_shared_clone's `--depth 1` removal). A shared-clone cache
+    directory created while the old `--depth 1` code was live stays shallow
+    forever: ensure_shared_clone early-returns because `.git` already
+    exists, and a plain `fetch origin HEAD` does not unshallow on its own
+    (verified live). refresh_shared_clone must detect `.git/shallow` and run
+    `git fetch --unshallow origin` first, so a legacy shallow cache
+    self-heals on its next refresh instead of keeping the shallow-clone
+    misattribution (audit finding C1) forever.
+    """
+    builder_cache = tmp_path / "builder-cache"
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(builder_cache))
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    url = f"file://{origin}"
+    root = tmp_path / "evaluations"
+
+    # Two commits by different authors, same fixture shape as the C1
+    # regression above: a shallow (grafted-tip) clone attributes every path
+    # to bob (the later, tip commit) instead of proj-a's real author alice.
+    _make_minimal_project(root, "proj-a")
+    _publish_project_as(monkeypatch, url, root, "proj-a", "alice")
+    _make_minimal_project(root, "proj-b")
+    _publish_project_as(monkeypatch, url, root, "proj-b", "bob")
+
+    # Point QUODEQ_CACHE_ROOT at the real cache root this test targets, and
+    # manually build a shallow clone at the EXACT path shared_repo_path(url)
+    # expects -- simulating a cache dir created back when ensure_shared_clone
+    # still used `git clone --depth 1`.
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    repo = shared_repo_path(url)
+    repo.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["git", "clone", "--depth", "1", url, str(repo)], check=True, capture_output=True,
+    )
+    assert (repo / ".git" / "shallow").exists()
+
+    assert refresh_shared_clone(url) is True
+    assert not (repo / ".git" / "shallow").exists()
+
+    # Force the legacy git-log fallback for proj-a, AFTER refresh (refresh's
+    # own reset --hard would otherwise restore published.json from history,
+    # masking the bug this test targets).
+    (shared_evaluations_root(url) / "proj-a" / "published.json").unlink()
+
+    meta = published_meta(url)
+    assert meta["proj-a"]["publishedBy"] == "alice"
