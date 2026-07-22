@@ -66,6 +66,32 @@ def test_fallback_removes_partial_clone_dir(tmp_path):
     assert len(calls) == 2
 
 
+def test_fallback_removes_partial_clone_with_readonly_objects(
+    tmp_path, windows_unlink_semantics
+):
+    """A partial dest holds read-only git object files, which Windows
+    refuses to unlink. rmtree(ignore_errors=True) silently left them
+    behind, turning the retry into a bogus dest_exists failure. Cleanup
+    must clear the read-only bit and retry (shared_repo.remove_clone_dir)."""
+    dest = tmp_path / "dest"
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        if len(calls) == 1:
+            objects = dest / ".git" / "objects" / "09"
+            objects.mkdir(parents=True)
+            blob = objects / "deadbeef"
+            blob.write_bytes(b"x")
+            blob.chmod(0o444)
+            raise _stderr("some unrelated git error")
+        assert not dest.exists(), "partial clone dir must be removed before the retry"
+
+    with patch("quodeq.services._fs_clone._subprocess.run", side_effect=fake_run):
+        run_git_clone("https://x/y.git", dest)
+    assert len(calls) == 2
+
+
 @pytest.mark.parametrize(
     "stderr_text,expected_kind",
     [
