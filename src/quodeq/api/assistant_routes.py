@@ -31,6 +31,14 @@ _running_turns: set[str] = set()
 _cancel_tokens: dict[str, CancelToken] = {}
 _running_lock = threading.Lock()
 
+# Each open assistant SSE stream pins a server worker thread for its whole
+# lifetime, and the global rate limiter exempts GETs — without a cap an
+# authenticated caller can exhaust every worker with idle streams. 16 is
+# generous for the real UI (one stream per open drawer/tab).
+_MAX_SSE_STREAMS = 16
+_open_sse_streams = 0
+_sse_lock = threading.Lock()
+
 
 def _try_claim_turn(sid: str) -> bool:
     """Atomically claim the per-session turn slot for a workspace action so a
@@ -224,6 +232,27 @@ def register_assistant_routes(app: Flask) -> None:
         except ValueError:
             after = 0
 
+        global _open_sse_streams
+        with _sse_lock:
+            if _open_sse_streams >= _MAX_SSE_STREAMS:
+                return jsonify({"error": "too many open event streams"}), 429
+            _open_sse_streams += 1
+
+        released = False
+
+        def _release_stream():
+            # Idempotent: runs from both the generator's finally and the
+            # response's on-close callback (the callback covers the case where
+            # the client drops before the generator is ever started, in which
+            # case a generator finally never executes).
+            nonlocal released
+            global _open_sse_streams
+            with _sse_lock:
+                if released:
+                    return
+                released = True
+                _open_sse_streams -= 1
+
         def _generate():
             # SSE comments (":keepalive") are invisible to EventSource — only
             # DATA frames fire onmessage and reset the browser's inactivity
@@ -232,21 +261,25 @@ def register_assistant_routes(app: Flask) -> None:
             # frame, not just comments. Throttled to ~every 20th idle tick
             # (20 * _POLL_SECONDS == ~5s) so we don't spam a data frame every
             # 0.25s; cheap ":keepalive" comments fill the gaps in between.
-            yield ":keepalive\n\n"
-            idle_ticks = 0
-            for item in event_frames(repo, sid, after):
-                if item is None:
-                    idle_ticks += 1
-                    if idle_ticks % 20 == 0:
-                        yield sse_line(json.dumps({"type": "heartbeat"}))
+            try:
+                yield ":keepalive\n\n"
+                idle_ticks = 0
+                for item in event_frames(repo, sid, after):
+                    if item is None:
+                        idle_ticks += 1
+                        if idle_ticks % 20 == 0:
+                            yield sse_line(json.dumps({"type": "heartbeat"}))
+                        else:
+                            yield ":keepalive\n\n"
                     else:
-                        yield ":keepalive\n\n"
-                else:
-                    idle_ticks = 0
-                    seq, frame = item
-                    yield sse_line(json.dumps(frame, ensure_ascii=False), event_id=seq)
+                        idle_ticks = 0
+                        seq, frame = item
+                        yield sse_line(json.dumps(frame, ensure_ascii=False), event_id=seq)
+            finally:
+                _release_stream()
 
         resp = Response(_generate(), mimetype="text/event-stream")
+        resp.call_on_close(_release_stream)
         resp.headers["Cache-Control"] = "no-cache"
         resp.headers["X-Accel-Buffering"] = "no"
         return resp

@@ -68,3 +68,56 @@ def test_validated_path_rejects_dotdot_in_raw_path(tmp_path: Path):
     assert ".." in Path(raw).parts, "precondition: '..' must be in raw parts"
     assert ".." not in Path(raw).resolve().parts, "precondition: resolve() removes '..'"
     assert _validated_rate_limit_path(raw) == _DEFAULT_RATE_LIMIT_FILE
+
+
+# ---------------------------------------------------------------------------
+# REL-082/083 -- window/max env values must be positive; zero, negative, or
+# malformed values fall back to the defaults instead of disabling the limiter
+# (window <= 0) or blocking every client (max <= 0).
+# ---------------------------------------------------------------------------
+
+from quodeq.api._rate_limit_config import (
+    _DEFAULT_RATE_LIMIT_MAX,
+    _DEFAULT_RATE_LIMIT_WINDOW,
+    _rate_limit_max,
+    _rate_limit_window,
+)
+
+
+@pytest.mark.parametrize("raw", ["0", "-5", "abc", ""])
+def test_rate_limit_window_falls_back_on_invalid_env(raw):
+    assert _rate_limit_window(env={"QUODEQ_RATE_LIMIT_WINDOW": raw}) == _DEFAULT_RATE_LIMIT_WINDOW
+
+
+def test_rate_limit_window_accepts_valid_env():
+    assert _rate_limit_window(env={"QUODEQ_RATE_LIMIT_WINDOW": "30"}) == 30
+
+
+@pytest.mark.parametrize("raw", ["0", "-1", "many", ""])
+def test_rate_limit_max_falls_back_on_invalid_env(raw):
+    assert _rate_limit_max(env={"QUODEQ_RATE_LIMIT_MAX": raw}) == _DEFAULT_RATE_LIMIT_MAX
+
+
+def test_rate_limit_max_accepts_valid_env():
+    assert _rate_limit_max(env={"QUODEQ_RATE_LIMIT_MAX": "5"}) == 5
+
+
+# ---------------------------------------------------------------------------
+# REL-078 -- a valid-JSON-but-non-object state file must not crash
+# record()/check(); it is treated as empty state.
+# ---------------------------------------------------------------------------
+
+def test_load_treats_non_dict_json_as_empty(tmp_path: Path):
+    target = tmp_path / "rl.json"
+    target.write_text("[1, 2, 3]", encoding="utf-8")
+    store = FileRateLimitStore(path=target)
+    assert store.check("1.2.3.4", 1000.0) is False
+    store.record("1.2.3.4", 1000.0)  # must not raise
+    assert "1.2.3.4" in json.loads(target.read_text(encoding="utf-8"))
+
+
+def test_load_treats_scalar_json_as_empty(tmp_path: Path):
+    target = tmp_path / "rl.json"
+    target.write_text('"corrupt"', encoding="utf-8")
+    store = FileRateLimitStore(path=target)
+    assert store.check("1.2.3.4", 1000.0) is False

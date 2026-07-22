@@ -148,3 +148,85 @@ class TestEstimateAgentsValidation:
         )
         assert resp.status_code == 400
         assert resp.get_json()["code"] == "INVALID_PARAM"
+
+
+# ---------------------------------------------------------------------------
+# SEC-13 — the OMLX models route takes the API key from the X-Api-Key header,
+#          never from the query string (query params leak via access logs,
+#          browser history, and referrers).
+# ---------------------------------------------------------------------------
+
+class TestOmlxModels:
+    def test_api_key_read_from_header(self, client):
+        with patch("quodeq.api.llm_bridge_routes.list_omlx_models") as mock:
+            mock.return_value = []
+            resp = client.get(
+                "/api/omlx/models?base_url=http://localhost:10240",
+                headers={"X-Api-Key": " sk-header "},
+            )
+        assert resp.status_code == 200
+        mock.assert_called_once_with(base_url="http://localhost:10240", api_key="sk-header")
+
+    def test_api_key_query_param_no_longer_honored(self, client):
+        with patch("quodeq.api.llm_bridge_routes.list_omlx_models") as mock:
+            mock.return_value = []
+            resp = client.get("/api/omlx/models?api_key=sk-leaky")
+        assert resp.status_code == 200
+        mock.assert_called_once_with(base_url=None, api_key=None)
+
+
+# ---------------------------------------------------------------------------
+# REL-084/085/086/087/088 — POST routes must 400 on a JSON body that parses
+# but is not an object (e.g. [1] or "x"), instead of crashing at data.get.
+# ---------------------------------------------------------------------------
+
+class TestJsonObjectBodyRequired:
+    @pytest.mark.parametrize("route", [
+        "/api/ollama/test-concurrency",
+        "/api/ollama/estimate-agents",
+        "/api/llamacpp/test-concurrency",
+        "/api/omlx/test-concurrency",
+        "/api/provider/test",
+    ])
+    def test_array_body_returns_400(self, client, route):
+        resp = client.post(route, json=[1], headers={"Origin": "http://localhost"})
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_PARAM"
+
+    @pytest.mark.parametrize("route", [
+        "/api/ollama/test-concurrency",
+        "/api/omlx/test-concurrency",
+    ])
+    def test_string_body_returns_400(self, client, route):
+        resp = client.post(route, json="x", headers={"Origin": "http://localhost"})
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_PARAM"
+
+    def test_omlx_non_string_base_url_returns_400(self, client):
+        resp = client.post(
+            "/api/omlx/test-concurrency",
+            json={"model": "m", "base_url": 123},
+            headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_PARAM"
+
+    def test_omlx_non_string_api_key_returns_400(self, client):
+        resp = client.post(
+            "/api/omlx/test-concurrency",
+            json={"model": "m", "api_key": ["k"]},
+            headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_PARAM"
+
+    def test_omlx_valid_string_fields_pass_through(self, client):
+        with patch("quodeq.api.llm_bridge_routes.run_omlx_concurrency_test") as mock:
+            mock.return_value = {"recommended": 2}
+            resp = client.post(
+                "/api/omlx/test-concurrency",
+                json={"model": "m", "base_url": " http://x ", "api_key": ""},
+                headers={"Origin": "http://localhost"},
+            )
+        assert resp.status_code == 200
+        mock.assert_called_once_with("m", base_url="http://x", api_key=None)

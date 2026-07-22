@@ -23,6 +23,20 @@ from quodeq.llm_bridge import (
 from quodeq.shared.url_validation import validate_url_safe
 
 
+def _json_body() -> dict | None:
+    """Return the request's JSON body when it is an object, else None.
+
+    A body like ``[1]`` or ``"x"`` parses as valid JSON but crashes the
+    ``data.get(...)`` calls below with an AttributeError (a 500); callers
+    turn None into a 400 instead.
+    """
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else None
+
+
+_BODY_NOT_OBJECT = {"error": "request body must be a JSON object", "code": "INVALID_PARAM"}
+
+
 def register_llm_bridge_routes(app: Flask) -> None:
     """Register all llm_bridge API routes."""
 
@@ -36,7 +50,9 @@ def register_llm_bridge_routes(app: Flask) -> None:
 
     @app.post("/api/ollama/test-concurrency")
     def ollama_test_concurrency() -> Response:
-        data = request.get_json() or {}
+        data = _json_body()
+        if data is None:
+            return jsonify(_BODY_NOT_OBJECT), 400
         model = data.get("model", "")
         if not model or not isinstance(model, str):
             return jsonify({"error": "model is required", "code": "MISSING_PARAM"}), 400
@@ -47,7 +63,9 @@ def register_llm_bridge_routes(app: Flask) -> None:
 
     @app.post("/api/ollama/estimate-agents")
     def ollama_estimate_agents() -> Response:
-        data = request.get_json() or {}
+        data = _json_body()
+        if data is None:
+            return jsonify(_BODY_NOT_OBJECT), 400
         model_size = data.get("model_size", 0)
         gpu_memory = data.get("gpu_memory", 0)
         if (isinstance(model_size, bool) or isinstance(gpu_memory, bool)
@@ -66,7 +84,9 @@ def register_llm_bridge_routes(app: Flask) -> None:
 
     @app.post("/api/llamacpp/test-concurrency")
     def llamacpp_test_concurrency() -> Response:
-        data = request.get_json() or {}
+        data = _json_body()
+        if data is None:
+            return jsonify(_BODY_NOT_OBJECT), 400
         model = data.get("model", "")
         if not isinstance(model, str):
             return jsonify({"error": "model must be a string", "code": "INVALID_PARAM"}), 400
@@ -83,25 +103,35 @@ def register_llm_bridge_routes(app: Flask) -> None:
     @app.get("/api/omlx/models")
     def omlx_models() -> Response:
         base_url = request.args.get("base_url", "").strip() or None
-        api_key = request.args.get("api_key", "").strip() or None
+        # The key rides in a header, never the query string: query params leak
+        # through access logs, browser history, and referrers.
+        api_key = (request.headers.get("X-Api-Key") or "").strip() or None
         return jsonify({"models": list_omlx_models(base_url=base_url, api_key=api_key)})
 
     @app.post("/api/omlx/test-concurrency")
     def omlx_test_concurrency() -> Response:
-        data = request.get_json() or {}
+        data = _json_body()
+        if data is None:
+            return jsonify(_BODY_NOT_OBJECT), 400
         model = data.get("model", "")
         if not isinstance(model, str):
             return jsonify({"error": "model must be a string", "code": "INVALID_PARAM"}), 400
         if "\\" in model or ".." in model or "\0" in model:
             return jsonify({"error": "Invalid model name", "code": "INVALID_PARAM"}), 400
-        base_url = data.get("base_url", "").strip() or None
-        api_key = data.get("api_key", "").strip() or None
+        base_url = data.get("base_url") or ""
+        api_key = data.get("api_key") or ""
+        if not isinstance(base_url, str) or not isinstance(api_key, str):
+            return jsonify({"error": "base_url and api_key must be strings", "code": "INVALID_PARAM"}), 400
+        base_url = base_url.strip() or None
+        api_key = api_key.strip() or None
         result = run_omlx_concurrency_test(model, base_url=base_url, api_key=api_key)
         return jsonify(result)
 
     @app.post("/api/provider/test")
     def provider_test() -> Response:
-        data = request.get_json() or {}
+        data = _json_body()
+        if data is None:
+            return jsonify(_BODY_NOT_OBJECT), 400
         configs = get_provider_configs()
         provider_id = data.get("provider", "")
         provider_cfg = configs.get(provider_id, {}) if provider_id else {}

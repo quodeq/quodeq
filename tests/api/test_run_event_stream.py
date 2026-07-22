@@ -336,3 +336,29 @@ def test_run_events_generator_handles_already_terminal_run(tmp_path: Path):
 # evals. See ``routes_findings.py`` and the API-level tests for the new
 # mutation-returns-scores contract.
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# REL-023 -- a malformed QUODEQ_SSE_HEARTBEAT_S must not raise at module
+# import (that would prevent the API process from starting); it falls back
+# to the 15s default. Out-of-range values fall back too.
+# ---------------------------------------------------------------------------
+
+def test_heartbeat_env_fallback_never_breaks_import(monkeypatch):
+    import importlib
+
+    from quodeq.api import _run_event_stream as mod
+
+    try:
+        monkeypatch.setenv("QUODEQ_SSE_HEARTBEAT_S", "not-a-number")
+        assert importlib.reload(mod)._HEARTBEAT_S == 15.0
+
+        monkeypatch.setenv("QUODEQ_SSE_HEARTBEAT_S", "-3")
+        assert importlib.reload(mod)._HEARTBEAT_S == 15.0
+
+        monkeypatch.setenv("QUODEQ_SSE_HEARTBEAT_S", "2.5")
+        assert importlib.reload(mod)._HEARTBEAT_S == 2.5
+    finally:
+        # Restore the module to its env-clean state for other tests.
+        monkeypatch.delenv("QUODEQ_SSE_HEARTBEAT_S", raising=False)
+        importlib.reload(mod)

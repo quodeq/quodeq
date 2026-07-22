@@ -1,8 +1,9 @@
 """Rate-limit configuration constants and environment helpers."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
+
+from quodeq.shared._env import env_int
 
 _DEFAULT_RATE_LIMIT_WINDOW = 60
 # 60/min was too tight for the dashboard's bulk-dismiss UX — burst-dismissing
@@ -17,19 +18,21 @@ _PRUNE_THRESHOLD_MULTIPLIER = 2  # prune per-IP list when it exceeds max_request
 
 
 def _rate_limit_window(env: dict[str, str] | None = None) -> int:
-    """Return the rate-limit window in seconds."""
-    try:
-        return int((env or os.environ).get("QUODEQ_RATE_LIMIT_WINDOW", str(_DEFAULT_RATE_LIMIT_WINDOW)))
-    except (ValueError, TypeError):
-        return _DEFAULT_RATE_LIMIT_WINDOW
+    """Return the rate-limit window in seconds.
+
+    minimum=1: a zero/negative window prunes every recorded timestamp
+    immediately, silently disabling the limiter.
+    """
+    return env_int("QUODEQ_RATE_LIMIT_WINDOW", _DEFAULT_RATE_LIMIT_WINDOW, minimum=1, env=env)
 
 
 def _rate_limit_max(env: dict[str, str] | None = None) -> int:
-    """Return the maximum number of requests per window."""
-    try:
-        return int((env or os.environ).get("QUODEQ_RATE_LIMIT_MAX", str(_DEFAULT_RATE_LIMIT_MAX)))
-    except (ValueError, TypeError):
-        return _DEFAULT_RATE_LIMIT_MAX
+    """Return the maximum number of requests per window.
+
+    minimum=1: a zero/negative maximum makes every request exceed the limit,
+    blocking all clients including the app's own UI.
+    """
+    return env_int("QUODEQ_RATE_LIMIT_MAX", _DEFAULT_RATE_LIMIT_MAX, minimum=1, env=env)
 
 
 def default_rate_limit_path() -> Path:
