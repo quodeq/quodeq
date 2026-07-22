@@ -116,7 +116,15 @@ export function usePublish({ enabled = true } = {}) {
     // mounted with `enabled: false` (e.g. no local projects at the moment
     // the job that just finished was started for a project elsewhere).
     return queryClient
-      .fetchQuery({ queryKey: sharedKeys.list(), queryFn: () => sharedListProjects({ refresh: false }) })
+      .fetchQuery({
+        queryKey: sharedKeys.list(),
+        queryFn: () => sharedListProjects({ refresh: false }),
+        // Force the fetch: the production QueryClient's default staleTime is
+        // 30s (see api/queryClient.js), so without this a still-fresh cache
+        // entry would let fetchQuery resolve without ever hitting the
+        // network -- silently contradicting the comment above this function.
+        staleTime: 0,
+      })
       .catch(() => {
         // Best effort -- a failed refresh just leaves the "published <time
         // ago>" meta stale on cards; it is not primary content worth an

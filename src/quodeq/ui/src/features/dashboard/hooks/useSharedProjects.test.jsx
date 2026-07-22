@@ -1,9 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useSharedProjects } from './useSharedProjects.js';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
+import { sharedKeys } from '../../../api/queryKeys.js';
 
 function makeFakeApi(overrides = {}) {
   return {
@@ -237,6 +239,38 @@ describe('useSharedProjects', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.lastSynced).toBe('2026-07-15T00:00:00Z');
     expect(result.current.error).toBe('list failed');
+  });
+
+  // Ghost shared cards after disconnect (final whole-branch review, Important
+  // finding): the list query is disabled once `configured` flips false, but a
+  // disabled query's cached data is not cleared by invalidation alone -- it
+  // just sits there. Before the fix, `projects` read straight off
+  // `listQuery.data` ungated, so a lingering cache entry (left over from
+  // before a disconnect, or from a DIFFERENT shared repo before a reconnect)
+  // kept rendering shared cards with live pull buttons even though
+  // `configured` is false. Gate on `configured` so a stale cache can never
+  // surface regardless of how/when it was populated.
+  it('never returns projects from a lingering list cache when unconfigured', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } } });
+    // Seed the cache as if a previous, now-stale mount had already listed a
+    // (possibly different) shared repo's projects.
+    client.setQueryData(sharedKeys.list(), {
+      projects: [{ id: 'ghost', name: 'stale-repo-entry' }],
+      lastSynced: '2026-07-16T00:00:00Z',
+      stale: false,
+    });
+    const fakeApi = makeFakeApi({ getSharedStatus: vi.fn(async () => ({ configured: false, url: null })) });
+    const { result } = renderHook(() => useSharedProjects(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>
+          <ApiProvider value={fakeApi}>{children}</ApiProvider>
+        </QueryClientProvider>
+      ),
+    });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.configured).toBe(false);
+    expect(result.current.projects).toEqual([]);
   });
 
   it('pull(id, action) delegates to pullSharedProject', async () => {

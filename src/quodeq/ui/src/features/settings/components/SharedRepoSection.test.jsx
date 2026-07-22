@@ -285,6 +285,38 @@ describe('SharedRepoSection', () => {
     });
   });
 
+  // Ghost shared cards after disconnect (final whole-branch review, Important
+  // finding): invalidating sharedKeys.list() alone leaves its cached data in
+  // place once the list query is disabled (configured -> false), so the
+  // Projects page kept rendering the old shared cards. The disconnect
+  // mutation must actively clear that cache entry, not just mark it stale.
+  it('removes the shared list cache on a successful disconnect', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } } });
+    client.setQueryData(sharedKeys.list(), {
+      projects: [{ id: 'p1', name: 'demo' }],
+      lastSynced: '2026-07-16T00:00:00Z',
+      stale: false,
+    });
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
+      disconnectShared: vi.fn(async () => ({ configured: false })),
+    });
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={client}>
+        <ApiProvider value={fakeApi}><SharedRepoSection /></ApiProvider>
+      </QueryClientProvider>
+    );
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /disconnect/i })).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: /disconnect/i }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /yes/i })).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: /yes/i }));
+
+    await waitFor(() => expect(fakeApi.disconnectShared).toHaveBeenCalled());
+    await waitFor(() => expect(client.getQueryData(sharedKeys.list())).toBeUndefined());
+  });
+
   it('does not call onDisconnected when disconnect is cancelled', async () => {
     const fakeApi = makeFakeApi({
       getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),

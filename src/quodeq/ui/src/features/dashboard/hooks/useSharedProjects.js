@@ -192,7 +192,13 @@ export function useSharedProjects() {
   }, [pullSharedProject, queryClient]);
 
   const url = statusQuery.data?.url ?? null;
-  const projects = listQuery.data?.projects || [];
+  // Gated on `configured`, not just read off listQuery.data: the list query
+  // is disabled (not removed) when unconfigured, so a lingering cache entry
+  // from before a disconnect (or from a DIFFERENT shared repo before a
+  // reconnect) would otherwise keep rendering shared cards -- with live pull
+  // buttons -- on a page that has nothing connected (ghost shared cards
+  // after disconnect, final whole-branch review).
+  const projects = configured ? (listQuery.data?.projects || []) : [];
   const lastSynced = listQuery.data?.lastSynced ?? statusQuery.data?.lastSynced ?? null;
   const stale = staleOverride || !!listQuery.data?.stale;
 

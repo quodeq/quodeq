@@ -87,6 +87,16 @@ export default function SharedRepoSection({ onDisconnected }) {
       }
     },
     onSuccess: () => {
+      // Remove the list's cached data BEFORE invalidating: sharedKeys.status()
+      // hasn't refetched/flipped `configured` to false anywhere yet at this
+      // point, so an already-mounted list observer elsewhere (ProjectsPage's
+      // useSharedProjects) is still enabled and would otherwise go on serving
+      // its now-stale cached projects until its own status update lands --
+      // removing first guarantees there is no shared-repo data left to render
+      // in that window, and no leftover entry from a since-disconnected repo
+      // to flash on a later reconnect to a different URL (ghost shared cards
+      // after disconnect, final whole-branch review).
+      queryClient.removeQueries({ queryKey: sharedKeys.list() });
       queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
     },
   });
