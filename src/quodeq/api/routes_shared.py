@@ -28,11 +28,15 @@ from quodeq.services.score_cache import score_cache_path_override
 from quodeq.services.scoring import get_project_scores, get_scores_slim
 from quodeq.services.shared_publish import get_publish_status, start_publish
 from quodeq.services.shared_repo import (
+    check_repo_format,
+    clone_lock,
     ensure_shared_clone,
     last_synced_at,
     published_meta,
     read_state,
     refresh_shared_clone,
+    remove_clone_dir,
+    shared_cache_dir,
     shared_evaluations_root,
     shared_index_db_path,
     shared_score_cache_path,
@@ -59,13 +63,18 @@ _MAX_DISMISSED_LIMIT = 5000
 def _with_shared_root(fn):
     """Resolve the configured clone; inject eval_root; scope the score cache.
 
-    Every decorated route becomes: 409 when unconfigured, 409 when the clone's
-    format is newer than this build understands, 503 when the clone hasn't
-    been fetched yet (or is otherwise unreadable), else the wrapped view runs
-    with ``eval_root`` (the shared clone's evaluations directory) and ``url``
-    (the configured remote) injected as keyword arguments, with the score
-    cache transparently scoped to this clone's own cache DB (Task 9) so its
-    rows never mix with the local clone's cache.
+    Every decorated route becomes: 409 when unconfigured, 409 when the
+    clone's format is foreign or newer than this build understands, 503 when
+    the clone hasn't been fetched yet at all, else the wrapped view runs with
+    ``eval_root`` (the shared clone's evaluations directory) and ``url`` (the
+    configured remote) injected as keyword arguments, with the score cache
+    transparently scoped to this clone's own cache DB (Task 9) so its rows
+    never mix with the local clone's cache.
+
+    "ok" and "empty" (cloned, never published into) both proceed: an empty
+    clone is a legitimate first-connect state, not an error, and every
+    wrapped list-shaped route already tolerates a missing evaluations dir by
+    returning an empty result (see build_project_list) rather than raising.
     """
 
     @functools.wraps(fn)
@@ -79,8 +88,23 @@ def _with_shared_root(fn):
                 jsonify({"error": "this shared repository requires a newer version of quodeq"}),
                 409,
             )
-        if state != "ok":
-            return jsonify({"error": "shared repository has not been cloned yet"}), 503
+        if state == "foreign":
+            return (
+                jsonify(
+                    {
+                        "error": "the configured repository does not look like a quodeq results repository",
+                        "code": "FOREIGN_REPO",
+                    }
+                ),
+                409,
+            )
+        if state == "missing":
+            return (
+                jsonify(
+                    {"error": "the shared repository has not been cloned yet — reconnect it in Settings"}
+                ),
+                503,
+            )
         root = shared_evaluations_root(settings.url)
         with score_cache_path_override(shared_score_cache_path(settings.url)):
             return fn(*args, eval_root=root, url=settings.url, **kwargs)
@@ -132,6 +156,11 @@ def register_shared_routes(app: Flask) -> None:
                 # can bind to it without existence checks.
                 "error": None,
                 "publish": publish,
+                # ok | empty | foreign | unsupported_version | missing | None
+                # (unconfigured) -- lets the UI distinguish "healthy but
+                # never published into" from the failure states instead of
+                # inferring clone health from configured+lastSynced alone.
+                "repoState": read_state(settings.url) if settings.url else None,
             }
         )
 
@@ -145,19 +174,69 @@ def register_shared_routes(app: Flask) -> None:
             validate_remote_url(url)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
-        if ensure_shared_clone(url) is None:
+        # Audit finding A4: reconnecting to a URL whose cache dir is already
+        # on disk (a prior connect, possibly stale) must not silently keep
+        # serving whatever was last fetched -- ensure_shared_clone below
+        # early-returns an existing clone without fetching, so the freshness
+        # check has to happen here, before it. refresh_shared_clone acquires
+        # clone_lock itself (RLock, so nesting would be safe too, but there
+        # is nothing else in this route that needs the lock held around it).
+        pre_existing = read_state(url) != "missing"
+        repo = ensure_shared_clone(url)
+        if repo is None:
             return (
                 jsonify(
                     {"error": f"could not clone the repository, check that git can access {url}"}
                 ),
                 502,
             )
+        if pre_existing:
+            ok, _ = refresh_shared_clone(url)  # best effort; failure just leaves the pre-existing clone as-is, reason already logged internally
+        # Format validation only makes sense once the clone actually exists,
+        # so it runs AFTER ensure_shared_clone, not before -- a foreign or
+        # too-new repo must never reach write_settings (that would connect
+        # the UI to a repo every subsequent /api/shared/* route then 409s
+        # on). "empty" (never published into) is a legitimate first-connect
+        # state and is accepted here same as "ok".
+        fmt = check_repo_format(repo)
+        if fmt == "foreign":
+            return (
+                jsonify(
+                    {"error": "the repository exists but does not look like a quodeq results repository"}
+                ),
+                400,
+            )
+        if fmt == "unsupported_version":
+            return (
+                jsonify({"error": "this shared repository requires a newer version of quodeq"}),
+                400,
+            )
         write_settings(SharedSettings(url=url))
         return jsonify({"configured": True, "url": url})
 
     @app.delete("/api/shared/config")
     def shared_config_delete() -> Response:
+        # Audit finding A4: disconnecting must not leave the clone's cache
+        # dir (repo + index.db + score_cache.db, all under shared_cache_dir)
+        # behind on disk forever. Read the url BEFORE clearing settings (it's
+        # gone from settings after write_settings), then remove it AFTER --
+        # so a crash between the two leaves the (still-usable) clone in
+        # place rather than an orphaned dir with no settings pointing at it.
+        # remove_clone_dir handles git's read-only object files (plain
+        # rmtree leaves them behind on Windows, corrupting a later
+        # reconnect's adopted clone) and never raises: a half-removed or
+        # permission-denied cache dir must not turn a disconnect into a 500.
+        #
+        # Review finding: rmtree must run under clone_lock(url), same as
+        # every other clone mutator (ensure_shared_clone, refresh_shared_clone,
+        # publish_project) -- otherwise a concurrent publish/refresh holding
+        # the lock can have its clone directory removed mid-operation,
+        # potentially leaving a partially-deleted .git that doesn't self-heal.
+        settings = read_settings()
         write_settings(SharedSettings(url=None))
+        if settings.url is not None:
+            with clone_lock(settings.url):
+                remove_clone_dir(shared_cache_dir(settings.url))
         return jsonify({"configured": False})
 
     @app.post("/api/shared/refresh")
@@ -165,9 +244,16 @@ def register_shared_routes(app: Flask) -> None:
         settings = read_settings()
         if not settings.url:
             return jsonify({"error": "no shared repository configured"}), 400
-        if not refresh_shared_clone(settings.url):
+        ok, reason = refresh_shared_clone(settings.url)
+        if not ok:
             return (
-                jsonify({"stale": True, "lastSynced": last_synced_at(settings.url)}),
+                jsonify(
+                    {
+                        "stale": True,
+                        "lastSynced": last_synced_at(settings.url),
+                        "error": reason,
+                    }
+                ),
                 502,
             )
         return jsonify({"stale": False, "lastSynced": last_synced_at(settings.url)})
@@ -283,7 +369,8 @@ def register_shared_routes(app: Flask) -> None:
             # clone contents, just flag it. The index is only re-synced
             # after a successful refresh; there is nothing new to index
             # when the fetch itself failed.
-            if refresh_shared_clone(url):
+            ok, _ = refresh_shared_clone(url)
+            if ok:
                 sync_shared_index(url)
                 stale = False
             else:

@@ -1,5 +1,7 @@
 """Tests for the publish staging logic (pure file operations)."""
 import json
+import subprocess
+import time
 from pathlib import Path
 
 from quodeq.services.shared_publish import (
@@ -132,6 +134,55 @@ def test_list_completed_runs_skips_unsupported_schema_version(tmp_path):
     runs = list_completed_runs(tmp_path)
     # Only the valid "done" run should be included; the unsupported one should be skipped
     assert [r.name for r in runs] == ["r-done"]
+
+
+def test_stage_project_writes_published_json(tmp_path):
+    """Task 2 (audit C1): stage_project records who published and when at
+    publish time, instead of relying solely on git log against the shared
+    clone (which used to be permanently shallow, misattributing every
+    project to whoever pushed last)."""
+    project = tmp_path / "local" / "proj-uuid"
+    project.mkdir(parents=True)
+    (project / "repository_info.json").write_text('{"name":"x"}')
+    _make_run(project, "r-done", "done")
+
+    clone = tmp_path / "clone"
+    clone.mkdir()
+    subprocess.run(["git", "init"], cwd=clone, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.name", "alice"], cwd=clone, check=True, capture_output=True,
+    )
+
+    dest = clone / "evaluations" / "proj-uuid"
+    before = int(time.time())
+    stage_project(project, dest)
+    after = int(time.time())
+
+    meta = json.loads((dest / "published.json").read_text(encoding="utf-8"))
+    assert meta["publishedBy"] == "alice"
+    assert isinstance(meta["publishedAt"], int)
+    assert before <= meta["publishedAt"] <= after
+
+
+def test_stage_project_published_json_falls_back_to_unknown_without_git_identity(tmp_path, monkeypatch):
+    """When the clone has no git user.name configured at all (isolated from
+    whatever happens to be set on the machine running the tests), stage_project
+    must not crash and must record "unknown" rather than an empty string."""
+    isolated_global_config = tmp_path / "empty_gitconfig"
+    isolated_global_config.write_text("", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(isolated_global_config))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+
+    project = tmp_path / "local" / "proj-uuid"
+    project.mkdir(parents=True)
+    (project / "repository_info.json").write_text('{"name":"x"}')
+    _make_run(project, "r-done", "done")
+    dest = tmp_path / "clone" / "evaluations" / "proj-uuid"
+
+    stage_project(project, dest)
+
+    meta = json.loads((dest / "published.json").read_text(encoding="utf-8"))
+    assert meta["publishedBy"] == "unknown"
 
 
 def test_merge_actions_log_missing_timestamp_sorts_last(tmp_path):

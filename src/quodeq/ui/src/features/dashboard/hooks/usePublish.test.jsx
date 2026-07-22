@@ -1,9 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { usePublish } from './usePublish.js';
+import { useSharedProjects } from './useSharedProjects.js';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
+import { sharedKeys } from '../../../api/queryKeys.js';
 
 function makeFakeApi(overrides = {}) {
   return {
@@ -147,6 +150,159 @@ describe('usePublish', () => {
     }
   });
 
+  // Minor finding (final whole-branch review): refreshListAfterCompletion's
+  // fetchQuery inherited the production QueryClient's staleTime: 30s (see
+  // api/queryClient.js), so it could resolve straight from a still-fresh
+  // cache entry instead of actually fetching -- silently contradicting its
+  // own doc comment ("always performs the fetch"). withQueryClient() (used by
+  // every other test in this file) sets staleTime: 0 for the whole test
+  // client, which would mask the bug -- a 0-staleTime entry is already
+  // "stale" regardless of the fix, so fetchQuery would refetch either way.
+  // This test builds its own client with production's real staleTime: 30_000
+  // so the assertion actually exercises the bug.
+  it('refetches the shared list after a completed publish even when the cached entry is still within staleTime', async () => {
+    vi.useFakeTimers();
+    try {
+      const getSharedStatus = vi.fn(async () => ({
+        configured: true,
+        publish: { state: 'done', project: 'p1', runs: 2 },
+      }));
+      const sharedListProjects = vi.fn(async () => ({
+        projects: [{ id: 'p1', name: 'demo', publishedAt: '2026-07-18T00:00:00Z' }],
+        lastSynced: '2026-07-18T00:00:00Z',
+        stale: false,
+      }));
+      const fakeApi = makeFakeApi({ getSharedStatus, sharedListProjects });
+
+      const client = new QueryClient({
+        defaultOptions: { queries: { staleTime: 30_000, gcTime: 5 * 60_000, retry: false } },
+      });
+      // Seed the list cache with a fresh entry (just written, well inside the
+      // 30s staleTime window) -- absent the fix, fetchQuery would resolve
+      // straight from this without ever calling sharedListProjects again.
+      client.setQueryData(sharedKeys.list(), {
+        projects: [{ id: 'p1', name: 'demo', publishedAt: '2026-07-17T00:00:00Z' }],
+        lastSynced: '2026-07-17T00:00:00Z',
+        stale: false,
+      });
+
+      const { result } = renderHook(() => usePublish({ enabled: false }), {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>
+            <ApiProvider value={fakeApi}>{children}</ApiProvider>
+          </QueryClientProvider>
+        ),
+      });
+
+      await act(async () => {
+        await result.current.publish('p1');
+      });
+      expect(result.current.publishState).toBe('running');
+      expect(sharedListProjects).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      // advanceTimersByTimeAsync flushes the microtask chain triggered by the
+      // tick (checkStatus -> refreshListAfterCompletion -> fetchQuery), so
+      // the outcome is already settled here -- no waitFor needed (and
+      // waitFor's own timer-driven polling would hang under fake timers).
+      expect(result.current.publishState).toBe('done');
+      // The completion refresh must hit the network for fresh data, not
+      // resolve silently from the still-fresh cache entry seeded above.
+      expect(sharedListProjects).toHaveBeenCalledWith({ refresh: false });
+      expect(result.current.publishedAtByProject.p1).toBe('2026-07-18T00:00:00Z');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Audit C3/C4: the "published <relative time>" meta, the PUBLISHED badge,
+  // and the publish/update button used to update at different speeds --
+  // the meta from usePublish's own cheap refetch, the badge/button only once
+  // the (possibly-coalesced, possibly-slow) authoritative refresh landed.
+  // The fix optimistically upserts the published id into the shared list
+  // cache the instant the job reports 'done', synchronously before the
+  // authoritative refresh's network round trip even starts -- so every
+  // consumer of sharedKeys.list() flips in the same render. This test holds
+  // the authoritative refresh open to prove the cache is patched BEFORE it
+  // resolves, then resolves it to prove the optimistic entry gets
+  // overwritten by real server data rather than left stale.
+  it('optimistically patches the list cache with the published id before the authoritative refresh resolves, then the refresh overwrites it', async () => {
+    vi.useFakeTimers();
+    try {
+      const getSharedStatus = vi.fn(async () => ({
+        configured: true,
+        publish: { state: 'done', project: 'p1', runs: 1 },
+      }));
+      let resolveList;
+      const sharedListProjects = vi.fn(() => new Promise((resolve) => { resolveList = resolve; }));
+      const fakeApi = makeFakeApi({ getSharedStatus, sharedListProjects });
+
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const { result } = renderHook(() => usePublish({ enabled: false }), {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>
+            <ApiProvider value={fakeApi}>{children}</ApiProvider>
+          </QueryClientProvider>
+        ),
+      });
+
+      const local = {
+        id: 'p1',
+        name: 'demo',
+        latestRunId: 'run-9',
+        latestDoneRunId: 'run-9',
+        originUrl: 'https://github.com/org/demo',
+      };
+      await act(async () => {
+        await result.current.publish('p1', local);
+      });
+      expect(result.current.publishState).toBe('running');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      // The poll saw 'done' and the optimistic patch landed synchronously --
+      // the authoritative refresh (sharedListProjects) is still pending
+      // (resolveList captured but not yet called).
+      expect(resolveList).toBeDefined();
+      const midFlight = client.getQueryData(sharedKeys.list());
+      const optimisticEntry = midFlight.projects.find((p) => p.id === 'p1');
+      expect(optimisticEntry).toMatchObject({
+        id: 'p1',
+        name: 'demo',
+        publishedBy: null,
+        source: 'shared',
+        latestRunId: 'run-9',
+        latestDoneRunId: 'run-9',
+        originUrl: 'https://github.com/org/demo',
+      });
+      expect(optimisticEntry.publishedAt).toEqual(expect.any(Number));
+      expect(result.current.publishState).toBe('done');
+
+      // Now let the authoritative refresh resolve with real server data --
+      // it must overwrite the optimistic entry, not merely coexist with it.
+      resolveList({
+        projects: [{ id: 'p1', name: 'demo', publishedAt: '2026-07-19T00:00:00Z', publishedBy: 'alice' }],
+        lastSynced: '2026-07-19T00:00:00Z',
+        stale: false,
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      const settled = client.getQueryData(sharedKeys.list());
+      const finalEntry = settled.projects.find((p) => p.id === 'p1');
+      expect(finalEntry.publishedBy).toBe('alice');
+      expect(finalEntry.publishedAt).toBe('2026-07-19T00:00:00Z');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a 409 from the POST itself surfaces the message inline without crashing', async () => {
     const err = new Error('a publish is already running');
     const fakeApi = makeFakeApi({ publishProject: vi.fn(async () => { throw err; }) });
@@ -210,12 +366,10 @@ describe('usePublish', () => {
       wrapper: ({ children }) => wrap(fakeApi, children),
     });
 
-    await act(async () => {});
-
+    await waitFor(() => expect(result.current.configured).toBe(true));
+    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledWith({ refresh: false }));
     expect(fakeApi.getSharedStatus).toHaveBeenCalledTimes(1);
-    expect(fakeApi.sharedListProjects).toHaveBeenCalledWith({ refresh: false });
-    expect(result.current.configured).toBe(true);
-    expect(result.current.publishedAtByProject.p1).toBe('2026-07-10T00:00:00Z');
+    await waitFor(() => expect(result.current.publishedAtByProject.p1).toBe('2026-07-10T00:00:00Z'));
   });
 
   it('does not call sharedListProjects on mount when unconfigured', async () => {
@@ -252,9 +406,8 @@ describe('usePublish', () => {
       }
     );
 
-    // Mount enabled: loadStatus sees the running job and tracks it.
-    await act(async () => {});
-    expect(result.current.publishState).toBe('running');
+    // Mount enabled: the fresh status shows the running job; it's adopted.
+    await waitFor(() => expect(result.current.publishState).toBe('running'));
     expect(result.current.publishingProject).toBe('p1');
 
     // User switches to the online tab: hook disabled, polling stops,
@@ -270,20 +423,21 @@ describe('usePublish', () => {
       configured: true,
       publish: { state: 'done', project: 'p1' },
     }));
+    await waitFor(() => expect(sharedListProjects.mock.calls.length).toBeGreaterThan(0));
     const listCallsBefore = sharedListProjects.mock.calls.length;
 
-    // User returns to the local tab: hook re-enabled, loadStatus refetches.
+    // User returns to the local tab: hook re-enabled, status refetches.
     await act(async () => {
       rerender({ enabled: true });
     });
 
     // The wedge: without reconciliation, state stays 'running' forever.
-    expect(result.current.publishState).not.toBe('running');
-    expect(result.current.publishState).toBe('done');
+    await waitFor(() => expect(result.current.publishState).toBe('done'));
     expect(result.current.publishingProject).toBeNull();
     // The done transition triggered the shared-list re-fetch (on top of the
-    // configured-path fetch loadStatus always does): exactly 2 new calls.
-    expect(sharedListProjects.mock.calls.length).toBe(listCallsBefore + 2);
+    // configured-path fetch re-enabling the list query always does): exactly
+    // 2 new calls.
+    await waitFor(() => expect(sharedListProjects.mock.calls.length).toBe(listCallsBefore + 2));
     expect(sharedListProjects).toHaveBeenCalledWith({ refresh: false });
   });
 
@@ -301,8 +455,7 @@ describe('usePublish', () => {
       }
     );
 
-    await act(async () => {});
-    expect(result.current.publishState).toBe('running');
+    await waitFor(() => expect(result.current.publishState).toBe('running'));
     expect(result.current.publishingProject).toBe('p1');
 
     await act(async () => {
@@ -319,7 +472,7 @@ describe('usePublish', () => {
       rerender({ enabled: true });
     });
 
-    expect(result.current.publishState).toBe('error');
+    await waitFor(() => expect(result.current.publishState).toBe('error'));
     expect(result.current.publishingProject).toBeNull();
     expect(result.current.publishError).toBe('permission denied');
     expect(result.current.publishErrorProject).toBe('p1');
@@ -398,5 +551,36 @@ describe('usePublish', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // Audit C6: useSharedProjects and usePublish used to each fetch status
+  // and list independently -- two of every request per Projects mount.
+  // Both hooks now read `sharedKeys.status()`/`sharedKeys.list()`, so
+  // react-query dedupes: mounting them together issues exactly one status
+  // fetch and one list fetch, not one pair per hook.
+  it('mounting alongside useSharedProjects issues exactly one status fetch and one list fetch (react-query dedup)', async () => {
+    // Held open so the background revalidate useSharedProjects fires after
+    // its own first successful list never completes during this test --
+    // otherwise its own re-list would add a second, legitimate list fetch
+    // and muddy the "exactly one" assertion this test is making.
+    const refreshShared = vi.fn(() => new Promise(() => {}));
+    const fakeApi = makeFakeApi({ refreshShared });
+
+    function BothHooks() {
+      useSharedProjects();
+      return usePublish({ enabled: true });
+    }
+
+    renderHook(() => BothHooks(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+
+    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(1));
+    // Give a would-be duplicate fetch (the bug this locks in against) a
+    // chance to show up before asserting the counts hold steady.
+    await act(async () => {});
+    expect(fakeApi.getSharedStatus).toHaveBeenCalledTimes(1);
+    expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(1);
   });
 });

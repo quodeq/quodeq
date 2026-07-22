@@ -89,6 +89,27 @@ export function deriveAction(entry, { configured }) {
   const { local, shared } = entry;
   if (local && !shared) return configured ? 'publish' : null;
   if (!local && shared) return 'pull';
+  // Both sides present. Prefer done-run identity: it's exact and immune to
+  // the date-only-vs-epoch skew a same-day timestamp comparison can't
+  // resolve. local.latestRunId is the newest run of ANY status, but publish
+  // only ever copies done runs into the shared repo -- comparing raw
+  // latestRunId would show a permanent false 'update' once a later local run
+  // fails or is cancelled, since it could never again equal shared's id.
+  // latestDoneRunId is the newest run that actually finished, so use that
+  // instead (falling back to latestRunId on the shared side: every shared
+  // entry's runs are done runs already, by construction of publish).
+  const localId = local?.latestDoneRunId ?? null;
+  const sharedId = shared?.latestDoneRunId ?? shared?.latestRunId ?? null;
+  if (localId != null && sharedId != null) {
+    return localId !== sharedId ? 'update' : null;
+  }
+  if (localId == null && sharedId != null) {
+    // No done local run to publish -- nothing new to offer, already in sync.
+    return null;
+  }
+  // Absent latestRunId means no manifest-bearing run was ever produced for
+  // that side (list_runs only counts runs with an evidence manifest), not
+  // strictly "zero runs" -- a run can exist on disk and still not count.
   const lastEval = toMs(local?.latestDate);
   const publishedAt = toMs(shared?.publishedAt);
   if (lastEval != null && (publishedAt == null || lastEval > publishedAt)) return 'update';

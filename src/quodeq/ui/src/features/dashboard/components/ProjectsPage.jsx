@@ -500,7 +500,7 @@ function FilterPill({ label, value, options, valueLabels = {}, onChange }) {
   );
 }
 
-function ProjectsToolbar({ filters = {}, onFiltersChange, configured, lastSynced, stale, refreshing, onRefresh }) {
+function ProjectsToolbar({ filters = {}, onFiltersChange, configured, lastSynced, stale, error, refreshing, onRefresh }) {
   const { query = '', location = 'all', sort = 'activity' } = filters;
   const set = (patch) => onFiltersChange?.({ query, location, sort, ...patch });
   return (
@@ -528,25 +528,31 @@ function ProjectsToolbar({ filters = {}, onFiltersChange, configured, lastSynced
         valueLabels={{ activity: 'recent activity' }}
         onChange={(s) => set({ sort: s })}
       />
-      <SyncedIndicator configured={configured} lastSynced={lastSynced} stale={stale} refreshing={refreshing} onRefresh={onRefresh} />
+      <SyncedIndicator configured={configured} lastSynced={lastSynced} stale={stale} error={error} refreshing={refreshing} onRefresh={onRefresh} />
     </div>
   );
 }
 
-// "syncing…" while a background refresh is in flight, else "synced <relative
-// time>" (+ " · stale" when the last refresh failed), or "not synced yet"
-// before the first list has ever landed -- the merged list's only
-// sync-status surface now that the old online sub-tab (and its "refresh
-// failed, showing results synced..." banner) is gone. Renders nothing at
-// all (refresh button included) when no shared repo is configured -- there
-// is nothing to sync.
-function SyncedIndicator({ configured, lastSynced, stale, refreshing, onRefresh }) {
+// "syncing…" while a background refresh is in flight, else "sync failed ·
+// retry" when the shared hook reports an error (an initial status/list load
+// that never landed -- audit A2; onRefresh doubles as the retry affordance
+// since useSharedProjects' refresh() re-checks both status and list), else
+// "synced <relative time>" (+ " · stale" when the last refresh failed but a
+// prior successful listing is still on screen), or "not synced yet" before
+// the first list has EVER landed and there is no error either -- the merged
+// list's only sync-status surface now that the old online sub-tab (and its
+// "refresh failed, showing results synced..." banner) is gone. Renders
+// nothing at all (refresh button included) when no shared repo is
+// configured -- there is nothing to sync.
+function SyncedIndicator({ configured, lastSynced, stale, error, refreshing, onRefresh }) {
   if (!configured) return null;
   const label = refreshing
     ? 'syncing…'
-    : lastSynced == null
-      ? 'not synced yet'
-      : `synced ${relativeTime(lastSynced)}${stale ? ' · stale' : ''}`;
+    : error
+      ? 'sync failed · retry'
+      : lastSynced == null
+        ? 'not synced yet'
+        : `synced ${relativeTime(lastSynced)}${stale ? ' · stale' : ''}`;
   return (
     <span className="projects-toolbar-sync">
       <span className="projects-toolbar-sync-label">{label}</span>
@@ -591,27 +597,14 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
     publish,
   } = usePublish({ enabled: projects.length > 0 });
 
-  // Important-2 (review): usePublish's own re-fetch on job completion only
-  // updates ITS `publishedAtByProject` map -- useSharedProjects' list (which
-  // useMergedProjects reads to derive each entry's chips/action) is never
-  // re-fetched by a publish completing, so a card would keep showing a live
-  // 'publish'/'update' button with stale chips after the job finishes.
-  // Refresh the shared list exactly once per completion; the ref (not
-  // state) means re-renders while publishState stays 'done' don't re-fire
-  // it.
-  const prevPublishStateRef = useRef(publishState);
-  useEffect(() => {
-    if (publishState === 'done' && prevPublishStateRef.current !== 'done') {
-      shared.refresh();
-    }
-    prevPublishStateRef.current = publishState;
-  }, [publishState, shared.refresh]);
-
   // Local project objects never carry publishedAt on their own (it lives
   // only on the shared list's git-log-derived metadata) -- merge it in by
-  // id/name so ProjectCard can read `project.publishedAt` uniformly, and so
-  // a publish that just completed is reflected immediately even though
-  // useSharedProjects' own list isn't re-fetched by it.
+  // id/name so ProjectCard can read `project.publishedAt` uniformly. Belt
+  // and suspenders with `entry.shared?.publishedAt` below (the merged
+  // entry already carries it too, since usePublish and useSharedProjects
+  // share the same sharedKeys.list() cache entry -- see Task 5) but this
+  // keeps LocalPublishedMeta's prop stable even for callers that only ever
+  // look at `project.publishedAt` directly.
   const projectsWithPublished = useMemo(() => {
     if (!sharedConfigured || Object.keys(publishedAtByProject).length === 0) return projects;
     return projects.map((p) => {
@@ -708,7 +701,12 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
     publishingProject,
     publishError,
     publishErrorProject,
-    onPublish: publish,
+    // Passes the local project object alongside its id -- usePublish's own
+    // done-branch optimistic cache patch (audit C3/C4) needs
+    // originUrl/latestRunId/latestDoneRunId to attribute the completed
+    // publish to the right merged entry, and CardFooter's onClick only ever
+    // hands back the bare id/name string.
+    onPublish: (id) => publish(id, localEntryById.get(id)?.local),
   };
 
   // Pull-to-local (shared-only cards): mirrors the delete-confirm idiom for
@@ -803,6 +801,7 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
             configured={shared.configured}
             lastSynced={shared.lastSynced}
             stale={shared.stale}
+            error={shared.error}
             refreshing={shared.refreshing}
             onRefresh={shared.refresh}
           />

@@ -29,6 +29,7 @@ class ProjectEntry:
     scope_path: str | None = None
     runs_count: int = 0
     latest_run_id: str | None = None
+    latest_done_run_id: str | None = None
     latest_date: str | None = None
     path_exists: bool | None = None
     files_count: int | None = None
