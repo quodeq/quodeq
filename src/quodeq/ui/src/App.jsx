@@ -207,6 +207,29 @@ export function shouldShowEvaluateButton(projectsCount, selectedSource) {
 }
 
 /**
+ * The project's friendly name for the topbar/sidebar. A LOCAL selection
+ * resolves from the local projects list (selectedProjectInfo / the
+ * list-derived selectedDisplayName). A SHARED (remote) selection is NOT in
+ * that list, so selectedProjectInfo is null and selectedDisplayName stays
+ * equal to the raw UUID -- the anti-UUID guard below would then blank the
+ * title entirely. For 'shared', fall back to the resolved sharedProjectInfo
+ * payload's name (the same "has data to show" signal shouldShowProjectTabs
+ * uses). Returns null while the lists are still unresolved so the UUID never
+ * flashes. Exported so the source-gating contract is testable without
+ * mounting the whole App.
+ */
+export function resolveProjectDisplayName({
+  selectedProjectInfo, selectedSource, sharedProjectInfo, selectedDisplayName, selectedProject,
+}) {
+  return selectedProjectInfo?.displayName
+    || selectedProjectInfo?.name
+    || (selectedSource === 'shared' ? sharedProjectInfo?.name : null)
+    || (selectedDisplayName && selectedDisplayName !== selectedProject
+          ? selectedDisplayName
+          : null);
+}
+
+/**
  * Whether the sidebar's project-data tabs (overview/violations/map/history)
  * should render. The local signal is the run count from the LOCAL project
  * list -- which is null/zero for a shared selection with no local mirror, so
@@ -915,16 +938,17 @@ export default function App() {
     dismissRefreshKey,
   };
 
-  // Resolve the project's friendly name. Until the /api/projects response
-  // has populated the projects array, selectedDisplayName falls back to the
-  // raw project id (a UUID) — we explicitly filter that case out so the
-  // sidebar and topbar show nothing rather than flashing the UUID.
-  const resolvedDisplayName =
-    selectedProjectInfo?.displayName
-    || selectedProjectInfo?.name
-    || (state.selectedDisplayName && state.selectedDisplayName !== state.selectedProject
-          ? state.selectedDisplayName
-          : null);
+  // Resolve the project's friendly name (see resolveProjectDisplayName): local
+  // selections read the local projects list; shared/remote selections (absent
+  // from that list) fall back to the resolved sharedProjectInfo name. Until the
+  // lists populate this stays null so the raw UUID never flashes.
+  const resolvedDisplayName = resolveProjectDisplayName({
+    selectedProjectInfo,
+    selectedSource: state.selectedSource,
+    sharedProjectInfo: state.sharedProjectInfo,
+    selectedDisplayName: state.selectedDisplayName,
+    selectedProject: state.selectedProject,
+  });
 
   return (
     <>
