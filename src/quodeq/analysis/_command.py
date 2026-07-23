@@ -113,6 +113,10 @@ def _build_mcp_args(
     mcp_flag = provider_cfg.get("mcp_config_flag", "--mcp-config")
     mcp_prefix = provider_cfg.get("mcp_config_prefix", "")
     args: list[str] = [mcp_flag, f"{mcp_prefix}{mcp_config_path}"]
+    # Restrict the subprocess to the findings server only. Without this the
+    # CLI also loads the user's own MCP servers (user/project scope), and
+    # bypassPermissions would let the model call them.
+    args.extend(provider_cfg.get("mcp_strict_args", ["--strict-mcp-config"]))
 
     if provider_cfg.get("supports_tools", True):
         allowed = _MCP_TOOL_REPORT_FINDING

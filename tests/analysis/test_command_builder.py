@@ -105,6 +105,25 @@ class TestBuildAiCmdClaude:
         assert "--permission-mode" in args
         assert "bypassPermissions" in args
 
+    def test_strict_mcp_config_when_jsonl_set(self, tmp_path):
+        # Without --strict-mcp-config the CLI also loads the user's own MCP
+        # servers (~/.claude.json etc.) into the analysis subprocess.
+        jsonl = tmp_path / "findings.jsonl"
+        jsonl.touch()
+        config = AnalysisConfig(
+            ai_cmd="claude", ai_model="sonnet-4",
+            jsonl_file=jsonl, compiled_dir=tmp_path, dimension="security",
+        )
+        with _patch_providers(_CLAUDE_CFG):
+            args, _ = _build_ai_cmd("Analyze", config)
+        assert "--strict-mcp-config" in args
+
+    def test_no_strict_mcp_config_without_jsonl(self):
+        config = AnalysisConfig(ai_cmd="claude", ai_model="sonnet-4")
+        with _patch_providers(_CLAUDE_CFG):
+            args, _ = _build_ai_cmd("Analyze", config)
+        assert "--strict-mcp-config" not in args
+
 
 class TestBuildAiCmdCodex:
     """Codex provider command building."""

@@ -31,6 +31,7 @@
     "supports_budget": true,
     "supports_turns": true,
     "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
+    "mcp_strict_args": ["--strict-mcp-config"],
     "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
     "env_remove": ["CLAUDECODE"],
     "assistant": {

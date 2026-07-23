@@ -23,6 +23,7 @@ _PROVIDER_CONFIGS_FALLBACK: dict[str, dict] = {
         "supports_budget": True,
         "supports_turns": True,
         "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
+        "mcp_strict_args": ["--strict-mcp-config"],
         "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
         "env_remove": ["CLAUDECODE"],
     },
