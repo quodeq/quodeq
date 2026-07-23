@@ -12,6 +12,22 @@ from quodeq.services.shared_publish import PublishError, publish_project
 from quodeq.services.shared_repo import ensure_shared_clone, shared_repo_path
 
 
+def _monotonic_clock(start: float = 1_000_000.0, step: float = 50.0):
+    """A stand-in for time.time() that returns a strictly increasing value on
+    every call. Used instead of a finite iterator so a publish that reads the
+    clock more than once (the rebase-retry path under a git race) can never
+    exhaust it -- the tests that use it assert on commit count / timestamp
+    ordering, both of which a monotonic clock satisfies deterministically.
+    """
+    state = {"t": start - step}
+
+    def clock() -> float:
+        state["t"] += step
+        return state["t"]
+
+    return clock
+
+
 def _bare_origin(tmp_path: Path) -> str:
     origin = tmp_path / "origin.git"
     subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
@@ -76,8 +92,12 @@ def test_publish_is_idempotent_no_empty_commit(tmp_path, monkeypatch):
     """
     url = _bare_origin(tmp_path)
     root = _local_project(tmp_path)
-    times = iter([1_000_000.0, 1_000_050.0])
-    monkeypatch.setattr(shared_publish.time, "time", lambda: next(times))
+    # A monotonic clock, not a finite iterator: the publish path may legitimately
+    # read time.time() more than once per call (e.g. the rebase-retry loop under
+    # a git push/fetch race), and this test asserts idempotency by COMMIT COUNT,
+    # not by a frozen timestamp -- so a clock that keeps ticking is both correct
+    # and more faithful to "regardless of wall-clock ticks between publishes".
+    monkeypatch.setattr(shared_publish.time, "time", _monotonic_clock())
     publish_project("proj-uuid-1", url, evaluations_root=root)
     publish_project("proj-uuid-1", url, evaluations_root=root)  # must not raise
     repo = shared_repo_path(url)
@@ -93,8 +113,10 @@ def test_publish_after_real_change_commits_and_advances_published_at(tmp_path, m
     advances -- the idempotency fix must not suppress real updates."""
     url = _bare_origin(tmp_path)
     root = _local_project(tmp_path)
-    times = iter([1_000_000.0, 1_000_100.0])
-    monkeypatch.setattr(shared_publish.time, "time", lambda: next(times))
+    # Monotonic clock (see the idempotency test): every read is strictly greater
+    # than the last, so the "second publishedAt > first" assertion holds no
+    # matter how many times the publish path reads the clock.
+    monkeypatch.setattr(shared_publish.time, "time", _monotonic_clock())
 
     publish_project("proj-uuid-1", url, evaluations_root=root)
     repo = shared_repo_path(url)

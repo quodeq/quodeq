@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.7.1] - 2026-07-23
+
+This is the first 1.7 release to reach PyPI and Homebrew. 1.7.0 shipped desktop builds but a flaky publish-time test blocked its PyPI and Homebrew steps, so pip and Homebrew users install 1.7.1. The full 1.7 feature set is below; there is no change to shipped code between 1.7.0 and 1.7.1 beyond the release-plumbing fix.
+
+### Features
+- **Shared evaluations (share the code)**: publish a project's results to a git repository your team controls, and browse teammates' evaluations read-only from the same Repositories page. Publishing is additive and syncs only completed runs. There is no server, the shared repo is your own git remote and auth is your existing git access.
+- **Semantic precedent matching**: when you dismiss a finding, Quodeq now recognizes the same issue on later runs by meaning, not just by exact fingerprint, so a false positive you already judged stops coming back after small code or wording changes.
+- **Assistant on remote projects**: the AI assistant now opens on shared (remote) projects in read-only mode, so you can ask it to explain scores and dig into findings on a teammate's results without a local copy. Its mutating actions stay disabled there.
+- **Projects page redesign**: local and shared projects live in one unified, filterable list with sync-state badges (local / published / remote) and a single badge system that follows your theme in light and dark.
+- **Grade formula responsiveness**: changing a grade threshold invalidates the cached scores immediately, so the dashboard reflects your new formula without a manual refresh.
+- **macOS Help menu**: a native Help menu on the desktop app.
+
+### Improvements
+- **Projects page**: newly added projects appear instantly, a location filter (local / published / remote), and cards flip to their published state right after publishing instead of waiting for a background refresh.
+
+### Fixes
+- **Security**: hardened error-detail handling in confidentiality checks, tightened SSRF path and shell-argument handling on clone, and a batch of security and reliability findings from the audit.
+- **Terminal on remote projects**: the terminal now opens on shared projects (it is a local shell and never needed a project mutation path).
+- **Remote project title**: the topbar and sidebar show the project name (clickable) on remote projects instead of only the page name.
+- **Shared repositories**: consistent online and offline project states, safe clone cleanup on Windows with read-only git objects, shallow-clone handling for online repos, and correct sidebar tabs, empty states, and navigation for shared selections.
+- **Onboarding**: the setup-incomplete state resolves correctly once a project has runs.
+- **Release plumbing**: a shared-publish idempotency test monkeypatched the clock with a fixed two-value iterator, which a legitimate rebase-retry under a git push/fetch race could exhaust (StopIteration) and fail the publish workflow non-deterministically; the test now uses a monotonic clock.
+
 ## [1.7.0] - 2026-07-23
 
 ### Features
