@@ -1,14 +1,16 @@
 name: Snyk
 
 # Snyk Open Source (dependencies) + Snyk Code (SAST) on the shipped source.
-# Requires the SNYK_TOKEN repo secret; without it (e.g. PRs from forks) every
-# scan step skips and the job passes, so external contributors aren't blocked.
+# Requires the SNYK_TOKEN repo secret; without it every scan step skips and
+# the job passes.
+#
+# Weekly + manual only, not per-PR: the free Snyk tier allows a few hundred
+# tests per month and this repo merges ~200 PRs in that time. Per-PR SAST
+# gating is CodeQL's job (codeql.yml, free on public repos); the Snyk GitHub
+# app additionally diff-checks manifests on PRs without spending CLI tests.
 
 on:
-  pull_request:
-    branches: [develop, main]
-  push:
-    branches: [develop]
+  workflow_dispatch:
   schedule:
     # Weekly sweep catches newly disclosed CVEs against unchanged deps.
     - cron: '30 6 * * 1'
