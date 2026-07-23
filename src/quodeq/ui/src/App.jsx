@@ -382,6 +382,25 @@ export function shouldAutoOpenOnboardingWizard({ projectsLoaded, projectsCount, 
   return true;
 }
 
+/**
+ * One-shot initial-landing decision. With zero local projects the default
+ * 'overview' landing is a dead-end empty state; when a configured shared
+ * repo has published content, land on the repositories tab instead so the
+ * remote projects are visible without scanning anything locally. Only the
+ * default 'overview' landing redirects: a user who already navigated
+ * elsewhere (settings, help) before the signals settled keeps their page,
+ * and a restored 'shared' selection is already a working view. The caller
+ * latches the decision once inputs settle, so mid-session deletions or
+ * disconnects never yank the user. Exported for unit tests.
+ */
+export function shouldRedirectToRemoteRepositories({ projectsLoaded, projectsCount, selectedSource, sharedSettled, sharedHasContent, activeTab }) {
+  if (!projectsLoaded || !sharedSettled) return false;
+  if ((projectsCount ?? 0) > 0) return false;
+  if (selectedSource === 'shared') return false;
+  if (!sharedHasContent) return false;
+  return activeTab === 'overview';
+}
+
 function renderEvalPrincipleDetail(params, props) {
   const { selectedProject, selectedRun, selectedSource } = props.navigation;
   const evalPrincipal = {
@@ -886,6 +905,26 @@ export default function App() {
     ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
     : null;
   const { activePage, navStack, navPop, navGoTo, navTab, activeTab } = state;
+  // Initial landing: decided exactly once, the first render after both the
+  // local projects list and the shared signal have settled (whatever the
+  // outcome). Mid-session changes never re-trigger it.
+  const initialLandingDecidedRef = useRef(false);
+  useEffect(() => {
+    if (initialLandingDecidedRef.current) return;
+    if (!state.projectsLoaded || !sharedSignal.settled) return;
+    initialLandingDecidedRef.current = true;
+    if (shouldRedirectToRemoteRepositories({
+      projectsLoaded: state.projectsLoaded,
+      projectsCount: state.projects.length,
+      selectedSource: state.selectedSource,
+      sharedSettled: sharedSignal.settled,
+      sharedHasContent: sharedSignal.hasContent,
+      activeTab,
+    })) {
+      navTab('projects');
+    }
+  }, [state.projectsLoaded, state.projects.length, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent, activeTab, navTab]);
+
   // Native-shell bridge: the macOS Help menu opens tabs by dispatching
   // quodeq:navigate (see _webview_window._install_macos_help_menu).
   useNativeNavBridge(navTab);
