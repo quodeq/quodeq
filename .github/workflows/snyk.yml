@@ -1,0 +1,56 @@
+name: Snyk
+
+# Snyk Open Source (dependencies) + Snyk Code (SAST) on the shipped source.
+# Requires the SNYK_TOKEN repo secret; without it (e.g. PRs from forks) every
+# scan step skips and the job passes, so external contributors aren't blocked.
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
+  schedule:
+    # Weekly sweep catches newly disclosed CVEs against unchanged deps.
+    - cron: '30 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  snyk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Notice when SNYK_TOKEN is missing
+        if: env.SNYK_TOKEN == ''
+        run: echo "SNYK_TOKEN not set (fork PR or missing secret), skipping Snyk scans."
+
+      - name: Install uv
+        if: env.SNYK_TOKEN != ''
+        uses: astral-sh/setup-uv@v8.3.2
+
+      - name: Export pinned Python requirements
+        if: env.SNYK_TOKEN != ''
+        run: uv export --no-dev --no-hashes --no-emit-project -o requirements.txt
+
+      - name: Install Snyk CLI
+        if: env.SNYK_TOKEN != ''
+        run: npm install -g snyk
+
+      - name: Snyk Open Source, Python dependencies
+        if: env.SNYK_TOKEN != ''
+        run: snyk test --file=requirements.txt --package-manager=pip --severity-threshold=high
+
+      - name: Snyk Open Source, UI dependencies
+        if: env.SNYK_TOKEN != ''
+        run: snyk test --file=src/quodeq/ui/package-lock.json --package-manager=npm --severity-threshold=high
+
+      - name: Snyk Code, SAST on shipped source
+        if: env.SNYK_TOKEN != ''
+        # Scoped to src/quodeq: tests/ and benchmarks/ hold intentionally
+        # vulnerable fixtures that would always fail a repo-wide SAST scan.
+        run: snyk code test src/quodeq --severity-threshold=high
