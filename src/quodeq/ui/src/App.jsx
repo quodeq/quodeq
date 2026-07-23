@@ -1,6 +1,7 @@
 import { lazy, Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
 import UpdateBanner from './features/updates/UpdateBanner.jsx';
+import { useSharedContentSignal } from './features/dashboard/hooks/useSharedProjects.js';
 
 const DashboardPage = lazy(() => import('./features/dashboard/components/DashboardPage.jsx'));
 const ExplorerPage = lazy(() => import('./features/explorer/components/ExplorerPage.jsx'));
@@ -363,14 +364,21 @@ export function resolveSelectionAfterSharedDisconnect({ selectedSource, projects
  * connected to a shared repo and is viewing a shared project also reads as
  * zero local projects (state.projects is always the local list per
  * useProjectState), but they already have a real working view open -- the
- * wizard must not cover it uninvited. Exported so this contract is
- * unit-testable without mounting the whole App (which needs ~8 providers).
+ * wizard must not cover it uninvited. Likewise a shared repo with published
+ * content (sharedHasContent, see useSharedContentSignal) gives the user
+ * remote repositories to browse -- the wizard must not open over those
+ * either. While the shared signal is still resolving (sharedSettled=false)
+ * the decision is DEFERRED: return false but do not latch, same as the
+ * other transient blocks. Exported so this contract is unit-testable
+ * without mounting the whole App (which needs ~8 providers).
  */
-export function shouldAutoOpenOnboardingWizard({ projectsLoaded, projectsCount, selectedSource, isEvaluating }) {
+export function shouldAutoOpenOnboardingWizard({ projectsLoaded, projectsCount, selectedSource, isEvaluating, sharedSettled = true, sharedHasContent = false }) {
   if (!projectsLoaded) return false;
   if ((projectsCount ?? 0) > 0) return false;
   if (selectedSource === 'shared') return false;
   if (isEvaluating) return false;
+  if (!sharedSettled) return false;
+  if (sharedHasContent) return false;
   return true;
 }
 
@@ -711,6 +719,11 @@ export default function App() {
   const { dismissFinding } = useApi();
   const queryClient = useQueryClient();
   const state = useAppState();
+  // Passive shared-repo content signal driving the zero-local-projects flow:
+  // wizard auto-open (below), the one-shot landing redirect, and the
+  // "browse remote repositories" empty-state actions. Same react-query cache
+  // as ProjectsPage/Settings — no extra fetching once those mount.
+  const sharedSignal = useSharedContentSignal();
   const APP_VERSION = state.serverVersion;
   const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
   const [sidebarPinned, setSidebarPinned] = useState(false);
@@ -820,12 +833,14 @@ export default function App() {
       projectsCount: state.projects.length,
       selectedSource: state.selectedSource,
       isEvaluating,
+      sharedSettled: sharedSignal.settled,
+      sharedHasContent: sharedSignal.hasContent,
     })) {
       // Blocked for a transient reason (shared selection, an evaluation in
-      // flight) -- do NOT mark autoOpenedRef: once the block lifts (source
-      // switches back to local, the evaluation finishes) while local
-      // projects are still zero, the decision must be reconsidered rather
-      // than permanently skipped.
+      // flight, shared signal still resolving) -- do NOT mark autoOpenedRef:
+      // once the block lifts (source switches back to local, the evaluation
+      // finishes, the signal settles) while local projects are still zero, the
+      // decision must be reconsidered rather than permanently skipped.
       return;
     }
     let skipped = false;
@@ -834,7 +849,7 @@ export default function App() {
     if (!skipped) {
       setWizardEntry({ startStep: 'welcome', isFirstProject: true });
     }
-  }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource]);
+  }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent]);
 
   // Project-data tabs (overview/violations/map/history) only make sense once
   // the selected project has at least one completed evaluation run. Until

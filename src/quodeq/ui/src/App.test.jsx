@@ -232,6 +232,21 @@ describe('shouldAutoOpenOnboardingWizard', () => {
   it('does not open while an evaluation is running', () => {
     expect(shouldAutoOpenOnboardingWizard({ ...base, isEvaluating: true })).toBe(false);
   });
+
+  // Remote-content awareness: a configured shared repo with published
+  // projects is a working view the user can browse — the wizard must not
+  // open over it (spec 2026-07-23-remote-repos-without-local-projects).
+  it('defers (no open) while the shared-repo signal has not settled', () => {
+    expect(shouldAutoOpenOnboardingWizard({ ...base, sharedSettled: false })).toBe(false);
+  });
+
+  it('does not open when the shared repo has content', () => {
+    expect(shouldAutoOpenOnboardingWizard({ ...base, sharedSettled: true, sharedHasContent: true })).toBe(false);
+  });
+
+  it('opens when the shared repo settled without content', () => {
+    expect(shouldAutoOpenOnboardingWizard({ ...base, sharedSettled: true, sharedHasContent: false })).toBe(true);
+  });
 });
 
 // Sidebar tab gating must be source-aware. hasCurrentProjectRuns is derived
