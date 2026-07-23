@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import {
   buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
-  resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldShowProjectTabs,
+  resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldRedirectToRemoteRepositories, shouldShowProjectTabs,
   buildNavigationBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
   resolveProjectDisplayName,
 } from './App.jsx';
@@ -231,6 +231,60 @@ describe('shouldAutoOpenOnboardingWizard', () => {
 
   it('does not open while an evaluation is running', () => {
     expect(shouldAutoOpenOnboardingWizard({ ...base, isEvaluating: true })).toBe(false);
+  });
+
+  // Remote-content awareness: a configured shared repo with published
+  // projects is a working view the user can browse — the wizard must not
+  // open over it (spec 2026-07-23-remote-repos-without-local-projects).
+  it('defers (no open) while the shared-repo signal has not settled', () => {
+    expect(shouldAutoOpenOnboardingWizard({ ...base, sharedSettled: false })).toBe(false);
+  });
+
+  it('does not open when the shared repo has content', () => {
+    expect(shouldAutoOpenOnboardingWizard({ ...base, sharedSettled: true, sharedHasContent: true })).toBe(false);
+  });
+
+  it('opens when the shared repo settled without content', () => {
+    expect(shouldAutoOpenOnboardingWizard({ ...base, sharedSettled: true, sharedHasContent: false })).toBe(true);
+  });
+});
+
+// One-shot landing decision: a fresh start with zero local projects but
+// remote content lands on the repositories tab instead of the dead-end
+// 'overview' empty state. Latched in App once inputs settle — these tests
+// pin the pure decision only.
+describe('shouldRedirectToRemoteRepositories', () => {
+  const base = {
+    projectsLoaded: true, projectsCount: 0, selectedSource: 'local',
+    sharedSettled: true, sharedHasContent: true, activeTab: 'overview',
+  };
+
+  it('redirects a fresh start: zero local projects, remote content, default overview landing', () => {
+    expect(shouldRedirectToRemoteRepositories(base)).toBe(true);
+  });
+
+  it('does not redirect before local projects load', () => {
+    expect(shouldRedirectToRemoteRepositories({ ...base, projectsLoaded: false })).toBe(false);
+  });
+
+  it('does not redirect before the shared signal settles', () => {
+    expect(shouldRedirectToRemoteRepositories({ ...base, sharedSettled: false })).toBe(false);
+  });
+
+  it('does not redirect when local projects exist', () => {
+    expect(shouldRedirectToRemoteRepositories({ ...base, projectsCount: 2 })).toBe(false);
+  });
+
+  it('does not redirect over a restored shared selection (already a working view)', () => {
+    expect(shouldRedirectToRemoteRepositories({ ...base, selectedSource: 'shared' })).toBe(false);
+  });
+
+  it('does not redirect without remote content', () => {
+    expect(shouldRedirectToRemoteRepositories({ ...base, sharedHasContent: false })).toBe(false);
+  });
+
+  it('does not redirect off a non-default tab the user already navigated to', () => {
+    expect(shouldRedirectToRemoteRepositories({ ...base, activeTab: 'settings' })).toBe(false);
   });
 });
 

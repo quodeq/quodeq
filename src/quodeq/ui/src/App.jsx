@@ -1,6 +1,7 @@
 import { lazy, Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
 import UpdateBanner from './features/updates/UpdateBanner.jsx';
+import { useSharedContentSignal } from './features/dashboard/hooks/useSharedProjects.js';
 
 const DashboardPage = lazy(() => import('./features/dashboard/components/DashboardPage.jsx'));
 const ExplorerPage = lazy(() => import('./features/explorer/components/ExplorerPage.jsx'));
@@ -255,7 +256,7 @@ export function shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, s
  * consumed but never forwarded). Exported so producer and consumer can be
  * pinned together in tests without mounting the whole App.
  */
-export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluating, showToast, setWizardEntry }) {
+export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluating, showToast, setWizardEntry, sharedHasContent = false }) {
   return {
     selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
     projectsLoaded: state.projectsLoaded,
@@ -298,6 +299,9 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
         presetProjectId: projectId,
       });
     },
+    // null when the shared repo has no content — consumers use the nullness
+    // to hide their "browse remote repositories" affordance.
+    onBrowseRemote: sharedHasContent ? () => navTab('projects') : null,
     isEvaluating,
   };
 }
@@ -363,15 +367,41 @@ export function resolveSelectionAfterSharedDisconnect({ selectedSource, projects
  * connected to a shared repo and is viewing a shared project also reads as
  * zero local projects (state.projects is always the local list per
  * useProjectState), but they already have a real working view open -- the
- * wizard must not cover it uninvited. Exported so this contract is
- * unit-testable without mounting the whole App (which needs ~8 providers).
+ * wizard must not cover it uninvited. Likewise a shared repo with published
+ * content (sharedHasContent, see useSharedContentSignal) gives the user
+ * remote repositories to browse -- the wizard must not open over those
+ * either. While the shared signal is still resolving (sharedSettled=false)
+ * the decision is DEFERRED: return false but do not latch, same as the
+ * other transient blocks. Exported so this contract is unit-testable
+ * without mounting the whole App (which needs ~8 providers).
  */
-export function shouldAutoOpenOnboardingWizard({ projectsLoaded, projectsCount, selectedSource, isEvaluating }) {
+export function shouldAutoOpenOnboardingWizard({ projectsLoaded, projectsCount, selectedSource, isEvaluating, sharedSettled = true, sharedHasContent = false }) {
   if (!projectsLoaded) return false;
   if ((projectsCount ?? 0) > 0) return false;
   if (selectedSource === 'shared') return false;
   if (isEvaluating) return false;
+  if (!sharedSettled) return false;
+  if (sharedHasContent) return false;
   return true;
+}
+
+/**
+ * One-shot initial-landing decision. With zero local projects the default
+ * 'overview' landing is a dead-end empty state; when a configured shared
+ * repo has published content, land on the repositories tab instead so the
+ * remote projects are visible without scanning anything locally. Only the
+ * default 'overview' landing redirects: a user who already navigated
+ * elsewhere (settings, help) before the signals settled keeps their page,
+ * and a restored 'shared' selection is already a working view. The caller
+ * latches the decision once inputs settle, so mid-session deletions or
+ * disconnects never yank the user. Exported for unit tests.
+ */
+export function shouldRedirectToRemoteRepositories({ projectsLoaded, projectsCount, selectedSource, sharedSettled, sharedHasContent, activeTab }) {
+  if (!projectsLoaded || !sharedSettled) return false;
+  if ((projectsCount ?? 0) > 0) return false;
+  if (selectedSource === 'shared') return false;
+  if (!sharedHasContent) return false;
+  return activeTab === 'overview';
 }
 
 function renderEvalPrincipleDetail(params, props) {
@@ -675,6 +705,7 @@ function MainContent({ activePage, props }) {
       <EmptyStateWithTour
         onAdd={() => props.navigation.onAddProject()}
         onTour={() => props.navigation.onTakeTour()}
+        onBrowseRemote={props.navigation.onBrowseRemote}
         isEvaluating={props.navigation.isEvaluating}
       />
     );
@@ -711,6 +742,11 @@ export default function App() {
   const { dismissFinding } = useApi();
   const queryClient = useQueryClient();
   const state = useAppState();
+  // Passive shared-repo content signal driving the zero-local-projects flow:
+  // wizard auto-open (below), the one-shot landing redirect, and the
+  // "browse remote repositories" empty-state actions. Same react-query cache
+  // as ProjectsPage/Settings — no extra fetching once those mount.
+  const sharedSignal = useSharedContentSignal();
   const APP_VERSION = state.serverVersion;
   const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
   const [sidebarPinned, setSidebarPinned] = useState(false);
@@ -820,12 +856,25 @@ export default function App() {
       projectsCount: state.projects.length,
       selectedSource: state.selectedSource,
       isEvaluating,
+      sharedSettled: sharedSignal.settled,
+      sharedHasContent: sharedSignal.hasContent,
     })) {
-      // Blocked for a transient reason (shared selection, an evaluation in
-      // flight) -- do NOT mark autoOpenedRef: once the block lifts (source
-      // switches back to local, the evaluation finishes) while local
-      // projects are still zero, the decision must be reconsidered rather
-      // than permanently skipped.
+      // A settled "shared repo has content" outcome is FINAL for this page
+      // load, not transient: if it later flips (repo disconnected in
+      // Settings, background refresh reveals an emptied repo), the wizard
+      // must not pop over the user's working view -- the wall/empty states
+      // are the non-modal fallback. Latch here; the remaining blocks
+      // (unsettled signal, shared selection, evaluation in flight) stay
+      // unlatched so the decision is reconsidered when they lift.
+      if (sharedSignal.settled && sharedSignal.hasContent) {
+        autoOpenedRef.current = true;
+      }
+      // Otherwise blocked for a transient reason (shared selection, an
+      // evaluation in flight, shared signal still resolving) -- do NOT mark
+      // autoOpenedRef: once the block lifts (source switches back to local,
+      // the evaluation finishes, the signal settles) while local projects
+      // are still zero, the decision must be reconsidered rather than
+      // permanently skipped.
       return;
     }
     let skipped = false;
@@ -834,7 +883,7 @@ export default function App() {
     if (!skipped) {
       setWizardEntry({ startStep: 'welcome', isFirstProject: true });
     }
-  }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource]);
+  }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent]);
 
   // Project-data tabs (overview/violations/map/history) only make sense once
   // the selected project has at least one completed evaluation run. Until
@@ -871,6 +920,26 @@ export default function App() {
     ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
     : null;
   const { activePage, navStack, navPop, navGoTo, navTab, activeTab } = state;
+  // Initial landing: decided exactly once, the first render after both the
+  // local projects list and the shared signal have settled (whatever the
+  // outcome). Mid-session changes never re-trigger it.
+  const initialLandingDecidedRef = useRef(false);
+  useEffect(() => {
+    if (initialLandingDecidedRef.current) return;
+    if (!state.projectsLoaded || !sharedSignal.settled) return;
+    initialLandingDecidedRef.current = true;
+    if (shouldRedirectToRemoteRepositories({
+      projectsLoaded: state.projectsLoaded,
+      projectsCount: state.projects.length,
+      selectedSource: state.selectedSource,
+      sharedSettled: sharedSignal.settled,
+      sharedHasContent: sharedSignal.hasContent,
+      activeTab,
+    })) {
+      navTab('projects');
+    }
+  }, [state.projectsLoaded, state.projects.length, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent, activeTab, navTab]);
+
   // Native-shell bridge: the macOS Help menu opens tabs by dispatching
   // quodeq:navigate (see _webview_window._install_macos_help_menu).
   useNativeNavBridge(navTab);
@@ -919,10 +988,12 @@ export default function App() {
       availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
       selectedDisplayName: state.selectedDisplayName,
       granularity: state.granularity, onGranularityChange: state.onGranularityChange,
+      sharedHasContent: sharedSignal.hasContent,
     },
     navigation: buildNavigationBundle({
       state, navTab, navStackLength: navStack.length,
       isEvaluating, showToast, setWizardEntry,
+      sharedHasContent: sharedSignal.hasContent,
     }),
     evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useSharedProjects } from './useSharedProjects.js';
+import { useSharedProjects, useSharedContentSignal } from './useSharedProjects.js';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
@@ -387,5 +387,76 @@ describe('useSharedProjects', () => {
     });
 
     expect(fakeApi.pullSharedProject).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The passive signal App.jsx uses to decide the zero-local-projects flow
+// (wizard auto-open, landing redirect, empty-state copy). Same cache keys as
+// useSharedProjects, but no background refresh — mounting it must never
+// trigger a POST /api/shared/refresh.
+describe('useSharedContentSignal', () => {
+  it('settles with hasContent=false when no shared repo is configured, without listing', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: false })),
+    });
+    const { result } = renderHook(() => useSharedContentSignal(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.settled).toBe(true));
+    expect(result.current.hasContent).toBe(false);
+    expect(fakeApi.sharedListProjects).not.toHaveBeenCalled();
+  });
+
+  it('reports hasContent=true when configured and the list has projects', async () => {
+    const fakeApi = makeFakeApi();
+    const { result } = renderHook(() => useSharedContentSignal(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.settled).toBe(true));
+    expect(result.current.hasContent).toBe(true);
+  });
+
+  it('reports hasContent=false when configured but the list is empty', async () => {
+    const fakeApi = makeFakeApi({
+      sharedListProjects: vi.fn(async () => ({ projects: [], lastSynced: null, stale: false })),
+    });
+    const { result } = renderHook(() => useSharedContentSignal(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.settled).toBe(true));
+    expect(result.current.hasContent).toBe(false);
+  });
+
+  it('settles with hasContent=false when the status fetch fails (fallback to local-only flow)', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => { throw new Error('boom'); }),
+    });
+    const { result } = renderHook(() => useSharedContentSignal(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.settled).toBe(true));
+    expect(result.current.hasContent).toBe(false);
+  });
+
+  it('is not settled while the status fetch is in flight', async () => {
+    const d = deferred();
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(() => d.promise),
+    });
+    const { result } = renderHook(() => useSharedContentSignal(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    expect(result.current.settled).toBe(false);
+    d.resolve({ configured: false });
+    await waitFor(() => expect(result.current.settled).toBe(true));
+  });
+
+  it('never triggers a background refresh on its own', async () => {
+    const fakeApi = makeFakeApi();
+    const { result } = renderHook(() => useSharedContentSignal(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.settled).toBe(true));
+    expect(fakeApi.refreshShared).not.toHaveBeenCalled();
   });
 });
