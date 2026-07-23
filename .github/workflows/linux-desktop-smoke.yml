@@ -26,7 +26,7 @@ jobs:
       LIBGL_ALWAYS_SOFTWARE: "1"
       WEBKIT_DISABLE_COMPOSITING_MODE: "1"
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
 
       - name: Install system GTK/WebKit + xvfb
         run: |
