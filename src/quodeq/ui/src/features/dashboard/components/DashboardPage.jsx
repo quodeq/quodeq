@@ -133,7 +133,7 @@ export function selectDashboardProjectInfo({ selectedSource, projects, selectedP
 }
 
 export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
-  const { selectedProject, selectedSource, selectedRun, projects = [], sharedProjectInfo = null, dashboard, accumulated, loading, isFetching, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange } = data;
+  const { selectedProject, selectedSource, selectedRun, projects = [], sharedProjectInfo = null, dashboard, accumulated, loading, isFetching, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange, sharedHasContent = false } = data;
   const projectInfo = selectDashboardProjectInfo({ selectedSource, projects, selectedProject, sharedProjectInfo });
   const { onNavigate, onRunSelect, onProjectsReload } = callbacks;
   // After a successful clone-on-add migration the project's repository_info.json
@@ -177,6 +177,20 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   const { projectsLoaded } = data;
   if (!projectsLoaded) return <LoadingScreen />;
   if (projects.length === 0 && selectedSource !== 'shared') {
+    // Zero local projects. When the connected shared repo has published
+    // content, the useful next step is browsing it (read-only until pulled)
+    // -- not necessarily scanning something locally. Both CTAs land on the
+    // repositories tab; the copy is what differs.
+    if (sharedHasContent) {
+      return (
+        <EmptyState
+          title="No local projects yet"
+          description="Your team's online repository has published projects you can browse without scanning anything locally."
+          actionLabel="Browse remote repositories"
+          onAction={() => onNavigate?.('projects')}
+        />
+      );
+    }
     return (
       <EmptyState
         title="No projects yet"

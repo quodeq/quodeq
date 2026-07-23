@@ -977,6 +977,7 @@ export default function App() {
       availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
       selectedDisplayName: state.selectedDisplayName,
       granularity: state.granularity, onGranularityChange: state.onGranularityChange,
+      sharedHasContent: sharedSignal.hasContent,
     },
     navigation: buildNavigationBundle({
       state, navTab, navStackLength: navStack.length,
