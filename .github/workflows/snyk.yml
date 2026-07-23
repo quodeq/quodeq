@@ -37,13 +37,19 @@ jobs:
         if: env.SNYK_TOKEN != ''
         run: uv export --no-dev --no-hashes --no-emit-project -o requirements.txt
 
+      # Snyk's pip scanner resolves the dependency graph from installed
+      # packages, not from the requirements file alone (SNYK-OS-PYTHON-0013).
+      - name: Install requirements into a venv for Snyk
+        if: env.SNYK_TOKEN != ''
+        run: uv venv && uv pip install -r requirements.txt
+
       - name: Install Snyk CLI
         if: env.SNYK_TOKEN != ''
         run: npm install -g snyk
 
       - name: Snyk Open Source, Python dependencies
         if: env.SNYK_TOKEN != ''
-        run: snyk test --file=requirements.txt --package-manager=pip --severity-threshold=high
+        run: snyk test --file=requirements.txt --package-manager=pip --command=.venv/bin/python --severity-threshold=high
 
       - name: Snyk Open Source, UI dependencies
         if: env.SNYK_TOKEN != ''
