@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import uuid
 import zipfile
 from datetime import datetime, timezone
@@ -390,6 +391,20 @@ def test_import_oversize_returns_413(app_client, monkeypatch):
             headers=_ORIGIN,
         )
     assert resp.status_code in (413,)
+
+
+def test_import_uncompressed_over_limit_but_compressed_under_is_accepted(app_client):
+    """The MB cap applies to the zip bytes; extraction gets bounded headroom
+    so text that legitimately compresses well (evaluation data deflates ~5x)
+    can round-trip through export and import."""
+    c, home, _ = app_client
+    # ~3 MiB uncompressed at a ~4x compression ratio -> well under a 1 MiB zip.
+    payload = b"".join(os.urandom(64) + b"x" * 192 for _ in range(12288))
+    data = _make_zip(extra_files={"evidence.jsonl": payload})
+    assert len(data) < 1024 * 1024
+    with patch("quodeq.api.import_project._max_zip_size_bytes", return_value=1024 * 1024), _patch_home(home):
+        resp = _post_zip(c, data)
+    assert resp.status_code == 200, resp.get_json()
 
 
 def test_import_zip_bomb_ratio_rejected(app_client):
