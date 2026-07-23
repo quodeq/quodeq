@@ -859,11 +859,22 @@ export default function App() {
       sharedSettled: sharedSignal.settled,
       sharedHasContent: sharedSignal.hasContent,
     })) {
-      // Blocked for a transient reason (shared selection, an evaluation in
-      // flight, shared signal still resolving) -- do NOT mark autoOpenedRef:
-      // once the block lifts (source switches back to local, the evaluation
-      // finishes, the signal settles) while local projects are still zero, the
-      // decision must be reconsidered rather than permanently skipped.
+      // A settled "shared repo has content" outcome is FINAL for this page
+      // load, not transient: if it later flips (repo disconnected in
+      // Settings, background refresh reveals an emptied repo), the wizard
+      // must not pop over the user's working view -- the wall/empty states
+      // are the non-modal fallback. Latch here; the remaining blocks
+      // (unsettled signal, shared selection, evaluation in flight) stay
+      // unlatched so the decision is reconsidered when they lift.
+      if (sharedSignal.settled && sharedSignal.hasContent) {
+        autoOpenedRef.current = true;
+      }
+      // Otherwise blocked for a transient reason (shared selection, an
+      // evaluation in flight, shared signal still resolving) -- do NOT mark
+      // autoOpenedRef: once the block lifts (source switches back to local,
+      // the evaluation finishes, the signal settles) while local projects
+      // are still zero, the decision must be reconsidered rather than
+      // permanently skipped.
       return;
     }
     let skipped = false;

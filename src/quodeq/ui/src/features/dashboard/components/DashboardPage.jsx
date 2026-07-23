@@ -185,7 +185,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       return (
         <EmptyState
           title="No local projects yet"
-          description="Your team's online repository has published projects you can browse without scanning anything locally."
+          description="Your team’s online repository has published projects you can browse without scanning anything locally."
           actionLabel="Browse remote repositories"
           onAction={() => onNavigate?.('projects')}
         />

@@ -247,16 +247,25 @@ export function useSharedProjects() {
 export function useSharedContentSignal() {
   const { getSharedStatus, sharedListProjects } = useApi();
 
+  // This signal feeds a one-time startup decision (wizard auto-open,
+  // initial landing). Focus revalidation belongs to the pages that render
+  // the list, not here -- refetching on focus would let hasContent flip
+  // mid-session for users who never open those pages. This is a
+  // per-observer option and does not affect useSharedProjects' own
+  // observers on the same query keys.
   const statusQuery = useQuery({
     queryKey: sharedKeys.status(),
     queryFn: getSharedStatus,
+    refetchOnWindowFocus: false,
   });
   const configured = !!statusQuery.data?.configured;
 
+  // See comment above: same rationale applies to the list query.
   const listQuery = useQuery({
     queryKey: sharedKeys.list(),
     queryFn: () => sharedListProjects({ refresh: false }),
     enabled: configured,
+    refetchOnWindowFocus: false,
   });
 
   const statusSettled = statusQuery.isSuccess || statusQuery.isError;

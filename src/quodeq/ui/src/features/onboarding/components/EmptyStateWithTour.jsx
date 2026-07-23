@@ -13,7 +13,7 @@ export default function EmptyStateWithTour({ onAdd, onTour, onBrowseRemote = nul
       <TermHeader name="projects" sub="no projects yet" />
       <p>
         {onBrowseRemote
-          ? "no local projects yet. your team's online repository has published projects you can browse, or set up your own."
+          ? 'no local projects yet. your team’s online repository has published projects you can browse, or set up your own.'
           : 'set up your first repository. quodeq scans it locally and runs an evaluation against the standards you pick.'}
       </p>
       <div className="empty-state__actions">
