@@ -228,3 +228,41 @@ export function useSharedProjects() {
     pull,
   };
 }
+
+/**
+ * useSharedContentSignal — passive "does the shared repo have anything to
+ * show?" signal for App-level flow decisions (wizard auto-open, initial
+ * landing, zero-local empty states). Reads the SAME sharedKeys.status()/
+ * sharedKeys.list() cache entries as useSharedProjects (react-query dedupes
+ * by key, so mounting both costs one fetch each), but deliberately has no
+ * background refresh, no mutations, and no error surface: a failed status
+ * or list load settles as hasContent=false, which falls back to today's
+ * local-only flow.
+ *
+ * settled: the decision inputs are final for this load — status resolved or
+ * errored, and (when configured) the first list fetch resolved or errored.
+ * Consumers defer their decision (without latching) until settled so the
+ * wizard doesn't flash open over a remote list that was about to appear.
+ */
+export function useSharedContentSignal() {
+  const { getSharedStatus, sharedListProjects } = useApi();
+
+  const statusQuery = useQuery({
+    queryKey: sharedKeys.status(),
+    queryFn: getSharedStatus,
+  });
+  const configured = !!statusQuery.data?.configured;
+
+  const listQuery = useQuery({
+    queryKey: sharedKeys.list(),
+    queryFn: () => sharedListProjects({ refresh: false }),
+    enabled: configured,
+  });
+
+  const statusSettled = statusQuery.isSuccess || statusQuery.isError;
+  const listSettled = listQuery.isSuccess || listQuery.isError;
+  const settled = statusSettled && (!configured || listSettled);
+  const hasContent = configured && (listQuery.data?.projects?.length ?? 0) > 0;
+
+  return { settled, hasContent };
+}
