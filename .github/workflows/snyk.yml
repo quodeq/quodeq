@@ -38,10 +38,14 @@ jobs:
         run: uv export --no-dev --no-hashes --no-emit-project -o requirements.txt
 
       # Snyk's pip scanner resolves the dependency graph from installed
-      # packages, not from the requirements file alone (SNYK-OS-PYTHON-0013).
+      # packages, not from the requirements file alone (SNYK-OS-PYTHON-0013),
+      # and its resolver runs inside the venv's interpreter, which needs
+      # pip and setuptools present (bare uv venvs ship neither).
       - name: Install requirements into a venv for Snyk
         if: env.SNYK_TOKEN != ''
-        run: uv venv && uv pip install -r requirements.txt
+        run: |
+          uv venv --seed
+          uv pip install setuptools -r requirements.txt
 
       - name: Install Snyk CLI
         if: env.SNYK_TOKEN != ''
