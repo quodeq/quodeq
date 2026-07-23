@@ -1,0 +1,68 @@
+name: Snyk
+
+# Snyk Open Source (dependencies) + Snyk Code (SAST) on the shipped source.
+# Requires the SNYK_TOKEN repo secret; without it every scan step skips and
+# the job passes.
+#
+# Weekly + manual only, not per-PR: the free Snyk tier allows a few hundred
+# tests per month and this repo merges ~200 PRs in that time. Per-PR SAST
+# gating is CodeQL's job (codeql.yml, free on public repos); the Snyk GitHub
+# app additionally diff-checks manifests on PRs without spending CLI tests.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly sweep catches newly disclosed CVEs against unchanged deps.
+    - cron: '30 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  snyk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Notice when SNYK_TOKEN is missing
+        if: env.SNYK_TOKEN == ''
+        run: echo "SNYK_TOKEN not set (fork PR or missing secret), skipping Snyk scans."
+
+      - name: Install uv
+        if: env.SNYK_TOKEN != ''
+        uses: astral-sh/setup-uv@v8.3.2
+
+      - name: Export pinned Python requirements
+        if: env.SNYK_TOKEN != ''
+        run: uv export --no-dev --no-hashes --no-emit-project -o requirements.txt
+
+      # Snyk's pip scanner resolves the dependency graph from installed
+      # packages, not from the requirements file alone (SNYK-OS-PYTHON-0013),
+      # and its resolver runs inside the venv's interpreter, which needs
+      # pip and setuptools present (bare uv venvs ship neither).
+      - name: Install requirements into a venv for Snyk
+        if: env.SNYK_TOKEN != ''
+        run: |
+          uv venv --seed
+          uv pip install setuptools -r requirements.txt
+
+      - name: Install Snyk CLI
+        if: env.SNYK_TOKEN != ''
+        run: npm install -g snyk
+
+      - name: Snyk Open Source, Python dependencies
+        if: env.SNYK_TOKEN != ''
+        run: snyk test --file=requirements.txt --package-manager=pip --command=.venv/bin/python --severity-threshold=high
+
+      - name: Snyk Open Source, UI dependencies
+        if: env.SNYK_TOKEN != ''
+        run: snyk test --file=src/quodeq/ui/package-lock.json --package-manager=npm --severity-threshold=high
+
+      - name: Snyk Code, SAST on shipped source
+        if: env.SNYK_TOKEN != ''
+        # Scoped to src/quodeq: tests/ and benchmarks/ hold intentionally
+        # vulnerable fixtures that would always fail a repo-wide SAST scan.
+        run: snyk code test src/quodeq --severity-threshold=high
