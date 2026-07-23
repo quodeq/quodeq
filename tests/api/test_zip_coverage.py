@@ -76,6 +76,30 @@ class TestBuildProjectZip:
             with pytest.raises(ValueError, match="exceeds maximum"):
                 _build_project_zip(project)
 
+    def test_limit_applies_to_compressed_size(self, tmp_path):
+        # 1 MB of repeated text deflates to ~1 KB. The cap is on the archive
+        # size, so this must export even though the input exceeds the limit.
+        from quodeq.api.zip import _build_project_zip
+        project = tmp_path / "myproject"
+        project.mkdir()
+        (project / "big.txt").write_text("x" * (1024 * 1024))
+
+        with patch("quodeq.api.zip._max_zip_size_bytes", return_value=64 * 1024):
+            result = _build_project_zip(project)
+            assert result.exists()
+            assert result.stat().st_size <= 64 * 1024
+            os.unlink(result)
+
+    def test_incompressible_data_over_limit_raises(self, tmp_path):
+        from quodeq.api.zip import _build_project_zip
+        project = tmp_path / "myproject"
+        project.mkdir()
+        (project / "blob.bin").write_bytes(os.urandom(256 * 1024))
+
+        with patch("quodeq.api.zip._max_zip_size_bytes", return_value=64 * 1024):
+            with pytest.raises(ValueError, match="exceeds maximum"):
+                _build_project_zip(project)
+
 
 class TestExportProjectZip:
     def test_invalid_project_path_traversal(self, tmp_path):

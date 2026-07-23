@@ -38,6 +38,11 @@ _MAX_MEMBERS = 50_000
 _MAX_PER_MEMBER_BYTES = 1 * 1024 * 1024 * 1024  # 1 GiB uncompressed cap per file
 _MAX_RATIO = 200  # uncompressed/compressed ratio per member (zip-bomb guard)
 _RATIO_GUARD_THRESHOLD = 1024  # only enforce ratio above this uncompressed size
+# The MB cap (QUODEQ_MAX_ZIP_SIZE_MB) applies to the zip bytes, matching the
+# export side. Extraction gets this multiple as headroom: evaluation data is
+# text that deflates ~5x, so a cap-sized archive legitimately inflates past
+# the cap. Total extraction stays bounded at cap * headroom.
+_EXTRACT_HEADROOM = 10
 _MAX_PATH_DEPTH = 64  # limit on path components to bound recursion-style attacks
 
 _ACTION_REPLACE = "replace"
@@ -371,7 +376,7 @@ def import_zip_stream(stream: Any, reports_dir: str, action: str | None) -> Resp
 
     try:
         with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-            top_dir, members = _validate_archive(zf, max_total_bytes=size_limit)
+            top_dir, members = _validate_archive(zf, max_total_bytes=size_limit * _EXTRACT_HEADROOM)
 
             repo_info_arc = f"{top_dir}/{_REPO_INFO_FILENAME}"
             if repo_info_arc not in members:

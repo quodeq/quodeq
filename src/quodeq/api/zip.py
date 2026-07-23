@@ -66,30 +66,37 @@ def _build_manifest(project_path: Path) -> dict[str, object]:
 
 
 def _build_project_zip(project_path: Path) -> Path:
-    """Create a temporary zip archive of a project directory and return its path."""
+    """Create a temporary zip archive of a project directory and return its path.
+
+    The size cap applies to the compressed archive, matching the check on the
+    import side (which reads the zip bytes against the same limit).
+    """
     fd, tmp_path = tempfile.mkstemp(suffix=".zip", prefix="quodeq_export_")
     os.close(fd)
-    total_size = 0
     size_limit = _max_zip_size_bytes()
+    limit_error = ValueError(
+        f"Project exceeds maximum export size of {size_limit // (1024 * 1024)} MB compressed. "
+        f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
+    )
     try:
-        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
-            for file_entry in project_path.rglob("*"):
-                if file_entry.is_symlink():
-                    continue
-                if not file_entry.is_file():
-                    continue
-                # Skip any prior manifest so the export-time one is authoritative.
-                if file_entry == project_path / _MANIFEST_FILENAME:
-                    continue
-                total_size += file_entry.stat().st_size
-                if total_size > size_limit:
-                    raise ValueError(
-                        f"Project exceeds maximum export size of {size_limit // (1024 * 1024)} MB. "
-                        f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
-                    )
-                zf.write(file_entry, file_entry.relative_to(project_path.parent))
-            manifest_arcname = f"{project_path.name}/{_MANIFEST_FILENAME}"
-            zf.writestr(manifest_arcname, json.dumps(_build_manifest(project_path), indent=2))
+        with open(tmp_path, "wb") as fh:
+            with zipfile.ZipFile(fh, "w", zipfile.ZIP_DEFLATED) as zf:
+                for file_entry in project_path.rglob("*"):
+                    if file_entry.is_symlink():
+                        continue
+                    if not file_entry.is_file():
+                        continue
+                    # Skip any prior manifest so the export-time one is authoritative.
+                    if file_entry == project_path / _MANIFEST_FILENAME:
+                        continue
+                    zf.write(file_entry, file_entry.relative_to(project_path.parent))
+                    if fh.tell() > size_limit:
+                        raise limit_error
+                manifest_arcname = f"{project_path.name}/{_MANIFEST_FILENAME}"
+                zf.writestr(manifest_arcname, json.dumps(_build_manifest(project_path), indent=2))
+        # The central directory is written on close; re-check the final size.
+        if os.path.getsize(tmp_path) > size_limit:
+            raise limit_error
     except (OSError, zipfile.BadZipFile, ValueError):
         os.unlink(tmp_path)
         raise
