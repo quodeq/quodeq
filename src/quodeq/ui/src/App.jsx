@@ -256,7 +256,7 @@ export function shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, s
  * consumed but never forwarded). Exported so producer and consumer can be
  * pinned together in tests without mounting the whole App.
  */
-export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluating, showToast, setWizardEntry }) {
+export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluating, showToast, setWizardEntry, sharedHasContent = false }) {
   return {
     selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
     projectsLoaded: state.projectsLoaded,
@@ -299,6 +299,9 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
         presetProjectId: projectId,
       });
     },
+    // null when the shared repo has no content — consumers use the nullness
+    // to hide their "browse remote repositories" affordance.
+    onBrowseRemote: sharedHasContent ? () => navTab('projects') : null,
     isEvaluating,
   };
 }
@@ -702,6 +705,7 @@ function MainContent({ activePage, props }) {
       <EmptyStateWithTour
         onAdd={() => props.navigation.onAddProject()}
         onTour={() => props.navigation.onTakeTour()}
+        onBrowseRemote={props.navigation.onBrowseRemote}
         isEvaluating={props.navigation.isEvaluating}
       />
     );
@@ -977,6 +981,7 @@ export default function App() {
     navigation: buildNavigationBundle({
       state, navTab, navStackLength: navStack.length,
       isEvaluating, showToast, setWizardEntry,
+      sharedHasContent: sharedSignal.hasContent,
     }),
     evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
