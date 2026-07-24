@@ -10,7 +10,10 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     # Cap the whole job so a hanging test fails fast instead of burning
-    # runner minutes. Ubuntu + macOS finish in ~1 min, Windows in ~2-3 min.
+    # runner minutes. Ubuntu + macOS run in ~2-3 min. Windows is far slower
+    # per test (no fork(), slow git-subprocess startup, NTFS small-file I/O,
+    # Defender scanning), so it runs under pytest-xdist (-n auto) with a
+    # Defender exclusion to stay well within this budget.
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -38,9 +41,25 @@ jobs:
         # tolerable. PR CI should be fast and deterministic.
         run: uv run pytest tests/ -q --tb=short -m "not integration" --cov=quodeq --cov-report=term-missing
 
+      - name: Speed up Windows file I/O (exclude churn paths from Defender)
+        if: runner.os == 'Windows'
+        # The suite spawns thousands of git/python subprocesses and writes
+        # thousands of tiny temp files. Defender's real-time scan of every new
+        # process image and file write is a large, invisible tax on
+        # windows-latest. Exclude the churn dirs and the two hot executables.
+        # Best effort: never let a Defender hiccup block the gate.
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          Add-MpPreference -ExclusionPath $env:RUNNER_TEMP, $env:TEMP, $env:GITHUB_WORKSPACE
+          Add-MpPreference -ExclusionProcess "git.exe", "python.exe"
+
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
+        # -n auto (pytest-xdist): the suite is process- and file-I/O-bound on
+        # Windows, and every test is state-isolated by the autouse
+        # _isolate_quodeq_home fixture (tests/conftest.py), so distributing
+        # across cores cuts wall time roughly linearly (~12 min -> a few).
         # Verbose + -ra so per-test names and the FAILED summary survive
-        # GitHub's log truncation, making any Windows-specific failure easy
-        # to pinpoint now that Windows is a blocking gate.
-        run: uv run pytest tests/ -v -ra --tb=short -m "not integration"
+        # GitHub's log truncation, keeping this blocking gate easy to triage.
+        run: uv run pytest tests/ -v -ra --tb=short -m "not integration" -n auto
