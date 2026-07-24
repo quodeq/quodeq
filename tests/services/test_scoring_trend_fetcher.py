@@ -1,7 +1,10 @@
 """Tests for the trend fetcher selection (scalar fast-path vs heavy rescoring)."""
 from pathlib import Path
 
+import pytest
+
 from quodeq.core.types import DimensionResult
+from quodeq.services._trend_fetcher import make_rescoring_fetcher
 from quodeq.services.scoring import _make_trend_fetcher
 
 
@@ -90,3 +93,11 @@ def test_active_deletion_uses_heavy_path(tmp_path: Path, monkeypatch) -> None:
     result = fetcher("r2")
     assert [d.overall_score for d in result] == ["6.0/10"]
     assert rescoring_calls == ["r2"]
+
+
+def test_make_rescoring_fetcher_rejects_traversal_project(tmp_path: Path) -> None:
+    """``make_rescoring_fetcher`` builds its own ``project_dir`` join
+    independent of any caller-side validation, so a traversal project must be
+    rejected locally before that join (CodeQL py/path-injection build site)."""
+    with pytest.raises(ValueError):
+        make_rescoring_fetcher(tmp_path, "../etc", base_fetcher=lambda run_id: [])

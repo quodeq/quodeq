@@ -18,6 +18,7 @@ def handle_ci(args: argparse.Namespace) -> int:
 def _handle_report(args: argparse.Namespace) -> int:
     """Post evaluation results as a GitHub PR review."""
     from quodeq.ci._evidence_reader import load_violations_from_evidence
+    from quodeq.ci._suppressions import filter_suppressed_violations
     from quodeq.ci.reporter import (
         build_review_payload,
         fetch_pr_changed_lines,
@@ -50,12 +51,20 @@ def _handle_report(args: argparse.Namespace) -> int:
         # an approving review so the PR shows "Quodeq ran and found nothing"
         # rather than silence (which CI cannot distinguish from "job broken").
         violations = load_violations_from_evidence(evaluation_dir / "evidence")
-        reports = [{
+        # In --from-evidence mode, `evaluation_dir` IS the run directory (its
+        # "evidence" subfolder holds the JSONL) -- see the --from-evidence
+        # help text and .github/workflows/quodeq-review.yml, which passes the
+        # parent of evidence/ as --evaluation-dir. That's one level shallower
+        # than the scored-report "evaluation" folder used in the else branch
+        # below, so project_dir is one parent up here, not two.
+        project_dir = evaluation_dir.parent
+        report = filter_suppressed_violations({
             "dimension": "pr-diff",
             "violations": violations,
             "overallScore": "N/A",
             "overallGrade": "N/A",
-        }]
+        }, project_dir)
+        reports = [report]
         baseline_violations: list[dict] = []
         baseline_available = False
     else:

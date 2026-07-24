@@ -160,14 +160,21 @@ def handle_review(args) -> int:
     evidence_dir = current_run_dir / "evidence"
 
     from quodeq.ci._evidence_reader import load_violations_from_evidence
+    from quodeq.ci._suppressions import filter_suppressed_violations
     violations = load_violations_from_evidence(evidence_dir)
 
-    reports = [{
+    # evidence_dir = current_run_dir / "evidence", so its parent is the run
+    # dir and .parent.parent is the project dir (layout:
+    # <reports_root>/<project>/<run>/evidence) -- same project_dir the
+    # dashboard's dismiss/delete actions.jsonl and deleted.json live under.
+    project_dir = evidence_dir.parent.parent
+    report = filter_suppressed_violations({
         "dimension": "pr-diff",
         "violations": violations,
         "overallScore": "N/A",
         "overallGrade": "N/A",
-    }]
+    }, project_dir)
+    reports = [report]
 
     from quodeq.ci.reporter import build_review_payload
     payload = build_review_payload(
@@ -177,7 +184,7 @@ def handle_review(args) -> int:
         baseline_available=False,
     )
 
-    total_violations = len(violations)
+    total_violations = len(report["violations"])
     print(f"Evaluation complete: {total_violations} violation(s) found in diff")
     print(f"Verdict: {payload['event']}")
 
