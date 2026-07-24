@@ -710,6 +710,75 @@ export function buildAssistantSessionPayload({ provider, model, projectId, runId
 }
 
 /**
+ * Handler for the `quodeq:assistant-action-applied` window event, which the
+ * assistant's ActionPreviewCard dispatches after a successful apply.
+ *
+ * Extracted and exported so the post-dismiss convergence contract can be
+ * pinned without mounting App (which needs ~8 providers). An assistant
+ * dismiss mutates exactly the payloads a manual dismiss does, so it owes the
+ * same three follow-ups — see the inline notes on each.
+ *
+ * @param {{
+ *   applyDelta: (project: string, scores: Object, delta: Object) => void,
+ *   bumpDismissRefresh: () => void,
+ *   refreshDashboard?: () => void,
+ *   scheduleDashboardReconcile?: () => void,
+ *   selectedProject: string,
+ * }} deps
+ * @returns {(event: CustomEvent) => void}
+ */
+export function buildAssistantActionAppliedHandler({
+  applyDelta,
+  bumpDismissRefresh,
+  refreshDashboard,
+  scheduleDashboardReconcile,
+  selectedProject,
+}) {
+  return (event) => {
+    if (event.detail?.actionType !== 'dismiss_finding') return;
+    // Apply the delta first so the currently-visible screen patches in place
+    // immediately; the refresh/reconcile below are the eventual-correctness
+    // path (e.g. for views the delta doesn't cover).
+    // Prefer the delta's own project over the live selectedProject: the
+    // apply POST may resolve after the user switched projects, and the
+    // delta is frozen to the action's project. Keying the patch on the
+    // live selection would write project A's rollup into project B's cache.
+    if (event.detail.delta) {
+      try {
+        applyDelta(
+          event.detail.delta?.project || selectedProject,
+          event.detail.scores,
+          event.detail.delta,
+        );
+      } catch {
+        // Instant patch is best-effort; the refresh/reconcile are the fallback.
+      }
+    }
+    bumpDismissRefresh();
+    // Invalidate the project queries so frozen run views (staleTime Infinity)
+    // refetch on their next mount instead of showing the pre-dismiss counts
+    // forever. Mark-stale only (refetchType:'none'), so this is cheap.
+    refreshDashboard?.();
+    // ...and actively reconcile, exactly as the manual dismiss handlers do
+    // (see useDismissedFindings.js). Mark-stale alone never reaches the
+    // Overview: its useDashboard observer is mounted at the app root and
+    // never remounts, and the pywebview window never fires the focus-refetch
+    // a browser tab gets. So for any view the delta above doesn't cover --
+    // and for an assistant dismiss that returns no delta at all -- the
+    // visible screen would keep showing pre-dismiss numbers indefinitely,
+    // which reads as "nothing updated". Debounced, so a multi-action apply
+    // coalesces into one refetch of the 10-20 MB payload.
+    //
+    // Unlike applyDelta this keys on the LIVE selectedProject rather than the
+    // delta's frozen project, matching refreshDashboard. That is safe here
+    // where it wouldn't be above: reconciling is a refetch, so aiming it at
+    // the wrong project after a mid-flight switch merely re-pulls fresh data;
+    // it never writes one project's rollup into another's cache.
+    scheduleDashboardReconcile?.();
+  };
+}
+
+/**
  * @param {{ activePage: { page: string }, props: Object }} params
  * @returns {JSX.Element|null}
  */
@@ -774,44 +843,27 @@ export default function App() {
   // fetched once on mount.
   const [dismissRefreshKey, setDismissRefreshKey] = useState(0);
   const bumpDismissRefresh = () => setDismissRefreshKey((k) => k + 1);
-  const { refreshDashboard: refreshDashboardForApply, selectedProject } = state;
+  const {
+    refreshDashboard: refreshDashboardForApply,
+    scheduleDashboardReconcile: scheduleReconcileForApply,
+    selectedProject,
+  } = state;
   // Shared with the manual dismiss handlers below (buildDismissPayload
   // callers). Patches the dashboard/scores caches from a dismiss response's
   // delta so the Overview updates instantly instead of waiting on a refetch.
   const applyDelta = (project, scores, delta) =>
     applyMutationDelta(queryClient, project, delta && { ...delta, dimensions: scores?.dimensions });
   useEffect(() => {
-    const handler = (event) => {
-      if (event.detail?.actionType === 'dismiss_finding') {
-        // Apply the delta first so the currently-visible screen patches in
-        // place immediately; the refresh/refetch below is the lazy,
-        // eventual-correctness path (e.g. for views the delta doesn't cover).
-        // Prefer the delta's own project over the live selectedProject: the
-        // apply POST may resolve after the user switched projects, and the
-        // delta is frozen to the action's project. Keying the patch on the
-        // live selection would write project A's rollup into project B's cache.
-        if (event.detail.delta) {
-          try {
-            applyDelta(
-              event.detail.delta?.project || selectedProject,
-              event.detail.scores,
-              event.detail.delta,
-            );
-          } catch {
-            // Instant patch is best-effort; the lazy refresh below is the fallback.
-          }
-        }
-        bumpDismissRefresh();
-        // Assistant-applied dismissals mutate the same payloads manual ones
-        // do; invalidate the project queries so frozen run views (staleTime
-        // Infinity) refetch on their next mount instead of showing the
-        // pre-dismiss counts forever.
-        refreshDashboardForApply?.();
-      }
-    };
+    const handler = buildAssistantActionAppliedHandler({
+      applyDelta,
+      bumpDismissRefresh,
+      refreshDashboard: refreshDashboardForApply,
+      scheduleDashboardReconcile: scheduleReconcileForApply,
+      selectedProject,
+    });
     window.addEventListener('quodeq:assistant-action-applied', handler);
     return () => window.removeEventListener('quodeq:assistant-action-applied', handler);
-  }, [refreshDashboardForApply, selectedProject]);
+  }, [refreshDashboardForApply, scheduleReconcileForApply, selectedProject]);
   // Auto-open is a once-per-session decision. Without this guard, closing the
   // wizard sets wizardEntry → null, which re-fires this effect and re-opens
   // the wizard immediately because projects.length is still 0. The user's
