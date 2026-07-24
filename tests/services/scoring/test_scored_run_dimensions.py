@@ -151,3 +151,15 @@ def test_rescore_runs_by_dimension_validates_path_segments():
             [{"dimension": "security", "fromRunId": "run1"}],
             Path("/reports"), "../etc", dismissed=set(),
         )
+
+
+def test_get_scores_raw_validates_path_segments():
+    """``get_scores_raw`` builds ``reports_root / project / run_id`` itself
+    and feeds it to ``SqliteFindingsRepository``/``open_evaluation_db`` (a
+    broader read/write surface than the evidence jsonl sink), so a traversal
+    project or run_id must be rejected locally before that join, not left to
+    whatever validated it upstream."""
+    with pytest.raises(ValueError):
+        scoring.get_scores_raw(Path("/reports"), "proj", "../../etc/passwd")
+    with pytest.raises(ValueError):
+        scoring.get_scores_raw(Path("/reports"), "../etc", "run1")

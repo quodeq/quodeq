@@ -289,6 +289,7 @@ def get_scores_raw(
     payload, which made live-grade updates impossible for them: the dismiss
     POST returned no scores, the UI had nothing to apply.
     """
+    validate_path_segment(project, run_id)
     run_dir = reports_root / project / run_id
     if not run_dir.is_dir():
         raise FileNotFoundError(f"Run directory not found: {run_dir}")

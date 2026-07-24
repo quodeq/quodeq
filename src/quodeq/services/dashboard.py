@@ -187,6 +187,7 @@ def _rescore_run_dimensions(
     from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
     from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
 
+    validate_path_segment(project)
     project_dir = reports_root / project
     dismissed = dismissed_keys(project_dir)
     deleted = deleted_keys(project_dir)

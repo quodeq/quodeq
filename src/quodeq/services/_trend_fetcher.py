@@ -54,6 +54,7 @@ def make_rescoring_fetcher(
     dismiss-adjusted data. Identity when the project has no active
     dismissals/deletions.
     """
+    validate_path_segment(project)
     project_dir = reports_root / project
     dismissed = dismissed_keys(project_dir)
     deleted = deleted_keys(project_dir)
