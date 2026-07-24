@@ -36,6 +36,22 @@ it('mounts an xterm terminal when active', async () => {
   expect(fakeTerm.open).toHaveBeenCalled();
 });
 
+it('focuses xterm when it is the active tab so the user can type without clicking in', async () => {
+  socketState.status = 'open';
+  fakeTerm.focus.mockClear();
+  render(<TerminalPane active />);
+  await screen.findByTestId('tty-root');
+  expect(fakeTerm.focus).toHaveBeenCalled();
+});
+
+it('does not focus xterm while backgrounded (active=false)', async () => {
+  socketState.status = 'open';
+  fakeTerm.focus.mockClear();
+  render(<TerminalPane active={false} />);
+  await screen.findByTestId('tty-root');
+  expect(fakeTerm.focus).not.toHaveBeenCalled();
+});
+
 it('mounts xterm even when backgrounded (active=false) so the PTY survives a tab switch', async () => {
   const { Terminal } = await import('@xterm/xterm');
   Terminal.mockClear();

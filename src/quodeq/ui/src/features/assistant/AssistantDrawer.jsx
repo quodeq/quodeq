@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAssistantDrawer } from './AssistantDrawerProvider.jsx';
 import { MessageList } from './MessageList.jsx';
 import { CommandMenu } from './CommandMenu.jsx';
@@ -15,8 +15,12 @@ import { StopIcon } from '../../components/CopyButton.jsx';
  *
  * `uiState` is passed in as a prop (current app view context, e.g. active
  * tab) and forwarded verbatim to `sendMessage` on every send.
+ *
+ * `active` is whether this pane is the frontmost drawer tab. It drives the
+ * autofocus effect below; a backgrounded pane (display:none) must not steal
+ * focus. Defaults to true so a standalone render still focuses its input.
  */
-export function AssistantPane({ uiState }) {
+export function AssistantPane({ uiState, active = true }) {
   const {
     messages, streaming, error, sendMessage, stopTurn,
     catalog, addLocalExchange, resetConversation, readOnly,
@@ -24,6 +28,16 @@ export function AssistantPane({ uiState }) {
   const [draft, setDraft] = useState('');
   const [menuIndex, setMenuIndex] = useState(0);
   const [menuDismissed, setMenuDismissed] = useState(false);
+  const inputRef = useRef(null);
+
+  // Give the prompt keyboard focus when this pane becomes the frontmost tab
+  // (drawer open or tab switch) so the user can type immediately without
+  // clicking in. The parent flips display:none→flex in the same commit, so by
+  // the time this effect runs the textarea is laid out and focusable. Skip
+  // while streaming (the textarea is disabled then); refocus once it ends.
+  useEffect(() => {
+    if (active && !streaming) inputRef.current?.focus();
+  }, [active, streaming]);
 
   const suggestions = useMemo(
     () => (streaming ? [] : matchCommands(catalog, draft, { readOnly })),
@@ -77,6 +91,7 @@ export function AssistantPane({ uiState }) {
           <CommandMenu suggestions={suggestions} selectedIndex={menuIndex} onPick={acceptSuggestion} />
         )}
         <textarea
+          ref={inputRef}
           className="assistant-drawer-input"
           placeholder="Ask the assistant…"
           value={draft}
