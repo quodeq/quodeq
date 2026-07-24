@@ -128,12 +128,12 @@ def safe_editor_path(
     """
     try:
         real = realpath(path)
-    except OSError:
+    except (OSError, ValueError):  # ValueError: embedded NUL byte in path
         return None
     for base in bases:
         try:
             base_real = realpath(base)
-        except OSError:
+        except (OSError, ValueError):
             continue
         try:
             if commonpath([real, base_real]) == base_real:

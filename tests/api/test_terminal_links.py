@@ -118,6 +118,13 @@ def test_safe_editor_path_checks_multiple_bases():
     assert got == "/second/a.py"
 
 
+def test_safe_editor_path_null_byte_returns_none():
+    # The real os.path.realpath raises ValueError on an embedded NUL. The /open
+    # route promises to fail soft (never raise into a request), so a NUL path
+    # must resolve to None rather than propagate a 500.
+    assert safe_editor_path("/home/u/a\x00.py", ["/home/u"]) is None
+
+
 # --- detect_editor ----------------------------------------------------------
 
 def test_detect_editor_prefers_code_on_path():
