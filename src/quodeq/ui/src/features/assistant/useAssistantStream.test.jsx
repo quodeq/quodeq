@@ -160,6 +160,74 @@ it('a null JSON payload frame is ignored instead of crashing', () => {
   expect(result.current.error).toBe(null);
 });
 
+it('a large token frame is revealed progressively, not in one paint', () => {
+  // Providers without deltas (codex) deliver a whole message as ONE token
+  // frame. The drawer should sweep it in at a readable rate instead of
+  // popping the full block in a single flush.
+  const { result } = renderHook(() => useAssistantStream('s1'));
+  const es = MockES.instances[0];
+  const block = 'x'.repeat(600);
+  act(() => { es.emit('message', { type: 'token', text: block }); });
+  act(() => { vi.advanceTimersByTime(40); });
+  const partial = result.current.messages.find((m) => m.role === 'assistant');
+  expect(partial).toBeTruthy();
+  expect(partial.text.length).toBeGreaterThan(0);
+  expect(partial.text.length).toBeLessThan(600);
+  expect(block.startsWith(partial.text)).toBe(true);
+  act(() => { vi.advanceTimersByTime(2000); });
+  expect(result.current.messages.find((m) => m.role === 'assistant').text).toBe(block);
+});
+
+it('done waits for the progressive reveal to finish before ending the turn', () => {
+  // codex sends its final message and `done` back to back. Ending the turn
+  // immediately would force-flush the block and defeat the reveal.
+  const onDone = vi.fn();
+  const { result } = renderHook(() => useAssistantStream('s1', { onDone }));
+  const es = MockES.instances[0];
+  const block = 'y'.repeat(600);
+  act(() => {
+    es.emit('message', { type: 'token', text: block });
+    es.emit('done', { type: 'done' });
+  });
+  // Turn must still be live while text is draining.
+  expect(result.current.streaming).toBe(true);
+  expect(onDone).not.toHaveBeenCalled();
+  act(() => { vi.advanceTimersByTime(2000); });
+  expect(result.current.messages.find((m) => m.role === 'assistant').text).toBe(block);
+  expect(result.current.streaming).toBe(false);
+  expect(onDone).toHaveBeenCalledTimes(1);
+});
+
+it('a next-turn token during the reveal finishes the old turn into its own bubble', () => {
+  const onDone = vi.fn();
+  const { result } = renderHook(() => useAssistantStream('s1', { onDone }));
+  const es = MockES.instances[0];
+  const block = 'z'.repeat(300);
+  act(() => {
+    es.emit('message', { type: 'token', text: block });
+    es.emit('done', { type: 'done' });
+    // user fires the next turn before the reveal finished
+    es.emit('message', { type: 'token', text: 'next answer' });
+  });
+  act(() => { vi.advanceTimersByTime(2000); });
+  const assistants = result.current.messages.filter((m) => m.role === 'assistant');
+  expect(assistants.map((m) => m.text)).toEqual([block, 'next answer']);
+  expect(onDone).toHaveBeenCalledTimes(1); // second turn has no done yet
+});
+
+it('an error force-flushes pending text immediately, no reveal delay', () => {
+  const { result } = renderHook(() => useAssistantStream('s1'));
+  const es = MockES.instances[0];
+  act(() => {
+    es.emit('message', { type: 'token', text: 'w'.repeat(600) });
+    es.emit('message', { type: 'error', message: 'boom' });
+  });
+  // No timer advance: the full text and the error state land synchronously.
+  expect(result.current.messages.find((m) => m.role === 'assistant').text).toBe('w'.repeat(600));
+  expect(result.current.error).toBe('boom');
+  expect(result.current.streaming).toBe(false);
+});
+
 it('a stopped frame ends the turn with a stop marker, not an error', () => {
   const onDone = vi.fn();
   const { result } = renderHook(() => useAssistantStream('s1', { onDone }));
