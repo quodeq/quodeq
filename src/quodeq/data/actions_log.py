@@ -55,6 +55,10 @@ def read_action_events(project_dir: Path, *, from_offset: int = 0) -> Iterator[B
         return
     with open(log_path, encoding="utf-8") as f:
         if from_offset > 0:
+            # int-seek on a text-mode file is only formally valid for offsets
+            # returned by f.tell(); it's exact here because from_offset is
+            # always a previously recorded file size, which lands on a UTF-8
+            # line boundary in this append-only log.
             f.seek(from_offset)
         for line in f:
             line = line.strip()
