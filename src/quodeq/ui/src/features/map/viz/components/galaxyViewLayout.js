@@ -29,22 +29,39 @@ export function computeClusterPositions(groupKeys) {
  */
 export function buildMSTLines(clusterStars, startIdx) {
   const lines = [];
-  if (clusterStars.length < 2) return lines;
+  const n = clusterStars.length;
+  if (n < 2) return lines;
 
-  const connected = new Set([0]);
-  while (connected.size < clusterStars.length) {
-    let bestA = -1, bestB = -1, bestD = Infinity;
-    for (const ai of connected) {
-      for (let bi = 0; bi < clusterStars.length; bi++) {
-        if (connected.has(bi)) continue;
-        const dx = clusterStars[ai]._ox - clusterStars[bi]._ox;
-        const dy = clusterStars[ai]._oy - clusterStars[bi]._oy;
-        const d = dx * dx + dy * dy;
-        if (d < bestD) { bestD = d; bestA = ai; bestB = bi; }
-      }
+  // Prim's algorithm with a nearest-connected-node cache. For each unconnected
+  // node we track its closest connected node (nearD/nearA); adding a node costs
+  // one O(n) pass to refresh those caches, so the whole tree is O(n^2) instead
+  // of the O(n^3) that re-scanning every connected node per step would cost.
+  const inTree = new Array(n).fill(false);
+  const nearD = new Array(n).fill(Infinity);
+  const nearA = new Array(n).fill(-1);
+  inTree[0] = true;
+  for (let b = 1; b < n; b++) {
+    const dx = clusterStars[0]._ox - clusterStars[b]._ox;
+    const dy = clusterStars[0]._oy - clusterStars[b]._oy;
+    nearD[b] = dx * dx + dy * dy;
+    nearA[b] = 0;
+  }
+
+  for (let step = 1; step < n; step++) {
+    let bestB = -1, bestD = Infinity;
+    for (let b = 0; b < n; b++) {
+      if (!inTree[b] && nearD[b] < bestD) { bestD = nearD[b]; bestB = b; }
     }
-    if (bestB >= 0) { lines.push({ a: startIdx + bestA, b: startIdx + bestB }); connected.add(bestB); }
-    else break;
+    if (bestB < 0) break;
+    lines.push({ a: startIdx + nearA[bestB], b: startIdx + bestB });
+    inTree[bestB] = true;
+    for (let b = 0; b < n; b++) {
+      if (inTree[b]) continue;
+      const dx = clusterStars[bestB]._ox - clusterStars[b]._ox;
+      const dy = clusterStars[bestB]._oy - clusterStars[b]._oy;
+      const d = dx * dx + dy * dy;
+      if (d < nearD[b]) { nearD[b] = d; nearA[b] = bestB; }
+    }
   }
   return lines;
 }
