@@ -192,14 +192,17 @@ describe('ROUTE_RENDERERS onDismiss source gating', () => {
   });
 });
 
-// The Dismissed sub-tab's restore/delete (single + bulk) handlers all call
-// the ViolationsRoute-supplied onRefresh (see useDismissedFindings.js).
-// restore-all/delete-all return a payload applyMutationDelta's gates can't
-// patch (scores:null, delta.isLatest:false), so this seam must wire to the
-// debounced ACTIVE scheduleDashboardReconcile, not the lazy refreshDashboard
-// — otherwise a restore-all leaves the Overview showing dismissed counts
-// until the user switches projects.
-describe('ViolationsRoute onRefresh wiring (Dismissed tab reconcile)', () => {
+// ViolationsPage fires its onRefresh on every mount (see
+// ViolationsPage.jsx's tabKey effect) -- including plain drill-down/back
+// navigation with no mutation involved, since the page remounts on every
+// round trip. Wiring onRefresh to scheduleDashboardReconcile (as a prior
+// revision did) turned every such round trip into an ACTIVE refetch of the
+// 10-20 MB dashboard payload -- the exact freeze refetchType:'none' exists
+// to avoid. onRefresh must stay wired to the lazy refreshDashboard; only the
+// four suppression-mutation handlers in useDismissedFindings.js (restore/
+// restore-all/delete/delete-all) get the debounced ACTIVE reconcile, via the
+// separate onReconcile callback threaded down from here.
+describe('ViolationsRoute onRefresh/onReconcile wiring (Dismissed tab reconcile)', () => {
   function renderViolationsRoute(props) {
     const outer = ROUTE_RENDERERS.violations({}, props);
     // ROUTE_RENDERERS.violations returns <ViolationsRoute params props />;
@@ -218,11 +221,17 @@ describe('ViolationsRoute onRefresh wiring (Dismissed tab reconcile)', () => {
     };
   }
 
-  it('wires onRefresh to scheduleDashboardReconcile, not refreshDashboard', () => {
+  it('wires onRefresh to refreshDashboard (lazy mark-stale) so plain navigation never forces an active refetch', () => {
     const props = violationsProps();
     const inner = renderViolationsRoute(props);
-    expect(inner.props.callbacks.onRefresh).toBe(props.scheduleDashboardReconcile);
-    expect(inner.props.callbacks.onRefresh).not.toBe(props.refreshDashboard);
+    expect(inner.props.callbacks.onRefresh).toBe(props.refreshDashboard);
+    expect(inner.props.callbacks.onRefresh).not.toBe(props.scheduleDashboardReconcile);
+  });
+
+  it('wires onReconcile to scheduleDashboardReconcile, for the suppression-mutation handlers to call in addition to onRefresh', () => {
+    const props = violationsProps();
+    const inner = renderViolationsRoute(props);
+    expect(inner.props.callbacks.onReconcile).toBe(props.scheduleDashboardReconcile);
   });
 });
 

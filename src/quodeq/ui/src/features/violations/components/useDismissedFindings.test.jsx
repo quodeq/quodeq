@@ -208,6 +208,129 @@ describe('useDismissedFindings — handleDeleteAll', () => {
   });
 });
 
+// Item 1 fix: onRefresh is now the lazy refreshDashboard (mark-stale only) --
+// wiring it to the ACTIVE scheduleDashboardReconcile forced a full refetch of
+// the 10-20 MB dashboard payload on every plain navigation remount (see
+// ViolationsPage's tabKey mount effect). The four mutation handlers below
+// must therefore call a SEPARATE onReconcile callback in addition to
+// onRefresh, so restore/delete still gets the debounced ACTIVE reconcile
+// without plain navigation triggering it.
+describe('useDismissedFindings — onReconcile (called alongside onRefresh, not instead of it)', () => {
+  it('handleRestore calls both onRefresh and onReconcile on success', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA]);
+    restoreFinding.mockResolvedValueOnce({ ok: true });
+    const onRefresh = vi.fn();
+    const onReconcile = vi.fn();
+    const { result } = renderHook(
+      () => useDismissedFindings('proj', onRefresh, vi.fn(), 0, 'local', onReconcile),
+      withQueryClient(),
+    );
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
+
+    await act(async () => { await result.current.handleRestore(sampleA); });
+
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onReconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it('handleRestore does not call onReconcile on failure', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA]);
+    restoreFinding.mockRejectedValueOnce(new Error('boom'));
+    const onReconcile = vi.fn();
+    const { result } = renderHook(
+      () => useDismissedFindings('proj', vi.fn(), vi.fn(), 0, 'local', onReconcile),
+      withQueryClient(),
+    );
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
+
+    await act(async () => { await result.current.handleRestore(sampleA); });
+
+    expect(onReconcile).not.toHaveBeenCalled();
+  });
+
+  it('handleRestoreAll calls both onRefresh and onReconcile on success', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
+    restoreAllFindings.mockResolvedValueOnce({ ok: true, restored: 2 });
+    const onRefresh = vi.fn();
+    const onReconcile = vi.fn();
+    const { result } = renderHook(
+      () => useDismissedFindings('proj', onRefresh, vi.fn(), 0, 'local', onReconcile),
+      withQueryClient(),
+    );
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
+
+    await act(async () => { await result.current.handleRestoreAll(); });
+
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onReconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it('handleDelete calls both onRefresh and onReconcile on success', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
+    deleteFinding.mockResolvedValueOnce({ ok: true, swept: 1 });
+    const onRefresh = vi.fn();
+    const onReconcile = vi.fn();
+    const { result } = renderHook(
+      () => useDismissedFindings('proj', onRefresh, vi.fn(), 0, 'local', onReconcile),
+      withQueryClient(),
+    );
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
+
+    await act(async () => { await result.current.handleDelete(sampleA); });
+
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onReconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it('handleDeleteAll calls both onRefresh and onReconcile on success', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
+    confirmDialog.mockResolvedValueOnce(true);
+    deleteAllFindings.mockResolvedValueOnce({ ok: true, deleted: 2 });
+    const onRefresh = vi.fn();
+    const onReconcile = vi.fn();
+    const { result } = renderHook(
+      () => useDismissedFindings('proj', onRefresh, vi.fn(), 0, 'local', onReconcile),
+      withQueryClient(),
+    );
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
+
+    await act(async () => { await result.current.handleDeleteAll(); });
+
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onReconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it('handleDeleteAll does not call onReconcile when the user cancels', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
+    confirmDialog.mockResolvedValueOnce(false);
+    const onReconcile = vi.fn();
+    const { result } = renderHook(
+      () => useDismissedFindings('proj', vi.fn(), vi.fn(), 0, 'local', onReconcile),
+      withQueryClient(),
+    );
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
+
+    await act(async () => { await result.current.handleDeleteAll(); });
+
+    expect(onReconcile).not.toHaveBeenCalled();
+  });
+
+  it('works fine when onReconcile is omitted (optional param, back-compat)', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA]);
+    restoreFinding.mockResolvedValueOnce({ ok: true });
+    const onRefresh = vi.fn();
+    const { result } = renderHook(
+      () => useDismissedFindings('proj', onRefresh, vi.fn()),
+      withQueryClient(),
+    );
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
+
+    await act(async () => { await result.current.handleRestore(sampleA); });
+
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+});
+
 // Shared projects have no mutation routes on the backend (dismiss/restore/
 // delete are local-only by design, and the same project id can exist in both
 // worlds). The dismissed list must read from the shared-repo mirror endpoint,

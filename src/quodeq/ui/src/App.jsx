@@ -523,13 +523,20 @@ function ViolationsRoute({ params, props }) {
           }
         },
         onPrincipleClick: (principleObj) => navigateToPrinciple(principleObj),
-        // Restore/delete (single + bulk) route through here via
-        // useDismissedFindings' onRefresh. restore-all/delete-all return a
-        // payload applyMutationDelta can't patch (scores:null,
-        // delta.isLatest:false), so this must actively reconcile rather than
-        // just mark the cache stale — see scheduleDashboardReconcile in
+        // ViolationsPage fires onRefresh on EVERY mount (its tabKey effect),
+        // including plain drill-down/back navigation with no mutation --
+        // the page remounts on every round trip. onRefresh must stay wired
+        // to the lazy refreshDashboard (mark-stale, refetchType:'none') so
+        // plain navigation never forces an active refetch of the 10-20 MB
+        // dashboard payload. Restore/delete (single + bulk) route through a
+        // SEPARATE onReconcile callback via useDismissedFindings, called
+        // alongside onRefresh from its four mutation handlers.
+        // restore-all/delete-all return a payload applyMutationDelta can't
+        // patch (scores:null, delta.isLatest:false), so those need the
+        // debounced ACTIVE reconcile — see scheduleDashboardReconcile in
         // useDashboard.js.
-        onRefresh: props.scheduleDashboardReconcile,
+        onRefresh: props.refreshDashboard,
+        onReconcile: props.scheduleDashboardReconcile,
         onNavigate: nav,
       }}
       isDirectNav={props.navigation.navStackLength === 1}

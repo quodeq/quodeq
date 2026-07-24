@@ -143,6 +143,18 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
   // the (potentially 10-20 MB) dashboard payload instead of one per action.
   const reconcileTimer = useRef(null);
   const scheduleDashboardReconcile = useCallback(() => {
+    if (!selectedProject) return;
+    // Mark-stale NOW, synchronously, before the timer is (re)armed. The
+    // timer is a single shared ref: a rapid project switch clears it before
+    // the 1200ms elapses, dropping the ACTIVE refetch below. Without this,
+    // a dropped reconcile would leave the cache silently fresh-and-wrong
+    // (no invalidation happened at all); with it, a dropped reconcile
+    // degrades to exactly refreshDashboard's mark-stale-only semantics, so
+    // a remount or Overview-return still self-heals.
+    queryClient.invalidateQueries({
+      queryKey: projectKeys.project(selectedProject, selectedSource),
+      refetchType: 'none',
+    });
     if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
     reconcileTimer.current = setTimeout(() => {
       reconcileTimer.current = null;
