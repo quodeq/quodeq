@@ -170,6 +170,7 @@ def _rescore_run_dimensions(
     dims: list[DimensionResult],
     reports_root: Path,
     project: str,
+    run_id: str,
     params: ScoringParams,
 ) -> list[DimensionResult]:
     """Apply the project-wide dismiss/delete rescore to a run's dimensions.
@@ -177,7 +178,9 @@ def _rescore_run_dimensions(
     Identity when the project has no active dismissals/deletions. Otherwise each
     dimension passes through the same ``_rescore_dimension`` transform the
     accumulated view and the per-run explorer use, so every read path reports
-    the identical dismiss-adjusted score/grade.
+    the identical dismiss-adjusted score/grade. *run_id* is the run the *dims*
+    were read from: its directory is passed as the evidence basis so a touched
+    dimension is re-scored from that run's own evidence, not the legacy formula.
     """
     from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
     from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
@@ -188,7 +191,11 @@ def _rescore_run_dimensions(
     deleted = deleted_keys(project_dir)
     if not dismissed and not deleted:
         return dims
-    return [_rescore_dimension(d, dismissed, deleted, params=params) for d in dims]
+    run_dir = project_dir / run_id
+    return [
+        _rescore_dimension(d, dismissed, deleted, params=params, run_dir=run_dir)
+        for d in dims
+    ]
 
 
 def _count_eval_files(reports_root: Path, project: str, run_id: str) -> int:
@@ -586,7 +593,8 @@ def build_dashboard(
         (d.dimension or ""): pre_filter_counts.get(d.dimension, 0) - len(d.violations)
         for d in dismissed_only
     }
-    selected_dims = _rescore_run_dimensions(raw_dims, reports_root, project, params)
+    selected_dims = _rescore_run_dimensions(
+        raw_dims, reports_root, project, selected_run.run_id, params)
     ctx = _SelectedRunContext(
         run=selected_run,
         index=selected_index,

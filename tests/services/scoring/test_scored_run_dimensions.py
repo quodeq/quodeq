@@ -95,6 +95,30 @@ def test_scored_run_dimensions_no_dismissals_returns_unchanged(monkeypatch):
     assert [d.overall_score for d in result] == [raw_dim.overall_score]
 
 
+def test_scored_run_dimensions_passes_the_run_dir_to_rescore(monkeypatch):
+    """The rescore must receive THIS run's directory as its evidence basis.
+
+    ``_rescore_dimension`` scores from ``<run_dir>/evidence/<dim>_evidence.jsonl``
+    when given a run_dir; passing none (or the wrong run's) silently falls back
+    to the legacy formula / scores from another scan's evidence.
+    """
+    raw_dim = _make_dimension([_make_violation()], [_make_compliance()])
+    seen: list[Path | None] = []
+
+    def fake_rescore(dim, dismissed, deleted=None, params=None, *, run_dir=None):
+        seen.append(run_dir)
+        return dim
+
+    monkeypatch.setattr(scoring, "_rescore_dimension", fake_rescore)
+    monkeypatch.setattr(scoring, "read_run_data", lambda root, p, r: [raw_dim])
+    monkeypatch.setattr(scoring, "dismissed_keys", lambda pdir: {("R1", "a.py", 1)})
+    monkeypatch.setattr(scoring, "deleted_keys", lambda pdir: set())
+
+    scoring.scored_run_dimensions(Path("/reports"), "proj", "run1")
+
+    assert seen == [Path("/reports/proj/run1")]
+
+
 def test_scored_run_dimensions_validates_path_segments(monkeypatch):
     """Path-traversal segments are rejected like read_run_data does."""
     monkeypatch.setattr(scoring, "read_run_data", lambda root, p, r: [])

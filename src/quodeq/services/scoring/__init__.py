@@ -267,7 +267,8 @@ def _build_response_from_eval_files(
     deleted = deleted_keys(project_dir)
 
     dims = base_fetcher(run_id)
-    rescored = rescore_dimensions(dims, dismissed, deleted, params=params)
+    rescored = rescore_dimensions(
+        dims, dismissed, deleted, params=params, run_dir=project_dir / run_id)
     return {
         "dimensions": rescored.get("dimensions", []),
         "summary": rescored.get("summary", {}),
@@ -394,7 +395,11 @@ def scored_run_dimensions(
     dims = read_run_data(reports_root, project, run_id)
     if not dismissed and not deleted:
         return dims
-    return [_rescore_dimension(d, dismissed, deleted, params=params) for d in dims]
+    run_dir = project_dir / run_id
+    return [
+        _rescore_dimension(d, dismissed, deleted, params=params, run_dir=run_dir)
+        for d in dims
+    ]
 
 
 def _make_rescoring_fetcher(
@@ -455,7 +460,11 @@ def _rescore_runs_by_dimension(
     for dim_key, run_id in dim_to_run.items():
         if run_id not in seen_runs:
             run_dims = fetcher(run_id)
-            result = rescore_dimensions(run_dims, dismissed, deleted, params=params)
+            # Grouped per run, so this run's own directory is the evidence
+            # basis for every dimension sourced from it.
+            result = rescore_dimensions(
+                run_dims, dismissed, deleted, params=params,
+                run_dir=reports_root / project / run_id)
             seen_runs[run_id] = {
                 (rd.get("dimension") or "").lower(): rd
                 for rd in result.get("dimensions", [])

@@ -1,10 +1,15 @@
+import json
 from pathlib import Path
 import pytest
 
+from quodeq.analysis._report_io import write_dimension_report
+from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.core.scoring.engine import score_evidence
 from quodeq.services.dashboard import (
     build_dashboard, clear_shared_dimension_cache, _SHARED_RUN_DIM_CACHE,
 )
 from quodeq.services.dismissed import dismiss_finding, dismissed_keys
+from quodeq.services.evidence_rescore import score_dimension_from_evidence
 from quodeq.services.score_cache import score_cache_version
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from tests.services._scalar_fixtures import build_projected_run
@@ -60,3 +65,83 @@ def test_dismiss_produces_a_new_shared_cache_version(tmp_path):
     assert expected in new_versions, (
         "shared-cache version does not match the project suppression hash"
     )
+
+
+def _ev_line(dim, req, file, line, sev="major", t="violation", p="Modularity", vt="VT-COUPLING"):
+    """One evidence-jsonl judgment (same shape as tests/services/test_evidence_rescore.py)."""
+    return {"schema_version": 1, "req": req, "t": t, "file": file, "line": line,
+            "severity": sev, "w": "title", "reason": f"reason {req} {file} {line}",
+            "vt": vt, "p": p, "d": dim}
+
+
+def test_dismissed_dimension_score_comes_from_run_evidence(tmp_path):
+    """After a dismiss, the dashboard serves the evidence-based rescore.
+
+    The run's report JSON is generated from its own evidence jsonl via the
+    real pipeline (``score_evidence`` + ``write_dimension_report``), so the
+    stored score and the evidence score agree by construction. Dismissing one
+    finding must then re-score the dimension from that run's evidence (the
+    exact scan-time basis) -- NOT via the legacy report-JSON formula, which
+    loses violation types and diverges. Requires ``build_dashboard`` to pass
+    ``run_dir`` down to ``_rescore_dimension``.
+    """
+    reports = tmp_path / "evaluations"
+    project = "proj"
+    run_id = "20260101T000000"
+    run_dir = reports / project / run_id
+    dim = "maintainability"
+    sfc, files_read = 10, 5
+
+    # Evidence: typed violations (two sharing a violation_type) so the
+    # taxonomy-mode evidence score differs from the reason-fallback legacy
+    # formula once a finding is dismissed.
+    lines = [
+        _ev_line(dim, "R-1", "a.kt", 10, sev="major", vt="VT-COUPLING"),
+        _ev_line(dim, "R-2", "a.kt", 20, sev="critical", vt="VT-GODCLASS"),
+        _ev_line(dim, "R-5", "b.kt", 7, sev="major", vt="VT-COUPLING"),
+        _ev_line(dim, "C-1", "a.kt", 1, t="compliance"),
+        _ev_line(dim, "C-3", "b.kt", 3, t="compliance"),
+        _ev_line(dim, "R-4", "c.kt", 9, sev="major", vt="VT-DUPLICATION", p="Reusability"),
+        _ev_line(dim, "C-2", "c.kt", 2, t="compliance", p="Reusability"),
+    ]
+    ev_dir = run_dir / "evidence"
+    ev_dir.mkdir(parents=True)
+    jsonl = ev_dir / f"{dim}_evidence.jsonl"
+    jsonl.write_text("\n".join(json.dumps(l) for l in lines) + "\n", encoding="utf-8")
+    # list_runs only recognizes a run dir that has evidence/manifest.json.
+    (ev_dir / "manifest.json").write_text(
+        json.dumps({"language_stats": {}, "source_files_count": sfc}),
+        encoding="utf-8")
+    # read_run_data (no evaluation.db here) sources each dimension's
+    # sourceFileCount from <dim>_evidence.json -- the rescore needs it to
+    # match the scan-time confidence classification.
+    (ev_dir / f"{dim}_evidence.json").write_text(
+        json.dumps({"source_file_count": sfc, "date": "2026-01-01"}),
+        encoding="utf-8")
+
+    evidence = parse_jsonl_to_evidence(jsonl, EvidenceContext(
+        language=dim, repository=project, date_str="2026-01-01",
+        source_file_count=sfc, files_read=files_read,
+    ))
+    scores = score_evidence(evidence, mode="numerical", params=DEFAULT_PARAMS)
+    write_dimension_report(evidence, scores, dim, run_dir / "evaluation")
+    (run_dir / "status.json").write_text(
+        json.dumps({"state": "complete"}), encoding="utf-8")
+
+    dismiss_finding(reports / project, {"req": "R-2", "file": "a.kt", "line": 20})
+    dismissed = dismissed_keys(reports / project)
+    assert dismissed, "dismiss did not register"
+
+    expected = score_dimension_from_evidence(
+        run_dir, dim, dismissed=dismissed, deleted=set(),
+        source_file_count=sfc, files_read=files_read, params=DEFAULT_PARAMS,
+    )
+    assert expected is not None
+    assert expected.overall.weighted_score is not None
+
+    payload = build_dashboard(reports, project, run="latest", params=DEFAULT_PARAMS)
+    served = next(d for d in payload["dimensions"] if d["dimension"] == dim)
+    # The dismissed violation is gone from the served list...
+    assert "R-2" not in {v.get("req") for v in served["violations"]}
+    # ...and the served score is the evidence-basis rescore.
+    assert served["overallScore"] == f"{expected.overall.weighted_score}/10"

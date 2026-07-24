@@ -37,7 +37,11 @@ _BUSY_TIMEOUT_MS = 5000
 # per-run version path had no completeness gate), which load_run_keys froze
 # forever; the gate now persists only terminal runs, and this bump purges the
 # non-version-keyed run_keys table once so stranded partial snapshots rebuild.
-_CACHE_WRITER_EPOCH = "4"
+# "5": dismiss/delete rescoring switched basis from the legacy report-JSON
+# formula to the run's own evidence jsonl (services/evidence_rescore), so
+# scores cached by the prior writer differ for the SAME suppression state and
+# params; this bump rebuilds them on the evidence basis once.
+_CACHE_WRITER_EPOCH = "5"
 
 # Shared-root isolation seam (Phase 2): when serving read endpoints from a
 # second (shared) clone, the score cache must not mix rows with the local

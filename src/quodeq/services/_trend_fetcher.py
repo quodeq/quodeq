@@ -61,7 +61,13 @@ def make_rescoring_fetcher(
 
     def rescoring_fetcher(run_id: str) -> list[DimensionResult]:
         dims = base_fetcher(run_id)
-        return [_rescore_dimension(d, dismissed, deleted, params=params) for d in dims]
+        # The fetched dims all belong to *run_id*, so that run's directory is
+        # the evidence basis for the rescore.
+        run_dir = project_dir / run_id
+        return [
+            _rescore_dimension(d, dismissed, deleted, params=params, run_dir=run_dir)
+            for d in dims
+        ]
 
     return rescoring_fetcher
 
