@@ -32,7 +32,7 @@ from quodeq.services.dismissed import dismissed_keys as _default_dismissed_keys
 from quodeq.services.ports import read_run_scalars as _default_read_run_scalars
 from quodeq.services.rescore import _rescore_dimension
 from quodeq.services.score_cache import make_cache_backed_fetcher
-from quodeq.shared.validation import jailed_run_dir, validate_path_segment
+from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 
@@ -65,7 +65,8 @@ def make_rescoring_fetcher(
         dims = base_fetcher(run_id)
         # The fetched dims all belong to *run_id*, so that run's directory is
         # the evidence basis for the rescore.
-        run_dir = jailed_run_dir(reports_root, project, run_id)
+        validate_path_segment(run_id)
+        run_dir = project_dir / run_id
         return [
             _rescore_dimension(d, dismissed, deleted, params=params, run_dir=run_dir)
             for d in dims
