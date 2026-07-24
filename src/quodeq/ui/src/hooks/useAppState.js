@@ -105,21 +105,32 @@ export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRun
 // refocus. `stale: true` keeps this a no-op when nothing is actually stale,
 // so switching tabs doesn't re-download the (potentially 10-20 MB) payload
 // on every visit — only a query already marked stale gets refetched here.
+//
+// Gates on `rootTab` (navStack[0].page), NOT the derived `activeTab`.
+// `activeTab`'s fallback bucket defaults any untagged/unknown page to
+// TAB_OVERVIEW -- and drill-down pages pushed without a `sourceTab` (e.g.
+// ExplorerPage's onPrincipleClick -> 'evalprinciple', handleCardNavigate ->
+// 'file') hit that fallback while the user is still mid-triage inside
+// Violations/Map. That would misfire a real refetch of the (potentially
+// 10-20 MB) payload during triage -- exactly the freeze this stack exists to
+// avoid. `navTab()` (useNavStack.js) always resets the stack to a single root
+// entry and `navPush` only appends, so `navStack[0].page` is the true
+// top-level tab regardless of drill-down depth or sourceTab tagging.
 // Exported (and taking plain values rather than reading nav state itself) so
 // the transition-gating logic is testable without mounting all of useAppState.
-export function useOverviewReturnReconcile({ activeTab, selectedProject, selectedSource }) {
+export function useOverviewReturnReconcile({ rootTab, selectedProject, selectedSource }) {
   const queryClient = useQueryClient();
-  const prevTabRef = useRef(activeTab);
+  const prevTabRef = useRef(rootTab);
   useEffect(() => {
-    const cameToOverview = prevTabRef.current !== TAB_OVERVIEW && activeTab === TAB_OVERVIEW;
-    prevTabRef.current = activeTab;
+    const cameToOverview = prevTabRef.current !== TAB_OVERVIEW && rootTab === TAB_OVERVIEW;
+    prevTabRef.current = rootTab;
     if (!cameToOverview || !selectedProject) return;
     queryClient.refetchQueries({
       queryKey: projectKeys.project(selectedProject, selectedSource),
       stale: true,
       type: 'active',
     });
-  }, [activeTab, selectedProject, selectedSource, queryClient]);
+  }, [rootTab, selectedProject, selectedSource, queryClient]);
 }
 
 export function useAppState() {
@@ -185,7 +196,7 @@ export function useAppState() {
   const showProjectHeader = PROJECT_TABS.includes(activeTab) && projects.length > 0 && !!selectedProject;
   const showRunNav = activeTab === TAB_OVERVIEW && showProjectHeader && visibleDailyRuns.length > 0 && navStack.length === 1;
 
-  useOverviewReturnReconcile({ activeTab, selectedProject, selectedSource });
+  useOverviewReturnReconcile({ rootTab: navStack[0]?.page, selectedProject, selectedSource });
 
   return {
     serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navTab,
