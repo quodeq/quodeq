@@ -63,3 +63,31 @@ jobs:
         # Verbose + -ra so per-test names and the FAILED summary survive
         # GitHub's log truncation, keeping this blocking gate easy to triage.
         run: uv run pytest tests/ -v -ra --tb=short -m "not integration" -n auto
+
+  ui:
+    # The web UI ships ~1600 tests (vitest .test.jsx + node:test .test.js) that
+    # nothing else in CI runs; production builds only `npm run build` them. They
+    # are jsdom/pure-JS and OS-independent, so one Linux runner is enough. Runs
+    # in parallel with `test`, which is far slower, so it adds no wall time.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          # 22, not 20: the `test` script runs `node --test` with a glob
+          # pattern, and node only expands glob args to --test on 21+.
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: src/quodeq/ui/package-lock.json
+
+      - name: Install UI dependencies
+        working-directory: src/quodeq/ui
+        run: npm ci
+
+      - name: Run UI tests
+        working-directory: src/quodeq/ui
+        # test:all = node --test (.test.js) + vitest run (.test.jsx).
+        run: npm run test:all
