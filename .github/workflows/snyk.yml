@@ -8,9 +8,15 @@ name: Snyk
 # tests per month and this repo merges ~200 PRs in that time. Per-PR SAST
 # gating is CodeQL's job (codeql.yml, free on public repos); the Snyk GitHub
 # app additionally diff-checks manifests on PRs without spending CLI tests.
+#
+# Findings are also uploaded to the GitHub code scanning (Security) tab as
+# SARIF, alongside CodeQL, so a sweep surfaces alerts there and not only in
+# the run log.
 
 on:
   workflow_dispatch:
+  release:
+    types: [published]
   schedule:
     # Weekly sweep catches newly disclosed CVEs against unchanged deps.
     - cron: '30 6 * * 1'
@@ -22,6 +28,10 @@ jobs:
   snyk:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      # Required to upload SARIF to the code scanning API.
+      security-events: write
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
@@ -53,16 +63,59 @@ jobs:
         if: env.SNYK_TOKEN != ''
         run: npm install -g snyk
 
+      # continue-on-error so a high-severity finding in one scan does not skip
+      # the remaining scans (each must still produce its SARIF); the final gate
+      # below re-fails the job when any scan reported issues.
       - name: Snyk Open Source, Python dependencies
+        id: snyk_python
         if: env.SNYK_TOKEN != ''
-        run: snyk test --file=requirements.txt --package-manager=pip --command=.venv/bin/python --severity-threshold=high
+        continue-on-error: true
+        run: snyk test --file=requirements.txt --package-manager=pip --command=.venv/bin/python --severity-threshold=high --sarif-file-output=snyk-python.sarif
 
       - name: Snyk Open Source, UI dependencies
+        id: snyk_ui
         if: env.SNYK_TOKEN != ''
-        run: snyk test --file=src/quodeq/ui/package-lock.json --package-manager=npm --severity-threshold=high
+        continue-on-error: true
+        run: snyk test --file=src/quodeq/ui/package-lock.json --package-manager=npm --severity-threshold=high --sarif-file-output=snyk-ui.sarif
 
       - name: Snyk Code, SAST on shipped source
+        id: snyk_code
         if: env.SNYK_TOKEN != ''
+        continue-on-error: true
         # Scoped to src/quodeq: tests/ and benchmarks/ hold intentionally
         # vulnerable fixtures that would always fail a repo-wide SAST scan.
-        run: snyk code test src/quodeq --severity-threshold=high
+        run: snyk code test src/quodeq --severity-threshold=high --sarif-file-output=snyk-code.sarif
+
+      # Distinct categories keep the three analyses from overwriting each other
+      # in the code scanning tab. hashFiles guards against a scan erroring out
+      # before it writes SARIF.
+      - name: Upload Snyk Python (deps) SARIF
+        if: always() && env.SNYK_TOKEN != '' && hashFiles('snyk-python.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: snyk-python.sarif
+          category: snyk-python-deps
+
+      - name: Upload Snyk UI (deps) SARIF
+        if: always() && env.SNYK_TOKEN != '' && hashFiles('snyk-ui.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: snyk-ui.sarif
+          category: snyk-ui-deps
+
+      - name: Upload Snyk Code (SAST) SARIF
+        if: always() && env.SNYK_TOKEN != '' && hashFiles('snyk-code.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: snyk-code.sarif
+          category: snyk-code
+
+      - name: Fail if any Snyk scan found high-severity issues
+        if: >-
+          env.SNYK_TOKEN != '' &&
+          (steps.snyk_python.outcome == 'failure' ||
+           steps.snyk_ui.outcome == 'failure' ||
+           steps.snyk_code.outcome == 'failure')
+        run: |
+          echo "One or more Snyk scans reported high-severity issues. See the Security tab."
+          exit 1
