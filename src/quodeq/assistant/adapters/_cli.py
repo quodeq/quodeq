@@ -118,7 +118,8 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
         # stop already landed).
         cancel.register_kill(lambda: _kill_proc_tree(proc))
         texts, errors, raw_errors, parsed_sid = [], [], [], spec.session_id
-        last_emitted = None
+        last_full = None  # text of the last complete message, emitted or not
+        partial_buf = ""  # delta text streamed since the last complete message
         saw_result = False
         for line in iter_lines(proc.stdout):
             event = _stream.parse_line(line)
@@ -133,17 +134,27 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
             err = _stream.error_message(event)
             if err:
                 errors.append(err)
-            for t in _stream.assistant_text(event):
-                texts.append(t)
-                # the final `result` event echoes the full text already streamed
-                # via `assistant`/`item.completed` events; skip re-emitting it so
-                # the drawer doesn't show the answer twice. Gate on content, not
-                # presence: a `result` whose text DIFFERS from what was streamed
-                # (or a result-only turn) must still be emitted.
-                if etype == "result" and t == last_emitted:
-                    continue
-                emit({"type": "token", "text": t})
-                last_emitted = t
+            delta = _stream.partial_text(event)
+            if delta:
+                partial_buf += delta
+                emit({"type": "token", "text": delta})
+            event_texts = _stream.assistant_text(event)
+            if event_texts:
+                texts.extend(event_texts)
+                # complete events echo text the drawer already shows: an
+                # `assistant` message repeats its own streamed deltas, and the
+                # final `result` repeats the last assistant message. Gate on
+                # content, not presence: an echo whose text DIFFERS from what
+                # was streamed (or a result-only turn, or a provider without
+                # deltas) must still be emitted.
+                joined = "".join(event_texts)
+                is_echo = (joined == partial_buf
+                           or (etype == "result" and joined == last_full))
+                if not is_echo:
+                    for t in event_texts:
+                        emit({"type": "token", "text": t})
+                last_full = joined
+                partial_buf = ""
             for tu in _stream.tool_use_details(event):
                 frame = {"type": "tool_call", "name": tu["name"]}
                 if tu["args_summary"]:
@@ -157,6 +168,10 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
         except subprocess.TimeoutExpired:
             _kill_proc_tree(proc)
             returncode = proc.wait()
+        # a turn killed mid-message (stop/timeout) streamed deltas that never
+        # got their complete-message echo; they are the answer the user saw.
+        if partial_buf:
+            texts.append(partial_buf)
         # argv-append/result providers (claude) end with a `result` event that
         # echoes the complete answer, so the last text IS the whole reply.
         # streaming-only providers (codex) never send `result`; their answer is

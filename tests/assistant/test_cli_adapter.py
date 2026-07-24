@@ -108,6 +108,92 @@ def test_result_with_differing_text_is_emitted(tmp_path):
     assert text == "Final answer: X"
 
 
+def _delta(text):
+    return ('{"type": "stream_event", "event": {"type": "content_block_delta", '
+            '"index": 0, "delta": {"type": "text_delta", "text": "%s"}}}' % text)
+
+
+def test_claude_partial_deltas_stream_and_message_echo_is_suppressed(tmp_path):
+    # With --include-partial-messages the CLI streams text_delta chunks, then
+    # echoes the complete message as an `assistant` event, then again as
+    # `result`. The chunks must be emitted as they arrive; neither echo may
+    # repeat text already streamed.
+    repo = _repo(tmp_path)
+    lines = [
+        _delta("Hel"),
+        _delta("lo"),
+        '{"type": "assistant", "message": {"content": [{"type": "text", "text": "Hello"}]}}',
+        '{"type": "result", "result": "Hello", "session_id": "claude-uuid-1"}',
+    ]
+    frames = []
+    text = run_cli_turn(
+        messages=[{"role": "user", "content": "hi"}],
+        config=_config(tmp_path), session_id="s1", prior_session_id=None,
+        repository=repo, emit=frames.append,
+        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+    assert text == "Hello"
+    assert [f["text"] for f in frames if f["type"] == "token"] == ["Hel", "lo"]
+
+
+def test_claude_deltas_reset_per_message_across_tool_use(tmp_path):
+    # A tool-use turn carries several assistant messages, each streamed via its
+    # own deltas. Echo suppression must reset per message, and the final
+    # `result` (which repeats only the LAST message) must stay suppressed.
+    repo = _repo(tmp_path)
+    lines = [
+        _delta("Checking."),
+        '{"type": "assistant", "message": {"content": [{"type": "text", "text": "Checking."}, '
+        '{"type": "tool_use", "name": "get_scores", "input": {}}]}}',
+        _delta("Done"),
+        _delta("."),
+        '{"type": "assistant", "message": {"content": [{"type": "text", "text": "Done."}]}}',
+        '{"type": "result", "result": "Done."}',
+    ]
+    frames = []
+    text = run_cli_turn(
+        messages=[{"role": "user", "content": "hi"}],
+        config=_config(tmp_path), session_id="s1", prior_session_id=None,
+        repository=repo, emit=frames.append,
+        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+    assert text == "Done."
+    assert [f["text"] for f in frames if f["type"] == "token"] == ["Checking.", "Done", "."]
+    assert any(f["type"] == "tool_call" and f["name"] == "get_scores" for f in frames)
+
+
+def test_message_echo_differing_from_deltas_is_still_emitted(tmp_path):
+    # Same content-not-presence gate as the result echo: if the complete
+    # message DIFFERS from what the deltas streamed, it must not be swallowed.
+    repo = _repo(tmp_path)
+    lines = [
+        _delta("Hel"),
+        '{"type": "assistant", "message": {"content": [{"type": "text", "text": "Hello world"}]}}',
+        '{"type": "result", "result": "Hello world"}',
+    ]
+    frames = []
+    run_cli_turn(
+        messages=[{"role": "user", "content": "hi"}],
+        config=_config(tmp_path), session_id="s1", prior_session_id=None,
+        repository=repo, emit=frames.append,
+        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+    assert [f["text"] for f in frames if f["type"] == "token"] == ["Hel", "Hello world"]
+
+
+def test_partial_deltas_without_message_completion_count_as_output(tmp_path):
+    # A killed/stopped turn ends mid-message: deltas streamed but no complete
+    # `assistant` echo ever arrives. The streamed text is the answer the user
+    # saw, so it must survive into the returned/partial text.
+    repo = _repo(tmp_path)
+    lines = [_delta("Par"), _delta("tial")]
+    frames = []
+    text = run_cli_turn(
+        messages=[{"role": "user", "content": "hi"}],
+        config=_config(tmp_path), session_id="s1", prior_session_id=None,
+        repository=repo, emit=frames.append,
+        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+    assert text == "Partial"
+    assert [f["text"] for f in frames if f["type"] == "token"] == ["Par", "tial"]
+
+
 def test_tool_use_emits_frame(tmp_path):
     repo = _repo(tmp_path)
     lines = [
