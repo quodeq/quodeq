@@ -210,8 +210,8 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       />
     );
   }
+  const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
   if (!loading && !isFetching && !dashboard) {
-    const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
     return (
       <div className="dashboard-page dashboard-fade dashboard-ready">
         <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
@@ -244,7 +244,12 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : 'dashboard-ready'}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
       <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
       {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
-      {isLoading && <LoadingScreen />}
+      {/* Name the project being loaded. A project switch now clears the old
+          payload (placeholderData is project-scoped -- see
+          samePlaceholderScope), so this spinner is what the user sees right
+          after picking a project; saying which one makes the wait legible
+          instead of looking like the page hung. */}
+      {isLoading && <LoadingScreen message={projectName ? `Loading ${projectName}…` : undefined} />}
       {dashboard && (
         <DashboardContent
           runMode={runMode}
