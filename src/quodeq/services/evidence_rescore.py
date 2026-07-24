@@ -10,6 +10,7 @@ exclusions the result is identical to the stored scan scores by construction.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
@@ -51,10 +52,19 @@ def score_dimension_from_evidence(
     Returns None when the evidence file is missing/empty/unparseable so the
     caller can fall back to the legacy in-place formula.
     """
-    # dim_id is used to build a filesystem path and can carry request-supplied
-    # values; reject separators/traversal before touching the filesystem.
+    # dim_id / run_dir are built from request-supplied values. Guard with the
+    # path-injection remediation CodeQL recommends: normalize with
+    # os.path.normpath (a pure-string op, no filesystem access) to collapse any
+    # ".." segments, then confirm the result stays within run_dir/evidence
+    # before touching the filesystem. (validate_path_segment additionally
+    # rejects separators in dim_id at the input.)
     validate_path_segment(dim_id)
-    jsonl = run_dir / "evidence" / f"{dim_id}_evidence.jsonl"
+    evidence_dir = os.path.normpath(str(run_dir / "evidence"))
+    candidate = os.path.normpath(os.path.join(evidence_dir, f"{dim_id}_evidence.jsonl"))
+    if not candidate.startswith(evidence_dir + os.sep):
+        _logger.debug("Evidence path escapes run dir for %s/%s", run_dir.name, dim_id)
+        return None
+    jsonl = Path(candidate)
     if not jsonl.is_file() or jsonl.stat().st_size == 0:
         return None
     try:
