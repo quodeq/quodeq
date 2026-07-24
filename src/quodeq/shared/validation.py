@@ -21,3 +21,19 @@ def validate_resolved_within(path: Path, root: Path) -> None:
             "Path escapes its root directory. "
             "Ensure the path does not contain '..' segments or symlinks that resolve outside the project root."
         )
+
+
+def jailed_run_dir(reports_root: Path, project: str, run_id: str) -> Path:
+    """Return reports_root/project/run_id, guaranteed within reports_root.
+
+    Raises ValueError on traversal/separators or if the resolved path escapes
+    reports_root. The inline resolve()+is_relative_to guard is the recognized
+    path-injection barrier (same shape as api._project_dir); reports_root is
+    trusted app config, so the returned path is safe to use for filesystem access.
+    """
+    validate_path_segment(project, run_id)
+    base = Path(reports_root).resolve()
+    resolved = (base / project / run_id).resolve()
+    if not resolved.is_relative_to(base):
+        raise ValueError("Run directory escapes the evaluations root.")
+    return resolved

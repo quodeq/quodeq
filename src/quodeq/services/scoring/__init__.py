@@ -48,7 +48,7 @@ from quodeq.services.score_cache import (
 from quodeq.services.ports import RunInfo, list_runs, read_run_data, read_run_scalars
 from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
 from quodeq.shared._env import env_int
-from quodeq.shared.validation import validate_path_segment
+from quodeq.shared.validation import jailed_run_dir, validate_path_segment
 from quodeq.services.scoring._summary import recompute_summary
 
 
@@ -261,7 +261,6 @@ def _build_response_from_eval_files(
     Returns the same camelCase ``{dimensions, summary}`` shape as the SQL
     path, so callers (UI dismiss handlers) don't need to branch.
     """
-    validate_path_segment(project, run_id)
     base_fetcher = _make_run_dimension_fetcher(reports_root, project)
     project_dir = reports_root / project
     dismissed = dismissed_keys(project_dir)
@@ -269,7 +268,8 @@ def _build_response_from_eval_files(
 
     dims = base_fetcher(run_id)
     rescored = rescore_dimensions(
-        dims, dismissed, deleted, params=params, run_dir=project_dir / run_id)
+        dims, dismissed, deleted, params=params,
+        run_dir=jailed_run_dir(reports_root, project, run_id))
     return {
         "dimensions": rescored.get("dimensions", []),
         "summary": rescored.get("summary", {}),
@@ -289,8 +289,7 @@ def get_scores_raw(
     payload, which made live-grade updates impossible for them: the dismiss
     POST returned no scores, the UI had nothing to apply.
     """
-    validate_path_segment(project, run_id)
-    run_dir = reports_root / project / run_id
+    run_dir = jailed_run_dir(reports_root, project, run_id)
     if not run_dir.is_dir():
         raise FileNotFoundError(f"Run directory not found: {run_dir}")
 
@@ -397,7 +396,7 @@ def scored_run_dimensions(
     dims = read_run_data(reports_root, project, run_id)
     if not dismissed and not deleted:
         return dims
-    run_dir = project_dir / run_id
+    run_dir = jailed_run_dir(reports_root, project, run_id)
     return [
         _rescore_dimension(d, dismissed, deleted, params=params, run_dir=run_dir)
         for d in dims
@@ -449,7 +448,6 @@ def _rescore_runs_by_dimension(
     params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, dict]:
     """Rescore each unique run and return a map of dim_key -> rescored dict."""
-    validate_path_segment(project)
     dim_to_run: dict[str, str] = {}
     for d in dims:
         key = (d.get("dimension") or "").lower()
@@ -462,13 +460,12 @@ def _rescore_runs_by_dimension(
     seen_runs: dict[str, dict[str, dict]] = {}
     for dim_key, run_id in dim_to_run.items():
         if run_id not in seen_runs:
-            validate_path_segment(run_id)
             run_dims = fetcher(run_id)
             # Grouped per run, so this run's own directory is the evidence
             # basis for every dimension sourced from it.
             result = rescore_dimensions(
                 run_dims, dismissed, deleted, params=params,
-                run_dir=reports_root / project / run_id)
+                run_dir=jailed_run_dir(reports_root, project, run_id))
             seen_runs[run_id] = {
                 (rd.get("dimension") or "").lower(): rd
                 for rd in result.get("dimensions", [])

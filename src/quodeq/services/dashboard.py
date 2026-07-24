@@ -25,7 +25,7 @@ from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services._trend_fetcher import make_trend_fetcher
 from quodeq.services.scoring_view import is_eligible_for_default_view, select_trend_runs
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
-from quodeq.shared.validation import validate_path_segment
+from quodeq.shared.validation import jailed_run_dir
 
 _logger = logging.getLogger(__name__)
 
@@ -187,14 +187,16 @@ def _rescore_run_dimensions(
     from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
     from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
 
-    validate_path_segment(project)
+    # Resolved unconditionally (before the dismissed/deleted check below) so
+    # a traversal project/run_id is rejected even when this project has no
+    # active suppressions and would otherwise take the early-return path
+    # below without ever building run_dir.
+    run_dir = jailed_run_dir(reports_root, project, run_id)
     project_dir = reports_root / project
     dismissed = dismissed_keys(project_dir)
     deleted = deleted_keys(project_dir)
     if not dismissed and not deleted:
         return dims
-    validate_path_segment(run_id)
-    run_dir = project_dir / run_id
     return [
         _rescore_dimension(d, dismissed, deleted, params=params, run_dir=run_dir)
         for d in dims
