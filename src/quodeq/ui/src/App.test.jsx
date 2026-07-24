@@ -115,9 +115,10 @@ describe('ROUTE_RENDERERS onDismiss source gating', () => {
   function baseProps(selectedSource) {
     return {
       navigation: { selectedProject: 'proj1', selectedRun: 'latest', selectedSource, projects: [] },
-      dismissFinding: vi.fn(),
+      dismissFinding: vi.fn().mockResolvedValue({ scores: { dimensions: [] }, delta: {} }),
       applyDelta: vi.fn(),
       refreshDashboard: vi.fn(),
+      scheduleDashboardReconcile: vi.fn(),
       bumpDismissRefresh: vi.fn(),
     };
   }
@@ -155,6 +156,73 @@ describe('ROUTE_RENDERERS onDismiss source gating', () => {
   it('eval-principle-detail (alias route) also gates onDismiss for a shared project', () => {
     const el = ROUTE_RENDERERS['eval-principle-detail']({ evalPrincipal: { principle: 'P', dimension: 'Security' } }, baseProps('shared'));
     expect(el.props.onDismiss).toBeUndefined();
+  });
+
+  // The dashboard must eventually reflect a dismiss even though the delta
+  // patch is only best-effort (e.g. it doesn't cover every view). Each
+  // onDismiss success path calls BOTH the existing lazy refreshDashboard
+  // (mark-stale, cheap) AND the new debounced scheduleDashboardReconcile
+  // (active refetch of the always-mounted Overview observer) — see
+  // useDashboard.js. Neither call replaces the other.
+  it('file route onDismiss calls refreshDashboard, scheduleDashboardReconcile, and bumpDismissRefresh on success', async () => {
+    const props = baseProps('local');
+    const el = ROUTE_RENDERERS.file({ file: { path: 'a.py' }, runId: 'r1' }, props);
+    await el.props.onDismiss({ reason: 'test' });
+    expect(props.refreshDashboard).toHaveBeenCalledTimes(1);
+    expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+    expect(props.bumpDismissRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('finding route onDismiss calls refreshDashboard, scheduleDashboardReconcile, and bumpDismissRefresh on success', async () => {
+    const props = baseProps('local');
+    const el = ROUTE_RENDERERS.finding({ finding: {}, principle: 'P', dimension: 'Security' }, props);
+    await el.props.onDismiss({ reason: 'test' });
+    expect(props.refreshDashboard).toHaveBeenCalledTimes(1);
+    expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+    expect(props.bumpDismissRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('evalprinciple route onDismiss calls refreshDashboard, scheduleDashboardReconcile, and bumpDismissRefresh on success', async () => {
+    const props = baseProps('local');
+    const el = ROUTE_RENDERERS.evalprinciple({ evalPrincipal: { principle: 'P', dimension: 'Security' } }, props);
+    await el.props.onDismiss({ reason: 'test' });
+    expect(props.refreshDashboard).toHaveBeenCalledTimes(1);
+    expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+    expect(props.bumpDismissRefresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The Dismissed sub-tab's restore/delete (single + bulk) handlers all call
+// the ViolationsRoute-supplied onRefresh (see useDismissedFindings.js).
+// restore-all/delete-all return a payload applyMutationDelta's gates can't
+// patch (scores:null, delta.isLatest:false), so this seam must wire to the
+// debounced ACTIVE scheduleDashboardReconcile, not the lazy refreshDashboard
+// — otherwise a restore-all leaves the Overview showing dismissed counts
+// until the user switches projects.
+describe('ViolationsRoute onRefresh wiring (Dismissed tab reconcile)', () => {
+  function renderViolationsRoute(props) {
+    const outer = ROUTE_RENDERERS.violations({}, props);
+    // ROUTE_RENDERERS.violations returns <ViolationsRoute params props />;
+    // ViolationsRoute itself has no hooks, so invoking it directly (the way
+    // React would) is safe without mounting a component tree.
+    return outer.type(outer.props);
+  }
+
+  function violationsProps() {
+    return {
+      dashboardData: { latestAccumulated: null, accumulated: null, selectedDisplayName: 'p1', loading: false, isFetching: false },
+      navigation: { selectedProject: 'proj1', selectedSource: 'local', projects: [], projectsLoaded: true, handleNavigate: vi.fn(), navStackLength: 1 },
+      dismissRefreshKey: 0,
+      refreshDashboard: vi.fn(),
+      scheduleDashboardReconcile: vi.fn(),
+    };
+  }
+
+  it('wires onRefresh to scheduleDashboardReconcile, not refreshDashboard', () => {
+    const props = violationsProps();
+    const inner = renderViolationsRoute(props);
+    expect(inner.props.callbacks.onRefresh).toBe(props.scheduleDashboardReconcile);
+    expect(inner.props.callbacks.onRefresh).not.toBe(props.refreshDashboard);
   });
 });
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -128,6 +128,72 @@ describe("useDashboard", () => {
       await result.current.refreshDashboardActive();
     });
     await waitFor(() => expect(fakeApi.getDashboard).toHaveBeenCalledTimes(2));
+  });
+});
+
+// After restore-all/delete-all, the mutation response carries scores:null /
+// delta.isLatest:false — applyMutationDelta's gates are a no-op — so
+// refreshDashboard's lazy (refetchType:'none') invalidation is the ONLY
+// signal the Overview ever gets, and its always-mounted observer never
+// refetches on its own (no remount, and the desktop pywebview window never
+// fires a focus refetch). scheduleDashboardReconcile is the debounced ACTIVE
+// counterpart the suppression-mutation handlers call alongside
+// refreshDashboard so restored/deleted findings actually reappear.
+describe("useDashboard scheduleDashboardReconcile (debounced active reconcile)", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  function renderWithSpy() {
+    const fakeApi = makeFakeApi();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+    });
+    const spy = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(
+      () => useDashboard({ selectedProject: "p1", selectedRun: null }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>
+            <ApiProvider value={fakeApi}>{children}</ApiProvider>
+          </QueryClientProvider>
+        ),
+      },
+    );
+    return { result, spy };
+  }
+
+  it("invalidates the project subtree with an ACTIVE refetch after the debounce window", () => {
+    const { result, spy } = renderWithSpy();
+    act(() => result.current.scheduleDashboardReconcile());
+    expect(spy).not.toHaveBeenCalled(); // debounced, not immediate
+    act(() => { vi.advanceTimersByTime(1200); });
+    expect(spy).toHaveBeenCalledTimes(1);
+    const arg = spy.mock.calls[0][0];
+    expect(arg.refetchType).toBeUndefined(); // default 'active', NOT 'none'
+    expect(arg.queryKey).toEqual(projectKeys.project("p1", "local"));
+  });
+
+  it("coalesces rapid calls into one invalidation", () => {
+    const { result, spy } = renderWithSpy();
+    act(() => {
+      result.current.scheduleDashboardReconcile();
+      vi.advanceTimersByTime(600);
+      result.current.scheduleDashboardReconcile(); // resets the timer
+      vi.advanceTimersByTime(600);
+      result.current.scheduleDashboardReconcile();
+    });
+    act(() => { vi.advanceTimersByTime(1200); });
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression pin: the debounced reconcile is additive, not a replacement.
+  // refreshDashboard must keep its lazy refetchType:'none' contract for its
+  // other callers (evaluation-completion effect, run deletion, etc.).
+  it("refreshDashboard keeps mark-stale-only behavior (regression pin)", () => {
+    const { result, spy } = renderWithSpy();
+    act(() => result.current.refreshDashboard());
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][0].refetchType).toBe("none");
   });
 });
 

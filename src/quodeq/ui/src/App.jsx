@@ -424,6 +424,7 @@ function renderEvalPrincipleDetail(params, props) {
         const result = await props.dismissFinding(selectedProject, payload);
         props.applyDelta?.(selectedProject, result?.scores, result?.delta);
         props.refreshDashboard?.();
+        props.scheduleDashboardReconcile?.();
         props.bumpDismissRefresh?.();
         return result;
       }}
@@ -522,7 +523,13 @@ function ViolationsRoute({ params, props }) {
           }
         },
         onPrincipleClick: (principleObj) => navigateToPrinciple(principleObj),
-        onRefresh: props.refreshDashboard,
+        // Restore/delete (single + bulk) route through here via
+        // useDismissedFindings' onRefresh. restore-all/delete-all return a
+        // payload applyMutationDelta can't patch (scores:null,
+        // delta.isLatest:false), so this must actively reconcile rather than
+        // just mark the cache stale — see scheduleDashboardReconcile in
+        // useDashboard.js.
+        onRefresh: props.scheduleDashboardReconcile,
         onNavigate: nav,
       }}
       isDirectNav={props.navigation.navStackLength === 1}
@@ -633,6 +640,7 @@ export const ROUTE_RENDERERS = {
         const result = await props.dismissFinding(props.navigation.selectedProject, payload);
         props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
         props.refreshDashboard?.();
+        props.scheduleDashboardReconcile?.();
         props.bumpDismissRefresh?.();
         return result;
       }}
@@ -650,6 +658,7 @@ export const ROUTE_RENDERERS = {
         const result = await props.dismissFinding(props.navigation.selectedProject, payload);
         props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
         props.refreshDashboard?.();
+        props.scheduleDashboardReconcile?.();
         props.bumpDismissRefresh?.();
         return result;
       }}
@@ -999,6 +1008,14 @@ export default function App() {
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
     settings: state.settings,
     refreshDashboard: state.refreshDashboard,
+    // Debounced ACTIVE reconcile for suppression mutations (dismiss/restore/
+    // delete) — see useDashboard.js. refreshDashboard's refetchType:'none'
+    // only marks the cache stale; this actually refetches the always-mounted
+    // Overview observer after the 1200ms window, so restore-all/delete-all
+    // (whose response can't be patched via applyMutationDelta) and every
+    // other suppression mutation converge without waiting for a project
+    // switch.
+    scheduleDashboardReconcile: state.scheduleDashboardReconcile,
     dismissFinding,
     // Patch the dashboard/scores caches from the dismiss response delta so the
     // Overview updates instantly. Additive — the refreshDashboard /
