@@ -35,6 +35,34 @@ export const projectKeys = {
   info: (projectId, source = "local") => ["project", projectId, source, "info"],
 };
 
+/**
+ * placeholderData guard for project-scoped queries.
+ *
+ * React Query's `placeholderData: (prev) => prev` is OBSERVER-scoped, not
+ * key-scoped: it hands back the last data this observer rendered no matter
+ * which key produced it. That's what makes run-to-run Overview navigation feel
+ * instant — but it also means switching PROJECTS leaves the previous project's
+ * payload on screen, with `isLoading` false (status is 'success' on
+ * placeholder data), until the new fetch lands. On a large project that is
+ * several seconds of the wrong project's grades, visually indistinguishable
+ * from the new project's real data.
+ *
+ * Gate the reuse on the key's project+source segments so a placeholder only
+ * survives a change WITHIN one project's subtree (i.e. the run swap it exists
+ * for), and a project or source switch falls through to a real loading state.
+ *
+ *   placeholderData: (prev, prevQuery) =>
+ *     samePlaceholderScope(prevQuery, projectId, source) ? prev : undefined
+ *
+ * Relies on the [scope, projectId, source, ...] layout the factories above
+ * build; keep the two in step.
+ */
+export function samePlaceholderScope(previousQuery, projectId, source = "local") {
+  const key = previousQuery?.queryKey;
+  if (!Array.isArray(key)) return false;
+  return key[1] === projectId && key[2] === source;
+}
+
 export const systemKeys = {
   all: () => ["system"],
   health: () => ["system", "health"],

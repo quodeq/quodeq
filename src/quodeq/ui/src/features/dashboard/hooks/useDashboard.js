@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { useProjectScores } from "../../../hooks/useProjectScores.js";
-import { projectKeys } from "../../../api/queryKeys.js";
+import { projectKeys, samePlaceholderScope } from "../../../api/queryKeys.js";
 
 /**
  * @param {{
@@ -32,6 +32,11 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
   const { getDashboard, sharedGetDashboard, sharedGetProjectInfo } = useApi();
   const fetchDashboard = selectedSource === "shared" ? sharedGetDashboard : getDashboard;
   const queryClient = useQueryClient();
+  const projectKey = selectedProject || "_none_";
+  const keepInScope = useCallback(
+    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
+    [projectKey, selectedSource],
+  );
 
   // Shared projects aren't in the LOCAL projects list DashboardPage otherwise
   // reads projectInfo from, and a shared selection's id can collide with an
@@ -40,7 +45,7 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
   // into a shared Overview. Fetch the shared project's own info instead, keyed
   // by source so switching sources never serves the other source's cache.
   const sharedProjectInfoQuery = useQuery({
-    queryKey: projectKeys.info(selectedProject || "_none_", selectedSource),
+    queryKey: projectKeys.info(projectKey, selectedSource),
     queryFn: () => sharedGetProjectInfo(selectedProject),
     enabled: selectedSource === "shared" && !!selectedProject,
   });
@@ -66,7 +71,7 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
   const isFrozenRun = !!selectedRun && selectedRun !== "latest" && runStatus !== "in_progress";
 
   const dashboardQuery = useQuery({
-    queryKey: projectKeys.dashboard(selectedProject || "_none_", selectedRun, selectedSource),
+    queryKey: projectKeys.dashboard(projectKey, selectedRun, selectedSource),
     queryFn: () => fetchDashboard(selectedProject, selectedRun),
     enabled: !!selectedProject,
     staleTime: isFrozenRun ? Infinity : 60_000,
@@ -74,7 +79,10 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     // perceived navigation. isFetching toggles true during the background
     // fetch, which the page reads to show a subtle indicator.
     // Disabled when keepPlaceholder=false (History run details).
-    placeholderData: keepPlaceholder ? (prev) => prev : undefined,
+    // Scoped to this project+source: a PROJECT switch must fall through to a
+    // real loading state instead of parking the old project's overview on
+    // screen (see samePlaceholderScope).
+    placeholderData: keepPlaceholder ? keepInScope : undefined,
   });
 
   const dashboardWithTrend = useMemo(() => {

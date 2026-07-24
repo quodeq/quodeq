@@ -1,4 +1,12 @@
-export default function LoadingScreen() {
+/**
+ * @param {{ message?: string }} props
+ *
+ * `message` labels what is being waited on. Worth passing whenever the wait
+ * follows a user action that swapped the whole page's subject (e.g. switching
+ * projects on the Overview), so the pulsing logo reads as "loading THAT" rather
+ * than an unexplained blank.
+ */
+export default function LoadingScreen({ message }) {
   return (
     <div className="loading-screen" role="status" aria-live="polite">
       <svg className="loading-logo" viewBox="288 209 965 588" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -9,6 +17,7 @@ export default function LoadingScreen() {
           fillRule="evenodd"
         />
       </svg>
+      {message && <p className="loading-message">{message}</p>}
     </div>
   );
 }

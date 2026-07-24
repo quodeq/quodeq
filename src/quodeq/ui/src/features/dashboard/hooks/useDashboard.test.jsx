@@ -469,6 +469,76 @@ describe("useDashboard frozen historical runs", () => {
     expect(result.current.dashboard).toBe(before); // identity stable => no flicker
     expect(result.current.dashboard.trend).toBe(dashTrend);
   });
+
+  // placeholderData is observer-scoped, not key-scoped — an unguarded
+  // (prev) => prev parks the PREVIOUS project's overview on screen (with
+  // loading false, so no loading state either) until the new project's fetch
+  // lands. See samePlaceholderScope in api/queryKeys.js.
+  //
+  // NOTE: build the wrapper ONCE. `wrap()` above calls withQueryClient()
+  // during the wrapper's render, minting a new component type every render;
+  // React remounts the subtree and destroys the observer that carries the
+  // placeholder, so the bug becomes invisible to the test.
+  describe("placeholder scope", () => {
+    function stableWrapper(api) {
+      const QC = withQueryClient();
+      return function Wrapper({ children }) {
+        return (
+          <QC>
+            <ApiProvider value={api}>{children}</ApiProvider>
+          </QC>
+        );
+      };
+    }
+
+    it("drops the previous project's dashboard while the new project loads", async () => {
+      let release;
+      const fakeApi = makeFakeApi();
+      fakeApi.getDashboard = vi.fn(async (project, run) => {
+        if (project === "p1") return makeDashboardPayload({ project, run: run || "latest" });
+        return new Promise((resolve) => {
+          release = () => resolve(makeDashboardPayload({ project, summary: { score: 20 } }));
+        });
+      });
+      const { result, rerender } = renderHook(
+        ({ p }) => useDashboard({ selectedProject: p, selectedRun: null }),
+        { wrapper: stableWrapper(fakeApi), initialProps: { p: "p1" } },
+      );
+      await waitFor(() => expect(result.current.dashboard?.summary?.score).toBe(75));
+
+      rerender({ p: "p2" });
+      // No stale overview, and the page gets a real loading state to render.
+      expect(result.current.dashboard).toBeNull();
+      expect(result.current.loading).toBe(true);
+
+      release();
+      await waitFor(() => expect(result.current.dashboard?.summary?.score).toBe(20));
+    });
+
+    it("keeps the previous run's dashboard while a new run in the SAME project loads", async () => {
+      let release;
+      const fakeApi = makeFakeApi();
+      fakeApi.getDashboard = vi.fn(async (project, run) => {
+        if (!run || run === "latest") return makeDashboardPayload({ project, run: "latest" });
+        return new Promise((resolve) => {
+          release = () => resolve(makeDashboardPayload({ project, run, summary: { score: 33 } }));
+        });
+      });
+      const { result, rerender } = renderHook(
+        ({ run }) => useDashboard({ selectedProject: "p1", selectedRun: run }),
+        { wrapper: stableWrapper(fakeApi), initialProps: { run: null } },
+      );
+      await waitFor(() => expect(result.current.dashboard?.summary?.score).toBe(75));
+
+      rerender({ run: "r_old" });
+      await waitFor(() => expect(fakeApi.getDashboard).toHaveBeenCalledWith("p1", "r_old"));
+      // Instant perceived navigation within a project is preserved.
+      expect(result.current.dashboard?.summary?.score).toBe(75);
+
+      release();
+      await waitFor(() => expect(result.current.dashboard?.summary?.score).toBe(33));
+    });
+  });
 });
 
 // Note: live grade SSE merging used to live here. It was deleted in the

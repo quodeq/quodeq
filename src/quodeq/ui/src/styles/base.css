@@ -1858,11 +1858,22 @@ textarea:focus {
   position: fixed;
   inset: 0;
   display: flex;
+  /* Column so an optional .loading-message stacks under the logo. With the
+     logo alone this is visually identical to the row layout. */
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--space-3);
   z-index: 50;
   pointer-events: none;
   animation: loading-fadein 500ms ease;
+}
+
+.loading-message {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: center;
 }
 
 .loading-logo {
