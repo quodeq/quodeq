@@ -94,6 +94,16 @@ def test_deleted_key_removes_principle_file_matches(run_dir):
     assert out.principles["Reusability"].deductions.major_type_count == 0
 
 
+@pytest.mark.parametrize("bad", ["../secret", "a/b", "..\\x", "x\0y"])
+def test_traversal_dim_id_rejected_before_filesystem_access(tmp_path, bad):
+    # dim_id builds a filesystem path; separators/traversal must be refused
+    # rather than reaching Path.is_file()/stat() (py/path-injection guard).
+    with pytest.raises(ValueError):
+        score_dimension_from_evidence(
+            tmp_path, bad, dismissed=set(), deleted=set(),
+            source_file_count=0, files_read=0, params=DEFAULT_PARAMS)
+
+
 def test_missing_or_empty_evidence_returns_none(tmp_path):
     assert score_dimension_from_evidence(
         tmp_path, DIM, dismissed=set(), deleted=set(),

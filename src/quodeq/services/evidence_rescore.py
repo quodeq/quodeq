@@ -16,6 +16,7 @@ from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
+from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 
@@ -50,6 +51,9 @@ def score_dimension_from_evidence(
     Returns None when the evidence file is missing/empty/unparseable so the
     caller can fall back to the legacy in-place formula.
     """
+    # dim_id is used to build a filesystem path and can carry request-supplied
+    # values; reject separators/traversal before touching the filesystem.
+    validate_path_segment(dim_id)
     jsonl = run_dir / "evidence" / f"{dim_id}_evidence.jsonl"
     if not jsonl.is_file() or jsonl.stat().st_size == 0:
         return None
