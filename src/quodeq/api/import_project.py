@@ -22,6 +22,7 @@ from flask import Response, jsonify, request
 
 from quodeq.api.helpers import error_response
 from quodeq.api.zip import (
+    _EXTRACT_HEADROOM,
     _MANIFEST_FILENAME,
     _MANIFEST_KIND,
     _MANIFEST_SCHEMA,
@@ -38,11 +39,8 @@ _MAX_MEMBERS = 50_000
 _MAX_PER_MEMBER_BYTES = 1 * 1024 * 1024 * 1024  # 1 GiB uncompressed cap per file
 _MAX_RATIO = 200  # uncompressed/compressed ratio per member (zip-bomb guard)
 _RATIO_GUARD_THRESHOLD = 1024  # only enforce ratio above this uncompressed size
-# The MB cap (QUODEQ_MAX_ZIP_SIZE_MB) applies to the zip bytes, matching the
-# export side. Extraction gets this multiple as headroom: evaluation data is
-# text that deflates ~5x, so a cap-sized archive legitimately inflates past
-# the cap. Total extraction stays bounded at cap * headroom.
-_EXTRACT_HEADROOM = 10
+# _EXTRACT_HEADROOM (imported from quodeq.api.zip) bounds total extraction at
+# cap * headroom; export enforces the same bound so its output always re-imports.
 _MAX_PATH_DEPTH = 64  # limit on path components to bound recursion-style attacks
 
 _ACTION_REPLACE = "replace"
