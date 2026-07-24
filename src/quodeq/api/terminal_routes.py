@@ -21,6 +21,7 @@ from quodeq.terminal.links import (
     detect_editor,
     resolve_bases,
     resolve_path,
+    safe_editor_path,
 )
 from quodeq.terminal.manager import TerminalManager
 
@@ -141,10 +142,15 @@ def register_terminal_routes(app: Flask, manager: TerminalManager | None = None)
         path = body.get("path")
         if not isinstance(path, str) or not path:
             return jsonify({"error": "path is required"}), 400
+        # Confine the launch to the terminal's own working directories (shell
+        # cwd, server cwd, home) and normalize the untrusted path to its real,
+        # canonical form. Everything below uses this sanitized value, never the
+        # raw client string. Outside the bases -> refuse.
+        safe = safe_editor_path(path, resolve_bases(manager.pid))
         # Never launch on a non-file, even though the client only sends paths it
         # got back as exists=true — the state could have changed, and this is the
         # authoritative check before spawning a process.
-        if not os.path.isfile(path):
+        if safe is None or not os.path.isfile(safe):
             return jsonify({"opened": False, "editor": None})
         editor = detect_editor()
         if editor is None:
@@ -152,15 +158,15 @@ def register_terminal_routes(app: Flask, manager: TerminalManager | None = None)
         line = _coerce_int(body.get("line"))
         col = _coerce_int(body.get("col"))
         try:
-            argv = build_open_argv(editor, path, line, col)
+            argv = build_open_argv(editor, safe, line, col)
             if argv is None:  # Windows startfile sentinel
-                os.startfile(path)  # type: ignore[attr-defined]
+                os.startfile(safe)  # type: ignore[attr-defined]
             else:
                 # Detached: the editor outlives this request; we don't wait on it.
                 subprocess.Popen(argv, start_new_session=True)
             return jsonify({"opened": True, "editor": editor.name})
         except (OSError, ValueError):
-            _logger.warning("failed to open %s in %s", path, editor.name, exc_info=True)
+            _logger.warning("failed to open %s in %s", safe, editor.name, exc_info=True)
             return jsonify({"opened": False, "editor": editor.name})
 
     @sock.route("/api/terminal/ws")

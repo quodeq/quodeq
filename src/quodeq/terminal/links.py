@@ -109,6 +109,40 @@ def _safe(fn):
         return None
 
 
+def safe_editor_path(
+    path: str,
+    bases: list[str],
+    *,
+    realpath=os.path.realpath,
+    commonpath=os.path.commonpath,
+) -> str | None:
+    """Return the canonical real path of ``path`` iff it lives under one of the
+    terminal's working directories (``bases``); otherwise None.
+
+    Guards the /open launch: the client may send any path, but we only ever hand
+    the editor a file inside the directories the terminal actually operates in
+    (shell cwd, server cwd, home). This both bounds the blast radius and, because
+    the launch sinks consume the *returned* normalized value, sanitizes the
+    untrusted input (a symlink escaping a base resolves out via realpath and is
+    rejected).
+    """
+    try:
+        real = realpath(path)
+    except OSError:
+        return None
+    for base in bases:
+        try:
+            base_real = realpath(base)
+        except OSError:
+            continue
+        try:
+            if commonpath([real, base_real]) == base_real:
+                return real
+        except ValueError:  # mixed abs/rel or different drive (Windows)
+            continue
+    return None
+
+
 def resolve_path(
     token: str,
     bases: list[str],

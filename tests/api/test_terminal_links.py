@@ -5,6 +5,8 @@ subprocess) and the /api/terminal/resolve + /open routes.
 """
 from __future__ import annotations
 
+import os
+
 import pytest
 from flask import Flask
 
@@ -15,6 +17,7 @@ from quodeq.terminal.links import (
     child_cwd,
     detect_editor,
     resolve_path,
+    safe_editor_path,
 )
 
 
@@ -50,6 +53,37 @@ def test_resolve_relative_none_exist_falls_back_to_first_base():
     )
     assert abs_path == "/first/rel.py"
     assert exists is False
+
+
+# --- safe_editor_path -------------------------------------------------------
+
+def test_safe_editor_path_within_base_returns_realpath():
+    got = safe_editor_path("/home/u/proj/a.py", ["/home/u"], realpath=lambda p: p)
+    assert got == "/home/u/proj/a.py"
+
+
+def test_safe_editor_path_outside_bases_is_none():
+    assert safe_editor_path("/etc/passwd", ["/home/u"], realpath=lambda p: p) is None
+
+
+def test_safe_editor_path_symlink_escape_rejected():
+    # realpath resolves the link OUT of the base -> rejected (not just lexical).
+    def _rp(p):
+        return "/etc/shadow" if p == "/home/u/link" else p
+
+    assert safe_editor_path("/home/u/link", ["/home/u"], realpath=_rp) is None
+
+
+def test_safe_editor_path_normalizes_returned_value():
+    got = safe_editor_path(
+        "/home/u/../u/proj/a.py", ["/home/u"], realpath=os.path.normpath,
+    )
+    assert got == "/home/u/proj/a.py"
+
+
+def test_safe_editor_path_checks_multiple_bases():
+    got = safe_editor_path("/second/a.py", ["/first", "/second"], realpath=lambda p: p)
+    assert got == "/second/a.py"
 
 
 # --- detect_editor ----------------------------------------------------------
@@ -210,6 +244,9 @@ def test_resolve_route_gated(app):
 
 def test_open_route_launches_editor(app, monkeypatch):
     calls = {}
+    # Bypass containment/realpath so the test is deterministic; safe path == input.
+    monkeypatch.setattr("quodeq.api.terminal_routes.resolve_bases", lambda pid: ["/base"])
+    monkeypatch.setattr("quodeq.api.terminal_routes.safe_editor_path", lambda p, bases: p)
     monkeypatch.setattr("quodeq.api.terminal_routes.os.path.isfile", lambda p: True)
     monkeypatch.setattr("quodeq.api.terminal_routes.detect_editor",
                         lambda: Editor("code", "/usr/bin/code", True))
@@ -230,7 +267,22 @@ def test_open_route_launches_editor(app, monkeypatch):
     assert calls["kw"].get("start_new_session") is True
 
 
+def test_open_route_rejects_path_outside_bases(app, monkeypatch):
+    # safe_editor_path returns None for anything outside the terminal's dirs.
+    monkeypatch.setattr("quodeq.api.terminal_routes.resolve_bases", lambda pid: ["/base"])
+    monkeypatch.setattr("quodeq.api.terminal_routes.safe_editor_path", lambda p, bases: None)
+    launched = []
+    monkeypatch.setattr("quodeq.api.terminal_routes.subprocess.Popen",
+                        lambda *a, **k: launched.append(a))
+    c = app.test_client()
+    r = c.post("/api/terminal/open", json={"path": "/etc/passwd"}, headers=_H, base_url="http://localhost")
+    assert r.get_json() == {"opened": False, "editor": None}
+    assert launched == []
+
+
 def test_open_route_missing_file_not_opened(app, monkeypatch):
+    monkeypatch.setattr("quodeq.api.terminal_routes.resolve_bases", lambda pid: ["/base"])
+    monkeypatch.setattr("quodeq.api.terminal_routes.safe_editor_path", lambda p, bases: p)
     monkeypatch.setattr("quodeq.api.terminal_routes.os.path.isfile", lambda p: False)
     launched = []
     monkeypatch.setattr("quodeq.api.terminal_routes.subprocess.Popen",
@@ -242,6 +294,8 @@ def test_open_route_missing_file_not_opened(app, monkeypatch):
 
 
 def test_open_route_fail_soft_on_launch_error(app, monkeypatch):
+    monkeypatch.setattr("quodeq.api.terminal_routes.resolve_bases", lambda pid: ["/base"])
+    monkeypatch.setattr("quodeq.api.terminal_routes.safe_editor_path", lambda p, bases: p)
     monkeypatch.setattr("quodeq.api.terminal_routes.os.path.isfile", lambda p: True)
     monkeypatch.setattr("quodeq.api.terminal_routes.detect_editor",
                         lambda: Editor("code", "/usr/bin/code", True))
