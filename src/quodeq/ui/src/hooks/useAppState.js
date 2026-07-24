@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useDashboard } from '../features/dashboard/hooks/useDashboard.js';
 import { usePrefetchAdjacentRuns } from '../features/dashboard/hooks/usePrefetchAdjacentRuns.js';
 import { buildPeriodRuns } from '../utils/dailyGrouping.js';
 import { readScoreHistoryGranularity, writeScoreHistoryGranularity } from '../utils/scoreHistoryPrefs.js';
+import { projectKeys } from '../api/queryKeys.js';
 import { useServerHealth } from './useServerHealth.js';
 import { useNavStack } from './useNavStack.js';
 import { useRunNavigator } from './useRunNavigator.js';
@@ -94,6 +96,32 @@ export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRun
   return dailyRuns[overviewRunIndex]?.dateLabel || currentOverviewRun;
 }
 
+// Returning to the Overview from another tab must reconcile any project query
+// a mark-stale-only invalidation left behind (refreshDashboard's
+// refetchType:'none', or ordinary staleTime elapse): the Overview's
+// useDashboard observer is mounted at the app root and never remounts on tab
+// navigation (see the eval-completion effect below), and the desktop
+// pywebview window never fires the focus-refetch a browser tab gets on
+// refocus. `stale: true` keeps this a no-op when nothing is actually stale,
+// so switching tabs doesn't re-download the (potentially 10-20 MB) payload
+// on every visit — only a query already marked stale gets refetched here.
+// Exported (and taking plain values rather than reading nav state itself) so
+// the transition-gating logic is testable without mounting all of useAppState.
+export function useOverviewReturnReconcile({ activeTab, selectedProject, selectedSource }) {
+  const queryClient = useQueryClient();
+  const prevTabRef = useRef(activeTab);
+  useEffect(() => {
+    const cameToOverview = prevTabRef.current !== TAB_OVERVIEW && activeTab === TAB_OVERVIEW;
+    prevTabRef.current = activeTab;
+    if (!cameToOverview || !selectedProject) return;
+    queryClient.refetchQueries({
+      queryKey: projectKeys.project(selectedProject, selectedSource),
+      stale: true,
+      type: 'active',
+    });
+  }, [activeTab, selectedProject, selectedSource, queryClient]);
+}
+
 export function useAppState() {
   const nav = useAppNavigation();
   const { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
@@ -156,6 +184,8 @@ export function useAppState() {
     : TAB_OVERVIEW;
   const showProjectHeader = PROJECT_TABS.includes(activeTab) && projects.length > 0 && !!selectedProject;
   const showRunNav = activeTab === TAB_OVERVIEW && showProjectHeader && visibleDailyRuns.length > 0 && navStack.length === 1;
+
+  useOverviewReturnReconcile({ activeTab, selectedProject, selectedSource });
 
   return {
     serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navTab,
