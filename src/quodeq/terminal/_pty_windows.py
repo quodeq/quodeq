@@ -60,6 +60,10 @@ class WindowsPty:
     def alive(self) -> bool:
         return self._proc is not None and self._proc.isalive()
 
+    @property
+    def pid(self) -> int | None:
+        return getattr(self._proc, "pid", None) if self._proc is not None else None
+
     def kill(self) -> None:
         if self._proc is not None:
             try:

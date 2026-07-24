@@ -81,6 +81,13 @@ class TerminalManager:
     def alive(self) -> bool:
         return self._backend is not None and self._backend.alive
 
+    @property
+    def pid(self) -> int | None:
+        """PID of the live shell, or None. Used to read the shell's cwd so
+        clickable relative paths resolve against where the user actually is."""
+        backend = self._backend
+        return backend.pid if backend is not None else None
+
     def _append_scrollback(self, data: str) -> None:
         self._ring.append(data)
         self._ring_size += len(data)

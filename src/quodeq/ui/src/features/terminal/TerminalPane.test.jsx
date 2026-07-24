@@ -5,6 +5,8 @@ import '@testing-library/jest-dom/vitest';
 const fakeTerm = { open: vi.fn(), write: vi.fn(), dispose: vi.fn(), loadAddon: vi.fn(),
   onData: vi.fn(), onResize: vi.fn(), focus: vi.fn(), attachCustomKeyEventHandler: vi.fn(),
   reset: vi.fn(),
+  registerLinkProvider: vi.fn(() => ({ dispose: vi.fn() })),
+  buffer: { active: { getLine: () => ({ translateToString: () => '' }) } },
   cols: 80, rows: 24, options: {} };
 // Use `function` (not arrow) implementations so vi.fn() produces a constructible
 // mock: xterm's Terminal/FitAddon are always invoked with `new` in TerminalPane.
@@ -16,6 +18,8 @@ vi.mock('../../api/terminal.js', () => ({
   terminalStatus: vi.fn(async () => ({ enabled: true, running: false, reason: null })),
   killTerminal: vi.fn(async () => ({ ok: true })),
   terminalSocketUrl: () => 'ws://localhost/api/terminal/ws',
+  resolveTerminalPaths: vi.fn(async () => []),
+  openInEditor: vi.fn(async () => ({ opened: true, editor: 'code' })),
 }));
 // Mock the socket hook: jsdom has no real terminal WS to reach, and the
 // overlay tests need to drive each connection status directly. lastSocketOpts

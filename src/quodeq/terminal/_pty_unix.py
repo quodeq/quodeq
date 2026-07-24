@@ -117,6 +117,10 @@ class UnixPty:
     def alive(self) -> bool:
         return self._proc is not None and self._proc.poll() is None
 
+    @property
+    def pid(self) -> int | None:
+        return self._proc.pid if self._proc is not None else None
+
     def kill(self) -> None:
         if self._proc is not None:
             kill_proc_tree(self._proc)

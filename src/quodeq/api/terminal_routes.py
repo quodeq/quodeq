@@ -9,12 +9,19 @@ import json
 import logging
 import os
 import struct
+import subprocess
 import threading
 
 from flask import Flask, current_app, jsonify, request
 from flask_sock import Sock
 
 from quodeq.terminal.gate import terminal_env_reason, terminal_gate_reason
+from quodeq.terminal.links import (
+    build_open_argv,
+    detect_editor,
+    resolve_bases,
+    resolve_path,
+)
 from quodeq.terminal.manager import TerminalManager
 
 _logger = logging.getLogger(__name__)
@@ -47,6 +54,15 @@ def _gate_reason() -> str | None:
 # succeed, so it must not loop — only unexpected drops are retried.
 _WS_CLOSE_BUSY = 4002     # single-connection lock held by another window
 _WS_CLOSE_REFUSED = 4003  # terminal gate refused the handshake
+
+
+def _coerce_int(value) -> int | None:
+    """Line/col from a JSON body: accept ints or numeric strings, else None."""
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return None
+    return n if n > 0 else None
 
 
 def _clamp_winsize(value: int) -> int:
@@ -91,6 +107,61 @@ def register_terminal_routes(app: Flask, manager: TerminalManager | None = None)
             return jsonify({"error": "forbidden"}), 403
         manager.kill()
         return jsonify({"ok": True})
+
+    @app.post("/api/terminal/resolve")
+    def terminal_resolve():
+        """Resolve candidate path tokens the client detected in a terminal line
+        to absolute paths, reporting which exist. The client makes only the
+        existing ones clickable, so path-shaped text never becomes a dead link.
+        Gated exactly like the other terminal routes (same threat model: a
+        single-user localhost app whose terminal already grants a full shell)."""
+        if _gate_reason() is not None:
+            return jsonify({"error": "forbidden"}), 403
+        body = request.get_json(silent=True) or {}
+        paths = body.get("paths")
+        if not isinstance(paths, list):
+            return jsonify({"error": "paths must be a list"}), 400
+        bases = resolve_bases(manager.pid)
+        resolved = []
+        for token in paths:
+            if not isinstance(token, str) or not token:
+                continue
+            abs_path, exists = resolve_path(token, bases)
+            resolved.append({"input": token, "abs": abs_path, "exists": exists})
+        return jsonify({"resolved": resolved})
+
+    @app.post("/api/terminal/open")
+    def terminal_open():
+        """Open an already-resolved absolute path in the user's editor at an
+        optional line/col. Fail-soft: any error returns opened=false rather than
+        raising, so a missing editor never surfaces as a 500."""
+        if _gate_reason() is not None:
+            return jsonify({"error": "forbidden"}), 403
+        body = request.get_json(silent=True) or {}
+        path = body.get("path")
+        if not isinstance(path, str) or not path:
+            return jsonify({"error": "path is required"}), 400
+        # Never launch on a non-file, even though the client only sends paths it
+        # got back as exists=true — the state could have changed, and this is the
+        # authoritative check before spawning a process.
+        if not os.path.isfile(path):
+            return jsonify({"opened": False, "editor": None})
+        editor = detect_editor()
+        if editor is None:
+            return jsonify({"opened": False, "editor": None})
+        line = _coerce_int(body.get("line"))
+        col = _coerce_int(body.get("col"))
+        try:
+            argv = build_open_argv(editor, path, line, col)
+            if argv is None:  # Windows startfile sentinel
+                os.startfile(path)  # type: ignore[attr-defined]
+            else:
+                # Detached: the editor outlives this request; we don't wait on it.
+                subprocess.Popen(argv, start_new_session=True)
+            return jsonify({"opened": True, "editor": editor.name})
+        except (OSError, ValueError):
+            _logger.warning("failed to open %s in %s", path, editor.name, exc_info=True)
+            return jsonify({"opened": False, "editor": editor.name})
 
     @sock.route("/api/terminal/ws")
     def terminal_ws(ws):
