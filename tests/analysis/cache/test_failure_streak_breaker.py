@@ -56,6 +56,28 @@ class TestFailureStreakBreaker:
         assert len(watcher.trip_event.recent) == 5
         assert watcher.trip_event.recent[0].reason == "token_limit"
 
+    def test_non_dict_json_line_does_not_kill_scan(self, tmp_path: Path):
+        # A JSONL line that decodes to a non-object (array/number/string/null)
+        # must be skipped, not crash the scan thread with AttributeError. If the
+        # thread died on the bad line it would never see the trailing errors and
+        # the breaker would not trip.
+        jsonl = tmp_path / "evidence.jsonl"
+        jsonl.touch()
+        watcher = FailureStreakWatcher(jsonl, threshold=5)
+        watcher.start()
+        with jsonl.open("a") as f:
+            f.write("[1, 2, 3]\n")   # array, not object
+            f.write("42\n")           # bare number
+            f.write('"a string"\n')  # bare string
+            f.write("null\n")         # null
+        for i in range(5):
+            _append(jsonl, {"_marker": "file_done", "file": f"f{i}.py", "status": "error", "reason": "token_limit"})
+        watcher.wait_for_trip(timeout=5.0)
+        watcher.stop_and_join(timeout=5.0)
+        assert cancellation.is_cancelled()
+        assert isinstance(watcher.trip_event, TripEvent)
+        assert watcher.trip_event.streak == 5
+
     def test_threshold_zero_disables(self, tmp_path: Path):
         jsonl = tmp_path / "evidence.jsonl"
         jsonl.touch()

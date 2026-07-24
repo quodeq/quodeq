@@ -143,6 +143,8 @@ class FailureStreakWatcher:
                 entry = json.loads(raw)
             except (json.JSONDecodeError, UnicodeDecodeError):
                 continue
+            if not isinstance(entry, dict):
+                continue
             if entry.get("_marker") != "file_done":
                 continue
             status = entry.get("status")
