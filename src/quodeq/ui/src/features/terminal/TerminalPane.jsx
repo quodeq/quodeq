@@ -176,6 +176,18 @@ export default function TerminalPane({ active }) {
     try { fitRef.current.fit(); resize(termRef.current.cols, termRef.current.rows); } catch { /* noop */ }
   }, [active, resize]);
 
+  // Give xterm keyboard focus when the terminal becomes the frontmost tab
+  // (drawer open or tab switch) so the user can type immediately without
+  // clicking into it. Gated on `active` so a backgrounded pane never steals
+  // focus; `paneLive` is a dep so this runs once the terminal has mounted on
+  // first open (termRef is set by the mount effect declared above). No
+  // isHidden guard: focus() doesn't resize the PTY, and an active tab is
+  // visible by definition.
+  useEffect(() => {
+    if (!active || !paneLive || !termRef.current) return;
+    try { termRef.current.focus(); } catch { /* noop */ }
+  }, [active, paneLive]);
+
   // While the socket is not open, disable xterm input. send() already no-ops
   // when disconnected, so keystrokes would otherwise vanish silently into a
   // dead shell (and buffering them is unsafe — the line would land in a fresh
