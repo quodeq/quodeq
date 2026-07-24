@@ -5,7 +5,7 @@ import {
   buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
   resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldRedirectToRemoteRepositories, shouldShowProjectTabs,
   buildNavigationBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
-  resolveProjectDisplayName,
+  buildAssistantActionAppliedHandler, resolveProjectDisplayName,
 } from './App.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
@@ -232,6 +232,93 @@ describe('ViolationsRoute onRefresh/onReconcile wiring (Dismissed tab reconcile)
     const props = violationsProps();
     const inner = renderViolationsRoute(props);
     expect(inner.props.callbacks.onReconcile).toBe(props.scheduleDashboardReconcile);
+  });
+});
+
+// An assistant-applied dismiss mutates exactly the payloads a manual dismiss
+// does, so it owes the same convergence follow-ups the manual paths got: the
+// instant delta patch, the dismissed-list bump, the lazy mark-stale, AND the
+// debounced ACTIVE reconcile. The reconcile is the one that reaches the
+// Overview -- its useDashboard observer is mounted at the app root and never
+// remounts, and pywebview never fires a focus-refetch -- so without it, any
+// view the delta doesn't cover keeps showing pre-dismiss numbers, which is
+// the "nothing updated" symptom the manual paths were fixed for.
+describe('buildAssistantActionAppliedHandler', () => {
+  function deps(overrides = {}) {
+    return {
+      applyDelta: vi.fn(),
+      bumpDismissRefresh: vi.fn(),
+      refreshDashboard: vi.fn(),
+      scheduleDashboardReconcile: vi.fn(),
+      selectedProject: 'proj1',
+      ...overrides,
+    };
+  }
+
+  const dismissEvent = (detail) => ({ detail: { actionType: 'dismiss_finding', ...detail } });
+
+  it('schedules the active dashboard reconcile after a dismiss apply', () => {
+    const d = deps();
+    buildAssistantActionAppliedHandler(d)(dismissEvent({ delta: { project: 'proj1' }, scores: {} }));
+    expect(d.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls the lazy refresh as well, never one in place of the other', () => {
+    const d = deps();
+    buildAssistantActionAppliedHandler(d)(dismissEvent({ delta: { project: 'proj1' }, scores: {} }));
+    expect(d.refreshDashboard).toHaveBeenCalledTimes(1);
+    expect(d.bumpDismissRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  // The regression this pins: a dismiss whose response carries no delta at
+  // all has NOTHING patching the visible screen, so the reconcile is the only
+  // path back to correct numbers. Skipping it here would be silently wrong.
+  it('still reconciles when the apply response carries no delta to patch', () => {
+    const d = deps();
+    buildAssistantActionAppliedHandler(d)(dismissEvent({}));
+    expect(d.applyDelta).not.toHaveBeenCalled();
+    expect(d.refreshDashboard).toHaveBeenCalledTimes(1);
+    expect(d.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+  });
+
+  // applyDelta writes into a project-keyed cache, so it must use the delta's
+  // frozen project rather than the live selection (the apply POST can resolve
+  // after a project switch). The reconcile is only a refetch, so it stays on
+  // the live selection -- aiming it wrong re-pulls data, it never corrupts.
+  it('patches the delta against the delta\'s own project, not the live selection', () => {
+    const d = deps({ selectedProject: 'proj2' });
+    buildAssistantActionAppliedHandler(d)(dismissEvent({ delta: { project: 'proj1' }, scores: { dimensions: [] } }));
+    expect(d.applyDelta).toHaveBeenCalledWith('proj1', { dimensions: [] }, { project: 'proj1' });
+  });
+
+  it('falls back to the live selection when the delta names no project', () => {
+    const d = deps({ selectedProject: 'proj2' });
+    buildAssistantActionAppliedHandler(d)(dismissEvent({ delta: { some: 'delta' }, scores: {} }));
+    expect(d.applyDelta).toHaveBeenCalledWith('proj2', {}, { some: 'delta' });
+  });
+
+  // The patch is best-effort; a throw must not swallow the follow-ups that
+  // are the actual convergence guarantee.
+  it('still refreshes and reconciles when the delta patch throws', () => {
+    const d = deps({ applyDelta: vi.fn(() => { throw new Error('bad delta'); }) });
+    buildAssistantActionAppliedHandler(d)(dismissEvent({ delta: { project: 'proj1' }, scores: {} }));
+    expect(d.refreshDashboard).toHaveBeenCalledTimes(1);
+    expect(d.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores assistant actions that are not dismissals', () => {
+    const d = deps();
+    buildAssistantActionAppliedHandler(d)({ detail: { actionType: 'verify_finding', delta: {} } });
+    expect(d.applyDelta).not.toHaveBeenCalled();
+    expect(d.bumpDismissRefresh).not.toHaveBeenCalled();
+    expect(d.refreshDashboard).not.toHaveBeenCalled();
+    expect(d.scheduleDashboardReconcile).not.toHaveBeenCalled();
+  });
+
+  it('tolerates an event with no detail at all', () => {
+    const d = deps();
+    expect(() => buildAssistantActionAppliedHandler(d)({})).not.toThrow();
+    expect(d.scheduleDashboardReconcile).not.toHaveBeenCalled();
   });
 });
 
