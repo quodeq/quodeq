@@ -16,6 +16,14 @@ from quodeq.services import shared_publish, shared_repo
 from quodeq.services.shared_publish import publish_project
 from quodeq.services.shared_repo import clone_lock, ensure_shared_clone, refresh_shared_clone
 
+# The thread join()/wait() calls below are deadlock guards, not performance
+# assertions: a genuine clone-lock deadlock hangs forever, so any generous
+# ceiling still trips on a real hang. 5s was too tight for the real git
+# clone/commit/push subprocesses these tests spawn over file://, which flaked
+# on loaded Windows CI runners. A large budget keeps the deadlock signal while
+# removing the timing sensitivity.
+_DEADLOCK_GUARD_TIMEOUT = 60.0
+
 
 def _bare_origin(tmp_path: Path, name: str = "origin.git") -> str:
     origin = tmp_path / name
@@ -114,11 +122,13 @@ def test_refresh_waits_for_publish(tmp_path, monkeypatch):
     refresh_thread = threading.Thread(target=_fire_refresh, name="refresh")
 
     publish_thread.start()
-    assert commit_reached.wait(timeout=5), "publish never reached its commit step"
+    assert commit_reached.wait(timeout=_DEADLOCK_GUARD_TIMEOUT), (
+        "publish never reached its commit step"
+    )
     refresh_thread.start()
 
-    publish_thread.join(timeout=5)
-    refresh_thread.join(timeout=5)
+    publish_thread.join(timeout=_DEADLOCK_GUARD_TIMEOUT)
+    refresh_thread.join(timeout=_DEADLOCK_GUARD_TIMEOUT)
 
     assert not publish_thread.is_alive(), "publish_project deadlocked"
     assert not refresh_thread.is_alive(), "refresh_shared_clone deadlocked"
@@ -153,7 +163,7 @@ def test_clone_lock_is_reentrant_for_publish_internal_refresh(tmp_path):
 
     thread = threading.Thread(target=_do_publish, name="publish")
     thread.start()
-    thread.join(timeout=5)
+    thread.join(timeout=_DEADLOCK_GUARD_TIMEOUT)
 
     assert not thread.is_alive(), (
         "publish_project deadlocked acquiring its own clone lock reentrantly "
