@@ -113,3 +113,33 @@ def test_missing_or_empty_evidence_returns_none(tmp_path):
     assert score_dimension_from_evidence(
         tmp_path, DIM, dismissed=set(), deleted=set(),
         source_file_count=0, files_read=0, params=DEFAULT_PARAMS) is None
+
+
+def test_traversal_dim_id_does_not_read_evidence_planted_outside_run_dir(tmp_path):
+    """A path-traversal dim_id must be rejected before the join, not silently
+    walked outside run_dir -- CodeQL py/path-injection sink guard.
+
+    Plants real evidence at the exact location the traversal would resolve
+    to, so this test fails (proves a real read happened) if the guard is
+    ever removed, instead of passing vacuously because the target is
+    missing.
+    """
+    run_dir = tmp_path / "run"
+    (run_dir / "evidence").mkdir(parents=True)
+    secret_dir = tmp_path / "secret"
+    secret_dir.mkdir()
+    (secret_dir / "leak_evidence.jsonl").write_text(
+        json.dumps(_line("R-1", "a.kt", 10)) + "\n"
+    )
+    traversal_dim_id = "../../secret/leak"
+    # Sanity check: confirm the naive (unguarded) join really would resolve
+    # onto the planted secret file, so this test actually exercises escape.
+    escaped = run_dir / "evidence" / f"{traversal_dim_id}_evidence.jsonl"
+    assert escaped.resolve() == (secret_dir / "leak_evidence.jsonl").resolve()
+
+    # The guard raises before the join, so the planted secret is never read.
+    with pytest.raises(ValueError):
+        score_dimension_from_evidence(
+            run_dir, traversal_dim_id, dismissed=set(), deleted=set(),
+            source_file_count=1000, files_read=50, params=DEFAULT_PARAMS,
+        )

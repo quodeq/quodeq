@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from quodeq.services.ports import RunInfo, read_run_data, safe_read_dir, summarize_dimensions
+from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 
@@ -111,6 +112,7 @@ def _read_accumulated_summary(
                     # the stub's inflated grade.
                     if d.dimension and d.dimension not in latest_by_dim and _has_valid_score(d):
                         latest_by_dim[d.dimension] = d
+                        validate_path_segment(run.run_id)
                         run_dir_by_dim[d.dimension] = project_dir / run.run_id
                     if files_count is None and d.source_file_count:
                         files_count = d.source_file_count

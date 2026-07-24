@@ -25,6 +25,7 @@ from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services._trend_fetcher import make_trend_fetcher
 from quodeq.services.scoring_view import is_eligible_for_default_view, select_trend_runs
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
+from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 
@@ -191,6 +192,7 @@ def _rescore_run_dimensions(
     deleted = deleted_keys(project_dir)
     if not dismissed and not deleted:
         return dims
+    validate_path_segment(run_id)
     run_dir = project_dir / run_id
     return [
         _rescore_dimension(d, dismissed, deleted, params=params, run_dir=run_dir)

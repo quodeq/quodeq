@@ -261,6 +261,7 @@ def _build_response_from_eval_files(
     Returns the same camelCase ``{dimensions, summary}`` shape as the SQL
     path, so callers (UI dismiss handlers) don't need to branch.
     """
+    validate_path_segment(project, run_id)
     base_fetcher = _make_run_dimension_fetcher(reports_root, project)
     project_dir = reports_root / project
     dismissed = dismissed_keys(project_dir)
@@ -447,6 +448,7 @@ def _rescore_runs_by_dimension(
     params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, dict]:
     """Rescore each unique run and return a map of dim_key -> rescored dict."""
+    validate_path_segment(project)
     dim_to_run: dict[str, str] = {}
     for d in dims:
         key = (d.get("dimension") or "").lower()
@@ -459,6 +461,7 @@ def _rescore_runs_by_dimension(
     seen_runs: dict[str, dict[str, dict]] = {}
     for dim_key, run_id in dim_to_run.items():
         if run_id not in seen_runs:
+            validate_path_segment(run_id)
             run_dims = fetcher(run_id)
             # Grouped per run, so this run's own directory is the evidence
             # basis for every dimension sourced from it.

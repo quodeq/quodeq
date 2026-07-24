@@ -126,3 +126,28 @@ def test_scored_run_dimensions_validates_path_segments(monkeypatch):
     monkeypatch.setattr(scoring, "deleted_keys", lambda pdir: set())
     with pytest.raises(ValueError):
         scoring.scored_run_dimensions(Path("/reports"), "../etc", "run1")
+
+
+def test_build_response_from_eval_files_validates_path_segments():
+    """The legacy eval-file rescore path builds its own run_dir join
+    (``project_dir / run_id``) separate from ``read_run_data``'s, so it must
+    validate project/run_id itself before that second join -- CodeQL
+    py/path-injection build site."""
+    with pytest.raises(ValueError):
+        scoring._build_response_from_eval_files(Path("/reports"), "proj", "../../etc/passwd")
+    with pytest.raises(ValueError):
+        scoring._build_response_from_eval_files(Path("/reports"), "../etc", "run1")
+
+
+def test_rescore_runs_by_dimension_validates_path_segments():
+    """``dim_to_run`` sources run_id from on-disk ``fromRunId``/``runId``
+    values, but the run_dir join here is separate from any earlier
+    validation, so a traversal value must still be rejected before the join."""
+    dims = [{"dimension": "security", "fromRunId": "../../etc/passwd"}]
+    with pytest.raises(ValueError):
+        scoring._rescore_runs_by_dimension(dims, Path("/reports"), "proj", dismissed=set())
+    with pytest.raises(ValueError):
+        scoring._rescore_runs_by_dimension(
+            [{"dimension": "security", "fromRunId": "run1"}],
+            Path("/reports"), "../etc", dismissed=set(),
+        )
