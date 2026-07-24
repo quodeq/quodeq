@@ -178,3 +178,13 @@ def test_v3_db_migrates_to_v4_with_local_source(tmp_path):
     conn = sqlite3.connect(db)
     assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
     conn.close()
+
+
+def test_connect_uses_wal_with_normal_sync(tmp_path):
+    # WAL + synchronous=NORMAL is durable against app crashes and avoids an
+    # fsync per commit. CLI streaming now writes one event row per text delta
+    # (~50-200 per answer), so a per-commit fsync would pace the read loop.
+    repo = _repo(tmp_path)
+    with repo._connect() as conn:
+        assert conn.execute("PRAGMA journal_mode").fetchone()["journal_mode"].lower() == "wal"
+        assert conn.execute("PRAGMA synchronous").fetchone()["synchronous"] == 1  # 1 == NORMAL

@@ -34,6 +34,10 @@ class AssistantRepository:
         conn = sqlite3.connect(self._db_path)
         try:
             conn.execute("PRAGMA journal_mode = WAL")
+            # NORMAL is durable against app crashes under WAL and skips the
+            # per-commit fsync. CLI streaming writes one event row per text
+            # delta, so a FULL fsync per commit would pace the reader thread.
+            conn.execute("PRAGMA synchronous = NORMAL")
             conn.execute("PRAGMA foreign_keys = ON")
             conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
             version = conn.execute("PRAGMA user_version").fetchone()[0]
