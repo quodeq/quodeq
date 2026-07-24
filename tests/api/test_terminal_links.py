@@ -5,8 +5,6 @@ subprocess) and the /api/terminal/resolve + /open routes.
 """
 from __future__ import annotations
 
-import os
-
 import pytest
 from flask import Flask
 
@@ -21,18 +19,43 @@ from quodeq.terminal.links import (
 )
 
 
+# POSIX-style path primitives injected into the pure helpers so these logic
+# tests are deterministic on every OS (the host's os.path uses \ on Windows,
+# which would break literal "/foo" assertions without exercising real logic).
+def _pjoin(a, b):
+    return a.rstrip("/") + "/" + b
+
+
+def _ident(p):
+    return p
+
+
+def _pisabs(p):
+    return p.startswith("/")
+
+
+def _pcommonpath(paths):
+    a, base = paths
+    b = base.rstrip("/")
+    return base if (a == base or a == b or a.startswith(b + "/")) else "/"
+
+
 # --- resolve_path -----------------------------------------------------------
 
 def test_resolve_absolute_existing():
     abs_path, exists = resolve_path(
         "/proj/a.py", ["/base"], isfile=lambda p: p == "/proj/a.py",
+        isabs=_pisabs, join=_pjoin, normpath=_ident, expanduser=_ident,
     )
     assert abs_path == "/proj/a.py"
     assert exists is True
 
 
 def test_resolve_absolute_missing():
-    abs_path, exists = resolve_path("/nope.py", ["/base"], isfile=lambda p: False)
+    abs_path, exists = resolve_path(
+        "/nope.py", ["/base"], isfile=lambda p: False,
+        isabs=_pisabs, join=_pjoin, normpath=_ident, expanduser=_ident,
+    )
     assert abs_path == "/nope.py"
     assert exists is False
 
@@ -42,6 +65,7 @@ def test_resolve_relative_picks_first_existing_base():
     real = "/second/rel.py"
     abs_path, exists = resolve_path(
         "rel.py", ["/first", "/second"], isfile=lambda p: p == real,
+        isabs=_pisabs, join=_pjoin, normpath=_ident, expanduser=_ident,
     )
     assert abs_path == real
     assert exists is True
@@ -50,6 +74,7 @@ def test_resolve_relative_picks_first_existing_base():
 def test_resolve_relative_none_exist_falls_back_to_first_base():
     abs_path, exists = resolve_path(
         "rel.py", ["/first", "/second"], isfile=lambda p: False,
+        isabs=_pisabs, join=_pjoin, normpath=_ident, expanduser=_ident,
     )
     assert abs_path == "/first/rel.py"
     assert exists is False
@@ -58,12 +83,14 @@ def test_resolve_relative_none_exist_falls_back_to_first_base():
 # --- safe_editor_path -------------------------------------------------------
 
 def test_safe_editor_path_within_base_returns_realpath():
-    got = safe_editor_path("/home/u/proj/a.py", ["/home/u"], realpath=lambda p: p)
+    got = safe_editor_path("/home/u/proj/a.py", ["/home/u"],
+                           realpath=_ident, commonpath=_pcommonpath)
     assert got == "/home/u/proj/a.py"
 
 
 def test_safe_editor_path_outside_bases_is_none():
-    assert safe_editor_path("/etc/passwd", ["/home/u"], realpath=lambda p: p) is None
+    assert safe_editor_path("/etc/passwd", ["/home/u"],
+                            realpath=_ident, commonpath=_pcommonpath) is None
 
 
 def test_safe_editor_path_symlink_escape_rejected():
@@ -71,18 +98,23 @@ def test_safe_editor_path_symlink_escape_rejected():
     def _rp(p):
         return "/etc/shadow" if p == "/home/u/link" else p
 
-    assert safe_editor_path("/home/u/link", ["/home/u"], realpath=_rp) is None
+    assert safe_editor_path("/home/u/link", ["/home/u"],
+                            realpath=_rp, commonpath=_pcommonpath) is None
 
 
 def test_safe_editor_path_normalizes_returned_value():
+    # realpath collapses the `..`; the returned value is the normalized one.
     got = safe_editor_path(
-        "/home/u/../u/proj/a.py", ["/home/u"], realpath=os.path.normpath,
+        "/home/u/../u/proj/a.py", ["/home/u"],
+        realpath=lambda p: "/home/u/proj/a.py" if ".." in p else p,
+        commonpath=_pcommonpath,
     )
     assert got == "/home/u/proj/a.py"
 
 
 def test_safe_editor_path_checks_multiple_bases():
-    got = safe_editor_path("/second/a.py", ["/first", "/second"], realpath=lambda p: p)
+    got = safe_editor_path("/second/a.py", ["/first", "/second"],
+                           realpath=_ident, commonpath=_pcommonpath)
     assert got == "/second/a.py"
 
 
