@@ -286,13 +286,22 @@ def _print_scores(
             print(f"  {dim}: {score}")
             continue
         source_file_count, files_read = _dim_evidence_counts(evaluation_dir, dim)
-        result = score_dimension_from_evidence(
-            run_dir, dim,
-            dismissed=dismissed, deleted=deleted,
-            source_file_count=source_file_count, files_read=files_read,
-            params=params,
-        )
-        adjusted = _format_adjusted_score(score, result) if result is not None else None
+        try:
+            result = score_dimension_from_evidence(
+                run_dir, dim,
+                dismissed=dismissed, deleted=deleted,
+                source_file_count=source_file_count, files_read=files_read,
+                params=params,
+            )
+            adjusted = _format_adjusted_score(score, result) if result is not None else None
+        except Exception as exc:  # noqa: BLE001 — this is a console embellishment
+            # on top of reports already written to disk; a scoring-engine edge
+            # case here must never crash an otherwise-successful scan's exit
+            # path (nothing upstream catches a generic exception -- see
+            # _run_pipeline_with_cleanup, which only catches AnalysisError/
+            # EvaluationError). Fall back to the original line instead.
+            _logger.debug("Suppression-aware rescore failed for dim %s: %s", dim, exc)
+            adjusted = None
         if adjusted is None:
             print(f"  {dim}: {score}")
             continue

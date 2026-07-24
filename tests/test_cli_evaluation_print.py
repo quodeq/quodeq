@@ -118,3 +118,36 @@ def test_dimension_without_evidence_falls_back_to_original_line(tmp_path, capsys
 
     out = capsys.readouterr().out
     assert out == "  security: 8.0/10\n"
+
+
+def test_rescore_exception_falls_back_to_original_line(tmp_path, capsys, monkeypatch):
+    """A scoring-engine exception during the suppression-aware rescore must
+    never propagate. The rescore is a console embellishment layered on top
+    of reports already written to disk -- nothing upstream of
+    `_execute_pipeline` catches a generic exception (only AnalysisError /
+    EvaluationError), so a bug here would otherwise crash an
+    otherwise-successful scan's exit path with a raw traceback.
+    """
+    project_dir = tmp_path / "proj"
+    run_dir = project_dir / "run1"
+    lines = [
+        _ev_line("R-1", "a.kt", 10, sev="major", vt="VT-COUPLING"),
+        _ev_line("R-2", "a.kt", 20, sev="critical", vt="VT-GODCLASS"),
+        _ev_line("C-1", "a.kt", 1, t="compliance"),
+    ]
+    original_score = _build_run(run_dir, DIM, lines)
+
+    # A dismissal that matches this run's evidence, so `_print_scores` takes
+    # the rescore branch (not the "no suppressions" or "no match" fallback).
+    dismiss_finding(project_dir, {"req": "R-2", "file": "a.kt", "line": 20})
+    assert dismissed_keys(project_dir), "dismiss did not register"
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("scoring engine exploded")
+
+    monkeypatch.setattr("quodeq._cli_evaluation.score_dimension_from_evidence", _boom)
+
+    _print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
+
+    out = capsys.readouterr().out
+    assert out == f"  {DIM}: {original_score}\n"
