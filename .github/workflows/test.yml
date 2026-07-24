@@ -77,7 +77,9 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7.0.0
         with:
-          node-version: '20'
+          # 22, not 20: the `test` script runs `node --test` with a glob
+          # pattern, and node only expands glob args to --test on 21+.
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: src/quodeq/ui/package-lock.json
 
