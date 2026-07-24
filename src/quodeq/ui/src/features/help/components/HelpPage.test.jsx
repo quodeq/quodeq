@@ -82,6 +82,30 @@ describe('HelpPage command line section', () => {
   });
 });
 
+describe('HelpPage shared repository section', () => {
+  it('lists Shared Repository in the section nav right after Projects', () => {
+    render(<HelpPage />);
+    const nav = screen.getByRole('button', { name: 'Shared Repository' });
+    expect(nav.previousSibling).toHaveTextContent('Projects');
+  });
+
+  it('documents connect, publish, pull, and the cache override', () => {
+    render(<HelpPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Shared Repository' }));
+    expect(screen.getByRole('heading', { level: 2, name: 'Shared Repository' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: 'Publishing' })).toBeInTheDocument();
+    expect(screen.getByText('pull local copy')).toBeInTheDocument();
+    expect(screen.getByText(/QUODEQ_CACHE_ROOT/)).toBeInTheDocument();
+  });
+
+  it('cross-references sharing from the Projects section', () => {
+    render(<HelpPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Projects' }));
+    expect(screen.getByText('Publish / update')).toBeInTheDocument();
+    expect(screen.getByText('Pull local copy')).toBeInTheDocument();
+  });
+});
+
 describe('HelpPage violations section', () => {
   it('describes the real sub-tabs', () => {
     render(<HelpPage />);

@@ -125,13 +125,68 @@ export function Projects() {
         ['Relocate', 'Update the local path if the repo moved on disk.'],
         ['Export', 'Download the run findings as JSON.'],
         ['Delete', 'Remove the project and all its runs. Not reversible.'],
+        ['Publish / update', 'Send completed runs to the connected shared repository.'],
+        ['Pull local copy', "Import a teammate's shared project into your local list."],
       ]} />
+      <p>With a shared repository connected, every card also carries a <em>LOCAL</em>, <em>PUBLISHED</em>, or <em>REMOTE</em> badge, and a location filter appears above the list. The <strong>Shared Repository</strong> help section covers the whole workflow.</p>
 
       <h3>Sub-projects and monorepos</h3>
       <p>You can evaluate a subdirectory of a repository as its own project by setting <strong>Scope</strong> in the wizard or in <em>Evaluate</em>. Each scoped run becomes a distinct project; Quodeq detects the parent-child relationship and groups them in the list so you can compare quality across packages.</p>
 
       <Tip title="Wiping the slate">
         Projects, runs, and findings live under <code>~/.quodeq</code>. Delete that directory and Quodeq starts fresh, including the welcome wizard.
+      </Tip>
+    </section>
+  );
+}
+
+export function SharedRepository() {
+  return (
+    <section className="help-section">
+      <h2>Shared Repository</h2>
+      <p>A shared repository is a plain git repo your team uses to exchange results. You publish a project's finished runs to it; teammates who connect the same repo see that project in their own list, grades and findings included, without running anything themselves.</p>
+
+      <h3>Connecting</h3>
+      <p>Open <strong>Settings</strong>, find the <em>shared repository</em> section, paste the repository URL, and press <strong>save</strong>. HTTPS (<code>https://github.com/team/results.git</code>) and SSH (<code>git@github.com:team/results.git</code>) forms both work.</p>
+      <ul>
+        <li>An empty repository is fine. The first publish sets up the layout.</li>
+        <li>A repository that already contains unrelated files is rejected, so you cannot accidentally point Quodeq at a code repo and write into it.</li>
+        <li>If the repo was written by a newer Quodeq than yours, connecting fails with a message asking you to upgrade first.</li>
+      </ul>
+
+      <h3>Authentication</h3>
+      <p>Quodeq uses your own git setup and never asks for credentials. The rule of thumb: if <code>git clone</code> works for that URL in a terminal, it works here.</p>
+      <ul>
+        <li><strong>SSH</strong> needs the key loaded in your agent and the host already in <code>known_hosts</code>.</li>
+        <li><strong>HTTPS</strong> needs a credential helper holding a token. Interactive prompts are disabled, so a URL that would ask for a password fails instead of hanging.</li>
+      </ul>
+
+      <h3>Publishing</h3>
+      <p>Once a repo is connected, local project cards grow a <strong>publish</strong> button. It uploads the project's completed runs and flips the card badge to <em>PUBLISHED</em>. When a newer run finishes later, the same button reads <strong>update</strong>.</p>
+      <ul>
+        <li>Only completed runs are published. Interrupted runs, and runs from old Quodeq versions that predate run status tracking, are skipped.</li>
+        <li>One publish runs at a time. While it is busy, the other publish buttons wait.</li>
+        <li>Each publish records who and when, taken from your git <code>user.name</code>. Teammates see it on the card.</li>
+      </ul>
+
+      <h3>What teammates see</h3>
+      <p>Everyone connected to the same repo gets one merged projects list. Badges tell the entries apart:</p>
+      <KeyTable rows={[
+        ['LOCAL', 'Exists only on this machine, not published yet.'],
+        ['PUBLISHED', 'A local project that is also in the shared repo.'],
+        ['REMOTE', "A teammate's project, present only in the shared repo."],
+      ]} />
+      <p>The list renders instantly from the last synced copy, then checks the remote in the background. A sync line in the toolbar shows <em>syncing…</em>, <em>synced</em> with a time, or <em>sync failed · retry</em>; the refresh button forces a new check.</p>
+      <p>Opening a shared project is read-only. You can browse every run and finding, but evaluating, dismissing findings, and deleting stay local-only. The header shows a <em>shared · read-only</em> chip as a reminder.</p>
+
+      <h3>Pulling a project</h3>
+      <p>A <em>REMOTE</em> card offers <strong>pull local copy</strong>: it imports the project, runs and all, into your local list so you can evaluate it yourself from there. If a local project already has that name, Quodeq asks whether to import it as a copy.</p>
+
+      <h3>Disconnecting</h3>
+      <p><strong>disconnect</strong>, in the same Settings section, forgets the URL and deletes the local cache of the repo. Nothing in the shared repo itself is touched; reconnect later and everything is still there.</p>
+
+      <Tip title="Where the clone lives">
+        Quodeq keeps its working clone of the shared repo under <code>~/.quodeq/cache</code>. Set <code>QUODEQ_CACHE_ROOT</code> to put it somewhere else.
       </Tip>
     </section>
   );
@@ -629,6 +684,9 @@ export function Settings() {
 
       <h3>Server</h3>
       <p>Shows the current dashboard server: port, version, and status. Live log streams (server, Ollama, evaluation) are wired into the side-pane log viewer. Open it from the bottom-bar log buttons to tail what is happening.</p>
+
+      <h3>Shared repository</h3>
+      <p>Paste a git URL here to share results with your team: you publish finished runs from the projects list, teammates see them in theirs. The <strong>Shared Repository</strong> help section walks through connect, publish, pull, and disconnect.</p>
 
       <h3>Appearance</h3>
       <p>Light or dark mode plus a theme family selector. Themes change accent colors and surface tones; layout stays the same.</p>
