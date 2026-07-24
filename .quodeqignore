@@ -1,0 +1,11 @@
+# Repo-local exclusions for quodeq's own self-evaluation.
+# One glob per line, relative to the repo root. Naming a directory
+# excludes everything under it. See src/quodeq/analysis/_ignore.py.
+
+# Accuracy benchmark harness: dev/release tooling, not the product.
+# The planted-bug corpus under benchmarks/.corpus/ is already skipped
+# (dot-directory), but the harness source (quodeq_bench/, baselines/,
+# precedent_golden.py) is normal code that would otherwise be scanned
+# into quodeq's self-eval and clutter the map. It's scaffolding, so we
+# keep it out of the self-evaluation on purpose.
+benchmarks/
