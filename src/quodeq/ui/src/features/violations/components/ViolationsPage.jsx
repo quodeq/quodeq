@@ -98,7 +98,7 @@ function FileSubTab({ dimensions, onFileClick, currentPath, setCurrentPath }) {
   );
 }
 
-function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, initialSubTab, initialFilePath, dismissRefreshKey, selectedSource }) {
+function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, onReconcile, initialSubTab, initialFilePath, dismissRefreshKey, selectedSource }) {
   const [activeSubTab, _setActiveSubTab] = useState(initialSubTab);
   const setActiveSubTab = (v) => {
     writeCachedState('violations', selectedProject, { activeSubTab: v });
@@ -116,7 +116,7 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, 
   // sub-tab reflects new entries without needing the user to re-open the
   // page or switch projects.
   const { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll } =
-    useDismissedFindings(selectedProject, onRefresh, setRestoreError, dismissRefreshKey, selectedSource);
+    useDismissedFindings(selectedProject, onRefresh, setRestoreError, dismissRefreshKey, selectedSource, onReconcile);
 
   const visibleDimensions = useMemo(() => {
     const visibleSet = new Set(readVisibleStandardIds());
@@ -194,7 +194,7 @@ export function ViolationsSubTabContent(props) {
 export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
   const { accumulatedDimensions = [], selectedProject, dismissRefreshKey = 0, selectedSource = 'local' } = data;
   const { projects = [], projectsLoaded, projectName, loading, isFetching } = data;
-  const { onNavigate, onRefresh } = callbacks;
+  const { onNavigate, onRefresh, onReconcile } = callbacks;
 
   // Fresh tab click (tabKey changed) drops the cached navigation state so
   // the user lands at the default sub-tab / root path. Round-tripping
@@ -211,6 +211,12 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
     fileCurrentPath: '',
   });
 
+  // Fires on every mount, including plain drill-down/back navigation with no
+  // mutation involved (the page remounts on every round trip) -- onRefresh
+  // MUST stay the lazy refreshDashboard (mark-stale only). Do not wire this
+  // to an active-refetching callback (e.g. scheduleDashboardReconcile); that
+  // turns routine navigation into a forced re-download of the dashboard
+  // payload. See App.jsx's ViolationsRoute for the onRefresh/onReconcile split.
   useEffect(() => {
     onRefresh?.();
   }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -225,6 +231,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
     accumulatedDimensions,
     selectedProject,
     onRefresh,
+    onReconcile,
     initialSubTab: cached.activeSubTab,
     initialFilePath: cached.fileCurrentPath,
     dismissRefreshKey,

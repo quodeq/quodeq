@@ -13,7 +13,10 @@ import { confirmDialog } from '../../../utils/confirmDialog.js';
 
 /**
  * @param {string} selectedProject
- * @param {Function} [onRefresh]
+ * @param {Function} [onRefresh] - Called by every mutation handler below on
+ *   success. This is the lazy refreshDashboard (mark-stale, refetchType:
+ *   'none') threaded from App.jsx via ViolationsPage -- NOT the ACTIVE
+ *   reconcile; see `onReconcile` for that.
  * @param {Function} [setRestoreError]
  * @param {number} [refreshKey=0]
  * @param {'local'|'shared'} [selectedSource='local'] - Shared projects have no
@@ -24,8 +27,16 @@ import { confirmDialog } from '../../../utils/confirmDialog.js';
  *   handlers to the dismissed sub-tab, but this guard protects against a
  *   handler slipping through some other path and corrupting the local cache
  *   with shared-derived deltas (the local id can collide with a shared id).
+ * @param {Function} [onReconcile] - The debounced ACTIVE
+ *   scheduleDashboardReconcile (see useDashboard.js). Called IN ADDITION to
+ *   onRefresh by every mutation handler below, never in place of it.
+ *   restore-all/delete-all return a payload applyMutationDelta's gates can't
+ *   patch (scores:null, delta.isLatest:false), so onRefresh's lazy mark-stale
+ *   alone would leave the always-mounted Overview observer showing stale
+ *   data indefinitely; onReconcile actively refetches it after a short
+ *   debounce window.
  */
-export function useDismissedFindings(selectedProject, onRefresh, setRestoreError, refreshKey = 0, selectedSource = 'local') {
+export function useDismissedFindings(selectedProject, onRefresh, setRestoreError, refreshKey = 0, selectedSource = 'local', onReconcile) {
   const [dismissed, setDismissed] = useState([]);
   const queryClient = useQueryClient();
   const isShared = selectedSource === 'shared';
@@ -33,7 +44,7 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
   // Fold the mutation-delta from a restore/delete response into the React Query
   // caches so dimension scores/grades update instantly and the run-detail
   // violation lists get invalidated for a lazy refetch. Additive — the local
-  // setDismissed splices and onRefresh below still run.
+  // setDismissed splices and the onRefresh/onReconcile calls below still run.
   const applyDelta = useCallback((result) => {
     const delta = result?.delta;
     if (!delta) return;
@@ -60,11 +71,12 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       applyDelta(result);
       setDismissed((prev) => prev.filter((item) => !(item.req === d.req && item.file === d.file && item.line === d.line)));
       onRefresh?.();
+      onReconcile?.();
     } catch (err) {
       console.error('Failed to restore finding:', err);
       setRestoreError?.('Failed to restore finding. Please try again.');
     }
-  }, [selectedProject, onRefresh, setRestoreError, applyDelta, isShared]);
+  }, [selectedProject, onRefresh, onReconcile, setRestoreError, applyDelta, isShared]);
 
   const handleRestoreAll = useCallback(async () => {
     if (isShared) return;
@@ -73,11 +85,12 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       applyDelta(result);
       setDismissed([]);
       onRefresh?.();
+      onReconcile?.();
     } catch (err) {
       console.error('Failed to restore all findings:', err);
       setRestoreError?.('Failed to restore all findings. Please try again.');
     }
-  }, [selectedProject, onRefresh, setRestoreError, applyDelta, isShared]);
+  }, [selectedProject, onRefresh, onReconcile, setRestoreError, applyDelta, isShared]);
 
   const handleDelete = useCallback(async (d) => {
     if (isShared) return;
@@ -96,11 +109,12 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
         && item.file === d.file
       )));
       onRefresh?.();
+      onReconcile?.();
     } catch (err) {
       console.error('Failed to delete finding:', err);
       setRestoreError?.('Failed to delete finding. Please try again.');
     }
-  }, [selectedProject, onRefresh, setRestoreError, applyDelta, isShared]);
+  }, [selectedProject, onRefresh, onReconcile, setRestoreError, applyDelta, isShared]);
 
   const handleDeleteAll = useCallback(async () => {
     if (isShared) return;
@@ -118,11 +132,12 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       applyDelta(result);
       setDismissed([]);
       onRefresh?.();
+      onReconcile?.();
     } catch (err) {
       console.error('Failed to delete all findings:', err);
       setRestoreError?.('Failed to delete all findings. Please try again.');
     }
-  }, [selectedProject, onRefresh, setRestoreError, dismissed.length, applyDelta, isShared]);
+  }, [selectedProject, onRefresh, onReconcile, setRestoreError, dismissed.length, applyDelta, isShared]);
 
   return { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll };
 }

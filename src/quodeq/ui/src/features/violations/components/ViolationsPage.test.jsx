@@ -134,6 +134,28 @@ describe('ViolationsPage — teammate persona: shared selection + zero local pro
   });
 });
 
+// Item 1 regression: ViolationsPage fires its mount effect (onRefresh) on
+// EVERY mount, including plain drill-down/back navigation with no mutation
+// -- the page remounts on every round trip through a file/principle detail.
+// A prior revision wired the route's onRefresh to the ACTIVE
+// scheduleDashboardReconcile, turning routine navigation into a forced
+// refetch of the 10-20 MB dashboard payload (the freeze refetchType:'none'
+// exists to avoid). The mount effect must only ever reach onRefresh -- never
+// onReconcile, which is reserved for the Dismissed sub-tab's mutation
+// handlers (see useDismissedFindings.js).
+describe('ViolationsPage — mount-effect onRefresh does not reach onReconcile (Item 1 regression)', () => {
+  it('calls onRefresh on mount but never onReconcile, even though both are supplied', () => {
+    const onRefresh = vi.fn();
+    const onReconcile = vi.fn();
+    renderPage(
+      baseData({ selectedSource: 'local', selectedProject: 'p1', projects: [{ id: 'p1', name: 'p1' }] }),
+      { onRefresh, onReconcile },
+    );
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onReconcile).not.toHaveBeenCalled();
+  });
+});
+
 describe('ViolationsPage — shared read-only chip (Finding 6)', () => {
   it('shows the chip for a shared project with data', () => {
     renderPage(baseData({

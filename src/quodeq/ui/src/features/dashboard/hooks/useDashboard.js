@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { useProjectScores } from "../../../hooks/useProjectScores.js";
@@ -129,6 +129,43 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     });
   }, [queryClient, selectedProject, selectedSource]);
 
+  // Debounced counterpart to refreshDashboardActive, for the high-frequency
+  // suppression mutations (dismiss/restore/delete). refreshDashboard's
+  // refetchType:'none' leaves the Overview's always-mounted observer showing
+  // stale data until the user switches projects and back -- fine for a single
+  // dismiss (the mutation response already patched the visible page's local
+  // scores via applyMutationDelta), but restore-all/delete-all return a
+  // payload the delta gates can't apply (scores:null, delta.isLatest:false),
+  // so the Overview stays wrong indefinitely. The pywebview desktop window
+  // also never fires the focus-refetch a browser tab would get on refocus,
+  // so there's no other path back to fresh data short of an app switch.
+  // Debounce coalesces rapid multi-dismiss/restore bursts into one refetch of
+  // the (potentially 10-20 MB) dashboard payload instead of one per action.
+  const reconcileTimer = useRef(null);
+  const scheduleDashboardReconcile = useCallback(() => {
+    if (!selectedProject) return;
+    // Mark-stale NOW, synchronously, before the timer is (re)armed. The
+    // timer is a single shared ref: a rapid project switch clears it before
+    // the 1200ms elapses, dropping the ACTIVE refetch below. Without this,
+    // a dropped reconcile would leave the cache silently fresh-and-wrong
+    // (no invalidation happened at all); with it, a dropped reconcile
+    // degrades to exactly refreshDashboard's mark-stale-only semantics, so
+    // a remount or Overview-return still self-heals.
+    queryClient.invalidateQueries({
+      queryKey: projectKeys.project(selectedProject, selectedSource),
+      refetchType: 'none',
+    });
+    if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
+    reconcileTimer.current = setTimeout(() => {
+      reconcileTimer.current = null;
+      if (!selectedProject) return;
+      queryClient.invalidateQueries({
+        queryKey: projectKeys.project(selectedProject, selectedSource),
+      });
+    }, 1200);
+  }, [queryClient, selectedProject, selectedSource]);
+  useEffect(() => () => clearTimeout(reconcileTimer.current), []);
+
   return {
     dashboard: dashboardWithTrend,
     accumulated: scores?.accumulated || null,
@@ -145,6 +182,7 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     availableRuns,
     refreshDashboard,
     refreshDashboardActive,
+    scheduleDashboardReconcile,
     sharedProjectInfo: sharedProjectInfoQuery.data || null,
   };
 }
