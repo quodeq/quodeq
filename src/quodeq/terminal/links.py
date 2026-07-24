@@ -126,14 +126,20 @@ def safe_editor_path(
     untrusted input (a symlink escaping a base resolves out via realpath and is
     rejected).
     """
+    # A NUL byte can never appear in a real path. Reject it up front: POSIX
+    # realpath raises ValueError on it, but Windows realpath returns it intact,
+    # so an explicit guard is what makes the behavior consistent and keeps the
+    # NUL out of the editor launch on every platform.
+    if "\x00" in path:
+        return None
     try:
         real = realpath(path)
-    except OSError:
+    except (OSError, ValueError):
         return None
     for base in bases:
         try:
             base_real = realpath(base)
-        except OSError:
+        except (OSError, ValueError):
             continue
         try:
             if commonpath([real, base_real]) == base_real:

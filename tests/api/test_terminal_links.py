@@ -118,6 +118,14 @@ def test_safe_editor_path_checks_multiple_bases():
     assert got == "/second/a.py"
 
 
+def test_safe_editor_path_null_byte_returns_none():
+    # A NUL byte must never reach the editor launch. POSIX realpath raises
+    # ValueError on it (previously an uncaught 500), while Windows realpath
+    # returns it intact under the base; both must resolve to None. Uses the
+    # real os.path.realpath so the platform behavior is exercised.
+    assert safe_editor_path("/home/u/a\x00.py", ["/home/u"]) is None
+
+
 # --- detect_editor ----------------------------------------------------------
 
 def test_detect_editor_prefers_code_on_path():
