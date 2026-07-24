@@ -54,16 +54,7 @@ def score_dimension_from_evidence(
     # dim_id is used to build a filesystem path and can carry request-supplied
     # values; reject separators/traversal before touching the filesystem.
     validate_path_segment(dim_id)
-    # Confine the resolved evidence path within run_dir/evidence before any
-    # filesystem access. The inline resolve()+is_relative_to() guard is the
-    # recognized path-injection barrier (same shape as api._project_dir) and
-    # covers taint reaching the path from dim_id or run_dir.
-    evidence_dir = (run_dir / "evidence").resolve()
-    jsonl = (evidence_dir / f"{dim_id}_evidence.jsonl").resolve()
-    if not jsonl.is_relative_to(evidence_dir):
-        _logger.debug(
-            "Evidence path escapes run dir for %s/%s", run_dir.name, dim_id)
-        return None
+    jsonl = run_dir / "evidence" / f"{dim_id}_evidence.jsonl"
     if not jsonl.is_file() or jsonl.stat().st_size == 0:
         return None
     try:
