@@ -11,6 +11,8 @@ name: Snyk
 
 on:
   workflow_dispatch:
+  release:
+    types: [published]
   schedule:
     # Weekly sweep catches newly disclosed CVEs against unchanged deps.
     - cron: '30 6 * * 1'
