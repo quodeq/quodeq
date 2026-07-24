@@ -3,12 +3,17 @@
  * Seeded with the backend Q2 defaults; App.jsx overwrites them at boot from
  * GET /api/grade-formula so every surface agrees with the server formula.
  */
-const DEFAULT_THRESHOLDS = [
-  [9, 'Exemplary'], [7, 'Good'], [5, 'Adequate'], [3, 'Poor'],
-];
+const DEFAULT_THRESHOLDS = Object.freeze([
+  Object.freeze([9, 'Exemplary']),
+  Object.freeze([7, 'Good']),
+  Object.freeze([5, 'Adequate']),
+  Object.freeze([3, 'Poor']),
+]);
 
 let thresholds = DEFAULT_THRESHOLDS;
 
+// Returns the shared threshold table by reference. It is frozen so callers
+// (all read-only today) cannot mutate app-wide grading through the reference.
 export function getGradeThresholds() {
   return thresholds;
 }
@@ -17,8 +22,8 @@ export function setGradeThresholds(next) {
   if (!Array.isArray(next) || next.length === 0) return;
   const clean = next
     .filter((e) => Array.isArray(e) && typeof e[0] === 'number' && typeof e[1] === 'string')
-    .map((e) => [e[0], e[1]]);
-  if (clean.length === next.length && clean.length > 0) thresholds = clean;
+    .map((e) => Object.freeze([e[0], e[1]]));
+  if (clean.length === next.length && clean.length > 0) thresholds = Object.freeze(clean);
 }
 
 export function resetGradeThresholds() {
