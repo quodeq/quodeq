@@ -26,6 +26,22 @@ def _texts_from_blocks(blocks) -> list[str]:
     return out
 
 
+def partial_text(event: dict) -> str | None:
+    """Incremental text from a `stream_event` wrapper (claude/gemini
+    --include-partial-messages): the Anthropic SSE `content_block_delta`
+    carrying a `text_delta`. Thinking/tool-input deltas are not display text."""
+    if event.get("type") != "stream_event":
+        return None
+    inner = event.get("event")
+    if not isinstance(inner, dict) or inner.get("type") != "content_block_delta":
+        return None
+    delta = inner.get("delta")
+    if not isinstance(delta, dict) or delta.get("type") != "text_delta":
+        return None
+    text = delta.get("text")
+    return text if isinstance(text, str) else None
+
+
 def assistant_text(event: dict) -> list[str]:
     etype = event.get("type")
     if etype == "assistant":

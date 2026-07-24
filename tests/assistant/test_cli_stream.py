@@ -1,6 +1,6 @@
 from quodeq.assistant.adapters import _stream
 from quodeq.assistant.adapters._stream import (
-    assistant_text, parse_line, session_id, tool_uses,
+    assistant_text, parse_line, partial_text, session_id, tool_uses,
 )
 
 
@@ -107,6 +107,47 @@ def test_codex_tool_item_not_double_counted_on_completed():
         "type": "mcp_tool_call", "tool": "get_context", "arguments": {},
         "status": "completed"}}
     assert _stream.tool_use_details(mcp_completed) == []
+
+
+def test_partial_text_extracts_text_delta():
+    # Real claude shape with --include-partial-messages: stream_event wrapping
+    # the Anthropic SSE content_block_delta.
+    ev = {"type": "stream_event", "event": {
+        "type": "content_block_delta", "index": 0,
+        "delta": {"type": "text_delta", "text": "hel"}}}
+    assert partial_text(ev) == "hel"
+
+
+def test_partial_text_ignores_non_text_deltas():
+    for delta in ({"type": "thinking_delta", "thinking": "hmm"},
+                  {"type": "input_json_delta", "partial_json": '{"q'}):
+        ev = {"type": "stream_event", "event": {
+            "type": "content_block_delta", "index": 0, "delta": delta}}
+        assert partial_text(ev) is None
+
+
+def test_partial_text_ignores_other_stream_events():
+    for inner in ({"type": "message_start"},
+                  {"type": "content_block_start", "content_block": {"type": "text", "text": ""}},
+                  {"type": "content_block_stop"},
+                  {"type": "message_stop"}):
+        assert partial_text({"type": "stream_event", "event": inner}) is None
+
+
+def test_partial_text_ignores_non_stream_events_and_malformed():
+    assert partial_text({"type": "assistant", "message": {"content": []}}) is None
+    assert partial_text({"type": "stream_event"}) is None
+    assert partial_text({"type": "stream_event", "event": None}) is None
+    assert partial_text({"type": "stream_event", "event": {
+        "type": "content_block_delta", "delta": {"type": "text_delta", "text": 3}}}) is None
+
+
+def test_stream_event_is_not_assistant_text_or_tool_use():
+    ev = {"type": "stream_event", "event": {
+        "type": "content_block_delta", "index": 0,
+        "delta": {"type": "text_delta", "text": "hi"}}}
+    assert assistant_text(ev) == []
+    assert tool_uses(ev) == []
 
 
 def test_codex_agent_message_completed_is_not_a_tool_call():
