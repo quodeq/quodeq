@@ -119,7 +119,9 @@ class WorktreeManager:
         return self.path.is_dir() and (self.path / ".git").exists()
 
     def create(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        # ``git worktree add`` creates the target path (and any missing
+        # parents) as part of its own operation. Keep directory allocation in
+        # that authoritative, atomic worktree lifecycle.
         _run(["git", "-C", str(self.repo_root), "worktree", "prune"])
         if self.path.exists() and not self.exists():
             # stale leftover directory (crash, stray files); a live worktree has .git
