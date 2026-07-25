@@ -21,8 +21,12 @@ export default function CountdownTimer({ deadlineAt, budgetSeconds, phase }) {
   }, [deadlineAt]);
 
   if (TERMINAL_PHASES.has(phase)) return null;
+  // Unlimited means there is nothing to count. A run can still carry a
+  // deadline while the configured limit is Unlimited (it was started under a
+  // limit, or it is a CLI run the Evaluate tab adopted), and counting that
+  // stale deadline down reads as "my unlimited run is about to be cut off".
   const unlimited = !budgetSeconds || budgetSeconds <= 0;
-  if (unlimited && !deadlineAt) return null;
+  if (unlimited) return null;
 
   if (!deadlineAt) {
     return (
