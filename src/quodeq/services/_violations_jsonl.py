@@ -7,10 +7,13 @@ from pathlib import Path
 from typing import Iterable
 
 from quodeq.core.types import Finding, ViolationResponse
+from quodeq.core.evidence._req_mapping import PrincipleResolver, build_principle_resolver
 from quodeq.core.evidence.parser import build_req_refs_lookup
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.services.violation_context import ViolationContext
 from quodeq.services.suppression import SuppressionMatcher, load_req_to_principle
+from quodeq.config.paths import default_paths
+from quodeq.shared.validation import validate_path_segment
 from quodeq.services.violations_parsing import (
     _build_finding_entry,
     _build_violation_response,
@@ -26,11 +29,17 @@ _logger = logging.getLogger(__name__)
 
 def _parse_jsonl_findings(
     lines: Iterable[str], dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None,
-    req_to_principle: dict[str, str] | None = None,
+    resolver: PrincipleResolver | None = None,
     dismissed_keys: "set[tuple] | None" = None,
     deleted_keys: "set[tuple] | None" = None,
 ) -> tuple[list[Finding], list[Finding]]:
-    """Parse raw JSONL lines into deduplicated violation and compliance lists."""
+    """Parse raw JSONL lines into deduplicated violation and compliance lists.
+
+    Two exclusions keep this live view from showing more findings than the
+    persisted evaluation: rows the dashboard suppresses (dismissed/deleted), and
+    rows whose principle is not in the dimension's standard, which the report
+    path quarantines in ``_group_judgments``.
+    """
     violations: list[Finding] = []
     compliance: list[Finding] = []
     seen: set[tuple] = set()
@@ -40,7 +49,9 @@ def _parse_jsonl_findings(
         dimension=dimension,
         dismissed=frozenset(dismissed_keys or ()),
         deleted=frozenset(deleted_keys or ()),
-        req_to_principle=req_to_principle or {},
+        # Same table the quarantine check uses, so the delete key and the
+        # scored report can never map a req ID to different principles.
+        req_to_principle=resolver.req_to_principle if resolver else {},
     )
     for raw_line in lines:
         raw = raw_line.strip()
@@ -57,7 +68,14 @@ def _parse_jsonl_findings(
             continue
         if matcher.is_suppressed(obj):
             continue
-        obj["p"] = matcher.principle_for(principle)
+        if resolver is None:
+            obj["p"] = matcher.principle_for(principle)
+        else:
+            # Unmappable: the report quarantines it, so this view must not show it.
+            resolved = resolver.resolve(principle)
+            if resolved is None:
+                continue
+            obj["p"] = resolved
         dedup_key = (principle, obj.get("t"), obj.get("file"), obj.get("line"))
         if dedup_key in seen:
             continue
@@ -76,6 +94,21 @@ def _parse_jsonl_findings(
 _load_req_to_principle = load_req_to_principle
 
 
+def _build_resolver(dimension: str, compiled_dir: Path | None) -> PrincipleResolver:
+    """Resolve *dimension*'s principle set the same way the report path does.
+
+    Routes through the shared builder in ``core.evidence._req_mapping`` rather
+    than reading evaluators here, so this path inherits the compiled-standard
+    fallback. Without it the map is empty on a stock install (the evaluators
+    dir exists but is empty for built-in dimensions) and every requirement ID
+    would look unmappable.
+    """
+    validate_path_segment(dimension)  # dimension reaches a path join downstream
+    return build_principle_resolver(
+        dimension, default_paths().evaluators_dir, compiled_dir,
+    )
+
+
 def parse_violations_from_jsonl(
     jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext,
     compiled_dir: Path | None = None,
@@ -84,11 +117,11 @@ def parse_violations_from_jsonl(
 ) -> ViolationResponse | None:
     """Parse live JSONL findings written by the MCP server."""
     req_refs_lookup = build_req_refs_lookup(compiled_dir, ctx.dimension) if compiled_dir else None
-    req_to_principle = load_req_to_principle(ctx.dimension)
+    resolver = _build_resolver(ctx.dimension, compiled_dir)
     try:
         with open_text(jsonl_path) as _f:
             violations, compliance = _parse_jsonl_findings(
-                _f, ctx.dimension, req_refs_lookup, req_to_principle,
+                _f, ctx.dimension, req_refs_lookup, resolver,
                 dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
             )
     except OSError as exc:

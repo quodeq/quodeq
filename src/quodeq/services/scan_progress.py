@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.analysis.subagents.jsonl_utils import tally_unique_findings
+from quodeq.config.paths import default_paths
+from quodeq.core.evidence._req_mapping import build_principle_resolver
 from quodeq.services.suppression import build_matcher, project_suppressions
 from quodeq.shared.dim_estimates_io import read_dim_estimates
 from quodeq.shared.dimensions_state import read_dimensions
@@ -37,6 +39,7 @@ class _DimProgress:
     compliance: int = 0
     duplicates: int = 0
     suppressed: int = 0  # re-found findings already dismissed/deleted in the dashboard
+    quarantined: int = 0  # findings whose principle is not in the dimension's standard
     elapsed_s: float | None = None
     budget_s: int | None = None
     active_agents: int = 0
@@ -172,11 +175,18 @@ def build_scan_progress(
     run_dir: Path,
     *,
     time_limit_s: int | None = None,
+    compiled_dir: Path | None = None,
 ) -> _ScanProgress | None:
     """Compute progress for a run.
 
     Reads only on-disk state — works for internal and external runs uniformly.
     Returns None if the run dir is missing or has no status.json.
+
+    *compiled_dir* supplies the built-in standards used to exclude findings the
+    report path quarantines, so the live counters match the persisted run report.
+    Without it only custom evaluators are consulted, which on a stock install is
+    an empty directory — the counters then stay permissive and can over-count by
+    the number of unmappable findings.
     """
     if not run_dir.is_dir():
         return None
@@ -220,6 +230,7 @@ def build_scan_progress(
             recovered.setdefault(key, None)
         dim_ids = list(recovered)
     evidence_dir = run_dir / "evidence"
+    evaluators_dir = default_paths().evaluators_dir
     # The scanner re-finds everything the user has dismissed or deleted, so a
     # raw evidence tally can run several times the number the finished report
     # shows. Read the suppression stores once per tick and net them out here,
@@ -272,6 +283,7 @@ def build_scan_progress(
         tally = tally_unique_findings(
             evidence_dir / f"{dim_id}_evidence.jsonl",
             suppressed=matcher.is_suppressed if matcher.active else None,
+            resolver=build_principle_resolver(dim_id, evaluators_dir, compiled_dir),
         )
         elapsed = _dim_elapsed_s(dim_id, run_dir, d_state)
         budget = time_limit_s if (d_state == "running" and time_limit_s and time_limit_s > 0) else None
@@ -285,6 +297,7 @@ def build_scan_progress(
             compliance=tally.compliance,
             duplicates=tally.duplicates,
             suppressed=tally.suppressed,
+            quarantined=tally.quarantined,
             elapsed_s=elapsed,
             budget_s=budget,
             active_agents=active,
