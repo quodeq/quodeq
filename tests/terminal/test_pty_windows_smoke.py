@@ -3,6 +3,8 @@ import time
 
 import pytest
 
+from tests._timeouts import budget
+
 pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="Windows ConPTY only")
 
 
@@ -14,7 +16,7 @@ def test_windows_pty_spawns_and_echoes():
     assert pty.alive
     pty.write(b"echo hello-conpty\r\n")  # write() takes bytes (matches the Unix backend contract)
     buf = ""
-    deadline = time.monotonic() + 8
+    deadline = time.monotonic() + budget(8)
     while time.monotonic() < deadline:
         chunk = pty.read(4096).decode("utf-8", "replace")
         buf += chunk

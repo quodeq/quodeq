@@ -29,6 +29,8 @@ from pathlib import Path
 
 import pytest
 
+from tests._timeouts import budget
+
 # Subprocess waits up to 120 s inside these tests; give pytest-timeout
 # enough room above that to avoid double-killing a still-cleaning-up
 # process.
@@ -108,7 +110,8 @@ def test_sigterm_writes_cancelled_status(tmp_path: Path) -> None:
     # dry-run, so once it exists the child is guaranteed to be inside the
     # lifecycle context with signal handlers installed and the run_dir
     # (including status.json) already on disk.
-    deadline = time.monotonic() + 60
+    marker_s = budget(60)
+    deadline = time.monotonic() + marker_s
     while not marker.exists():
         if proc.poll() is not None:
             _out, err = proc.communicate()
@@ -116,7 +119,7 @@ def test_sigterm_writes_cancelled_status(tmp_path: Path) -> None:
         if time.monotonic() > deadline:
             proc.kill()
             proc.wait()
-            pytest.fail("CLI did not reach the dry-run pause within 60 s")
+            pytest.fail(f"CLI did not reach the dry-run pause within {marker_s:g} s")
         time.sleep(0.05)
 
     projects = [d for d in reports.iterdir() if d.is_dir()]
@@ -129,11 +132,12 @@ def test_sigterm_writes_cancelled_status(tmp_path: Path) -> None:
 
     # Send SIGTERM and wait for process to exit.
     proc.send_signal(signal.SIGTERM)
+    exit_s = budget(30)
     try:
-        proc.wait(timeout=30)
+        proc.wait(timeout=exit_s)
     except subprocess.TimeoutExpired:
         proc.kill()
-        pytest.fail("CLI did not exit after SIGTERM within 30 s")
+        pytest.fail(f"CLI did not exit after SIGTERM within {exit_s:g} s")
 
     # Poll for the terminal state to be written.
     status = None

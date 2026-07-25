@@ -12,6 +12,7 @@ from quodeq.analysis.subagents._heartbeat import (
     heartbeat_loop,
 )
 from quodeq.analysis.subagents.jsonl_utils import FindingTally
+from tests._timeouts import budget
 
 
 def _violation(p: str, file: str, line: int) -> str:
@@ -160,9 +161,9 @@ class TestHeartbeatLoop:
         )
         thread.start()
         # Wait briefly for at least one tick, then stop.
-        thread.join(timeout=0.2)
+        thread.join(timeout=budget(0.2))
         stop.set()
-        thread.join(timeout=1.0)
+        thread.join(timeout=budget(1.0))
 
         assert emitted, "heartbeat should emit at least one log line"
         assert "[security]" in emitted[0]

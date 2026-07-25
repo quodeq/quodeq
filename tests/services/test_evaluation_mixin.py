@@ -23,6 +23,7 @@ from quodeq.services.evaluation_mixin import (
     _score_completed_evidence,
     _wait_for_terminal_status,
 )
+from tests._timeouts import budget
 
 
 # ---------------------------------------------------------------------------
@@ -389,7 +390,7 @@ class TestWaitForTerminalStatus:
 
         threading.Thread(target=write_terminal, daemon=True).start()
         assert _wait_for_terminal_status(
-            run_dir, timeout_s=1.0, poll_interval_s=0.02,
+            run_dir, timeout_s=budget(1.0), poll_interval_s=0.02,
         ) is True
 
 

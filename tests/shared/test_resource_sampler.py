@@ -20,6 +20,7 @@ from quodeq.shared.resource_sampler import (
     _ollama_rss_mb,
     _self_rss_mb,
 )
+from tests._timeouts import budget
 
 
 class TestSnapshotFormat:
@@ -62,7 +63,7 @@ class TestStartStop:
         sampler.start()
         thread = sampler._thread
         time.sleep(0.1)  # let it tick at least once
-        sampler.stop(timeout=1.0)
+        sampler.stop(timeout=budget(1.0))
         assert thread is not None
         assert not thread.is_alive()
 

@@ -6,6 +6,7 @@ from flask import Flask
 
 from quodeq.api.assistant_routes import register_assistant_routes
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
+from tests._timeouts import budget
 
 _VALID_STANDARD = {
     "id": "api-errors", "name": "API Error Contract", "description": "d",
@@ -451,7 +452,7 @@ def test_apply_unknown_action_404(client):
 
 
 def _wait_for(seen, key, timeout=2.0):
-    deadline = time.time() + timeout
+    deadline = time.time() + budget(timeout)
     while key not in seen and time.time() < deadline:
         time.sleep(0.01)
     return seen.get(key)
@@ -653,7 +654,7 @@ def test_message_passes_write_enabled(client, app, monkeypatch):
                       json={"provider": "ollama"}).get_json()["sessionId"]
     client.post(f"/api/assistant/sessions/{sid}/messages",
                 json={"text": "hi", "writeEnabled": True})
-    assert done.wait(timeout=2)  # run_turn runs on a daemon thread
+    assert done.wait(timeout=budget(2))  # run_turn runs on a daemon thread
     assert seen.get("write_enabled") is True
 
 
@@ -688,7 +689,7 @@ def test_stop_cancels_running_turn_and_frees_the_token(client, monkeypatch):
 
     def fake_run_turn(request, *, repository, tool_ctx, cancel, **kw):
         started.set()
-        assert cancel.wait(timeout=5)  # blocks until the stop route cancels
+        assert cancel.wait(timeout=budget(5))  # blocks until the stop route cancels
         finished.set()
 
     monkeypatch.setattr("quodeq.api.assistant_routes.run_turn", fake_run_turn)
@@ -696,22 +697,23 @@ def test_stop_cancels_running_turn_and_frees_the_token(client, monkeypatch):
                       json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
     assert client.post(f"/api/assistant/sessions/{sid}/messages",
                        json={"text": "hi"}).status_code == 202
-    assert started.wait(timeout=5)
+    assert started.wait(timeout=budget(5))
 
     resp = client.post(f"/api/assistant/sessions/{sid}/stop")
     assert resp.status_code == 202
     assert resp.get_json() == {"stopping": True}
-    assert finished.wait(timeout=5)
+    assert finished.wait(timeout=budget(5))
 
     # once the worker unwinds, the token is gone: a second stop has nothing to
     # cancel, and a new message can claim the turn slot again
-    deadline = time.time() + 5
+    deadline = time.time() + budget(5)
     while time.time() < deadline:
         if client.post(f"/api/assistant/sessions/{sid}/stop").status_code == 409:
             break
         time.sleep(0.01)
     else:
         pytest.fail("cancel token not cleaned up after the turn ended")
+
     assert client.post(f"/api/assistant/sessions/{sid}/messages",
                        json={"text": "again"}).status_code == 202
 

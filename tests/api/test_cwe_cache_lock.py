@@ -7,6 +7,7 @@ import time as _time
 import pytest
 
 import quodeq.api.standards_read_routes as _mod
+from tests._timeouts import budget
 
 
 @pytest.fixture(autouse=True)
@@ -36,7 +37,7 @@ def test_concurrent_expiry_reloads_exactly_once():
     def _loader():
         nonlocal call_count
         load_started.set()        # signal that loading has begun
-        slow_start.wait(timeout=5)  # wait for test harness to let it proceed
+        slow_start.wait(timeout=budget(5))  # wait for test harness to let it proceed
         call_count += 1
         return [{"id": "CWE-79", "name": "XSS"}]
 
@@ -51,7 +52,7 @@ def test_concurrent_expiry_reloads_exactly_once():
 
     def _thread():
         try:
-            start_gate.wait(timeout=5)  # all three release together
+            start_gate.wait(timeout=budget(5))  # all three release together
             result = _mod._reload_cwe_if_needed(_loader)
             results.append(result)
         except Exception as exc:
@@ -63,12 +64,12 @@ def test_concurrent_expiry_reloads_exactly_once():
     t2.start()
 
     # Release all three (main + 2 workers) simultaneously.
-    start_gate.wait(timeout=5)
+    start_gate.wait(timeout=budget(5))
     # Let the loader proceed after threads are racing.
     slow_start.set()
 
-    t1.join(timeout=10)
-    t2.join(timeout=10)
+    t1.join(timeout=budget(10))
+    t2.join(timeout=budget(10))
 
     assert not errors, f"Thread errors: {errors}"
     assert call_count == 1, f"Expected exactly 1 reload, got {call_count}"

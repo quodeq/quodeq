@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.shared.run_heartbeat import HeartbeatThread, HEARTBEAT_FILENAME
+from tests._timeouts import budget
 
 
 def test_starts_and_touches_file(tmp_path: Path) -> None:
@@ -20,7 +21,7 @@ def test_starts_and_touches_file(tmp_path: Path) -> None:
         # window, leaving both reads on the same mtime (a false failure). This
         # mirrors the deadline-poll pattern in test_swallows_oserror below.
         second_mtime = first_mtime
-        deadline = time.monotonic() + 5.0
+        deadline = time.monotonic() + budget(5.0)
         while time.monotonic() < deadline:
             second_mtime = (tmp_path / HEARTBEAT_FILENAME).stat().st_mtime
             if second_mtime > first_mtime:
@@ -57,7 +58,7 @@ def test_swallows_oserror(tmp_path: Path, monkeypatch) -> None:
     # Poll instead of sleeping a fixed window — a loaded CI runner can
     # tick the heartbeat much slower than 20 ms, so a 200 ms sleep is
     # not enough headroom to guarantee >=3 touches.
-    deadline = time.monotonic() + 5.0
+    deadline = time.monotonic() + budget(5.0)
     while len(errors) < 3 and time.monotonic() < deadline:
         time.sleep(0.05)
     hb.stop()

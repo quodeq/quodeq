@@ -62,6 +62,14 @@ jobs:
         # across cores cuts wall time roughly linearly (~12 min -> a few).
         # Verbose + -ra so per-test names and the FAILED summary survive
         # GitHub's log truncation, keeping this blocking gate easy to triage.
+        #
+        # QUODEQ_TEST_TIMEOUT_SCALE (tests/_timeouts.py): -n auto puts four
+        # workers on a 4-vCPU runner, so the box is saturated and a thread can
+        # miss a 5s window purely by not being scheduled. Multiply every
+        # budget() wait here rather than hand-tuning ~45 call sites for the
+        # slowest runner and slowing local runs down with them.
+        env:
+          QUODEQ_TEST_TIMEOUT_SCALE: "4"
         run: uv run pytest tests/ -v -ra --tb=short -m "not integration" -n auto
 
   ui:

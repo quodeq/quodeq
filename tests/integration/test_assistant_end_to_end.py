@@ -17,6 +17,7 @@ from flask import Flask
 
 from quodeq.api.assistant_routes import register_assistant_routes
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
+from tests._timeouts import budget
 
 _STANDARD = {
     "id": "rfc7807-errors", "name": "RFC7807 Errors", "description": "d",
@@ -105,7 +106,7 @@ def test_full_draft_and_apply_flow(client, app, tmp_path):
     # is consumed only once and repeated GETs against a live generator
     # interact poorly with the Flask test client under a polling loop.
     repo = AssistantRepository(app.config["ASSISTANT_DB_PATH"])
-    deadline = time.time() + 5
+    deadline = time.time() + budget(5)
     events: list[dict] = []
     while time.time() < deadline:
         events = [frame for _seq, frame in repo.events_after(sid, 0)]

@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+from tests._timeouts import budget
+
 
 def _make_jsonrpc(method: str, params: dict, msg_id: int) -> bytes:
     """Frame a JSON-RPC 2.0 request for the findings_server stdio protocol."""
@@ -92,7 +94,7 @@ def test_findings_server_writes_cache_via_mcp(tmp_path):
     finally:
         proc.stdin.close()
         proc.terminate()
-        proc.wait(timeout=5)
+        proc.wait(timeout=budget(5))
 
 
 def test_findings_server_raises_when_dimension_set_without_cache_args(tmp_path):

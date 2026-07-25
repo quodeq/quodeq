@@ -3,6 +3,7 @@ import sys
 import threading
 
 from quodeq.dashboard._webview_window import _NAVIGATE_HELP_JS, _non_macos_menu
+from tests._timeouts import budget
 
 
 class _FakeWindow:
@@ -40,7 +41,7 @@ def test_action_dispatches_navigate_event(monkeypatch):
     (help_menu,) = _non_macos_menu(window)
     (action,) = help_menu.items
     action.function()
-    assert window.called.wait(timeout=5), "evaluate_js was never called"
+    assert window.called.wait(timeout=budget(5)), "evaluate_js was never called"
     assert window.calls == [_NAVIGATE_HELP_JS]
 
 

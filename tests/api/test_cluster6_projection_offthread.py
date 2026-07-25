@@ -15,6 +15,7 @@ from flask import Flask
 
 from quodeq.api.routes_findings import register_findings_routes
 from quodeq.services.mutation_rescore import _projection_locks
+from tests._timeouts import budget
 
 
 @pytest.fixture()
@@ -40,7 +41,7 @@ def test_dismiss_returns_without_waiting_for_projection(client, tmp_path):
 
     def _slow_project(project_dir):
         projection_started.set()
-        projection_may_finish.wait(timeout=5)
+        projection_may_finish.wait(timeout=budget(5))
 
     with patch(
         "quodeq.services.mutation_rescore._project_all_runs",
@@ -60,7 +61,7 @@ def test_dismiss_returns_without_waiting_for_projection(client, tmp_path):
     projection_may_finish.set()
 
     # Confirm the thread was actually launched.
-    assert projection_started.wait(timeout=2), (
+    assert projection_started.wait(timeout=budget(2)), (
         "Background projection thread never started."
     )
 
@@ -93,7 +94,7 @@ def test_concurrent_dismisses_same_project_call_project_all_runs_once(
         call_count += 1
         projection_first_started.set()
         # Hold the lock while the second request fires.
-        projection_first_may_finish.wait(timeout=5)
+        projection_first_may_finish.wait(timeout=budget(5))
 
     with patch(
         "quodeq.services.mutation_rescore._project_all_runs",
@@ -103,7 +104,7 @@ def test_concurrent_dismisses_same_project_call_project_all_runs_once(
         r1 = client.post("/api/findings/dismiss", json={
             "project": "proj", "req": "R1", "file": "a.py", "line": 1,
         })
-        assert projection_first_started.wait(timeout=2), (
+        assert projection_first_started.wait(timeout=budget(2)), (
             "First projection never started."
         )
 

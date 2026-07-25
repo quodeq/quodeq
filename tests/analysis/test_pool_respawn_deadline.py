@@ -12,6 +12,7 @@ from pathlib import Path
 
 from quodeq.analysis.subagents._pool_scaling import should_respawn
 from quodeq.analysis.subagents.file_queue import FileQueue
+from tests._timeouts import budget
 
 
 def _queue(tmp_path: Path, files: int = 5) -> FileQueue:
@@ -35,7 +36,7 @@ def test_respawn_allowed_before_run_deadline(tmp_path):
         queue, queue._path,
         pool_start=time.monotonic(),
         max_duration=600,
-        deadline_at=time.monotonic() + 60,
+        deadline_at=time.monotonic() + budget(60),
     ) == 5
 
 
