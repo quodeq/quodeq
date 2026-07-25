@@ -70,7 +70,7 @@ class TestHeartbeatFormat:
             dimension="security", mins=1, secs=2,
             active=2, plural="s",
             taken=10, total_files=30, remaining=20,
-            violations=2, compliance=5,
+            violations=2, compliance=5, quarantined="",
         )
         assert line.startswith("[security] 1m02s")
         assert "2 v · 5 c" in line
@@ -84,9 +84,20 @@ class TestHeartbeatFormat:
             dimension="security", mins=0, secs=5,
             active=1, plural="",
             taken=1, total_files=2, remaining=1,
-            violations=0, compliance=0,
+            violations=0, compliance=0, quarantined="",
         )
         assert line.endswith("1 agent")
+
+    def test_unmapped_segment_only_appears_when_something_was_quarantined(self) -> None:
+        """A clean run keeps the line's original shape."""
+        kwargs = dict(
+            dimension="security", mins=0, secs=5, active=1, plural="",
+            taken=1, total_files=2, remaining=1, violations=3, compliance=0,
+        )
+        assert "unmapped" not in _HEARTBEAT_FMT.format(quarantined="", **kwargs)
+        assert "3 v · 0 c · 1 unmapped" in _HEARTBEAT_FMT.format(
+            quarantined=" · 1 unmapped", **kwargs,
+        )
 
 
 class TestHeartbeatLoop:

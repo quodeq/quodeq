@@ -8,13 +8,14 @@ from pathlib import Path
 
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.jsonl_utils import FindingTally, tally_unique_findings
+from quodeq.core.evidence._req_mapping import PrincipleResolver
 from quodeq.shared.logging import log_info, log_warning
 
 _HEARTBEAT_INTERVAL = 10
 _SECONDS_PER_MINUTE = 60
 _HEARTBEAT_FMT = (
     "[{dimension}] {mins}m{secs:02d}s | "
-    "{violations} v · {compliance} c | "
+    "{violations} v · {compliance} c{quarantined} | "
     "files {taken}/{total_files} · {remaining} left | "
     "{active} agent{plural}"
 )
@@ -27,13 +28,17 @@ class HeartbeatContext:
     dimension_key: str
     jsonl_path: Path
     lock: threading.Lock
+    resolver: PrincipleResolver | None = None
 
 
-def _read_tally(jsonl_path: Path, lock: threading.Lock) -> FindingTally:
+def _read_tally(
+    jsonl_path: Path, lock: threading.Lock,
+    resolver: PrincipleResolver | None = None,
+) -> FindingTally:
     """Tally under the shared write lock to avoid TOCTOU with MCP writers."""
     try:
         with lock:
-            return tally_unique_findings(jsonl_path)
+            return tally_unique_findings(jsonl_path, resolver)
     except OSError:
         return FindingTally()
 
@@ -47,19 +52,26 @@ def heartbeat_loop(
     Each tick re-reads the dimension JSONL and deduplicates by
     ``(p, file, line, t)`` in memory, so the violation/compliance counts
     always match :mod:`quodeq.services.scan_progress` (which the UI consumes).
+
+    Findings the report path quarantines are excluded from the v/c counts and
+    reported separately, so the heartbeat matches the final run report rather
+    than over-counting by the number of unmappable findings.
     """
     start = time.monotonic()
     while not stop.wait(_HEARTBEAT_INTERVAL):
         try:
             elapsed = int(time.monotonic() - start)
             mins, secs = divmod(elapsed, _SECONDS_PER_MINUTE)
-            tally = _read_tally(ctx.jsonl_path, ctx.lock)
+            tally = _read_tally(ctx.jsonl_path, ctx.lock, ctx.resolver)
             remaining, taken = FileQueue(ctx.queue_path).stats()
             active = sum(1 for v in finished.values() if not v)
             log_info(_HEARTBEAT_FMT.format(
                 dimension=ctx.dimension_key,
                 mins=mins,
                 secs=secs,
+                # Only surfaces when a finding was actually quarantined, so the
+                # usual line keeps its shape.
+                quarantined=f" · {tally.quarantined} unmapped" if tally.quarantined else "",
                 active=active,
                 plural="" if active == 1 else "s",
                 taken=taken,

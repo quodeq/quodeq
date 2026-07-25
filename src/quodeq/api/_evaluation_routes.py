@@ -211,7 +211,10 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
             )
             if isinstance(raw, int) and raw > 0:
                 time_limit_s = raw
-        progress = build_scan_progress(job_id, run_dir, time_limit_s=time_limit_s)
+        progress = build_scan_progress(
+            job_id, run_dir, time_limit_s=time_limit_s,
+            compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
+        )
         if progress is None:
             body, status = error_response("Run not ready", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status

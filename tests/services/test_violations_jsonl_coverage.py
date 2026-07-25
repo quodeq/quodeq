@@ -84,56 +84,58 @@ class TestParseJsonlFindings:
         assert len(v) == 0
 
     def test_req_to_principle_mapping(self):
+        from quodeq.core.evidence._req_mapping import PrincipleResolver
         from quodeq.services._violations_jsonl import _parse_jsonl_findings
         line = json.dumps({"p": "REQ-1", "t": "compliance", "file": "a.py", "line": 1})
-        mapping = {"REQ-1": "Authentication"}
-        v, c = _parse_jsonl_findings([line], "security", req_to_principle=mapping)
+        resolver = PrincipleResolver({"REQ-1": "Authentication"}, frozenset({"Authentication"}))
+        v, c = _parse_jsonl_findings([line], "security", resolver=resolver)
         assert len(c) == 1
+        assert c[0].practice_id == "Authentication"
+
+    def test_unmappable_finding_is_skipped(self):
+        """Matches the report path, which quarantines it out of the evaluation."""
+        from quodeq.core.evidence._req_mapping import PrincipleResolver
+        from quodeq.services._violations_jsonl import _parse_jsonl_findings
+        line = json.dumps({"req": "N/A", "t": "violation", "file": "a.py", "line": 1})
+        resolver = PrincipleResolver({"REQ-1": "Authentication"}, frozenset({"Authentication"}))
+        v, c = _parse_jsonl_findings([line], "security", resolver=resolver)
+        assert v == []
 
 
-class TestLoadReqToPrinciple:
-    def test_no_evaluators_dir(self, tmp_path):
-        from quodeq.services._violations_jsonl import _load_req_to_principle
-        result = _load_req_to_principle("security", tmp_path / "nonexistent")
-        assert result == {}
+class TestBuildResolver:
+    """The live view resolves principles through the shared builder.
 
-    def test_no_dimension_file(self, tmp_path):
-        from quodeq.services._violations_jsonl import _load_req_to_principle
-        tmp_path.mkdir(exist_ok=True)
-        result = _load_req_to_principle("security", tmp_path)
-        assert result == {}
+    It used to read the evaluators dir itself, with no fallback to the compiled
+    built-in standards. On a stock install that dir exists but is empty for
+    built-in dimensions, so the map came back empty and requirement IDs never
+    resolved to their principle. Malformed-evaluator degradation is covered by
+    tests/core/test_req_mapping_robustness.py, which the shared builder shares.
+    """
 
-    def test_valid_dimension_file(self, tmp_path):
-        from quodeq.services._violations_jsonl import _load_req_to_principle
-        data = {
+    def test_falls_back_to_compiled_standard(self, tmp_path):
+        from quodeq.services._violations_jsonl import _build_resolver
+        compiled = tmp_path / "compiled"
+        compiled.mkdir()
+        (compiled / "security.json").write_text(json.dumps({
             "principles": [
-                {
-                    "name": "Authentication",
-                    "requirements": [
-                        {"id": "REQ-1"},
-                        {"id": "REQ-2"},
-                    ]
-                }
+                {"name": "Authentication", "requirements": [{"id": "REQ-1"}]},
             ]
-        }
-        dim_file = tmp_path / "security.json"
-        dim_file.write_text(json.dumps(data))
-        result = _load_req_to_principle("security", tmp_path)
-        assert result == {"REQ-1": "Authentication", "REQ-2": "Authentication"}
+        }))
+        resolver = _build_resolver("security", compiled)
+        assert resolver.resolve("REQ-1") == "Authentication"
+        assert resolver.resolve("Authentication") == "Authentication"
+        assert resolver.resolve("N/A") is None
 
-    def test_corrupt_json(self, tmp_path):
-        from quodeq.services._violations_jsonl import _load_req_to_principle
-        (tmp_path / "security.json").write_text("not json")
-        result = _load_req_to_principle("security", tmp_path)
-        assert result == {}
+    def test_no_standard_stays_permissive(self, tmp_path):
+        from quodeq.services._violations_jsonl import _build_resolver
+        resolver = _build_resolver("security", tmp_path / "nonexistent")
+        assert resolver.resolve("anything") == "anything"
 
-    @pytest.mark.parametrize("payload", ['[{"name": "x"}]', "null", '"hello"', "42"])
-    def test_non_dict_top_level_returns_empty(self, tmp_path, payload):
-        """A valid-JSON-but-non-dict evaluator file must not crash with
-        AttributeError on data.get(); it degrades to an empty mapping."""
-        from quodeq.services._violations_jsonl import _load_req_to_principle
-        (tmp_path / "security.json").write_text(payload)
-        assert _load_req_to_principle("security", tmp_path) == {}
+    def test_rejects_a_traversing_dimension(self, tmp_path):
+        """The dimension reaches a path join, so the guard must survive."""
+        from quodeq.services._violations_jsonl import _build_resolver
+        with pytest.raises(ValueError):
+            _build_resolver("../../etc/passwd", tmp_path)
 
 
 class TestParseViolationsFromJsonl:
@@ -152,8 +154,7 @@ class TestParseViolationsFromJsonl:
         jsonl = tmp_path / "findings.jsonl"
         jsonl.write_text(json.dumps({"p": "P1", "t": "violation", "file": "a.py", "line": 1}) + "\n")
         ctx = ViolationContext(dimension="sec", run_id="r1", project="p1")
-        with patch("quodeq.services._violations_jsonl._load_req_to_principle", return_value={}), \
-             patch("quodeq.services._violations_jsonl.build_req_refs_lookup", return_value=None):
+        with patch("quodeq.services._violations_jsonl.build_req_refs_lookup", return_value=None):
             result = parse_violations_from_jsonl(jsonl, None, ctx)
             assert result is not None
             assert result.dimension == "sec"
