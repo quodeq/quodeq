@@ -5,7 +5,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
 from quodeq.shared.logging import log_info
 from quodeq.shared.utils import open_text
@@ -15,17 +15,26 @@ _logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class FindingTally:
-    """Unique violation/compliance counts plus the duplicates folded out."""
+    """Unique violation/compliance counts plus the duplicates folded out.
+
+    ``violations`` is the *net* count the user will see in the report:
+    ``suppressed`` holds the unique violations a caller-supplied predicate
+    excluded (findings already dismissed or deleted in the dashboard), which
+    the scanner still re-finds on every run.
+    """
     violations: int = 0
     compliance: int = 0
     duplicates: int = 0
+    suppressed: int = 0
 
     @property
     def total(self) -> int:
         return self.violations + self.compliance
 
 
-def tally_unique_findings(jsonl_path: Path) -> FindingTally:
+def tally_unique_findings(
+    jsonl_path: Path, suppressed: "Callable[[dict], bool] | None" = None,
+) -> FindingTally:
     """Count unique findings (deduplicated by ``(p, file, line, t)``) and duplicates.
 
     Single source of truth for the heartbeat and the dashboard progress reader,
@@ -33,13 +42,18 @@ def tally_unique_findings(jsonl_path: Path) -> FindingTally:
     :func:`deduplicate_jsonl` pass runs at end of pool, the file holds raw
     appends from many parallel agents and contains overlapping findings.
 
+    *suppressed* is an optional predicate over a raw evidence row (see
+    ``quodeq.services.suppression``). It is applied AFTER dedup, so a row
+    excluded three times counts once — and it is injected rather than imported
+    to keep this analysis-layer module free of a services dependency.
+
     Tolerant: missing files, malformed lines, and OSError yield empty/partial
     tallies silently.
     """
     if not jsonl_path.is_file():
         return FindingTally()
     seen: set[tuple] = set()
-    violations = compliance = duplicates = 0
+    violations = compliance = duplicates = hidden = 0
     try:
         with open_text(jsonl_path) as f:
             for raw in f:
@@ -50,6 +64,8 @@ def tally_unique_findings(jsonl_path: Path) -> FindingTally:
                     obj = json.loads(stripped)
                 except json.JSONDecodeError:
                     continue
+                if not isinstance(obj, dict):
+                    continue  # valid JSON but not an object (a bare list/number)
                 t = obj.get("t")
                 key = (obj.get("p"), obj.get("file"), obj.get("line"), t)
                 if key in seen:
@@ -57,12 +73,18 @@ def tally_unique_findings(jsonl_path: Path) -> FindingTally:
                     continue
                 seen.add(key)
                 if t == "violation":
-                    violations += 1
+                    if suppressed is not None and suppressed(obj):
+                        hidden += 1
+                    else:
+                        violations += 1
                 elif t == "compliance":
                     compliance += 1
     except OSError:
         pass
-    return FindingTally(violations=violations, compliance=compliance, duplicates=duplicates)
+    return FindingTally(
+        violations=violations, compliance=compliance,
+        duplicates=duplicates, suppressed=hidden,
+    )
 
 
 def dedup_jsonl_lines(lines: Iterable[str]) -> list[str]:
