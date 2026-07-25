@@ -714,8 +714,19 @@ def test_stop_cancels_running_turn_and_frees_the_token(client, monkeypatch):
     else:
         pytest.fail("cancel token not cleaned up after the turn ended")
 
+    # The slot is reclaimable. Reap the turn this starts before returning:
+    # fake_run_turn parks the worker until something cancels it, so a thread
+    # left running here outlives the test, and once monkeypatch unwinds its
+    # assert fires inside whichever test happens to be running 5s later
+    # (it surfaced as a PytestUnhandledThreadExceptionWarning attributed to
+    # test_shared_session_resolves_clone_run_dir on an unrelated xdist worker).
+    started.clear()
+    finished.clear()
     assert client.post(f"/api/assistant/sessions/{sid}/messages",
                        json={"text": "again"}).status_code == 202
+    assert started.wait(timeout=budget(5))
+    assert client.post(f"/api/assistant/sessions/{sid}/stop").status_code == 202
+    assert finished.wait(timeout=budget(5))
 
 
 # ---------------------------------------------------------------------------
