@@ -10,23 +10,24 @@ const baseSummary = {
   dimensionCount: 1,
   severity: { critical: 0, major: 11, minor: 120 },
   dismissed: 0,
+  suppressed: 0,
 };
 
 const dashboard = { selectedRun: { runId: 'r1', dateLabel: '4 Jul 2026' } };
 
-describe('RunHeroSection dismissed note', () => {
-  it('shows how many findings the dismissed filter hid', () => {
+describe('RunHeroSection suppressed note', () => {
+  it('shows how many findings the suppression filters hid', () => {
     render(
       <RunHeroSection
         dashboard={dashboard}
         selectedRunId="r1"
-        runSummary={{ ...baseSummary, dismissed: 404 }}
+        runSummary={{ ...baseSummary, suppressed: 404 }}
       />,
     );
-    expect(screen.getByText(/404 dismissed hidden/)).toBeTruthy();
+    expect(screen.getByText(/404 suppressed/)).toBeTruthy();
   });
 
-  it('renders no note when nothing was dismissed', () => {
+  it('renders no note when nothing was suppressed', () => {
     render(
       <RunHeroSection
         dashboard={dashboard}
@@ -34,10 +35,10 @@ describe('RunHeroSection dismissed note', () => {
         runSummary={baseSummary}
       />,
     );
-    expect(screen.queryByText(/dismissed hidden/)).toBeNull();
+    expect(screen.queryByText(/suppressed/)).toBeNull();
   });
 
-  it('shows the note even when every violation was dismissed', () => {
+  it('shows the note even when every violation was suppressed', () => {
     render(
       <RunHeroSection
         dashboard={dashboard}
@@ -46,10 +47,23 @@ describe('RunHeroSection dismissed note', () => {
           ...baseSummary,
           totalViolations: 0,
           severity: { critical: 0, major: 0, minor: 0 },
-          dismissed: 535,
+          suppressed: 535,
         }}
       />,
     );
-    expect(screen.getByText(/535 dismissed hidden/)).toBeTruthy();
+    expect(screen.getByText(/535 suppressed/)).toBeTruthy();
+  });
+
+  it('counts deletions, which the dismissed-only number misses', () => {
+    // The case that motivated this: a project whose triage history is all
+    // deletions reads dismissed: 0 while 391 findings are hidden from the view.
+    render(
+      <RunHeroSection
+        dashboard={dashboard}
+        selectedRunId="r1"
+        runSummary={{ ...baseSummary, dismissed: 0, suppressed: 391 }}
+      />,
+    );
+    expect(screen.getByText(/391 suppressed/)).toBeTruthy();
   });
 });

@@ -70,7 +70,7 @@ class TestHeartbeatFormat:
             dimension="security", mins=1, secs=2,
             active=2, plural="s",
             taken=10, total_files=30, remaining=20,
-            violations=2, compliance=5, quarantined="",
+            violations=2, compliance=5, suppressed="", quarantined="",
         )
         assert line.startswith("[security] 1m02s")
         assert "2 v · 5 c" in line
@@ -84,20 +84,53 @@ class TestHeartbeatFormat:
             dimension="security", mins=0, secs=5,
             active=1, plural="",
             taken=1, total_files=2, remaining=1,
-            violations=0, compliance=0, quarantined="",
+            violations=0, compliance=0, suppressed="", quarantined="",
         )
         assert line.endswith("1 agent")
+
+    def test_suppressed_segment_follows_the_compliance_count(self) -> None:
+        line = _HEARTBEAT_FMT.format(
+            dimension="reliability", mins=16, secs=1,
+            active=1, plural="",
+            taken=34, total_files=34, remaining=0,
+            violations=122, compliance=261, suppressed=" · 339 supp",
+            quarantined="",
+        )
+        assert "122 v · 261 c · 339 supp |" in line
+
+    def test_no_suppressed_segment_when_nothing_is_hidden(self) -> None:
+        """A project with no dismissals must keep the pre-existing line shape."""
+        line = _HEARTBEAT_FMT.format(
+            dimension="reliability", mins=1, secs=0,
+            active=1, plural="",
+            taken=1, total_files=2, remaining=1,
+            violations=7, compliance=3, suppressed="", quarantined="",
+        )
+        assert "7 v · 3 c |" in line
+        assert "supp" not in line
 
     def test_unmapped_segment_only_appears_when_something_was_quarantined(self) -> None:
         """A clean run keeps the line's original shape."""
         kwargs = dict(
             dimension="security", mins=0, secs=5, active=1, plural="",
             taken=1, total_files=2, remaining=1, violations=3, compliance=0,
+            suppressed="",
         )
         assert "unmapped" not in _HEARTBEAT_FMT.format(quarantined="", **kwargs)
         assert "3 v · 0 c · 1 unmapped" in _HEARTBEAT_FMT.format(
             quarantined=" · 1 unmapped", **kwargs,
         )
+
+    def test_both_exclusion_segments_render_together(self) -> None:
+        """Suppressed comes first, then unmapped, and neither swallows the other."""
+        line = _HEARTBEAT_FMT.format(
+            dimension="maintainability", mins=2, secs=0,
+            active=1, plural="",
+            taken=5, total_files=5, remaining=0,
+            violations=570, compliance=168,
+            suppressed=" · 12 supp", quarantined=" · 1 unmapped",
+        )
+        assert "570 v · 168 c · 12 supp · 1 unmapped |" in line
 
 
 class TestHeartbeatLoop:

@@ -331,18 +331,27 @@ def _attach_exit_reason_to_dim(
 
 def _attach_dismissed_count_to_dim(
     dim_dict: dict[str, Any], dismissed_counts: dict[str, int],
+    suppressed_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
-    """Add ``dismissedCount`` to a serialized dimension dict when > 0.
+    """Add ``dismissedCount`` / ``suppressedCount`` to a dimension dict when > 0.
 
-    The count says how many of the scan's re-found violations were hidden by
-    the project-level dismissed filter, so the UI can explain the gap between
-    "what the scan found" and "what the view shows". Omitted when nothing was
-    filtered, mirroring the exitReason convention.
+    Both explain the gap between "what the scan found" and "what the view
+    shows". ``dismissedCount`` covers the dismissed filter alone;
+    ``suppressedCount`` covers dismissals *and* deletions, so it is the total
+    the UI reports. They differ sharply on projects with a triage history:
+    deletions suppress a whole principle across a file and accumulate over
+    many runs, so a scan can re-find several times what the report displays.
+    Omitted when nothing was filtered, mirroring the exitReason convention.
     """
-    count = dismissed_counts.get(dim_dict.get("dimension") or "", 0)
-    if count <= 0:
-        return dim_dict
-    return {**dim_dict, "dismissedCount": count}
+    key = dim_dict.get("dimension") or ""
+    out = dim_dict
+    count = dismissed_counts.get(key, 0)
+    if count > 0:
+        out = {**out, "dismissedCount": count}
+    total = (suppressed_counts or {}).get(key, 0)
+    if total > 0:
+        out = {**out, "suppressedCount": total}
+    return out
 
 
 def _slim_history_dim(dim: DimensionResult) -> dict[str, Any]:
@@ -368,12 +377,14 @@ def _build_dashboard_result(
     *,
     exit_reason: str | None = None,
     dismissed_counts: dict[str, int] | None = None,
+    suppressed_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Assemble the final dashboard response dict from pre-computed parts."""
     dim_dicts = [
         _attach_dismissed_count_to_dim(
             _attach_exit_reason_to_dim(to_camel_dict(d), exit_reason),
             dismissed_counts or {},
+            suppressed_counts or {},
         )
         for d in payload.dimensions_with_trend
     ]
@@ -598,6 +609,12 @@ def build_dashboard(
     }
     selected_dims = _rescore_run_dimensions(
         raw_dims, reports_root, project, selected_run.run_id, params)
+    # Measured against the SAME dimensions the response ships, so the number
+    # the UI shows always reconciles: shown + suppressed == what the scan found.
+    suppressed_counts = {
+        (d.dimension or ""): pre_filter_counts.get(d.dimension, 0) - len(d.violations)
+        for d in selected_dims
+    }
     ctx = _SelectedRunContext(
         run=selected_run,
         index=selected_index,
@@ -609,4 +626,5 @@ def build_dashboard(
     return _build_dashboard_result(
         project, runs, selected_run, payload,
         exit_reason=exit_reason, dismissed_counts=dismissed_counts,
+        suppressed_counts=suppressed_counts,
     )

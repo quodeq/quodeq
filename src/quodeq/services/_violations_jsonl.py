@@ -11,6 +11,9 @@ from quodeq.core.evidence._req_mapping import PrincipleResolver, build_principle
 from quodeq.core.evidence.parser import build_req_refs_lookup
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.services.violation_context import ViolationContext
+from quodeq.services.suppression import SuppressionMatcher, load_req_to_principle
+from quodeq.config.paths import default_paths
+from quodeq.shared.validation import validate_path_segment
 from quodeq.services.violations_parsing import (
     _build_finding_entry,
     _build_violation_response,
@@ -19,9 +22,7 @@ from quodeq.services.violations_parsing import (
     _TYPE_COMPLIANCE,
     _TYPE_VIOLATION,
 )
-from quodeq.config.paths import default_paths
 from quodeq.shared.utils import open_text
-from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 
@@ -34,14 +35,24 @@ def _parse_jsonl_findings(
 ) -> tuple[list[Finding], list[Finding]]:
     """Parse raw JSONL lines into deduplicated violation and compliance lists.
 
-    When *resolver* is supplied, findings whose principle is not in the
-    dimension's standard are skipped -- the same quarantine the report path
-    applies in ``_group_judgments``, so this live view cannot show more
-    findings than the persisted evaluation.
+    Two exclusions keep this live view from showing more findings than the
+    persisted evaluation: rows the dashboard suppresses (dismissed/deleted), and
+    rows whose principle is not in the dimension's standard, which the report
+    path quarantines in ``_group_judgments``.
     """
     violations: list[Finding] = []
     compliance: list[Finding] = []
     seen: set[tuple] = set()
+    # One seam for both suppression stores, shared with the live-progress
+    # tally -- see quodeq.services.suppression for the key shapes.
+    matcher = SuppressionMatcher(
+        dimension=dimension,
+        dismissed=frozenset(dismissed_keys or ()),
+        deleted=frozenset(deleted_keys or ()),
+        # Same table the quarantine check uses, so the delete key and the
+        # scored report can never map a req ID to different principles.
+        req_to_principle=resolver.req_to_principle if resolver else {},
+    )
     for raw_line in lines:
         raw = raw_line.strip()
         if not raw:
@@ -55,24 +66,16 @@ def _parse_jsonl_findings(
         principle = obj.get("p") or obj.get("req")
         if not principle or obj.get("t") not in _FINDING_TYPES:
             continue
-        # Skip dismissed findings -- match by req ID (e.g. "M-MOD-3"), not principle name
-        if dismissed_keys and obj.get("t") == _TYPE_VIOLATION:
-            req_id = obj.get("req") or principle
-            dismissed_key = (req_id, obj.get("file", ""), obj.get("line", 0))
-            if dismissed_key in dismissed_keys:
-                continue
-        if resolver is not None:
+        if matcher.is_suppressed(obj):
+            continue
+        if resolver is None:
+            obj["p"] = matcher.principle_for(principle)
+        else:
+            # Unmappable: the report quarantines it, so this view must not show it.
             resolved = resolver.resolve(principle)
             if resolved is None:
                 continue
             obj["p"] = resolved
-        else:
-            obj["p"] = principle
-        # Skip permanently-deleted findings -- match by (dimension, principle, file).
-        if deleted_keys and obj.get("t") == _TYPE_VIOLATION:
-            deleted_key = (dimension, obj["p"], obj.get("file", ""))
-            if deleted_key in deleted_keys:
-                continue
         dedup_key = (principle, obj.get("t"), obj.get("file"), obj.get("line"))
         if dedup_key in seen:
             continue
@@ -83,6 +86,12 @@ def _parse_jsonl_findings(
         else:
             compliance.append(entry)
     return violations, compliance
+
+
+# Moved to quodeq.services.suppression, which owns the req -> principle map
+# because the delete key is built from it. Kept as an alias: several tests and
+# call sites still reach for the private name.
+_load_req_to_principle = load_req_to_principle
 
 
 def _build_resolver(dimension: str, compiled_dir: Path | None) -> PrincipleResolver:

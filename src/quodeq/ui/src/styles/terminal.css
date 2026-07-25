@@ -494,16 +494,21 @@ button.term-sev-badge--clickable:focus-visible {
   align-items: center;
 }
 /* Quiet meta note beside the severity badges: how many re-found findings the
-   project-level dismissed filter hid from this run view. */
-.term-stat__dismissed-note {
+   project-level dismissed + deleted filters hid from this run view. */
+.term-stat__suppressed-note {
+  /* Own line, not trailing the severity badges: the count runs to four digits
+     on a triaged project, and inline it wrapped between the number and its
+     unit ("1337" / "suppressed"). */
+  display: block;
   font-family: var(--term-font-mono);
   font-size: 11px;
   color: var(--color-text-muted);
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
-.acc-eval-sev-row + .term-stat__dismissed-note {
-  margin-left: var(--term-space-2);
+.acc-eval-sev-row + .term-stat__suppressed-note {
+  margin-top: var(--term-space-1);
 }
 
 /* ------------------------------------------------------------

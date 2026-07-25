@@ -5,7 +5,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
 from quodeq.core.evidence._req_mapping import PrincipleResolver
 from quodeq.shared.logging import log_info
@@ -16,10 +16,22 @@ _logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class FindingTally:
-    """Unique violation/compliance counts plus the duplicates folded out."""
+    """Unique violation/compliance counts plus the duplicates folded out.
+
+    ``violations`` is the *net* count the user will see in the report. The two
+    exclusions netted out of it are each kept, so a run that dropped most of its
+    findings is distinguishable from a clean one:
+
+    - ``suppressed``: unique violations a caller-supplied predicate excluded
+      (already dismissed or deleted in the dashboard), which the scanner still
+      re-finds on every run.
+    - ``quarantined``: findings naming a principle the dimension's standard does
+      not define, which the report path drops before scoring.
+    """
     violations: int = 0
     compliance: int = 0
     duplicates: int = 0
+    suppressed: int = 0
     quarantined: int = 0
 
     @property
@@ -28,7 +40,9 @@ class FindingTally:
 
 
 def tally_unique_findings(
-    jsonl_path: Path, resolver: PrincipleResolver | None = None,
+    jsonl_path: Path,
+    suppressed: "Callable[[dict], bool] | None" = None,
+    resolver: PrincipleResolver | None = None,
 ) -> FindingTally:
     """Count unique findings (deduplicated by ``(p, file, line, t)``) and duplicates.
 
@@ -37,16 +51,23 @@ def tally_unique_findings(
     :func:`deduplicate_jsonl` pass runs at end of pool, the file holds raw
     appends from many parallel agents and contains overlapping findings.
 
-    When *resolver* is supplied, findings whose principle is not in the
-    dimension's standard are counted under ``quarantined`` instead of
-    ``violations``/``compliance`` — matching what the report path drops in
-    :func:`~quodeq.core.evidence._req_mapping._group_judgments`, so the live
-    counter and the persisted evaluation agree. Without a resolver the tally
-    stays permissive and counts every finding, since there is no standard to
-    validate against.
+    Two independent exclusions bring this in line with the report, both applied
+    AFTER dedup so a row excluded three times counts once:
 
-    Deduplication happens before the quarantine check, so a repeated unmappable
-    finding is one quarantined entry, not one per copy.
+    *resolver* drops findings whose principle is not in the dimension's standard,
+    counting them under ``quarantined``. This matches what the report path
+    quarantines in
+    :func:`~quodeq.core.evidence._req_mapping._group_judgments`.
+
+    *suppressed* is a predicate over a raw evidence row (see
+    ``quodeq.services.suppression``) for findings the user already dismissed or
+    deleted, counted under ``suppressed``. It is injected rather than imported to
+    keep this analysis-layer module free of a services dependency.
+
+    Quarantine is checked first: a finding with no principle in the standard has
+    no valid delete key (those are keyed on the principle), so asking whether it
+    was suppressed is not meaningful. Without either argument the tally stays
+    permissive and counts every finding.
 
     Tolerant: missing files, malformed lines, and OSError yield empty/partial
     tallies silently.
@@ -54,7 +75,7 @@ def tally_unique_findings(
     if not jsonl_path.is_file():
         return FindingTally()
     seen: set[tuple] = set()
-    violations = compliance = duplicates = quarantined = 0
+    violations = compliance = duplicates = hidden = quarantined = 0
     try:
         with open_text(jsonl_path) as f:
             for raw in f:
@@ -66,7 +87,7 @@ def tally_unique_findings(
                 except json.JSONDecodeError:
                     continue
                 if not isinstance(obj, dict):
-                    continue
+                    continue  # valid JSON but not an object (a bare list/number)
                 t = obj.get("t")
                 key = (obj.get("p"), obj.get("file"), obj.get("line"), t)
                 if key in seen:
@@ -82,14 +103,17 @@ def tally_unique_findings(
                     quarantined += 1
                     continue
                 if t == "violation":
-                    violations += 1
+                    if suppressed is not None and suppressed(obj):
+                        hidden += 1
+                    else:
+                        violations += 1
                 else:
                     compliance += 1
     except OSError:
         pass
     return FindingTally(
         violations=violations, compliance=compliance,
-        duplicates=duplicates, quarantined=quarantined,
+        duplicates=duplicates, suppressed=hidden, quarantined=quarantined,
     )
 
 

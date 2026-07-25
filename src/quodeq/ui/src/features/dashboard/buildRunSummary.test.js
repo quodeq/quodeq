@@ -42,6 +42,38 @@ test('dismissed: ignores non-numeric dismissedCount', () => {
 });
 
 // ---------------------------------------------------------------------------
+// suppressed aggregation (dismissed + deleted)
+// ---------------------------------------------------------------------------
+
+test('suppressed: sums suppressedCount across dimensions', () => {
+  const summary = buildRunSummary([
+    dim({ dimension: 'reliability', suppressedCount: 339 }),
+    dim({ dimension: 'security', suppressedCount: 52 }),
+  ]);
+  assert.equal(summary.suppressed, 391);
+});
+
+test('suppressed: counts deletions that dismissedCount misses', () => {
+  // A project whose triage history is all deletions: dismissed reads 0 while
+  // the scan still re-finds hundreds of suppressed findings every run.
+  const summary = buildRunSummary([dim({ suppressedCount: 339 })]);
+  assert.equal(summary.dismissed, 0);
+  assert.equal(summary.suppressed, 339);
+});
+
+test('suppressed: 0 when no dimension carries suppressedCount', () => {
+  assert.equal(buildRunSummary([dim()]).suppressed, 0);
+});
+
+test('suppressed: 0 for the empty-dimensions fallback', () => {
+  assert.equal(buildRunSummary([]).suppressed, 0);
+});
+
+test('suppressed: ignores a non-numeric suppressedCount', () => {
+  assert.equal(buildRunSummary([dim({ suppressedCount: 'nope' })]).suppressed, 0);
+});
+
+// ---------------------------------------------------------------------------
 // existing aggregation still intact
 // ---------------------------------------------------------------------------
 
