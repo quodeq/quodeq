@@ -55,6 +55,7 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     latestScores,
     loading: scoresLoading,
     error: scoresError,
+    scoresPending,
     availableRuns,
   } = useProjectScores({ selectedProject, selectedRun, selectedSource, keepPlaceholder });
 
@@ -184,6 +185,9 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     // (e.g. user switched to a different run). Page shows a subtle
     // shimmer/dim instead of the full loading screen.
     isFetching: dashboardQuery.isFetching,
+    // Scores for the newly-picked run are still loading; the panels below are
+    // showing the previous selection's numbers until they land.
+    scoresPending,
     error: dashboardQuery.isError
       ? "Failed to load dashboard data. Check your connection and try refreshing."
       : (scoresError || null),

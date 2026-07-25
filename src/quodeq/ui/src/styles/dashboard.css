@@ -388,6 +388,21 @@
   margin-bottom: 0;
 }
 
+/* Scores for a newly-picked day are still in flight, so the cards below are
+   still showing the previous selection's grades. Fade them and label the
+   panel rather than letting stale numbers read as the answer. */
+.quality-dimensions--pending .dimensions-panel {
+  opacity: 0.55;
+  transition: opacity 120ms ease;
+}
+
+.quality-dimensions__pending {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 /* ── Dimension cards ──────────────────────────────────── */
 
 .dimension-grid {

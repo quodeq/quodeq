@@ -137,11 +137,16 @@ export function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accu
   );
 }
 
-function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, selectedDayDimNames, dimTrends }) {
+function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, selectedDayDimNames, dimTrends, pending }) {
   return (
-    <section className="quality-dimensions" aria-label="Quality dimensions">
+    <section
+      className={`quality-dimensions${pending ? ' quality-dimensions--pending' : ''}`}
+      aria-label="Quality dimensions"
+      aria-busy={pending || undefined}
+    >
       <div className="quality-dimensions__head">
         <SectionLabel>quality_dimensions · {sortedDimensions.length}</SectionLabel>
+        {pending && <span className="quality-dimensions__pending">updating…</span>}
       </div>
       <div className="dimensions-panel">
         <DimensionCardsGrid
@@ -303,6 +308,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
         onDimensionClick={onDimensionClick}
         selectedDayDimNames={selectedDayDimNames}
         dimTrends={dimTrends}
+        pending={data.scoresPending}
       />
 
       {topFiles.length > 0 && (

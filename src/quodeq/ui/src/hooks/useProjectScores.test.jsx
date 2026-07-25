@@ -298,4 +298,49 @@ describe("useProjectScores", () => {
       expect(fakeApi.getProjectScores).not.toHaveBeenCalled();
     });
   });
+
+  // Selecting a day on the score-history chart refetches as-of scores, and
+  // placeholderData keeps the PREVIOUS day's numbers on screen meanwhile.
+  // scoresPending is what lets the dimension cards say so instead of
+  // presenting stale grades as settled.
+  describe("scoresPending", () => {
+    // Must use withStableQueryApi: a wrapper rebuilt per render remounts the
+    // subtree and destroys isPlaceholderData, so this would pass either way.
+    it("is true while a newly-selected run is in flight, false once it lands", async () => {
+      let release;
+      const gate = new Promise((r) => { release = r; });
+      let call = 0;
+      const api = {
+        getProjectScores: vi.fn(async (project, asOf) => {
+          call += 1;
+          if (call > 1 && asOf) await gate;
+          return {
+            accumulated: { score: asOf ? 80 : 90 },
+            trend: [],
+            availableRuns: [
+              { runId: "r9", status: "complete" },
+              { runId: "r1", status: "complete" },
+            ],
+          };
+        }),
+        sharedGetProjectScores: vi.fn(),
+      };
+
+      const { result, rerender } = renderHook(
+        ({ run }) => useProjectScores({ selectedProject: "p1", selectedRun: run }),
+        { wrapper: withStableQueryApi(api), initialProps: { run: null } },
+      );
+      await waitFor(() => expect(result.current.scores?.accumulated?.score).toBe(90));
+      expect(result.current.scoresPending).toBe(false);
+
+      rerender({ run: "r1" });
+      await waitFor(() => expect(result.current.scoresPending).toBe(true));
+      // The old day's scores are still what's rendered — that is the point.
+      expect(result.current.scores?.accumulated?.score).toBe(90);
+
+      release();
+      await waitFor(() => expect(result.current.scores?.accumulated?.score).toBe(80));
+      expect(result.current.scoresPending).toBe(false);
+    });
+  });
 });
