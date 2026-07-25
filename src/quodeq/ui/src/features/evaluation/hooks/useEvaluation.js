@@ -32,6 +32,7 @@ import {
   providerKey,
   DEFAULT_MAX_SUBAGENTS,
   DEFAULT_TIME_LIMIT_S,
+  LOCAL_API_PROVIDERS,
 } from "../../../constants.js";
 
 const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === "true";
@@ -41,7 +42,9 @@ const DEFAULT_OLLAMA_SUBAGENTS = "1";
 const DEFAULT_CLI_SUBAGENTS = String(DEFAULT_MAX_SUBAGENTS);
 const DEFAULT_OLLAMA_BUDGET = "0";
 const DEFAULT_CLI_BUDGET = String(DEFAULT_TIME_LIMIT_S);
-export const LOCAL_API_PROVIDERS = new Set(["ollama", "llamacpp", "omlx"]);
+// Re-exported for the existing importers; the set itself lives in constants.js
+// so the Evaluate header resolves unset limits exactly like the start payload.
+export { LOCAL_API_PROVIDERS };
 
 /**
  * Merge per-provider Settings (provider, model, subagents, budget, etc.)

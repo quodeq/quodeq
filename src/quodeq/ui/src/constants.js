@@ -15,6 +15,12 @@ export const PER_DIMENSION_STORAGE_KEY = 'cc-per-dimension';
 
 export const ACTIVE_PROVIDER_KEY = 'cc-active-provider';
 
+// Providers that talk to a local model server. They default to no time limit
+// (Settings renders them as "Unlimited" and only writes the key once the user
+// edits it), so every reader of the stored limit must agree on the list or the
+// UI and the run disagree about whether the run is limited at all.
+export const LOCAL_API_PROVIDERS = new Set(['ollama', 'llamacpp', 'omlx']);
+
 export function providerKey(providerId, setting) {
   return `cc-${providerId}-${setting}`;
 }
