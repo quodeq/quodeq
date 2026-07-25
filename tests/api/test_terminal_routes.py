@@ -6,6 +6,7 @@ import pytest
 from flask import Flask
 
 from quodeq.api.terminal_routes import _apply_control, register_terminal_routes
+from tests._timeouts import budget
 
 try:
     import simple_websocket
@@ -160,7 +161,7 @@ def _serve(manager):
         yield srv.server_port
     finally:
         srv.shutdown()
-        t.join(timeout=2)
+        t.join(timeout=budget(2))
 
 
 @contextlib.contextmanager
@@ -208,11 +209,11 @@ if _WS_OK:
 def test_ws_single_active_connection_refuses_second():
     with _serve(_LiveManager()) as port:
         with _connect(port) as a:
-            assert a.receive(timeout=_RECV_TIMEOUT) == "0ready\n"   # A acquired the conn lock
+            assert a.receive(timeout=budget(_RECV_TIMEOUT)) == "0ready\n"   # A acquired the conn lock
             with _connect(port) as b:
                 msg = None
                 with contextlib.suppress(simple_websocket.ConnectionClosed):
-                    msg = b.receive(timeout=_RECV_TIMEOUT)
+                    msg = b.receive(timeout=budget(_RECV_TIMEOUT))
                 assert msg is not None and "already open" in msg
 
 
@@ -222,11 +223,11 @@ def test_ws_busy_close_uses_dedicated_code():
     # and spam the other window), so the refusal carries close code 4002.
     with _serve(_LiveManager()) as port:
         with _connect(port) as a:
-            assert a.receive(timeout=2) == "0ready\n"
+            assert a.receive(timeout=budget(2)) == "0ready\n"
             with _connect(port) as b:
                 with pytest.raises(simple_websocket.ConnectionClosed) as exc:
-                    b.receive(timeout=2)   # banner frame...
-                    b.receive(timeout=2)   # ...then the close
+                    b.receive(timeout=budget(2))   # banner frame...
+                    b.receive(timeout=budget(2))   # ...then the close
                 assert exc.value.reason == 4002
 
 
@@ -240,7 +241,7 @@ def test_ws_gate_refusal_close_uses_dedicated_code():
             headers={"Origin": "http://evil.example"})
         try:
             with pytest.raises(simple_websocket.ConnectionClosed) as exc:
-                c.receive(timeout=2)
+                c.receive(timeout=budget(2))
             assert exc.value.reason == 4003
         finally:
             with contextlib.suppress(Exception):
@@ -252,7 +253,7 @@ def test_ws_spawn_failure_closes_cleanly_and_frees_lock():
     with _serve(_FlakyManager()) as port:
         with _connect(port) as first:       # ensure_session raises -> clean close
             with contextlib.suppress(simple_websocket.ConnectionClosed):
-                first.receive(timeout=_RECV_TIMEOUT)    # must not hang / must not 500
+                first.receive(timeout=budget(_RECV_TIMEOUT))    # must not hang / must not 500
         # the conn lock's finally released even though spawn failed -> reattach works
         with _connect(port) as second:
-            assert second.receive(timeout=_RECV_TIMEOUT) == "0ready\n"
+            assert second.receive(timeout=budget(_RECV_TIMEOUT)) == "0ready\n"

@@ -8,6 +8,7 @@ import pytest
 import webview as real_webview
 
 from quodeq.dashboard import _webview_window as ww
+from tests._timeouts import budget
 
 # Some tests import PyObjCTools to patch AppHelper. pyobjc is darwin-only
 # (pywebview pulls it in under sys_platform == 'darwin'), so those tests can
@@ -133,7 +134,7 @@ class TestOnClosing:
     def _join(on_closing):
         worker = getattr(on_closing, "_worker", None)
         if worker is not None:
-            worker.join(timeout=2)
+            worker.join(timeout=budget(2))
             # A hung worker is the exact failure class this fix targets — surface
             # it as itself, not as a downstream mock-call-count mismatch.
             assert not worker.is_alive(), "close-confirm worker did not finish (possible re-deadlock)"
@@ -188,7 +189,7 @@ class TestOnClosing:
             result = []
             caller = threading.Thread(target=lambda: result.append(on_closing()))
             caller.start()
-            caller.join(timeout=2)
+            caller.join(timeout=budget(2))
             try:
                 assert not caller.is_alive(), "_on_closing blocked on the dialog — re-deadlock regression"
                 assert result == [False]
@@ -272,7 +273,7 @@ class TestOnClosing:
         with patch.object(ww, "_ask_close_choice", return_value="cancel") as choose:
             assert on_closing() is False
             first_worker = on_closing._worker
-            assert cancel_started.wait(2)  # worker is now inside the cancel call
+            assert cancel_started.wait(budget(2))  # worker is now inside the cancel call
             # Second close while the cancel is in flight: vetoed, no new prompt.
             assert on_closing() is False
             assert on_closing._worker is first_worker

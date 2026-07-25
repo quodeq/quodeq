@@ -15,6 +15,7 @@ import pytest
 from quodeq.services import shared_publish, shared_repo
 from quodeq.services.shared_publish import publish_project
 from quodeq.services.shared_repo import clone_lock, ensure_shared_clone, refresh_shared_clone
+from tests._timeouts import budget
 
 # The thread join()/wait() calls below are deadlock guards, not performance
 # assertions: a genuine clone-lock deadlock hangs forever, so any generous
@@ -61,9 +62,9 @@ def test_clone_lock_keyed_by_path_and_reentrant(tmp_path, monkeypatch):
     assert lock_a1 is lock_a2
     assert lock_a1 is not lock_b
 
-    assert lock_a1.acquire(timeout=1)
+    assert lock_a1.acquire(timeout=budget(1))
     try:
-        assert lock_a1.acquire(timeout=1)  # reentrant on the same thread
+        assert lock_a1.acquire(timeout=budget(1))  # reentrant on the same thread
         lock_a1.release()
     finally:
         lock_a1.release()
@@ -122,13 +123,13 @@ def test_refresh_waits_for_publish(tmp_path, monkeypatch):
     refresh_thread = threading.Thread(target=_fire_refresh, name="refresh")
 
     publish_thread.start()
-    assert commit_reached.wait(timeout=_DEADLOCK_GUARD_TIMEOUT), (
+    assert commit_reached.wait(timeout=budget(_DEADLOCK_GUARD_TIMEOUT)), (
         "publish never reached its commit step"
     )
     refresh_thread.start()
 
-    publish_thread.join(timeout=_DEADLOCK_GUARD_TIMEOUT)
-    refresh_thread.join(timeout=_DEADLOCK_GUARD_TIMEOUT)
+    publish_thread.join(timeout=budget(_DEADLOCK_GUARD_TIMEOUT))
+    refresh_thread.join(timeout=budget(_DEADLOCK_GUARD_TIMEOUT))
 
     assert not publish_thread.is_alive(), "publish_project deadlocked"
     assert not refresh_thread.is_alive(), "refresh_shared_clone deadlocked"
@@ -163,7 +164,7 @@ def test_clone_lock_is_reentrant_for_publish_internal_refresh(tmp_path):
 
     thread = threading.Thread(target=_do_publish, name="publish")
     thread.start()
-    thread.join(timeout=_DEADLOCK_GUARD_TIMEOUT)
+    thread.join(timeout=budget(_DEADLOCK_GUARD_TIMEOUT))
 
     assert not thread.is_alive(), (
         "publish_project deadlocked acquiring its own clone lock reentrantly "

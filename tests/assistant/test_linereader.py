@@ -3,6 +3,7 @@ import os
 import threading
 
 from quodeq.assistant.adapters._linereader import iter_lines
+from tests._timeouts import budget
 
 
 def test_yields_complete_lines():
@@ -41,12 +42,12 @@ def test_yields_line_while_stream_still_open():
     try:
         writer.write('{"type":"token"}\n')
         writer.flush()
-        assert first_line.wait(timeout=5), \
+        assert first_line.wait(timeout=budget(5)), \
             "line was not yielded while the pipe was still open (reader waits for EOF)"
         assert got == ['{"type":"token"}']
     finally:
         writer.close()
-        t.join(timeout=5)
+        t.join(timeout=budget(5))
         reader.close()
 
 

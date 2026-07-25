@@ -20,6 +20,7 @@ from quodeq.services._index_sync import (
     _check_stale_and_promote,
     force_promote_to_cancelled_stale,
 )
+from tests._timeouts import budget
 
 
 def test_is_pid_alive_current_process() -> None:
@@ -198,8 +199,8 @@ def test_stale_promotion_after_sigkill_real_subprocess(tmp_path: Path) -> None:
         heartbeat.touch()
 
         proc.send_signal(signal.SIGKILL)
-        proc.wait(timeout=5)
-        deadline = time.time() + 2
+        proc.wait(timeout=budget(5))
+        deadline = time.time() + budget(2)
         while _is_pid_alive(proc.pid) and time.time() < deadline:
             time.sleep(0.05)
         assert not _is_pid_alive(proc.pid), "subprocess PID still alive after kill -9"
@@ -219,7 +220,7 @@ def test_stale_promotion_after_sigkill_real_subprocess(tmp_path: Path) -> None:
     finally:
         if proc.poll() is None:
             proc.kill()
-            proc.wait(timeout=5)
+            proc.wait(timeout=budget(5))
         db.close()
 
 

@@ -3,12 +3,19 @@ import time
 
 import pytest
 
+from tests._timeouts import budget
+
 pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="Unix PTY only")
 
 
-def _drain_until(pty, needle: bytes, timeout: float = 5.0) -> bytes:
+def _drain_until(pty, needle: bytes, timeout: float = 5.0,
+                 scale: bool = True) -> bytes:
     buf = b""
-    deadline = time.monotonic() + timeout
+    # Scale here, not at the call sites, so callers waiting on a needle that
+    # should arrive still get the runner's headroom. Pass scale=False when the
+    # needle is never expected and the timeout IS the drain -- scaling that
+    # only burns wall time.
+    deadline = time.monotonic() + (budget(timeout) if scale else timeout)
     while time.monotonic() < deadline:
         chunk = pty.read(4096)
         if not chunk:
@@ -43,7 +50,7 @@ def test_read_returns_empty_quickly_when_idle():
     pty.spawn(cwd="/", cols=80, rows=24)
     try:
         # Drain the initial prompt/banner so the shell is quiescent.
-        _drain_until(pty, b"__no_such_needle__", timeout=1.0)
+        _drain_until(pty, b"__no_such_needle__", timeout=1.0, scale=False)
         # The shell is idle but alive: read() must return b"" promptly (non-blocking)
         # rather than parking in os.read forever.
         start = time.monotonic()

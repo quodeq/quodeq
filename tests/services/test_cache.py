@@ -19,6 +19,7 @@ from quodeq.services._cache import (
     _wait_for_inflight,
     make_lru_dimension_fetcher,
 )
+from tests._timeouts import budget
 
 
 def _make_dim(name: str = "security") -> DimensionResult:
@@ -202,11 +203,11 @@ class TestMakeLruDimensionFetcher:
         t1 = threading.Thread(target=worker, args=(0,))
         t1.start()
         # Wait for t1 to start the fetch, then launch t2 which should wait
-        started.wait(timeout=5)
+        started.wait(timeout=budget(5))
         t2 = threading.Thread(target=worker, args=(1,))
         t2.start()
-        t1.join(timeout=10)
-        t2.join(timeout=10)
+        t1.join(timeout=budget(10))
+        t2.join(timeout=budget(10))
 
         # Both should have results
         assert results[0] is not None

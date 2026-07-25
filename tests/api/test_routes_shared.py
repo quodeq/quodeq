@@ -21,6 +21,7 @@ from quodeq.services.shared_repo import (
     shared_cache_dir,
     shared_repo_path,
 )
+from tests._timeouts import budget
 
 _ORIGIN = {"Origin": "http://localhost"}
 
@@ -356,11 +357,11 @@ def test_delete_config_waits_for_clone_lock(client, monkeypatch, tmp_path):
     def _hold_lock():
         with lock:
             lock_acquired.set()
-            release_lock.wait(timeout=5)
+            release_lock.wait(timeout=budget(5))
 
     holder = threading.Thread(target=_hold_lock, name="holder")
     holder.start()
-    assert lock_acquired.wait(timeout=5), "lock holder thread never acquired the lock"
+    assert lock_acquired.wait(timeout=budget(5)), "lock holder thread never acquired the lock"
 
     results: list = []
     # A fresh, un-entered client (rather than the fixture's own `client`,
@@ -381,8 +382,8 @@ def test_delete_config_waits_for_clone_lock(client, monkeypatch, tmp_path):
     assert cache_dir.exists(), "cache dir was removed while the clone lock was still held"
 
     release_lock.set()
-    delete_thread.join(timeout=5)
-    holder.join(timeout=5)
+    delete_thread.join(timeout=budget(5))
+    holder.join(timeout=budget(5))
 
     assert not delete_thread.is_alive(), "DELETE deadlocked waiting for the clone lock"
     assert not holder.is_alive()

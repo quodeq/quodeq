@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from tests._timeouts import budget
+
 
 # The signal-escalation tests exercise POSIX process-group semantics
 # (start_new_session=True, killpg, SIGKILL). Windows has no equivalent
@@ -55,8 +57,12 @@ def _start_reaper(proc: subprocess.Popen) -> threading.Event:
 
 
 def _wait_for_exit(proc: subprocess.Popen, timeout: float) -> bool:
-    """Poll proc.poll() up to *timeout* seconds; return True if it exited."""
-    deadline = time.monotonic() + timeout
+    """Poll proc.poll() up to *timeout* seconds; return True if it exited.
+
+    Scaled at the point of use so callers passing an explicit *timeout* still
+    get the loaded-runner headroom.
+    """
+    deadline = time.monotonic() + budget(timeout)
     while time.monotonic() < deadline:
         if proc.poll() is not None:
             return True
@@ -73,7 +79,7 @@ def _force_cleanup(proc: subprocess.Popen) -> None:
     except (OSError, ProcessLookupError):
         pass
     try:
-        proc.wait(timeout=5)
+        proc.wait(timeout=budget(5))
     except subprocess.TimeoutExpired:
         pass
 
@@ -253,7 +259,7 @@ def test_cancel_external_run_kills_child_processes_in_same_group(tmp_path):
 
         # Both parent and child must be gone.
         assert _wait_for_exit(proc, timeout=5.0), "parent still alive after cancel"
-        deadline = time.monotonic() + 5.0
+        deadline = time.monotonic() + budget(5.0)
         child_dead = False
         while time.monotonic() < deadline:
             try:
