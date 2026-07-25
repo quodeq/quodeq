@@ -54,20 +54,37 @@ function buildPartialTooltip({ filesRead, sourceFileCount, exitReason }) {
   return parts.join(' · ');
 }
 
-function CoverageLine({ dateText, coveragePct, isPartial, tooltip }) {
+/**
+ * Findings the scan produced but scoring never saw, because the principle they
+ * named is not in this dimension's standard. Not a findings bucket: they have no
+ * principle, so no card and no score. The count sits next to coverage because it
+ * answers the same question, how much of the evidence actually reached the grade.
+ *
+ * Renders nothing at 0, which is every healthy run and every report written
+ * before the field existed.
+ */
+function UnmappedSegment({ count }) {
+  if (!count) return null;
+  const noun = count === 1 ? 'finding' : 'findings';
+  return (
+    <> · <span
+      className="dim-gauge-card__unmapped"
+      title={`${count.toLocaleString()} ${noun} excluded from scoring: the principle named is not in this dimension's standard`}
+    >{count.toLocaleString()} unmapped</span></>
+  );
+}
+
+function CoverageLine({ dateText, coveragePct, isPartial, tooltip, quarantinedCount }) {
   if (!dateText) return null;
-  if (coveragePct === null) {
-    return (
-      <div className="dim-gauge-card__coverage-line" title={isPartial ? tooltip : undefined}>
-        {dateText}
-      </div>
-    );
-  }
   return (
     <div className="dim-gauge-card__coverage-line" title={isPartial ? tooltip : undefined}>
-      {dateText} · <span
-        className={`dim-gauge-card__coverage-pct${isPartial ? ' dim-gauge-card__coverage-pct--partial' : ''}`}
-      >{coveragePct}%</span>
+      {dateText}
+      {coveragePct !== null && (
+        <> · <span
+          className={`dim-gauge-card__coverage-pct${isPartial ? ' dim-gauge-card__coverage-pct--partial' : ''}`}
+        >{coveragePct}%</span></>
+      )}
+      <UnmappedSegment count={quarantinedCount} />
     </div>
   );
 }
@@ -201,6 +218,7 @@ export default function DimensionGaugeCard({
         coveragePct={coverage.coveragePct}
         isPartial={coverage.isPartial}
         tooltip={partialTooltip}
+        quarantinedCount={item.quarantinedCount}
       />
     </article>
   );

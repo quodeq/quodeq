@@ -22,6 +22,10 @@ class _GroupedJudgments:
     violations: dict[str, list[Judgment]]
     compliance: dict[str, list[Judgment]]
     severity: dict[str, str]
+    # Findings dropped for naming a principle the standard does not define.
+    # Reported as run metadata so a run that discarded most of its evidence is
+    # distinguishable from a clean one; never re-joined to the findings lists.
+    quarantined: int = 0
 
 
 def _build_req_to_principle_map(dimension: str, evaluators_dir: Path | None = None) -> dict[str, str]:
@@ -144,6 +148,7 @@ def _group_judgments(
     sc_violations: dict[str, list[Judgment]] = {}
     sc_compliance: dict[str, list[Judgment]] = {}
     sc_severity: dict[str, str] = {}
+    quarantined = 0
 
     for j in judgments:
         # When the dimension has a standard, a finding whose principle is not
@@ -161,6 +166,7 @@ def _group_judgments(
                 resolver.req_to_principle.get(j.practice_id, j.practice_id),
                 j.practice_id, j.req, j.file,
             )
+            quarantined += 1
             continue
         if j.verdict == "violation":
             sc_violations.setdefault(principle, []).append(j)
@@ -170,4 +176,4 @@ def _group_judgments(
         if principle not in sc_severity or _sev_rank(sev) > _sev_rank(sc_severity[principle]):
             sc_severity[principle] = sev
 
-    return _GroupedJudgments(sc_violations, sc_compliance, sc_severity)
+    return _GroupedJudgments(sc_violations, sc_compliance, sc_severity, quarantined)

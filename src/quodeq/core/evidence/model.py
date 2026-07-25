@@ -148,6 +148,10 @@ class Evidence:
     coverage_pct: float
     principles: dict[str, PrincipleEvidence] = field(default_factory=dict)
     dismissed_count: int = 0
+    # Findings excluded for naming a principle outside the dimension's standard.
+    # Trust metadata alongside coverage_pct: it does not affect the score, it
+    # says how much of the evidence reached scoring at all.
+    quarantined_count: int = 0
     meta: dict = field(default_factory=dict)
     module: str = ""
     exit_reason: str | None = None
@@ -201,6 +205,7 @@ def evidence_to_scoring_dict(evidence: Evidence) -> dict:
         "source_file_count": evidence.source_file_count,
         "files_read": evidence.files_read,
         "coverage_pct": evidence.coverage_pct,
+        "quarantined_count": evidence.quarantined_count,
         "exit_reason": evidence.exit_reason,
         "meta": evidence.meta,
         "principles": principles,
