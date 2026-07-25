@@ -130,11 +130,22 @@ function elapsedCell(elapsedS, label = 'ELAPSED', hint = null) {
   };
 }
 
-function foundCell(liveCount, label = 'FOUND', hint = 'live violations') {
+/**
+ * The count of findings this run re-discovered but the user had already
+ * dismissed or deleted, as a hint suffix. Without it the counter silently
+ * drops a number that can dwarf what's shown — on a project with a triage
+ * history the scan re-finds hundreds of suppressed findings every run.
+ */
+export function suppressedSuffix(suppressedCount) {
+  if (!(suppressedCount > 0)) return '';
+  return ` · ${suppressedCount} suppressed`;
+}
+
+function foundCell(liveCount, label = 'FOUND', hint = 'live violations', suppressedCount = 0) {
   return {
     label,
     value: liveCount,
-    hint,
+    hint: `${hint}${suppressedSuffix(suppressedCount)}`,
     tone: liveCount > 0 ? 'critical' : 'default',
   };
 }
@@ -147,6 +158,7 @@ function foundCell(liveCount, label = 'FOUND', hint = 'live violations') {
  * @param {number} inputs.totalFiles
  * @param {number|null|undefined} inputs.elapsedS
  * @param {number} inputs.liveCount
+ * @param {number} [inputs.suppressedCount] — re-found findings already dismissed/deleted
  * @returns {Array<{label,value,hint,tone}>} exactly 4 cells.
  */
 export function buildJobStatCells(status, inputs) {
@@ -157,7 +169,7 @@ export function buildJobStatCells(status, inputs) {
     return [
       statusCell,
       { label: 'SCANNED', value: inputs.totalFiles > 0 ? inputs.totalFiles : '—', hint: 'files', tone: 'default' },
-      foundCell(inputs.liveCount, 'VIOLATIONS', severityHint(inputs.liveCount)),
+      foundCell(inputs.liveCount, 'VIOLATIONS', severityHint(inputs.liveCount), inputs.suppressedCount),
       elapsedCell(inputs.elapsedS, 'DURATION', 'total'),
     ];
   }
@@ -165,7 +177,7 @@ export function buildJobStatCells(status, inputs) {
   return [
     statusCell,
     progressCell(inputs),
-    foundCell(inputs.liveCount),
+    foundCell(inputs.liveCount, 'FOUND', 'live violations', inputs.suppressedCount),
     elapsedCell(inputs.elapsedS, 'ELAPSED', inputs.etaHint ?? null),
   ];
 }

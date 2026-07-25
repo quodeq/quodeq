@@ -70,7 +70,7 @@ class TestHeartbeatFormat:
             dimension="security", mins=1, secs=2,
             active=2, plural="s",
             taken=10, total_files=30, remaining=20,
-            violations=2, compliance=5,
+            violations=2, compliance=5, suppressed="",
         )
         assert line.startswith("[security] 1m02s")
         assert "2 v · 5 c" in line
@@ -84,9 +84,29 @@ class TestHeartbeatFormat:
             dimension="security", mins=0, secs=5,
             active=1, plural="",
             taken=1, total_files=2, remaining=1,
-            violations=0, compliance=0,
+            violations=0, compliance=0, suppressed="",
         )
         assert line.endswith("1 agent")
+
+    def test_suppressed_segment_follows_the_compliance_count(self) -> None:
+        line = _HEARTBEAT_FMT.format(
+            dimension="reliability", mins=16, secs=1,
+            active=1, plural="",
+            taken=34, total_files=34, remaining=0,
+            violations=122, compliance=261, suppressed=" · 339 supp",
+        )
+        assert "122 v · 261 c · 339 supp |" in line
+
+    def test_no_suppressed_segment_when_nothing_is_hidden(self) -> None:
+        """A project with no dismissals must keep the pre-existing line shape."""
+        line = _HEARTBEAT_FMT.format(
+            dimension="reliability", mins=1, secs=0,
+            active=1, plural="",
+            taken=1, total_files=2, remaining=1,
+            violations=7, compliance=3, suppressed="",
+        )
+        assert "7 v · 3 c |" in line
+        assert "supp" not in line
 
 
 class TestHeartbeatLoop:
