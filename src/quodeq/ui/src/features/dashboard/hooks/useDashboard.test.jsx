@@ -3,7 +3,7 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useDashboard } from "./useDashboard";
-import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
+import { withQueryClient, withStableQueryApi } from "../../../test-utils/withQueryClient.jsx";
 import { ApiProvider } from "../../../api/ApiContext.jsx";
 import { projectKeys } from "../../../api/queryKeys.js";
 
@@ -475,21 +475,11 @@ describe("useDashboard frozen historical runs", () => {
   // loading false, so no loading state either) until the new project's fetch
   // lands. See samePlaceholderScope in api/queryKeys.js.
   //
-  // NOTE: build the wrapper ONCE. `wrap()` above calls withQueryClient()
-  // during the wrapper's render, minting a new component type every render;
-  // React remounts the subtree and destroys the observer that carries the
-  // placeholder, so the bug becomes invisible to the test.
+  // NOTE: these tests must NOT use `wrap()` above — it remounts the subtree on
+  // every render and destroys the observer that carries the placeholder, so
+  // they would pass against the bug. See withStableQueryApi's doc comment.
   describe("placeholder scope", () => {
-    function stableWrapper(api) {
-      const QC = withQueryClient();
-      return function Wrapper({ children }) {
-        return (
-          <QC>
-            <ApiProvider value={api}>{children}</ApiProvider>
-          </QC>
-        );
-      };
-    }
+    const stableWrapper = withStableQueryApi;
 
     it("drops the previous project's dashboard while the new project loads", async () => {
       let release;

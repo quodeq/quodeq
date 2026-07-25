@@ -4,7 +4,7 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { usePublish } from './usePublish.js';
 import { useSharedProjects } from './useSharedProjects.js';
-import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
+import { withQueryClient, withStableQueryApi } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
 
@@ -40,21 +40,10 @@ function wrap(fakeApi, children) {
   );
 }
 
-// Rerender-safe wrapper: builds the QueryClient wrapper component ONCE.
-// The inline `({ children }) => wrap(fakeApi, children)` idiom above calls
-// withQueryClient() on every render, producing a NEW component type each
-// time -- a rerender() would remount the whole tree and silently reset all
-// hook state. Tests that rerender (the enabled-toggle repros) must use this.
-function makeStableWrapper(fakeApi) {
-  const QC = withQueryClient();
-  return function StableWrapper({ children }) {
-    return (
-      <QC>
-        <ApiProvider value={fakeApi}>{children}</ApiProvider>
-      </QC>
-    );
-  };
-}
+// Rerender-safe wrapper. See withStableQueryApi's doc comment for why the
+// inline `({ children }) => wrap(fakeApi, children)` idiom above must not be
+// used by any test that rerenders.
+const makeStableWrapper = withStableQueryApi;
 
 describe('usePublish', () => {
   it('publish(id) ignores a second call while the first is still in flight (double-click guard)', async () => {

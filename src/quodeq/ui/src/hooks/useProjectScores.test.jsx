@@ -3,7 +3,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useProjectScores } from "./useProjectScores";
-import { withQueryClient } from "../test-utils/withQueryClient.jsx";
+import { withQueryClient, withStableQueryApi } from "../test-utils/withQueryClient.jsx";
 import { ApiProvider } from "../api/ApiContext.jsx";
 import { projectKeys } from "../api/queryKeys.js";
 
@@ -181,21 +181,11 @@ describe("useProjectScores", () => {
   // the previous project's scores on screen (and suppresses `loading`) until
   // the new fetch lands.
   //
-  // NOTE: these tests must NOT use `wrap()` above. It calls withQueryClient()
-  // during the wrapper's render, minting a fresh component type every render —
-  // React then remounts the whole subtree, destroying the very observer that
-  // carries placeholderData across a key change. Build the wrapper ONCE.
+  // NOTE: these tests must NOT use `wrap()` above — it remounts the subtree on
+  // every render and destroys the observer that carries placeholderData, so
+  // they would pass against the bug. See withStableQueryApi's doc comment.
   describe("placeholder scope", () => {
-    function stableWrapper(api) {
-      const QC = withQueryClient();
-      return function Wrapper({ children }) {
-        return (
-          <QC>
-            <ApiProvider value={api}>{children}</ApiProvider>
-          </QC>
-        );
-      };
-    }
+    const stableWrapper = withStableQueryApi;
 
     it("drops the previous project's scores while the new project loads", async () => {
       let release;
