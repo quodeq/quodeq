@@ -256,6 +256,30 @@ export function shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, s
  * consumed but never forwarded). Exported so producer and consumer can be
  * pinned together in tests without mounting the whole App.
  */
+/**
+ * The dashboard data bundle handed to every DashboardPage route.
+ *
+ * Same hazard as buildNavigationBundle, quieter failure: this is an explicit
+ * key whitelist, so a field added to useAppState and read by DashboardPage
+ * silently arrives as undefined unless it is forwarded here. Nothing throws --
+ * the feature just never activates (that is how scoresPending, and the
+ * dimension-panel pending state that depends on it, was inert at first).
+ * Exported so producer and consumer can be pinned together in tests.
+ */
+export function buildDashboardDataBundle({ state, sharedHasContent = false }) {
+  return {
+    selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
+    projectsLoaded: state.projectsLoaded,
+    dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
+    scoresPending: state.scoresPending,
+    sharedProjectInfo: state.sharedProjectInfo,
+    availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
+    selectedDisplayName: state.selectedDisplayName,
+    granularity: state.granularity, onGranularityChange: state.onGranularityChange,
+    sharedHasContent,
+  };
+}
+
 export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluating, showToast, setWizardEntry, sharedHasContent = false }) {
   return {
     selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
@@ -1048,16 +1072,7 @@ export default function App() {
   );
 
   const contentProps = {
-    dashboardData: {
-      selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
-      projectsLoaded: state.projectsLoaded,
-      dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
-      sharedProjectInfo: state.sharedProjectInfo,
-      availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
-      selectedDisplayName: state.selectedDisplayName,
-      granularity: state.granularity, onGranularityChange: state.onGranularityChange,
-      sharedHasContent: sharedSignal.hasContent,
-    },
+    dashboardData: buildDashboardDataBundle({ state, sharedHasContent: sharedSignal.hasContent }),
     navigation: buildNavigationBundle({
       state, navTab, navStackLength: navStack.length,
       isEvaluating, showToast, setWizardEntry,

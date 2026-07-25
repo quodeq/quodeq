@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import {
   buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
   resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldRedirectToRemoteRepositories, shouldShowProjectTabs,
-  buildNavigationBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
+  buildNavigationBundle, buildDashboardDataBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
   buildAssistantActionAppliedHandler, resolveProjectDisplayName,
 } from './App.jsx';
 import Sidebar from './components/Sidebar.jsx';
@@ -730,5 +730,41 @@ describe('resolveSelectionAfterSharedDisconnect', () => {
   it('clears the selection to the app\'s no-project state when there are no local projects', () => {
     expect(resolveSelectionAfterSharedDisconnect({ selectedSource: 'shared', projects: [] }))
       .toEqual({ id: '', source: 'local' });
+  });
+});
+
+// Same producer x consumer hazard as buildNavigationBundle, but silent: the
+// dashboard bundle is an explicit key whitelist, so a field DashboardPage
+// reads arrives as undefined unless it is forwarded. Nothing throws — the
+// feature is simply inert, which is exactly how the dimension-panel pending
+// state shipped dead the first time.
+describe('buildDashboardDataBundle', () => {
+  const stubState = () => ({
+    selectedProject: 'p1', selectedSource: 'local', selectedRun: 'latest',
+    projects: [], projectsLoaded: true,
+    dashboard: {}, accumulated: {}, latestAccumulated: {},
+    loading: false, isFetching: false, scoresPending: true, error: null,
+    sharedProjectInfo: null,
+    availableRuns: [], dailyRuns: [], overviewRunIndex: 0,
+    selectedDisplayName: 'p1',
+    granularity: 'day', onGranularityChange: () => {},
+  });
+
+  it('forwards scoresPending (the dimension cards look settled while stale without it)', () => {
+    const bundle = buildDashboardDataBundle({ state: stubState(), sharedHasContent: false });
+    expect(bundle.scoresPending).toBe(true);
+  });
+
+  it('forwards every key DashboardPage destructures off its data prop', () => {
+    const bundle = buildDashboardDataBundle({ state: stubState(), sharedHasContent: true });
+    // Mirrors the destructure at the top of DashboardPage.
+    const consumed = [
+      'selectedProject', 'selectedSource', 'selectedRun', 'projects', 'sharedProjectInfo',
+      'dashboard', 'accumulated', 'loading', 'isFetching', 'scoresPending', 'error',
+      'availableRuns', 'dailyRuns', 'overviewRunIndex', 'granularity',
+      'onGranularityChange', 'sharedHasContent',
+    ];
+    const missing = consumed.filter((k) => !(k in bundle));
+    expect(missing).toEqual([]);
   });
 });

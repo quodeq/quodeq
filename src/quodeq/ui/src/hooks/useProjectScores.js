@@ -106,6 +106,11 @@ export function useProjectScores({ selectedProject, selectedRun, selectedSource 
     scores: scoresQuery.data ?? null,
     latestScores: latestQuery.data ?? null,
     loading: scoresQuery.isLoading || latestQuery.isLoading,
+    // True while the panel is rendering the PREVIOUS selection's scores because
+    // the newly-picked run is still in flight. placeholderData keeps those old
+    // numbers on screen, so without this the dimension cards look settled while
+    // showing another day's grades.
+    scoresPending: scoresQuery.isPlaceholderData,
     error:
       (scoresQuery.isError || latestQuery.isError)
         ? "Failed to load score data. Check your connection and try refreshing."
