@@ -67,6 +67,10 @@ def parse_report_json(json_path: Path) -> dict[str, Any] | None:
         # missing values as "no coverage signal" and skips the badge.
         "filesRead": data.get("filesRead"),
         "sourceFileCount": data.get("sourceFileCount"),
+        # Findings that never reached scoring because they named a principle
+        # outside the standard. Same trust-signal tier as the coverage numbers;
+        # reports written before this field default to 0 (nothing known dropped).
+        "quarantinedCount": data.get("quarantinedCount", 0),
         "exitReason": data.get("exitReason"),
         "principles": [
             {"name": p.get("name"), "score": p.get("score"), "grade": p.get("grade")}

@@ -163,6 +163,71 @@ describe('DimensionGaugeCard', () => {
 
   });
 
+  describe('unmapped findings', () => {
+    const dateLabel = '13 May 2026';
+    const coverageLineMatcher = (expectedText) => (_, el) =>
+      el?.classList?.contains('dim-gauge-card__coverage-line') &&
+      el.textContent.replace(/\s+/g, ' ').trim() === expectedText;
+
+    const renderWith = (extra) =>
+      render(
+        <DimensionGaugeCard
+          item={{ ...baseItem, filesRead: 100, sourceFileCount: 100, ...extra }}
+          dateLabel={dateLabel}
+          onDimensionClick={() => {}}
+        />,
+      );
+
+    it('appends "· N unmapped" after the coverage percentage', () => {
+      renderWith({ quarantinedCount: 1 });
+      expect(
+        screen.getByText(coverageLineMatcher(`${dateLabel} · 100% · 1 unmapped`)),
+      ).toBeInTheDocument();
+    });
+
+    it('explains the exclusion in a tooltip on the segment itself', () => {
+      renderWith({ quarantinedCount: 12 });
+      const seg = screen.getByText('12 unmapped');
+      expect(seg.getAttribute('title')).toBe(
+        '12 findings excluded from scoring: the principle named is not in this dimension\'s standard',
+      );
+    });
+
+    it('uses the singular noun for one finding', () => {
+      renderWith({ quarantinedCount: 1 });
+      expect(screen.getByText('1 unmapped').getAttribute('title')).toContain('1 finding excluded');
+    });
+
+    it('renders nothing at zero, keeping the pre-existing line shape', () => {
+      renderWith({ quarantinedCount: 0 });
+      expect(
+        screen.getByText(coverageLineMatcher(`${dateLabel} · 100%`)),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/unmapped/)).toBeNull();
+    });
+
+    it('renders nothing when the field is absent, as on reports written before it existed', () => {
+      renderWith({});
+      expect(
+        screen.getByText(coverageLineMatcher(`${dateLabel} · 100%`)),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/unmapped/)).toBeNull();
+    });
+
+    it('still shows on a legacy run that has no file counts', () => {
+      render(
+        <DimensionGaugeCard
+          item={{ ...baseItem, quarantinedCount: 3 }}
+          dateLabel={dateLabel}
+          onDimensionClick={() => {}}
+        />,
+      );
+      expect(
+        screen.getByText(coverageLineMatcher(`${dateLabel} · 3 unmapped`)),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe('partial coverage colouring', () => {
     it('applies the partial CSS class to the coverage % span when exitReason != "done"', () => {
       const item = {
