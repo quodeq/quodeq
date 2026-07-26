@@ -20,6 +20,10 @@ _DEFAULT_MAX_ZIP_SIZE_MB = 500
 _MANIFEST_FILENAME = "manifest.json"
 _MANIFEST_KIND = "quodeq-project-export"
 _MANIFEST_SCHEMA = 1
+# Import allows the extracted (uncompressed) archive to reach the MB cap times
+# this multiple (evaluation data is text that deflates ~5x). Export applies the
+# same bound so it never produces an archive that would fail re-import.
+_EXTRACT_HEADROOM = 10
 
 
 def _max_zip_size_bytes(max_mb: int | None = None, env: dict[str, str] | None = None) -> int:
@@ -66,30 +70,52 @@ def _build_manifest(project_path: Path) -> dict[str, object]:
 
 
 def _build_project_zip(project_path: Path) -> Path:
-    """Create a temporary zip archive of a project directory and return its path."""
+    """Create a temporary zip archive of a project directory and return its path.
+
+    Two caps mirror the import side so a successful export always re-imports:
+    the compressed archive against the MB limit, and the total uncompressed size
+    against that limit times ``_EXTRACT_HEADROOM``.
+    """
     fd, tmp_path = tempfile.mkstemp(suffix=".zip", prefix="quodeq_export_")
     os.close(fd)
-    total_size = 0
     size_limit = _max_zip_size_bytes()
+    uncompressed_limit = size_limit * _EXTRACT_HEADROOM
+    compressed_error = ValueError(
+        f"Project exceeds maximum export size of {size_limit // (1024 * 1024)} MB compressed. "
+        f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
+    )
+    uncompressed_error = ValueError(
+        f"Project exceeds maximum uncompressed size of "
+        f"{uncompressed_limit // (1024 * 1024)} MB (it would be rejected on re-import). "
+        f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
+    )
     try:
-        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
-            for file_entry in project_path.rglob("*"):
-                if file_entry.is_symlink():
-                    continue
-                if not file_entry.is_file():
-                    continue
-                # Skip any prior manifest so the export-time one is authoritative.
-                if file_entry == project_path / _MANIFEST_FILENAME:
-                    continue
-                total_size += file_entry.stat().st_size
-                if total_size > size_limit:
-                    raise ValueError(
-                        f"Project exceeds maximum export size of {size_limit // (1024 * 1024)} MB. "
-                        f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
-                    )
-                zf.write(file_entry, file_entry.relative_to(project_path.parent))
-            manifest_arcname = f"{project_path.name}/{_MANIFEST_FILENAME}"
-            zf.writestr(manifest_arcname, json.dumps(_build_manifest(project_path), indent=2))
+        with open(tmp_path, "wb") as fh:
+            with zipfile.ZipFile(fh, "w", zipfile.ZIP_DEFLATED) as zf:
+                total_uncompressed = 0
+                for file_entry in project_path.rglob("*"):
+                    if file_entry.is_symlink():
+                        continue
+                    if not file_entry.is_file():
+                        continue
+                    # Skip any prior manifest so the export-time one is authoritative.
+                    if file_entry == project_path / _MANIFEST_FILENAME:
+                        continue
+                    zf.write(file_entry, file_entry.relative_to(project_path.parent))
+                    total_uncompressed += file_entry.stat().st_size
+                    if fh.tell() > size_limit:
+                        raise compressed_error
+                    if total_uncompressed > uncompressed_limit:
+                        raise uncompressed_error
+                manifest_json = json.dumps(_build_manifest(project_path), indent=2)
+                manifest_arcname = f"{project_path.name}/{_MANIFEST_FILENAME}"
+                zf.writestr(manifest_arcname, manifest_json)
+                total_uncompressed += len(manifest_json.encode("utf-8"))
+                if total_uncompressed > uncompressed_limit:
+                    raise uncompressed_error
+        # The central directory is written on close; re-check the final size.
+        if os.path.getsize(tmp_path) > size_limit:
+            raise compressed_error
     except (OSError, zipfile.BadZipFile, ValueError):
         os.unlink(tmp_path)
         raise

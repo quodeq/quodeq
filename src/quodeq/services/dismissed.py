@@ -241,17 +241,6 @@ def restore_all_findings(project_dir: Path) -> int:
     return count
 
 
-def _finding_key(f: Finding) -> tuple:
-    # line is coerced to int to match the stored dismiss key (dismissed_keys
-    # stores int(line)); Finding.line is typed int|str|None, so a string line
-    # would otherwise never match its own dismissal.
-    try:
-        line = int(f.line)
-    except (TypeError, ValueError):
-        line = 0
-    return (f.req or "", f.file or "", line)
-
-
 def recount_totals(
     violations: list[Finding],
     compliance_count: int | None = None,
@@ -285,12 +274,18 @@ def filter_dismissed_from_dimensions(
     Recalculates totals for any dimension whose violations were filtered.
     Leaves compliance, principles, overall_score, overall_grade unchanged.
     """
+    from quodeq.services.suppression import is_dismissed  # noqa: PLC0415
+
     keys = dismissed_keys(project_dir)
     if not keys:
         return dimensions
     result = []
     for dim in dimensions:
-        filtered = [v for v in dim.violations if _finding_key(v) not in keys]
+        filtered = [
+            v for v in dim.violations
+            if not is_dismissed(keys, req=v.req, principle=v.practice_id,
+                                file=v.file, line=v.line)
+        ]
         if len(filtered) == len(dim.violations):
             result.append(dim)
         else:

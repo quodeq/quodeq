@@ -3,9 +3,9 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import {
   buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
-  resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldShowProjectTabs,
-  buildNavigationBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
-  resolveProjectDisplayName,
+  resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldRedirectToRemoteRepositories, shouldShowProjectTabs,
+  buildNavigationBundle, buildDashboardDataBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
+  buildAssistantActionAppliedHandler, resolveProjectDisplayName,
 } from './App.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
@@ -115,9 +115,10 @@ describe('ROUTE_RENDERERS onDismiss source gating', () => {
   function baseProps(selectedSource) {
     return {
       navigation: { selectedProject: 'proj1', selectedRun: 'latest', selectedSource, projects: [] },
-      dismissFinding: vi.fn(),
+      dismissFinding: vi.fn().mockResolvedValue({ scores: { dimensions: [] }, delta: {} }),
       applyDelta: vi.fn(),
       refreshDashboard: vi.fn(),
+      scheduleDashboardReconcile: vi.fn(),
       bumpDismissRefresh: vi.fn(),
     };
   }
@@ -155,6 +156,164 @@ describe('ROUTE_RENDERERS onDismiss source gating', () => {
   it('eval-principle-detail (alias route) also gates onDismiss for a shared project', () => {
     const el = ROUTE_RENDERERS['eval-principle-detail']({ evalPrincipal: { principle: 'P', dimension: 'Security' } }, baseProps('shared'));
     expect(el.props.onDismiss).toBeUndefined();
+  });
+
+  // The dashboard must eventually reflect a dismiss even though the delta
+  // patch is only best-effort (e.g. it doesn't cover every view). Each
+  // onDismiss success path makes ONE reconcile call: scheduleDashboardReconcile
+  // marks the project queries stale synchronously AND actively refetches the
+  // always-mounted Overview observer after the debounce (see useDashboard.js),
+  // so a separate refreshDashboard call would be redundant.
+  it('file route onDismiss calls scheduleDashboardReconcile and bumpDismissRefresh on success', async () => {
+    const props = baseProps('local');
+    const el = ROUTE_RENDERERS.file({ file: { path: 'a.py' }, runId: 'r1' }, props);
+    await el.props.onDismiss({ reason: 'test' });
+    expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+    expect(props.refreshDashboard).not.toHaveBeenCalled();
+    expect(props.bumpDismissRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('finding route onDismiss calls scheduleDashboardReconcile and bumpDismissRefresh on success', async () => {
+    const props = baseProps('local');
+    const el = ROUTE_RENDERERS.finding({ finding: {}, principle: 'P', dimension: 'Security' }, props);
+    await el.props.onDismiss({ reason: 'test' });
+    expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+    expect(props.refreshDashboard).not.toHaveBeenCalled();
+    expect(props.bumpDismissRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('evalprinciple route onDismiss calls scheduleDashboardReconcile and bumpDismissRefresh on success', async () => {
+    const props = baseProps('local');
+    const el = ROUTE_RENDERERS.evalprinciple({ evalPrincipal: { principle: 'P', dimension: 'Security' } }, props);
+    await el.props.onDismiss({ reason: 'test' });
+    expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+    expect(props.refreshDashboard).not.toHaveBeenCalled();
+    expect(props.bumpDismissRefresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ViolationsPage fires its onRefresh on every mount (see
+// ViolationsPage.jsx's tabKey effect) -- including plain drill-down/back
+// navigation with no mutation involved, since the page remounts on every
+// round trip. Wiring onRefresh to scheduleDashboardReconcile (as a prior
+// revision did) turned every such round trip into an ACTIVE refetch of the
+// 10-20 MB dashboard payload -- the exact freeze refetchType:'none' exists
+// to avoid. onRefresh must stay wired to the lazy refreshDashboard; only the
+// four suppression-mutation handlers in useDismissedFindings.js (restore/
+// restore-all/delete/delete-all) get the debounced ACTIVE reconcile, via the
+// separate onReconcile callback threaded down from here.
+describe('ViolationsRoute onRefresh/onReconcile wiring (Dismissed tab reconcile)', () => {
+  function renderViolationsRoute(props) {
+    const outer = ROUTE_RENDERERS.violations({}, props);
+    // ROUTE_RENDERERS.violations returns <ViolationsRoute params props />;
+    // ViolationsRoute itself has no hooks, so invoking it directly (the way
+    // React would) is safe without mounting a component tree.
+    return outer.type(outer.props);
+  }
+
+  function violationsProps() {
+    return {
+      dashboardData: { latestAccumulated: null, accumulated: null, selectedDisplayName: 'p1', loading: false, isFetching: false },
+      navigation: { selectedProject: 'proj1', selectedSource: 'local', projects: [], projectsLoaded: true, handleNavigate: vi.fn(), navStackLength: 1 },
+      dismissRefreshKey: 0,
+      refreshDashboard: vi.fn(),
+      scheduleDashboardReconcile: vi.fn(),
+    };
+  }
+
+  it('wires onRefresh to refreshDashboard (lazy mark-stale) so plain navigation never forces an active refetch', () => {
+    const props = violationsProps();
+    const inner = renderViolationsRoute(props);
+    expect(inner.props.callbacks.onRefresh).toBe(props.refreshDashboard);
+    expect(inner.props.callbacks.onRefresh).not.toBe(props.scheduleDashboardReconcile);
+  });
+
+  it('wires onReconcile to scheduleDashboardReconcile, for the suppression-mutation handlers to call in addition to onRefresh', () => {
+    const props = violationsProps();
+    const inner = renderViolationsRoute(props);
+    expect(inner.props.callbacks.onReconcile).toBe(props.scheduleDashboardReconcile);
+  });
+});
+
+// An assistant-applied dismiss mutates exactly the payloads a manual dismiss
+// does, so it owes the same convergence follow-ups the manual paths got: the
+// instant delta patch, the dismissed-list bump, the lazy mark-stale, AND the
+// debounced ACTIVE reconcile. The reconcile is the one that reaches the
+// Overview -- its useDashboard observer is mounted at the app root and never
+// remounts, and pywebview never fires a focus-refetch -- so without it, any
+// view the delta doesn't cover keeps showing pre-dismiss numbers, which is
+// the "nothing updated" symptom the manual paths were fixed for.
+describe('buildAssistantActionAppliedHandler', () => {
+  function deps(overrides = {}) {
+    return {
+      applyDelta: vi.fn(),
+      bumpDismissRefresh: vi.fn(),
+      scheduleDashboardReconcile: vi.fn(),
+      selectedProject: 'proj1',
+      ...overrides,
+    };
+  }
+
+  const dismissEvent = (detail) => ({ detail: { actionType: 'dismiss_finding', ...detail } });
+
+  it('schedules the active dashboard reconcile after a dismiss apply', () => {
+    const d = deps();
+    buildAssistantActionAppliedHandler(d)(dismissEvent({ delta: { project: 'proj1' }, scores: {} }));
+    expect(d.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it('bumps the dismissed list alongside the reconcile', () => {
+    const d = deps();
+    buildAssistantActionAppliedHandler(d)(dismissEvent({ delta: { project: 'proj1' }, scores: {} }));
+    expect(d.bumpDismissRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  // The regression this pins: a dismiss whose response carries no delta at
+  // all has NOTHING patching the visible screen, so the reconcile is the only
+  // path back to correct numbers. Skipping it here would be silently wrong.
+  it('still reconciles when the apply response carries no delta to patch', () => {
+    const d = deps();
+    buildAssistantActionAppliedHandler(d)(dismissEvent({}));
+    expect(d.applyDelta).not.toHaveBeenCalled();
+    expect(d.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+  });
+
+  // applyDelta writes into a project-keyed cache, so it must use the delta's
+  // frozen project rather than the live selection (the apply POST can resolve
+  // after a project switch). The reconcile is only a refetch, so it stays on
+  // the live selection -- aiming it wrong re-pulls data, it never corrupts.
+  it('patches the delta against the delta\'s own project, not the live selection', () => {
+    const d = deps({ selectedProject: 'proj2' });
+    buildAssistantActionAppliedHandler(d)(dismissEvent({ delta: { project: 'proj1' }, scores: { dimensions: [] } }));
+    expect(d.applyDelta).toHaveBeenCalledWith('proj1', { dimensions: [] }, { project: 'proj1' });
+  });
+
+  it('falls back to the live selection when the delta names no project', () => {
+    const d = deps({ selectedProject: 'proj2' });
+    buildAssistantActionAppliedHandler(d)(dismissEvent({ delta: { some: 'delta' }, scores: {} }));
+    expect(d.applyDelta).toHaveBeenCalledWith('proj2', {}, { some: 'delta' });
+  });
+
+  // The patch is best-effort; a throw must not swallow the follow-ups that
+  // are the actual convergence guarantee.
+  it('still reconciles when the delta patch throws', () => {
+    const d = deps({ applyDelta: vi.fn(() => { throw new Error('bad delta'); }) });
+    buildAssistantActionAppliedHandler(d)(dismissEvent({ delta: { project: 'proj1' }, scores: {} }));
+    expect(d.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores assistant actions that are not dismissals', () => {
+    const d = deps();
+    buildAssistantActionAppliedHandler(d)({ detail: { actionType: 'verify_finding', delta: {} } });
+    expect(d.applyDelta).not.toHaveBeenCalled();
+    expect(d.bumpDismissRefresh).not.toHaveBeenCalled();
+    expect(d.scheduleDashboardReconcile).not.toHaveBeenCalled();
+  });
+
+  it('tolerates an event with no detail at all', () => {
+    const d = deps();
+    expect(() => buildAssistantActionAppliedHandler(d)({})).not.toThrow();
+    expect(d.scheduleDashboardReconcile).not.toHaveBeenCalled();
   });
 });
 
@@ -231,6 +390,60 @@ describe('shouldAutoOpenOnboardingWizard', () => {
 
   it('does not open while an evaluation is running', () => {
     expect(shouldAutoOpenOnboardingWizard({ ...base, isEvaluating: true })).toBe(false);
+  });
+
+  // Remote-content awareness: a configured shared repo with published
+  // projects is a working view the user can browse — the wizard must not
+  // open over it (spec 2026-07-23-remote-repos-without-local-projects).
+  it('defers (no open) while the shared-repo signal has not settled', () => {
+    expect(shouldAutoOpenOnboardingWizard({ ...base, sharedSettled: false })).toBe(false);
+  });
+
+  it('does not open when the shared repo has content', () => {
+    expect(shouldAutoOpenOnboardingWizard({ ...base, sharedSettled: true, sharedHasContent: true })).toBe(false);
+  });
+
+  it('opens when the shared repo settled without content', () => {
+    expect(shouldAutoOpenOnboardingWizard({ ...base, sharedSettled: true, sharedHasContent: false })).toBe(true);
+  });
+});
+
+// One-shot landing decision: a fresh start with zero local projects but
+// remote content lands on the repositories tab instead of the dead-end
+// 'overview' empty state. Latched in App once inputs settle — these tests
+// pin the pure decision only.
+describe('shouldRedirectToRemoteRepositories', () => {
+  const base = {
+    projectsLoaded: true, projectsCount: 0, selectedSource: 'local',
+    sharedSettled: true, sharedHasContent: true, activeTab: 'overview',
+  };
+
+  it('redirects a fresh start: zero local projects, remote content, default overview landing', () => {
+    expect(shouldRedirectToRemoteRepositories(base)).toBe(true);
+  });
+
+  it('does not redirect before local projects load', () => {
+    expect(shouldRedirectToRemoteRepositories({ ...base, projectsLoaded: false })).toBe(false);
+  });
+
+  it('does not redirect before the shared signal settles', () => {
+    expect(shouldRedirectToRemoteRepositories({ ...base, sharedSettled: false })).toBe(false);
+  });
+
+  it('does not redirect when local projects exist', () => {
+    expect(shouldRedirectToRemoteRepositories({ ...base, projectsCount: 2 })).toBe(false);
+  });
+
+  it('does not redirect over a restored shared selection (already a working view)', () => {
+    expect(shouldRedirectToRemoteRepositories({ ...base, selectedSource: 'shared' })).toBe(false);
+  });
+
+  it('does not redirect without remote content', () => {
+    expect(shouldRedirectToRemoteRepositories({ ...base, sharedHasContent: false })).toBe(false);
+  });
+
+  it('does not redirect off a non-default tab the user already navigated to', () => {
+    expect(shouldRedirectToRemoteRepositories({ ...base, activeTab: 'settings' })).toBe(false);
   });
 });
 
@@ -512,5 +725,67 @@ describe('resolveSelectionAfterSharedDisconnect', () => {
   it('clears the selection to the app\'s no-project state when there are no local projects', () => {
     expect(resolveSelectionAfterSharedDisconnect({ selectedSource: 'shared', projects: [] }))
       .toEqual({ id: '', source: 'local' });
+  });
+});
+
+// Same producer x consumer hazard as buildNavigationBundle, but silent: the
+// dashboard bundle is an explicit key whitelist, so a field DashboardPage
+// reads arrives as undefined unless it is forwarded. Nothing throws — the
+// feature is simply inert, which is exactly how the dimension-panel pending
+// state shipped dead the first time.
+describe('buildDashboardDataBundle', () => {
+  const stubState = () => ({
+    selectedProject: 'p1', selectedSource: 'local', selectedRun: 'latest',
+    projects: [], projectsLoaded: true,
+    dashboard: {}, accumulated: {}, latestAccumulated: {},
+    loading: false, isFetching: false, scoresPending: true, error: null,
+    sharedProjectInfo: null,
+    availableRuns: [], dailyRuns: [], overviewRunIndex: 0,
+    selectedDisplayName: 'p1',
+    granularity: 'day', onGranularityChange: () => {},
+  });
+
+  it('forwards scoresPending (the dimension cards look settled while stale without it)', () => {
+    const bundle = buildDashboardDataBundle({ state: stubState(), sharedHasContent: false });
+    expect(bundle.scoresPending).toBe(true);
+  });
+
+  it('forwards every key DashboardPage destructures off its data prop', () => {
+    const bundle = buildDashboardDataBundle({ state: stubState(), sharedHasContent: true });
+    // Mirrors the destructure at the top of DashboardPage.
+    const consumed = [
+      'selectedProject', 'selectedSource', 'selectedRun', 'projects', 'sharedProjectInfo',
+      'dashboard', 'accumulated', 'loading', 'isFetching', 'scoresPending', 'error',
+      'availableRuns', 'dailyRuns', 'overviewRunIndex', 'granularity',
+      'onGranularityChange', 'sharedHasContent',
+    ];
+    const missing = consumed.filter((k) => !(k in bundle));
+    expect(missing).toEqual([]);
+  });
+});
+
+// Deleting a run changes the accumulated rollup the Overview grade is built
+// from -- the same class of mutation as dismiss/restore/delete-finding, which
+// all get the debounced ACTIVE reconcile. mark-stale alone leaves the
+// always-mounted Overview observer on pre-deletion numbers indefinitely
+// (pywebview never fires a focus refetch).
+describe('history route onRunDeleted wiring', () => {
+  it('wires onRunDeleted to the debounced active reconcile, not mark-stale only', () => {
+    const props = {
+      dashboardData: {
+        dashboard: { trend: [] }, availableRuns: [], overviewRunIndex: 0,
+        accumulated: null, loading: false, isFetching: false,
+      },
+      navigation: {
+        selectedProject: 'proj1', selectedSource: 'local', projects: [],
+        projectsLoaded: true, handleNavigate: vi.fn(), historySelectedRun: null,
+        setHistorySelectedRun: vi.fn(),
+      },
+      refreshDashboard: vi.fn(),
+      scheduleDashboardReconcile: vi.fn(),
+    };
+    const el = ROUTE_RENDERERS.history({}, props);
+    el.props.callbacks.onRunDeleted();
+    expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
   });
 });

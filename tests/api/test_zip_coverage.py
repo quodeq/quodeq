@@ -76,6 +76,48 @@ class TestBuildProjectZip:
             with pytest.raises(ValueError, match="exceeds maximum"):
                 _build_project_zip(project)
 
+    def test_limit_applies_to_compressed_size(self, tmp_path):
+        # 500 KB of repeated text deflates to ~1 KB. The compressed cap is what
+        # gates export, so this must succeed even though the uncompressed input
+        # (still under the 640 KB uncompressed headroom) far exceeds the 64 KB
+        # compressed cap.
+        from quodeq.api.zip import _build_project_zip
+        project = tmp_path / "myproject"
+        project.mkdir()
+        (project / "big.txt").write_text("x" * (500 * 1024))
+
+        with patch("quodeq.api.zip._max_zip_size_bytes", return_value=64 * 1024):
+            result = _build_project_zip(project)
+            assert result.exists()
+            assert result.stat().st_size <= 64 * 1024
+            os.unlink(result)
+
+    def test_incompressible_data_over_limit_raises(self, tmp_path):
+        from quodeq.api.zip import _build_project_zip
+        project = tmp_path / "myproject"
+        project.mkdir()
+        (project / "blob.bin").write_bytes(os.urandom(256 * 1024))
+
+        with patch("quodeq.api.zip._max_zip_size_bytes", return_value=64 * 1024):
+            with pytest.raises(ValueError, match="exceeds maximum"):
+                _build_project_zip(project)
+
+    def test_uncompressed_size_over_headroom_raises(self, tmp_path):
+        # Highly compressible data can slip under the compressed cap while its
+        # uncompressed size exceeds what import accepts (size_limit *
+        # _EXTRACT_HEADROOM). Export must reject it up front rather than produce
+        # an archive that then fails on re-import. 64 KB cap -> 640 KB
+        # uncompressed headroom; 800 KB of "x" deflates to ~1 KB (under the
+        # compressed cap) but is over the uncompressed cap.
+        from quodeq.api.zip import _build_project_zip
+        project = tmp_path / "myproject"
+        project.mkdir()
+        (project / "big.txt").write_text("x" * (800 * 1024))
+
+        with patch("quodeq.api.zip._max_zip_size_bytes", return_value=64 * 1024):
+            with pytest.raises(ValueError, match="uncompressed"):
+                _build_project_zip(project)
+
 
 class TestExportProjectZip:
     def test_invalid_project_path_traversal(self, tmp_path):

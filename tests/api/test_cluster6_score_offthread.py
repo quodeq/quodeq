@@ -21,6 +21,7 @@ from quodeq.api._evaluation_routes import (
 )
 from quodeq.services.base import ActionProvider, EvaluationOptions
 from quodeq.services._job_model import JobSnapshot
+from tests._timeouts import budget
 
 
 @pytest.fixture(autouse=True)
@@ -105,7 +106,7 @@ def test_get_evaluation_returns_before_scoring_completes(client):
         scoring_started.set()
         # Block until the test releases it — if the handler waited for this
         # the test would deadlock.
-        scoring_may_finish.wait(timeout=5)
+        scoring_may_finish.wait(timeout=budget(5))
 
     with patch(
         "quodeq.api._evaluation_routes._score_completed_evidence",
@@ -120,7 +121,7 @@ def test_get_evaluation_returns_before_scoring_completes(client):
     scoring_may_finish.set()
 
     # Wait briefly for the thread to actually start, confirming it was launched.
-    assert scoring_started.wait(timeout=2), (
+    assert scoring_started.wait(timeout=budget(2)), (
         "Background scoring thread never started — check that the thread is "
         "actually launched in the handler."
     )
@@ -186,7 +187,7 @@ def test_claim_scoring_exactly_once_under_concurrency():
     for t in threads:
         t.start()
     for t in threads:
-        t.join(timeout=5)
+        t.join(timeout=budget(5))
 
     assert len(results) == n_threads, "Not all threads reported a result"
     true_count = sum(1 for r in results if r)

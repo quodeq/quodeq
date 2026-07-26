@@ -3,25 +3,21 @@ from __future__ import annotations
 
 from typing import Iterator, TextIO
 
-_CHUNK = 1 << 16
 
+def iter_lines(stream: TextIO, *, max_line: int = 1 << 20) -> Iterator[str]:
+    """Yield each line as soon as it arrives, without waiting for EOF.
 
-def iter_lines(stream: TextIO, *, chunk_size: int = _CHUNK, max_line: int = 1 << 20) -> Iterator[str]:
-    buffer = ""
+    readline() returns the moment a newline is decoded, unlike read(n) on a
+    TextIOWrapper, which is greedy (blocks until n chars or EOF) and would
+    hold a live pipe's output hostage until the subprocess exits.
+
+    The size argument bounds a newline-less run: past max_line, readline
+    returns the oversized fragment as its own piece (downstream JSON-parse
+    simply fails it and moves on), so one malformed/huge line can't hang or
+    OOM the reader.
+    """
     while True:
-        chunk = stream.read(chunk_size)
-        if not chunk:
+        line = stream.readline(max_line)
+        if not line:
             break
-        buffer += chunk
-        while "\n" in buffer:
-            line, buffer = buffer.split("\n", 1)
-            yield line
-        # A newline-less stream can't be allowed to grow the buffer forever.
-        # Yield the oversized chunk as a "line" (downstream JSON-parse simply
-        # fails it and moves on) instead of raising, so one malformed/huge
-        # line can't hang or OOM the reader.
-        if len(buffer) > max_line:
-            yield buffer
-            buffer = ""
-    if buffer:
-        yield buffer
+        yield line[:-1] if line.endswith("\n") else line

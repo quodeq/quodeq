@@ -138,9 +138,9 @@ class TestDismissEndpoint:
         assert delta["runId"] == "run-1"
         assert delta["dismissed"] == {"req": "R1", "file": "a.py", "line": 10}
         assert "isLatest" in delta
-        assert delta["accumulated"] is not None
-        assert "dimensions" in delta["accumulated"]
-        assert "summary" in delta["accumulated"]
+        # The delta no longer carries a server-computed rollup — the client
+        # derives the Overview accumulated dimension grades from ``scores``.
+        assert delta["accumulated"] is None
 
     def test_dismiss_without_run_id_delta_has_null_accumulated(self, client, tmp_path):
         """Without a run_id, the delta still describes the dismissed finding but
@@ -222,7 +222,7 @@ class TestRestoreEndpoint:
         assert delta["runId"] == "run-1"
         assert delta["restored"] == {"req": "R1", "file": "a.py", "line": 10}
         assert "isLatest" in delta
-        assert delta["accumulated"] is not None
+        assert delta["accumulated"] is None
 
     def test_restore_appends_undismiss_event(self, client, tmp_path):
         project_dir = tmp_path / "my-project"

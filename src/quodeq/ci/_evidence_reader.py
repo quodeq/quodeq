@@ -41,6 +41,13 @@ def _judgment_to_violation(obj: dict) -> dict | None:
     req = obj.get("req")
     if req:
         out["req"] = req
+    # Carry the principle forward as "practiceId". Scored report JSON names
+    # this field "principle" (analysis/_report_findings), so
+    # filter_suppressed_violations matches deleted-finding keys against
+    # either name.
+    principle = obj.get("p")
+    if principle:
+        out["practiceId"] = principle
     return out
 
 

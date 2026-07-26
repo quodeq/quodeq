@@ -204,9 +204,9 @@ def is_finding_deleted(
     file: str,
 ) -> bool:
     """Return True if ``(dimension, principle, file)`` is in *deleted*."""
-    if not deleted:
-        return False
-    return (dimension or "", principle or "", file or "") in deleted
+    from quodeq.services.suppression import is_deleted  # noqa: PLC0415
+
+    return is_deleted(deleted, dimension=dimension, principle=principle, file=file)
 
 
 def filter_deleted_from_dimensions(
@@ -225,7 +225,8 @@ def filter_deleted_from_dimensions(
         dim_id = (getattr(dim, "dimension", "") or "")
         filtered = [
             v for v in dim.violations
-            if (dim_id, _principle_of(v), v.file or "") not in keys
+            if not is_finding_deleted(keys, dimension=dim_id,
+                                      principle=_principle_of(v), file=v.file or "")
         ]
         if len(filtered) == len(dim.violations):
             result.append(dim)

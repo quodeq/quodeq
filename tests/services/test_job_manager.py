@@ -21,6 +21,7 @@ from quodeq.services.jobs import (
     _EXIT_CODE_SPAWN_FAILURE,
     _EXIT_CODE_TIMEOUT,
 )
+from tests._timeouts import budget
 
 
 class FakeProcess:
@@ -39,9 +40,13 @@ class FakeProcess:
 
 
 def _wait_for_job(manager: JobManager, job_id: str, timeout: float = 5.0) -> JobSnapshot | None:
-    """Poll until the job reaches a terminal state."""
+    """Poll until the job reaches a terminal state.
+
+    Scaled at the point of use so callers passing an explicit *timeout* still
+    get the loaded-runner headroom.
+    """
     import time
-    deadline = time.monotonic() + timeout
+    deadline = time.monotonic() + budget(timeout)
     while time.monotonic() < deadline:
         snap = manager.get_job(job_id)
         if snap and snap.status != STATUS_RUNNING:

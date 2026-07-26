@@ -41,6 +41,7 @@ from flask import Flask
 from quodeq.api.assistant_routes import register_assistant_routes
 from quodeq.assistant.tools import ToolContext, build_registry
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
+from tests._timeouts import budget
 
 _STANDARD = {
     "id": "rfc7807-errors", "name": "RFC7807 Errors", "description": "d",
@@ -139,7 +140,7 @@ def test_full_cli_draft_and_apply_flow(client, app, tmp_path):
     # Poll events via a fresh AssistantRepository rather than re-fetching the
     # SSE stream body (see test_assistant_end_to_end.py for the rationale).
     repo = AssistantRepository(app.config["ASSISTANT_DB_PATH"])
-    deadline = time.time() + 5
+    deadline = time.time() + budget(5)
     events: list[dict] = []
     while time.time() < deadline:
         events = [frame for _seq, frame in repo.events_after(sid, 0)]

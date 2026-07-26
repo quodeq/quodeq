@@ -29,12 +29,15 @@ class ProjectionEngine:
     def update_actions(self, actions_log: Path, run_dir: Path, *, force: bool = False) -> int:
         """Replay actions.jsonl events into run_dir's state store.
 
-        With ``force=False`` (default), skips when the actions log size hasn't
-        changed since the last checkpoint. With ``force=True``, replays even if
-        the size is unchanged -- needed when events.jsonl just grew, because new
-        findings must be matched against existing dismissals.
+        Incremental: the log is append-only, so when it merely grew we replay
+        only the appended tail (from the last projected byte size). A full
+        replay happens when ``force=True`` (events.jsonl grew — new findings
+        must be matched against existing dismissals) or when the log shrank
+        (rewritten/compacted). Handlers are idempotent (UPDATE by stable key),
+        so a full replay is always safe.
 
-        Handlers are idempotent (UPDATE by stable key), so full replay is safe.
+        The whole replay holds ONE db connection; per-event connections made
+        bulk dismiss/delete O(runs x events x connect) and froze the Overview.
         """
         from quodeq.data.actions_log import read_action_events  # noqa: PLC0415
 
@@ -45,19 +48,23 @@ class ProjectionEngine:
         if not force and current_size == last_size:
             return 0
 
+        grew_only = not force and 0 < last_size < current_size
+        offset = last_size if grew_only else 0
+
         applied = 0
-        for event in read_action_events(actions_log.parent):
-            try:
-                handle(event, store)
-                applied += 1
-            except Exception:
-                _logger.error(
-                    "Handler failed for action event %s (type=%s) - skipping",
-                    getattr(event, "event_id", "?"),
-                    getattr(event, "event_type", "?"),
-                    exc_info=True,
-                )
-        store.save_actions_projected_size(current_size)
+        with store.connection():
+            for event in read_action_events(actions_log.parent, from_offset=offset):
+                try:
+                    handle(event, store)
+                    applied += 1
+                except Exception:
+                    _logger.error(
+                        "Handler failed for action event %s (type=%s) - skipping",
+                        getattr(event, "event_id", "?"),
+                        getattr(event, "event_type", "?"),
+                        exc_info=True,
+                    )
+            store.save_actions_projected_size(current_size)
         return applied
 
     def _project(

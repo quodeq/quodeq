@@ -20,8 +20,9 @@ from quodeq.analysis.subagents._pool_worker import WorkerContext, build_agent_co
 from quodeq.analysis.subagents.file_queue import WorkQueue
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, merge_jsonl
 from quodeq.analysis.subprocess import AnalysisConfig
+from quodeq.core.evidence._req_mapping import build_principle_resolver
 from quodeq.shared.constants import _DEFAULT_TIME_LIMIT
-from quodeq.shared.logging import log_info
+from quodeq.shared.logging import log_info, log_warning
 
 # Re-export public API so existing imports keep working.
 __all__ = ["SubagentPool", "SubagentResult", "PoolPaths", "PoolOptions"]
@@ -81,11 +82,44 @@ class SubagentPool:
         self._futures[executor.submit(self._run_single, self._next_idx)] = self._next_idx
         self._next_idx += 1
 
+    def _suppression_predicate(self):
+        """Predicate the heartbeat uses to net dismissed/deleted findings out.
+
+        Built once per pool, not per tick: the stores are read here and the
+        resulting matcher is immutable, so a heartbeat firing every 10s costs
+        no extra file reads. Suppression state is project-scoped and the
+        evidence dir is ``<project>/<run>/evidence``.
+
+        Returns None when the project has no suppressions, when the layout
+        isn't the expected one, or for consolidated runs — whose synthetic
+        dimension key would never match a real delete key anyway. The counts
+        then stay raw, which is the pre-existing behaviour.
+        """
+        if self._dimension_key == "consolidated":
+            return None
+        try:
+            from quodeq.services.suppression import matcher_for  # noqa: PLC0415
+            project_dir = self._evidence_dir.parent.parent
+            matcher = matcher_for(project_dir, self._dimension_key)
+        except (ImportError, OSError, ValueError) as exc:
+            log_warning(f"Suppression state unavailable, counts stay raw: {exc}")
+            return None
+        return matcher.is_suppressed if matcher.active else None
+
     def _start_heartbeat(self) -> tuple[threading.Event, threading.Thread]:
         stop = threading.Event()
+        run_config = getattr(self._base_config, "run_config", None)
         ctx = HeartbeatContext(
             queue_path=self._queue_path, dimension_key=self._dimension_key,
             jsonl_path=self._shared_jsonl_path(), lock=self._jsonl_lock,
+            suppressed=self._suppression_predicate(),
+            # Same standard the evidence parser uses at end of run, so the
+            # heartbeat counts what the report will keep.
+            resolver=build_principle_resolver(
+                self._dimension_key,
+                getattr(run_config, "evaluators_dir", None),
+                self._base_config.compiled_dir,
+            ),
         )
         hb = threading.Thread(
             target=heartbeat_loop, args=(stop, self._finished, ctx), daemon=True,

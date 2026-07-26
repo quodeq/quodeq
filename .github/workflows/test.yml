@@ -10,7 +10,10 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     # Cap the whole job so a hanging test fails fast instead of burning
-    # runner minutes. Ubuntu + macOS finish in ~1 min, Windows in ~2-3 min.
+    # runner minutes. Ubuntu + macOS run in ~2-3 min. Windows is far slower
+    # per test (no fork(), slow git-subprocess startup, NTFS small-file I/O,
+    # Defender scanning), so it runs under pytest-xdist (-n auto) with a
+    # Defender exclusion to stay well within this budget.
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -19,7 +22,7 @@ jobs:
         python-version: ["3.13"]
 
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
 
       - name: Install uv
         uses: astral-sh/setup-uv@v8.3.2
@@ -38,9 +41,61 @@ jobs:
         # tolerable. PR CI should be fast and deterministic.
         run: uv run pytest tests/ -q --tb=short -m "not integration" --cov=quodeq --cov-report=term-missing
 
+      - name: Speed up Windows file I/O (exclude churn paths from Defender)
+        if: runner.os == 'Windows'
+        # The suite spawns thousands of git/python subprocesses and writes
+        # thousands of tiny temp files. Defender's real-time scan of every new
+        # process image and file write is a large, invisible tax on
+        # windows-latest. Exclude the churn dirs and the two hot executables.
+        # Best effort: never let a Defender hiccup block the gate.
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          Add-MpPreference -ExclusionPath $env:RUNNER_TEMP, $env:TEMP, $env:GITHUB_WORKSPACE
+          Add-MpPreference -ExclusionProcess "git.exe", "python.exe"
+
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
+        # -n auto (pytest-xdist): the suite is process- and file-I/O-bound on
+        # Windows, and every test is state-isolated by the autouse
+        # _isolate_quodeq_home fixture (tests/conftest.py), so distributing
+        # across cores cuts wall time roughly linearly (~12 min -> a few).
         # Verbose + -ra so per-test names and the FAILED summary survive
-        # GitHub's log truncation, making any Windows-specific failure easy
-        # to pinpoint now that Windows is a blocking gate.
-        run: uv run pytest tests/ -v -ra --tb=short -m "not integration"
+        # GitHub's log truncation, keeping this blocking gate easy to triage.
+        #
+        # QUODEQ_TEST_TIMEOUT_SCALE (tests/_timeouts.py): -n auto puts four
+        # workers on a 4-vCPU runner, so the box is saturated and a thread can
+        # miss a 5s window purely by not being scheduled. Multiply every
+        # budget() wait here rather than hand-tuning ~45 call sites for the
+        # slowest runner and slowing local runs down with them.
+        env:
+          QUODEQ_TEST_TIMEOUT_SCALE: "4"
+        run: uv run pytest tests/ -v -ra --tb=short -m "not integration" -n auto
+
+  ui:
+    # The web UI ships ~1600 tests (vitest .test.jsx + node:test .test.js) that
+    # nothing else in CI runs; production builds only `npm run build` them. They
+    # are jsdom/pure-JS and OS-independent, so one Linux runner is enough. Runs
+    # in parallel with `test`, which is far slower, so it adds no wall time.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          # 22, not 20: the `test` script runs `node --test` with a glob
+          # pattern, and node only expands glob args to --test on 21+.
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: src/quodeq/ui/package-lock.json
+
+      - name: Install UI dependencies
+        working-directory: src/quodeq/ui
+        run: npm ci
+
+      - name: Run UI tests
+        working-directory: src/quodeq/ui
+        # test:all = node --test (.test.js) + vitest run (.test.jsx).
+        run: npm run test:all

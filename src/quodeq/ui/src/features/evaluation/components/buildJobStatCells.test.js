@@ -9,6 +9,7 @@ import {
   formatEta,
   buildEtaHint,
   msUntilNextSecond,
+  suppressedSuffix,
 } from './buildJobStatCells.js';
 
 const baseInputs = {
@@ -224,4 +225,34 @@ test('msUntilNextSecond: normalizes negatives and defaults non-finite to 1000', 
   assert.equal(msUntilNextSecond(-300), 300);
   assert.equal(msUntilNextSecond(NaN), 1000);
   assert.equal(msUntilNextSecond(Infinity), 1000);
+});
+
+// ---------------------------------------------------------------------------
+// suppressed hint — the live counters are net, so say what was netted out
+// ---------------------------------------------------------------------------
+
+test('buildJobStatCells: FOUND hint reports the suppressed count while running', () => {
+  const cells = buildJobStatCells('running', { ...baseInputs, liveCount: 122, suppressedCount: 339 });
+  assert.equal(cells[2].label, 'FOUND');
+  assert.equal(cells[2].value, 122);
+  assert.equal(cells[2].hint, 'live violations · 339 suppressed');
+});
+
+test('buildJobStatCells: VIOLATIONS hint reports it on a finished job too', () => {
+  const cells = buildJobStatCells('done', { ...baseInputs, liveCount: 146, suppressedCount: 391 });
+  assert.equal(cells[2].label, 'VIOLATIONS');
+  assert.ok(cells[2].hint.endsWith('391 suppressed'), `got: ${cells[2].hint}`);
+});
+
+test('buildJobStatCells: no suppressed hint on a project with nothing suppressed', () => {
+  const running = buildJobStatCells('running', { ...baseInputs, suppressedCount: 0 });
+  const missing = buildJobStatCells('running', baseInputs);
+  assert.equal(running[2].hint, 'live violations');
+  assert.equal(missing[2].hint, 'live violations');
+});
+
+test('suppressedSuffix: ignores negative and non-numeric counts', () => {
+  assert.equal(suppressedSuffix(-5), '');
+  assert.equal(suppressedSuffix(undefined), '');
+  assert.equal(suppressedSuffix('lots'), '');
 });

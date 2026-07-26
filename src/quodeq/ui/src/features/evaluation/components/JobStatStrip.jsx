@@ -12,6 +12,13 @@ function sumLiveViolations(liveViolations) {
   return Object.values(liveViolations).reduce((n, vs) => n + (vs?.length || 0), 0);
 }
 
+// The live feed already excludes dismissed/deleted findings (it reads the same
+// filtered dimension evals the report does), so FOUND is a net number. The
+// progress payload carries what was netted out, so the strip can say so.
+function sumSuppressed(progress) {
+  return (progress?.dimensions || []).reduce((n, d) => n + (d?.suppressed || 0), 0);
+}
+
 // Live elapsed from wall-clock so the cell ticks every second between the 2s
 // progress polls. Falls back to the backend-reported elapsed only when the job
 // carries no usable startedAt.
@@ -75,7 +82,10 @@ export default function JobStatStrip({ job, liveViolations }) {
     // because the parallel start burst-completes cached files cheaply.
     const rate = isTerminal ? null : computeRate(getRateSamples(jobId));
     const etaHint = isTerminal ? null : buildEtaHint({ rate, takenFiles, totalFiles });
-    return buildJobStatCells(job.status, { overallPct, takenFiles, totalFiles, elapsedS, liveCount, etaHint });
+    const suppressedCount = sumSuppressed(progress);
+    return buildJobStatCells(job.status, {
+      overallPct, takenFiles, totalFiles, elapsedS, liveCount, etaHint, suppressedCount,
+    });
     // `tick` drives the per-second recompute; the sample store is read (not a dep).
   }, [jobId, job?.status, job?.startedAt, job?.endedAt, isTerminal, progress, liveViolations, tick]);
 

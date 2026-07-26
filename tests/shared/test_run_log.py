@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from quodeq.shared.run_log import RunLogWriter, RunLogHandler
+from tests._timeouts import budget
 
 
 def test_write_creates_file_with_line(tmp_path: Path) -> None:
@@ -119,7 +120,7 @@ def test_concurrent_write_and_close_does_not_raise(tmp_path: Path) -> None:
     time.sleep(0.01)
     writer.close()
     stop.set()
-    t.join(timeout=2.0)
+    t.join(timeout=budget(2.0))
 
     assert errors == [], f"concurrent write/close raised: {errors!r}"
 

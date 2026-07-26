@@ -11,10 +11,11 @@ vi.mock('../../../components/terminal/index.js', () => ({
 vi.mock('../../../constants.js', () => ({
   ACTIVE_PROVIDER_KEY: 'active-provider',
   DEFAULT_TIME_LIMIT_S: 3600,
+  LOCAL_API_PROVIDERS: new Set(['ollama', 'llamacpp', 'omlx']),
   providerKey: (p, k) => `${p}-${k}`,
 }));
 
-import EvaluateScreen from './EvaluateScreen.jsx';
+import EvaluateScreen, { readBudgetSeconds } from './EvaluateScreen.jsx';
 
 const baseEvaluation = { job: null, jobError: null, liveViolations: [] };
 const baseContext = { selectedProject: null, projectInfo: null, jobProjectInfo: null };
@@ -53,5 +54,26 @@ describe('ErrorToast accessibility', () => {
     fireEvent.click(toast);
     // After click the toast should be gone from DOM
     expect(document.querySelector('.job-error-toast')).toBeNull();
+  });
+});
+
+describe('readBudgetSeconds', () => {
+  const storage = (entries) => ({ getItem: (key) => (key in entries ? entries[key] : null) });
+
+  it('treats every local-API provider as unlimited when no limit was ever stored', () => {
+    // Settings shows these providers as Unlimited by default and never writes
+    // the key until the user edits it, so the header must agree — otherwise it
+    // renders a phantom countdown for a run that has no limit at all.
+    for (const provider of ['ollama', 'llamacpp', 'omlx']) {
+      expect(readBudgetSeconds(storage({ 'active-provider': provider }))).toBe(0);
+    }
+  });
+
+  it('keeps the CLI default for providers that default to a limit', () => {
+    expect(readBudgetSeconds(storage({ 'active-provider': 'claude' }))).toBe(3600);
+  });
+
+  it('honours an explicitly stored unlimited value', () => {
+    expect(readBudgetSeconds(storage({ 'active-provider': 'claude', 'claude-time-limit': '0' }))).toBe(0);
   });
 });

@@ -269,3 +269,49 @@ def test_review_invokes_evaluate_with_diff_from_not_incremental(tmp_path, monkey
     assert "--diff-from" in argv
     assert "origin/develop" in argv
     assert "--incremental" not in argv
+
+
+def test_handle_review_excludes_dismissed_finding(tmp_path, monkeypatch, capsys):
+    """A finding dismissed in the dashboard must not reach the diff-mode
+    review `quodeq review` builds from evidence JSONL -- same suppression
+    contract as `ci report --from-evidence` (both read raw evidence, no
+    scored reports)."""
+    import argparse
+    from quodeq.ci.review import handle_review
+    from quodeq.services.dismissed import dismiss_finding
+
+    output_dir = tmp_path / "out"
+    project_dir = output_dir / "proj"
+    run_dir = project_dir / "run1"
+    evidence_dir = run_dir / "evidence"
+    evidence_dir.mkdir(parents=True)
+    (evidence_dir / "security_evidence.jsonl").write_text(
+        "\n".join(json.dumps(o) for o in [
+            {"p": "SEC-1", "req": "R-1", "t": "violation", "d": "security",
+             "file": "x.py", "line": 3, "severity": "high", "w": "Dismissed one"},
+            {"p": "SEC-2", "req": "R-2", "t": "violation", "d": "security",
+             "file": "y.py", "line": 5, "severity": "high", "w": "Kept one"},
+        ]) + "\n"
+    )
+    # evidence_dir.parent.parent == project_dir -- where actions.jsonl lives.
+    dismiss_finding(project_dir, {"req": "R-1", "file": "x.py", "line": 3})
+
+    monkeypatch.setattr("quodeq.ci.review.detect_pr", lambda pr_override=None: (42, "develop"))
+    monkeypatch.setattr("quodeq.ci.review.get_repo_info", lambda: ("owner", "repo"))
+    monkeypatch.setattr("quodeq._cli_evaluation.run_evaluate", lambda args: 0)
+    monkeypatch.setattr(
+        "quodeq.cli_parser.build_parser",
+        lambda: type("P", (), {"parse_args": staticmethod(lambda argv: argparse.Namespace())})(),
+    )
+
+    args = argparse.Namespace(
+        pr=42, dimensions=None, pool_budget=None,
+        output=str(output_dir), dry_run=True,
+    )
+
+    with patch("quodeq.ci.review.snapshot_run_dirs", side_effect=[set(), {run_dir}]):
+        rc = handle_review(args)
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "1 violation(s) found in diff" in out

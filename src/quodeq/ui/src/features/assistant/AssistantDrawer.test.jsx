@@ -41,6 +41,16 @@ it('renders the prompt input', () => {
   expect(screen.getByPlaceholderText(/ask/i)).toBeInTheDocument();
 });
 
+it('focuses the prompt input when the pane is the active tab (so you can type without clicking)', () => {
+  render(<AssistantPane uiState={{}} active />);
+  expect(screen.getByPlaceholderText(/ask/i)).toHaveFocus();
+});
+
+it('does not focus the prompt input when the pane is a backgrounded tab', () => {
+  render(<AssistantPane uiState={{}} active={false} />);
+  expect(screen.getByPlaceholderText(/ask/i)).not.toHaveFocus();
+});
+
 it('Enter sends the message with uiState', () => {
   render(<AssistantPane uiState={{ activeTab: 'standards' }} />);
   const input = screen.getByPlaceholderText(/ask/i);

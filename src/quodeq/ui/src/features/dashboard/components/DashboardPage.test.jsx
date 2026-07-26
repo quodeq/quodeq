@@ -1,4 +1,4 @@
-import { render, act } from '@testing-library/react';
+import { render, act, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import DashboardPage, { selectDashboardProjectInfo } from './DashboardPage.jsx';
 
@@ -153,6 +153,36 @@ describe('DashboardPage, teammate persona: shared selection + zero local project
       />,
     );
     expect(getByText('No projects yet')).toBeTruthy();
+  });
+
+  // Remote-content awareness: zero local projects + a shared repo with
+  // published content must route to the repositories tab, not dead-end on
+  // "Add a project" (spec 2026-07-23-remote-repos-without-local-projects).
+  it('local source, zero local projects, shared content: offers Browse remote repositories', () => {
+    const onNavigate = vi.fn();
+    const { getByText, queryByText } = render(
+      <DashboardPage
+        data={{ ...sharedNoLocalData, selectedSource: 'local', selectedProject: '', sharedProjectInfo: null, sharedHasContent: true }}
+        callbacks={{ onNavigate }}
+        runMode={false}
+      />,
+    );
+    expect(getByText('No local projects yet')).toBeTruthy();
+    expect(queryByText('No projects yet')).toBeNull();
+    fireEvent.click(getByText('Browse remote repositories'));
+    expect(onNavigate).toHaveBeenCalledWith('projects');
+  });
+
+  it('local source, zero local projects, NO shared content: unchanged Add-a-project wall', () => {
+    const { getByText } = render(
+      <DashboardPage
+        data={{ ...sharedNoLocalData, selectedSource: 'local', selectedProject: '', sharedProjectInfo: null, sharedHasContent: false }}
+        callbacks={{}}
+        runMode={false}
+      />,
+    );
+    expect(getByText('No projects yet')).toBeTruthy();
+    expect(getByText('Add a project')).toBeTruthy();
   });
 });
 

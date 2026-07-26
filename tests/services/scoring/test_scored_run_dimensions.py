@@ -95,6 +95,30 @@ def test_scored_run_dimensions_no_dismissals_returns_unchanged(monkeypatch):
     assert [d.overall_score for d in result] == [raw_dim.overall_score]
 
 
+def test_scored_run_dimensions_passes_the_run_dir_to_rescore(monkeypatch):
+    """The rescore must receive THIS run's directory as its evidence basis.
+
+    ``_rescore_dimension`` scores from ``<run_dir>/evidence/<dim>_evidence.jsonl``
+    when given a run_dir; passing none (or the wrong run's) silently falls back
+    to the legacy formula / scores from another scan's evidence.
+    """
+    raw_dim = _make_dimension([_make_violation()], [_make_compliance()])
+    seen: list[Path | None] = []
+
+    def fake_rescore(dim, dismissed, deleted=None, params=None, *, run_dir=None):
+        seen.append(run_dir)
+        return dim
+
+    monkeypatch.setattr(scoring, "_rescore_dimension", fake_rescore)
+    monkeypatch.setattr(scoring, "read_run_data", lambda root, p, r: [raw_dim])
+    monkeypatch.setattr(scoring, "dismissed_keys", lambda pdir: {("R1", "a.py", 1)})
+    monkeypatch.setattr(scoring, "deleted_keys", lambda pdir: set())
+
+    scoring.scored_run_dimensions(Path("/reports"), "proj", "run1")
+
+    assert seen == [Path("/reports/proj/run1")]
+
+
 def test_scored_run_dimensions_validates_path_segments(monkeypatch):
     """Path-traversal segments are rejected like read_run_data does."""
     monkeypatch.setattr(scoring, "read_run_data", lambda root, p, r: [])
@@ -102,3 +126,40 @@ def test_scored_run_dimensions_validates_path_segments(monkeypatch):
     monkeypatch.setattr(scoring, "deleted_keys", lambda pdir: set())
     with pytest.raises(ValueError):
         scoring.scored_run_dimensions(Path("/reports"), "../etc", "run1")
+
+
+def test_build_response_from_eval_files_validates_path_segments():
+    """The legacy eval-file rescore path builds its own run_dir join
+    (``project_dir / run_id``) separate from ``read_run_data``'s, so it must
+    validate project/run_id itself before that second join -- CodeQL
+    py/path-injection build site."""
+    with pytest.raises(ValueError):
+        scoring._build_response_from_eval_files(Path("/reports"), "proj", "../../etc/passwd")
+    with pytest.raises(ValueError):
+        scoring._build_response_from_eval_files(Path("/reports"), "../etc", "run1")
+
+
+def test_rescore_runs_by_dimension_validates_path_segments():
+    """``dim_to_run`` sources run_id from on-disk ``fromRunId``/``runId``
+    values, but the run_dir join here is separate from any earlier
+    validation, so a traversal value must still be rejected before the join."""
+    dims = [{"dimension": "security", "fromRunId": "../../etc/passwd"}]
+    with pytest.raises(ValueError):
+        scoring._rescore_runs_by_dimension(dims, Path("/reports"), "proj", dismissed=set())
+    with pytest.raises(ValueError):
+        scoring._rescore_runs_by_dimension(
+            [{"dimension": "security", "fromRunId": "run1"}],
+            Path("/reports"), "../etc", dismissed=set(),
+        )
+
+
+def test_get_scores_raw_validates_path_segments():
+    """``get_scores_raw`` builds ``reports_root / project / run_id`` itself
+    and feeds it to ``SqliteFindingsRepository``/``open_evaluation_db`` (a
+    broader read/write surface than the evidence jsonl sink), so a traversal
+    project or run_id must be rejected locally before that join, not left to
+    whatever validated it upstream."""
+    with pytest.raises(ValueError):
+        scoring.get_scores_raw(Path("/reports"), "proj", "../../etc/passwd")
+    with pytest.raises(ValueError):
+        scoring.get_scores_raw(Path("/reports"), "../etc", "run1")

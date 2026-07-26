@@ -1,6 +1,6 @@
 [project]
 name = "quodeq"
-version = "1.7.1"
+version = "1.7.2"
 description = "Source code quality evaluation platform powered by AI"
 readme = "README.md"
 license = "MIT"
@@ -41,6 +41,7 @@ dev = [
     "pytest==9.1.1",
     "pytest-cov==7.1.0",
     "pytest-timeout==2.4.0",
+    "pytest-xdist==3.8.0",
 ]
 
 [project.scripts]

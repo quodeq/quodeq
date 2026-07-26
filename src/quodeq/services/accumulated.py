@@ -20,8 +20,33 @@ from quodeq.shared.utils import _env_int
 
 # Re-export so existing external imports keep working.
 from quodeq.services._accumulated_data import _read_all_run_data  # noqa: F401
+from quodeq.services._accumulated_data import make_slim_run_fetcher
 
 _DEFAULT_ACC_CACHE_MAX = 256
+
+# Entries in the walk cache are findings-free (kilobytes), not full run reads
+# (megabytes), so this bound covers several projects' entire run history and
+# still costs a few MB. Set QUODEQ_ACC_WALK_CACHE_MAX=0 to disable.
+_DEFAULT_WALK_CACHE_MAX = 2048
+
+# Process-lived so consecutive as-of selections on the Overview score-history
+# chart reuse the walk. Their run sets overlap in all but a run or two; a
+# per-call cache made every newly-selected day re-read the whole history.
+_WALK_CACHE: OrderedDict[tuple, list[DimensionResult]] = OrderedDict()
+_WALK_CACHE_LOCK = threading.Lock()
+
+
+def clear_accumulated_process_cache() -> None:
+    """Drop the process-lived walk cache. For tests and cache kill switches."""
+    with _WALK_CACHE_LOCK:
+        _WALK_CACHE.clear()
+
+
+def _walk_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
+    """Return the walk-cache size limit (entries)."""
+    if override is not None:
+        return override
+    return _env_int("QUODEQ_ACC_WALK_CACHE_MAX", _DEFAULT_WALK_CACHE_MAX, env=env)
 
 
 def numeric_average(
@@ -192,8 +217,17 @@ def _build_accumulated_for_runs(
     runs = [r.run_id for r in run_infos]
     _cache, _lock, _max = _resolve_cache(cache_config)
     get_run_data = make_lru_dimension_fetcher(reports_root, project, _cache, _lock, _max)
+    # A caller-supplied cache_config asks for per-call isolation, so it backs the
+    # walk too; otherwise the walk runs off the shared process cache.
+    if cache_config is not None:
+        walk_cache, walk_lock, walk_max = _cache, _lock, _max
+    else:
+        walk_cache, walk_lock, walk_max = _WALK_CACHE, _WALK_CACHE_LOCK, _walk_cache_max()
+    get_run_slim = make_slim_run_fetcher(
+        reports_root, project, walk_cache, walk_lock, walk_max,
+    )
     latest_by_dim, prev_occurrence, prev_run_latest = _read_all_run_data(
-        reports_root, project, run_infos, runs, get_run_data,
+        reports_root, project, run_infos, runs, get_run_data, get_run_slim=get_run_slim,
     )
     project_dir = reports_root / project
     all_dims = filter_dismissed_from_dimensions(list(latest_by_dim.values()), project_dir)

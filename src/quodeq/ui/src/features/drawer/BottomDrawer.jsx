@@ -159,7 +159,7 @@ export function BottomDrawer({ uiState }) {
       </header>
       {openPanels.includes('assistant') && (
         <div className="drawer-panel" style={{ display: active === 'assistant' ? 'flex' : 'none' }}>
-          <AssistantPane uiState={uiState} />
+          <AssistantPane uiState={uiState} active={active === 'assistant'} />
         </div>
       )}
       {openPanels.includes('terminal') && (

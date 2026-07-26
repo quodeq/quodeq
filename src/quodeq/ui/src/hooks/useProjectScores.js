@@ -10,7 +10,7 @@
 import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api/ApiContext.jsx";
-import { projectKeys } from "../api/queryKeys.js";
+import { projectKeys, samePlaceholderScope } from "../api/queryKeys.js";
 
 /**
  * @param {{
@@ -31,15 +31,24 @@ export function useProjectScores({ selectedProject, selectedRun, selectedSource 
   const { getProjectScores, sharedGetProjectScores } = useApi();
   const fetchScores = selectedSource === "shared" ? sharedGetProjectScores : getProjectScores;
   const queryClient = useQueryClient();
+  const projectKey = selectedProject || "_none_";
+  // Reuse the previous payload only within the same project+source subtree —
+  // see samePlaceholderScope for why an unguarded (prev) => prev shows the
+  // PREVIOUS project's overview after a project switch.
+  const keepInScope = useCallback(
+    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
+    [projectKey, selectedSource],
+  );
 
   const latestQuery = useQuery({
-    queryKey: projectKeys.scores(selectedProject || "_none_", null, selectedSource),
+    queryKey: projectKeys.scores(projectKey, null, selectedSource),
     queryFn: () => fetchScores(selectedProject),
     enabled: !!selectedProject,
     staleTime: 60_000,
-    // Latest scores are project-wide (no per-run swap), so prev-data
-    // flashing isn't a concern — keep placeholder unconditionally.
-    placeholderData: (prev) => prev,
+    // Latest scores are project-wide (no per-run swap), so within one project
+    // there is nothing to flash — but a project/source switch must still drop
+    // to a real loading state rather than showing the old project's grades.
+    placeholderData: keepInScope,
   });
 
   // Overview is anchored on completed runs. If selectedRun points at an
@@ -59,7 +68,7 @@ export function useProjectScores({ selectedProject, selectedRun, selectedSource 
   }, [isLatestSelection, selectedRun, latestQuery.data]);
 
   const scoresQuery = useQuery({
-    queryKey: projectKeys.scores(selectedProject || "_none_", asOf, selectedSource),
+    queryKey: projectKeys.scores(projectKey, asOf, selectedSource),
     queryFn: () => fetchScores(selectedProject, asOf),
     // Wait for the latest run-status list before issuing a scoped fetch —
     // otherwise we'd briefly call with the raw selectedRun and only later
@@ -71,8 +80,9 @@ export function useProjectScores({ selectedProject, selectedRun, selectedSource 
     // the project subtree and force a refetch regardless of staleTime.
     // Freeze to skip the routine background refetch on re-entry.
     staleTime: asOf ? Infinity : 60_000,
-    // Keep prior scores visible while switching runs — see useDashboard for rationale.
-    placeholderData: keepPlaceholder ? (prev) => prev : undefined,
+    // Keep prior scores visible while switching runs — see useDashboard for
+    // rationale. Scoped to this project+source, so a project switch loads clean.
+    placeholderData: keepPlaceholder ? keepInScope : undefined,
   });
 
   const availableRuns = useMemo(() => {
@@ -96,6 +106,11 @@ export function useProjectScores({ selectedProject, selectedRun, selectedSource 
     scores: scoresQuery.data ?? null,
     latestScores: latestQuery.data ?? null,
     loading: scoresQuery.isLoading || latestQuery.isLoading,
+    // True while the panel is rendering the PREVIOUS selection's scores because
+    // the newly-picked run is still in flight. placeholderData keeps those old
+    // numbers on screen, so without this the dimension cards look settled while
+    // showing another day's grades.
+    scoresPending: scoresQuery.isPlaceholderData,
     error:
       (scoresQuery.isError || latestQuery.isError)
         ? "Failed to load score data. Check your connection and try refreshing."

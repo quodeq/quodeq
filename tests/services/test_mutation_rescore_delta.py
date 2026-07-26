@@ -59,12 +59,14 @@ class TestDismissDeltaEnvelope:
         assert delta["dismissed"] == {"req": "R1", "file": "a.py", "line": 10}
         assert delta["isLatest"] is False
 
-    def test_accumulated_present_when_run_id(self, tmp_path):
+    def test_accumulated_is_none_client_derives(self, tmp_path):
+        # The delta no longer carries a server-computed rollup: computing it ran
+        # compute_accumulated over every run (~100s cold on large projects) and
+        # tripped the client's 30s timeout. The client now derives the Overview
+        # accumulated dimension grades from the per-run rescore in ``scores``.
         _make_run(tmp_path, "proj", "run-1")
         delta = dismiss_delta(str(tmp_path), "proj", "run-1", dict(_DISMISSED))
-        assert delta["accumulated"] is not None
-        assert "dimensions" in delta["accumulated"]
-        assert "summary" in delta["accumulated"]
+        assert delta["accumulated"] is None
 
 
 class TestDismissDeltaIsLatest:
@@ -101,12 +103,10 @@ class TestRestoreDeltaEnvelope:
         assert "isLatest" in delta
         assert "accumulated" in delta
 
-    def test_accumulated_present_when_run_id(self, tmp_path):
+    def test_accumulated_is_none_client_derives(self, tmp_path):
         _make_run(tmp_path, "proj", "run-1")
         delta = restore_delta(str(tmp_path), "proj", "run-1", dict(_RESTORED))
-        assert delta["accumulated"] is not None
-        assert "dimensions" in delta["accumulated"]
-        assert "summary" in delta["accumulated"]
+        assert delta["accumulated"] is None
 
     def test_without_run_id_accumulated_is_none(self, tmp_path):
         _make_run(tmp_path, "proj", "run-1")
@@ -135,12 +135,10 @@ class TestDeleteDeltaEnvelope:
         assert "isLatest" in delta
         assert "accumulated" in delta
 
-    def test_accumulated_present_when_run_id(self, tmp_path):
+    def test_accumulated_is_none_client_derives(self, tmp_path):
         _make_run(tmp_path, "proj", "run-1")
         delta = delete_delta(str(tmp_path), "proj", "run-1", dict(_DELETED))
-        assert delta["accumulated"] is not None
-        assert "dimensions" in delta["accumulated"]
-        assert "summary" in delta["accumulated"]
+        assert delta["accumulated"] is None
 
     def test_without_run_id_accumulated_is_none(self, tmp_path):
         _make_run(tmp_path, "proj", "run-1")
@@ -168,8 +166,7 @@ class TestBulkDeltaEnvelopes:
         assert delta["kind"] == "restore_all"
         assert delta["runId"] == "run-1"
         assert "isLatest" in delta
-        assert delta["accumulated"] is not None
-        assert "dimensions" in delta["accumulated"]
+        assert delta["accumulated"] is None
         assert "restored" not in delta
         assert "deleted" not in delta
 
@@ -179,8 +176,7 @@ class TestBulkDeltaEnvelopes:
         assert delta["kind"] == "delete_all"
         assert delta["runId"] == "run-1"
         assert "isLatest" in delta
-        assert delta["accumulated"] is not None
-        assert "dimensions" in delta["accumulated"]
+        assert delta["accumulated"] is None
 
     def test_bulk_without_run_id_accumulated_is_none(self, tmp_path):
         _make_run(tmp_path, "proj", "run-1")

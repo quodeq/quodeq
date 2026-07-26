@@ -7,9 +7,13 @@ from pathlib import Path
 from typing import Iterable
 
 from quodeq.core.types import Finding, ViolationResponse
+from quodeq.core.evidence._req_mapping import PrincipleResolver, build_principle_resolver
 from quodeq.core.evidence.parser import build_req_refs_lookup
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.services.violation_context import ViolationContext
+from quodeq.services.suppression import SuppressionMatcher, load_req_to_principle
+from quodeq.config.paths import default_paths
+from quodeq.shared.validation import validate_path_segment
 from quodeq.services.violations_parsing import (
     _build_finding_entry,
     _build_violation_response,
@@ -18,23 +22,37 @@ from quodeq.services.violations_parsing import (
     _TYPE_COMPLIANCE,
     _TYPE_VIOLATION,
 )
-from quodeq.config.paths import default_paths
 from quodeq.shared.utils import open_text
-from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 
 
 def _parse_jsonl_findings(
     lines: Iterable[str], dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None,
-    req_to_principle: dict[str, str] | None = None,
+    resolver: PrincipleResolver | None = None,
     dismissed_keys: "set[tuple] | None" = None,
     deleted_keys: "set[tuple] | None" = None,
 ) -> tuple[list[Finding], list[Finding]]:
-    """Parse raw JSONL lines into deduplicated violation and compliance lists."""
+    """Parse raw JSONL lines into deduplicated violation and compliance lists.
+
+    Two exclusions keep this live view from showing more findings than the
+    persisted evaluation: rows the dashboard suppresses (dismissed/deleted), and
+    rows whose principle is not in the dimension's standard, which the report
+    path quarantines in ``_group_judgments``.
+    """
     violations: list[Finding] = []
     compliance: list[Finding] = []
     seen: set[tuple] = set()
+    # One seam for both suppression stores, shared with the live-progress
+    # tally -- see quodeq.services.suppression for the key shapes.
+    matcher = SuppressionMatcher(
+        dimension=dimension,
+        dismissed=frozenset(dismissed_keys or ()),
+        deleted=frozenset(deleted_keys or ()),
+        # Same table the quarantine check uses, so the delete key and the
+        # scored report can never map a req ID to different principles.
+        req_to_principle=resolver.req_to_principle if resolver else {},
+    )
     for raw_line in lines:
         raw = raw_line.strip()
         if not raw:
@@ -48,18 +66,16 @@ def _parse_jsonl_findings(
         principle = obj.get("p") or obj.get("req")
         if not principle or obj.get("t") not in _FINDING_TYPES:
             continue
-        # Skip dismissed findings -- match by req ID (e.g. "M-MOD-3"), not principle name
-        if dismissed_keys and obj.get("t") == _TYPE_VIOLATION:
-            req_id = obj.get("req") or principle
-            dismissed_key = (req_id, obj.get("file", ""), obj.get("line", 0))
-            if dismissed_key in dismissed_keys:
+        if matcher.is_suppressed(obj):
+            continue
+        if resolver is None:
+            obj["p"] = matcher.principle_for(principle)
+        else:
+            # Unmappable: the report quarantines it, so this view must not show it.
+            resolved = resolver.resolve(principle)
+            if resolved is None:
                 continue
-        obj["p"] = req_to_principle.get(principle, principle) if req_to_principle else principle
-        # Skip permanently-deleted findings -- match by (dimension, principle, file).
-        if deleted_keys and obj.get("t") == _TYPE_VIOLATION:
-            deleted_key = (dimension, obj["p"], obj.get("file", ""))
-            if deleted_key in deleted_keys:
-                continue
+            obj["p"] = resolved
         dedup_key = (principle, obj.get("t"), obj.get("file"), obj.get("line"))
         if dedup_key in seen:
             continue
@@ -72,36 +88,25 @@ def _parse_jsonl_findings(
     return violations, compliance
 
 
-def _load_req_to_principle(dimension: str, evaluators_dir: "Path | None" = None) -> dict[str, str]:
-    """Load req ID -> principle name mapping for custom evaluators.
+# Moved to quodeq.services.suppression, which owns the req -> principle map
+# because the delete key is built from it. Kept as an alias: several tests and
+# call sites still reach for the private name.
+_load_req_to_principle = load_req_to_principle
 
-    Args:
-        dimension: The dimension ID to look up.
-        evaluators_dir: Directory containing evaluator JSON files.
-            Defaults to ``default_paths().evaluators_dir`` when not provided.
+
+def _build_resolver(dimension: str, compiled_dir: Path | None) -> PrincipleResolver:
+    """Resolve *dimension*'s principle set the same way the report path does.
+
+    Routes through the shared builder in ``core.evidence._req_mapping`` rather
+    than reading evaluators here, so this path inherits the compiled-standard
+    fallback. Without it the map is empty on a stock install (the evaluators
+    dir exists but is empty for built-in dimensions) and every requirement ID
+    would look unmappable.
     """
-    if evaluators_dir is None:
-        evaluators_dir = default_paths().evaluators_dir
-    if not evaluators_dir.is_dir():
-        return {}
-    validate_path_segment(dimension)
-    path = evaluators_dir / f"{dimension}.json"
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            return {}  # valid JSON but not an object: degrade, don't crash
-        mapping: dict[str, str] = {}
-        for p in data.get("principles", []):
-            pname = p.get("name", "")
-            for req in p.get("requirements", []):
-                rid = req.get("id", "")
-                if rid and pname:
-                    mapping[rid] = pname
-        return mapping
-    except (OSError, ValueError):
-        return {}
+    validate_path_segment(dimension)  # dimension reaches a path join downstream
+    return build_principle_resolver(
+        dimension, default_paths().evaluators_dir, compiled_dir,
+    )
 
 
 def parse_violations_from_jsonl(
@@ -112,11 +117,11 @@ def parse_violations_from_jsonl(
 ) -> ViolationResponse | None:
     """Parse live JSONL findings written by the MCP server."""
     req_refs_lookup = build_req_refs_lookup(compiled_dir, ctx.dimension) if compiled_dir else None
-    req_to_principle = _load_req_to_principle(ctx.dimension)
+    resolver = _build_resolver(ctx.dimension, compiled_dir)
     try:
         with open_text(jsonl_path) as _f:
             violations, compliance = _parse_jsonl_findings(
-                _f, ctx.dimension, req_refs_lookup, req_to_principle,
+                _f, ctx.dimension, req_refs_lookup, resolver,
                 dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
             )
     except OSError as exc:

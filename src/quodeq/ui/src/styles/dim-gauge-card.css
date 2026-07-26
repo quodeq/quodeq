@@ -128,6 +128,12 @@
 .dim-gauge-card__coverage-pct--partial {
   color: #f0b95f;
 }
+/* Findings the scan produced but scoring never saw. Muted rather than warning-
+   coloured: it is a trust signal about the run, not a problem in the code. */
+.dim-gauge-card__unmapped {
+  color: var(--color-text-subtle);
+  cursor: help;
+}
 
 .dim-gauge-card__gauge--insuf .dim-gauge-card__score {
   fill: var(--color-text-subtle);

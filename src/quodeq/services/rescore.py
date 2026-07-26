@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
 from quodeq.core.types import DimensionResult, to_camel_dict
@@ -20,6 +21,7 @@ from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.scoring import PrincipleScore
 from quodeq.data.fs.report_parser.grades import summarize_dimensions
 from quodeq.services.dismissed import recount_totals
+from quodeq.services.suppression import is_deleted, is_dismissed
 
 
 def _finding_to_dict(f: Finding) -> dict[str, Any]:
@@ -122,37 +124,63 @@ def _score_all_principles(
     return principle_scores, principle_grades
 
 
-def _coerce_line(line) -> int:
-    """Coerce a Finding.line (typed int|str|None) to the int used in dismiss keys.
-
-    Dismiss keys store line as ``int`` (see services/dismissed.dismissed_keys),
-    but a Finding's line may be a string, so a straight ``line or 0`` compare
-    would miss a string-lined finding. Coercing here keeps the suppression key
-    identical to the stored dismiss key.
-    """
-    try:
-        return int(line)
-    except (TypeError, ValueError):
-        return 0
-
-
 def _rescore_dimension(
     dim: DimensionResult,
     dismissed: set[tuple],
     deleted: set[tuple] | None = None,
     params: ScoringParams = DEFAULT_PARAMS,
+    *,
+    run_dir: Path | None = None,
 ) -> DimensionResult:
-    """Rescore a single dimension after filtering dismissed and deleted findings."""
+    """Rescore a single dimension after filtering dismissed and deleted findings.
+
+    When *run_dir* is given and the run still has `<dim>_evidence.jsonl`, the
+    score is recomputed by the scan-time engine over the evidence minus the
+    excluded findings (single scoring basis). The in-place formula below is
+    only a fallback for runs without evidence.
+    """
     deleted = deleted or set()
     dim_id = dim.dimension or ""
     filtered_violations = [
         v for v in dim.violations
-        if (v.req or "", v.file or "", _coerce_line(v.line)) not in dismissed
-        and (dim_id, v.practice_id or "", v.file or "") not in deleted
+        if not is_dismissed(dismissed, req=v.req, principle=v.practice_id,
+                            file=v.file, line=v.line)
+        and not is_deleted(deleted, dimension=dim_id, principle=v.practice_id,
+                           file=v.file)
     ]
     if len(filtered_violations) == len(dim.violations):
         return dim
 
+    compliance_count = dim.totals.compliance_count if dim.totals else len(dim.compliance)
+
+    if run_dir is not None:
+        from quodeq.services.evidence_rescore import score_dimension_from_evidence  # noqa: PLC0415
+        scores = score_dimension_from_evidence(
+            run_dir, dim_id, dismissed=dismissed, deleted=deleted,
+            source_file_count=dim.source_file_count or 0,
+            files_read=dim.files_read or 0, params=params,
+        )
+        if scores is not None:
+            principle_grades = [
+                PrincipleGrade(
+                    principle=ps.display_name,
+                    score=(f"{ps.final_score}/10" if ps.final_score is not None else None),
+                    grade=ps.grade,
+                )
+                for ps in scores.principles.values()
+            ]
+            overall = scores.overall
+            return replace(
+                dim,
+                violations=filtered_violations,
+                principles=principle_grades,
+                overall_score=(f"{overall.weighted_score}/10"
+                               if overall.weighted_score is not None else None),
+                overall_grade=overall.grade or overall.weighted_grade,
+                totals=recount_totals(filtered_violations, compliance_count=compliance_count),
+            )
+
+    # Legacy fallback: no evidence available for this run/dimension.
     principles_violations = _group_by_principle(filtered_violations)
     principles_compliance = _group_by_principle(dim.compliance)
     principle_scores, principle_grades = _score_all_principles(
@@ -165,7 +193,6 @@ def _rescore_dimension(
     overall_score_str = f"{overall.weighted_score}/10" if overall.weighted_score is not None else None
     overall_grade = overall.grade or overall.weighted_grade
 
-    compliance_count = dim.totals.compliance_count if dim.totals else len(dim.compliance)
     new_totals = recount_totals(filtered_violations, compliance_count=compliance_count)
 
     return replace(
@@ -183,17 +210,21 @@ def rescore_dimensions(
     dismissed_keys: set[tuple],
     deleted_keys: set[tuple] | None = None,
     params: ScoringParams | None = None,
+    *,
+    run_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Rescore all dimensions after filtering dismissed and deleted findings.
 
     Returns a dict with 'dimensions' (list of camelCase dicts) and 'summary' (camelCase dict).
-    When *params* is None, the saved grade-formula params are loaded.
+    When *params* is None, the saved grade-formula params are loaded. When
+    *run_dir* is given, each touched dimension is rescored from that run's
+    evidence when available (see `_rescore_dimension`).
     """
     if params is None:
         from quodeq.services import grade_formula  # noqa: PLC0415
         params = grade_formula.load_params()
     rescored = [
-        _rescore_dimension(dim, dismissed_keys, deleted_keys, params=params)
+        _rescore_dimension(dim, dismissed_keys, deleted_keys, params=params, run_dir=run_dir)
         for dim in dimensions
     ]
     summary = summarize_dimensions(rescored, params=params)

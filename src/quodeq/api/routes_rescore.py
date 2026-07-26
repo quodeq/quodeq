@@ -56,5 +56,8 @@ def register_rescore_routes(app: Flask) -> None:
         dismissed = load_dismissed_keys(project_dir)
         deleted = load_deleted_keys(project_dir)
 
-        result = rescore_dimensions(dimensions, dismissed, deleted)
+        # *dimensions* were read from this one run, so its directory is the
+        # evidence basis for the rescore.
+        result = rescore_dimensions(
+            dimensions, dismissed, deleted, run_dir=project_dir / run_id)
         return jsonify(result)

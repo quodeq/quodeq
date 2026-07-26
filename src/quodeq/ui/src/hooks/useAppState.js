@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useDashboard } from '../features/dashboard/hooks/useDashboard.js';
 import { usePrefetchAdjacentRuns } from '../features/dashboard/hooks/usePrefetchAdjacentRuns.js';
 import { buildPeriodRuns } from '../utils/dailyGrouping.js';
 import { readScoreHistoryGranularity, writeScoreHistoryGranularity } from '../utils/scoreHistoryPrefs.js';
+import { projectKeys } from '../api/queryKeys.js';
 import { useServerHealth } from './useServerHealth.js';
 import { useNavStack } from './useNavStack.js';
 import { useRunNavigator } from './useRunNavigator.js';
@@ -94,6 +96,43 @@ export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRun
   return dailyRuns[overviewRunIndex]?.dateLabel || currentOverviewRun;
 }
 
+// Returning to the Overview from another tab must reconcile any project query
+// a mark-stale-only invalidation left behind (refreshDashboard's
+// refetchType:'none', or ordinary staleTime elapse): the Overview's
+// useDashboard observer is mounted at the app root and never remounts on tab
+// navigation (see the eval-completion effect below), and the desktop
+// pywebview window never fires the focus-refetch a browser tab gets on
+// refocus. `stale: true` keeps this a no-op when nothing is actually stale,
+// so switching tabs doesn't re-download the (potentially 10-20 MB) payload
+// on every visit — only a query already marked stale gets refetched here.
+//
+// Gates on `rootTab` (navStack[0].page), NOT the derived `activeTab`.
+// `activeTab`'s fallback bucket defaults any untagged/unknown page to
+// TAB_OVERVIEW -- and drill-down pages pushed without a `sourceTab` (e.g.
+// ExplorerPage's onPrincipleClick -> 'evalprinciple', handleCardNavigate ->
+// 'file') hit that fallback while the user is still mid-triage inside
+// Violations/Map. That would misfire a real refetch of the (potentially
+// 10-20 MB) payload during triage -- exactly the freeze this stack exists to
+// avoid. `navTab()` (useNavStack.js) always resets the stack to a single root
+// entry and `navPush` only appends, so `navStack[0].page` is the true
+// top-level tab regardless of drill-down depth or sourceTab tagging.
+// Exported (and taking plain values rather than reading nav state itself) so
+// the transition-gating logic is testable without mounting all of useAppState.
+export function useOverviewReturnReconcile({ rootTab, selectedProject, selectedSource }) {
+  const queryClient = useQueryClient();
+  const prevTabRef = useRef(rootTab);
+  useEffect(() => {
+    const cameToOverview = prevTabRef.current !== TAB_OVERVIEW && rootTab === TAB_OVERVIEW;
+    prevTabRef.current = rootTab;
+    if (!cameToOverview || !selectedProject) return;
+    queryClient.refetchQueries({
+      queryKey: projectKeys.project(selectedProject, selectedSource),
+      stale: true,
+      type: 'active',
+    });
+  }, [rootTab, selectedProject, selectedSource, queryClient]);
+}
+
 export function useAppState() {
   const nav = useAppNavigation();
   const { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
@@ -118,7 +157,7 @@ export function useAppState() {
   // usually nearly identical. The dashboard-refreshing class dims the
   // page during the background refetch so the user sees that something
   // is happening without the jarring full-screen LoadingScreen.
-  const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, refreshDashboard, refreshDashboardActive, sharedProjectInfo } = useDashboard({
+  const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, scoresPending, error, availableRuns, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, sharedProjectInfo } = useDashboard({
     selectedProject,
     selectedRun: effectiveRun,
     selectedSource,
@@ -157,15 +196,17 @@ export function useAppState() {
   const showProjectHeader = PROJECT_TABS.includes(activeTab) && projects.length > 0 && !!selectedProject;
   const showRunNav = activeTab === TAB_OVERVIEW && showProjectHeader && visibleDailyRuns.length > 0 && navStack.length === 1;
 
+  useOverviewReturnReconcile({ rootTab: navStack[0]?.page, selectedProject, selectedSource });
+
   return {
     serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navTab,
     projects, projectsLoaded, selectedProject, selectedSource, selectedRun, loadProjects, handleProjectChange, handleNavigate, handleNavigateReplace,
     handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject,
-    dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex, sharedProjectInfo,
+    dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, scoresPending, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex, sharedProjectInfo,
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect, prefetchHandlers,
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
     historySelectedRun, setHistorySelectedRun,
-    evalLifecycle, settings, activeTab, showProjectHeader, showRunNav, refreshDashboard,
+    evalLifecycle, settings, activeTab, showProjectHeader, showRunNav, refreshDashboard, scheduleDashboardReconcile,
     granularity, onGranularityChange: handleGranularityChange,
   };
 }

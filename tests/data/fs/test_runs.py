@@ -57,6 +57,66 @@ def test_list_runs_marks_in_progress_when_pid_is_live(tmp_path: Path) -> None:
     assert runs[0].status == "in_progress"
 
 
+def test_list_runs_cancelled_state_overrides_live_pid(tmp_path: Path) -> None:
+    """A run cancelled while its process is still draining shows as cancelled.
+
+    The cancel path writes ``state: cancelled`` to status.json immediately, but
+    the subprocess keeps running for a few seconds while it reaps its subagents.
+    During that window a live PID must NOT override the explicit terminal state,
+    or the History table shows a cancelled run as "running".
+    """
+    from quodeq.data.fs.report_parser.runs import list_runs
+
+    project_uuid = "proj-cancel"
+    run_dir = tmp_path / project_uuid / "run-draining"
+    (run_dir / "evidence").mkdir(parents=True)
+    (run_dir / "evidence" / "manifest.json").write_text("{}")
+    # status.json already flipped to cancelled by the cancel path...
+    (run_dir / "status.json").write_text(json.dumps({"state": "cancelled"}))
+    # ...but the process is still alive (our own PID passes the liveness probe).
+    (run_dir / ".pid").write_text(str(os.getpid()))
+
+    runs = list_runs(tmp_path, project_uuid)
+    assert len(runs) == 1
+    assert runs[0].status == "cancelled"
+
+
+def test_list_runs_failed_state_overrides_live_pid(tmp_path: Path) -> None:
+    """A failed terminal state also wins over a lingering live PID."""
+    from quodeq.data.fs.report_parser.runs import list_runs
+
+    project_uuid = "proj-failed"
+    run_dir = tmp_path / project_uuid / "run-failing"
+    (run_dir / "evidence").mkdir(parents=True)
+    (run_dir / "evidence" / "manifest.json").write_text("{}")
+    (run_dir / "status.json").write_text(json.dumps({"state": "failed"}))
+    (run_dir / ".pid").write_text(str(os.getpid()))
+
+    runs = list_runs(tmp_path, project_uuid)
+    assert len(runs) == 1
+    assert runs[0].status == "failed"
+
+
+def test_list_runs_running_state_with_live_pid_stays_in_progress(tmp_path: Path) -> None:
+    """A genuinely running run (non-terminal state + live PID) stays in_progress.
+
+    Guards the fix from over-reaching: only *terminal* states short-circuit the
+    live-PID check.
+    """
+    from quodeq.data.fs.report_parser.runs import list_runs
+
+    project_uuid = "proj-running"
+    run_dir = tmp_path / project_uuid / "run-alive"
+    (run_dir / "evidence").mkdir(parents=True)
+    (run_dir / "evidence" / "manifest.json").write_text("{}")
+    (run_dir / "status.json").write_text(json.dumps({"state": "running"}))
+    (run_dir / ".pid").write_text(str(os.getpid()))
+
+    runs = list_runs(tmp_path, project_uuid)
+    assert len(runs) == 1
+    assert runs[0].status == "in_progress"
+
+
 def test_list_runs_marks_historical_runs_as_complete(tmp_path: Path) -> None:
     """A historical run (manifest present, no live PID) shows as complete in History.
 

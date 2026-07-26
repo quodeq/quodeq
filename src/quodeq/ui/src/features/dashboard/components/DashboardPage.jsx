@@ -45,7 +45,7 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }
 }
 
 function DashboardContent({ runMode, data, focus, callbacks }) {
-  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource } = data;
+  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending } = data;
   const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
   const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick, onNavigate, onGranularityChange } = callbacks;
   if (runMode) {
@@ -91,6 +91,7 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
         accumulated: accumulated ? { ...accumulated, dimensions: accumulatedDimensions } : accumulated,
         accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex,
         trend: dashboard?.trend || [], selectedRunId, selectedProject, projectInfo, granularity, selectedSource,
+        scoresPending,
       }}
       callbacks={{
         onRunClick: onRunSelect, onDimensionClick: onAccumulatedDimensionClick, onNavigate, onGranularityChange,
@@ -133,7 +134,7 @@ export function selectDashboardProjectInfo({ selectedSource, projects, selectedP
 }
 
 export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
-  const { selectedProject, selectedSource, selectedRun, projects = [], sharedProjectInfo = null, dashboard, accumulated, loading, isFetching, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange } = data;
+  const { selectedProject, selectedSource, selectedRun, projects = [], sharedProjectInfo = null, dashboard, accumulated, loading, isFetching, scoresPending = false, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange, sharedHasContent = false } = data;
   const projectInfo = selectDashboardProjectInfo({ selectedSource, projects, selectedProject, sharedProjectInfo });
   const { onNavigate, onRunSelect, onProjectsReload } = callbacks;
   // After a successful clone-on-add migration the project's repository_info.json
@@ -177,6 +178,20 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   const { projectsLoaded } = data;
   if (!projectsLoaded) return <LoadingScreen />;
   if (projects.length === 0 && selectedSource !== 'shared') {
+    // Zero local projects. When the connected shared repo has published
+    // content, the useful next step is browsing it (read-only until pulled)
+    // -- not necessarily scanning something locally. Both CTAs land on the
+    // repositories tab; the copy is what differs.
+    if (sharedHasContent) {
+      return (
+        <EmptyState
+          title="No local projects yet"
+          description="Your team’s online repository has published projects you can browse without scanning anything locally."
+          actionLabel="Browse remote repositories"
+          onAction={() => onNavigate?.('projects')}
+        />
+      );
+    }
     return (
       <EmptyState
         title="No projects yet"
@@ -196,8 +211,8 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       />
     );
   }
+  const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
   if (!loading && !isFetching && !dashboard) {
-    const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
     return (
       <div className="dashboard-page dashboard-fade dashboard-ready">
         <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
@@ -230,11 +245,16 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : 'dashboard-ready'}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
       <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
       {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
-      {isLoading && <LoadingScreen />}
+      {/* Name the project being loaded. A project switch now clears the old
+          payload (placeholderData is project-scoped -- see
+          samePlaceholderScope), so this spinner is what the user sees right
+          after picking a project; saying which one makes the wait legible
+          instead of looking like the page hung. */}
+      {isLoading && <LoadingScreen message={projectName ? `Loading ${projectName}…` : undefined} />}
       {dashboard && (
         <DashboardContent
           runMode={runMode}
-          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource }}
+          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending }}
           focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
           callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onNavigate, onGranularityChange }}
         />

@@ -37,6 +37,10 @@ class DimensionResult:
     totals: Totals | None = None
     source_file_count: int | None = None
     files_read: int | None = None
+    # Findings excluded from scoring for naming a principle outside the
+    # dimension's standard. Trust metadata beside the coverage counts, not a
+    # findings bucket. 0 on reports written before the field existed.
+    quarantined_count: int = 0
     exit_reason: str | None = None
     evidence_date: str | None = None
     discipline: str | None = None

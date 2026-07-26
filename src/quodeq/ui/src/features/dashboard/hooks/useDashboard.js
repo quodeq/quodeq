@@ -1,8 +1,8 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { useProjectScores } from "../../../hooks/useProjectScores.js";
-import { projectKeys } from "../../../api/queryKeys.js";
+import { projectKeys, samePlaceholderScope } from "../../../api/queryKeys.js";
 
 /**
  * @param {{
@@ -32,6 +32,11 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
   const { getDashboard, sharedGetDashboard, sharedGetProjectInfo } = useApi();
   const fetchDashboard = selectedSource === "shared" ? sharedGetDashboard : getDashboard;
   const queryClient = useQueryClient();
+  const projectKey = selectedProject || "_none_";
+  const keepInScope = useCallback(
+    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
+    [projectKey, selectedSource],
+  );
 
   // Shared projects aren't in the LOCAL projects list DashboardPage otherwise
   // reads projectInfo from, and a shared selection's id can collide with an
@@ -40,7 +45,7 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
   // into a shared Overview. Fetch the shared project's own info instead, keyed
   // by source so switching sources never serves the other source's cache.
   const sharedProjectInfoQuery = useQuery({
-    queryKey: projectKeys.info(selectedProject || "_none_", selectedSource),
+    queryKey: projectKeys.info(projectKey, selectedSource),
     queryFn: () => sharedGetProjectInfo(selectedProject),
     enabled: selectedSource === "shared" && !!selectedProject,
   });
@@ -50,6 +55,7 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     latestScores,
     loading: scoresLoading,
     error: scoresError,
+    scoresPending,
     availableRuns,
   } = useProjectScores({ selectedProject, selectedRun, selectedSource, keepPlaceholder });
 
@@ -66,7 +72,7 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
   const isFrozenRun = !!selectedRun && selectedRun !== "latest" && runStatus !== "in_progress";
 
   const dashboardQuery = useQuery({
-    queryKey: projectKeys.dashboard(selectedProject || "_none_", selectedRun, selectedSource),
+    queryKey: projectKeys.dashboard(projectKey, selectedRun, selectedSource),
     queryFn: () => fetchDashboard(selectedProject, selectedRun),
     enabled: !!selectedProject,
     staleTime: isFrozenRun ? Infinity : 60_000,
@@ -74,7 +80,10 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     // perceived navigation. isFetching toggles true during the background
     // fetch, which the page reads to show a subtle indicator.
     // Disabled when keepPlaceholder=false (History run details).
-    placeholderData: keepPlaceholder ? (prev) => prev : undefined,
+    // Scoped to this project+source: a PROJECT switch must fall through to a
+    // real loading state instead of parking the old project's overview on
+    // screen (see samePlaceholderScope).
+    placeholderData: keepPlaceholder ? keepInScope : undefined,
   });
 
   const dashboardWithTrend = useMemo(() => {
@@ -129,6 +138,44 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     });
   }, [queryClient, selectedProject, selectedSource]);
 
+  // Debounced counterpart to refreshDashboardActive, for the high-frequency
+  // suppression mutations (dismiss/restore/delete). refreshDashboard's
+  // refetchType:'none' leaves the Overview's always-mounted observer showing
+  // stale data until the user switches projects and back -- fine for a single
+  // dismiss (the mutation response already patched the visible page's local
+  // scores via applyMutationDelta), but restore-all/delete-all return a
+  // payload the delta gates can't apply (scores:null, delta.isLatest:false),
+  // so the Overview stays wrong indefinitely. The pywebview desktop window
+  // also never fires the focus-refetch a browser tab would get on refocus,
+  // so there's no other path back to fresh data short of an app switch.
+  // Debounce coalesces rapid multi-dismiss/restore bursts into one refetch of
+  // the (potentially 10-20 MB) dashboard payload instead of one per action.
+  const reconcileTimer = useRef(null);
+  const scheduleDashboardReconcile = useCallback(() => {
+    if (!selectedProject) return;
+    // Mark-stale NOW, synchronously, before the timer is (re)armed. The
+    // timer is a single shared ref, cleared on unmount and re-armed by the
+    // next schedule call; if the ACTIVE refetch below ever gets dropped
+    // (unmount) or fires against a stale closure (the project switched
+    // before the 1200ms elapsed, so it invalidates the old project's now
+    // inactive queries -- a harmless no-op), this mark-stale has already
+    // happened, so the mutation degrades to refreshDashboard's
+    // mark-stale-only semantics and a remount or Overview-return still
+    // self-heals.
+    queryClient.invalidateQueries({
+      queryKey: projectKeys.project(selectedProject, selectedSource),
+      refetchType: 'none',
+    });
+    if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
+    reconcileTimer.current = setTimeout(() => {
+      reconcileTimer.current = null;
+      queryClient.invalidateQueries({
+        queryKey: projectKeys.project(selectedProject, selectedSource),
+      });
+    }, 1200);
+  }, [queryClient, selectedProject, selectedSource]);
+  useEffect(() => () => clearTimeout(reconcileTimer.current), []);
+
   return {
     dashboard: dashboardWithTrend,
     accumulated: scores?.accumulated || null,
@@ -139,12 +186,16 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     // (e.g. user switched to a different run). Page shows a subtle
     // shimmer/dim instead of the full loading screen.
     isFetching: dashboardQuery.isFetching,
+    // Scores for the newly-picked run are still loading; the panels below are
+    // showing the previous selection's numbers until they land.
+    scoresPending,
     error: dashboardQuery.isError
       ? "Failed to load dashboard data. Check your connection and try refreshing."
       : (scoresError || null),
     availableRuns,
     refreshDashboard,
     refreshDashboardActive,
+    scheduleDashboardReconcile,
     sharedProjectInfo: sharedProjectInfoQuery.data || null,
   };
 }

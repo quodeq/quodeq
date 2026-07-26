@@ -164,6 +164,18 @@ def _read_run_status(run_dir: Path) -> str | None:
     return state if isinstance(state, str) else None
 
 
+# Terminal status.json states → History status vocabulary. A terminal state is
+# authoritative even when the run's PID is still alive: the cancel path flips
+# status.json to ``cancelled`` immediately, but the subprocess keeps draining
+# its subagents for a few seconds before it exits. Without this, a cancelled
+# run reappears as "running" in History for the length of that drain.
+_TERMINAL_STATE_TO_STATUS = {
+    "done": "complete",
+    "failed": "failed",
+    "cancelled": "cancelled",
+}
+
+
 def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIMIT) -> list[RunInfo]:
     """Return runs for a project, sorted newest-first by date.
 
@@ -186,16 +198,19 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
         if not manifest_exists:
             continue
         # Status precedence:
-        #   1. Live process holding the PID → "in_progress" (dimmed "Running…" in UI)
-        #   2. status.json state in {cancelled, failed} → pass through
+        #   1. status.json state is terminal (done/failed/cancelled) → honor it,
+        #      even over a still-live PID (a cancelled run keeps draining after
+        #      its state flips; it must not resurface as "running").
+        #   2. Live process holding the PID → "in_progress" (dimmed "Running…" in UI)
         #   3. Otherwise → "complete" (historical, crashed, pre-.pid-era runs)
-        from quodeq.services._external_jobs import resolve_external_pid  # noqa: PLC0415
-        pid = resolve_external_pid(project_dir.name, entry.name, reports_root)
-        if pid is not None:
-            status = "in_progress"
+        raw_state = _read_run_status(run_dir)
+        terminal_status = _TERMINAL_STATE_TO_STATUS.get(raw_state or "")
+        if terminal_status is not None:
+            status = terminal_status
         else:
-            raw_state = _read_run_status(run_dir)
-            status = raw_state if raw_state in ("cancelled", "failed") else "complete"
+            from quodeq.services._external_jobs import resolve_external_pid  # noqa: PLC0415
+            pid = resolve_external_pid(project_dir.name, entry.name, reports_root)
+            status = "in_progress" if pid is not None else "complete"
         cached = index_dates.get(entry.name)
         if cached is not None:
             date_iso, date_label = cached

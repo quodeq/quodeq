@@ -21,6 +21,8 @@ from pathlib import Path
 
 import pytest
 
+from tests._timeouts import budget
+
 _READY_TIMEOUT_S = 30
 
 
@@ -54,7 +56,8 @@ def test_api_health_subprocess(tmp_path: Path) -> None:
     )
     try:
         url = f"http://127.0.0.1:{port}/api/health"
-        deadline = time.monotonic() + _READY_TIMEOUT_S
+        ready_s = budget(_READY_TIMEOUT_S)
+        deadline = time.monotonic() + ready_s
         last_err: Exception | None = None
         while time.monotonic() < deadline:
             if proc.poll() is not None:
@@ -73,13 +76,13 @@ def test_api_health_subprocess(tmp_path: Path) -> None:
                 last_err = exc
                 time.sleep(0.5)
         pytest.fail(
-            f"/api/health never returned 200 within {_READY_TIMEOUT_S}s "
+            f"/api/health never returned 200 within {ready_s:g}s "
             f"(last error: {last_err!r})"
         )
     finally:
         proc.terminate()
         try:
-            proc.wait(timeout=10)
+            proc.wait(timeout=budget(10))
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait()

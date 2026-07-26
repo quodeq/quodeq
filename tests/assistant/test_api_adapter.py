@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 from quodeq.assistant.adapters._api import ApiTurnConfig, run_api_turn
 from quodeq.assistant.tools._registry import ToolRegistry, ToolSpec
+from tests._timeouts import budget
 
 
 def _delta(content=None, tool_calls=None, finish=None):
@@ -254,7 +255,9 @@ def test_cancel_interrupts_a_stalled_stream_read():
 
     def stalled_stream():
         yield _delta("Hel")
-        release.wait(timeout=30)  # blocks like a dead connection: no data, no EOF
+        # blocks like a dead connection: no data, no EOF. Scaled so the stall
+        # always outlasts the (also scaled) join budget below.
+        release.wait(timeout=budget(30))
         yield _delta("lo")
 
     client = ClosableFakeClient([stalled_stream()])
@@ -275,9 +278,9 @@ def test_cancel_interrupts_a_stalled_stream_read():
     t.start()
     time.sleep(0.3)   # let the turn consume "Hel" and block in the stalled read
     token.cancel()
-    t.join(timeout=3)
+    t.join(timeout=budget(3))
     release.set()     # unblock the abandoned reader so the test process exits clean
     if t.is_alive():
-        pytest.fail("turn thread still blocked 3s after cancel()")
+        pytest.fail("turn thread still blocked after cancel()")
     assert outcome["result"] == "cancelled"
     assert outcome["partial"] == "Hel"

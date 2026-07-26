@@ -20,6 +20,7 @@ export default function buildRunSummary(dimensions, apiSummary) {
       dimensionCount: 0,
       severity: { critical: 0, major: 0, minor: 0 },
       dismissed: 0,
+      suppressed: 0,
     };
   }
 
@@ -30,7 +31,8 @@ export default function buildRunSummary(dimensions, apiSummary) {
       ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
       : null;
 
-  let totalViolations = 0, totalCompliance = 0, critical = 0, major = 0, minor = 0, dismissed = 0;
+  let totalViolations = 0, totalCompliance = 0, critical = 0, major = 0, minor = 0;
+  let dismissed = 0, suppressed = 0;
   for (const d of dimensions) {
     totalViolations += d.totals?.violationCount || 0;
     totalCompliance += d.totals?.complianceCount || 0;
@@ -38,6 +40,10 @@ export default function buildRunSummary(dimensions, apiSummary) {
     major += d.totals?.severity?.major || 0;
     minor += d.totals?.severity?.minor || 0;
     dismissed += typeof d.dismissedCount === 'number' ? d.dismissedCount : 0;
+    // Dismissed AND deleted. On a project with a triage history this dwarfs
+    // `dismissed` — deletions suppress a whole principle across a file and
+    // accumulate across runs, while the scan re-finds them every time.
+    suppressed += typeof d.suppressedCount === 'number' ? d.suppressedCount : 0;
   }
 
   return {
@@ -48,5 +54,6 @@ export default function buildRunSummary(dimensions, apiSummary) {
     dimensionCount: dimensions.length,
     severity: { critical, major, minor },
     dismissed,
+    suppressed,
   };
 }

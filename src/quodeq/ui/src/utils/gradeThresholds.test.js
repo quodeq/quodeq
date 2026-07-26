@@ -32,6 +32,23 @@ test('setGradeThresholds changes the mapping', () => {
   assert.equal(scoreToGradeLabel(3.9), 'Critical');
 });
 
+test('getGradeThresholds returns a frozen table that callers cannot mutate', () => {
+  const t = getGradeThresholds();
+  assert.ok(Object.isFrozen(t));
+  assert.ok(Object.isFrozen(t[0]));
+  assert.throws(() => { t.push([1, 'x']); }, TypeError);
+  assert.throws(() => { t[0][0] = 0; }, TypeError);
+  // The shared table is unchanged after the failed mutations.
+  assert.equal(scoreToGradeLabel(9.2), 'Exemplary');
+});
+
+test('setGradeThresholds result is also frozen', () => {
+  setGradeThresholds([[9.5, 'Exemplary'], [8, 'Good'], [6, 'Adequate'], [4, 'Poor']]);
+  const t = getGradeThresholds();
+  assert.ok(Object.isFrozen(t));
+  assert.ok(Object.isFrozen(t[0]));
+});
+
 test('setGradeThresholds ignores junk', () => {
   setGradeThresholds(undefined);
   setGradeThresholds([]);

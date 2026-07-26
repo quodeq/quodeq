@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { assistantEventsUrl } from '../../api/assistant.js';
 
 const INACTIVITY_MS = 60000;
+// Max characters revealed per flush tick. Delta-streaming providers (ollama,
+// claude) send frames smaller than this, so they render unchanged; providers
+// without deltas (codex) deliver a whole message as ONE frame, which sweeps
+// in at a readable rate instead of popping as a block.
+const CHARS_PER_TICK = 60;
 
 export function useAssistantStream(sessionId, { onDone } = {}) {
   const [messages, setMessages] = useState([]);
@@ -9,6 +14,9 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
   const [error, setError] = useState(null);
   const pending = useRef(''); const raf = useRef(null); const timer = useRef(null);
   const inactivity = useRef(null); const onDoneRef = useRef(onDone);
+  // Set when the turn's `done` arrived while text was still being revealed:
+  // the turn ends when the drain empties instead of force-flushing the rest.
+  const endPending = useRef(false);
   // When true, the next flushed token starts a NEW assistant bubble instead of
   // appending to the last one — set on each turn's terminal frame so turn 2's
   // answer doesn't concatenate onto turn 1's ("A"+"B" → "AB"). One SSE stream
@@ -21,13 +29,17 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
   useEffect(() => {
     if (!sessionId) { setStreaming(false); return undefined; }
     setMessages([]); setError(null); setStreaming(true); pending.current = '';
-    turnBoundary.current = false;
+    turnBoundary.current = false; endPending.current = false;
 
-    const flushTokens = () => {
+    const finishTurn = () => { endPending.current = false; setStreaming(false);
+      turnBoundary.current = true; onDoneRef.current?.(); };
+    const drain = (all) => {
       if (raf.current != null) { cancelAnimationFrame(raf.current); raf.current = null; }
       if (timer.current != null) { clearTimeout(timer.current); timer.current = null; }
-      const chunk = pending.current; if (!chunk) return;
-      pending.current = '';
+      const buf = pending.current;
+      if (!buf) { if (endPending.current) finishTurn(); return; }
+      const chunk = all ? buf : buf.slice(0, CHARS_PER_TICK);
+      pending.current = all ? '' : buf.slice(CHARS_PER_TICK);
       const startNewBubble = turnBoundary.current;
       turnBoundary.current = false;
       setMessages((prev) => {
@@ -40,19 +52,28 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
         }
         return next;
       });
+      if (pending.current) scheduleFlush();
+      else if (endPending.current) finishTurn();
     };
+    // Structural frames (tool calls, warnings, errors, stop) force the rest
+    // of the reveal out at once so ordering stays exact and errors are never
+    // delayed behind an animation.
+    const flushTokens = () => drain(true);
     const scheduleFlush = () => {
-      if (raf.current == null) raf.current = requestAnimationFrame(flushTokens);
-      if (timer.current == null) timer.current = setTimeout(flushTokens, 50);
+      if (raf.current == null) raf.current = requestAnimationFrame(() => drain(false));
+      if (timer.current == null) timer.current = setTimeout(() => drain(false), 50);
     };
     const append = (msg) => setMessages((prev) => [...prev, msg]);
     const es = new EventSource(assistantEventsUrl(sessionId, 0));
-    // End the TURN (flush, clear spinner, mark a boundary, notify the
-    // provider) WITHOUT closing the connection — the stream stays open so the
-    // next turn's frames still arrive. The EventSource is only closed in the
-    // effect cleanup (sessionId change / unmount).
-    const endTurn = () => { flushTokens(); setStreaming(false);
-      turnBoundary.current = true; onDoneRef.current?.(); };
+    // End the TURN (clear spinner, mark a boundary, notify the provider)
+    // WITHOUT closing the connection — the stream stays open so the next
+    // turn's frames still arrive. The EventSource is only closed in the
+    // effect cleanup (sessionId change / unmount). If text is still being
+    // revealed, the turn ends when the drain empties.
+    const endTurn = () => {
+      if (pending.current) { endPending.current = true; scheduleFlush(); }
+      else finishTurn();
+    };
     const resetInactivity = () => {
       if (inactivity.current) clearTimeout(inactivity.current);
       // End the turn cleanly (same as any other terminal frame) instead of
@@ -72,7 +93,12 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
       resetInactivity();
       let frame; try { frame = JSON.parse(e.data); } catch { return; }
       if (!frame || typeof frame !== 'object') return;
-      if (frame.type === 'token') { beginContent(); pending.current += frame.text || ''; scheduleFlush(); }
+      if (frame.type === 'token') {
+        // A next-turn token during the previous turn's reveal: close that
+        // turn out first so the new text starts its own bubble.
+        if (endPending.current) drain(true);
+        beginContent(); pending.current += frame.text || ''; scheduleFlush();
+      }
       else if (frame.type === 'tool_call') { beginContent(); flushTokens(); append({ role: 'tool', name: frame.name, argsSummary: frame.argsSummary }); }
       else if (frame.type === 'action_draft') { beginContent(); flushTokens();
         append({ role: 'action', actionId: frame.actionId, actionType: frame.actionType, summary: frame.summary }); }

@@ -30,4 +30,26 @@ describe('EmptyStateWithTour', () => {
     expect(onTour).toHaveBeenCalled();
     expect(localStorage.getItem('quodeq_onboarding_skipped')).toBeNull();
   });
+
+  // Remote-content awareness: with a connected shared repo that has
+  // published projects, the wall must offer a path to them, not only
+  // "add a project" (spec 2026-07-23-remote-repos-without-local-projects).
+  it('hides the browse-remote button when onBrowseRemote is not provided', () => {
+    render(<EmptyStateWithTour onAdd={() => {}} onTour={() => {}} />);
+    expect(screen.queryByRole('button', { name: /browse remote repositories/i })).toBeNull();
+  });
+
+  it('shows the browse-remote button and calls onBrowseRemote', () => {
+    const onBrowseRemote = vi.fn();
+    render(<EmptyStateWithTour onAdd={() => {}} onTour={() => {}} onBrowseRemote={onBrowseRemote} />);
+    fireEvent.click(screen.getByRole('button', { name: /browse remote repositories/i }));
+    expect(onBrowseRemote).toHaveBeenCalled();
+  });
+
+  it('browse-remote stays clickable during an evaluation (read-only path)', () => {
+    const onBrowseRemote = vi.fn();
+    render(<EmptyStateWithTour onAdd={() => {}} onTour={() => {}} onBrowseRemote={onBrowseRemote} isEvaluating />);
+    fireEvent.click(screen.getByRole('button', { name: /browse remote repositories/i }));
+    expect(onBrowseRemote).toHaveBeenCalled();
+  });
 });

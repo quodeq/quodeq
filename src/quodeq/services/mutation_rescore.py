@@ -179,50 +179,36 @@ def _resolve_default_run_id(evaluations_dir: str, project: str) -> str | None:
     return selected.run_id
 
 
-def _accumulated_payload(evaluations_dir: str, project: str) -> dict[str, Any] | None:
-    """Return the cache-backed accumulated payload, or None on any failure.
-
-    ``get_project_scores(reports_root, project, None)`` returns a dict with an
-    ``accumulated`` key ({dimensions, summary}); we surface just that so the
-    client can patch the accumulated (cross-run) scores cache.
-    """
-    from quodeq.services.scoring import get_project_scores  # noqa: PLC0415
-
-    reports_root = Path(evaluations_dir).resolve()
-    try:
-        payload = get_project_scores(reports_root, project, None)
-    except Exception:
-        _logger.warning("Accumulated fetch for delta failed for %s", project, exc_info=True)
-        return None
-    if not payload:
-        return None
-    return payload.get("accumulated")
-
-
 def _mutation_envelope(
     evaluations_dir: str, project: str, run_id: str | None, kind: str,
 ) -> dict[str, Any]:
-    """Shared delta scaffold: kind/runId/isLatest/accumulated.
+    """Shared delta scaffold: kind/runId/isLatest.
 
     ``isLatest`` is True when ``run_id`` is the run the Overview lands on by
     default — the exact ``_resolve_default_run_id`` rule shared with the
-    dashboard. ``accumulated`` carries the (cache-backed) cross-run rollup so
-    the Overview's accumulated view updates without a refetch; it is None when
-    no ``run_id`` was supplied (the caller has no run to anchor the rollup to)
-    or when the fetch fails. Per-kind finding fields (``dismissed`` /
-    ``restored`` / ``deleted``) are folded in by the caller — bulk kinds
-    (``restore_all`` / ``delete_all``) carry none.
+    dashboard. Per-kind finding fields (``dismissed`` / ``restored`` /
+    ``deleted``) are folded in by the caller — bulk kinds (``restore_all`` /
+    ``delete_all``) carry none.
+
+    ``accumulated`` is intentionally ALWAYS None. The client derives the
+    Overview's per-dimension grades from the (fast, ~0.1s) single-run rescore
+    returned alongside this delta in ``scores`` — the accumulated entry for a
+    dimension the latest run owns equals that run's rescored dimension. We used
+    to compute the full cross-run rollup here, but that ran ``compute_accumulated``
+    over every run (~100s cold on large projects, and recomputed on EVERY
+    mutation because the dismissed-set hash changes), which blew past the
+    client's 30s timeout. The request then aborted, the client never applied the
+    delta, and the Overview grade only refreshed on a later window-focus
+    refetch. See ``applyMutationDelta`` for the client-side derivation; the
+    weighted overall summary is left to a lazy refetch to avoid duplicating the
+    grade formula on the client.
     """
-    is_latest = False
-    accumulated: dict[str, Any] | None = None
-    if run_id:
-        is_latest = run_id == _resolve_default_run_id(evaluations_dir, project)
-        accumulated = _accumulated_payload(evaluations_dir, project)
+    is_latest = bool(run_id) and run_id == _resolve_default_run_id(evaluations_dir, project)
     return {
         "kind": kind,
         "runId": run_id,
         "isLatest": is_latest,
-        "accumulated": accumulated,
+        "accumulated": None,
     }
 
 
@@ -232,7 +218,8 @@ def dismiss_delta(
     """Describe a dismiss mutation so the client can patch its caches.
 
     The client splices the dismissed finding out of the run-detail violation
-    list locally (it has the full key) and patches scores + accumulated.
+    list locally (it has the full key), patches the per-run scores, and derives
+    the Overview accumulated dimension grades from the rescored ``scores``.
     """
     envelope = _mutation_envelope(evaluations_dir, project, run_id, "dismiss")
     envelope["dismissed"] = {
@@ -255,8 +242,9 @@ def restore_delta(
     """Describe a restore mutation so the client can patch its caches.
 
     Unlike dismiss, the client can't reconstruct the restored violation body,
-    so it patches scores + accumulated and INVALIDATES the run-detail violation
-    source (refetch on next view). ``restored`` carries the finding key.
+    so it patches the per-run scores (deriving the Overview accumulated
+    dimension grades from them) and INVALIDATES the run-detail violation source
+    (refetch on next view). ``restored`` carries the finding key.
     """
     envelope = _mutation_envelope(evaluations_dir, project, run_id, "restore")
     envelope["restored"] = {
@@ -273,8 +261,9 @@ def delete_delta(
     """Describe a delete mutation so the client can patch its caches.
 
     Delete sweeps every finding sharing (dimension, principle, file), so the
-    client can't cheaply mirror the batch removal — it patches scores +
-    accumulated and INVALIDATES the run-detail violation source.
+    client can't cheaply mirror the batch removal — it patches the per-run
+    scores (deriving the Overview accumulated dimension grades from them) and
+    INVALIDATES the run-detail violation source.
     """
     envelope = _mutation_envelope(evaluations_dir, project, run_id, "delete")
     envelope["deleted"] = {

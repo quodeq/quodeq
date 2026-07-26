@@ -60,7 +60,7 @@ export function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNav
   const grade = runSummary.overallGrade;
   const violations = runSummary.totalViolations || 0;
   const compliance = runSummary.totalCompliance || 0;
-  const dismissed = runSummary.dismissed || 0;
+  const suppressed = runSummary.suppressed || 0;
   const totalChecks = violations + compliance;
   const ratio = complianceRatio(violations, compliance);
 
@@ -85,8 +85,8 @@ export function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNav
           hint={
             <>
               <SeverityBadgeRow severity={runSummary.severity} onSeverityClick={handleSeverity} />
-              {dismissed > 0 && (
-                <span className="term-stat__dismissed-note">{dismissed} dismissed hidden</span>
+              {suppressed > 0 && (
+                <span className="term-stat__suppressed-note">{suppressed} suppressed</span>
               )}
             </>
           }

@@ -3,7 +3,8 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { useTerminalSocket } from './useTerminalSocket.js';
-import { terminalStatus } from '../../api/terminal.js';
+import { terminalStatus, resolveTerminalPaths, openInEditor } from '../../api/terminal.js';
+import { createUrlLinkProvider, createFileLinkProvider } from './terminalLinks.js';
 
 // Two drawer chords are reserved for the host; return false so xterm lets them
 // bubble to the window handler instead of typing into the shell.
@@ -101,6 +102,7 @@ export default function TerminalPane({ active }) {
     let ro = null;
     let mo = null;
     let fitTimer = null;
+    const linkProviders = [];
 
     const setup = () => {
       if (disposed || termRef.current || !rootRef.current) return;
@@ -125,6 +127,23 @@ export default function TerminalPane({ active }) {
       term.attachCustomKeyEventHandler((e) => !isReservedChord(e));
       term.onData((d) => send(d));
       termRef.current = term; fitRef.current = fit;
+
+      // Clickable links: cmd/ctrl-click a URL to open it in the system browser,
+      // or a real file path to open it in the user's editor. The file provider
+      // asks the backend which candidates are real files before lighting them
+      // up (see terminalLinks.js). y is a 1-based buffer line number.
+      const readLine = (y) => term.buffer.active.getLine(y - 1)?.translateToString(true) ?? '';
+      linkProviders.push(
+        term.registerLinkProvider(createUrlLinkProvider({
+          readLine,
+          openUrl: (url) => window.open(url, '_blank', 'noopener,noreferrer'),
+        })),
+        term.registerLinkProvider(createFileLinkProvider({
+          readLine,
+          resolvePaths: resolveTerminalPaths,
+          openFile: (abs, line, col) => { openInEditor(abs, line, col).catch(() => {}); },
+        })),
+      );
       // Fit only when visible. If the pane mounts on a hidden/background tab,
       // fitting measures a 0x0 box (bogus PTY size); the status-open and
       // tab-activation effects both fit once the pane is actually shown.
@@ -162,6 +181,7 @@ export default function TerminalPane({ active }) {
       disposed = true;
       if (fitTimer) clearTimeout(fitTimer);
       ro?.disconnect(); mo?.disconnect();
+      linkProviders.forEach((d) => { try { d.dispose(); } catch { /* noop */ } });
       if (termRef.current) { termRef.current.dispose(); }
       termRef.current = null; fitRef.current = null;
     };
@@ -175,6 +195,18 @@ export default function TerminalPane({ active }) {
     if (!active || !fitRef.current || !termRef.current || isHidden(el)) return;
     try { fitRef.current.fit(); resize(termRef.current.cols, termRef.current.rows); } catch { /* noop */ }
   }, [active, resize]);
+
+  // Give xterm keyboard focus when the terminal becomes the frontmost tab
+  // (drawer open or tab switch) so the user can type immediately without
+  // clicking into it. Gated on `active` so a backgrounded pane never steals
+  // focus; `paneLive` is a dep so this runs once the terminal has mounted on
+  // first open (termRef is set by the mount effect declared above). No
+  // isHidden guard: focus() doesn't resize the PTY, and an active tab is
+  // visible by definition.
+  useEffect(() => {
+    if (!active || !paneLive || !termRef.current) return;
+    try { termRef.current.focus(); } catch { /* noop */ }
+  }, [active, paneLive]);
 
   // While the socket is not open, disable xterm input. send() already no-ops
   // when disconnected, so keystrokes would otherwise vanish silently into a

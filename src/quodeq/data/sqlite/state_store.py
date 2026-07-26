@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Iterator, Optional
 
 if TYPE_CHECKING:
     from quodeq.core.scoring.params import ScoringParams
@@ -35,15 +37,39 @@ class SQLiteStateStore:
 
     def __init__(self, run_dir: Path) -> None:
         self._run_dir = run_dir
+        self._held: sqlite3.Connection | None = None
+
+    @contextmanager
+    def connection(self) -> Iterator[sqlite3.Connection]:
+        """Hold ONE connection for a batch of store operations.
+
+        The projection replay calls update_verdict once per event; without
+        this, every call opens/configures/closes its own connection
+        (measured: ~21s of pure connection churn for a 100-run project).
+        """
+        with open_evaluation_db(self._run_dir) as conn:
+            self._held = conn
+            try:
+                yield conn
+            finally:
+                self._held = None
+
+    @contextmanager
+    def _db(self) -> Iterator[sqlite3.Connection]:
+        if self._held is not None:
+            yield self._held
+        else:
+            with open_evaluation_db(self._run_dir) as conn:
+                yield conn
 
     def record_finding(self, payload: Judgment) -> None:
         row = judgment_to_row(payload)
-        with open_evaluation_db(self._run_dir) as conn:
+        with self._db() as conn:
             conn.execute(_INSERT_FINDING, row)
             conn.commit()
 
     def clear_all(self) -> None:
-        with open_evaluation_db(self._run_dir) as conn:
+        with self._db() as conn:
             conn.execute("DELETE FROM findings")
             conn.execute("DELETE FROM dimension_scores")
             conn.execute(
@@ -53,7 +79,7 @@ class SQLiteStateStore:
             conn.commit()
 
     def get_checkpoint(self) -> Optional[datetime]:
-        with open_evaluation_db(self._run_dir) as conn:
+        with self._db() as conn:
             row = conn.execute(
                 "SELECT value FROM run_meta WHERE key = ?", (_CHECKPOINT_KEY,)
             ).fetchone()
@@ -62,7 +88,7 @@ class SQLiteStateStore:
         return datetime.fromisoformat(row[0])
 
     def save_checkpoint(self, ts: datetime) -> None:
-        with open_evaluation_db(self._run_dir) as conn:
+        with self._db() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO run_meta (key, value) VALUES (?, ?)",
                 (_CHECKPOINT_KEY, ts.isoformat()),
@@ -70,7 +96,7 @@ class SQLiteStateStore:
             conn.commit()
 
     def get_projected_size(self) -> int | None:
-        with open_evaluation_db(self._run_dir) as conn:
+        with self._db() as conn:
             row = conn.execute(
                 "SELECT value FROM run_meta WHERE key = ?", (_PROJECTED_SIZE_KEY,)
             ).fetchone()
@@ -79,7 +105,7 @@ class SQLiteStateStore:
         return int(row[0])
 
     def save_projected_size(self, size: int) -> None:
-        with open_evaluation_db(self._run_dir) as conn:
+        with self._db() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO run_meta (key, value) VALUES (?, ?)",
                 (_PROJECTED_SIZE_KEY, str(size)),
@@ -95,7 +121,7 @@ class SQLiteStateStore:
         against rows whose requirement is NULL or empty, scoped so it cannot
         sweep a different, req-bearing finding at the same location.
         """
-        with open_evaluation_db(self._run_dir) as conn:
+        with self._db() as conn:
             if req:
                 cur = conn.execute(
                     "UPDATE findings SET verdict = ? "
@@ -113,7 +139,7 @@ class SQLiteStateStore:
             return cur.rowcount
 
     def get_actions_projected_size(self) -> int | None:
-        with open_evaluation_db(self._run_dir) as conn:
+        with self._db() as conn:
             row = conn.execute(
                 "SELECT value FROM run_meta WHERE key = ?", (_ACTIONS_SIZE_KEY,)
             ).fetchone()
@@ -122,7 +148,7 @@ class SQLiteStateStore:
         return int(row[0])
 
     def save_actions_projected_size(self, size: int) -> None:
-        with open_evaluation_db(self._run_dir) as conn:
+        with self._db() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO run_meta (key, value) VALUES (?, ?)",
                 (_ACTIONS_SIZE_KEY, str(size)),
@@ -134,7 +160,7 @@ class SQLiteStateStore:
     def record_dimension_score(
         self, *, dimension: str, score: float | None, grade: str | None,
     ) -> None:
-        with open_evaluation_db(self._run_dir) as conn:
+        with self._db() as conn:
             conn.execute(
                 "INSERT INTO dimension_scores (dimension, score, grade, completed_at) "
                 "VALUES (?, ?, ?, datetime('now')) "
@@ -153,7 +179,7 @@ class SQLiteStateStore:
         finding_count: int,
         dismissed_count: int,
     ) -> None:
-        with open_evaluation_db(self._run_dir) as conn:
+        with self._db() as conn:
             conn.execute(
                 "INSERT INTO principle_grades "
                 "(dimension, principle_id, score, grade, finding_count, dismissed_count, completed_at) "
@@ -183,7 +209,7 @@ class SQLiteStateStore:
             dimension_rows: Sequence of dimension score dicts
                 (``{"dimension": ..., "score": ..., "grade": ...}``).
         """
-        with open_evaluation_db(self._run_dir) as conn:
+        with self._db() as conn:
             conn.execute("DELETE FROM dimension_scores")
             conn.execute("DELETE FROM principle_grades")
             for dim, p_grade in principle_rows:
@@ -211,13 +237,13 @@ class SQLiteStateStore:
             conn.commit()
 
     def clear_grades(self) -> None:
-        with open_evaluation_db(self._run_dir) as conn:
+        with self._db() as conn:
             conn.execute("DELETE FROM dimension_scores")
             conn.execute("DELETE FROM principle_grades")
             conn.commit()
 
     def read_dimension_scores(self) -> list[dict]:
-        with open_evaluation_db(self._run_dir) as conn:
+        with self._db() as conn:
             rows = conn.execute(
                 "SELECT dimension, score, grade, exit_reason "
                 "FROM dimension_scores ORDER BY dimension"
@@ -228,7 +254,7 @@ class SQLiteStateStore:
         ]
 
     def read_principle_grades(self) -> list[dict]:
-        with open_evaluation_db(self._run_dir) as conn:
+        with self._db() as conn:
             rows = conn.execute(
                 "SELECT dimension, principle_id, score, grade, finding_count, dismissed_count "
                 "FROM principle_grades ORDER BY dimension, principle_id"

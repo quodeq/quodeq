@@ -11,6 +11,7 @@ from quodeq.core.types import DimensionResult, DimensionSummary
 from quodeq.services.dashboard import (
     _collect_previous_scores,
     _enrich_dimensions_with_trend,
+    _rescore_run_dimensions,
     build_dashboard,
 )
 from quodeq.services._dashboard_trend import build_accumulated_trend as _build_accumulated_trend
@@ -88,6 +89,26 @@ class TestEnrichDimensionsWithTrend:
         dims = [_dim("security")]
         result = _enrich_dimensions_with_trend(dims, {})
         assert result[0].previous_run_id is None
+
+
+class TestRescoreRunDimensionsValidatesPathSegments:
+    """``_rescore_run_dimensions`` builds its own ``project_dir`` / ``run_dir``
+    joins independent of any upstream validation, so a traversal project or
+    run_id must be rejected locally before either join (CodeQL
+    py/path-injection build site)."""
+
+    def test_rejects_traversal_project(self, tmp_path):
+        with pytest.raises(ValueError):
+            _rescore_run_dimensions([], tmp_path, "../etc", "run1", params=None)
+
+    def test_rejects_traversal_run_id(self, tmp_path, monkeypatch):
+        # Force past the "no active suppressions" early return so the
+        # run_id join at :196 is actually reached.
+        monkeypatch.setattr(
+            "quodeq.services.dismissed.dismissed_keys", lambda _pd: {("R1", "a.py", 1)})
+        monkeypatch.setattr("quodeq.services.deleted.deleted_keys", lambda _pd: set())
+        with pytest.raises(ValueError):
+            _rescore_run_dimensions([], tmp_path, "proj", "../../etc/passwd", params=None)
 
 
 class TestBuildAccumulatedTrend:

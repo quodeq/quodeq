@@ -11,6 +11,17 @@ describe('CountdownTimer', () => {
     expect(container.firstChild).toBeNull();
   });
 
+  it('renders nothing when the limit is unlimited even if the run carries a deadline', () => {
+    // A run started under a limit (or a CLI run the tab adopted) keeps its
+    // deadline in status.json. Once the user has switched to Unlimited the
+    // header must stay empty rather than counting that stale deadline down.
+    const now = Date.now();
+    vi.setSystemTime(now);
+    const deadline = new Date(now + 90_000).toISOString();
+    const { container } = render(<CountdownTimer deadlineAt={deadline} budgetSeconds={0} phase="analyzing" />);
+    expect(container.firstChild).toBeNull();
+  });
+
   it('shows greyed static budget during preparing', () => {
     render(<CountdownTimer deadlineAt={null} budgetSeconds={600} phase="preparing" />);
     const el = screen.getByTestId('eval-countdown');

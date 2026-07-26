@@ -9,6 +9,7 @@ from quodeq.assistant.adapters._cli_spawn import (
     assert_no_dangerous_args, build_chat_env, external_sandbox_prefix,
     scratch_cwd, spawn_turn,
 )
+from tests._timeouts import budget
 
 
 def _wrapped_codex(*extra):
@@ -195,6 +196,6 @@ def test_spawn_turn_streams_stdout(tmp_path):
     argv = [sys.executable, "-c", "print('a'); print('b')"]
     proc = spawn_turn(argv, cwd=scratch_cwd(tmp_path), env=build_chat_env({"PATH": __import__("os").environ.get("PATH", "")}))
     out = proc.stdout.read()
-    proc.wait(timeout=10)
+    proc.wait(timeout=budget(10))
     assert "a" in out and "b" in out
     assert proc.returncode == 0

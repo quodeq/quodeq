@@ -49,14 +49,17 @@ def _build_principles(
     return principles
 
 
-def _build_evidence(context: EvidenceContext, principles: dict[str, PrincipleEvidence]) -> Evidence:
+def _build_evidence(
+    context: EvidenceContext, principles: dict[str, PrincipleEvidence],
+    quarantined: int = 0,
+) -> Evidence:
     """Create an Evidence object from context and principles."""
     return Evidence(
         repository=context.repository, language=context.language, date=context.date_str,
         source_file_count=context.source_file_count, files_read=context.files_read,
         coverage_pct=compute_coverage_pct(context.files_read, context.source_file_count),
-        principles=principles, dismissed_count=0, module=context.module,
-        exit_reason=context.exit_reason,
+        principles=principles, dismissed_count=0, quarantined_count=quarantined,
+        module=context.module, exit_reason=context.exit_reason,
     )
 
 
@@ -83,13 +86,15 @@ def parse_jsonl_to_evidence_by_dimension(
                 by_dim.setdefault(j.dimension or "unknown", []).append(j)
     if not by_dim:
         return {}
-    return {
-        dim: _build_evidence(context, _build_principles(
-            _group_judgments(dj, dimension=dim, evaluators_dir=evaluators_dir,
-                             compiled_dir=compiled_dir),
-            dim, context.source_file_count))
-        for dim, dj in by_dim.items()
-    }
+    result: dict[str, Evidence] = {}
+    for dim, dj in by_dim.items():
+        grouped = _group_judgments(dj, dimension=dim, evaluators_dir=evaluators_dir,
+                                   compiled_dir=compiled_dir)
+        result[dim] = _build_evidence(
+            context, _build_principles(grouped, dim, context.source_file_count),
+            grouped.quarantined,
+        )
+    return result
 
 
 def parse_jsonl_to_evidence(
@@ -105,4 +110,7 @@ def parse_jsonl_to_evidence(
     dim = judgments[0].dimension if judgments else ""
     grouped = _group_judgments(judgments, dimension=dim, evaluators_dir=evaluators_dir,
                                compiled_dir=compiled_dir)
-    return _build_evidence(context, _build_principles(grouped, dim, context.source_file_count))
+    return _build_evidence(
+        context, _build_principles(grouped, dim, context.source_file_count),
+        grouped.quarantined,
+    )

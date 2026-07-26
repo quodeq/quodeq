@@ -5,6 +5,8 @@ import '@testing-library/jest-dom/vitest';
 const fakeTerm = { open: vi.fn(), write: vi.fn(), dispose: vi.fn(), loadAddon: vi.fn(),
   onData: vi.fn(), onResize: vi.fn(), focus: vi.fn(), attachCustomKeyEventHandler: vi.fn(),
   reset: vi.fn(),
+  registerLinkProvider: vi.fn(() => ({ dispose: vi.fn() })),
+  buffer: { active: { getLine: () => ({ translateToString: () => '' }) } },
   cols: 80, rows: 24, options: {} };
 // Use `function` (not arrow) implementations so vi.fn() produces a constructible
 // mock: xterm's Terminal/FitAddon are always invoked with `new` in TerminalPane.
@@ -16,6 +18,8 @@ vi.mock('../../api/terminal.js', () => ({
   terminalStatus: vi.fn(async () => ({ enabled: true, running: false, reason: null })),
   killTerminal: vi.fn(async () => ({ ok: true })),
   terminalSocketUrl: () => 'ws://localhost/api/terminal/ws',
+  resolveTerminalPaths: vi.fn(async () => []),
+  openInEditor: vi.fn(async () => ({ opened: true, editor: 'code' })),
 }));
 // Mock the socket hook: jsdom has no real terminal WS to reach, and the
 // overlay tests need to drive each connection status directly. lastSocketOpts
@@ -34,6 +38,22 @@ it('mounts an xterm terminal when active', async () => {
   await screen.findByTestId('tty-root');
   expect(Terminal).toHaveBeenCalled();
   expect(fakeTerm.open).toHaveBeenCalled();
+});
+
+it('focuses xterm when it is the active tab so the user can type without clicking in', async () => {
+  socketState.status = 'open';
+  fakeTerm.focus.mockClear();
+  render(<TerminalPane active />);
+  await screen.findByTestId('tty-root');
+  expect(fakeTerm.focus).toHaveBeenCalled();
+});
+
+it('does not focus xterm while backgrounded (active=false)', async () => {
+  socketState.status = 'open';
+  fakeTerm.focus.mockClear();
+  render(<TerminalPane active={false} />);
+  await screen.findByTestId('tty-root');
+  expect(fakeTerm.focus).not.toHaveBeenCalled();
 });
 
 it('mounts xterm even when backgrounded (active=false) so the PTY survives a tab switch', async () => {

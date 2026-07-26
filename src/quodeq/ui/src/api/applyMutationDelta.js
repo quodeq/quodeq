@@ -105,9 +105,12 @@ export function applyMutationDelta(queryClient, projectId, delta) {
     }));
   };
 
-  // Accumulated (cross-run) scores cache: the server sent the whole rollup, so
+  // Accumulated (cross-run) scores cache: when the server sent a whole rollup,
   // swap it in wholesale; if absent, invalidate (it's small — a default refetch
-  // is fine).
+  // is fine). The dismiss/restore/delete deltas no longer carry one (computing
+  // it server-side ran compute_accumulated over every run — ~100s cold on large
+  // projects — and blew past the client's 30s timeout, aborting the whole
+  // delta), so this path is only taken by callers that still provide one.
   const patchAccumulated = (key, accumulated) => {
     const prev = queryClient.getQueryData(key);
     if (!accumulated || !prev) {
@@ -115,6 +118,36 @@ export function applyMutationDelta(queryClient, projectId, delta) {
       return;
     }
     queryClient.setQueryData(key, (old) => ({ ...old, accumulated }));
+  };
+
+  // Client-derive the Overview's accumulated dimension grades from the per-run
+  // rescore instead of a server-computed rollup. The accumulated entry for each
+  // dimension the latest run OWNS (``fromRunId === runId``) equals that run's
+  // rescored dimension, so we copy overallScore/overallGrade across — no
+  // cross-run recompute, so the dismiss POST stays ~0.1s and never times out.
+  // The weighted overall summary is deliberately left untouched (a lazy refetch
+  // reconciles it); recomputing it here would duplicate the grade formula.
+  // No-op — crucially NOT an invalidate, which would trigger the slow refetch —
+  // when the entry isn't cached; it fills in on its next fetch.
+  const patchAccumulatedDims = (key) => {
+    const prev = queryClient.getQueryData(key);
+    if (!Array.isArray(prev?.accumulated?.dimensions)) return;
+    queryClient.setQueryData(key, (old) => ({
+      ...old,
+      accumulated: {
+        ...old.accumulated,
+        dimensions: old.accumulated.dimensions.map((dim) => {
+          if (dim?.fromRunId !== runId) return dim;
+          const resc = scoreByDim.get(dim?.dimension);
+          if (!resc) return dim;
+          return {
+            ...dim,
+            overallScore: resc.overallScore ?? dim.overallScore,
+            overallGrade: resc.overallGrade ?? dim.overallGrade,
+          };
+        }),
+      },
+    }));
   };
 
   // Invalidate the run-detail violation source so lists refetch on next view.
@@ -142,6 +175,21 @@ export function applyMutationDelta(queryClient, projectId, delta) {
 
   if (delta.isLatest) {
     patchScores(projectKeys.dashboard(projectId, "latest"), { spliceDismissed: splices });
-    patchAccumulated(projectKeys.scores(projectId, null), delta.accumulated);
+    if (delta.accumulated) {
+      // A caller supplied the authoritative rollup — prefer it.
+      patchAccumulated(projectKeys.scores(projectId, null), delta.accumulated);
+      if (runId) patchAccumulated(projectKeys.scores(projectId, runId), delta.accumulated);
+    } else if (runId) {
+      // Client-derive from the per-run rescore. The Overview's app-root
+      // useDashboard reads `accumulated` from the null "latest" entry OR the
+      // run-scoped scores(projectId, runId) entry (the latter the moment the
+      // user drills into any run / dimension detail — see useProjectScores asOf
+      // resolution). Both are patched: the run-scoped entry has
+      // staleTime:Infinity and refreshDashboard only marks it stale
+      // (refetchType:"none"), so without this the Overview grade cards would sit
+      // stale until a window-focus refetch.
+      patchAccumulatedDims(projectKeys.scores(projectId, null));
+      patchAccumulatedDims(projectKeys.scores(projectId, runId));
+    }
   }
 }

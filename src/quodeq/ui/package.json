@@ -17,8 +17,8 @@
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.8",
-    "@tanstack/react-query": "^5.101.2",
-    "@tanstack/react-virtual": "^3.14.6",
+    "@tanstack/react-query": "^5.101.3",
+    "@tanstack/react-virtual": "^3.14.7",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/xterm": "6.0.0",
     "d3-hierarchy": "^3.1.2",
@@ -29,13 +29,13 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
-    "@tanstack/react-query-devtools": "^5.101.2",
+    "@tanstack/react-query-devtools": "^5.101.3",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@vitejs/plugin-react": "6.0.3",
     "jsdom": "^29.1.1",
-    "vite": "8.1.4",
+    "vite": "8.1.5",
     "vitest": "^4.1.10"
   }
 }

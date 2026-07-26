@@ -22,6 +22,10 @@ class _GroupedJudgments:
     violations: dict[str, list[Judgment]]
     compliance: dict[str, list[Judgment]]
     severity: dict[str, str]
+    # Findings dropped for naming a principle the standard does not define.
+    # Reported as run metadata so a run that discarded most of its evidence is
+    # distinguishable from a clean one; never re-joined to the findings lists.
+    quarantined: int = 0
 
 
 def _build_req_to_principle_map(dimension: str, evaluators_dir: Path | None = None) -> dict[str, str]:
@@ -73,6 +77,52 @@ def _resolve_req_to_principle_map(
     return mapping
 
 
+@dataclass(frozen=True)
+class PrincipleResolver:
+    """Resolves a finding's raw principle/requirement ID to a canonical principle.
+
+    The single source of truth for "does this finding belong to the dimension's
+    standard?". Both the report path (:func:`_group_judgments`) and the live
+    scan counters resolve through this, so the counters the UI shows mid-scan
+    and the persisted evaluation JSON can never disagree on which findings count.
+    """
+
+    req_to_principle: dict[str, str]
+    canonical: frozenset[str]
+
+    def resolve(self, practice_id: str | None) -> str | None:
+        """Canonical principle name, or None when the finding is unmappable.
+
+        None means quarantine: the dimension has a standard and this finding's
+        principle is not one it defines. With no standard (canonical empty) every
+        finding maps through unchanged, keeping callers permissive. A missing
+        practice_id never resolves — it has no principle to group under.
+        """
+        if not practice_id:
+            return None
+        principle = self.req_to_principle.get(practice_id, practice_id)
+        if self.canonical and principle not in self.canonical:
+            return None
+        return principle
+
+
+def build_principle_resolver(
+    dimension: str, evaluators_dir: Path | None = None,
+    compiled_dir: Path | None = None,
+) -> PrincipleResolver:
+    """Build the resolver for *dimension* from its standard.
+
+    A custom evaluator standard wins; otherwise the compiled built-in standard.
+    An unknown/blank dimension yields a permissive resolver. The directories must
+    be supplied by the caller; the core layer does not resolve paths itself.
+    """
+    mapping = (
+        _resolve_req_to_principle_map(dimension, evaluators_dir, compiled_dir)
+        if dimension else {}
+    )
+    return PrincipleResolver(mapping, frozenset(p for p in mapping.values() if p))
+
+
 def principle_names_for_dimension(
     dimension: str, evaluators_dir: Path | None = None,
     compiled_dir: Path | None = None,
@@ -94,29 +144,29 @@ def _group_judgments(
     evaluators_dir: Path | None = None,
     compiled_dir: Path | None = None,
 ) -> _GroupedJudgments:
-    req_to_principle = (
-        _resolve_req_to_principle_map(dimension, evaluators_dir, compiled_dir)
-        if dimension else {}
-    )
-    canonical = {p for p in req_to_principle.values() if p}
+    resolver = build_principle_resolver(dimension, evaluators_dir, compiled_dir)
     sc_violations: dict[str, list[Judgment]] = {}
     sc_compliance: dict[str, list[Judgment]] = {}
     sc_severity: dict[str, str] = {}
+    quarantined = 0
 
     for j in judgments:
-        principle = req_to_principle.get(j.practice_id, j.practice_id)
         # When the dimension has a standard, a finding whose principle is not
         # one the standard defines is unmappable: quarantine it (keep it out of
         # principle scoring) and log, so a misfiled finding -- a critical, in the
         # worst case -- is never silently turned into a phantom principle (e.g.
-        # an "N/A" card on the dashboard). Without a standard (canonical empty),
-        # stay permissive and group by the raw principle.
-        if canonical and principle not in canonical:
+        # an "N/A" card on the dashboard). The live scan counters resolve through
+        # the same PrincipleResolver, so they exclude exactly these findings too.
+        principle = resolver.resolve(j.practice_id)
+        if principle is None:
             _logger.warning(
                 "Quarantining unmapped %s finding in dimension %r: principle %r "
                 "not in standard (practice_id=%r, req=%r, file=%s)",
-                j.severity or "?", dimension, principle, j.practice_id, j.req, j.file,
+                j.severity or "?", dimension,
+                resolver.req_to_principle.get(j.practice_id, j.practice_id),
+                j.practice_id, j.req, j.file,
             )
+            quarantined += 1
             continue
         if j.verdict == "violation":
             sc_violations.setdefault(principle, []).append(j)
@@ -126,4 +176,4 @@ def _group_judgments(
         if principle not in sc_severity or _sev_rank(sev) > _sev_rank(sc_severity[principle]):
             sc_severity[principle] = sev
 
-    return _GroupedJudgments(sc_violations, sc_compliance, sc_severity)
+    return _GroupedJudgments(sc_violations, sc_compliance, sc_severity, quarantined)

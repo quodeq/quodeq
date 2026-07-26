@@ -3,6 +3,7 @@ import sys
 import time
 
 from quodeq.shared._process_kill import kill_proc_tree
+from tests._timeouts import budget
 
 
 def test_kill_proc_tree_kills_a_real_process():
@@ -10,7 +11,7 @@ def test_kill_proc_tree_kills_a_real_process():
                             start_new_session=(sys.platform != "win32"))
     assert proc.poll() is None
     kill_proc_tree(proc)
-    proc.wait(timeout=10)
+    proc.wait(timeout=budget(10))
     assert proc.poll() is not None
 
 

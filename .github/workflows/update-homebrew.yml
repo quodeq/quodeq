@@ -12,7 +12,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
         with:
           # Check out the exact commit the release was published from -- the tag
           # commit that triggered "Publish to PyPI" -- NOT `develop`. publish.yml
@@ -81,7 +81,6 @@ jobs:
             license "MIT"
 
             depends_on "python@3.12"
-            depends_on "node"
 
             def install
               virtualenv_install_with_resources

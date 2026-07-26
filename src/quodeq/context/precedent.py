@@ -312,8 +312,13 @@ def load_precedent_corpus(
             if try_claim_backfill(conn):
                 try:
                     deadline = time.monotonic() + _BACKFILL_BUDGET_S
+                    # We hold the exclusive backfill claim, so no other writer
+                    # adds fingerprints while we run. Read the stored set once and
+                    # track inserts locally instead of re-querying the whole
+                    # (growing) table on every chunk -- that was an N+1 scan whose
+                    # cost climbed with the corpus size.
+                    stored = stored_fingerprints(conn)
                     while time.monotonic() < deadline:
-                        stored = stored_fingerprints(conn)
                         missing = [fp for fp in texts if fp not in stored]
                         if not missing:
                             break
@@ -327,6 +332,7 @@ def load_precedent_corpus(
                             break
                         if not insert_vectors(conn, model, list(zip(chunk, vecs))):
                             break
+                        stored.update(chunk)
                         embedded_new += len(chunk)
                 finally:
                     release_backfill_claim(conn)

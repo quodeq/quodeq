@@ -143,17 +143,23 @@ export default function HistoryChartPanel({ trend = [], selectedRunId = null, on
 
   const data = useMemo(() => buildTrendData(trend, selectedRunId), [trend, selectedRunId]);
 
-  if (!trend || trend.length < 2) return null;
-
   // Stats computed from the full trend (not just the windowed slice), matching
-  // the mockup's LATEST / AVG / MIN / MAX header row.
-  const scores = trend
-    .map((t) => parseFloat(t.runNumericAverage ?? t.numericAverage))
-    .filter((n) => !Number.isNaN(n));
-  const latest = scores[0];
-  const min = scores.length ? Math.min(...scores) : null;
-  const max = scores.length ? Math.max(...scores) : null;
-  const avg = scores.length ? scores.reduce((s, n) => s + n, 0) / scores.length : null;
+  // the mockup's LATEST / AVG / MIN / MAX header row. Memoized on `trend` so the
+  // O(N) scan doesn't re-run on every hover render (hoveredIndex changes fire a
+  // re-render on each mouse move).
+  const { latest, min, max, avg } = useMemo(() => {
+    const scores = trend
+      .map((t) => parseFloat(t.runNumericAverage ?? t.numericAverage))
+      .filter((n) => !Number.isNaN(n));
+    return {
+      latest: scores[0],
+      min: scores.length ? Math.min(...scores) : null,
+      max: scores.length ? Math.max(...scores) : null,
+      avg: scores.length ? scores.reduce((s, n) => s + n, 0) / scores.length : null,
+    };
+  }, [trend]);
+
+  if (!trend || trend.length < 2) return null;
 
   const fmt = (n) => (n == null ? '—' : n.toFixed(1));
 

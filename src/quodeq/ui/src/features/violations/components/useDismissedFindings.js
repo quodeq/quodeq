@@ -13,7 +13,9 @@ import { confirmDialog } from '../../../utils/confirmDialog.js';
 
 /**
  * @param {string} selectedProject
- * @param {Function} [onRefresh]
+ * @param {Function} [onRefresh] - Unused by the mutation handlers (the
+ *   reconcile below marks stale itself); kept in the signature for the
+ *   navigation-time mount refresh ViolationsPage wires separately.
  * @param {Function} [setRestoreError]
  * @param {number} [refreshKey=0]
  * @param {'local'|'shared'} [selectedSource='local'] - Shared projects have no
@@ -24,8 +26,15 @@ import { confirmDialog } from '../../../utils/confirmDialog.js';
  *   handlers to the dismissed sub-tab, but this guard protects against a
  *   handler slipping through some other path and corrupting the local cache
  *   with shared-derived deltas (the local id can collide with a shared id).
+ * @param {Function} [onReconcile] - The debounced ACTIVE
+ *   scheduleDashboardReconcile (see useDashboard.js): the ONE call every
+ *   mutation handler below makes on success. It marks the project queries
+ *   stale synchronously and then actively refetches after the debounce
+ *   window -- restore-all/delete-all return a payload applyMutationDelta's
+ *   gates can't patch (scores:null, delta.isLatest:false), and mark-stale
+ *   alone never reaches the always-mounted Overview observer.
  */
-export function useDismissedFindings(selectedProject, onRefresh, setRestoreError, refreshKey = 0, selectedSource = 'local') {
+export function useDismissedFindings(selectedProject, onRefresh, setRestoreError, refreshKey = 0, selectedSource = 'local', onReconcile) {
   const [dismissed, setDismissed] = useState([]);
   const queryClient = useQueryClient();
   const isShared = selectedSource === 'shared';
@@ -33,7 +42,7 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
   // Fold the mutation-delta from a restore/delete response into the React Query
   // caches so dimension scores/grades update instantly and the run-detail
   // violation lists get invalidated for a lazy refetch. Additive — the local
-  // setDismissed splices and onRefresh below still run.
+  // setDismissed splices and the onReconcile calls below still run.
   const applyDelta = useCallback((result) => {
     const delta = result?.delta;
     if (!delta) return;
@@ -59,12 +68,12 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       const result = await restoreFinding(selectedProject, { req: d.req, file: d.file, line: d.line });
       applyDelta(result);
       setDismissed((prev) => prev.filter((item) => !(item.req === d.req && item.file === d.file && item.line === d.line)));
-      onRefresh?.();
+      onReconcile?.();
     } catch (err) {
       console.error('Failed to restore finding:', err);
       setRestoreError?.('Failed to restore finding. Please try again.');
     }
-  }, [selectedProject, onRefresh, setRestoreError, applyDelta, isShared]);
+  }, [selectedProject, onReconcile, setRestoreError, applyDelta, isShared]);
 
   const handleRestoreAll = useCallback(async () => {
     if (isShared) return;
@@ -72,12 +81,12 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       const result = await restoreAllFindings(selectedProject);
       applyDelta(result);
       setDismissed([]);
-      onRefresh?.();
+      onReconcile?.();
     } catch (err) {
       console.error('Failed to restore all findings:', err);
       setRestoreError?.('Failed to restore all findings. Please try again.');
     }
-  }, [selectedProject, onRefresh, setRestoreError, applyDelta, isShared]);
+  }, [selectedProject, onReconcile, setRestoreError, applyDelta, isShared]);
 
   const handleDelete = useCallback(async (d) => {
     if (isShared) return;
@@ -95,12 +104,12 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
         && item.principle === d.principle
         && item.file === d.file
       )));
-      onRefresh?.();
+      onReconcile?.();
     } catch (err) {
       console.error('Failed to delete finding:', err);
       setRestoreError?.('Failed to delete finding. Please try again.');
     }
-  }, [selectedProject, onRefresh, setRestoreError, applyDelta, isShared]);
+  }, [selectedProject, onReconcile, setRestoreError, applyDelta, isShared]);
 
   const handleDeleteAll = useCallback(async () => {
     if (isShared) return;
@@ -117,12 +126,12 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       const result = await deleteAllFindings(selectedProject);
       applyDelta(result);
       setDismissed([]);
-      onRefresh?.();
+      onReconcile?.();
     } catch (err) {
       console.error('Failed to delete all findings:', err);
       setRestoreError?.('Failed to delete all findings. Please try again.');
     }
-  }, [selectedProject, onRefresh, setRestoreError, dismissed.length, applyDelta, isShared]);
+  }, [selectedProject, onReconcile, setRestoreError, dismissed.length, applyDelta, isShared]);
 
   return { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll };
 }

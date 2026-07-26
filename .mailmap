@@ -1,0 +1,4 @@
+# Canonical contributor identities.
+# Maps every commit to the author's personal identity; the persgroep.net
+# address was used by accident on a handful of commits.
+Victor Purcallas Marchesi <vpurcallas@gmail.com> <victor.purcallas.marchesi@persgroep.net>

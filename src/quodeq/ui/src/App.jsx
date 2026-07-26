@@ -1,6 +1,7 @@
 import { lazy, Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
 import UpdateBanner from './features/updates/UpdateBanner.jsx';
+import { useSharedContentSignal } from './features/dashboard/hooks/useSharedProjects.js';
 
 const DashboardPage = lazy(() => import('./features/dashboard/components/DashboardPage.jsx'));
 const ExplorerPage = lazy(() => import('./features/explorer/components/ExplorerPage.jsx'));
@@ -255,7 +256,31 @@ export function shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, s
  * consumed but never forwarded). Exported so producer and consumer can be
  * pinned together in tests without mounting the whole App.
  */
-export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluating, showToast, setWizardEntry }) {
+/**
+ * The dashboard data bundle handed to every DashboardPage route.
+ *
+ * Same hazard as buildNavigationBundle, quieter failure: this is an explicit
+ * key whitelist, so a field added to useAppState and read by DashboardPage
+ * silently arrives as undefined unless it is forwarded here. Nothing throws --
+ * the feature just never activates (that is how scoresPending, and the
+ * dimension-panel pending state that depends on it, was inert at first).
+ * Exported so producer and consumer can be pinned together in tests.
+ */
+export function buildDashboardDataBundle({ state, sharedHasContent = false }) {
+  return {
+    selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
+    projectsLoaded: state.projectsLoaded,
+    dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
+    scoresPending: state.scoresPending,
+    sharedProjectInfo: state.sharedProjectInfo,
+    availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
+    selectedDisplayName: state.selectedDisplayName,
+    granularity: state.granularity, onGranularityChange: state.onGranularityChange,
+    sharedHasContent,
+  };
+}
+
+export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluating, showToast, setWizardEntry, sharedHasContent = false }) {
   return {
     selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
     projectsLoaded: state.projectsLoaded,
@@ -298,6 +323,9 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
         presetProjectId: projectId,
       });
     },
+    // null when the shared repo has no content — consumers use the nullness
+    // to hide their "browse remote repositories" affordance.
+    onBrowseRemote: sharedHasContent ? () => navTab('projects') : null,
     isEvaluating,
   };
 }
@@ -363,15 +391,41 @@ export function resolveSelectionAfterSharedDisconnect({ selectedSource, projects
  * connected to a shared repo and is viewing a shared project also reads as
  * zero local projects (state.projects is always the local list per
  * useProjectState), but they already have a real working view open -- the
- * wizard must not cover it uninvited. Exported so this contract is
- * unit-testable without mounting the whole App (which needs ~8 providers).
+ * wizard must not cover it uninvited. Likewise a shared repo with published
+ * content (sharedHasContent, see useSharedContentSignal) gives the user
+ * remote repositories to browse -- the wizard must not open over those
+ * either. While the shared signal is still resolving (sharedSettled=false)
+ * the decision is DEFERRED: return false but do not latch, same as the
+ * other transient blocks. Exported so this contract is unit-testable
+ * without mounting the whole App (which needs ~8 providers).
  */
-export function shouldAutoOpenOnboardingWizard({ projectsLoaded, projectsCount, selectedSource, isEvaluating }) {
+export function shouldAutoOpenOnboardingWizard({ projectsLoaded, projectsCount, selectedSource, isEvaluating, sharedSettled = true, sharedHasContent = false }) {
   if (!projectsLoaded) return false;
   if ((projectsCount ?? 0) > 0) return false;
   if (selectedSource === 'shared') return false;
   if (isEvaluating) return false;
+  if (!sharedSettled) return false;
+  if (sharedHasContent) return false;
   return true;
+}
+
+/**
+ * One-shot initial-landing decision. With zero local projects the default
+ * 'overview' landing is a dead-end empty state; when a configured shared
+ * repo has published content, land on the repositories tab instead so the
+ * remote projects are visible without scanning anything locally. Only the
+ * default 'overview' landing redirects: a user who already navigated
+ * elsewhere (settings, help) before the signals settled keeps their page,
+ * and a restored 'shared' selection is already a working view. The caller
+ * latches the decision once inputs settle, so mid-session deletions or
+ * disconnects never yank the user. Exported for unit tests.
+ */
+export function shouldRedirectToRemoteRepositories({ projectsLoaded, projectsCount, selectedSource, sharedSettled, sharedHasContent, activeTab }) {
+  if (!projectsLoaded || !sharedSettled) return false;
+  if ((projectsCount ?? 0) > 0) return false;
+  if (selectedSource === 'shared') return false;
+  if (!sharedHasContent) return false;
+  return activeTab === 'overview';
 }
 
 function renderEvalPrincipleDetail(params, props) {
@@ -393,7 +447,11 @@ function renderEvalPrincipleDetail(params, props) {
         const payload = { ...buildDismissPayload(v, evalPrincipal.dimension), run_id: evalPrincipal.runId };
         const result = await props.dismissFinding(selectedProject, payload);
         props.applyDelta?.(selectedProject, result?.scores, result?.delta);
-        props.refreshDashboard?.();
+        // One call per suppression mutation: the reconcile marks the project
+        // queries stale synchronously AND schedules the debounced active
+        // refetch (see scheduleDashboardReconcile in useDashboard.js), so a
+        // separate refreshDashboard call here would be redundant.
+        props.scheduleDashboardReconcile?.();
         props.bumpDismissRefresh?.();
         return result;
       }}
@@ -492,7 +550,20 @@ function ViolationsRoute({ params, props }) {
           }
         },
         onPrincipleClick: (principleObj) => navigateToPrinciple(principleObj),
+        // ViolationsPage fires onRefresh on EVERY mount (its tabKey effect),
+        // including plain drill-down/back navigation with no mutation --
+        // the page remounts on every round trip. onRefresh must stay wired
+        // to the lazy refreshDashboard (mark-stale, refetchType:'none') so
+        // plain navigation never forces an active refetch of the 10-20 MB
+        // dashboard payload. Restore/delete (single + bulk) route through a
+        // SEPARATE onReconcile callback via useDismissedFindings, called
+        // alongside onRefresh from its four mutation handlers.
+        // restore-all/delete-all return a payload applyMutationDelta can't
+        // patch (scores:null, delta.isLatest:false), so those need the
+        // debounced ACTIVE reconcile — see scheduleDashboardReconcile in
+        // useDashboard.js.
         onRefresh: props.refreshDashboard,
+        onReconcile: props.scheduleDashboardReconcile,
         onNavigate: nav,
       }}
       isDirectNav={props.navigation.navStackLength === 1}
@@ -551,7 +622,11 @@ export const ROUTE_RENDERERS = {
           onDimensionClick: (dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject }),
           onNavigate: props.navigation.handleNavigate,
           onRunChange: props.navigation.setHistorySelectedRun,
-          onRunDeleted: () => props.refreshDashboard?.(),
+          // Run deletion changes the accumulated rollup the Overview grade is
+          // built from — same mutation class as dismiss/restore, so it gets
+          // the same debounced ACTIVE reconcile (mark-stale alone never
+          // reaches the always-mounted Overview observer).
+          onRunDeleted: () => props.scheduleDashboardReconcile?.(),
         }}
         projects={props.navigation.projects}
         projectsLoaded={props.navigation.projectsLoaded}
@@ -602,7 +677,11 @@ export const ROUTE_RENDERERS = {
         const payload = { ...buildDismissPayload(v), run_id: params.runId };
         const result = await props.dismissFinding(props.navigation.selectedProject, payload);
         props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
-        props.refreshDashboard?.();
+        // One call per suppression mutation: the reconcile marks the project
+        // queries stale synchronously AND schedules the debounced active
+        // refetch (see scheduleDashboardReconcile in useDashboard.js), so a
+        // separate refreshDashboard call here would be redundant.
+        props.scheduleDashboardReconcile?.();
         props.bumpDismissRefresh?.();
         return result;
       }}
@@ -619,7 +698,11 @@ export const ROUTE_RENDERERS = {
         const payload = { ...buildDismissPayload(v, params.dimension), run_id: params.runId };
         const result = await props.dismissFinding(props.navigation.selectedProject, payload);
         props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
-        props.refreshDashboard?.();
+        // One call per suppression mutation: the reconcile marks the project
+        // queries stale synchronously AND schedules the debounced active
+        // refetch (see scheduleDashboardReconcile in useDashboard.js), so a
+        // separate refreshDashboard call here would be redundant.
+        props.scheduleDashboardReconcile?.();
         props.bumpDismissRefresh?.();
         return result;
       }}
@@ -664,6 +747,72 @@ export function buildAssistantSessionPayload({ provider, model, projectId, runId
 }
 
 /**
+ * Handler for the `quodeq:assistant-action-applied` window event, which the
+ * assistant's ActionPreviewCard dispatches after a successful apply.
+ *
+ * Extracted and exported so the post-dismiss convergence contract can be
+ * pinned without mounting App (which needs ~8 providers). An assistant
+ * dismiss mutates exactly the payloads a manual dismiss does, so it owes the
+ * same three follow-ups — see the inline notes on each.
+ *
+ * @param {{
+ *   applyDelta: (project: string, scores: Object, delta: Object) => void,
+ *   bumpDismissRefresh: () => void,
+ *   scheduleDashboardReconcile?: () => void,
+ *   selectedProject: string,
+ * }} deps
+ * @returns {(event: CustomEvent) => void}
+ */
+export function buildAssistantActionAppliedHandler({
+  applyDelta,
+  bumpDismissRefresh,
+  scheduleDashboardReconcile,
+  selectedProject,
+}) {
+  return (event) => {
+    if (event.detail?.actionType !== 'dismiss_finding') return;
+    // Apply the delta first so the currently-visible screen patches in place
+    // immediately; the refresh/reconcile below are the eventual-correctness
+    // path (e.g. for views the delta doesn't cover).
+    // Prefer the delta's own project over the live selectedProject: the
+    // apply POST may resolve after the user switched projects, and the
+    // delta is frozen to the action's project. Keying the patch on the
+    // live selection would write project A's rollup into project B's cache.
+    if (event.detail.delta) {
+      try {
+        applyDelta(
+          event.detail.delta?.project || selectedProject,
+          event.detail.scores,
+          event.detail.delta,
+        );
+      } catch {
+        // Instant patch is best-effort; the refresh/reconcile are the fallback.
+      }
+    }
+    bumpDismissRefresh();
+    // Reconcile exactly as the manual dismiss handlers do: the call below
+    // marks the project queries stale synchronously (so frozen run views
+    // refetch on their next mount) and then actively refetches after the
+    // debounce window
+    // (see useDismissedFindings.js). Mark-stale alone never reaches the
+    // Overview: its useDashboard observer is mounted at the app root and
+    // never remounts, and the pywebview window never fires the focus-refetch
+    // a browser tab gets. So for any view the delta above doesn't cover --
+    // and for an assistant dismiss that returns no delta at all -- the
+    // visible screen would keep showing pre-dismiss numbers indefinitely,
+    // which reads as "nothing updated". Debounced, so a multi-action apply
+    // coalesces into one refetch of the 10-20 MB payload.
+    //
+    // Unlike applyDelta this keys on the LIVE selectedProject rather than the
+    // delta's frozen project. That is safe here
+    // where it wouldn't be above: reconciling is a refetch, so aiming it at
+    // the wrong project after a mid-flight switch merely re-pulls fresh data;
+    // it never writes one project's rollup into another's cache.
+    scheduleDashboardReconcile?.();
+  };
+}
+
+/**
  * @param {{ activePage: { page: string }, props: Object }} params
  * @returns {JSX.Element|null}
  */
@@ -675,6 +824,7 @@ function MainContent({ activePage, props }) {
       <EmptyStateWithTour
         onAdd={() => props.navigation.onAddProject()}
         onTour={() => props.navigation.onTakeTour()}
+        onBrowseRemote={props.navigation.onBrowseRemote}
         isEvaluating={props.navigation.isEvaluating}
       />
     );
@@ -711,6 +861,11 @@ export default function App() {
   const { dismissFinding } = useApi();
   const queryClient = useQueryClient();
   const state = useAppState();
+  // Passive shared-repo content signal driving the zero-local-projects flow:
+  // wizard auto-open (below), the one-shot landing redirect, and the
+  // "browse remote repositories" empty-state actions. Same react-query cache
+  // as ProjectsPage/Settings — no extra fetching once those mount.
+  const sharedSignal = useSharedContentSignal();
   const APP_VERSION = state.serverVersion;
   const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
   const [sidebarPinned, setSidebarPinned] = useState(false);
@@ -722,44 +877,25 @@ export default function App() {
   // fetched once on mount.
   const [dismissRefreshKey, setDismissRefreshKey] = useState(0);
   const bumpDismissRefresh = () => setDismissRefreshKey((k) => k + 1);
-  const { refreshDashboard: refreshDashboardForApply, selectedProject } = state;
+  const {
+    scheduleDashboardReconcile: scheduleReconcileForApply,
+    selectedProject,
+  } = state;
   // Shared with the manual dismiss handlers below (buildDismissPayload
   // callers). Patches the dashboard/scores caches from a dismiss response's
   // delta so the Overview updates instantly instead of waiting on a refetch.
   const applyDelta = (project, scores, delta) =>
     applyMutationDelta(queryClient, project, delta && { ...delta, dimensions: scores?.dimensions });
   useEffect(() => {
-    const handler = (event) => {
-      if (event.detail?.actionType === 'dismiss_finding') {
-        // Apply the delta first so the currently-visible screen patches in
-        // place immediately; the refresh/refetch below is the lazy,
-        // eventual-correctness path (e.g. for views the delta doesn't cover).
-        // Prefer the delta's own project over the live selectedProject: the
-        // apply POST may resolve after the user switched projects, and the
-        // delta is frozen to the action's project. Keying the patch on the
-        // live selection would write project A's rollup into project B's cache.
-        if (event.detail.delta) {
-          try {
-            applyDelta(
-              event.detail.delta?.project || selectedProject,
-              event.detail.scores,
-              event.detail.delta,
-            );
-          } catch {
-            // Instant patch is best-effort; the lazy refresh below is the fallback.
-          }
-        }
-        bumpDismissRefresh();
-        // Assistant-applied dismissals mutate the same payloads manual ones
-        // do; invalidate the project queries so frozen run views (staleTime
-        // Infinity) refetch on their next mount instead of showing the
-        // pre-dismiss counts forever.
-        refreshDashboardForApply?.();
-      }
-    };
+    const handler = buildAssistantActionAppliedHandler({
+      applyDelta,
+      bumpDismissRefresh,
+      scheduleDashboardReconcile: scheduleReconcileForApply,
+      selectedProject,
+    });
     window.addEventListener('quodeq:assistant-action-applied', handler);
     return () => window.removeEventListener('quodeq:assistant-action-applied', handler);
-  }, [refreshDashboardForApply, selectedProject]);
+  }, [scheduleReconcileForApply, selectedProject]);
   // Auto-open is a once-per-session decision. Without this guard, closing the
   // wizard sets wizardEntry → null, which re-fires this effect and re-opens
   // the wizard immediately because projects.length is still 0. The user's
@@ -820,12 +956,25 @@ export default function App() {
       projectsCount: state.projects.length,
       selectedSource: state.selectedSource,
       isEvaluating,
+      sharedSettled: sharedSignal.settled,
+      sharedHasContent: sharedSignal.hasContent,
     })) {
-      // Blocked for a transient reason (shared selection, an evaluation in
-      // flight) -- do NOT mark autoOpenedRef: once the block lifts (source
-      // switches back to local, the evaluation finishes) while local
-      // projects are still zero, the decision must be reconsidered rather
-      // than permanently skipped.
+      // A settled "shared repo has content" outcome is FINAL for this page
+      // load, not transient: if it later flips (repo disconnected in
+      // Settings, background refresh reveals an emptied repo), the wizard
+      // must not pop over the user's working view -- the wall/empty states
+      // are the non-modal fallback. Latch here; the remaining blocks
+      // (unsettled signal, shared selection, evaluation in flight) stay
+      // unlatched so the decision is reconsidered when they lift.
+      if (sharedSignal.settled && sharedSignal.hasContent) {
+        autoOpenedRef.current = true;
+      }
+      // Otherwise blocked for a transient reason (shared selection, an
+      // evaluation in flight, shared signal still resolving) -- do NOT mark
+      // autoOpenedRef: once the block lifts (source switches back to local,
+      // the evaluation finishes, the signal settles) while local projects
+      // are still zero, the decision must be reconsidered rather than
+      // permanently skipped.
       return;
     }
     let skipped = false;
@@ -834,7 +983,7 @@ export default function App() {
     if (!skipped) {
       setWizardEntry({ startStep: 'welcome', isFirstProject: true });
     }
-  }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource]);
+  }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent]);
 
   // Project-data tabs (overview/violations/map/history) only make sense once
   // the selected project has at least one completed evaluation run. Until
@@ -871,6 +1020,26 @@ export default function App() {
     ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
     : null;
   const { activePage, navStack, navPop, navGoTo, navTab, activeTab } = state;
+  // Initial landing: decided exactly once, the first render after both the
+  // local projects list and the shared signal have settled (whatever the
+  // outcome). Mid-session changes never re-trigger it.
+  const initialLandingDecidedRef = useRef(false);
+  useEffect(() => {
+    if (initialLandingDecidedRef.current) return;
+    if (!state.projectsLoaded || !sharedSignal.settled) return;
+    initialLandingDecidedRef.current = true;
+    if (shouldRedirectToRemoteRepositories({
+      projectsLoaded: state.projectsLoaded,
+      projectsCount: state.projects.length,
+      selectedSource: state.selectedSource,
+      sharedSettled: sharedSignal.settled,
+      sharedHasContent: sharedSignal.hasContent,
+      activeTab,
+    })) {
+      navTab('projects');
+    }
+  }, [state.projectsLoaded, state.projects.length, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent, activeTab, navTab]);
+
   // Native-shell bridge: the macOS Help menu opens tabs by dispatching
   // quodeq:navigate (see _webview_window._install_macos_help_menu).
   useNativeNavBridge(navTab);
@@ -911,23 +1080,24 @@ export default function App() {
   );
 
   const contentProps = {
-    dashboardData: {
-      selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
-      projectsLoaded: state.projectsLoaded,
-      dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
-      sharedProjectInfo: state.sharedProjectInfo,
-      availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
-      selectedDisplayName: state.selectedDisplayName,
-      granularity: state.granularity, onGranularityChange: state.onGranularityChange,
-    },
+    dashboardData: buildDashboardDataBundle({ state, sharedHasContent: sharedSignal.hasContent }),
     navigation: buildNavigationBundle({
       state, navTab, navStackLength: navStack.length,
       isEvaluating, showToast, setWizardEntry,
+      sharedHasContent: sharedSignal.hasContent,
     }),
     evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
     settings: state.settings,
     refreshDashboard: state.refreshDashboard,
+    // Debounced ACTIVE reconcile for suppression mutations (dismiss/restore/
+    // delete) — see useDashboard.js. refreshDashboard's refetchType:'none'
+    // only marks the cache stale; this actually refetches the always-mounted
+    // Overview observer after the 1200ms window, so restore-all/delete-all
+    // (whose response can't be patched via applyMutationDelta) and every
+    // other suppression mutation converge without waiting for a project
+    // switch.
+    scheduleDashboardReconcile: state.scheduleDashboardReconcile,
     dismissFinding,
     // Patch the dashboard/scores caches from the dismiss response delta so the
     // Overview updates instantly. Additive — the refreshDashboard /

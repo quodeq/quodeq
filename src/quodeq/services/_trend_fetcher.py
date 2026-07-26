@@ -32,6 +32,7 @@ from quodeq.services.dismissed import dismissed_keys as _default_dismissed_keys
 from quodeq.services.ports import read_run_scalars as _default_read_run_scalars
 from quodeq.services.rescore import _rescore_dimension
 from quodeq.services.score_cache import make_cache_backed_fetcher
+from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 
@@ -53,6 +54,7 @@ def make_rescoring_fetcher(
     dismiss-adjusted data. Identity when the project has no active
     dismissals/deletions.
     """
+    validate_path_segment(project)
     project_dir = reports_root / project
     dismissed = dismissed_keys(project_dir)
     deleted = deleted_keys(project_dir)
@@ -61,7 +63,14 @@ def make_rescoring_fetcher(
 
     def rescoring_fetcher(run_id: str) -> list[DimensionResult]:
         dims = base_fetcher(run_id)
-        return [_rescore_dimension(d, dismissed, deleted, params=params) for d in dims]
+        # The fetched dims all belong to *run_id*, so that run's directory is
+        # the evidence basis for the rescore.
+        validate_path_segment(run_id)
+        run_dir = project_dir / run_id
+        return [
+            _rescore_dimension(d, dismissed, deleted, params=params, run_dir=run_dir)
+            for d in dims
+        ]
 
     return rescoring_fetcher
 
