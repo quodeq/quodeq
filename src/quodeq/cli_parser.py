@@ -9,6 +9,21 @@ _DEFAULT_N_SUBAGENTS = 5
 _MODE_NUMERICAL = "numerical"
 _MODE_GRADES = "grades"
 
+# Spells out the single-letter counters in the progress lines the scan emits.
+# They are abbreviated there to keep the line readable at a glance.
+_EVALUATE_EPILOG = """\
+progress lines:
+  [security] 1m30s | 13 v · 316 c · 4 s · 2 u | files 105/200 | 5 agents
+
+  v  violations found so far
+  c  compliance findings found so far
+  s  suppressed: findings you already dismissed or deleted, not counted in v
+  u  unmapped: findings quarantined for naming a principle outside the
+     standard, not counted in v either
+
+  s and u only appear when non-zero.
+"""
+
 
 def _add_output_args(parser: argparse.ArgumentParser) -> None:
     """Register output and scoring mode arguments."""
@@ -127,7 +142,9 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard_parser.set_defaults(handler_command="dashboard")
 
     evaluate_parser = subparsers.add_parser(
-        "evaluate", help="Run evaluation (auto-detects language)"
+        "evaluate", help="Run evaluation (auto-detects language)",
+        epilog=_EVALUATE_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     _add_evaluate_args(evaluate_parser)
     evaluate_parser.set_defaults(handler_command="evaluate")

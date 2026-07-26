@@ -75,7 +75,9 @@ class TestHeartbeatFormat:
         )
         assert line.startswith("[security] 1m02s")
         assert "2 v · 5 c" in line
-        assert "files 10/30 · 20 left" in line
+        # The remaining count is dropped: 30 minus 10 already says it.
+        assert "files 10/30 |" in line
+        assert "left" not in line
         assert line.endswith("2 agents")
         assert "findings" not in line
         assert "total" not in line
@@ -94,10 +96,10 @@ class TestHeartbeatFormat:
             dimension="reliability", mins=16, secs=1,
             active=1, plural="",
             taken=34, total_files=34, remaining=0,
-            violations=122, compliance=261, suppressed=" · 339 supp",
+            violations=122, compliance=261, suppressed=" · 339 s",
             quarantined="",
         )
-        assert "122 v · 261 c · 339 supp |" in line
+        assert "122 v · 261 c · 339 s |" in line
 
     def test_no_suppressed_segment_when_nothing_is_hidden(self) -> None:
         """A project with no dismissals must keep the pre-existing line shape."""
@@ -108,7 +110,6 @@ class TestHeartbeatFormat:
             violations=7, compliance=3, suppressed="", quarantined="",
         )
         assert "7 v · 3 c |" in line
-        assert "supp" not in line
 
     def test_unmapped_segment_only_appears_when_something_was_quarantined(self) -> None:
         """A clean run keeps the line's original shape."""
@@ -117,9 +118,9 @@ class TestHeartbeatFormat:
             taken=1, total_files=2, remaining=1, violations=3, compliance=0,
             suppressed="",
         )
-        assert "unmapped" not in _HEARTBEAT_FMT.format(quarantined="", **kwargs)
-        assert "3 v · 0 c · 1 unmapped" in _HEARTBEAT_FMT.format(
-            quarantined=" · 1 unmapped", **kwargs,
+        assert "3 v · 0 c |" in _HEARTBEAT_FMT.format(quarantined="", **kwargs)
+        assert "3 v · 0 c · 1 u |" in _HEARTBEAT_FMT.format(
+            quarantined=" · 1 u", **kwargs,
         )
 
     def test_both_exclusion_segments_render_together(self) -> None:
@@ -129,9 +130,9 @@ class TestHeartbeatFormat:
             active=1, plural="",
             taken=5, total_files=5, remaining=0,
             violations=570, compliance=168,
-            suppressed=" · 12 supp", quarantined=" · 1 unmapped",
+            suppressed=" · 12 s", quarantined=" · 1 u",
         )
-        assert "570 v · 168 c · 12 supp · 1 unmapped |" in line
+        assert "570 v · 168 c · 12 s · 1 u |" in line
 
 
 class TestHeartbeatLoop:
