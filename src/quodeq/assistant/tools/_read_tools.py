@@ -5,6 +5,7 @@ import dataclasses
 import json
 import logging
 import re
+from pathlib import Path
 
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
@@ -99,7 +100,7 @@ def _no_scope_error() -> ToolError:
         "scope, then ask the user to open a project overview or select a run.")
 
 
-def _raw_run_dims(eval_dir) -> list[dict]:
+def _raw_run_dims(eval_dir: Path) -> list[dict]:
     """A run's evaluation reports as dicts, each guaranteed a ``dimension``.
 
     Mirrors the pre-filtering fallback ``data.get("dimension", path.stem)``: a
@@ -123,22 +124,34 @@ def _available_names(ctx: ToolContext, dims: list[dict]) -> str:
     return ", ".join(sorted(shown))
 
 
+def _hidden_ids(ctx: ToolContext, names: list[str]) -> list[str]:
+    """Which of *names* the user has hidden, de-duplicated and sorted.
+
+    A blank/missing name is always treated as visible -- there is no
+    dimension to hide -- and must never itself surface as a hidden id.
+    """
+    non_blank = [n for n in names if (n or "").strip()]
+    _, hidden = partition_visible(non_blank, ctx.visible_standard_ids)
+    return sorted({h.strip().lower() for h in hidden})
+
+
 def _visible_only(ctx: ToolContext, entries: list[dict],
                   key: str = "dimension") -> tuple[list[dict], list[str]]:
     """Drop entries whose dimension the user has hidden.
 
     Returns ``(kept, hidden_ids)``. ``hidden_ids`` is de-duplicated and sorted
     so the payload is stable, and is what lets the assistant offer the withheld
-    data instead of silently omitting it.
+    data instead of silently omitting it. An entry with a blank/missing
+    dimension is always kept -- there is nothing to hide it as.
     """
     names = [str(e.get(key) or "") for e in entries]
-    _, hidden = partition_visible(names, ctx.visible_standard_ids)
+    hidden = _hidden_ids(ctx, names)
     if not hidden:
         return entries, []
-    hidden_set = {h.strip().lower() for h in hidden}
+    hidden_set = set(hidden)
     kept = [e for e, n in zip(entries, names, strict=True)
-            if n.strip().lower() not in hidden_set]
-    return kept, sorted(hidden_set)
+            if not n.strip() or n.strip().lower() not in hidden_set]
+    return kept, hidden
 
 
 # Trimmed violation shape shared by get_report and get_violations. We keep only
@@ -264,7 +277,19 @@ def _severity_key(v: dict):
 
 def _search_findings(ctx: ToolContext, query: str, limit: int = 20) -> dict:
     run_dir = _require_run(ctx)
-    hits = SqliteFindingsRepository(run_dir).search(query, limit=max(1, min(int(limit), 50)))
+    repo = SqliteFindingsRepository(run_dir)
+    # Hidden dims must be known BEFORE the query runs, so the exclusion can be
+    # pushed into SQL ahead of LIMIT (see SqliteFindingsRepository.search).
+    # Filtering the returned rows afterward is not equivalent: rows are
+    # ordered by insertion order, evaluators insert per dimension in batches,
+    # and enough hidden-dimension rows ahead of the visible ones can exhaust
+    # the whole limit window, returning zero results even though visible ones
+    # exist. Sourced from every dimension in the run's DB (not from the
+    # query's hits) so a dimension whose rows never come back from SQL is
+    # still reported as withheld.
+    hidden = _hidden_ids(ctx, list(repo.count_by_dimension()))
+    hits = repo.search(query, limit=max(1, min(int(limit), 50)),
+                        exclude_dimensions=hidden or None)
     # Model-facing key is "requirement"; the Finding attribute is `req`
     # (see data/sqlite/_row_mappers.py row_to_finding).
     rows = [
@@ -272,8 +297,7 @@ def _search_findings(ctx: ToolContext, query: str, limit: int = 20) -> dict:
          "file": f.file, "line": f.line, "reason": f.reason, "snippet": f.snippet}
         for f in hits
     ]
-    kept, hidden = _visible_only(ctx, rows)
-    return {"findings": kept, "hiddenStandardIds": hidden}
+    return {"findings": rows, "hiddenStandardIds": hidden}
 
 
 def _get_scores(ctx: ToolContext) -> dict:
