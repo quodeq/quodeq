@@ -1,4 +1,5 @@
 import { VISIBLE_STANDARDS_STORAGE_KEY, DEFAULT_VISIBLE_STANDARDS } from '../constants.js';
+import { getStandardsVisibility, putStandardsVisibility } from '../api/standards.js';
 
 /**
  * Read the visible standard IDs from localStorage.
@@ -12,6 +13,42 @@ export function readVisibleStandardIds(storage = localStorage) {
     return Array.isArray(parsed) ? parsed : DEFAULT_VISIBLE_STANDARDS;
   } catch {
     return DEFAULT_VISIBLE_STANDARDS;
+  }
+}
+
+/** Write the selection to the local cache. The server is the source of truth. */
+export function writeVisibleStandardIds(ids, storage = localStorage) {
+  storage.setItem(VISIBLE_STANDARDS_STORAGE_KEY, JSON.stringify(ids));
+}
+
+/**
+ * Sync the local cache with the server for a project.
+ *
+ * localStorage is a cache so the 8 synchronous read sites keep working; the
+ * file in the repo is authoritative. On the first run after upgrading, the
+ * server has no file yet (isDefault) while the browser may hold a real
+ * selection — that one gets pushed up rather than silently lost.
+ *
+ * Never throws: an offline/failed fetch leaves the cached value in place.
+ */
+export async function hydrateVisibleStandardIds(projectId, { storage = localStorage } = {}) {
+  if (!projectId) return readVisibleStandardIds(storage);
+  try {
+    const { visibleStandardIds, isDefault } = await getStandardsVisibility(projectId);
+    const cachedRaw = storage.getItem(VISIBLE_STANDARDS_STORAGE_KEY);
+    if (isDefault && cachedRaw) {
+      const cached = JSON.parse(cachedRaw);
+      if (Array.isArray(cached)) {
+        const saved = await putStandardsVisibility(projectId, cached);
+        const ids = saved?.visibleStandardIds ?? cached;
+        writeVisibleStandardIds(ids, storage);
+        return ids;
+      }
+    }
+    writeVisibleStandardIds(visibleStandardIds, storage);
+    return visibleStandardIds;
+  } catch {
+    return readVisibleStandardIds(storage);
   }
 }
 

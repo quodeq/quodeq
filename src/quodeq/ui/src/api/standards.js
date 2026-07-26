@@ -128,3 +128,25 @@ export async function putStandardsOverrides(projectId, overrides, { dryRun = fal
     body: JSON.stringify({ overrides }),
   });
 }
+
+/**
+ * Fetch the project's visible-standards selection.
+ * @param {string} projectId
+ * @returns {Promise<{ visibleStandardIds: string[], isDefault: boolean, knownStandardIds: string[] }>}
+ */
+export async function getStandardsVisibility(projectId) {
+  return request(`/projects/${encodeURIComponent(projectId)}/standards-visibility`);
+}
+
+/**
+ * Persist the project's visible-standards selection.
+ * @param {string} projectId
+ * @param {string[]} visibleStandardIds
+ * @returns {Promise<{ visibleStandardIds: string[], isDefault: boolean, knownStandardIds: string[] }>}
+ */
+export async function putStandardsVisibility(projectId, visibleStandardIds) {
+  return request(`/projects/${encodeURIComponent(projectId)}/standards-visibility`, {
+    method: 'PUT',
+    body: JSON.stringify({ visibleStandardIds }),
+  });
+}

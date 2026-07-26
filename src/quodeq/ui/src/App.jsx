@@ -33,7 +33,7 @@ import { ACTIVE_PROVIDER_KEY, providerKey } from './constants.js';
 import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { useNativeNavBridge } from './hooks/useNativeNavBridge.js';
-import { readVisibleStandardIds } from './utils/visibleStandards.js';
+import { readVisibleStandardIds, hydrateVisibleStandardIds } from './utils/visibleStandards.js';
 import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
 import { syncNativeTitlebar } from './utils/nativeTitlebar.js';
@@ -1051,6 +1051,21 @@ export default function App() {
   useEffect(() => {
     const main = document.querySelector('.app-shell__main-column > .dashboard');
     if (main) main.scrollTop = 0;
+  }, [state.selectedProject]);
+
+  // Sync the visible-standards cache (localStorage) with the server's
+  // per-project file whenever the selected project settles. This is the
+  // earliest point at which "the current project" is known, so it runs
+  // before any newly-mounted page reads readVisibleStandardIds() for that
+  // project. It migrates a pre-existing local selection up to the server on
+  // first run and never throws (see hydrateVisibleStandardIds). Note: pages
+  // already mounted with a memoized visible-standards Set (e.g. the sidebar
+  // trend/accumulated filters below, keyed with empty deps) do not
+  // recompute from this — that is a pre-existing limitation of those read
+  // sites, not something this hydration fixes.
+  useEffect(() => {
+    if (!state.selectedProject) return;
+    hydrateVisibleStandardIds(state.selectedProject);
   }, [state.selectedProject]);
 
   const currentDayLabel = useMemo(
