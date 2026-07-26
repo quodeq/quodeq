@@ -41,10 +41,10 @@ def _judgment_to_violation(obj: dict) -> dict | None:
     req = obj.get("req")
     if req:
         out["req"] = req
-    # Carry the principle forward as "practiceId" -- the same key name scored
-    # report JSON uses (Finding.practice_id -> camelCase via to_camel_dict) --
-    # so filter_suppressed_violations can match deleted-finding keys, which
-    # are (dimension, principle, file), without needing a second field name.
+    # Carry the principle forward as "practiceId". Scored report JSON names
+    # this field "principle" (analysis/_report_findings), so
+    # filter_suppressed_violations matches deleted-finding keys against
+    # either name.
     principle = obj.get("p")
     if principle:
         out["practiceId"] = principle

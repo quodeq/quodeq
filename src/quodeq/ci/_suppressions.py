@@ -40,6 +40,8 @@ def filter_suppressed_violations(report: dict, project_dir: Path) -> dict:
     kept = [
         v for v in report.get("violations") or []
         if (v.get("req") or "", v.get("file") or "", _coerce_line(v.get("line"))) not in dismissed
-        and (v.get("dimension") or report_dim, v.get("practiceId") or "", v.get("file") or "") not in deleted
+        and (v.get("dimension") or report_dim,
+             v.get("principle") or v.get("practiceId") or "",
+             v.get("file") or "") not in deleted
     ]
     return {**report, "violations": kept}
