@@ -9,7 +9,11 @@ from pathlib import Path
 
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
-from quodeq.core.standards.visibility import partition_visible
+from quodeq.core.standards.visibility import (
+    hidden_ids_for_names,
+    partition_entries_visible,
+    partition_visible,
+)
 from quodeq.core.types import to_camel_dict
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 from quodeq.services import _fs_reports
@@ -125,33 +129,20 @@ def _available_names(ctx: ToolContext, dims: list[dict]) -> str:
 
 
 def _hidden_ids(ctx: ToolContext, names: list[str]) -> list[str]:
-    """Which of *names* the user has hidden, de-duplicated and sorted.
-
-    A blank/missing name is always treated as visible -- there is no
-    dimension to hide -- and must never itself surface as a hidden id.
-    """
-    non_blank = [n for n in names if (n or "").strip()]
-    _, hidden = partition_visible(non_blank, ctx.visible_standard_ids)
-    return sorted({h.strip().lower() for h in hidden})
+    """Which of *names* the user has hidden. See ``hidden_ids_for_names``."""
+    return hidden_ids_for_names(names, ctx.visible_standard_ids)
 
 
 def _visible_only(ctx: ToolContext, entries: list[dict],
                   key: str = "dimension") -> tuple[list[dict], list[str]]:
     """Drop entries whose dimension the user has hidden.
 
-    Returns ``(kept, hidden_ids)``. ``hidden_ids`` is de-duplicated and sorted
-    so the payload is stable, and is what lets the assistant offer the withheld
-    data instead of silently omitting it. An entry with a blank/missing
-    dimension is always kept -- there is nothing to hide it as.
+    Thin per-context wrapper around ``partition_entries_visible`` -- the one
+    shared implementation used by every read surface, including
+    ``_overview.get_overview``, so "what counts as hidden" cannot drift
+    between them.
     """
-    names = [str(e.get(key) or "") for e in entries]
-    hidden = _hidden_ids(ctx, names)
-    if not hidden:
-        return entries, []
-    hidden_set = set(hidden)
-    kept = [e for e, n in zip(entries, names, strict=True)
-            if not n.strip() or n.strip().lower() not in hidden_set]
-    return kept, hidden
+    return partition_entries_visible(entries, ctx.visible_standard_ids, key=key)
 
 
 # Trimmed violation shape shared by get_report and get_violations. We keep only

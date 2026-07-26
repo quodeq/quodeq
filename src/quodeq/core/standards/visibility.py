@@ -115,3 +115,38 @@ def partition_visible(
     for value in ids:
         (shown if (value or "").strip().lower() in allowed else hidden).append(value)
     return shown, hidden
+
+
+def hidden_ids_for_names(
+    names: Iterable[str], visible: tuple[str, ...] | None,
+) -> list[str]:
+    """Which of *names* are hidden, de-duplicated and sorted.
+
+    A blank/missing name is always treated as visible -- there is no
+    dimension to hide -- and must never itself surface as a hidden id.
+    Shared by every read surface (assistant tools and the overview) so
+    "what counts as hidden" cannot drift between them.
+    """
+    non_blank = [n for n in names if (n or "").strip()]
+    _, hidden = partition_visible(non_blank, visible)
+    return sorted({h.strip().lower() for h in hidden})
+
+
+def partition_entries_visible(
+    entries: list[dict], visible: tuple[str, ...] | None, key: str = "dimension",
+) -> tuple[list[dict], list[str]]:
+    """Drop entries whose ``entry[key]`` the selection hides.
+
+    Returns ``(kept, hidden_ids)``. ``hidden_ids`` is de-duplicated and sorted
+    so the payload is stable, and is what lets a caller offer the withheld
+    data instead of silently omitting it. An entry with a blank/missing key is
+    always kept -- there is nothing to hide it as.
+    """
+    names = [str(e.get(key) or "") for e in entries]
+    hidden = hidden_ids_for_names(names, visible)
+    if not hidden:
+        return entries, []
+    hidden_set = set(hidden)
+    kept = [e for e, n in zip(entries, names, strict=True)
+            if not n.strip() or n.strip().lower() not in hidden_set]
+    return kept, hidden
