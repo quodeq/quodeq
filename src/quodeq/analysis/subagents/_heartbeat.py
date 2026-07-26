@@ -17,7 +17,7 @@ _SECONDS_PER_MINUTE = 60
 _HEARTBEAT_FMT = (
     "[{dimension}] {mins}m{secs:02d}s | "
     "{violations} v · {compliance} c{suppressed}{quarantined} | "
-    "files {taken}/{total_files} · {remaining} left | "
+    "files {taken}/{total_files} | "
     "{active} agent{plural}"
 )
 
@@ -65,8 +65,9 @@ def heartbeat_loop(
     — the scanner keeps re-finding them, and a raw count here would read as
     several times the number the finished report shows. ``ctx.resolver`` drops
     the ones the report path quarantines for naming a principle outside the
-    standard. Each excluded total is appended as its own segment (``N supp``,
-    ``N unmapped``) so neither drop is silent.
+    standard. Each excluded total is appended as its own segment (``N s``,
+    ``N u``) so neither drop is silent. The letters are spelled out in
+    ``quodeq evaluate --help``.
     """
     start = time.monotonic()
     while not stop.wait(_HEARTBEAT_INTERVAL):
@@ -84,15 +85,15 @@ def heartbeat_loop(
                 secs=secs,
                 # Only surfaces when a finding was actually quarantined, so the
                 # usual line keeps its shape.
-                quarantined=f" · {tally.quarantined} unmapped" if tally.quarantined else "",
+                quarantined=f" · {tally.quarantined} u" if tally.quarantined else "",
                 active=active,
                 plural="" if active == 1 else "s",
                 taken=taken,
+                # ``remaining`` is not printed: it is always total minus taken.
                 total_files=taken + remaining,
-                remaining=remaining,
                 violations=tally.violations,
                 compliance=tally.compliance,
-                suppressed=f" · {tally.suppressed} supp" if tally.suppressed else "",
+                suppressed=f" · {tally.suppressed} s" if tally.suppressed else "",
             ))
         except (OSError, ValueError, RuntimeError) as exc:
             log_warning(f"Heartbeat error: {exc}")
