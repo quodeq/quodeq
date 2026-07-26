@@ -322,6 +322,70 @@ def test_get_violations_accumulated_aggregates_when_omitted(acc_ctx):
     assert res["by_principle"] == {"S1": 1, "S2": 1, "R1": 1}
 
 
+# --- list_standards / get_standard visibility filtering. ---------------------
+
+
+def _standards_ctx(tmp_path, visible_standard_ids=None):
+    """A ctx whose StandardsService sees two custom standards: "security" and
+    "clean-architecture". evaluators_dir is real (glob'd by list_custom());
+    dimensions_file/compiled_dir are left non-existent so list_builtin()
+    degrades to [] and only the custom pair is in play."""
+    evaluators_dir = tmp_path / "evaluators"
+    evaluators_dir.mkdir(parents=True)
+    for sid in ("security", "clean-architecture"):
+        (evaluators_dir / f"{sid}.json").write_text(json.dumps({
+            "id": sid, "name": sid, "principles": [],
+        }))
+    repo = AssistantRepository(tmp_path / "assistant.db")
+    repo.create_session(session_id="s1", provider="ollama")
+    return ToolContext(
+        repository=repo, session_id="s1", run_dir=None, repo_root=None,
+        evaluators_dir=evaluators_dir, compiled_dir=tmp_path / "compiled",
+        dimensions_file=tmp_path / "dimensions.json",
+        visible_standard_ids=visible_standard_ids,
+    )
+
+
+def test_list_standards_hides_deselected(tmp_path):
+    from quodeq.assistant.tools._read_tools import _list_standards
+    ctx = _standards_ctx(tmp_path, visible_standard_ids=("security",))
+    out = _list_standards(ctx)
+    assert [s["id"] for s in out["standards"]] == ["security"]
+    assert "clean-architecture" in out["hiddenStandardIds"]
+
+
+def test_list_standards_include_hidden_returns_everything(tmp_path):
+    from quodeq.assistant.tools._read_tools import _list_standards
+    ctx = _standards_ctx(tmp_path, visible_standard_ids=("security",))
+    out = _list_standards(ctx, include_hidden=True)
+    ids = [s["id"] for s in out["standards"]]
+    assert "security" in ids and "clean-architecture" in ids
+    assert "clean-architecture" in out["hiddenStandardIds"]
+
+
+def test_list_standards_unfiltered_when_selection_is_none(tmp_path):
+    from quodeq.assistant.tools._read_tools import _list_standards
+    out = _list_standards(_standards_ctx(tmp_path, visible_standard_ids=None))
+    assert out["hiddenStandardIds"] == []
+
+
+def test_list_standards_empty_tuple_hides_everything(tmp_path):
+    # visible_standard_ids=() is a real selection ("hide everything"), distinct
+    # from None ("no filtering"). Must never be treated as falsy-equals-None.
+    from quodeq.assistant.tools._read_tools import _list_standards
+    ctx = _standards_ctx(tmp_path, visible_standard_ids=())
+    out = _list_standards(ctx)
+    assert out["standards"] == []
+    assert set(out["hiddenStandardIds"]) == {"security", "clean-architecture"}
+
+
+def test_get_standard_still_reaches_a_hidden_standard(tmp_path):
+    """The by-name escape hatch: hidden data stays reachable on explicit ask."""
+    from quodeq.assistant.tools._read_tools import _get_standard
+    ctx = _standards_ctx(tmp_path, visible_standard_ids=("security",))
+    assert _get_standard(ctx, "clean-architecture")["id"] == "clean-architecture"
+
+
 def test_get_scores_no_scope_errors(tmp_path):
     # No run AND no project scope → a clear error, not a crash.
     repo = AssistantRepository(tmp_path / "assistant.db")

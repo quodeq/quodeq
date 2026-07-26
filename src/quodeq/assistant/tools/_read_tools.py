@@ -8,6 +8,7 @@ import re
 
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.core.standards.visibility import partition_visible
 from quodeq.core.types import to_camel_dict
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 from quodeq.services import _fs_reports
@@ -387,9 +388,14 @@ def _service(ctx: ToolContext) -> StandardsService:
     return StandardsService(ctx.evaluators_dir, ctx.compiled_dir, ctx.dimensions_file)
 
 
-def _list_standards(ctx: ToolContext) -> dict:
+def _list_standards(ctx: ToolContext, include_hidden: bool = False) -> dict:
     metas = _service(ctx).list_standards()
-    return {"standards": [dataclasses.asdict(m) for m in metas]}
+    shown, hidden = partition_visible([m.id for m in metas], ctx.visible_standard_ids)
+    keep = set(shown) if not include_hidden else {m.id for m in metas}
+    return {
+        "standards": [dataclasses.asdict(m) for m in metas if m.id in keep],
+        "hiddenStandardIds": hidden,
+    }
 
 
 def _get_standard(ctx: ToolContext, standard_id: str) -> dict:
@@ -437,8 +443,15 @@ def register_read_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
         }},
         lambda **kw: _get_violations(ctx, **kw)))
     registry.register(ToolSpec(
-        "list_standards", "List all built-in and custom standards.",
-        {"type": "object", "properties": {}},
+        "list_standards",
+        "List the standards this project evaluates. Returns only the standards "
+        "the user has selected as visible; any others are named in "
+        "hiddenStandardIds. Pass include_hidden=true, or call "
+        "get_standard(standard_id), when the user explicitly asks about a "
+        "hidden standard.",
+        {"type": "object", "properties": {
+            "include_hidden": {"type": "boolean"},
+        }},
         lambda **kw: _list_standards(ctx, **kw)))
     registry.register(ToolSpec(
         "get_standard", "Get one standard's full principles and requirements.",
