@@ -18,6 +18,7 @@ from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
+from quodeq.services.suppression import is_deleted, is_dismissed
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
@@ -35,21 +36,6 @@ def standard_dirs() -> tuple[Path | None, Path | None]:
     standards = paths.standards_dir
     compiled = (standards / "compiled") if standards and standards.exists() else None
     return compiled, paths.evaluators_dir
-
-
-def _coerce_line(line: object) -> int:
-    try:
-        return int(line)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return 0
-
-
-def _is_dismissed(v: dict, dismissed: set[tuple]) -> bool:
-    return (v.get("req") or "", v.get("file") or "", _coerce_line(v.get("line"))) in dismissed
-
-
-def _is_deleted(v: dict, dim_id: str, practice_id: str, deleted: set[tuple]) -> bool:
-    return (dim_id, practice_id, v.get("file") or "") in deleted
 
 
 def score_dimension_from_evidence(
@@ -97,8 +83,10 @@ def score_dimension_from_evidence(
     for pe in evidence.principles.values():
         pe.violations = [
             v for v in pe.violations
-            if not _is_dismissed(v, dismissed)
-            and not _is_deleted(v, dim_id, pe.practice_id, deleted)
+            if not is_dismissed(dismissed, req=v.get("req"), principle=pe.practice_id,
+                                file=v.get("file"), line=v.get("line"))
+            and not is_deleted(deleted, dimension=dim_id, principle=pe.practice_id,
+                               file=v.get("file"))
         ]
         # Same call shape as core/evidence/parser._build_principles so the
         # recomputed metrics (confidence, compliance %) match scan time.

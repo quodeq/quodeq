@@ -545,7 +545,7 @@ class TestCardUsesDefaultViewRuns:
 # ---------------------------------------------------------------------------
 
 
-def _fsm_evidence_line(dim, req, file, line, sev="major", t="violation", p="Modularity", vt="VT-COUPLING"):
+def _fsm_evidence_line(dim, req, file, line, sev="major", t="violation", p="Confidentiality", vt="VT-COUPLING"):
     """One evidence-jsonl judgment (same shape as test_evidence_rescore.py)."""
     return {"schema_version": 1, "req": req, "t": t, "file": file, "line": line,
             "severity": sev, "w": "title", "reason": f"reason {req} {file} {line}",
@@ -593,8 +593,8 @@ class TestPerDimensionRunDirRescore:
                 _fsm_evidence_line(dim_a, "R-5", "b.kt", 7, sev="major", vt="VT-COUPLING"),
                 _fsm_evidence_line(dim_a, "C-1", "a.kt", 1, t="compliance"),
                 _fsm_evidence_line(dim_a, "C-3", "b.kt", 3, t="compliance"),
-                _fsm_evidence_line(dim_a, "R-4", "c.kt", 9, sev="major", vt="VT-DUPLICATION", p="Reusability"),
-                _fsm_evidence_line(dim_a, "C-2", "c.kt", 2, t="compliance", p="Reusability"),
+                _fsm_evidence_line(dim_a, "R-4", "c.kt", 9, sev="major", vt="VT-DUPLICATION", p="Integrity"),
+                _fsm_evidence_line(dim_a, "C-2", "c.kt", 2, t="compliance", p="Integrity"),
             ]) + "\n", encoding="utf-8",
         )
 
@@ -603,8 +603,8 @@ class TestPerDimensionRunDirRescore:
         ev_dir_new.mkdir(parents=True)
         (ev_dir_new / f"{dim_b}_evidence.jsonl").write_text(
             "\n".join(json.dumps(l) for l in [
-                _fsm_evidence_line(dim_b, "R-10", "x.kt", 3, sev="major", vt="VT-COUPLING"),
-                _fsm_evidence_line(dim_b, "C-10", "x.kt", 1, t="compliance"),
+                _fsm_evidence_line(dim_b, "R-10", "x.kt", 3, sev="major", vt="VT-COUPLING", p="Availability"),
+                _fsm_evidence_line(dim_b, "C-10", "x.kt", 1, t="compliance", p="Availability"),
             ]) + "\n", encoding="utf-8",
         )
 
@@ -627,31 +627,31 @@ class TestPerDimensionRunDirRescore:
                 dimension=dim_b, overall_score="7.0/10", overall_grade="B",
                 files_read=files_read, source_file_count=sfc,
                 violations=[Finding(req="R-10", file="x.kt", line=3,
-                                     practice_id="Modularity", severity="major",
+                                     practice_id="Availability", severity="major",
                                      dimension=dim_b)],
                 compliance=[Finding(req="C-10", file="x.kt", line=1,
-                                    practice_id="Modularity", dimension=dim_b)],
+                                    practice_id="Availability", dimension=dim_b)],
             )],
             run_old_id: [DimensionResult(
                 dimension=dim_a, overall_score="6.0/10", overall_grade="C",
                 files_read=files_read, source_file_count=sfc,
                 violations=[
                     Finding(req="R-1", file="a.kt", line=10,
-                            practice_id="Modularity", severity="major", dimension=dim_a),
+                            practice_id="Confidentiality", severity="major", dimension=dim_a),
                     Finding(req="R-2", file="a.kt", line=20,
-                            practice_id="Modularity", severity="critical", dimension=dim_a),
+                            practice_id="Confidentiality", severity="critical", dimension=dim_a),
                     Finding(req="R-5", file="b.kt", line=7,
-                            practice_id="Modularity", severity="major", dimension=dim_a),
+                            practice_id="Confidentiality", severity="major", dimension=dim_a),
                     Finding(req="R-4", file="c.kt", line=9,
-                            practice_id="Reusability", severity="major", dimension=dim_a),
+                            practice_id="Integrity", severity="major", dimension=dim_a),
                 ],
                 compliance=[
                     Finding(req="C-1", file="a.kt", line=1,
-                            practice_id="Modularity", dimension=dim_a),
+                            practice_id="Confidentiality", dimension=dim_a),
                     Finding(req="C-3", file="b.kt", line=3,
-                            practice_id="Modularity", dimension=dim_a),
+                            practice_id="Confidentiality", dimension=dim_a),
                     Finding(req="C-2", file="c.kt", line=2,
-                            practice_id="Reusability", dimension=dim_a),
+                            practice_id="Integrity", dimension=dim_a),
                 ],
             )],
         }

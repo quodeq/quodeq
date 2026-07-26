@@ -5,13 +5,7 @@ from pathlib import Path
 
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-
-
-def _coerce_line(line: object) -> int:
-    try:
-        return int(line)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return 0
+from quodeq.services.suppression import is_deleted, is_dismissed
 
 
 def filter_suppressed_violations(report: dict, project_dir: Path) -> dict:
@@ -37,11 +31,14 @@ def filter_suppressed_violations(report: dict, project_dir: Path) -> dict:
     if not dismissed and not deleted:
         return report
     report_dim = report.get("dimension") or ""
-    kept = [
-        v for v in report.get("violations") or []
-        if (v.get("req") or "", v.get("file") or "", _coerce_line(v.get("line"))) not in dismissed
-        and (v.get("dimension") or report_dim,
-             v.get("principle") or v.get("practiceId") or "",
-             v.get("file") or "") not in deleted
-    ]
-    return {**report, "violations": kept}
+
+    def _keep(v: dict) -> bool:
+        # Scored report JSON names the field "principle"; evidence-derived
+        # reports (--from-evidence, quodeq review) carry "practiceId".
+        principle = v.get("principle") or v.get("practiceId")
+        return not is_dismissed(dismissed, req=v.get("req"), principle=principle,
+                                file=v.get("file"), line=v.get("line")) \
+            and not is_deleted(deleted, dimension=v.get("dimension") or report_dim,
+                               principle=principle, file=v.get("file"))
+
+    return {**report, "violations": [v for v in report.get("violations") or [] if _keep(v)]}

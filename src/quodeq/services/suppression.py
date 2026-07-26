@@ -35,6 +35,41 @@ def _coerce_line(line: object) -> int:
         return 0
 
 
+def is_dismissed(
+    dismissed: frozenset | set, *, req: str | None, principle: str | None = "",
+    file: str | None = "", line: object = 0,
+) -> bool:
+    """True when the dismiss store hides this finding.
+
+    A finding's dismiss identity is its ``req``, falling back to its principle
+    when it has none -- the same ``req || principle`` the UI stores
+    (buildDismissPayload). Every read side must apply the same fallback, or a
+    no-req finding disappears from the counters while its grade never moves.
+
+    For a no-req finding the assistant's draft/apply path records the key with
+    an empty req (``("", file, line)``, see tests/assistant/
+    test_dismiss_apply_e2e.py), and older stores may hold either form -- so
+    both are accepted.
+    """
+    if not dismissed:
+        return False
+    file_key = file or ""
+    line_key = _coerce_line(line)
+    if (req or principle or "", file_key, line_key) in dismissed:
+        return True
+    return not req and ("", file_key, line_key) in dismissed
+
+
+def is_deleted(
+    deleted: frozenset | set, *, dimension: str | None,
+    principle: str | None, file: str | None,
+) -> bool:
+    """True when the delete store hides this finding's whole principle+file."""
+    if not deleted:
+        return False
+    return (dimension or "", principle or "", file or "") in deleted
+
+
 @dataclass(frozen=True)
 class SuppressionMatcher:
     """Immutable view of one dimension's suppression state."""
@@ -66,13 +101,11 @@ class SuppressionMatcher:
         if not raw:
             return False
         file = row.get("file") or ""
-        if self.dismissed:
-            req = row.get("req") or raw
-            if (req, file, _coerce_line(row.get("line"))) in self.dismissed:
-                return True
-        if self.deleted:
-            return (self.dimension, self.principle_for(raw), file) in self.deleted
-        return False
+        if is_dismissed(self.dismissed, req=row.get("req"), principle=raw,
+                        file=file, line=row.get("line")):
+            return True
+        return is_deleted(self.deleted, dimension=self.dimension,
+                          principle=self.principle_for(raw), file=file)
 
 
 def load_req_to_principle(

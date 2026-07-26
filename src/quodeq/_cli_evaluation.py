@@ -26,6 +26,7 @@ from quodeq.engine.scoring_pipeline import run_full
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.evidence_rescore import score_dimension_from_evidence, standard_dirs
+from quodeq.services.suppression import is_deleted, is_dismissed
 from quodeq.services.grade_formula import load_params
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.logging import log_error, log_info, log_warning
@@ -219,13 +220,10 @@ def _count_excluded_findings(
     count = 0
     for pe in evidence.principles.values():
         for v in pe.violations:
-            file = v.get("file") or ""
-            try:
-                line = int(v.get("line") or 0)
-            except (TypeError, ValueError):
-                line = 0
-            req = v.get("req") or ""
-            if (req, file, line) in dismissed or (dim_id, pe.practice_id, file) in deleted:
+            if is_dismissed(dismissed, req=v.get("req"), principle=pe.practice_id,
+                            file=v.get("file"), line=v.get("line")) \
+                    or is_deleted(deleted, dimension=dim_id,
+                                  principle=pe.practice_id, file=v.get("file")):
                 count += 1
     return count
 

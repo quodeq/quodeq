@@ -14,7 +14,14 @@ from quodeq.assistant.tools import ToolContext, build_registry
 from quodeq.assistant.tools._actions import ACTIONS
 from quodeq.core.types.finding import Finding
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
-from quodeq.services.dismissed import _finding_key, dismissed_keys
+from quodeq.services.dismissed import dismissed_keys
+from quodeq.services.suppression import is_dismissed
+
+
+def _suppresses(keys, finding) -> bool:
+    """The read-side predicate hides *finding* given the recorded keys."""
+    return is_dismissed(keys, req=finding.req, principle=finding.practice_id,
+                        file=finding.file, line=finding.line)
 
 
 def _ctx(tmp_path, violations):
@@ -71,7 +78,7 @@ def test_dismiss_roundtrip_suppresses_the_finding(tmp_path):
     keys = dismissed_keys(eval_root / "proj")
     assert keys == {("R1", "a.py", 10)}
     finding = Finding(req="R1", file="a.py", line=10, practice_id="P1", severity="critical")
-    assert _finding_key(finding) in keys
+    assert _suppresses(keys, finding)
 
 
 def test_dismiss_roundtrip_for_req_none_finding(tmp_path):
@@ -96,4 +103,4 @@ def test_dismiss_roundtrip_for_req_none_finding(tmp_path):
     keys = dismissed_keys(eval_root / "proj")
     assert keys == {("", "b.py", 7)}
     finding = Finding(file="b.py", line=7, practice_id="P1", severity="major")  # req=None
-    assert _finding_key(finding) in keys
+    assert _suppresses(keys, finding)

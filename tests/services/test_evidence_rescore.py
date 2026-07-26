@@ -194,3 +194,25 @@ def test_scoring_engine_exception_returns_none_for_fallback(run_dir, monkeypatch
         run_dir, DIM, dismissed=set(), deleted=set(),
         source_file_count=10, files_read=5, params=DEFAULT_PARAMS)
     assert out is None
+
+
+def test_dismiss_by_principle_key_matches_no_req_finding(run_dir):
+    """The UI stores a dismiss key as `req || principle`. For a finding whose
+    evidence row carries no req, the stored key is (principle, file, line);
+    the rescore must fall back to the principle group like the live counter
+    matcher does, or the counter hides the finding while the grade never moves.
+    """
+    lines = [
+        _line("M-MOD-1", "a.kt", 10),
+        {k: v for k, v in _line(None, "b.kt", 7, sev="critical").items() if k != "req"},
+        _line("C-1", "a.kt", 1, t="compliance"),
+    ]
+    _write_evidence(run_dir, lines)
+    base = score_dimension_from_evidence(
+        run_dir, DIM, dismissed=set(), deleted=set(),
+        source_file_count=10, files_read=5, params=DEFAULT_PARAMS)
+    out = score_dimension_from_evidence(
+        run_dir, DIM, dismissed={("Modularity", "b.kt", 7)}, deleted=set(),
+        source_file_count=10, files_read=5, params=DEFAULT_PARAMS)
+    assert out.principles["Modularity"].deductions.critical_type_count \
+        == base.principles["Modularity"].deductions.critical_type_count - 1

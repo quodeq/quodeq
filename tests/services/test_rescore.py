@@ -213,3 +213,17 @@ def test_untouched_dimension_passthrough_even_with_run_dir(tmp_path):
     dim = _make_dimension(violations=[_make_violation(req="R-9", file="z.kt", line=1)])
     out = _rescore_dimension(dim, {("OTHER", "x.kt", 5)}, set(), run_dir=tmp_path)
     assert out is dim  # early return preserved: no filtering -> no rescoring
+
+
+def test_rescore_dismiss_by_principle_key_matches_no_req_finding():
+    """A dismissal stored with the principle as its key (the UI's `req ||
+    principle` fallback for findings without a req) must filter the matching
+    no-req violation, or the early "nothing filtered" return keeps the score
+    frozen while the live counters hide the finding.
+    """
+    dim = _make_dimension(violations=[
+        _make_violation(req=None, practice_id="P1", file="a.py", line=3),
+        _make_violation(req="R2", practice_id="P1", file="b.py", line=9),
+    ])
+    rescored = _rescore_dimension(dim, {("P1", "a.py", 3)})
+    assert [v.req for v in rescored.violations] == ["R2"]
