@@ -135,3 +135,76 @@ def test_api_helper_shared_session_never_falls_back_to_a_local_repo_root(
     assert ctx.repo_root is None
     assert ctx.visible_standard_ids is None
     assert called == []
+
+
+def _mcp_context_from_namespace(ns, tmp_path):
+    """Mirror the context construction from _build_registry_from_args.
+
+    Used to test the MCP path's context wiring without modifying the source.
+    Tests the same load_visible_standard_ids call that _build_registry_from_args uses.
+    """
+    from pathlib import Path
+    from quodeq.shared._env import get_evaluations_dir
+    from quodeq.core.standards.visibility import load_visible_standard_ids
+
+    if ns.reports_dir:
+        reports_dir = Path(ns.reports_dir)
+    else:
+        reports_dir = Path(get_evaluations_dir())
+    repo_root = Path(ns.repo_root) if ns.repo_root else None
+    return ToolContext(
+        repository=AssistantRepository(Path(ns.db_path)),
+        session_id=ns.session_id,
+        run_dir=Path(ns.run_dir) if ns.run_dir else None,
+        repo_root=repo_root,
+        evaluators_dir=Path(ns.evaluators_dir),
+        compiled_dir=Path(ns.compiled_dir),
+        dimensions_file=Path(ns.dimensions_file),
+        project_id=ns.project_id or None,
+        reports_dir=reports_dir,
+        worktree_dir=None,
+        read_only=False,
+        visible_standard_ids=(
+            load_visible_standard_ids(repo_root) if repo_root is not None else None),
+    )
+
+
+def test_mcp_path_loads_saved_selection(tmp_path):
+    """MCP path (via _build_registry_from_args) loads standards-visibility.json."""
+    import argparse
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    save_visible_standard_ids(repo_root, ["security", "clean-architecture"])
+
+    ns = argparse.Namespace(
+        db_path=str(tmp_path / "a.db"),
+        session_id="mcp-test",
+        run_dir=None,
+        repo_root=str(repo_root),
+        evaluators_dir=str(tmp_path / "e"),
+        compiled_dir=str(tmp_path / "c"),
+        dimensions_file=str(tmp_path / "d.json"),
+        project_id=None,
+        reports_dir="",
+    )
+    ctx = _mcp_context_from_namespace(ns, tmp_path)
+    assert ctx.visible_standard_ids == ("security", "clean-architecture")
+
+
+def test_mcp_path_no_repo_root_yields_none(tmp_path):
+    """MCP path with no --repo-root carries None (no filtering)."""
+    import argparse
+    ns = argparse.Namespace(
+        db_path=str(tmp_path / "a.db"),
+        session_id="mcp-test",
+        run_dir=None,
+        repo_root=None,  # No repo root
+        evaluators_dir=str(tmp_path / "e"),
+        compiled_dir=str(tmp_path / "c"),
+        dimensions_file=str(tmp_path / "d.json"),
+        project_id=None,
+        reports_dir="",
+    )
+    ctx = _mcp_context_from_namespace(ns, tmp_path)
+    assert ctx.repo_root is None
+    assert ctx.visible_standard_ids is None

@@ -208,7 +208,11 @@ def build_tool_context(app: Flask, session: dict) -> ToolContext:
     # working copy -- see repo_root's "no_project"/"online_project" handling
     # in assistant_routes.create_session): guard the project_id fallback to
     # local sessions only, so it can't resolve a coincidental local project
-    # of the same id into a shared, read-only session's context.
+    # of the same id into a shared, read-only session's context. The fallback
+    # can flip a local session from no-repo-access to repo-access; it fires
+    # only when session-creation-time resolution failed, and it recomputes the
+    # identical repo_attach_info check rather than a looser one, so it is a
+    # self-healing retry rather than a widening of trust.
     if repo_root is None and source != "shared" and session.get("project_id"):
         resolved = resolve_repo_root(session["project_id"])
         repo_root = Path(resolved) if resolved else None
