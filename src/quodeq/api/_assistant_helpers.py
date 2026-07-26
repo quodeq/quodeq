@@ -11,6 +11,7 @@ from flask import Flask, current_app
 from quodeq.assistant import AssistantRepository
 from quodeq.assistant.tools import ToolContext
 from quodeq.assistant import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
+from quodeq.core.standards.visibility import load_visible_standard_ids
 from quodeq.services._fs_projects import get_project_info
 from quodeq.services.shared_repo import (
     read_state,
@@ -201,11 +202,21 @@ def build_tool_context(app: Flask, session: dict) -> ToolContext:
             raise SharedSourceUnavailable(f"shared repository unavailable: {state}")
         reports_dir = shared_evaluations_root(settings.url)
         score_cache_path = shared_score_cache_path(settings.url)
+    repo_root = (
+        Path(session["project_uuid"]) if session.get("project_uuid") else None)
+    # Shared sessions never attach a local repo root (the clone has no
+    # working copy -- see repo_root's "no_project"/"online_project" handling
+    # in assistant_routes.create_session): guard the project_id fallback to
+    # local sessions only, so it can't resolve a coincidental local project
+    # of the same id into a shared, read-only session's context.
+    if repo_root is None and source != "shared" and session.get("project_id"):
+        resolved = resolve_repo_root(session["project_id"])
+        repo_root = Path(resolved) if resolved else None
     return ToolContext(
         repository=get_repository(app),
         session_id=session["id"],
         run_dir=Path(run_dir) if run_dir else None,
-        repo_root=Path(session["project_uuid"]) if session.get("project_uuid") else None,
+        repo_root=repo_root,
         evaluators_dir=Path(app.config["STANDARDS_EVALUATORS_DIR"]),
         compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
         dimensions_file=Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
@@ -213,6 +224,8 @@ def build_tool_context(app: Flask, session: dict) -> ToolContext:
         reports_dir=reports_dir,
         read_only=(source == "shared"),
         score_cache_path=score_cache_path,
+        visible_standard_ids=(
+            load_visible_standard_ids(repo_root) if repo_root is not None else None),
     )
 
 
