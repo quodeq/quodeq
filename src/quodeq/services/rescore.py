@@ -21,6 +21,7 @@ from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.scoring import PrincipleScore
 from quodeq.data.fs.report_parser.grades import summarize_dimensions
 from quodeq.services.dismissed import recount_totals
+from quodeq.services.suppression import is_deleted, is_dismissed
 
 
 def _finding_to_dict(f: Finding) -> dict[str, Any]:
@@ -123,20 +124,6 @@ def _score_all_principles(
     return principle_scores, principle_grades
 
 
-def _coerce_line(line) -> int:
-    """Coerce a Finding.line (typed int|str|None) to the int used in dismiss keys.
-
-    Dismiss keys store line as ``int`` (see services/dismissed.dismissed_keys),
-    but a Finding's line may be a string, so a straight ``line or 0`` compare
-    would miss a string-lined finding. Coercing here keeps the suppression key
-    identical to the stored dismiss key.
-    """
-    try:
-        return int(line)
-    except (TypeError, ValueError):
-        return 0
-
-
 def _rescore_dimension(
     dim: DimensionResult,
     dismissed: set[tuple],
@@ -156,8 +143,10 @@ def _rescore_dimension(
     dim_id = dim.dimension or ""
     filtered_violations = [
         v for v in dim.violations
-        if (v.req or "", v.file or "", _coerce_line(v.line)) not in dismissed
-        and (dim_id, v.practice_id or "", v.file or "") not in deleted
+        if not is_dismissed(dismissed, req=v.req, principle=v.practice_id,
+                            file=v.file, line=v.line)
+        and not is_deleted(deleted, dimension=dim_id, principle=v.practice_id,
+                           file=v.file)
     ]
     if len(filtered_violations) == len(dim.violations):
         return dim

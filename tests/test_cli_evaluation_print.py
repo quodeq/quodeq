@@ -151,3 +151,27 @@ def test_rescore_exception_falls_back_to_original_line(tmp_path, capsys, monkeyp
 
     out = capsys.readouterr().out
     assert out == f"  {DIM}: {original_score}\n"
+
+
+def test_excluded_count_ignores_quarantined_findings(tmp_path, monkeypatch):
+    """A dismissed finding that scan time quarantined (principle not in the
+    dimension's standard) never entered the grade, so it must not count as
+    an exclusion: the printed suffix would otherwise promise a score change
+    the rescore does not deliver.
+    """
+    from quodeq._cli_evaluation import _count_excluded_findings
+
+    monkeypatch.setenv("QUODEQ_EVALUATORS_DIR", str(tmp_path / "no-evals"))
+    run_dir = tmp_path / "run"
+    ev_dir = run_dir / "evidence"
+    ev_dir.mkdir(parents=True)
+    lines = [
+        _ev_line("M-MOD-1", "a.kt", 10),
+        _ev_line("X-1", "z.kt", 3, sev="critical", p="NotInStandard"),
+    ]
+    (ev_dir / f"{DIM}_evidence.jsonl").write_text(
+        "\n".join(json.dumps(l) for l in lines) + "\n", encoding="utf-8")
+
+    count = _count_excluded_findings(
+        run_dir, DIM, dismissed={("X-1", "z.kt", 3)}, deleted=set())
+    assert count == 0

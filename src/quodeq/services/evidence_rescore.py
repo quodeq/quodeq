@@ -13,28 +13,29 @@ import logging
 import os
 from pathlib import Path
 
+from quodeq.config.paths import default_paths
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
+from quodeq.services.suppression import is_deleted, is_dismissed
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 
 
-def _coerce_line(line: object) -> int:
-    try:
-        return int(line)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return 0
+def standard_dirs() -> tuple[Path | None, Path | None]:
+    """(compiled_dir, evaluators_dir) resolved exactly as scan time does.
 
-
-def _is_dismissed(v: dict, dismissed: set[tuple]) -> bool:
-    return (v.get("req") or "", v.get("file") or "", _coerce_line(v.get("line"))) in dismissed
-
-
-def _is_deleted(v: dict, dim_id: str, practice_id: str, deleted: set[tuple]) -> bool:
-    return (dim_id, practice_id, v.get("file") or "") in deleted
+    Scan runs build RunConfig from default_paths() (see _cli_evaluation), so
+    resolving here keeps the rescore's PrincipleResolver identical to the one
+    that quarantined findings at scan time. Without these dirs the resolver is
+    permissive and quarantined findings would re-enter the grade on rescore.
+    """
+    paths = default_paths()
+    standards = paths.standards_dir
+    compiled = (standards / "compiled") if standards and standards.exists() else None
+    return compiled, paths.evaluators_dir
 
 
 def score_dimension_from_evidence(
@@ -67,11 +68,12 @@ def score_dimension_from_evidence(
     jsonl = Path(candidate)
     if not jsonl.is_file() or jsonl.stat().st_size == 0:
         return None
+    compiled_dir, evaluators_dir = standard_dirs()
     try:
         evidence = parse_jsonl_to_evidence(jsonl, EvidenceContext(
             language="", repository="", date_str="",
             source_file_count=source_file_count, files_read=files_read,
-        ))
+        ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir)
     except (OSError, ValueError, KeyError) as exc:
         _logger.debug("Evidence rescore parse failed for %s/%s: %s", run_dir.name, dim_id, exc)
         return None
@@ -81,11 +83,21 @@ def score_dimension_from_evidence(
     for pe in evidence.principles.values():
         pe.violations = [
             v for v in pe.violations
-            if not _is_dismissed(v, dismissed)
-            and not _is_deleted(v, dim_id, pe.practice_id, deleted)
+            if not is_dismissed(dismissed, req=v.get("req"), principle=pe.practice_id,
+                                file=v.get("file"), line=v.get("line"))
+            and not is_deleted(deleted, dimension=dim_id, principle=pe.practice_id,
+                               file=v.get("file"))
         ]
         # Same call shape as core/evidence/parser._build_principles so the
         # recomputed metrics (confidence, compliance %) match scan time.
         pe.compute_metrics(source_file_count=source_file_count)
 
-    return score_evidence(evidence, mode="numerical", params=params)
+    # Broad catch on purpose (mirrors mutation_rescore and the CLI print
+    # guard): the engine can throw on edge-case evidence, and every consumer
+    # (dashboard build, /api/rescore, trend fetcher) treats None as "fall back
+    # to the stored score" — one bad dimension must not fail the whole run.
+    try:
+        return score_evidence(evidence, mode="numerical", params=params)
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning("Evidence rescore failed for %s/%s: %s", run_dir.name, dim_id, exc)
+        return None

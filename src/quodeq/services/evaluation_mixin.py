@@ -641,6 +641,10 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
     evaluation_dir.mkdir(parents=True, exist_ok=True)
     source_file_count = _read_project_source_file_count(reports_dir, project)
     params = load_params()
+    # Same standard dirs as a completed run's scoring, so off-standard
+    # findings are quarantined here too instead of entering the grade.
+    from quodeq.services.evidence_rescore import standard_dirs  # noqa: PLC0415
+    compiled_dir, evaluators_dir = standard_dirs()
 
     from quodeq.shared.dimensions_state import read_dimensions
     dim_states = read_dimensions(Path(reports_dir) / project / run_id).get("dimensions", {})
@@ -665,7 +669,7 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
             evidence = parse_jsonl_to_evidence(jsonl_path, EvidenceContext(
                 language="", repository="", date_str="",
                 source_file_count=source_file_count, files_read=files_read,
-            ))
+            ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir)
             if evidence is None:
                 continue
             scores = score_evidence(evidence, mode="numerical", params=params)

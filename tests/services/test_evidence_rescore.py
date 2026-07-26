@@ -94,6 +94,43 @@ def test_deleted_key_removes_principle_file_matches(run_dir):
     assert out.principles["Reusability"].deductions.major_type_count == 0
 
 
+def test_quarantined_findings_stay_excluded_from_rescore(tmp_path, monkeypatch):
+    """Scan time quarantines findings whose principle is not in the dimension's
+    standard. The rescore must resolve the same standard and quarantine them
+    too, otherwise a dismiss makes previously excluded findings re-enter the
+    grade and phantom principles appear in the payload.
+    """
+    monkeypatch.setenv("QUODEQ_EVALUATORS_DIR", str(tmp_path / "no-evals"))
+    lines = [
+        _line("M-MOD-1", "a.kt", 10, p="Modularity"),
+        _line("M-MOD-2", "a.kt", 1, t="compliance", p="Modularity"),
+        # Off-standard principle: quarantined at scan time.
+        _line("X-1", "z.kt", 3, sev="critical", p="NotInStandard"),
+    ]
+    _write_evidence(tmp_path, lines)
+
+    from quodeq.config.paths import default_paths
+    scan = score_evidence(
+        parse_jsonl_to_evidence(
+            tmp_path / "evidence" / f"{DIM}_evidence.jsonl",
+            EvidenceContext(language="", repository="", date_str="",
+                            source_file_count=10, files_read=5),
+            compiled_dir=default_paths().standards_dir / "compiled",
+            evaluators_dir=default_paths().evaluators_dir,
+        ),
+        mode="numerical", params=DEFAULT_PARAMS,
+    )
+    assert "NotInStandard" not in scan.principles  # fixture sanity
+
+    rescored = score_dimension_from_evidence(
+        tmp_path, DIM, dismissed=set(), deleted=set(),
+        source_file_count=10, files_read=5, params=DEFAULT_PARAMS,
+    )
+    assert rescored is not None
+    assert "NotInStandard" not in rescored.principles
+    assert rescored.overall.weighted_score == scan.overall.weighted_score
+
+
 @pytest.mark.parametrize("bad", ["../secret", "a/b", "..\\x", "x\0y"])
 def test_traversal_dim_id_rejected_before_filesystem_access(tmp_path, bad):
     # dim_id builds a filesystem path; separators/traversal must be refused
@@ -143,3 +180,39 @@ def test_traversal_dim_id_does_not_read_evidence_planted_outside_run_dir(tmp_pat
             run_dir, traversal_dim_id, dismissed=set(), deleted=set(),
             source_file_count=1000, files_read=50, params=DEFAULT_PARAMS,
         )
+
+
+def test_scoring_engine_exception_returns_none_for_fallback(run_dir, monkeypatch):
+    """The engine can throw on edge-case evidence (see da04c1a2). The rescore
+    must degrade to None (callers fall back to the stored/legacy score) rather
+    than propagate and 500 the dashboard or /api/rescore for the whole run.
+    """
+    def _boom(*args, **kwargs):
+        raise RuntimeError("scoring engine exploded")
+    monkeypatch.setattr("quodeq.services.evidence_rescore.score_evidence", _boom)
+    out = score_dimension_from_evidence(
+        run_dir, DIM, dismissed=set(), deleted=set(),
+        source_file_count=10, files_read=5, params=DEFAULT_PARAMS)
+    assert out is None
+
+
+def test_dismiss_by_principle_key_matches_no_req_finding(run_dir):
+    """The UI stores a dismiss key as `req || principle`. For a finding whose
+    evidence row carries no req, the stored key is (principle, file, line);
+    the rescore must fall back to the principle group like the live counter
+    matcher does, or the counter hides the finding while the grade never moves.
+    """
+    lines = [
+        _line("M-MOD-1", "a.kt", 10),
+        {k: v for k, v in _line(None, "b.kt", 7, sev="critical").items() if k != "req"},
+        _line("C-1", "a.kt", 1, t="compliance"),
+    ]
+    _write_evidence(run_dir, lines)
+    base = score_dimension_from_evidence(
+        run_dir, DIM, dismissed=set(), deleted=set(),
+        source_file_count=10, files_read=5, params=DEFAULT_PARAMS)
+    out = score_dimension_from_evidence(
+        run_dir, DIM, dismissed={("Modularity", "b.kt", 7)}, deleted=set(),
+        source_file_count=10, files_read=5, params=DEFAULT_PARAMS)
+    assert out.principles["Modularity"].deductions.critical_type_count \
+        == base.principles["Modularity"].deductions.critical_type_count - 1
