@@ -1,8 +1,9 @@
 """GET/PUT the per-project visible-standards selection.
 
 The file lives inside the analyzed repository
-(``<repo>/.quodeq/standards-visibility.json``) so the dashboard, the CLI and
-the assistant all read one selection. See core.standards.visibility.
+(``<repo>/.quodeq/standards-visibility.json``) so the dashboard and the
+assistant both read one selection (there is no CLI consumer). See
+core.standards.visibility.
 """
 from __future__ import annotations
 

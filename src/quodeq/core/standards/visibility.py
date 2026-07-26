@@ -1,8 +1,9 @@
 """Per-project selection of which standards are shown.
 
 Hiding a standard is project configuration, not a per-browser view preference:
-the dashboard, the CLI and the assistant must all agree on which standards are
-in play. The selection lives in the analyzed repository at
+the dashboard and the assistant must both agree on which standards are in
+play (there is no CLI consumer). The selection lives in the analyzed
+repository at
 ``<project root>/.quodeq/standards-visibility.json``, alongside
 ``standards-overrides.json``, so the whole team shares it:
 

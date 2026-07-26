@@ -122,10 +122,13 @@ class SqliteFindingsRepository:
         """Full-text search, optionally excluding whole dimensions.
 
         ``exclude_dimensions``, when given, adds a ``dimension NOT IN (...)``
-        clause BEFORE ``LIMIT`` is applied (case-insensitively, since stored
-        ``dimension`` values are not guaranteed to be lowercase). This lets a
-        caller exclude hidden-standard rows inside the query itself, rather
-        than over-fetching and filtering after the fact -- rows are ordered by
+        clause BEFORE ``LIMIT`` is applied, matching case-insensitively via
+        SQLite's ``LOWER()`` (stored ``dimension`` values are not guaranteed
+        to be lowercase, and a custom standard's id has no charset
+        constraint). Note ``LOWER()`` is ASCII-only, so a non-ASCII uppercase
+        stored dimension would not match. This lets a caller exclude
+        hidden-standard rows inside the query itself, rather than
+        over-fetching and filtering after the fact -- rows are ordered by
         insertion order (``id``), and evaluators insert per dimension in
         batches, so a fixed over-fetch factor can still be exhausted entirely
         by excluded rows that happen to precede the ones the caller wants.
