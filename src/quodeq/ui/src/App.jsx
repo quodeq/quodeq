@@ -447,7 +447,10 @@ function renderEvalPrincipleDetail(params, props) {
         const payload = { ...buildDismissPayload(v, evalPrincipal.dimension), run_id: evalPrincipal.runId };
         const result = await props.dismissFinding(selectedProject, payload);
         props.applyDelta?.(selectedProject, result?.scores, result?.delta);
-        props.refreshDashboard?.();
+        // One call per suppression mutation: the reconcile marks the project
+        // queries stale synchronously AND schedules the debounced active
+        // refetch (see scheduleDashboardReconcile in useDashboard.js), so a
+        // separate refreshDashboard call here would be redundant.
         props.scheduleDashboardReconcile?.();
         props.bumpDismissRefresh?.();
         return result;
@@ -619,7 +622,11 @@ export const ROUTE_RENDERERS = {
           onDimensionClick: (dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject }),
           onNavigate: props.navigation.handleNavigate,
           onRunChange: props.navigation.setHistorySelectedRun,
-          onRunDeleted: () => props.refreshDashboard?.(),
+          // Run deletion changes the accumulated rollup the Overview grade is
+          // built from — same mutation class as dismiss/restore, so it gets
+          // the same debounced ACTIVE reconcile (mark-stale alone never
+          // reaches the always-mounted Overview observer).
+          onRunDeleted: () => props.scheduleDashboardReconcile?.(),
         }}
         projects={props.navigation.projects}
         projectsLoaded={props.navigation.projectsLoaded}
@@ -670,7 +677,10 @@ export const ROUTE_RENDERERS = {
         const payload = { ...buildDismissPayload(v), run_id: params.runId };
         const result = await props.dismissFinding(props.navigation.selectedProject, payload);
         props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
-        props.refreshDashboard?.();
+        // One call per suppression mutation: the reconcile marks the project
+        // queries stale synchronously AND schedules the debounced active
+        // refetch (see scheduleDashboardReconcile in useDashboard.js), so a
+        // separate refreshDashboard call here would be redundant.
         props.scheduleDashboardReconcile?.();
         props.bumpDismissRefresh?.();
         return result;
@@ -688,7 +698,10 @@ export const ROUTE_RENDERERS = {
         const payload = { ...buildDismissPayload(v, params.dimension), run_id: params.runId };
         const result = await props.dismissFinding(props.navigation.selectedProject, payload);
         props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
-        props.refreshDashboard?.();
+        // One call per suppression mutation: the reconcile marks the project
+        // queries stale synchronously AND schedules the debounced active
+        // refetch (see scheduleDashboardReconcile in useDashboard.js), so a
+        // separate refreshDashboard call here would be redundant.
         props.scheduleDashboardReconcile?.();
         props.bumpDismissRefresh?.();
         return result;
@@ -745,7 +758,6 @@ export function buildAssistantSessionPayload({ provider, model, projectId, runId
  * @param {{
  *   applyDelta: (project: string, scores: Object, delta: Object) => void,
  *   bumpDismissRefresh: () => void,
- *   refreshDashboard?: () => void,
  *   scheduleDashboardReconcile?: () => void,
  *   selectedProject: string,
  * }} deps
@@ -754,7 +766,6 @@ export function buildAssistantSessionPayload({ provider, model, projectId, runId
 export function buildAssistantActionAppliedHandler({
   applyDelta,
   bumpDismissRefresh,
-  refreshDashboard,
   scheduleDashboardReconcile,
   selectedProject,
 }) {
@@ -779,11 +790,10 @@ export function buildAssistantActionAppliedHandler({
       }
     }
     bumpDismissRefresh();
-    // Invalidate the project queries so frozen run views (staleTime Infinity)
-    // refetch on their next mount instead of showing the pre-dismiss counts
-    // forever. Mark-stale only (refetchType:'none'), so this is cheap.
-    refreshDashboard?.();
-    // ...and actively reconcile, exactly as the manual dismiss handlers do
+    // Reconcile exactly as the manual dismiss handlers do: the call below
+    // marks the project queries stale synchronously (so frozen run views
+    // refetch on their next mount) and then actively refetches after the
+    // debounce window
     // (see useDismissedFindings.js). Mark-stale alone never reaches the
     // Overview: its useDashboard observer is mounted at the app root and
     // never remounts, and the pywebview window never fires the focus-refetch
@@ -794,7 +804,7 @@ export function buildAssistantActionAppliedHandler({
     // coalesces into one refetch of the 10-20 MB payload.
     //
     // Unlike applyDelta this keys on the LIVE selectedProject rather than the
-    // delta's frozen project, matching refreshDashboard. That is safe here
+    // delta's frozen project. That is safe here
     // where it wouldn't be above: reconciling is a refetch, so aiming it at
     // the wrong project after a mid-flight switch merely re-pulls fresh data;
     // it never writes one project's rollup into another's cache.
@@ -868,7 +878,6 @@ export default function App() {
   const [dismissRefreshKey, setDismissRefreshKey] = useState(0);
   const bumpDismissRefresh = () => setDismissRefreshKey((k) => k + 1);
   const {
-    refreshDashboard: refreshDashboardForApply,
     scheduleDashboardReconcile: scheduleReconcileForApply,
     selectedProject,
   } = state;
@@ -881,13 +890,12 @@ export default function App() {
     const handler = buildAssistantActionAppliedHandler({
       applyDelta,
       bumpDismissRefresh,
-      refreshDashboard: refreshDashboardForApply,
       scheduleDashboardReconcile: scheduleReconcileForApply,
       selectedProject,
     });
     window.addEventListener('quodeq:assistant-action-applied', handler);
     return () => window.removeEventListener('quodeq:assistant-action-applied', handler);
-  }, [refreshDashboardForApply, scheduleReconcileForApply, selectedProject]);
+  }, [scheduleReconcileForApply, selectedProject]);
   // Auto-open is a once-per-session decision. Without this guard, closing the
   // wizard sets wizardEntry → null, which re-fires this effect and re-opens
   // the wizard immediately because projects.length is still 0. The user's

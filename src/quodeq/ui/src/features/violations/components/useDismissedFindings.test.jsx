@@ -54,19 +54,19 @@ beforeEach(() => {
 });
 
 describe('useDismissedFindings — restore handlers', () => {
-  it('handleRestore removes the matching entry on success and calls onRefresh', async () => {
+  it('handleRestore removes the matching entry on success and calls onReconcile', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     restoreFinding.mockResolvedValueOnce({ ok: true });
-    const onRefresh = vi.fn();
+    const onReconcile = vi.fn();
     const setRestoreError = vi.fn();
-    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError), withQueryClient());
+    const { result } = renderHook(() => useDismissedFindings('proj', vi.fn(), setRestoreError, 0, 'local', onReconcile), withQueryClient());
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
 
     await act(async () => { await result.current.handleRestore(sampleA); });
 
     expect(restoreFinding).toHaveBeenCalledWith('proj', { req: 'A1', file: 'a.py', line: 10 });
     expect(result.current.dismissed).toEqual([sampleB]);
-    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onReconcile).toHaveBeenCalledTimes(1);
     expect(setRestoreError).not.toHaveBeenCalled();
   });
 
@@ -74,8 +74,9 @@ describe('useDismissedFindings — restore handlers', () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA]);
     restoreFinding.mockRejectedValueOnce(new Error('boom'));
     const onRefresh = vi.fn();
+    const onReconcile = vi.fn();
     const setRestoreError = vi.fn();
-    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError), withQueryClient());
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError, 0, 'local', onReconcile), withQueryClient());
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
 
     await act(async () => { await result.current.handleRestore(sampleA); });
@@ -83,21 +84,22 @@ describe('useDismissedFindings — restore handlers', () => {
     expect(setRestoreError).toHaveBeenCalledWith('Failed to restore finding. Please try again.');
     expect(result.current.dismissed).toEqual([sampleA]);
     expect(onRefresh).not.toHaveBeenCalled();
+    expect(onReconcile).not.toHaveBeenCalled();
   });
 
-  it('handleRestoreAll clears state on success and calls onRefresh', async () => {
+  it('handleRestoreAll clears state on success and calls onReconcile', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     restoreAllFindings.mockResolvedValueOnce({ ok: true, restored: 2 });
-    const onRefresh = vi.fn();
+    const onReconcile = vi.fn();
     const setRestoreError = vi.fn();
-    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError), withQueryClient());
+    const { result } = renderHook(() => useDismissedFindings('proj', vi.fn(), setRestoreError, 0, 'local', onReconcile), withQueryClient());
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
 
     await act(async () => { await result.current.handleRestoreAll(); });
 
     expect(restoreAllFindings).toHaveBeenCalledWith('proj');
     expect(result.current.dismissed).toEqual([]);
-    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onReconcile).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -105,9 +107,9 @@ describe('useDismissedFindings — handleDelete', () => {
   it('permanently deletes by (dimension, principle, file) and removes the entry locally', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     deleteFinding.mockResolvedValueOnce({ ok: true, swept: 1 });
-    const onRefresh = vi.fn();
+    const onReconcile = vi.fn();
     const setRestoreError = vi.fn();
-    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError), withQueryClient());
+    const { result } = renderHook(() => useDismissedFindings('proj', vi.fn(), setRestoreError, 0, 'local', onReconcile), withQueryClient());
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
 
     await act(async () => { await result.current.handleDelete(sampleA); });
@@ -119,7 +121,7 @@ describe('useDismissedFindings — handleDelete', () => {
     });
     expect(restoreFinding).not.toHaveBeenCalled();
     expect(result.current.dismissed).toEqual([sampleB]);
-    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onReconcile).toHaveBeenCalledTimes(1);
     expect(setRestoreError).not.toHaveBeenCalled();
   });
 
@@ -139,15 +141,16 @@ describe('useDismissedFindings — handleDelete', () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA]);
     deleteFinding.mockRejectedValueOnce(new Error('boom'));
     const onRefresh = vi.fn();
+    const onReconcile = vi.fn();
     const setRestoreError = vi.fn();
-    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError), withQueryClient());
+    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError, 0, 'local', onReconcile), withQueryClient());
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
 
     await act(async () => { await result.current.handleDelete(sampleA); });
 
     expect(setRestoreError).toHaveBeenCalledWith('Failed to delete finding. Please try again.');
     expect(result.current.dismissed).toEqual([sampleA]);
-    expect(onRefresh).not.toHaveBeenCalled();
+    expect(onReconcile).not.toHaveBeenCalled();
   });
 });
 
@@ -156,9 +159,9 @@ describe('useDismissedFindings — handleDeleteAll', () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     confirmDialog.mockResolvedValueOnce(true);
     deleteAllFindings.mockResolvedValueOnce({ ok: true, deleted: 2 });
-    const onRefresh = vi.fn();
+    const onReconcile = vi.fn();
     const setRestoreError = vi.fn();
-    const { result } = renderHook(() => useDismissedFindings('proj', onRefresh, setRestoreError), withQueryClient());
+    const { result } = renderHook(() => useDismissedFindings('proj', vi.fn(), setRestoreError, 0, 'local', onReconcile), withQueryClient());
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
 
     await act(async () => { await result.current.handleDeleteAll(); });
@@ -172,7 +175,7 @@ describe('useDismissedFindings — handleDeleteAll', () => {
     expect(deleteAllFindings).toHaveBeenCalledWith('proj');
     expect(restoreAllFindings).not.toHaveBeenCalled();
     expect(result.current.dismissed).toEqual([]);
-    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onReconcile).toHaveBeenCalledTimes(1);
   });
 
   it('does nothing when the user cancels the confirmation dialog', async () => {
@@ -208,15 +211,13 @@ describe('useDismissedFindings — handleDeleteAll', () => {
   });
 });
 
-// Item 1 fix: onRefresh is now the lazy refreshDashboard (mark-stale only) --
-// wiring it to the ACTIVE scheduleDashboardReconcile forced a full refetch of
-// the 10-20 MB dashboard payload on every plain navigation remount (see
-// ViolationsPage's tabKey mount effect). The four mutation handlers below
-// must therefore call a SEPARATE onReconcile callback in addition to
-// onRefresh, so restore/delete still gets the debounced ACTIVE reconcile
-// without plain navigation triggering it.
-describe('useDismissedFindings — onReconcile (called alongside onRefresh, not instead of it)', () => {
-  it('handleRestore calls both onRefresh and onReconcile on success', async () => {
+// The mutation handlers make exactly ONE freshness call: onReconcile (the
+// debounced ACTIVE scheduleDashboardReconcile, which marks stale synchronously
+// itself). onRefresh stays reserved for ViolationsPage's plain-navigation
+// mount effect and must NOT be called by mutations -- wiring mutations to it
+// as well was a redundant two-call ritual that call sites kept forgetting.
+describe('useDismissedFindings — onReconcile (the single mutation freshness call)', () => {
+  it('handleRestore calls onReconcile and leaves onRefresh untouched on success', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA]);
     restoreFinding.mockResolvedValueOnce({ ok: true });
     const onRefresh = vi.fn();
@@ -229,8 +230,8 @@ describe('useDismissedFindings — onReconcile (called alongside onRefresh, not 
 
     await act(async () => { await result.current.handleRestore(sampleA); });
 
-    expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(onReconcile).toHaveBeenCalledTimes(1);
+    expect(onRefresh).not.toHaveBeenCalled();
   });
 
   it('handleRestore does not call onReconcile on failure', async () => {
@@ -248,7 +249,7 @@ describe('useDismissedFindings — onReconcile (called alongside onRefresh, not 
     expect(onReconcile).not.toHaveBeenCalled();
   });
 
-  it('handleRestoreAll calls both onRefresh and onReconcile on success', async () => {
+  it('handleRestoreAll calls onReconcile and leaves onRefresh untouched on success', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     restoreAllFindings.mockResolvedValueOnce({ ok: true, restored: 2 });
     const onRefresh = vi.fn();
@@ -261,11 +262,11 @@ describe('useDismissedFindings — onReconcile (called alongside onRefresh, not 
 
     await act(async () => { await result.current.handleRestoreAll(); });
 
-    expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(onReconcile).toHaveBeenCalledTimes(1);
+    expect(onRefresh).not.toHaveBeenCalled();
   });
 
-  it('handleDelete calls both onRefresh and onReconcile on success', async () => {
+  it('handleDelete calls onReconcile and leaves onRefresh untouched on success', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     deleteFinding.mockResolvedValueOnce({ ok: true, swept: 1 });
     const onRefresh = vi.fn();
@@ -278,11 +279,11 @@ describe('useDismissedFindings — onReconcile (called alongside onRefresh, not 
 
     await act(async () => { await result.current.handleDelete(sampleA); });
 
-    expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(onReconcile).toHaveBeenCalledTimes(1);
+    expect(onRefresh).not.toHaveBeenCalled();
   });
 
-  it('handleDeleteAll calls both onRefresh and onReconcile on success', async () => {
+  it('handleDeleteAll calls onReconcile and leaves onRefresh untouched on success', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     confirmDialog.mockResolvedValueOnce(true);
     deleteAllFindings.mockResolvedValueOnce({ ok: true, deleted: 2 });
@@ -296,8 +297,8 @@ describe('useDismissedFindings — onReconcile (called alongside onRefresh, not 
 
     await act(async () => { await result.current.handleDeleteAll(); });
 
-    expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(onReconcile).toHaveBeenCalledTimes(1);
+    expect(onRefresh).not.toHaveBeenCalled();
   });
 
   it('handleDeleteAll does not call onReconcile when the user cancels', async () => {
@@ -316,18 +317,17 @@ describe('useDismissedFindings — onReconcile (called alongside onRefresh, not 
   });
 
   it('works fine when onReconcile is omitted (optional param, back-compat)', async () => {
-    listDismissedFindings.mockResolvedValueOnce([sampleA]);
+    listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     restoreFinding.mockResolvedValueOnce({ ok: true });
-    const onRefresh = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings('proj', onRefresh, vi.fn()),
+      () => useDismissedFindings('proj', vi.fn(), vi.fn()),
       withQueryClient(),
     );
-    await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
 
     await act(async () => { await result.current.handleRestore(sampleA); });
 
-    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(result.current.dismissed).toEqual([sampleB]);
   });
 });
 

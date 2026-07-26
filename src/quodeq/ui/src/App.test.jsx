@@ -160,34 +160,34 @@ describe('ROUTE_RENDERERS onDismiss source gating', () => {
 
   // The dashboard must eventually reflect a dismiss even though the delta
   // patch is only best-effort (e.g. it doesn't cover every view). Each
-  // onDismiss success path calls BOTH the existing lazy refreshDashboard
-  // (mark-stale, cheap) AND the new debounced scheduleDashboardReconcile
-  // (active refetch of the always-mounted Overview observer) — see
-  // useDashboard.js. Neither call replaces the other.
-  it('file route onDismiss calls refreshDashboard, scheduleDashboardReconcile, and bumpDismissRefresh on success', async () => {
+  // onDismiss success path makes ONE reconcile call: scheduleDashboardReconcile
+  // marks the project queries stale synchronously AND actively refetches the
+  // always-mounted Overview observer after the debounce (see useDashboard.js),
+  // so a separate refreshDashboard call would be redundant.
+  it('file route onDismiss calls scheduleDashboardReconcile and bumpDismissRefresh on success', async () => {
     const props = baseProps('local');
     const el = ROUTE_RENDERERS.file({ file: { path: 'a.py' }, runId: 'r1' }, props);
     await el.props.onDismiss({ reason: 'test' });
-    expect(props.refreshDashboard).toHaveBeenCalledTimes(1);
     expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+    expect(props.refreshDashboard).not.toHaveBeenCalled();
     expect(props.bumpDismissRefresh).toHaveBeenCalledTimes(1);
   });
 
-  it('finding route onDismiss calls refreshDashboard, scheduleDashboardReconcile, and bumpDismissRefresh on success', async () => {
+  it('finding route onDismiss calls scheduleDashboardReconcile and bumpDismissRefresh on success', async () => {
     const props = baseProps('local');
     const el = ROUTE_RENDERERS.finding({ finding: {}, principle: 'P', dimension: 'Security' }, props);
     await el.props.onDismiss({ reason: 'test' });
-    expect(props.refreshDashboard).toHaveBeenCalledTimes(1);
     expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+    expect(props.refreshDashboard).not.toHaveBeenCalled();
     expect(props.bumpDismissRefresh).toHaveBeenCalledTimes(1);
   });
 
-  it('evalprinciple route onDismiss calls refreshDashboard, scheduleDashboardReconcile, and bumpDismissRefresh on success', async () => {
+  it('evalprinciple route onDismiss calls scheduleDashboardReconcile and bumpDismissRefresh on success', async () => {
     const props = baseProps('local');
     const el = ROUTE_RENDERERS.evalprinciple({ evalPrincipal: { principle: 'P', dimension: 'Security' } }, props);
     await el.props.onDismiss({ reason: 'test' });
-    expect(props.refreshDashboard).toHaveBeenCalledTimes(1);
     expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+    expect(props.refreshDashboard).not.toHaveBeenCalled();
     expect(props.bumpDismissRefresh).toHaveBeenCalledTimes(1);
   });
 });
@@ -248,7 +248,6 @@ describe('buildAssistantActionAppliedHandler', () => {
     return {
       applyDelta: vi.fn(),
       bumpDismissRefresh: vi.fn(),
-      refreshDashboard: vi.fn(),
       scheduleDashboardReconcile: vi.fn(),
       selectedProject: 'proj1',
       ...overrides,
@@ -263,10 +262,9 @@ describe('buildAssistantActionAppliedHandler', () => {
     expect(d.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
   });
 
-  it('calls the lazy refresh as well, never one in place of the other', () => {
+  it('bumps the dismissed list alongside the reconcile', () => {
     const d = deps();
     buildAssistantActionAppliedHandler(d)(dismissEvent({ delta: { project: 'proj1' }, scores: {} }));
-    expect(d.refreshDashboard).toHaveBeenCalledTimes(1);
     expect(d.bumpDismissRefresh).toHaveBeenCalledTimes(1);
   });
 
@@ -277,7 +275,6 @@ describe('buildAssistantActionAppliedHandler', () => {
     const d = deps();
     buildAssistantActionAppliedHandler(d)(dismissEvent({}));
     expect(d.applyDelta).not.toHaveBeenCalled();
-    expect(d.refreshDashboard).toHaveBeenCalledTimes(1);
     expect(d.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
   });
 
@@ -299,10 +296,9 @@ describe('buildAssistantActionAppliedHandler', () => {
 
   // The patch is best-effort; a throw must not swallow the follow-ups that
   // are the actual convergence guarantee.
-  it('still refreshes and reconciles when the delta patch throws', () => {
+  it('still reconciles when the delta patch throws', () => {
     const d = deps({ applyDelta: vi.fn(() => { throw new Error('bad delta'); }) });
     buildAssistantActionAppliedHandler(d)(dismissEvent({ delta: { project: 'proj1' }, scores: {} }));
-    expect(d.refreshDashboard).toHaveBeenCalledTimes(1);
     expect(d.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
   });
 
@@ -311,7 +307,6 @@ describe('buildAssistantActionAppliedHandler', () => {
     buildAssistantActionAppliedHandler(d)({ detail: { actionType: 'verify_finding', delta: {} } });
     expect(d.applyDelta).not.toHaveBeenCalled();
     expect(d.bumpDismissRefresh).not.toHaveBeenCalled();
-    expect(d.refreshDashboard).not.toHaveBeenCalled();
     expect(d.scheduleDashboardReconcile).not.toHaveBeenCalled();
   });
 
@@ -766,5 +761,31 @@ describe('buildDashboardDataBundle', () => {
     ];
     const missing = consumed.filter((k) => !(k in bundle));
     expect(missing).toEqual([]);
+  });
+});
+
+// Deleting a run changes the accumulated rollup the Overview grade is built
+// from -- the same class of mutation as dismiss/restore/delete-finding, which
+// all get the debounced ACTIVE reconcile. mark-stale alone leaves the
+// always-mounted Overview observer on pre-deletion numbers indefinitely
+// (pywebview never fires a focus refetch).
+describe('history route onRunDeleted wiring', () => {
+  it('wires onRunDeleted to the debounced active reconcile, not mark-stale only', () => {
+    const props = {
+      dashboardData: {
+        dashboard: { trend: [] }, availableRuns: [], overviewRunIndex: 0,
+        accumulated: null, loading: false, isFetching: false,
+      },
+      navigation: {
+        selectedProject: 'proj1', selectedSource: 'local', projects: [],
+        projectsLoaded: true, handleNavigate: vi.fn(), historySelectedRun: null,
+        setHistorySelectedRun: vi.fn(),
+      },
+      refreshDashboard: vi.fn(),
+      scheduleDashboardReconcile: vi.fn(),
+    };
+    const el = ROUTE_RENDERERS.history({}, props);
+    el.props.callbacks.onRunDeleted();
+    expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
   });
 });
