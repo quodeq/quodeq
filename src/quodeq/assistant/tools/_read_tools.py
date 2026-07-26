@@ -113,6 +113,16 @@ def _raw_run_dims(eval_dir) -> list[dict]:
     return out
 
 
+def _available_names(ctx: ToolContext, dims: list[dict]) -> str:
+    """Comma-joined visible dimension names for a not-found error message.
+
+    Filtered so an error never discloses a dimension the user has hidden.
+    """
+    names = [d.get("dimension") for d in dims if d.get("dimension")]
+    shown, _ = partition_visible(names, ctx.visible_standard_ids)
+    return ", ".join(sorted(shown))
+
+
 def _visible_only(ctx: ToolContext, entries: list[dict],
                   key: str = "dimension") -> tuple[list[dict], list[str]]:
     """Drop entries whose dimension the user has hidden.
@@ -327,7 +337,7 @@ def _get_report(ctx: ToolContext, dimension: str) -> dict:
         raise _no_scope_error()
     entry = next((d for d in dims if d.get("dimension") == dimension), None)
     if entry is None:
-        avail = ", ".join(sorted(d.get("dimension") for d in dims if d.get("dimension")))
+        avail = _available_names(ctx, dims)
         raise ToolError(
             f"no report for dimension: {dimension}. Available: {avail or '(none)'}")
     viols = entry.get("violations") or []
@@ -408,7 +418,7 @@ def _violations_from_accumulated(ctx: ToolContext, dimension: str | None):
     if dimension:
         entry = next((d for d in dims if d.get("dimension") == dimension), None)
         if entry is None:
-            avail = ", ".join(sorted(d.get("dimension") for d in dims if d.get("dimension")))
+            avail = _available_names(ctx, dims)
             raise ToolError(
                 f"no report for dimension: {dimension}. Available: "
                 f"{avail or '(none)'}. Or try get_overview for accumulated scores.")

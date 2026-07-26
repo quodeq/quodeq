@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.assistant.tools import ToolContext, build_registry
+from quodeq.assistant.tools import ToolContext, ToolError, build_registry
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
@@ -523,4 +523,25 @@ def test_search_findings_no_selection_means_no_filtering(tmp_path):
     out = _search_findings(ctx, query="risk")
     assert {f["dimension"] for f in out["findings"]} == {"security", "reliability"}
     assert out["hiddenStandardIds"] == []
+
+
+# --- get_report / get_violations not-found errors never name hidden dims. ----
+
+
+def test_report_not_found_error_does_not_name_hidden_dimensions(tmp_path, monkeypatch):
+    from quodeq.assistant.tools._read_tools import _get_report
+    ctx = _acc_ctx(tmp_path, monkeypatch, visible_standard_ids=("security",))
+    with pytest.raises(ToolError) as exc:
+        _get_report(ctx, "usability")
+    assert "reliability" not in str(exc.value)
+    assert "security" in str(exc.value)
+
+
+def test_violations_not_found_error_does_not_name_hidden_dimensions(tmp_path, monkeypatch):
+    from quodeq.assistant.tools._read_tools import _get_violations
+    ctx = _acc_ctx(tmp_path, monkeypatch, visible_standard_ids=("security",))
+    with pytest.raises(ToolError) as exc:
+        _get_violations(ctx, dimension="usability")
+    assert "reliability" not in str(exc.value)
+    assert "security" in str(exc.value)
 
