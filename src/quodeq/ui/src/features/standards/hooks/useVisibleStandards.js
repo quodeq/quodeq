@@ -20,8 +20,14 @@ export function useVisibleStandards({ storage = localStorage, projectId = null }
     });
   }, [persist]);
 
-  const visibleSet = useMemo(() => new Set(visibleIds), [visibleIds]);
-  const isVisible = useCallback((id) => visibleSet.has(id), [visibleSet]);
+  // Lowercase both sides: the server normalizes stored ids to lowercase,
+  // but custom/imported standard ids aren't charset-constrained (e.g.
+  // "OWASP-Top10"), so a raw comparison would read a visible standard as
+  // hidden here while the assistant and dashboard correctly show it.
+  const visibleSet = useMemo(
+    () => new Set(visibleIds.map((id) => id.toLowerCase())), [visibleIds]);
+  const isVisible = useCallback(
+    (id) => visibleSet.has((id || '').toLowerCase()), [visibleSet]);
 
   const add = useCallback((id) => {
     setVisibleIds((prev) => {

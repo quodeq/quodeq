@@ -71,6 +71,17 @@ describe('useVisibleStandards', () => {
     expect(result.current.isVisible('custom-standard')).toBe(true);
   });
 
+  it('isVisible compares mixed-case ids case-insensitively', () => {
+    // The server normalizes stored ids to lowercase, but custom/imported
+    // standard ids aren't charset-constrained (e.g. "OWASP-Top10"). A raw
+    // comparison would read a visible standard as hidden here.
+    const storage = fakeStorage({
+      [VISIBLE_STANDARDS_STORAGE_KEY]: JSON.stringify(['owasp-top10']),
+    });
+    const { result } = renderHook(() => useVisibleStandards({ storage }));
+    expect(result.current.isVisible('OWASP-Top10')).toBe(true);
+  });
+
   it('write-throughs a toggle to the server', async () => {
     const put = vi.spyOn(api, 'putStandardsVisibility').mockResolvedValue({});
     const storage = fakeStorage();
