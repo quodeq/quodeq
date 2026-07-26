@@ -1063,9 +1063,18 @@ export default function App() {
   // trend/accumulated filters below, keyed with empty deps) do not
   // recompute from this — that is a pre-existing limitation of those read
   // sites, not something this hydration fixes.
+  //
+  // isStale guards a real race: switching A -> B before A's request resolves
+  // must not let A's (now-stale) response overwrite B's selection in the
+  // single, per-browser cache. hydrateVisibleStandardIds checks isStale()
+  // right before every write it makes (including the migration PUT), so
+  // flipping `cancelled` in the cleanup is enough to make a stale response a
+  // no-op.
   useEffect(() => {
     if (!state.selectedProject) return;
-    hydrateVisibleStandardIds(state.selectedProject);
+    let cancelled = false;
+    hydrateVisibleStandardIds(state.selectedProject, { isStale: () => cancelled });
+    return () => { cancelled = true; };
   }, [state.selectedProject]);
 
   const currentDayLabel = useMemo(

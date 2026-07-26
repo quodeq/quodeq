@@ -3,7 +3,7 @@ import { readVisibleStandardIds, writeVisibleStandardIds } from '../../../utils/
 import { putStandardsVisibility } from '../../../api/standards.js';
 
 export function useVisibleStandards({ storage = localStorage, projectId = null } = {}) {
-  const [visibleIds, setVisibleIds] = useState(readVisibleStandardIds);
+  const [visibleIds, setVisibleIds] = useState(() => readVisibleStandardIds(storage));
 
   const persist = useCallback((next) => {
     writeVisibleStandardIds(next, storage);

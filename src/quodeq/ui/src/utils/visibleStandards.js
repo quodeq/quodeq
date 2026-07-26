@@ -30,16 +30,25 @@ export function writeVisibleStandardIds(ids, storage = localStorage) {
  * selection — that one gets pushed up rather than silently lost.
  *
  * Never throws: an offline/failed fetch leaves the cached value in place.
+ *
+ * `isStale` guards against a race: if the caller fires this for project A
+ * and the user switches to project B before the request resolves, A's
+ * response must not land in the (per-browser, not per-project) cache over
+ * B's. Pass a function that returns true once the selection this call was
+ * for is no longer the current one; it's checked right before every write,
+ * including the migration PUT, so a stale call is a no-op past that point.
  */
-export async function hydrateVisibleStandardIds(projectId, { storage = localStorage } = {}) {
+export async function hydrateVisibleStandardIds(projectId, { storage = localStorage, isStale } = {}) {
   if (!projectId) return readVisibleStandardIds(storage);
   try {
     const { visibleStandardIds, isDefault } = await getStandardsVisibility(projectId);
+    if (isStale?.()) return readVisibleStandardIds(storage);
     const cachedRaw = storage.getItem(VISIBLE_STANDARDS_STORAGE_KEY);
     if (isDefault && cachedRaw) {
       const cached = JSON.parse(cachedRaw);
       if (Array.isArray(cached)) {
         const saved = await putStandardsVisibility(projectId, cached);
+        if (isStale?.()) return readVisibleStandardIds(storage);
         const ids = saved?.visibleStandardIds ?? cached;
         writeVisibleStandardIds(ids, storage);
         return ids;

@@ -70,3 +70,52 @@ it('leaves the cached value in place when the request fails', async () => {
   expect(ids).toEqual(['security']);
   expect(readVisibleStandardIds(storage)).toEqual(['security']);
 });
+
+it('does not write a stale project response over the current project\'s cache (race)', async () => {
+  // Mirrors the App.jsx effect: each in-flight hydrate is given an isStale()
+  // predicate that flips true once the selected project moves on. Project A
+  // is still in flight when the user switches to B; B resolves first and
+  // caches its own selection; A resolves last and must be ignored.
+  let currentProject = 'A';
+  const isStaleFor = (projectId) => () => currentProject !== projectId;
+
+  let resolveA;
+  const aPromise = new Promise((resolve) => { resolveA = resolve; });
+  getStandardsVisibility.mockImplementation((projectId) => (
+    projectId === 'A' ? aPromise : Promise.resolve({ visibleStandardIds: ['reliability'], isDefault: false })
+  ));
+
+  const storage = fakeStorage();
+  const hydrateA = hydrateVisibleStandardIds('A', { storage, isStale: isStaleFor('A') });
+
+  currentProject = 'B';
+  await hydrateVisibleStandardIds('B', { storage, isStale: isStaleFor('B') });
+  expect(JSON.parse(storage._map[VISIBLE_STANDARDS_STORAGE_KEY])).toEqual(['reliability']);
+
+  resolveA({ visibleStandardIds: ['security'], isDefault: false });
+  await hydrateA;
+
+  expect(JSON.parse(storage._map[VISIBLE_STANDARDS_STORAGE_KEY])).toEqual(['reliability']);
+});
+
+it('does not fire the migration PUT for a project the user has left', async () => {
+  let currentProject = 'A';
+  const isStaleFor = (projectId) => () => currentProject !== projectId;
+
+  let resolveA;
+  const aPromise = new Promise((resolve) => { resolveA = resolve; });
+  getStandardsVisibility.mockImplementation((projectId) => (
+    projectId === 'A' ? aPromise : Promise.resolve({ visibleStandardIds: [...DEFAULT_VISIBLE_STANDARDS], isDefault: true })
+  ));
+
+  const storage = fakeStorage({
+    [VISIBLE_STANDARDS_STORAGE_KEY]: JSON.stringify(['security']),
+  });
+  const hydrateA = hydrateVisibleStandardIds('A', { storage, isStale: isStaleFor('A') });
+
+  currentProject = 'B';
+  resolveA({ visibleStandardIds: [...DEFAULT_VISIBLE_STANDARDS], isDefault: true });
+  await hydrateA;
+
+  expect(putStandardsVisibility).not.toHaveBeenCalled();
+});

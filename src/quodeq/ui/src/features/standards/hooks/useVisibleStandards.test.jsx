@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
+import { VISIBLE_STANDARDS_STORAGE_KEY } from '../../../constants.js';
 
 vi.mock('../../../api/standards.js', () => ({
   putStandardsVisibility: vi.fn(),
@@ -37,6 +38,18 @@ describe('useVisibleStandards', () => {
     expect(JSON.parse(storage._map[Object.keys(storage._map)[0]])).toContain('custom-standard');
     act(() => result.current.toggle('custom-standard'));
     expect(result.current.visibleIds).not.toContain('custom-standard');
+  });
+
+  it('initialises from the injected storage, not the real localStorage', () => {
+    // readVisibleStandardIds(storage) is honored on writes; the initial
+    // useState read must use the same injected storage rather than falling
+    // through to the real, unrelated localStorage.
+    window.localStorage.clear();
+    const storage = fakeStorage({
+      [VISIBLE_STANDARDS_STORAGE_KEY]: JSON.stringify(['custom-only']),
+    });
+    const { result } = renderHook(() => useVisibleStandards({ storage }));
+    expect(result.current.visibleIds).toEqual(['custom-only']);
   });
 
   it('add is idempotent and remove is a no-op when absent', () => {
