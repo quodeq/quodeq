@@ -180,3 +180,17 @@ def test_traversal_dim_id_does_not_read_evidence_planted_outside_run_dir(tmp_pat
             run_dir, traversal_dim_id, dismissed=set(), deleted=set(),
             source_file_count=1000, files_read=50, params=DEFAULT_PARAMS,
         )
+
+
+def test_scoring_engine_exception_returns_none_for_fallback(run_dir, monkeypatch):
+    """The engine can throw on edge-case evidence (see da04c1a2). The rescore
+    must degrade to None (callers fall back to the stored/legacy score) rather
+    than propagate and 500 the dashboard or /api/rescore for the whole run.
+    """
+    def _boom(*args, **kwargs):
+        raise RuntimeError("scoring engine exploded")
+    monkeypatch.setattr("quodeq.services.evidence_rescore.score_evidence", _boom)
+    out = score_dimension_from_evidence(
+        run_dir, DIM, dismissed=set(), deleted=set(),
+        source_file_count=10, files_read=5, params=DEFAULT_PARAMS)
+    assert out is None

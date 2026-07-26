@@ -104,4 +104,12 @@ def score_dimension_from_evidence(
         # recomputed metrics (confidence, compliance %) match scan time.
         pe.compute_metrics(source_file_count=source_file_count)
 
-    return score_evidence(evidence, mode="numerical", params=params)
+    # Broad catch on purpose (mirrors mutation_rescore and the CLI print
+    # guard): the engine can throw on edge-case evidence, and every consumer
+    # (dashboard build, /api/rescore, trend fetcher) treats None as "fall back
+    # to the stored score" — one bad dimension must not fail the whole run.
+    try:
+        return score_evidence(evidence, mode="numerical", params=params)
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning("Evidence rescore failed for %s/%s: %s", run_dir.name, dim_id, exc)
+        return None
