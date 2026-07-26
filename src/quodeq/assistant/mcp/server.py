@@ -89,8 +89,7 @@ def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:
         reports_dir=reports_dir,
         worktree_dir=Path(ns.worktree_dir) if getattr(ns, "worktree_dir", "") else None,
         read_only=bool(getattr(ns, "read_only", False)),
-        visible_standard_ids=(
-            load_visible_standard_ids(repo_root) if repo_root is not None else None),
+        visible_standard_ids=load_visible_standard_ids(repo_root),
     )
     registry = build_registry(ctx)
     if (getattr(ns, "enable_write", False) and ctx.worktree_dir is not None

@@ -228,8 +228,7 @@ def build_tool_context(app: Flask, session: dict) -> ToolContext:
         reports_dir=reports_dir,
         read_only=(source == "shared"),
         score_cache_path=score_cache_path,
-        visible_standard_ids=(
-            load_visible_standard_ids(repo_root) if repo_root is not None else None),
+        visible_standard_ids=load_visible_standard_ids(repo_root),
     )
 
 

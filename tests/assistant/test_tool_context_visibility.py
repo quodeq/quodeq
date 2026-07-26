@@ -78,12 +78,15 @@ def test_api_helper_loads_the_saved_selection(tmp_path):
     assert ctx.visible_standard_ids == ("security", "clean-architecture")
 
 
-def test_api_helper_leaves_none_when_no_repo_resolves(tmp_path):
+def test_api_helper_falls_back_to_defaults_when_no_repo_resolves(tmp_path):
+    """No repo root still resolves a concrete selection (the ISO defaults),
+    not None -- a session with nothing to scope to must not read as
+    "unfiltered"."""
     app = _app(tmp_path)
     with app.app_context():
         ctx = build_tool_context(app, _session(project_uuid=None, project_id=None))
     assert ctx.repo_root is None
-    assert ctx.visible_standard_ids is None
+    assert ctx.visible_standard_ids == DEFAULT_VISIBLE_STANDARDS
 
 
 def test_api_helper_resolves_repo_root_via_project_id_fallback(tmp_path, monkeypatch):
@@ -135,8 +138,38 @@ def test_api_helper_shared_session_never_falls_back_to_a_local_repo_root(
         ctx = build_tool_context(
             app, _session(source="shared", project_uuid=None, project_id="proj-x"))
     assert ctx.repo_root is None
-    assert ctx.visible_standard_ids is None
+    # A shared session still resolves a concrete selection (the ISO
+    # defaults), not None -- it gets no filtering-off exemption just because
+    # it has no local repo.
+    assert ctx.visible_standard_ids == DEFAULT_VISIBLE_STANDARDS
     assert called == []
+
+
+def test_api_helper_shared_session_gets_defaults_not_none(tmp_path, monkeypatch):
+    """A plain shared session (no project_id fallback in play at all) still
+    resolves DEFAULT_VISIBLE_STANDARDS. Filtering being silently off for
+    shared/online/moved-repo sessions was the original bug re-surfacing in a
+    new place; the shared clone has no working copy to scope to, so it must
+    fall back to the same defaults a local repo without a file would get."""
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.read_settings",
+        lambda: SharedSettings(url="file:///fake-origin.git"),
+    )
+    monkeypatch.setattr("quodeq.api._assistant_helpers.read_state", lambda url: "ok")
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.shared_evaluations_root",
+        lambda url: tmp_path / "shared",
+    )
+    monkeypatch.setattr(
+        "quodeq.api._assistant_helpers.shared_score_cache_path",
+        lambda url: tmp_path / "cache.db",
+    )
+    app = _app(tmp_path)
+    with app.app_context():
+        ctx = build_tool_context(
+            app, _session(source="shared", project_uuid=None, project_id=None))
+    assert ctx.repo_root is None
+    assert ctx.visible_standard_ids == DEFAULT_VISIBLE_STANDARDS
 
 
 def _capture_ctx(monkeypatch):
@@ -193,8 +226,10 @@ def test_mcp_path_loads_saved_selection(tmp_path, monkeypatch):
     assert captured["ctx"].visible_standard_ids == ("security", "clean-architecture")
 
 
-def test_mcp_path_no_repo_root_yields_none(tmp_path, monkeypatch):
-    """_build_registry_from_args with no --repo-root carries None (no filtering)."""
+def test_mcp_path_no_repo_root_falls_back_to_defaults(tmp_path, monkeypatch):
+    """_build_registry_from_args with no --repo-root still carries a concrete
+    selection (the ISO defaults), not None -- an MCP caller with no repo root
+    gets the same fallback as every other unresolved-repo session."""
     from quodeq.assistant.mcp.server import _build_registry_from_args
 
     captured = _capture_ctx(monkeypatch)
@@ -202,4 +237,4 @@ def test_mcp_path_no_repo_root_yields_none(tmp_path, monkeypatch):
     _build_registry_from_args(ns)
 
     assert captured["ctx"].repo_root is None
-    assert captured["ctx"].visible_standard_ids is None
+    assert captured["ctx"].visible_standard_ids == DEFAULT_VISIBLE_STANDARDS
