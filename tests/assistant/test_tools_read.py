@@ -24,11 +24,17 @@ def _finding(**over):
     return base
 
 
-@pytest.fixture()
-def ctx(tmp_path):
+def _run_ctx(tmp_path, visible_standard_ids=None, findings=None):
+    """A run-scoped ctx with "security" and "reliability" evaluation reports.
+
+    `findings` overrides the SQL findings seeded for search_findings (default:
+    a single "security" finding); `visible_standard_ids` plumbs the visibility
+    selection through, mirroring `_standards_ctx` below.
+    """
     run_dir = tmp_path / "run"
-    findings = SqliteFindingsRepository(run_dir)
-    findings.insert_finding(_finding())
+    repo_findings = SqliteFindingsRepository(run_dir)
+    for f in (findings if findings is not None else [_finding()]):
+        repo_findings.insert_finding(f)
     eval_dir = run_dir / "evaluation"
     eval_dir.mkdir(parents=True)
     (eval_dir / "security.json").write_text(json.dumps({
@@ -59,7 +65,13 @@ def ctx(tmp_path):
         repository=repo, session_id="s1", run_dir=run_dir, repo_root=None,
         evaluators_dir=tmp_path / "evaluators", compiled_dir=tmp_path / "compiled",
         dimensions_file=tmp_path / "dimensions.json",
+        visible_standard_ids=visible_standard_ids,
     )
+
+
+@pytest.fixture()
+def ctx(tmp_path):
+    return _run_ctx(tmp_path)
 
 
 def test_registry_registers_expected_tools(ctx):
@@ -143,7 +155,8 @@ def test_search_findings_without_run(ctx):
 def test_get_scores_and_report(ctx):
     reg = build_registry(ctx)
     scores = reg.dispatch("get_scores", {})
-    assert scores["result"]["security"] == {"score": 61.5, "grade": "C"}
+    assert scores["result"]["scores"]["security"] == {"score": 61.5, "grade": "C"}
+    assert scores["result"]["hiddenStandardIds"] == []
     report = reg.dispatch("get_report", {"dimension": "security"})
     assert report["result"]["principles"] == [{"name": "P1", "grade": "C"}]
     missing = reg.dispatch("get_report", {"dimension": "nope"})
@@ -265,8 +278,7 @@ _ACC = {
 }
 
 
-@pytest.fixture()
-def acc_ctx(tmp_path, monkeypatch):
+def _acc_ctx(tmp_path, monkeypatch, visible_standard_ids=None):
     repo = AssistantRepository(tmp_path / "assistant.db")
     repo.create_session(session_id="s1", provider="ollama")
     monkeypatch.setattr(
@@ -277,14 +289,21 @@ def acc_ctx(tmp_path, monkeypatch):
         evaluators_dir=tmp_path / "evaluators", compiled_dir=tmp_path / "compiled",
         dimensions_file=tmp_path / "dimensions.json",
         project_id="p", reports_dir=tmp_path / "reports",
+        visible_standard_ids=visible_standard_ids,
     )
+
+
+@pytest.fixture()
+def acc_ctx(tmp_path, monkeypatch):
+    return _acc_ctx(tmp_path, monkeypatch)
 
 
 def test_get_scores_accumulated(acc_ctx):
     out = build_registry(acc_ctx).dispatch("get_scores", {})["result"]
     # Each dimension carries its own source run — they can differ.
-    assert out["security"] == {"score": "9.6/10", "grade": "Exemplary", "fromRun": "runA"}
-    assert out["reliability"] == {"score": "9.0/10", "grade": "Exemplary", "fromRun": "runB"}
+    assert out["scores"]["security"] == {"score": "9.6/10", "grade": "Exemplary", "fromRun": "runA"}
+    assert out["scores"]["reliability"] == {"score": "9.0/10", "grade": "Exemplary", "fromRun": "runB"}
+    assert out["hiddenStandardIds"] == []
 
 
 def test_get_report_accumulated(acc_ctx):
@@ -398,3 +417,110 @@ def test_get_scores_no_scope_errors(tmp_path):
     out = build_registry(ctx).dispatch("get_scores", {})
     assert out["ok"] is False
     assert "get_context" in out["error"]
+
+
+# --- Hidden-standard filtering: get_scores / get_violations / search_findings.
+# Both `ctx` (run scope) and `acc_ctx` (accumulated scope) fixtures carry two
+# dimensions, "security" and "reliability"; these tests hide "reliability" and
+# confirm it disappears from aggregate reads but is still reachable by name.
+
+
+def test_get_scores_excludes_hidden_dimensions_run_scope(tmp_path):
+    from quodeq.assistant.tools._read_tools import _get_scores
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security",))
+    out = _get_scores(ctx)
+    assert set(out["scores"]) == {"security"}
+    assert out["hiddenStandardIds"] == ["reliability"]
+
+
+def test_get_scores_excludes_hidden_dimensions_accumulated(tmp_path, monkeypatch):
+    from quodeq.assistant.tools._read_tools import _get_scores
+    ctx = _acc_ctx(tmp_path, monkeypatch, visible_standard_ids=("security",))
+    out = _get_scores(ctx)
+    assert set(out["scores"]) == {"security"}
+    assert out["hiddenStandardIds"] == ["reliability"]
+
+
+def test_get_scores_no_selection_means_no_filtering(tmp_path, monkeypatch):
+    from quodeq.assistant.tools._read_tools import _get_scores
+    out = _get_scores(_acc_ctx(tmp_path, monkeypatch, visible_standard_ids=None))
+    assert "reliability" in out["scores"]
+    assert out["hiddenStandardIds"] == []
+
+
+def test_get_scores_filename_fallback_survives_filtering(tmp_path):
+    """A report file with no "dimension" key is keyed by its filename, not
+    dropped -- even once filtering is applied. Guards `_raw_run_dims`, which
+    exists specifically to preserve this behaviour through the new filter."""
+    from quodeq.assistant.tools._read_tools import _get_scores
+    ctx = _run_ctx(tmp_path, visible_standard_ids=None)
+    eval_dir = ctx.run_dir / "evaluation"
+    (eval_dir / "no-dim-field.json").write_text(json.dumps({
+        "overallScore": 42, "overallGrade": "D", "violations": [],
+    }))
+    out = _get_scores(ctx)
+    assert out["scores"]["no-dim-field"] == {"score": 42, "grade": "D"}
+
+
+def test_get_violations_excludes_hidden_dimensions_run_scope(tmp_path):
+    from quodeq.assistant.tools._read_tools import _get_violations
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security",))
+    out = _get_violations(ctx)
+    # reliability's R1 is excluded; only security's P1/P2 counts remain.
+    assert out["by_principle"] == {"P1": 2, "P2": 1}
+    assert out["hiddenStandardIds"] == ["reliability"]
+
+
+def test_get_violations_named_hidden_dimension_still_works_run_scope(tmp_path):
+    """Explicitly naming a hidden dimension is the deliberate escape hatch."""
+    from quodeq.assistant.tools._read_tools import _get_violations
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security",))
+    out = _get_violations(ctx, dimension="reliability")
+    assert out["dimension"] == "reliability"
+    assert out["count"] == 1
+    assert out["hiddenStandardIds"] == []
+
+
+def test_get_violations_excludes_hidden_dimensions_accumulated(tmp_path, monkeypatch):
+    from quodeq.assistant.tools._read_tools import _get_violations
+    ctx = _acc_ctx(tmp_path, monkeypatch, visible_standard_ids=("security",))
+    out = _get_violations(ctx)
+    assert out["by_principle"] == {"S1": 1, "S2": 1}
+    assert out["hiddenStandardIds"] == ["reliability"]
+
+
+def test_get_violations_named_hidden_dimension_still_works_accumulated(tmp_path, monkeypatch):
+    from quodeq.assistant.tools._read_tools import _get_violations
+    ctx = _acc_ctx(tmp_path, monkeypatch, visible_standard_ids=("security",))
+    out = _get_violations(ctx, dimension="reliability")
+    assert out["dimension"] == "reliability"
+    assert out["count"] > 0
+    assert out["hiddenStandardIds"] == []
+
+
+def test_search_findings_excludes_hidden_dimensions(tmp_path):
+    from quodeq.assistant.tools._read_tools import _search_findings
+    findings = [
+        _finding(),  # dimension "security", reason "sql injection risk"
+        _finding(d="reliability", p="req-2", req="req-2", file="src/r.py",
+                 reason="reliability risk"),
+    ]
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security",), findings=findings)
+    out = _search_findings(ctx, query="risk")
+    assert len(out["findings"]) == 1
+    assert all(f["dimension"] == "security" for f in out["findings"])
+    assert out["hiddenStandardIds"] == ["reliability"]
+
+
+def test_search_findings_no_selection_means_no_filtering(tmp_path):
+    from quodeq.assistant.tools._read_tools import _search_findings
+    findings = [
+        _finding(),
+        _finding(d="reliability", p="req-2", req="req-2", file="src/r.py",
+                 reason="reliability risk"),
+    ]
+    ctx = _run_ctx(tmp_path, visible_standard_ids=None, findings=findings)
+    out = _search_findings(ctx, query="risk")
+    assert {f["dimension"] for f in out["findings"]} == {"security", "reliability"}
+    assert out["hiddenStandardIds"] == []
+

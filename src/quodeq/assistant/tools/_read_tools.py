@@ -99,6 +99,38 @@ def _no_scope_error() -> ToolError:
         "scope, then ask the user to open a project overview or select a run.")
 
 
+def _raw_run_dims(eval_dir) -> list[dict]:
+    """A run's evaluation reports as dicts, each guaranteed a ``dimension``.
+
+    Mirrors the pre-filtering fallback ``data.get("dimension", path.stem)``: a
+    report that omits the field is named after its file rather than dropped.
+    """
+    out: list[dict] = []
+    for path in sorted(eval_dir.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data.setdefault("dimension", path.stem)
+        out.append(data)
+    return out
+
+
+def _visible_only(ctx: ToolContext, entries: list[dict],
+                  key: str = "dimension") -> tuple[list[dict], list[str]]:
+    """Drop entries whose dimension the user has hidden.
+
+    Returns ``(kept, hidden_ids)``. ``hidden_ids`` is de-duplicated and sorted
+    so the payload is stable, and is what lets the assistant offer the withheld
+    data instead of silently omitting it.
+    """
+    names = [str(e.get(key) or "") for e in entries]
+    _, hidden = partition_visible(names, ctx.visible_standard_ids)
+    if not hidden:
+        return entries, []
+    hidden_set = {h.strip().lower() for h in hidden}
+    kept = [e for e, n in zip(entries, names, strict=True)
+            if n.strip().lower() not in hidden_set]
+    return kept, sorted(hidden_set)
+
+
 # Trimmed violation shape shared by get_report and get_violations. We keep only
 # the fields that let the model locate and explain an issue and DROP the large
 # `snippet`/`context` blobs so a report full of violations stays within a sane
@@ -225,11 +257,13 @@ def _search_findings(ctx: ToolContext, query: str, limit: int = 20) -> dict:
     hits = SqliteFindingsRepository(run_dir).search(query, limit=max(1, min(int(limit), 50)))
     # Model-facing key is "requirement"; the Finding attribute is `req`
     # (see data/sqlite/_row_mappers.py row_to_finding).
-    return {"findings": [
+    rows = [
         {"dimension": f.dimension, "requirement": f.req, "severity": f.severity,
          "file": f.file, "line": f.line, "reason": f.reason, "snippet": f.snippet}
         for f in hits
-    ]}
+    ]
+    kept, hidden = _visible_only(ctx, rows)
+    return {"findings": kept, "hiddenStandardIds": hidden}
 
 
 def _get_scores(ctx: ToolContext) -> dict:
@@ -240,24 +274,26 @@ def _get_scores(ctx: ToolContext) -> dict:
         if not eval_dir.is_dir():
             raise ToolError("no evaluation reports in this run")
         scored = _scored_run_dims(ctx)
-        if scored is not None:
-            return {d["dimension"]: {
+        if scored is None:
+            scored = _raw_run_dims(eval_dir)
+        kept, hidden = _visible_only(ctx, scored)
+        return {
+            "scores": {d["dimension"]: {
                 "score": d.get("overallScore"), "grade": d.get("overallGrade"),
-            } for d in scored if d.get("dimension")}
-        out = {}
-        for path in sorted(eval_dir.glob("*.json")):
-            data = json.loads(path.read_text(encoding="utf-8"))
-            out[data.get("dimension", path.stem)] = {
-                "score": data.get("overallScore"), "grade": data.get("overallGrade"),
-            }
-        return out
+            } for d in kept if d.get("dimension")},
+            "hiddenStandardIds": hidden,
+        }
     dims = _accumulated_dims(ctx)
     if dims is None:
         raise _no_scope_error()
-    return {d.get("dimension"): {
-        "score": d.get("overallScore"), "grade": d.get("overallGrade"),
-        "fromRun": d.get("fromRunId"),
-    } for d in dims if d.get("dimension")}
+    kept, hidden = _visible_only(ctx, dims)
+    return {
+        "scores": {d.get("dimension"): {
+            "score": d.get("overallScore"), "grade": d.get("overallGrade"),
+            "fromRun": d.get("fromRunId"),
+        } for d in kept if d.get("dimension")},
+        "hiddenStandardIds": hidden,
+    }
 
 
 def _get_report(ctx: ToolContext, dimension: str) -> dict:
@@ -320,9 +356,9 @@ def _get_violations(ctx: ToolContext, dimension: str | None = None,
                     limit: int = _VIOLATIONS_DEFAULT_LIMIT) -> dict:
     limit = max(1, min(int(limit), _VIOLATIONS_MAX_LIMIT))
     if _has_run(ctx):
-        raw, dim_out = _violations_from_run(ctx, dimension)
+        raw, dim_out, hidden = _violations_from_run(ctx, dimension)
     else:
-        raw, dim_out = _violations_from_accumulated(ctx, dimension)
+        raw, dim_out, hidden = _violations_from_accumulated(ctx, dimension)
 
     # by_principle counts reflect ALL violations so "worst principle" stays
     # accurate even when the returned list is capped by `limit`.
@@ -333,8 +369,8 @@ def _get_violations(ctx: ToolContext, dimension: str | None = None,
 
     ordered = sorted(raw, key=_severity_key)
     trimmed = [_trim_violation(v) for v in ordered[:limit]]
-    return {"dimension": dim_out, "count": len(raw),
-            "violations": trimmed, "by_principle": by_principle}
+    return {"dimension": dim_out, "count": len(raw), "violations": trimmed,
+            "by_principle": by_principle, "hiddenStandardIds": hidden}
 
 
 def _violations_from_run(ctx: ToolContext, dimension: str | None):
@@ -351,19 +387,18 @@ def _violations_from_run(ctx: ToolContext, dimension: str | None):
         if scored is not None:
             entry = next((d for d in scored if d.get("dimension") == dimension), None)
             if entry is not None:
-                return entry.get("violations") or [], dimension
-        return json.loads(path.read_text(encoding="utf-8")).get("violations") or [], dimension
+                return entry.get("violations") or [], dimension, []
+        viols = json.loads(path.read_text(encoding="utf-8")).get("violations") or []
+        return viols, dimension, []
     if not eval_dir.is_dir():
         raise ToolError(
             "no evaluation reports in this run. Try get_overview for "
             "accumulated scores across runs.")
     scored = _scored_run_dims(ctx)
-    if scored is not None:
-        return [v for d in scored for v in (d.get("violations") or [])], None
-    raw: list = []
-    for p in sorted(eval_dir.glob("*.json")):
-        raw.extend(json.loads(p.read_text(encoding="utf-8")).get("violations") or [])
-    return raw, None
+    if scored is None:
+        scored = _raw_run_dims(eval_dir)
+    kept, hidden = _visible_only(ctx, scored)
+    return [v for d in kept for v in (d.get("violations") or [])], None, hidden
 
 
 def _violations_from_accumulated(ctx: ToolContext, dimension: str | None):
@@ -377,11 +412,12 @@ def _violations_from_accumulated(ctx: ToolContext, dimension: str | None):
             raise ToolError(
                 f"no report for dimension: {dimension}. Available: "
                 f"{avail or '(none)'}. Or try get_overview for accumulated scores.")
-        return entry.get("violations") or [], dimension
+        return entry.get("violations") or [], dimension, []
+    kept, hidden = _visible_only(ctx, dims)
     raw: list = []
-    for d in dims:
+    for d in kept:
         raw.extend(d.get("violations") or [])
-    return raw, None
+    return raw, None, hidden
 
 
 def _service(ctx: ToolContext) -> StandardsService:
@@ -419,9 +455,12 @@ def register_read_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
         lambda **kw: _search_findings(ctx, **kw)))
     registry.register(ToolSpec(
         "get_scores",
-        "Get all dimension scores and grades. Uses the selected run if one is "
-        "selected, otherwise the accumulated view (each dimension's latest "
-        "run, aggregated — the default dashboard data).",
+        "Get all dimension scores and grades, as {scores: {dimension: "
+        "{score, grade}}, hiddenStandardIds: [...]}. Uses the selected run if "
+        "one is selected, otherwise the accumulated view (each dimension's "
+        "latest run, aggregated — the default dashboard data). scores omits "
+        "any dimension the user has hidden; those ids are named in "
+        "hiddenStandardIds.",
         {"type": "object", "properties": {}},
         lambda **kw: _get_scores(ctx, **kw)))
     registry.register(ToolSpec(
