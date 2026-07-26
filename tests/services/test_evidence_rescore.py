@@ -94,6 +94,43 @@ def test_deleted_key_removes_principle_file_matches(run_dir):
     assert out.principles["Reusability"].deductions.major_type_count == 0
 
 
+def test_quarantined_findings_stay_excluded_from_rescore(tmp_path, monkeypatch):
+    """Scan time quarantines findings whose principle is not in the dimension's
+    standard. The rescore must resolve the same standard and quarantine them
+    too, otherwise a dismiss makes previously excluded findings re-enter the
+    grade and phantom principles appear in the payload.
+    """
+    monkeypatch.setenv("QUODEQ_EVALUATORS_DIR", str(tmp_path / "no-evals"))
+    lines = [
+        _line("M-MOD-1", "a.kt", 10, p="Modularity"),
+        _line("M-MOD-2", "a.kt", 1, t="compliance", p="Modularity"),
+        # Off-standard principle: quarantined at scan time.
+        _line("X-1", "z.kt", 3, sev="critical", p="NotInStandard"),
+    ]
+    _write_evidence(tmp_path, lines)
+
+    from quodeq.config.paths import default_paths
+    scan = score_evidence(
+        parse_jsonl_to_evidence(
+            tmp_path / "evidence" / f"{DIM}_evidence.jsonl",
+            EvidenceContext(language="", repository="", date_str="",
+                            source_file_count=10, files_read=5),
+            compiled_dir=default_paths().standards_dir / "compiled",
+            evaluators_dir=default_paths().evaluators_dir,
+        ),
+        mode="numerical", params=DEFAULT_PARAMS,
+    )
+    assert "NotInStandard" not in scan.principles  # fixture sanity
+
+    rescored = score_dimension_from_evidence(
+        tmp_path, DIM, dismissed=set(), deleted=set(),
+        source_file_count=10, files_read=5, params=DEFAULT_PARAMS,
+    )
+    assert rescored is not None
+    assert "NotInStandard" not in rescored.principles
+    assert rescored.overall.weighted_score == scan.overall.weighted_score
+
+
 @pytest.mark.parametrize("bad", ["../secret", "a/b", "..\\x", "x\0y"])
 def test_traversal_dim_id_rejected_before_filesystem_access(tmp_path, bad):
     # dim_id builds a filesystem path; separators/traversal must be refused

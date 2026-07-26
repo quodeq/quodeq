@@ -84,3 +84,41 @@ def test_idempotent_does_not_rescore(tmp_path: Path):
     })
     second_mtime = (run / "evaluation" / "d1.json").stat().st_mtime_ns
     assert first_mtime == second_mtime
+
+
+def test_cancelled_run_scoring_quarantines_off_standard_findings(tmp_path: Path, monkeypatch):
+    """Scoring after cancellation must resolve the dimension's standard like a
+    completed run does, so off-standard findings stay quarantined instead of
+    re-entering the grade as phantom principles.
+    """
+    from quodeq.services.evaluation_mixin import _score_completed_evidence
+    from quodeq.shared.dimensions_state import DimState, write_dim_state
+
+    monkeypatch.setenv("QUODEQ_EVALUATORS_DIR", str(tmp_path / "no-evals"))
+    reports, run = _seed_run(tmp_path)
+    _write_scan_json(reports, "proj")
+    dim = "maintainability"
+    p = run / "evidence" / f"{dim}_evidence.jsonl"
+    lines = [
+        {"file": "a.py", "req": "M-MOD-1", "t": "violation", "line": 1,
+         "severity": "minor", "w": "w", "reason": "r",
+         "p": "Modularity", "d": dim},
+        {"file": "z.py", "req": "X-1", "t": "violation", "line": 3,
+         "severity": "critical", "w": "w", "reason": "r",
+         "p": "NotInStandard", "d": dim},
+        {"_marker": "file_done", "file": "a.py", "status": "ok"},
+    ]
+    p.write_text("".join(json.dumps(line) + "\n" for line in lines))
+    _write_queue(run, dim)
+    write_dim_state(run, dim, DimState.PENDING)
+    write_dim_state(run, dim, DimState.RUNNING)
+    write_dim_state(run, dim, DimState.DONE)
+
+    _score_completed_evidence(str(reports), {
+        "outputProject": "proj", "outputRunId": "run-1",
+    })
+
+    report = json.loads((run / "evaluation" / f"{dim}.json").read_text())
+    assert report["quarantinedCount"] == 1
+    principles = {v.get("principle") for v in report["violations"]}
+    assert "NotInStandard" not in principles

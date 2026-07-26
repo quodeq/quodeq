@@ -25,7 +25,7 @@ from quodeq.core.types import ScoringResult
 from quodeq.engine.scoring_pipeline import run_full
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.evidence_rescore import score_dimension_from_evidence
+from quodeq.services.evidence_rescore import score_dimension_from_evidence, standard_dirs
 from quodeq.services.grade_formula import load_params
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.logging import log_error, log_info, log_warning
@@ -203,11 +203,14 @@ def _count_excluded_findings(
     jsonl = run_dir / "evidence" / f"{dim_id}_evidence.jsonl"
     if not jsonl.is_file() or jsonl.stat().st_size == 0:
         return 0
+    # Same standard dirs as the rescore: a quarantined finding never entered
+    # the grade, so a dismissal targeting it must not count as an exclusion.
+    compiled_dir, evaluators_dir = standard_dirs()
     try:
         evidence = parse_jsonl_to_evidence(jsonl, EvidenceContext(
             language="", repository="", date_str="",
             source_file_count=0, files_read=0,
-        ))
+        ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir)
     except (OSError, ValueError, KeyError):
         return 0
     if evidence is None:
