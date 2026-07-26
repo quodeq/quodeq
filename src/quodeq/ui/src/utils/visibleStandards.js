@@ -21,10 +21,15 @@ export function readVisibleStandardIds(storage = localStorage) {
 // before issuing its GET; if the counter has moved by the time a write would
 // happen, some other write (a toggle's persist(), or another hydrate call)
 // already landed a newer value, and this response is discarded instead of
-// clobbering it. This is a fresh sample per call, not shared mutable state a
-// test could leave dirty for the next one, so no test-only reset is needed:
-// every assertion only cares whether the counter moved *during* a given
-// call, never its absolute value.
+// clobbering it.
+//
+// The counter is module state, so it is only safe across tests because each
+// call compares against its own sample rather than an absolute value, AND
+// every caller awaits its in-flight hydrate before the next one starts. A
+// promise left dangling across a test boundary WOULD trip a later call's
+// check. That invariant is not enforced structurally; if a second caller of
+// hydrateVisibleStandardIds ever appears, or a test stops awaiting, export a
+// test-only reset rather than relying on it.
 let writeGeneration = 0;
 
 /** Write the selection to the local cache. The server is the source of truth. */
