@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.7.2] - 2026-07-26
+
+### Features
+- **Quarantine visibility**: reports record how many findings were quarantined, and the live scan counters net suppressed findings out instead of over-counting them.
+- **Terminal file links**: cmd-click a file path or URL in the terminal to open it.
+- **Remote repositories without local projects**: shared repositories now appear on the Repositories page even when you have no local projects yet.
+
+### Improvements
+- **Performance**: hot-path fixes found by self-evaluation (memoized stats, an O(n^2) MST, a hoisted backfill query), and the Overview reuses one run walk across as-of score selections.
+- **Assistant streaming**: CLI providers stream text as deltas instead of whole messages, so replies render as they arrive.
+- **Security scanning**: CodeQL and Snyk run on pull requests and releases, with results uploaded to GitHub code scanning.
+- **Help**: the shared repository workflow is documented in the in-app help.
+
+### Fixes
+- **Dismiss consistency**: dismissing, restoring, or deleting a finding now affects scores the same way on every surface. The dashboard reconciles immediately (including assistant-applied dismissals), the Overview grade refreshes on its own, and the CLI matches the UI.
+- **Stale data on project switch**: switching projects loads clean instead of briefly showing the previous project's numbers.
+- **Cancelled runs**: a cancelled run no longer shows as running while it drains.
+- **Exports**: the zip size cap applies to the compressed archive, and the uncompressed cap matches the import guard.
+- **Evaluation countdown**: hidden when the time limit is unlimited.
+- **Drawer inputs**: the terminal and assistant inputs autofocus when their tab opens.
+- **Terminal**: a NUL byte in the /open path fails soft instead of erroring.
+- **Analysis isolation**: the claude scan subprocess runs with --strict-mcp-config so local MCP configuration cannot leak into evaluations.
+- **Maintainability scoring**: non-dict JSONL lines are guarded and grade thresholds are frozen against accidental mutation.
+- **Assistant reliability**: the assistant database uses SQLite synchronous=NORMAL, avoiding stalls without risking corruption.
+
 ## [1.7.1] - 2026-07-23
 
 This is the first 1.7 release to reach PyPI and Homebrew. 1.7.0 shipped desktop builds but a flaky publish-time test blocked its PyPI and Homebrew steps, so pip and Homebrew users install 1.7.1. The full 1.7 feature set is below; there is no change to shipped code between 1.7.0 and 1.7.1 beyond the release-plumbing fix.
