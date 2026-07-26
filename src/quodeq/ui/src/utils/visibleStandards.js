@@ -1,6 +1,29 @@
 import { VISIBLE_STANDARDS_STORAGE_KEY, DEFAULT_VISIBLE_STANDARDS } from '../constants.js';
 import { getStandardsVisibility, putStandardsVisibility } from '../api/standards.js';
 
+// Marks that the (per-browser, not per-project) cache has been reconciled
+// with SOME project's own real file -- either because that project already
+// had one (isDefault: false) or because the one-time legacy migration below
+// just created one. Once set, the migration below never fires again: a
+// later project with no file of its own must read as "give me the ISO
+// defaults", not "adopt whatever the previous project's cache happens to
+// hold". Stored in `storage` (not module state) so it rides along with
+// whichever cache it governs, including in tests that inject their own
+// fake storage per test.
+const VISIBLE_STANDARDS_MIGRATED_KEY = 'quodeq-visible-standards-migrated';
+
+function sameIdSet(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length === 0 && b.length === 0) return true;
+  const setA = new Set(a);
+  const setB = new Set(b);
+  if (setA.size !== setB.size) return false;
+  for (const id of setA) {
+    if (!setB.has(id)) return false;
+  }
+  return true;
+}
+
 /**
  * Read the visible standard IDs from localStorage.
  * Returns the default ISO dimensions if nothing is stored.
@@ -44,7 +67,16 @@ export function writeVisibleStandardIds(ids, storage = localStorage) {
  * localStorage is a cache so the 8 synchronous read sites keep working; the
  * file in the repo is authoritative. On the first run after upgrading, the
  * server has no file yet (isDefault) while the browser may hold a real
- * selection — that one gets pushed up rather than silently lost.
+ * selection — that one gets pushed up rather than silently lost. This
+ * migration is one-shot and per-BROWSER, not per-project: it only fires
+ * while the cache (a) actually differs from the ISO defaults (nothing to
+ * migrate otherwise) and (b) has never been reconciled with any project's
+ * own real file yet (`VISIBLE_STANDARDS_MIGRATED_KEY`). Once either has
+ * happened once, a later project with no file of its own gets the plain ISO
+ * defaults, never another project's ids -- without guard (b), switching
+ * from a project with a real selection to one with none would otherwise
+ * "migrate" the first project's ids into the second project's brand-new
+ * file every time.
  *
  * Never throws: an offline/failed fetch leaves the cached value in place.
  *
@@ -69,16 +101,30 @@ export async function hydrateVisibleStandardIds(projectId, { storage = localStor
   try {
     const { visibleStandardIds, isDefault } = await getStandardsVisibility(projectId);
     if (supersededByNewerWrite()) return readVisibleStandardIds(storage);
-    const cachedRaw = storage.getItem(VISIBLE_STANDARDS_STORAGE_KEY);
-    if (isDefault && cachedRaw) {
-      const cached = JSON.parse(cachedRaw);
-      if (Array.isArray(cached)) {
+    if (isDefault && !storage.getItem(VISIBLE_STANDARDS_MIGRATED_KEY)) {
+      const cachedRaw = storage.getItem(VISIBLE_STANDARDS_STORAGE_KEY);
+      const cached = cachedRaw ? JSON.parse(cachedRaw) : null;
+      // Only a cache that actually differs from the ISO defaults carries
+      // real user intent worth migrating -- a cache that already equals the
+      // defaults (the common case: every project opened so far had no file
+      // of its own either) is nothing but the trailing residue of an
+      // earlier hydrate and must not spawn a file with nothing but the
+      // defaults in it.
+      if (Array.isArray(cached) && !sameIdSet(cached, DEFAULT_VISIBLE_STANDARDS)) {
         const saved = await putStandardsVisibility(projectId, cached);
         if (supersededByNewerWrite()) return readVisibleStandardIds(storage);
         const ids = saved?.visibleStandardIds ?? cached;
+        storage.setItem(VISIBLE_STANDARDS_MIGRATED_KEY, '1');
         writeVisibleStandardIds(ids, storage);
         return ids;
       }
+    }
+    if (!isDefault) {
+      // This project already has its own real file: the cache is now known
+      // to belong to a specific project's synced selection, so it must
+      // never again be read as an unclaimed legacy value up for grabs by
+      // the next project that happens to have no file yet.
+      storage.setItem(VISIBLE_STANDARDS_MIGRATED_KEY, '1');
     }
     writeVisibleStandardIds(visibleStandardIds, storage);
     return visibleStandardIds;

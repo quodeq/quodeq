@@ -98,6 +98,57 @@ it('does not write a stale project response over the current project\'s cache (r
   expect(JSON.parse(storage._map[VISIBLE_STANDARDS_STORAGE_KEY])).toEqual(['reliability']);
 });
 
+it('does not migrate when the cached selection already equals the defaults', async () => {
+  // Distinct from the "no cachedRaw" case below: here cachedRaw IS present,
+  // but it carries no real user intent because it's set-equal to the ISO
+  // defaults (e.g. left over from a previous project that also had no
+  // file). PUTting it would create an untracked
+  // .quodeq/standards-visibility.json with nothing but the defaults in it.
+  getStandardsVisibility.mockResolvedValue({
+    visibleStandardIds: [...DEFAULT_VISIBLE_STANDARDS], isDefault: true,
+  });
+  const storage = fakeStorage({
+    // Reordered/duplicated but set-equal to the defaults.
+    [VISIBLE_STANDARDS_STORAGE_KEY]: JSON.stringify(
+      [...DEFAULT_VISIBLE_STANDARDS].reverse()),
+  });
+  const ids = await hydrateVisibleStandardIds('p1', { storage });
+  expect(putStandardsVisibility).not.toHaveBeenCalled();
+  expect(ids).toEqual(DEFAULT_VISIBLE_STANDARDS);
+});
+
+it('does not let a project switch bleed one project\'s selection into another (cross-project bleed)', async () => {
+  // The regression this guards: project A has a real, already-synced
+  // selection (its own file, isDefault: false). The user then switches to
+  // project B, which has no file yet (isDefault: true). B must get the ISO
+  // defaults, NOT A's ids pushed into a brand-new file in B's repo -- the
+  // shared (per-browser, not per-project) localStorage cache must not be
+  // read as "B's own pending migration" just because A's hydrate happened
+  // to leave a non-default value sitting in it.
+  getStandardsVisibility.mockImplementation((projectId) => {
+    if (projectId === 'A') {
+      return Promise.resolve({
+        visibleStandardIds: ['maintainability', 'usability'], isDefault: false,
+      });
+    }
+    return Promise.resolve({
+      visibleStandardIds: [...DEFAULT_VISIBLE_STANDARDS], isDefault: true,
+    });
+  });
+  const storage = fakeStorage();
+
+  await hydrateVisibleStandardIds('A', { storage });
+  expect(JSON.parse(storage._map[VISIBLE_STANDARDS_STORAGE_KEY]))
+    .toEqual(['maintainability', 'usability']);
+
+  const idsForB = await hydrateVisibleStandardIds('B', { storage });
+
+  expect(putStandardsVisibility).not.toHaveBeenCalled();
+  expect(idsForB).toEqual(DEFAULT_VISIBLE_STANDARDS);
+  expect(JSON.parse(storage._map[VISIBLE_STANDARDS_STORAGE_KEY]))
+    .toEqual(DEFAULT_VISIBLE_STANDARDS);
+});
+
 it('does not migrate when isDefault is true but there is no cached selection to migrate', async () => {
   // Case 3 of the migration matrix: isDefault true, but cachedRaw is absent
   // (fresh browser, nothing to push up) rather than isDefault being false.
