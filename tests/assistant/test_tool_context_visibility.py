@@ -10,6 +10,8 @@ brief, which don't exist in this repo.
 """
 from __future__ import annotations
 
+import argparse
+
 from flask import Flask
 
 from quodeq.api._assistant_helpers import build_tool_context
@@ -137,74 +139,67 @@ def test_api_helper_shared_session_never_falls_back_to_a_local_repo_root(
     assert called == []
 
 
-def _mcp_context_from_namespace(ns, tmp_path):
-    """Mirror the context construction from _build_registry_from_args.
-
-    Used to test the MCP path's context wiring without modifying the source.
-    Tests the same load_visible_standard_ids call that _build_registry_from_args uses.
+def _capture_ctx(monkeypatch):
+    """Patch the module-level ToolContext in server.py with a capturing spy,
+    so a test can call the real _build_registry_from_args and then assert on
+    the ToolContext it actually constructed (build_registry itself doesn't
+    expose ctx, so this is the only way to observe it without touching the
+    source).
     """
-    from pathlib import Path
-    from quodeq.shared._env import get_evaluations_dir
-    from quodeq.core.standards.visibility import load_visible_standard_ids
+    from quodeq.assistant.mcp import server as mcp_server
+    captured = {}
+    real = mcp_server.ToolContext
 
-    if ns.reports_dir:
-        reports_dir = Path(ns.reports_dir)
-    else:
-        reports_dir = Path(get_evaluations_dir())
-    repo_root = Path(ns.repo_root) if ns.repo_root else None
-    return ToolContext(
-        repository=AssistantRepository(Path(ns.db_path)),
-        session_id=ns.session_id,
-        run_dir=Path(ns.run_dir) if ns.run_dir else None,
-        repo_root=repo_root,
-        evaluators_dir=Path(ns.evaluators_dir),
-        compiled_dir=Path(ns.compiled_dir),
-        dimensions_file=Path(ns.dimensions_file),
-        project_id=ns.project_id or None,
-        reports_dir=reports_dir,
+    def spy(**kwargs):
+        ctx = real(**kwargs)
+        captured["ctx"] = ctx
+        return ctx
+
+    monkeypatch.setattr(mcp_server, "ToolContext", spy)
+    return captured
+
+
+def _mcp_namespace(tmp_path, **kw):
+    base = dict(
+        db_path=str(tmp_path / "a.db"),
+        session_id="mcp-test",
+        run_dir=None,
+        repo_root=None,
+        evaluators_dir=str(tmp_path / "e"),
+        compiled_dir=str(tmp_path / "c"),
+        dimensions_file=str(tmp_path / "d.json"),
+        project_id=None,
+        reports_dir="",
+        enable_write=False,
         worktree_dir=None,
         read_only=False,
-        visible_standard_ids=(
-            load_visible_standard_ids(repo_root) if repo_root is not None else None),
     )
+    base.update(kw)
+    return argparse.Namespace(**base)
 
 
-def test_mcp_path_loads_saved_selection(tmp_path):
-    """MCP path (via _build_registry_from_args) loads standards-visibility.json."""
-    import argparse
+def test_mcp_path_loads_saved_selection(tmp_path, monkeypatch):
+    """_build_registry_from_args loads standards-visibility.json onto ToolContext."""
+    from quodeq.assistant.mcp.server import _build_registry_from_args
+
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     save_visible_standard_ids(repo_root, ["security", "clean-architecture"])
 
-    ns = argparse.Namespace(
-        db_path=str(tmp_path / "a.db"),
-        session_id="mcp-test",
-        run_dir=None,
-        repo_root=str(repo_root),
-        evaluators_dir=str(tmp_path / "e"),
-        compiled_dir=str(tmp_path / "c"),
-        dimensions_file=str(tmp_path / "d.json"),
-        project_id=None,
-        reports_dir="",
-    )
-    ctx = _mcp_context_from_namespace(ns, tmp_path)
-    assert ctx.visible_standard_ids == ("security", "clean-architecture")
+    captured = _capture_ctx(monkeypatch)
+    ns = _mcp_namespace(tmp_path, repo_root=str(repo_root))
+    _build_registry_from_args(ns)
+
+    assert captured["ctx"].visible_standard_ids == ("security", "clean-architecture")
 
 
-def test_mcp_path_no_repo_root_yields_none(tmp_path):
-    """MCP path with no --repo-root carries None (no filtering)."""
-    import argparse
-    ns = argparse.Namespace(
-        db_path=str(tmp_path / "a.db"),
-        session_id="mcp-test",
-        run_dir=None,
-        repo_root=None,  # No repo root
-        evaluators_dir=str(tmp_path / "e"),
-        compiled_dir=str(tmp_path / "c"),
-        dimensions_file=str(tmp_path / "d.json"),
-        project_id=None,
-        reports_dir="",
-    )
-    ctx = _mcp_context_from_namespace(ns, tmp_path)
-    assert ctx.repo_root is None
-    assert ctx.visible_standard_ids is None
+def test_mcp_path_no_repo_root_yields_none(tmp_path, monkeypatch):
+    """_build_registry_from_args with no --repo-root carries None (no filtering)."""
+    from quodeq.assistant.mcp.server import _build_registry_from_args
+
+    captured = _capture_ctx(monkeypatch)
+    ns = _mcp_namespace(tmp_path, repo_root=None)
+    _build_registry_from_args(ns)
+
+    assert captured["ctx"].repo_root is None
+    assert captured["ctx"].visible_standard_ids is None
