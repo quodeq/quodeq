@@ -101,3 +101,25 @@ def test_partition_with_none_hides_nothing():
     visible, hidden = partition_visible(["security", "clean-architecture"], None)
     assert visible == ["security", "clean-architecture"]
     assert hidden == []
+
+
+def test_partition_with_empty_tuple_hides_everything():
+    """() is an explicit "hide everything", distinct from None (no filtering).
+
+    Guards against a truthiness check (`if not visible`) in place of `is None`,
+    which would silently turn "hide everything" into "hide nothing".
+    """
+    visible, hidden = partition_visible(["security", "reliability"], ())
+    assert visible == []
+    assert hidden == ["security", "reliability"]
+
+
+def test_saved_file_is_pretty_printed_with_trailing_newline(tmp_path):
+    """The literal on-disk text, not just the parsed value.
+
+    The file is committed to the user's repository, so its formatting is part
+    of the contract: 2-space indent and a trailing newline keep diffs clean.
+    """
+    save_visible_standard_ids(tmp_path, ["security"])
+    text = (tmp_path / VISIBILITY_RELPATH).read_text(encoding="utf-8")
+    assert text == '{\n  "version": 1,\n  "visibleStandardIds": [\n    "security"\n  ]\n}\n'
