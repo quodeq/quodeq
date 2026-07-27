@@ -239,6 +239,27 @@ class TestBuildRunConfig:
         # Legacy QUODEQ_POOL_BUDGET still routes into time_limit via the env-var fallback.
         assert config.options.time_limit == 300
 
+    @patch("quodeq._cli_evaluation.default_paths")
+    @patch("quodeq._cli_evaluation.get_ai_model", return_value="model-x")
+    def test_env_time_limit_zero_is_unlimited(self, mock_model, mock_paths, tmp_path):
+        # Contract pin: the dashboard propagates unlimited as
+        # QUODEQ_TIME_LIMIT=0. It must resolve to 0 (not None), otherwise
+        # the pool substitutes its 600s default and unlimited runs die at
+        # 10 minutes.
+        from quodeq.cli import _build_run_config, ResolvedInputs
+        mock_paths_obj = MagicMock()
+        mock_paths_obj.standards_dir.exists.return_value = False
+        mock_paths_obj.evaluators_dir = tmp_path
+        mock_paths.return_value = mock_paths_obj
+        args = argparse.Namespace(
+            dimensions=None, no_consolidated=False, no_verify=False,
+            max_turns=None, max_duration=None, n_subagents=5,
+            pool_budget=None, clean_scan=True, legacy_incremental=False,
+        )
+        inputs = ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data={})
+        config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env={"QUODEQ_TIME_LIMIT": "0"})
+        assert config.options.time_limit == 0
+
 
 # ---------------------------------------------------------------------------
 # run_evaluate tests
