@@ -76,10 +76,12 @@ it('the maximized-restore glyph is distinct from the hide chevron', () => {
   drawer.maximized = false;
 });
 
-it('the model chip sits in the identity area on the left, not in the right controls', () => {
+it('the model chip leads the right-side controls cluster', () => {
   render(<BottomDrawer uiState={{}} />);
   const chip = screen.getByTitle(/Ollama · m/);
-  expect(chip.closest('.assistant-drawer-controls')).toBeNull();
+  const controls = chip.closest('.assistant-drawer-controls');
+  expect(controls).not.toBeNull();
+  expect(controls.firstElementChild).toBe(chip);
 });
 
 it('the model chip opens Settings AND hides the panel (drawer must not cover the settings page)', () => {
