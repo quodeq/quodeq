@@ -154,12 +154,16 @@ class TestBuildEvalEnv:
         env = m._build_eval_env("/repo", opts, env={})
         assert env["QUODEQ_TIME_LIMIT"] == str(_DEFAULT_TIME_LIMIT)
 
-    def test_unlimited_time_limit_not_set(self):
-        # 0 means "unlimited" — no deadline should be propagated.
+    def test_unlimited_time_limit_propagated_as_zero(self):
+        # 0 means "unlimited". It must reach the subprocess explicitly:
+        # with the env var absent the CLI resolves the limit to None and
+        # the pool substitutes the 600s default, so "unlimited" runs died
+        # at exactly 10 minutes. Downstream treats 0 as unlimited and
+        # sets no deadline.
         m = self._mixin()
         opts = EvaluationOptions(time_limit=0)
         env = m._build_eval_env("/repo", opts, env={})
-        assert "QUODEQ_TIME_LIMIT" not in env
+        assert env["QUODEQ_TIME_LIMIT"] == "0"
 
     def test_per_dimension(self):
         m = self._mixin()
