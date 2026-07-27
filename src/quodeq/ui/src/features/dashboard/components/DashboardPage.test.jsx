@@ -307,13 +307,59 @@ describe('DashboardPage no-runs -> first-run transition (P5-T2)', () => {
     expect(container.querySelector('.loading-screen')).toBeTruthy();
   });
 
-  it('runMode is excluded from the no-runs empty state, sticky or not', () => {
-    const { queryByText } = render(
+  it('runMode is excluded from the no-runs empty state, and instead renders a run-appropriate empty state (not a blank frame)', () => {
+    const onRetry = vi.fn();
+    const { container, getByText, queryByText } = render(
+      <SidePaneProvider>
+        <DashboardPage data={{ ...baseNoRuns, selectedRun: 'r1' }} callbacks={{ onRetry }} runMode={true} />
+      </SidePaneProvider>,
+    );
+    expect(queryByText('No evaluations yet')).toBeNull();
+    const page = container.querySelector('.dashboard-page');
+    expect(page).toBeTruthy();
+    expect(page.children.length).toBeGreaterThan(0);
+    expect(getByText("Couldn't load this run")).toBeTruthy();
+    fireEvent.click(getByText('Retry'));
+    expect(onRetry).toHaveBeenCalled();
+  });
+
+  it('runMode: shows the inline loader (not the run-appropriate empty state) while a retry of a falsy response is in flight', () => {
+    const { container, queryByText } = render(
+      <SidePaneProvider>
+        <DashboardPage data={{ ...baseNoRuns, selectedRun: 'r1', isFetching: true }} callbacks={{}} runMode={true} />
+      </SidePaneProvider>,
+    );
+    expect(queryByText("Couldn't load this run")).toBeNull();
+    expect(container.querySelector('.loading-screen')).toBeTruthy();
+  });
+
+  it('a runMode round-trip does not clear the overview sticky latch for the same project+source', () => {
+    const { getByText, rerender } = render(
+      <SidePaneProvider>
+        <DashboardPage data={baseNoRuns} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    expect(getByText('No evaluations yet')).toBeTruthy();
+
+    // User opens a run detail view for the same project+source, then returns
+    // to Overview without DashboardPage ever unmounting (App.jsx's key is the
+    // activeTab, which doesn't change when the run page's sourceTab is
+    // 'overview' -- see useAppState.js).
+    rerender(
       <SidePaneProvider>
         <DashboardPage data={{ ...baseNoRuns, selectedRun: 'r1' }} callbacks={{}} runMode={true} />
       </SidePaneProvider>,
     );
-    expect(queryByText('No evaluations yet')).toBeNull();
+
+    // Back to Overview mid-flip (post-eval selectedRun change): the sticky
+    // latch must still be active from the very first render, not cleared by
+    // the runMode pass in between.
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage data={{ ...baseNoRuns, loading: true, isFetching: true }} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    expect(getByText('No evaluations yet')).toBeTruthy();
   });
 });
 

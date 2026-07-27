@@ -185,12 +185,16 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   // null) instead of popping to the full inline loader for a beat. Keyed off
   // project+source so a project switch never inherits the previous
   // project's stickiness (see the reset check below). runMode never shows
-  // this empty state, so it's excluded outright.
+  // this empty state, so it's excluded outright -- and a runMode render must
+  // never touch the latch at all: App.jsx doesn't always remount DashboardPage
+  // between the Overview and a run detail view for the same project+source,
+  // so writing `active: false` here on a runMode pass would clear a
+  // legitimately-active Overview latch out from under it.
   const noRunsScopeKey = `${selectedProject}::${selectedSource}`;
   const [noRunsEmptySticky, setNoRunsEmptySticky] = useState({ scopeKey: noRunsScopeKey, active: false });
   const wasNoRunsEmpty = noRunsEmptySticky.scopeKey === noRunsScopeKey && noRunsEmptySticky.active;
   const showNoRunsEmpty = !runMode && !dashboard && !error && (!loading || wasNoRunsEmpty);
-  if (noRunsEmptySticky.scopeKey !== noRunsScopeKey || noRunsEmptySticky.active !== showNoRunsEmpty) {
+  if (!runMode && (noRunsEmptySticky.scopeKey !== noRunsScopeKey || noRunsEmptySticky.active !== showNoRunsEmpty)) {
     setNoRunsEmptySticky({ scopeKey: noRunsScopeKey, active: showNoRunsEmpty });
   }
 
@@ -276,6 +280,31 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
           description={`Run an evaluation for ${projectName} to populate this page.`}
           actionLabel="Start evaluation"
           onAction={() => onNavigate?.('evaluate')}
+        />
+      </div>
+    );
+  }
+  if (runMode && !loading && !dashboard && !error) {
+    // createDashboard passes a falsy raw response through unchanged rather
+    // than throwing (models/dashboard.js), so "settled, no error, no
+    // dashboard" is a valid non-error outcome, not just a theoretical one --
+    // this run's data didn't come back. Without this branch it fell through
+    // every other check (all gated on runMode being false, or on dashboard
+    // being truthy) to a genuinely blank .dashboard-page.
+    if (isFetching) {
+      return (
+        <div className="dashboard-page dashboard-fade dashboard-ready">
+          <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />
+        </div>
+      );
+    }
+    return (
+      <div className="dashboard-page dashboard-fade dashboard-ready">
+        <EmptyState
+          title="Couldn't load this run"
+          description="This run's data didn't come back. Try refreshing."
+          actionLabel="Retry"
+          onAction={() => callbacks.onRetry?.()}
         />
       </div>
     );
