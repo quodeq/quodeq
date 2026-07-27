@@ -6,6 +6,14 @@ import { AssistantWelcome } from './AssistantWelcome.jsx';
 import { buildMetaResponse, matchCommands, parseMetaCommand } from './commands.js';
 import { StopIcon } from '../../components/CopyButton.jsx';
 
+function SendIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 19V5M5 12l7-7 7 7" />
+    </svg>
+  );
+}
+
 /**
  * Residual assistant content rendered inside the shared BottomDrawer host.
  * The shell (aside, drag-resize, header controls, isOpen gating) lives in
@@ -38,6 +46,16 @@ export function AssistantPane({ uiState, active = true }) {
   useEffect(() => {
     if (active && !streaming) inputRef.current?.focus();
   }, [active, streaming]);
+
+  // Auto-grow the composer with its content (capped in CSS via max-height).
+  // Keyed on draft so external prefills (welcome cards, slash rows) resize
+  // too, not only direct typing.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, [draft]);
 
   const suggestions = useMemo(
     () => (streaming ? [] : matchCommands(catalog, draft, { readOnly })),
@@ -90,23 +108,37 @@ export function AssistantPane({ uiState, active = true }) {
         {menuVisible && (
           <CommandMenu suggestions={suggestions} selectedIndex={menuIndex} onPick={acceptSuggestion} />
         )}
-        <textarea
-          ref={inputRef}
-          className="assistant-drawer-input"
-          placeholder="Ask the assistant…"
-          value={draft}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          disabled={streaming}
-          rows={1}
-        />
-        {streaming && (
-          <button type="button" className="assistant-stop-btn"
-            onClick={stopTurn}
-            aria-label="Stop generating" title="Stop generating">
-            <StopIcon />
-          </button>
-        )}
+        <div className="assistant-composer">
+          <span className="assistant-composer-slash" aria-hidden="true">/</span>
+          <textarea
+            ref={inputRef}
+            className="assistant-drawer-input"
+            placeholder="Ask the assistant, or type / for commands…"
+            value={draft}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            disabled={streaming}
+            rows={1}
+          />
+          {streaming ? (
+            <button type="button" className="assistant-send-btn assistant-stop-btn"
+              onClick={stopTurn}
+              aria-label="Stop generating" title="Stop generating">
+              <StopIcon />
+            </button>
+          ) : (
+            <button type="button"
+              className={`assistant-send-btn${draft.trim() ? ' assistant-send-btn--ready' : ''}`}
+              onClick={handleSend}
+              disabled={!draft.trim()}
+              aria-label="Send" title="Send (Enter)">
+              <SendIcon />
+            </button>
+          )}
+        </div>
+        <div className="assistant-composer-hint">
+          Enter to send · Shift+Enter for newline · runs locally on your model
+        </div>
       </div>
     </>
   );

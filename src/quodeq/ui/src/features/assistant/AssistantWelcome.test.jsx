@@ -30,9 +30,18 @@ it('pill click pre-fills, does not send', () => {
 });
 
 it('renders without a catalog (fetch failed)', () => {
-  render(<AssistantWelcome catalog={null} view="overview" onPick={() => {}} />);
+  const { container } = render(<AssistantWelcome catalog={null} view="overview" onPick={() => {}} />);
   expect(screen.getByText('/help')).toBeInTheDocument();
-  expect(screen.queryByRole('button')).toBeNull(); // no pills without catalog
+  // No suggestion cards without a catalog (slash-command rows still render).
+  expect(container.querySelector('.assistant-suggest-card')).toBeNull();
+  expect(screen.queryByText('Suggested')).toBeNull();
+});
+
+it('slash-command row click pre-fills the composer', () => {
+  const onPick = vi.fn();
+  render(<AssistantWelcome catalog={catalog} view="overview" onPick={onPick} />);
+  fireEvent.click(screen.getByText('/help'));
+  expect(onPick).toHaveBeenCalledWith('/help ');
 });
 
 const RO_CATALOG = { skills: [
