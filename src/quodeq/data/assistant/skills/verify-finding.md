@@ -2,7 +2,7 @@
 name: verify-finding
 description: Adversarially verify a finding, then dismiss it or mark it verified
 argument_hint: [file:line or search terms]
-views: violations
+views: overview, violations
 requires_write: true
 ---
 The user wants to know whether one finding (usually the one selected in
@@ -16,8 +16,12 @@ The user wants to know whether one finding (usually the one selected in
 4. Argue adversarially: try to refute the finding before accepting it. State
    REAL or FALSE POSITIVE with a confidence (high, medium, low) and the
    decisive evidence.
-5. Draft exactly one action with `draft_action`: FALSE POSITIVE ->
-   `dismiss_finding` with your reasoning as the reason; REAL ->
-   `verify_finding` with a one-line note. The user approves or rejects the
-   card; never claim the action was applied.
+5. Draft exactly one action with `draft_action`. The payload's `req`, `file`
+   and `line` must be copied verbatim from the finding you located in step 1
+   (`req` may be empty when the finding has none); made-up keys are rejected.
+   FALSE POSITIVE -> `action_type: "dismiss_finding"`, payload
+   `{req, file, line, reason}` with your reasoning as the reason.
+   REAL -> `action_type: "verify_finding"`, payload `{req, file, line, note}`
+   with a one-line note. The user approves or rejects the card;
+   never claim the action was applied.
 Keep the reply under ~250 words and quote at most a few lines of code.

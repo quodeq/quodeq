@@ -12,6 +12,24 @@ FALLBACK_CONTRACT = (
     "enough information, answer normally without a tool_call object."
 )
 
+
+def fallback_contract(tools: list[dict]) -> str:
+    """The contract plus the actual tool catalog (names + argument schemas).
+
+    Native-tools providers get the schemas via the API's `tools` parameter;
+    prompted-JSON models otherwise never see a tool name or argument shape and
+    must guess them from prose, burning a full generation on every rejected
+    call (worst for draft_action, whose payload is validated strictly).
+    """
+    lines = []
+    for tool in tools:
+        fn = tool["function"]
+        schema = json.dumps(fn.get("parameters") or {}, ensure_ascii=False)
+        lines.append(f"- {fn['name']}: {fn['description']}\n  arguments schema: {schema}")
+    if not lines:
+        return FALLBACK_CONTRACT
+    return FALLBACK_CONTRACT + "\n\n# Available tools\n" + "\n".join(lines)
+
 _JSON_BLOCK = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 
 

@@ -55,7 +55,9 @@ def test_builtin_skills_have_views_and_hints():
 
 def test_verify_finding_skill_loads():
     skill = load_skills()["verify-finding"]
-    assert skill.views == ("violations",)
+    # Also offered on overview: search_findings falls back to get_violations
+    # in accumulated scope, and draft_action validates against it there too.
+    assert skill.views == ("overview", "violations")
     assert skill.argument_hint
 
 

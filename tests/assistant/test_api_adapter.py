@@ -94,7 +94,14 @@ def test_fallback_mode_uses_prompted_json_and_no_tools_param():
                         emit=lambda f: None, client_factory=lambda c: client)
     assert text == "C grade"
     assert "tools" not in client.calls[0]
-    assert "tool_call" in client.calls[0]["messages"][0]["content"]  # contract in system
+    system = client.calls[0]["messages"][0]["content"]
+    assert "tool_call" in system  # contract in system
+    # The tool CATALOG must be in the prompt too: without the API tools param
+    # the model otherwise never sees a tool name or argument schema and has to
+    # guess them, burning a full generation per rejected call.
+    assert "# Available tools" in system
+    assert "get_scores" in system
+    assert "arguments schema:" in system
 
 
 def test_tool_call_frame_carries_args_summary():
