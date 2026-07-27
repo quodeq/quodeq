@@ -84,15 +84,14 @@ test('buildMetaResponse /skills hides requiresWrite skills when readOnly; /help 
   assert.match(helpDefault, /\/create-standard/);
 });
 
-test('pillsForView leads with view-matching skills, then the rest, max 4', () => {
+test('pillsForView offers only view-matching skills, max 4', () => {
   const pills = pillsForView(catalog, 'overview');
-  assert.deepEqual(pills.map((p) => p.fill), ['/explain-score ', '/create-standard ']);
+  assert.deepEqual(pills.map((p) => p.fill), ['/explain-score ']);
   assert.equal(pills[0].label, 'Explain score');
-  // standards view reorders: create-standard first, remaining skills after
   assert.deepEqual(pillsForView(catalog, 'standards').map((p) => p.fill),
-    ['/create-standard ', '/explain-score ']);
-  // no view match: every skill still offered, catalog order
-  assert.deepEqual(pillsForView(catalog, 'map').map((p) => p.fill),
-    ['/explain-score ', '/create-standard ']);
+    ['/create-standard ']);
+  // No view match: no pills. A padded pill whose skill cannot run in the
+  // current scope invites a guaranteed-to-fail first tool call.
+  assert.deepEqual(pillsForView(catalog, 'map'), []);
   assert.deepEqual(pillsForView(null, 'overview'), []);
 });

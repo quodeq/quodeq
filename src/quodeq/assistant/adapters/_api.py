@@ -14,8 +14,8 @@ import httpx
 import openai
 
 from quodeq.assistant.adapters._fallback import (
-    FALLBACK_CONTRACT,
     extract_prompted_tool_call,
+    fallback_contract,
 )
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, guard_tool_result
@@ -153,9 +153,10 @@ def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
     cancel = cancel or CancelToken()
     convo = list(messages)
     if not config.native_tools:
-        convo = [dict(convo[0], content=convo[0]["content"] + FALLBACK_CONTRACT),
+        contract = fallback_contract(registry.openai_tools())
+        convo = [dict(convo[0], content=convo[0]["content"] + contract),
                  *convo[1:]] if convo and convo[0]["role"] == "system" else (
-            [{"role": "system", "content": FALLBACK_CONTRACT.strip()}, *convo])
+            [{"role": "system", "content": contract.strip()}, *convo])
     factory = client_factory or _default_client
     text = ""
     with factory(config) as client:

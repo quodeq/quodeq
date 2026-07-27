@@ -1,5 +1,5 @@
 import React from 'react';
-import { VISIBLE_META_COMMANDS, pillsForView } from './commands.js';
+import { pillsForView } from './commands.js';
 import { QMarkIcon } from '../../components/QMarkIcon.jsx';
 
 // Dot tints cycle so neighboring cards read as distinct entry points.
@@ -50,22 +50,8 @@ export function AssistantWelcome({ catalog, view, onPick, readOnly = false }) {
           </div>
         </div>
       )}
-      <div className="assistant-welcome-section">
-        <div className="assistant-welcome-label">Slash commands</div>
-        <div className="assistant-cmd-list">
-          {VISIBLE_META_COMMANDS.map((c) => (
-            <button
-              key={c.name}
-              type="button"
-              className="assistant-cmd-row"
-              onClick={() => onPick(`/${c.name} `)}
-            >
-              <code className="assistant-cmd-badge">/{c.name}</code>
-              <span className="assistant-cmd-desc">{c.description}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* No slash-command list here: typing "/" in the composer opens the
+          live CommandMenu autocomplete, which is the same catalog searchable. */}
     </div>
   );
 }

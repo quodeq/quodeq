@@ -65,9 +65,10 @@ export function pillsForView(catalog, view, { readOnly = false } = {}) {
   // Read-only (remote) sessions have no draft_action server-side, so
   // write-shaped skills would dead-end; hide their pills entirely.
   const skills = (catalog?.skills ?? []).filter((s) => !readOnly || !s.requiresWrite);
-  const matching = skills.filter((s) => (s.views ?? []).includes(view));
-  const rest = skills.filter((s) => !(s.views ?? []).includes(view));
-  return [...matching, ...rest]
+  // Only skills declared for this view: a padded pill whose skill cannot run
+  // in the current scope invites a guaranteed-to-fail first tool call.
+  return skills
+    .filter((s) => (s.views ?? []).includes(view))
     .slice(0, 4)
     .map((s) => ({
       label: s.name.replace(/-/g, ' ').replace(/^./, (ch) => ch.toUpperCase()),
