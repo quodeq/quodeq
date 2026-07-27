@@ -45,21 +45,6 @@
   white-space: nowrap;
 }
 
-.tty-localhost-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.125rem 0.55rem;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-surface-alt);
-  color: var(--color-text-muted);
-  font-family: var(--font-data);
-  font-size: 0.625rem;
-  white-space: nowrap;
-}
-.tty-localhost-pill svg { color: var(--color-success); }
-
 .tty-panel-controls {
   display: flex;
   gap: 0.25rem;
@@ -191,6 +176,17 @@
 }
 .tty-statusbar-sep { color: var(--color-border); }
 .tty-statusbar-spacer { flex: 1; }
+.tty-statusbar-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+.tty-statusbar-lock svg {
+  width: 9px;
+  height: 9px;
+  color: var(--color-success);
+}
 .tty-statusbar-cwd {
   overflow: hidden;
   text-overflow: ellipsis;

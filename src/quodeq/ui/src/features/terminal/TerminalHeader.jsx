@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';
 import PanelSwitcher from '../drawer/PanelSwitcher.jsx';
 import {
-  COPY_FEEDBACK_MS, ChevronDownIcon, CopyIcon, LockIcon, MaximizeIcon, MinimizeIcon, PlusIcon,
+  COPY_FEEDBACK_MS, ChevronDownIcon, CopyIcon, MaximizeIcon, MinimizeIcon, PlusIcon,
 } from '../../components/CopyButton.jsx';
 
 /**
@@ -41,12 +41,6 @@ export default function TerminalHeader({ onCopy, onNewSession }) {
           <PlusIcon />
         </button>
       )}
-      {/* The gate only ever admits loopback clients (terminal/gate.py); say so
-          where the user can see it instead of leaving the sandboxing implicit. */}
-      <span className="tty-localhost-pill" title="The embedded terminal only works on localhost">
-        <LockIcon />
-        localhost only
-      </span>
       <div className="tty-panel-controls">
         <button type="button" className={`assistant-drawer-btn${copied ? ' tty-copy-btn--done' : ''}`}
           onClick={handleCopy}

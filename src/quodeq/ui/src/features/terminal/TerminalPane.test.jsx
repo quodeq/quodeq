@@ -255,10 +255,11 @@ it('copy button copies the active session selection to the clipboard', async () 
   expect(writeText).toHaveBeenCalledWith('picked text');
 });
 
-it('shows shell, session count and active cwd in the status bar', async () => {
+it('shows shell, session count, sandbox note and active cwd in the status bar', async () => {
   render(<TerminalPane active />);
   await screen.findByTestId('tty-root');
   expect(screen.getByText('zsh')).toBeInTheDocument();
   expect(screen.getByText('1 session')).toBeInTheDocument();
+  expect(screen.getByText('localhost only')).toBeInTheDocument();
   expect(screen.getByText('~/proj')).toBeInTheDocument();
 });
