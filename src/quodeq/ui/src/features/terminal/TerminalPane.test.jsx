@@ -71,7 +71,10 @@ it('mounts an xterm terminal when active', async () => {
   render(<TerminalPane active />);
   // allow the status + session-list effects to resolve
   await screen.findByTestId('tty-root');
-  expect(Terminal).toHaveBeenCalled();
+  // waitFor, not a plain assert: tty-root appears on render commit but the
+  // Terminal constructor runs in the view's mount EFFECT, which can land a
+  // beat later under CI load (flaked once on a sync PR).
+  await waitFor(() => expect(Terminal).toHaveBeenCalled());
   expect(fakeTerm.open).toHaveBeenCalled();
 });
 
@@ -96,7 +99,7 @@ it('mounts xterm even when backgrounded (active=false) so the PTY survives a tab
   // the terminal must still mount (lifecycle follows panel-open, not active).
   render(<TerminalPane active={false} />);
   await screen.findByTestId('tty-root');
-  expect(Terminal).toHaveBeenCalled();
+  await waitFor(() => expect(Terminal).toHaveBeenCalled());
   expect(fakeTerm.open).toHaveBeenCalled();
 });
 
