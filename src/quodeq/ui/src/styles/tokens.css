@@ -326,6 +326,29 @@
   --color-console-bg:   #0d1117;
   --color-console-text: color-mix(in srgb, var(--color-accent) 35%, #dce8f2);
 
+  /* Embedded terminal ANSI palette (xterm reads these via JS, so they must
+     resolve to plain colors — no color-mix/var indirection xterm can't parse).
+     Two palettes total: this light set, and one dark override below shared by
+     every dark theme family. Light values are darkened for contrast on the
+     light console surface the drawer remaps to. */
+  --tty-ansi-black:          #1a1816;
+  --tty-ansi-red:            #c0392b;
+  --tty-ansi-green:          #2d7a4f;
+  --tty-ansi-yellow:         #b45309;
+  --tty-ansi-blue:           #2563a8;
+  --tty-ansi-magenta:        #8b3a8f;
+  --tty-ansi-cyan:           #0e6d8a;
+  --tty-ansi-white:          #d4ccc0;
+  --tty-ansi-bright-black:   #3d3a37;
+  --tty-ansi-bright-red:     #e05c4b;
+  --tty-ansi-bright-green:   #3f9d6b;
+  --tty-ansi-bright-yellow:  #d97706;
+  --tty-ansi-bright-blue:    #3b82c4;
+  --tty-ansi-bright-magenta: #a855a8;
+  --tty-ansi-bright-cyan:    #22a3c4;
+  --tty-ansi-bright-white:   #efe9e1;
+  --tty-selection:           rgba(26, 24, 22, 0.18);
+
   /* On-accent text (theme-invariant) */
   --color-on-accent: #ffffff;
 
@@ -447,6 +470,52 @@
     --logo-needle:         var(--primitive-flynn-accent);
     --logo-needle-dark:    var(--primitive-flynn-accent-dark);
   }
+}
+
+/* Terminal ANSI palette — dark variant. Every dark theme's data-theme value
+   ends in "dark" ("dark", "ifrit-dark", "neo-dark", …), so one suffix
+   selector covers all families; the media query covers the OS-driven case
+   when no explicit theme is set. Plain hex only (see the light block). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --tty-ansi-black:          #1a2230;
+    --tty-ansi-red:            #e05c4b;
+    --tty-ansi-green:          #4caf7d;
+    --tty-ansi-yellow:         #fbbf24;
+    --tty-ansi-blue:           #5aa2e8;
+    --tty-ansi-magenta:        #c987c9;
+    --tty-ansi-cyan:           #22d3ee;
+    --tty-ansi-white:          #d4e0f0;
+    --tty-ansi-bright-black:   #4a6a88;
+    --tty-ansi-bright-red:     #f05078;
+    --tty-ansi-bright-green:   #6fd49a;
+    --tty-ansi-bright-yellow:  #fcd34d;
+    --tty-ansi-bright-blue:    #82bcf4;
+    --tty-ansi-bright-magenta: #dfa8df;
+    --tty-ansi-bright-cyan:    #67e3f9;
+    --tty-ansi-bright-white:   #ffffff;
+    --tty-selection:           rgba(255, 255, 255, 0.22);
+  }
+}
+
+html[data-theme$="dark"]:root, [data-theme$="dark"] {
+  --tty-ansi-black:          #1a2230;
+  --tty-ansi-red:            #e05c4b;
+  --tty-ansi-green:          #4caf7d;
+  --tty-ansi-yellow:         #fbbf24;
+  --tty-ansi-blue:           #5aa2e8;
+  --tty-ansi-magenta:        #c987c9;
+  --tty-ansi-cyan:           #22d3ee;
+  --tty-ansi-white:          #d4e0f0;
+  --tty-ansi-bright-black:   #4a6a88;
+  --tty-ansi-bright-red:     #f05078;
+  --tty-ansi-bright-green:   #6fd49a;
+  --tty-ansi-bright-yellow:  #fcd34d;
+  --tty-ansi-bright-blue:    #82bcf4;
+  --tty-ansi-bright-magenta: #dfa8df;
+  --tty-ansi-bright-cyan:    #67e3f9;
+  --tty-ansi-bright-white:   #ffffff;
+  --tty-selection:           rgba(255, 255, 255, 0.22);
 }
 
 /* ── 4. Explicit theme overrides (user preference) ────────

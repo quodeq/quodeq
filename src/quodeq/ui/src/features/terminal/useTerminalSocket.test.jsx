@@ -93,6 +93,22 @@ it('reports busy and does not retry when another window owns the terminal', () =
   expect(MockWS.instances.length).toBe(1);      // no auto-retry ping-pong
 });
 
+it('connects to the session-specific url when given a sessionId', () => {
+  renderHook(() => useTerminalSocket({ active: true, onData: () => {}, sessionId: 's1' }));
+  expect(MockWS.instances[0].url).toContain('session=s1');
+});
+
+it('reports gone and does not retry when the session no longer exists', () => {
+  // Server restarted: the tab's session id is stale. Retrying the same URL
+  // can never succeed — the owner reconciles via the sessions list instead.
+  vi.useFakeTimers();
+  const { result } = renderHook(() => useTerminalSocket({ active: true, onData: () => {}, sessionId: 's1' }));
+  act(() => MockWS.instances[0]._drop(4004));
+  expect(result.current.status).toBe('gone');
+  act(() => vi.advanceTimersByTime(60000));
+  expect(MockWS.instances.length).toBe(1);
+});
+
 it('reports refused and does not retry when the gate rejects the connection', () => {
   vi.useFakeTimers();
   const { result } = renderHook(() => useTerminalSocket({ active: true, onData: () => {} }));
