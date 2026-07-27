@@ -177,6 +177,24 @@ class TestBuildEvalEnv:
         env = m._build_eval_env("/repo", opts, env={})
         assert env["QUODEQ_CONTEXT_SIZE"] == "128000"
 
+    def test_cloud_provider_api_key_exported(self):
+        # The subprocess resolves cloud keys from the env var named by the
+        # provider's api_key_env. Only omlx used to get its key exported, so
+        # an OpenRouter key typed in Settings was silently discarded.
+        m = self._mixin()
+        opts = EvaluationOptions(ai_cmd="openrouter", provider_api_key="sk-or-1")
+        env = m._build_eval_env("/repo", opts, env={})
+        assert env["OPENROUTER_API_KEY"] == "sk-or-1"
+
+    def test_omlx_key_and_base_still_exported(self):
+        m = self._mixin()
+        opts = EvaluationOptions(
+            ai_cmd="omlx", provider_api_key="k1", provider_api_base="http://h:1/v1",
+        )
+        env = m._build_eval_env("/repo", opts, env={})
+        assert env["OMLX_API_KEY"] == "k1"
+        assert env["OMLX_BASE_URL"] == "http://h:1/v1"
+
     def test_zero_context_size_not_set(self):
         m = self._mixin()
         opts = EvaluationOptions(context_size=0)

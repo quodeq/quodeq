@@ -24,6 +24,7 @@ from quodeq.data.fs.repo_validation import validate_remote_url
 from quodeq.services._fs_clone import run_git_clone
 from quodeq.services._fs_scan import scan_project
 from quodeq.shared._env import get_clones_dir
+from quodeq.shared.provider_env import provider_env_exports
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo
 
 if TYPE_CHECKING:
@@ -340,6 +341,13 @@ class FsEvaluationMixin:
             built_env["QUODEQ_NO_CONSOLIDATE"] = "1"
         if options.context_size > 0:
             built_env["QUODEQ_CONTEXT_SIZE"] = str(options.context_size)
+        # Export user-entered API credentials under the env names the scan
+        # subprocess resolves them from (provider's api_key_env). Without
+        # this, a key typed in Settings for e.g. OpenRouter never reached
+        # the run and it failed with a missing-key error.
+        built_env.update(provider_env_exports(
+            options.ai_cmd, options.provider_api_key, options.provider_api_base,
+        ))
         if options.ai_cmd == "omlx":
             if options.provider_api_key:
                 built_env["OMLX_API_KEY"] = options.provider_api_key
