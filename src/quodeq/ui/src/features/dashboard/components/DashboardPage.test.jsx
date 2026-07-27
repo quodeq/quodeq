@@ -208,6 +208,115 @@ describe('DashboardPage fetch-failure state', () => {
   });
 });
 
+// P5-T2: the no-runs -> first-run transition. Task 7 removed the redundant
+// eval-completion refetch, but the sequence "No evaluations yet" -> (dashboard
+// key changes to the new run) -> loader -> content still had two bugs: a
+// window-refocus/background refetch of an empty project used to render a
+// visually blank .dashboard-page (no dim, no loader), and the post-eval
+// selectedRun flip used to swap the empty state for the full inline loader
+// for a beat before content landed (empty -> loader -> content pop).
+describe('DashboardPage no-runs -> first-run transition (P5-T2)', () => {
+  const baseNoRuns = {
+    projectsLoaded: true,
+    projects: [{ id: 'p1', name: 'p1' }],
+    selectedProject: 'p1',
+    selectedSource: 'local',
+    dashboard: null,
+    accumulated: null,
+    loading: false,
+    isFetching: false,
+    error: null,
+    availableRuns: [],
+  };
+
+  it('blank-frame shape (background refetch of an empty project) shows the dimmed empty state, not a blank frame', () => {
+    const { container, getByText } = render(
+      <SidePaneProvider>
+        <DashboardPage data={{ ...baseNoRuns, isFetching: true }} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    expect(getByText('No evaluations yet')).toBeTruthy();
+    expect(container.querySelector('.loading-screen')).toBeNull();
+    expect(container.querySelector('.dashboard-page').className).toContain('dashboard-refreshing');
+  });
+
+  it('keeps the empty state (dimmed) through the post-eval selectedRun flip, then swaps straight to content', () => {
+    const { container, getByText, queryByText, rerender } = render(
+      <SidePaneProvider>
+        <DashboardPage data={baseNoRuns} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    expect(getByText('No evaluations yet')).toBeTruthy();
+
+    // selectedRun flips to the new run id: new dashboard query key mounts,
+    // same project/source, loading true, dashboard still null.
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage data={{ ...baseNoRuns, loading: true, isFetching: true }} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    expect(getByText('No evaluations yet')).toBeTruthy();
+    expect(container.querySelector('.loading-screen')).toBeNull();
+    expect(container.querySelector('.dashboard-page').className).toContain('dashboard-refreshing');
+
+    const dims = [{ dimension: 'maintainability', overallScore: '7.0/10' }];
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage
+          data={{
+            ...baseNoRuns,
+            dashboard: { dimensions: dims, trend: [], selectedRun: { runId: 'r1', dateLabel: '2026-07-01' } },
+            accumulated: { dimensions: dims },
+            loading: false,
+            isFetching: false,
+            availableRuns: [{ runId: 'r1', status: 'complete' }],
+          }}
+          callbacks={{}}
+          runMode={false}
+        />
+      </SidePaneProvider>,
+    );
+    expect(queryByText('No evaluations yet')).toBeNull();
+    expect(container.querySelector('.loading-screen')).toBeNull();
+  });
+
+  it('resets the stickiness on a project switch: the loader shows, not the previous project\'s empty state', () => {
+    const { container, getByText, queryByText, rerender } = render(
+      <SidePaneProvider>
+        <DashboardPage data={baseNoRuns} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    expect(getByText('No evaluations yet')).toBeTruthy();
+
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage
+          data={{
+            ...baseNoRuns,
+            selectedProject: 'p2',
+            projects: [{ id: 'p2', name: 'p2' }],
+            loading: true,
+            isFetching: true,
+          }}
+          callbacks={{}}
+          runMode={false}
+        />
+      </SidePaneProvider>,
+    );
+    expect(queryByText('No evaluations yet')).toBeNull();
+    expect(container.querySelector('.loading-screen')).toBeTruthy();
+  });
+
+  it('runMode is excluded from the no-runs empty state, sticky or not', () => {
+    const { queryByText } = render(
+      <SidePaneProvider>
+        <DashboardPage data={{ ...baseNoRuns, selectedRun: 'r1' }} callbacks={{}} runMode={true} />
+      </SidePaneProvider>,
+    );
+    expect(queryByText('No evaluations yet')).toBeNull();
+  });
+});
+
 // Scenario 2 (collision): runMode renders RunOverviewPanel, which has its own
 // inline loading state (`!dashboard.dimensions`). Before the page's own
 // isLoading/DashboardContent-mount decision accounted for that, the page-level
