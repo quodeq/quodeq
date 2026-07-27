@@ -55,8 +55,13 @@ export function invalidateDimensionCache() {
 }
 
 function _filterVisible(dims) {
-  const visibleSet = new Set(readVisibleStandardIds());
-  return dims.filter((d) => visibleSet.has(d.id));
+  // Lowercase both sides: the server normalizes stored ids to lowercase,
+  // but custom/imported standard ids aren't charset-constrained (e.g.
+  // "OWASP-Top10"), so a raw comparison would drop a visible standard from
+  // the scan dimension picker while the assistant and dashboard correctly
+  // keep it.
+  const visibleSet = new Set(readVisibleStandardIds().map((id) => id.toLowerCase()));
+  return dims.filter((d) => visibleSet.has((d.id || '').toLowerCase()));
 }
 
 /**

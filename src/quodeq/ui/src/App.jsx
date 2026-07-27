@@ -33,7 +33,7 @@ import { ACTIVE_PROVIDER_KEY, providerKey } from './constants.js';
 import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { useNativeNavBridge } from './hooks/useNativeNavBridge.js';
-import { readVisibleStandardIds } from './utils/visibleStandards.js';
+import { readVisibleStandardIds, hydrateVisibleStandardIds } from './utils/visibleStandards.js';
 import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
 import { syncNativeTitlebar } from './utils/nativeTitlebar.js';
@@ -1052,6 +1052,30 @@ export default function App() {
   useEffect(() => {
     const main = document.querySelector('.app-shell__main-column > .dashboard');
     if (main) main.scrollTop = 0;
+  }, [state.selectedProject]);
+
+  // Sync the visible-standards cache (localStorage) with the server's
+  // per-project file whenever the selected project settles. This is the
+  // earliest point at which "the current project" is known, so it runs
+  // before any newly-mounted page reads readVisibleStandardIds() for that
+  // project. It migrates a pre-existing local selection up to the server on
+  // first run and never throws (see hydrateVisibleStandardIds). Note: pages
+  // already mounted with a memoized visible-standards Set (e.g. the sidebar
+  // trend/accumulated filters below, keyed with empty deps) do not
+  // recompute from this — that is a pre-existing limitation of those read
+  // sites, not something this hydration fixes.
+  //
+  // isStale guards a real race: switching A -> B before A's request resolves
+  // must not let A's (now-stale) response overwrite B's selection in the
+  // single, per-browser cache. hydrateVisibleStandardIds checks isStale()
+  // right before every write it makes (including the migration PUT), so
+  // flipping `cancelled` in the cleanup is enough to make a stale response a
+  // no-op.
+  useEffect(() => {
+    if (!state.selectedProject) return;
+    let cancelled = false;
+    hydrateVisibleStandardIds(state.selectedProject, { isStale: () => cancelled });
+    return () => { cancelled = true; };
   }, [state.selectedProject]);
 
   const currentDayLabel = useMemo(

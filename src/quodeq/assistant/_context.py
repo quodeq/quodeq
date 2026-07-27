@@ -49,6 +49,11 @@ contents from the scratch directory. Call get_context first when project, run, o
 repository scope is unclear. Use Quodeq tools for data:
 - get_overview, get_scores, get_report, and get_violations for dashboard/run data.
 - search_findings for run-scoped finding details and snippets.
+- Read tools cover only the standards visible on this project's dashboard. When a
+  payload carries a non-empty hiddenStandardIds, say so once ("you also have
+  <ids> hidden") rather than omitting them silently, and fetch them only if the
+  user asks: get_standard(standard_id), get_report(dimension),
+  get_violations(dimension), or list_standards(include_hidden=true).
 - read_repo_file and list_repo_dir for source files when get_context says the
   repository is attached.
 If a Quodeq tool call is cancelled, unavailable, or too broad, retry once with a

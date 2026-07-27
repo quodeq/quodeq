@@ -13,6 +13,7 @@ from quodeq.assistant.tools import ToolContext, build_registry
 from quodeq.assistant.tools._registry import ToolRegistry
 from quodeq.assistant.tools._write_tools import register_write_tools
 from quodeq.assistant import AssistantRepository
+from quodeq.core.standards.visibility import load_visible_standard_ids
 
 _PROTOCOL = "2024-11-05"
 _SERVER_NAME = "quodeq-assistant"
@@ -75,11 +76,12 @@ def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:
     else:
         from quodeq.shared._env import get_evaluations_dir  # noqa: PLC0415
         reports_dir = Path(get_evaluations_dir())
+    repo_root = Path(ns.repo_root) if ns.repo_root else None
     ctx = ToolContext(
         repository=AssistantRepository(Path(ns.db_path)),
         session_id=ns.session_id,
         run_dir=Path(ns.run_dir) if ns.run_dir else None,
-        repo_root=Path(ns.repo_root) if ns.repo_root else None,
+        repo_root=repo_root,
         evaluators_dir=Path(ns.evaluators_dir),
         compiled_dir=Path(ns.compiled_dir),
         dimensions_file=Path(ns.dimensions_file),
@@ -87,6 +89,7 @@ def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:
         reports_dir=reports_dir,
         worktree_dir=Path(ns.worktree_dir) if getattr(ns, "worktree_dir", "") else None,
         read_only=bool(getattr(ns, "read_only", False)),
+        visible_standard_ids=load_visible_standard_ids(repo_root),
     )
     registry = build_registry(ctx)
     if (getattr(ns, "enable_write", False) and ctx.worktree_dir is not None

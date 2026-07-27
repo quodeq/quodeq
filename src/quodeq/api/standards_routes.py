@@ -15,6 +15,7 @@ from quodeq.api.standards_crud_routes import register_crud_routes
 from quodeq.api.standards_import_routes import register_import_routes
 from quodeq.api.standards_overrides_routes import register_overrides_routes
 from quodeq.api.standards_read_routes import register_read_routes
+from quodeq.api.standards_visibility_routes import register_visibility_routes
 from quodeq.services.standards import StandardsService
 from quodeq.services.standards_library import StandardsLibraryClient, UrllibJsonClient
 
@@ -49,3 +50,4 @@ def register_standards_routes(app: Flask) -> None:
     register_import_routes(app, _get_service, _get_library_client)
     register_crud_routes(app, _get_service)
     register_overrides_routes(app)
+    register_visibility_routes(app)

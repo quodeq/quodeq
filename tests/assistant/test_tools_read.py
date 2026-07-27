@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.assistant.tools import ToolContext, build_registry
+from quodeq.assistant.tools import ToolContext, ToolError, build_registry
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
@@ -24,11 +24,17 @@ def _finding(**over):
     return base
 
 
-@pytest.fixture()
-def ctx(tmp_path):
+def _run_ctx(tmp_path, visible_standard_ids=None, findings=None):
+    """A run-scoped ctx with "security" and "reliability" evaluation reports.
+
+    `findings` overrides the SQL findings seeded for search_findings (default:
+    a single "security" finding); `visible_standard_ids` plumbs the visibility
+    selection through, mirroring `_standards_ctx` below.
+    """
     run_dir = tmp_path / "run"
-    findings = SqliteFindingsRepository(run_dir)
-    findings.insert_finding(_finding())
+    repo_findings = SqliteFindingsRepository(run_dir)
+    for f in (findings if findings is not None else [_finding()]):
+        repo_findings.insert_finding(f)
     eval_dir = run_dir / "evaluation"
     eval_dir.mkdir(parents=True)
     (eval_dir / "security.json").write_text(json.dumps({
@@ -59,7 +65,13 @@ def ctx(tmp_path):
         repository=repo, session_id="s1", run_dir=run_dir, repo_root=None,
         evaluators_dir=tmp_path / "evaluators", compiled_dir=tmp_path / "compiled",
         dimensions_file=tmp_path / "dimensions.json",
+        visible_standard_ids=visible_standard_ids,
     )
+
+
+@pytest.fixture()
+def ctx(tmp_path):
+    return _run_ctx(tmp_path)
 
 
 def test_registry_registers_expected_tools(ctx):
@@ -143,7 +155,8 @@ def test_search_findings_without_run(ctx):
 def test_get_scores_and_report(ctx):
     reg = build_registry(ctx)
     scores = reg.dispatch("get_scores", {})
-    assert scores["result"]["security"] == {"score": 61.5, "grade": "C"}
+    assert scores["result"]["scores"]["security"] == {"score": 61.5, "grade": "C"}
+    assert scores["result"]["hiddenStandardIds"] == []
     report = reg.dispatch("get_report", {"dimension": "security"})
     assert report["result"]["principles"] == [{"name": "P1", "grade": "C"}]
     missing = reg.dispatch("get_report", {"dimension": "nope"})
@@ -265,8 +278,7 @@ _ACC = {
 }
 
 
-@pytest.fixture()
-def acc_ctx(tmp_path, monkeypatch):
+def _acc_ctx(tmp_path, monkeypatch, visible_standard_ids=None):
     repo = AssistantRepository(tmp_path / "assistant.db")
     repo.create_session(session_id="s1", provider="ollama")
     monkeypatch.setattr(
@@ -277,14 +289,21 @@ def acc_ctx(tmp_path, monkeypatch):
         evaluators_dir=tmp_path / "evaluators", compiled_dir=tmp_path / "compiled",
         dimensions_file=tmp_path / "dimensions.json",
         project_id="p", reports_dir=tmp_path / "reports",
+        visible_standard_ids=visible_standard_ids,
     )
+
+
+@pytest.fixture()
+def acc_ctx(tmp_path, monkeypatch):
+    return _acc_ctx(tmp_path, monkeypatch)
 
 
 def test_get_scores_accumulated(acc_ctx):
     out = build_registry(acc_ctx).dispatch("get_scores", {})["result"]
     # Each dimension carries its own source run — they can differ.
-    assert out["security"] == {"score": "9.6/10", "grade": "Exemplary", "fromRun": "runA"}
-    assert out["reliability"] == {"score": "9.0/10", "grade": "Exemplary", "fromRun": "runB"}
+    assert out["scores"]["security"] == {"score": "9.6/10", "grade": "Exemplary", "fromRun": "runA"}
+    assert out["scores"]["reliability"] == {"score": "9.0/10", "grade": "Exemplary", "fromRun": "runB"}
+    assert out["hiddenStandardIds"] == []
 
 
 def test_get_report_accumulated(acc_ctx):
@@ -322,6 +341,70 @@ def test_get_violations_accumulated_aggregates_when_omitted(acc_ctx):
     assert res["by_principle"] == {"S1": 1, "S2": 1, "R1": 1}
 
 
+# --- list_standards / get_standard visibility filtering. ---------------------
+
+
+def _standards_ctx(tmp_path, visible_standard_ids=None):
+    """A ctx whose StandardsService sees two custom standards: "security" and
+    "clean-architecture". evaluators_dir is real (glob'd by list_custom());
+    dimensions_file/compiled_dir are left non-existent so list_builtin()
+    degrades to [] and only the custom pair is in play."""
+    evaluators_dir = tmp_path / "evaluators"
+    evaluators_dir.mkdir(parents=True)
+    for sid in ("security", "clean-architecture"):
+        (evaluators_dir / f"{sid}.json").write_text(json.dumps({
+            "id": sid, "name": sid, "principles": [],
+        }))
+    repo = AssistantRepository(tmp_path / "assistant.db")
+    repo.create_session(session_id="s1", provider="ollama")
+    return ToolContext(
+        repository=repo, session_id="s1", run_dir=None, repo_root=None,
+        evaluators_dir=evaluators_dir, compiled_dir=tmp_path / "compiled",
+        dimensions_file=tmp_path / "dimensions.json",
+        visible_standard_ids=visible_standard_ids,
+    )
+
+
+def test_list_standards_hides_deselected(tmp_path):
+    from quodeq.assistant.tools._read_tools import _list_standards
+    ctx = _standards_ctx(tmp_path, visible_standard_ids=("security",))
+    out = _list_standards(ctx)
+    assert [s["id"] for s in out["standards"]] == ["security"]
+    assert "clean-architecture" in out["hiddenStandardIds"]
+
+
+def test_list_standards_include_hidden_returns_everything(tmp_path):
+    from quodeq.assistant.tools._read_tools import _list_standards
+    ctx = _standards_ctx(tmp_path, visible_standard_ids=("security",))
+    out = _list_standards(ctx, include_hidden=True)
+    ids = [s["id"] for s in out["standards"]]
+    assert "security" in ids and "clean-architecture" in ids
+    assert "clean-architecture" in out["hiddenStandardIds"]
+
+
+def test_list_standards_unfiltered_when_selection_is_none(tmp_path):
+    from quodeq.assistant.tools._read_tools import _list_standards
+    out = _list_standards(_standards_ctx(tmp_path, visible_standard_ids=None))
+    assert out["hiddenStandardIds"] == []
+
+
+def test_list_standards_empty_tuple_hides_everything(tmp_path):
+    # visible_standard_ids=() is a real selection ("hide everything"), distinct
+    # from None ("no filtering"). Must never be treated as falsy-equals-None.
+    from quodeq.assistant.tools._read_tools import _list_standards
+    ctx = _standards_ctx(tmp_path, visible_standard_ids=())
+    out = _list_standards(ctx)
+    assert out["standards"] == []
+    assert set(out["hiddenStandardIds"]) == {"security", "clean-architecture"}
+
+
+def test_get_standard_still_reaches_a_hidden_standard(tmp_path):
+    """The by-name escape hatch: hidden data stays reachable on explicit ask."""
+    from quodeq.assistant.tools._read_tools import _get_standard
+    ctx = _standards_ctx(tmp_path, visible_standard_ids=("security",))
+    assert _get_standard(ctx, "clean-architecture")["id"] == "clean-architecture"
+
+
 def test_get_scores_no_scope_errors(tmp_path):
     # No run AND no project scope → a clear error, not a crash.
     repo = AssistantRepository(tmp_path / "assistant.db")
@@ -334,3 +417,273 @@ def test_get_scores_no_scope_errors(tmp_path):
     out = build_registry(ctx).dispatch("get_scores", {})
     assert out["ok"] is False
     assert "get_context" in out["error"]
+
+
+# --- _visible_only: a blank/missing dimension is always visible (Finding 2). -
+
+
+def test_visible_only_blank_dimension_kept_and_not_named_hidden(tmp_path):
+    from quodeq.assistant.tools._read_tools import _visible_only
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security",))
+    kept, hidden = _visible_only(ctx, [{"dimension": "security"}, {"nodim": 1}])
+    assert kept == [{"dimension": "security"}, {"nodim": 1}]
+    assert hidden == []
+
+
+def test_visible_only_blank_dimension_kept_alongside_a_real_hidden_one(tmp_path):
+    from quodeq.assistant.tools._read_tools import _visible_only
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security",))
+    kept, hidden = _visible_only(ctx, [
+        {"dimension": "reliability"}, {"nodim": 1}, {"dimension": "security"},
+    ])
+    assert kept == [{"nodim": 1}, {"dimension": "security"}]
+    assert hidden == ["reliability"]
+    assert "" not in hidden
+
+
+# --- Hidden-standard filtering: get_scores / get_violations / search_findings.
+# Both `ctx` (run scope) and `acc_ctx` (accumulated scope) fixtures carry two
+# dimensions, "security" and "reliability"; these tests hide "reliability" and
+# confirm it disappears from aggregate reads but is still reachable by name.
+
+
+def test_get_scores_excludes_hidden_dimensions_run_scope(tmp_path):
+    from quodeq.assistant.tools._read_tools import _get_scores
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security",))
+    out = _get_scores(ctx)
+    assert set(out["scores"]) == {"security"}
+    assert out["hiddenStandardIds"] == ["reliability"]
+
+
+def test_get_scores_excludes_hidden_dimensions_accumulated(tmp_path, monkeypatch):
+    from quodeq.assistant.tools._read_tools import _get_scores
+    ctx = _acc_ctx(tmp_path, monkeypatch, visible_standard_ids=("security",))
+    out = _get_scores(ctx)
+    assert set(out["scores"]) == {"security"}
+    assert out["hiddenStandardIds"] == ["reliability"]
+
+
+def test_get_scores_no_selection_means_no_filtering(tmp_path, monkeypatch):
+    from quodeq.assistant.tools._read_tools import _get_scores
+    out = _get_scores(_acc_ctx(tmp_path, monkeypatch, visible_standard_ids=None))
+    assert "reliability" in out["scores"]
+    assert out["hiddenStandardIds"] == []
+
+
+def test_get_scores_filename_fallback_survives_filtering(tmp_path):
+    """A report file with no "dimension" key is keyed by its filename, not
+    dropped -- even once filtering is applied. Guards `_raw_run_dims`, which
+    exists specifically to preserve this behaviour through the new filter."""
+    from quodeq.assistant.tools._read_tools import _get_scores
+    ctx = _run_ctx(tmp_path, visible_standard_ids=None)
+    eval_dir = ctx.run_dir / "evaluation"
+    (eval_dir / "no-dim-field.json").write_text(json.dumps({
+        "overallScore": 42, "overallGrade": "D", "violations": [],
+    }))
+    out = _get_scores(ctx)
+    assert out["scores"]["no-dim-field"] == {"score": 42, "grade": "D"}
+
+
+def test_get_scores_filename_fallback_kept_when_stem_is_visible(tmp_path):
+    """A stem-derived dimension name matched against an ACTIVE selection that
+    includes it: kept, and never named in hiddenStandardIds."""
+    from quodeq.assistant.tools._read_tools import _get_scores
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security", "no-dim-field"))
+    eval_dir = ctx.run_dir / "evaluation"
+    (eval_dir / "no-dim-field.json").write_text(json.dumps({
+        "overallScore": 42, "overallGrade": "D", "violations": [],
+    }))
+    out = _get_scores(ctx)
+    assert out["scores"]["no-dim-field"] == {"score": 42, "grade": "D"}
+    assert "no-dim-field" not in out["hiddenStandardIds"]
+
+
+def test_get_scores_filename_fallback_hidden_when_stem_not_visible(tmp_path):
+    """The same stem-derived name against an ACTIVE selection that excludes
+    it: dropped, and named in hiddenStandardIds like any other dimension."""
+    from quodeq.assistant.tools._read_tools import _get_scores
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security",))
+    eval_dir = ctx.run_dir / "evaluation"
+    (eval_dir / "no-dim-field.json").write_text(json.dumps({
+        "overallScore": 42, "overallGrade": "D", "violations": [],
+    }))
+    out = _get_scores(ctx)
+    assert "no-dim-field" not in out["scores"]
+    assert "no-dim-field" in out["hiddenStandardIds"]
+
+
+def test_get_violations_filename_fallback_kept_when_stem_is_visible(tmp_path):
+    """Covers `_violations_from_run`'s use of `_raw_run_dims` (the second call
+    site the helper exists for) against an ACTIVE selection that includes the
+    stem-derived name."""
+    from quodeq.assistant.tools._read_tools import _get_violations
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security", "no-dim-field"))
+    eval_dir = ctx.run_dir / "evaluation"
+    (eval_dir / "no-dim-field.json").write_text(json.dumps({
+        "overallScore": 42, "overallGrade": "D",
+        "violations": [{"principle": "X1", "file": "f.py", "line": 1,
+                         "severity": "minor", "title": "t", "reason": "r"}],
+    }))
+    out = _get_violations(ctx)
+    assert out["by_principle"].get("X1") == 1
+    assert "no-dim-field" not in out["hiddenStandardIds"]
+
+
+def test_get_violations_filename_fallback_hidden_when_stem_not_visible(tmp_path):
+    """Same call site, ACTIVE selection that excludes the stem-derived name."""
+    from quodeq.assistant.tools._read_tools import _get_violations
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security",))
+    eval_dir = ctx.run_dir / "evaluation"
+    (eval_dir / "no-dim-field.json").write_text(json.dumps({
+        "overallScore": 42, "overallGrade": "D",
+        "violations": [{"principle": "X1", "file": "f.py", "line": 1,
+                         "severity": "minor", "title": "t", "reason": "r"}],
+    }))
+    out = _get_violations(ctx)
+    assert "X1" not in out["by_principle"]
+    assert "no-dim-field" in out["hiddenStandardIds"]
+
+
+def test_get_violations_excludes_hidden_dimensions_run_scope(tmp_path):
+    from quodeq.assistant.tools._read_tools import _get_violations
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security",))
+    out = _get_violations(ctx)
+    # reliability's R1 is excluded; only security's P1/P2 counts remain.
+    assert out["by_principle"] == {"P1": 2, "P2": 1}
+    assert out["hiddenStandardIds"] == ["reliability"]
+
+
+def test_get_violations_named_hidden_dimension_still_works_run_scope(tmp_path):
+    """Explicitly naming a hidden dimension is the deliberate escape hatch."""
+    from quodeq.assistant.tools._read_tools import _get_violations
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security",))
+    out = _get_violations(ctx, dimension="reliability")
+    assert out["dimension"] == "reliability"
+    assert out["count"] == 1
+    assert out["hiddenStandardIds"] == []
+
+
+def test_get_violations_excludes_hidden_dimensions_accumulated(tmp_path, monkeypatch):
+    from quodeq.assistant.tools._read_tools import _get_violations
+    ctx = _acc_ctx(tmp_path, monkeypatch, visible_standard_ids=("security",))
+    out = _get_violations(ctx)
+    assert out["by_principle"] == {"S1": 1, "S2": 1}
+    assert out["hiddenStandardIds"] == ["reliability"]
+
+
+def test_get_violations_named_hidden_dimension_still_works_accumulated(tmp_path, monkeypatch):
+    from quodeq.assistant.tools._read_tools import _get_violations
+    ctx = _acc_ctx(tmp_path, monkeypatch, visible_standard_ids=("security",))
+    out = _get_violations(ctx, dimension="reliability")
+    assert out["dimension"] == "reliability"
+    assert out["count"] > 0
+    assert out["hiddenStandardIds"] == []
+
+
+def test_search_findings_excludes_hidden_dimensions(tmp_path):
+    from quodeq.assistant.tools._read_tools import _search_findings
+    findings = [
+        _finding(),  # dimension "security", reason "sql injection risk"
+        _finding(d="reliability", p="req-2", req="req-2", file="src/r.py",
+                 reason="reliability risk"),
+    ]
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security",), findings=findings)
+    out = _search_findings(ctx, query="risk")
+    assert len(out["findings"]) == 1
+    assert all(f["dimension"] == "security" for f in out["findings"])
+    assert out["hiddenStandardIds"] == ["reliability"]
+
+
+def test_search_findings_no_selection_means_no_filtering(tmp_path):
+    from quodeq.assistant.tools._read_tools import _search_findings
+    findings = [
+        _finding(),
+        _finding(d="reliability", p="req-2", req="req-2", file="src/r.py",
+                 reason="reliability risk"),
+    ]
+    ctx = _run_ctx(tmp_path, visible_standard_ids=None, findings=findings)
+    out = _search_findings(ctx, query="risk")
+    assert {f["dimension"] for f in out["findings"]} == {"security", "reliability"}
+    assert out["hiddenStandardIds"] == []
+
+
+def test_search_findings_visible_rows_survive_hidden_rows_ahead_of_limit(tmp_path):
+    """Reviewer-proven regression: 25 matching hidden-dimension rows inserted
+    BEFORE 3 matching visible rows, with a limit smaller than the hidden
+    count. SQL orders by insertion order (id), so filtering the returned rows
+    AFTER `ORDER BY id LIMIT ?` can return zero results even though visible
+    matches exist -- the hidden rows alone fill the whole limit window.
+    The fix pushes the exclusion into the query itself, before LIMIT."""
+    from quodeq.assistant.tools._read_tools import _search_findings
+    hidden_rows = [
+        _finding(d="reliability", p=f"rel-{i}", req=f"rel-{i}",
+                 file=f"src/rel{i}.py", line=i, reason="widget flaky")
+        for i in range(25)
+    ]
+    visible_rows = [
+        _finding(d="security", p=f"sec-{i}", req=f"sec-{i}",
+                 file=f"src/sec{i}.py", line=i, reason="widget insecure")
+        for i in range(3)
+    ]
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security",),
+                    findings=hidden_rows + visible_rows)
+    out = _search_findings(ctx, query="widget", limit=20)
+    assert len(out["findings"]) == 3
+    assert {f["dimension"] for f in out["findings"]} == {"security"}
+    assert out["hiddenStandardIds"] == ["reliability"]
+
+
+def test_search_findings_hidden_dim_reported_even_with_zero_matching_hits(tmp_path):
+    """hiddenStandardIds must reflect what was withheld even when every one of
+    a hidden dimension's rows is excluded from the SQL result (the source can
+    no longer be "the rows the query returned")."""
+    from quodeq.assistant.tools._read_tools import _search_findings
+    hidden_rows = [
+        _finding(d="reliability", p=f"rel-{i}", req=f"rel-{i}",
+                 file=f"src/rel{i}.py", line=i, reason="widget flaky")
+        for i in range(5)
+    ]
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security",),
+                    findings=hidden_rows + [_finding()])
+    out = _search_findings(ctx, query="widget", limit=1)
+    assert out["findings"] == []
+    assert out["hiddenStandardIds"] == ["reliability"]
+
+
+def test_search_findings_blank_dimension_finding_always_returned(tmp_path):
+    """A blank/missing dimension is always visible and must never itself
+    surface in hiddenStandardIds (Finding 2)."""
+    from quodeq.assistant.tools._read_tools import _search_findings
+    findings = [
+        _finding(d="reliability", p="req-2", req="req-2", file="src/r.py",
+                 reason="widget risk"),
+        _finding(d="", p="req-3", req="req-3", file="src/blank.py",
+                 reason="widget risk"),
+    ]
+    ctx = _run_ctx(tmp_path, visible_standard_ids=("security",), findings=findings)
+    out = _search_findings(ctx, query="widget")
+    assert {f["file"] for f in out["findings"]} == {"src/blank.py"}
+    assert out["hiddenStandardIds"] == ["reliability"]
+    assert "" not in out["hiddenStandardIds"]
+
+
+# --- get_report / get_violations not-found errors never name hidden dims. ----
+
+
+def test_report_not_found_error_does_not_name_hidden_dimensions(tmp_path, monkeypatch):
+    from quodeq.assistant.tools._read_tools import _get_report
+    ctx = _acc_ctx(tmp_path, monkeypatch, visible_standard_ids=("security",))
+    with pytest.raises(ToolError) as exc:
+        _get_report(ctx, "usability")
+    assert "reliability" not in str(exc.value)
+    assert "security" in str(exc.value)
+
+
+def test_violations_not_found_error_does_not_name_hidden_dimensions(tmp_path, monkeypatch):
+    from quodeq.assistant.tools._read_tools import _get_violations
+    ctx = _acc_ctx(tmp_path, monkeypatch, visible_standard_ids=("security",))
+    with pytest.raises(ToolError) as exc:
+        _get_violations(ctx, dimension="usability")
+    assert "reliability" not in str(exc.value)
+    assert "security" in str(exc.value)
+
