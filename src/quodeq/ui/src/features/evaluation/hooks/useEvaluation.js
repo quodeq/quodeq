@@ -21,7 +21,7 @@
  *     terminal surface in the dashboard so users can close and reopen the UI
  *     without losing visibility into an in-progress scan.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { chooseDialog } from "../../../utils/chooseDialog.js";
@@ -38,6 +38,19 @@ import {
 const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === "true";
 const JOB_POLL_MS = 1500;
 const DIM_POLL_MS = 2000;
+
+/**
+ * Poll interval for the live findings query. Exported for tests.
+ *
+ * Polling must stop once the job is terminal: without the gate a finished
+ * run kept re-fetching every full evaluation/<dim>.json payload every 2s
+ * for as long as the Evaluate card stayed mounted.
+ */
+export function findingsRefetchInterval(job, sseEnabled = SSE_ENABLED) {
+  if (sseEnabled) return false;
+  if (job?.status && job.status !== "running") return false;
+  return DIM_POLL_MS;
+}
 const DEFAULT_OLLAMA_SUBAGENTS = "1";
 const DEFAULT_CLI_SUBAGENTS = String(DEFAULT_MAX_SUBAGENTS);
 const DEFAULT_OLLAMA_BUDGET = "0";
@@ -157,8 +170,24 @@ export function useEvaluation() {
     },
     enabled: !!jobId && (SSE_ENABLED || !!job?.outputProject),
     staleTime: SSE_ENABLED ? Infinity : 0,
-    refetchInterval: SSE_ENABLED ? false : DIM_POLL_MS,
+    refetchInterval: findingsRefetchInterval(job),
   });
+
+  // One final fetch on the running->terminal edge: the last dimension's
+  // report usually lands between the final running poll and the terminal
+  // transition, and stopping cold would freeze the feed just short of it.
+  const { refetch: refetchFindings } = findingsQuery;
+  const findingsSettledRef = useRef(false);
+  const isJobTerminal = !!job?.status && job.status !== "running";
+  useEffect(() => {
+    if (!jobId || SSE_ENABLED) return;
+    if (isJobTerminal && !findingsSettledRef.current) {
+      findingsSettledRef.current = true;
+      refetchFindings();
+    } else if (!isJobTerminal) {
+      findingsSettledRef.current = false;
+    }
+  }, [jobId, isJobTerminal, refetchFindings]);
 
   // Group findings into the legacy { [dim]: [violations] } shape.
   const findings = findingsQuery.data || [];

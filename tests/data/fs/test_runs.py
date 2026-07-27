@@ -198,3 +198,29 @@ def test_list_runs_mixes_historical_and_in_progress(tmp_path: Path) -> None:
         "run-historical": "complete",
         "run-live": "in_progress",
     }
+
+
+def test_list_runs_accepts_status_json_without_manifest(tmp_path: Path) -> None:
+    """A run with status.json but no manifest is a real run.
+
+    Runs started without a prescan never write evidence/manifest.json, and a
+    failed manifest write is swallowed. The SQLite index (History) accepts any
+    run with a status.json, so the Overview's enumerator skipping the same run
+    made the two views disagree: visible in History, "No evaluations yet" in
+    the Overview (a 404 when the finished run was the pinned selection).
+    """
+    import json as _json
+    from quodeq.data.fs.report_parser.runs import list_runs
+
+    project_uuid = "proj-3"
+    run_dir = tmp_path / project_uuid / "run-nomanifest"
+    run_dir.mkdir(parents=True)
+    (run_dir / "status.json").write_text(
+        _json.dumps({"schema_version": 1, "state": "done", "job_id": "ext-x",
+                     "started_at": "2026-07-01T00:00:00+00:00", "dimensions": []}),
+        encoding="utf-8",
+    )
+
+    runs = list_runs(tmp_path, project_uuid)
+    assert [r.run_id for r in runs] == ["run-nomanifest"]
+    assert runs[0].status == "complete"

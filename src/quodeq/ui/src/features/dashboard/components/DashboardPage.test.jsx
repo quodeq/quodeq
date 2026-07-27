@@ -111,6 +111,48 @@ describe('DashboardPage no-completed-evaluation empty state', () => {
   });
 });
 
+describe('DashboardPage fetch-failure state', () => {
+  // A failed dashboard query leaves dashboard === null with loading and
+  // isFetching settled. That used to fall into the "No evaluations yet"
+  // empty state, so a 404/500/timeout told the user their evaluations
+  // didn't exist (they did). Errors must render as errors.
+  const errorData = {
+    projectsLoaded: true,
+    projects: [{ id: 'p1', name: 'p1' }],
+    selectedProject: 'p1',
+    dashboard: null,
+    accumulated: null,
+    loading: false,
+    isFetching: false,
+    error: 'Failed to load dashboard data. Check your connection and try refreshing.',
+    availableRuns: [],
+  };
+
+  it('renders an error state, not "No evaluations yet"', () => {
+    const { getByText, queryByText } = render(
+      <DashboardPage data={errorData} callbacks={{}} runMode={false} />,
+    );
+    expect(queryByText('No evaluations yet')).toBeNull();
+    expect(getByText("Couldn't load this project")).toBeTruthy();
+  });
+
+  it('offers a Retry action wired to onRetry', () => {
+    const onRetry = vi.fn();
+    const { getByText } = render(
+      <DashboardPage data={errorData} callbacks={{ onRetry }} runMode={false} />,
+    );
+    fireEvent.click(getByText('Retry'));
+    expect(onRetry).toHaveBeenCalled();
+  });
+
+  it('without an error, the settled empty state still says No evaluations yet', () => {
+    const { getByText } = render(
+      <DashboardPage data={{ ...errorData, error: null }} callbacks={{}} runMode={false} />,
+    );
+    expect(getByText('No evaluations yet')).toBeTruthy();
+  });
+});
+
 // Teammate persona (shared-repo onboarding): a teammate with ZERO local
 // projects selects a shared project. The local-list empty-state gate must not
 // wall off the Overview when the selection is shared -- the shared data loads

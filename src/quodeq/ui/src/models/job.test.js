@@ -14,3 +14,14 @@ test('createJob leaves aiProvider/aiModel null when API omits them', () => {
   assert.equal(job.aiProvider, null);
   assert.equal(job.aiModel, null);
 });
+
+test('createJob maps timeLimitS, including 0 (unlimited)', () => {
+  assert.equal(createJob({ jobId: 'j1', timeLimitS: 600 }).timeLimitS, 600);
+  assert.equal(createJob({ jobId: 'j1', timeLimitS: 0 }).timeLimitS, 0);
+  assert.equal(createJob({ jobId: 'j1' }).timeLimitS, null);
+});
+
+test('createJob maps exitReason from API response', () => {
+  assert.equal(createJob({ jobId: 'j1', exitReason: 'deadline' }).exitReason, 'deadline');
+  assert.equal(createJob({ jobId: 'j1' }).exitReason, null);
+});

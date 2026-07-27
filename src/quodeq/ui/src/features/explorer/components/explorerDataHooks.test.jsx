@@ -158,3 +158,47 @@ describe('useExplorerData source-aware fetch selection', () => {
     expect(fakeApi.getRunScores).not.toHaveBeenCalled();
   });
 });
+
+describe('useExplorerData response handling', () => {
+  it('ignores a stale response that resolves after a newer request', async () => {
+    // Run-navigator clicks re-fire the fetch with no cancellation; a slow
+    // earlier response resolving last used to park another run's findings
+    // under the current header.
+    const resolvers = {};
+    const fakeApi = {
+      getDimensionEval: vi.fn((p, r) => new Promise((res) => { resolvers[r] = res; })),
+      getRunScores: vi.fn(async () => null),
+      sharedGetDimensionEval: vi.fn(),
+      sharedGetRunScores: vi.fn(),
+    };
+    const { result, rerender } = renderHook(
+      ({ runId }) => useExplorerData('proj', 'security', runId, null),
+      {
+        initialProps: { runId: 'r1' },
+        wrapper: ({ children }) => <ApiProvider value={fakeApi}>{children}</ApiProvider>,
+      },
+    );
+    rerender({ runId: 'r2' });
+    await act(async () => { resolvers.r2({ dimension: 'security', marker: 'r2' }); });
+    await act(async () => { resolvers.r1({ dimension: 'security', marker: 'r1' }); });
+    expect(result.current.evalData?.marker).toBe('r2');
+  });
+
+  it('flags a waiting (202) payload instead of presenting it as a report', async () => {
+    // The backend returns {waiting: true} while evaluation/<dim>.json is not
+    // written yet; rendering it as data showed SCORE — / 0 violations,
+    // indistinguishable from a genuinely clean dimension.
+    const fakeApi = {
+      getDimensionEval: vi.fn(async () => ({ waiting: true, project: 'proj', run: 'r1', dimension: 'security' })),
+      getRunScores: vi.fn(async () => null),
+      sharedGetDimensionEval: vi.fn(),
+      sharedGetRunScores: vi.fn(),
+    };
+    const { result } = renderHook(
+      () => useExplorerData('proj', 'security', 'r1', null),
+      { wrapper: ({ children }) => <ApiProvider value={fakeApi}>{children}</ApiProvider> },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.waiting).toBe(true);
+  });
+});

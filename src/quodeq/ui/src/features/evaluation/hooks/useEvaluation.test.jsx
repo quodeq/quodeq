@@ -325,3 +325,19 @@ describe("useEvaluation", () => {
     expect(result.current.jobError).toBeNull();
   });
 });
+
+describe("findingsRefetchInterval", () => {
+  it("polls while the job runs, stops when it reaches any terminal status", async () => {
+    const { findingsRefetchInterval } = await import("./useEvaluation.js");
+    expect(findingsRefetchInterval({ status: "running" }, false)).toBe(2000);
+    expect(findingsRefetchInterval(null, false)).toBe(2000);
+    for (const status of ["done", "failed", "cancelled", "lost", "completed"]) {
+      expect(findingsRefetchInterval({ status }, false)).toBe(false);
+    }
+  });
+
+  it("never polls under SSE", async () => {
+    const { findingsRefetchInterval } = await import("./useEvaluation.js");
+    expect(findingsRefetchInterval({ status: "running" }, true)).toBe(false);
+  });
+});

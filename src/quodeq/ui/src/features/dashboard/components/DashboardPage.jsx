@@ -213,6 +213,21 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   }
   const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
   if (!loading && !isFetching && !dashboard) {
+    // A failed fetch also lands here (dashboard === null, queries settled).
+    // It must render as an error: claiming "No evaluations yet" on a
+    // 404/500/timeout tells the user their existing evaluations are gone.
+    if (error) {
+      return (
+        <div className="dashboard-page dashboard-fade dashboard-ready">
+          <EmptyState
+            title="Couldn't load this project"
+            description={error}
+            actionLabel="Retry"
+            onAction={() => callbacks.onRetry?.()}
+          />
+        </div>
+      );
+    }
     return (
       <div className="dashboard-page dashboard-fade dashboard-ready">
         <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
