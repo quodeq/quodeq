@@ -258,11 +258,15 @@ export function useEvaluation() {
     },
     onError: (err) => {
       // The backend returns 409 when the job is no longer cancellable
-      // (process gone, status already terminal, etc.). Without this handler
-      // the user is trapped: status stays "running", Cancel does nothing
-      // visible. Surface the message and clear locally so the panel closes.
+      // (process gone, status already terminal) and 404 when it is unknown.
+      // Only those mean the job is really over — clear it so the panel
+      // closes. A transient failure (500, network, the 30s request timeout
+      // racing the ~33s server-side kill path) must KEEP the job: clearing
+      // it hid a still-running scan and let a second concurrent scan start
+      // on the same project.
       const msg = err?.message || "Could not cancel evaluation";
       setJobError(msg);
+      if (err?.status !== 409 && err?.status !== 404) return;
       const id = jobId;
       if (id) queryClient.removeQueries({ queryKey: evaluationKeys.evaluation(id) });
       setJobId(null);
