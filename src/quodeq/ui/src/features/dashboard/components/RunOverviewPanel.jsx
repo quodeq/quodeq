@@ -193,7 +193,7 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, projectName
   if (isLoading) {
     return (
       <div className="run-overview-fade run-overview-loading">
-        <div className="run-overview-spinner"><LoadingScreen /></div>
+        <div className="run-overview-spinner"><LoadingScreen variant="inline" /></div>
       </div>
     );
   }

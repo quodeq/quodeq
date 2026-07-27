@@ -48,6 +48,10 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
   const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending } = data;
   const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
   const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick, onNavigate, onGranularityChange } = callbacks;
+  // No readiness check here on purpose: the page only mounts this component
+  // once contentReady is true (see DashboardPage's return), so there is
+  // exactly one place in the whole page that decides whether a loader is
+  // shown -- never a render decision split between here and the parent.
   if (runMode) {
     return (
       <RunOverviewPanel
@@ -59,9 +63,6 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
         onNavigate={onNavigate}
       />
     );
-  }
-  if (!accumulated) {
-    return <LoadingScreen />;
   }
   if (accumulatedDimensions.length === 0) {
     // Project has runs (otherwise the upstream `!dashboard` empty
@@ -162,7 +163,10 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
 
   // What each view needs before it can render real content: run detail only
   // needs the dashboard payload; the Overview also needs the scores-derived
-  // `accumulated` block (DashboardContent returns a LoadingScreen without it).
+  // `accumulated` block. This is the single readiness rule for the whole page
+  // -- DashboardContent is only mounted once it holds, and never re-derives
+  // its own readiness from `accumulated`, so there is exactly one loader
+  // decision instead of two that can disagree.
   // These hooks MUST stay above the early returns below — calling them after a
   // conditional return changes the hook count between renders (React error
   // #310, a blank-crash on load).
@@ -257,23 +261,35 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   // the jarring full-screen LoadingScreen.
   const isRefreshing = isFetching && !!dashboard && !isLoading;
   return (
-    <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : 'dashboard-ready'}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
-      <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
-      {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
-      {/* Name the project being loaded. A project switch now clears the old
-          payload (placeholderData is project-scoped -- see
-          samePlaceholderScope), so this spinner is what the user sees right
-          after picking a project; saying which one makes the wait legible
-          instead of looking like the page hung. */}
-      {isLoading && <LoadingScreen message={projectName ? `Loading ${projectName}…` : undefined} />}
-      {dashboard && (
-        <DashboardContent
-          runMode={runMode}
-          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending }}
-          focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
-          callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onNavigate, onGranularityChange }}
-        />
-      )}
-    </div>
+    <>
+      {/* Sibling to .dashboard-page, not a child of it: that div carries the
+          `dashboard-loading` opacity-.4 class for exactly as long as this loader
+          is shown, and a loader dimmed by its own "still loading" state renders
+          its logo at an unreadable 6% opacity. Names the project being loaded --
+          a project switch now clears the old payload (placeholderData is
+          project-scoped -- see samePlaceholderScope), so this spinner is what
+          the user sees right after picking a project; saying which one makes
+          the wait legible instead of looking like the page hung. */}
+      {isLoading && <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />}
+      <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : 'dashboard-ready'}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
+        <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
+        {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
+        {/* Grace elapsed but content still isn't ready (dashboard is in, accumulated
+            isn't yet): the page has already stopped showing its own full loader
+            above, but there's nothing ready to mount below either. This is the ONE
+            other place, at this same top level, that a loader can render from --
+            DashboardContent itself never makes this decision, so the two can't
+            drift out of sync the way they did in the original bug. */}
+        {dashboard && !isLoading && !contentReady && <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />}
+        {dashboard && contentReady && (
+          <DashboardContent
+            runMode={runMode}
+            data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending }}
+            focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
+            callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onNavigate, onGranularityChange }}
+          />
+        )}
+      </div>
+    </>
   );
 }

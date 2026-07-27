@@ -5,7 +5,7 @@ import {
   buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
   resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldRedirectToRemoteRepositories, shouldShowProjectTabs,
   buildNavigationBundle, buildDashboardDataBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
-  buildAssistantActionAppliedHandler, resolveProjectDisplayName,
+  buildAssistantActionAppliedHandler, resolveProjectDisplayName, selectSidebarCounts,
 } from './App.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
@@ -489,6 +489,47 @@ describe('shouldShowProjectTabs', () => {
     expect(shouldShowProjectTabs({
       selectedSource: 'local', hasCurrentProjectRuns: false, sharedProjectInfo: { id: 'team-proj' },
     })).toBe(false);
+  });
+});
+
+// Scenario 7 (collision): the sidebar's violations/history badges must not
+// keep showing the OUTGOING project's numbers once a project switch is in
+// flight. `accumulated`/`dashboard` already reset to null the instant
+// `selectedProject` changes (samePlaceholderScope, api/queryKeys.js), so
+// reading straight off them here is what clears the badges immediately
+// instead of holding onto stale numbers until the new project's fetch lands.
+describe('selectSidebarCounts', () => {
+  it('reads violations/history counts off the filtered view when present', () => {
+    const result = selectSidebarCounts({
+      filteredAccumulated: { summary: { totalViolations: 12 } },
+      accumulated: { summary: { totalViolations: 99 } },
+      filteredTrend: [{ runId: 'r1' }, { runId: 'r2' }],
+      dashboard: { trend: [{ runId: 'r1' }] },
+    });
+    expect(result.violationsCount).toBe(12);
+    expect(result.historyCount).toBe(2);
+  });
+
+  it('falls back to the unfiltered accumulated/dashboard when the filtered view has nothing', () => {
+    const result = selectSidebarCounts({
+      filteredAccumulated: null,
+      accumulated: { summary: { totalViolations: 7 } },
+      filteredTrend: [],
+      dashboard: { trend: [{ runId: 'r1' }, { runId: 'r2' }] },
+    });
+    expect(result.violationsCount).toBe(7);
+    expect(result.historyCount).toBe(2);
+  });
+
+  it('clears both counts on a project switch, before the new project data lands', () => {
+    const result = selectSidebarCounts({
+      filteredAccumulated: null,
+      accumulated: null,
+      filteredTrend: [],
+      dashboard: null,
+    });
+    expect(result.violationsCount).toBeNull();
+    expect(result.historyCount).toBeNull();
   });
 });
 

@@ -248,6 +248,22 @@ export function shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, s
 }
 
 /**
+ * Sidebar violations/history badge counts. `accumulated` and `dashboard`
+ * reset to null the instant the selected project changes (placeholderData is
+ * scoped to project+source -- see samePlaceholderScope in api/queryKeys.js),
+ * so reading straight off them here is what clears the badges immediately on
+ * a project switch instead of leaving the outgoing project's numbers on
+ * screen until the new project's fetch lands. Exported so this contract is
+ * unit-testable without mounting the whole App.
+ */
+export function selectSidebarCounts({ filteredAccumulated, accumulated, filteredTrend, dashboard }) {
+  return {
+    violationsCount: filteredAccumulated?.summary?.totalViolations ?? accumulated?.summary?.totalViolations ?? null,
+    historyCount: (filteredTrend || []).length || dashboard?.trend?.length || null,
+  };
+}
+
+/**
  * Build the `navigation` prop bundle ROUTE_RENDERERS consume. Every
  * navigation key a route renderer reads MUST be forwarded here -- a route
  * consuming a key the bundle lacks fails silently at click time (the
@@ -1146,6 +1162,10 @@ export default function App() {
     selectedProject: state.selectedProject,
   });
 
+  const sidebarCounts = selectSidebarCounts({
+    filteredAccumulated, accumulated: state.accumulated, filteredTrend, dashboard: state.dashboard,
+  });
+
   return (
     <>
       <EvalLogProvider>
@@ -1172,8 +1192,8 @@ export default function App() {
                 meta: state.headerMeta,
               }}
               version={APP_VERSION}
-              violationsCount={filteredAccumulated?.summary?.totalViolations ?? state.accumulated?.summary?.totalViolations ?? null}
-              historyCount={filteredTrend.length || state.dashboard?.trend?.length || null}
+              violationsCount={sidebarCounts.violationsCount}
+              historyCount={sidebarCounts.historyCount}
               lastEvalAt={state.accumulated?.summary?.lastEvaluatedAt || state.accumulated?.summary?.createdAt || null}
               isPinned={sidebarPinned}
               onPinChange={setSidebarPinned}
