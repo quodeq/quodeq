@@ -328,6 +328,66 @@ describe('DashboardPage, teammate persona: shared selection + zero local project
   });
 });
 
+// P4: the Overview's frame must stay mounted across every state, including
+// the "no projects"/"no project selected" empty branches -- otherwise the
+// page jumps (no .dashboard-page wrapper, then one appears) the moment real
+// content shows up. The error and no-completed-evaluation branches already
+// wrap in .dashboard-page; these bare EmptyState returns did not.
+describe('DashboardPage frame stability in empty branches', () => {
+  const zeroLocalProjectsData = {
+    projectsLoaded: true,
+    projects: [],
+    selectedSource: 'local',
+    selectedProject: '',
+    sharedProjectInfo: null,
+    dashboard: null,
+    accumulated: { dimensions: [] },
+    loading: false,
+    isFetching: false,
+    error: null,
+    availableRuns: [],
+  };
+
+  it('wraps the no-local-projects (local source) empty state in .dashboard-page', () => {
+    const { container, getByText } = render(
+      <DashboardPage
+        data={{ ...zeroLocalProjectsData, sharedHasContent: false }}
+        callbacks={{}}
+        runMode={false}
+      />,
+    );
+    const page = container.querySelector('.dashboard-page');
+    expect(page).toBeTruthy();
+    expect(page.contains(getByText('No projects yet'))).toBe(true);
+  });
+
+  it('wraps the no-local-projects-but-shared-content empty state in .dashboard-page', () => {
+    const { container, getByText } = render(
+      <DashboardPage
+        data={{ ...zeroLocalProjectsData, sharedHasContent: true }}
+        callbacks={{}}
+        runMode={false}
+      />,
+    );
+    const page = container.querySelector('.dashboard-page');
+    expect(page).toBeTruthy();
+    expect(page.contains(getByText('No local projects yet'))).toBe(true);
+  });
+
+  it('wraps the no-project-selected empty state in .dashboard-page', () => {
+    const { container, getByText } = render(
+      <DashboardPage
+        data={{ projectsLoaded: true, projects: [{ id: 'p1', name: 'p1' }], selectedProject: '', loading: false, isFetching: false, error: null, availableRuns: [] }}
+        callbacks={{}}
+        runMode={false}
+      />,
+    );
+    const page = container.querySelector('.dashboard-page');
+    expect(page).toBeTruthy();
+    expect(page.contains(getByText('No project selected'))).toBe(true);
+  });
+});
+
 // Finding 5 (final whole-branch review): projectInfo for a shared selection
 // must come from the shared-repo fetch (sharedProjectInfo, see useDashboard),
 // never the LOCAL projects list -- a shared selection's id can collide with
