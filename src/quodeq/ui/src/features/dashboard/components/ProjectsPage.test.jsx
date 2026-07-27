@@ -75,6 +75,11 @@ describe('ProjectsPage — initial loading gate (P4)', () => {
     const loader = frame.querySelector('.loading-screen--inline');
     expect(loader).toBeTruthy();
     expect(screen.queryByText('Add your first project')).not.toBeInTheDocument();
+    // The header must not claim "0 repositories evaluated" while the real
+    // count is still unknown -- match the "loading…" vocabulary used by
+    // the other pages' TermHeader subs (Violations/Map/History).
+    expect(screen.queryByText(/repositories evaluated/)).not.toBeInTheDocument();
+    expect(screen.getByText('loading…')).toBeInTheDocument();
   });
 
   it('renders the empty CTA once projectsLoaded is true and there are still no projects', async () => {

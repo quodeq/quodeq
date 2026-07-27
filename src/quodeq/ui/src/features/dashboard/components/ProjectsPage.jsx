@@ -763,7 +763,11 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
       <div className="projects-page__header">
         <TermHeader
           name="repositories"
-          sub={`${projects.length} ${projects.length === 1 ? 'repository' : 'repositories'} evaluated`}
+          sub={
+            projectsLoaded
+              ? `${projects.length} ${projects.length === 1 ? 'repository' : 'repositories'} evaluated`
+              : 'loading…'
+          }
         />
         {!isEmpty && (
           <div className="projects-page__header-actions">
