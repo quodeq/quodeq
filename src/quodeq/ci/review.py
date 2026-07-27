@@ -135,7 +135,8 @@ def handle_review(args) -> int:
     dims = getattr(args, "dimensions", None)
     if dims:
         eval_parser_argv.extend(["--dimensions", expand_dimension_aliases(dims)])
-    time_limit = getattr(args, "pool_budget", None) or 300
+    pool_budget = getattr(args, "pool_budget", None)
+    time_limit = pool_budget if pool_budget is not None else 300
     eval_parser_argv.extend(["--time-limit", str(time_limit)])
 
     parser = build_parser()

@@ -134,39 +134,69 @@ def _parse_started_at(status: dict) -> datetime | None:
     if not isinstance(raw, str) or not raw:
         return None
     try:
-        return datetime.fromisoformat(raw)
+        parsed = datetime.fromisoformat(raw)
     except ValueError:
         return None
+    # Legacy status files can carry naive timestamps; subtracting one from an
+    # aware now() raises TypeError. Treat naive as UTC.
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _queue_take_timestamps(qstate: dict) -> list[float]:
+    """Extract valid take-log timestamps from a queue state dict."""
+    taken = qstate.get("taken")
+    if not isinstance(taken, list):
+        return []
+    return [
+        e["ts"] for e in taken
+        if isinstance(e, dict) and isinstance(e.get("ts"), (int, float))
+    ]
 
 
 def _dim_elapsed_s(dim_id: str, run_dir: Path, state: str) -> float | None:
-    """Per-dim elapsed time, derived from queue file mtime / status timing.
+    """Per-dim elapsed time, derived from queue-state timestamps.
 
-    Best-effort: queue creation time approximates the dimension start. For done
-    dims we use the youngest agent-stream mtime as the end. For running dims we
-    use now. For pending dims we return None.
+    The queue file is atomically rewritten on every take (new inode, fresh
+    mtime), so its mtime tracks the *last* take, not the dim start — using it
+    as the start made the running clock reset toward zero on every take.
+    Start comes from the queue's ``created_at`` (stamped at init), falling
+    back to the earliest take timestamp, then the file mtime for legacy
+    queues. For done dims the end is the latest activity signal we still
+    have: last take, evidence-file mtime, or any surviving agent streams
+    (streams are deleted at dim completion, so they rarely survive).
     """
     if state == "pending":
         return None
     queue = run_dir / "evidence" / f"{dim_id}_queue.json"
-    if not queue.is_file():
+    qstate = _read_json(queue)
+    if qstate is None:
         return None
-    try:
-        start = queue.stat().st_mtime
-    except OSError:
-        return None
+    take_ts = _queue_take_timestamps(qstate)
+    start = qstate.get("created_at")
+    if not isinstance(start, (int, float)):
+        if take_ts:
+            start = min(take_ts)
+        else:
+            try:
+                start = queue.stat().st_mtime
+            except OSError:
+                return None
     if state == "running":
         return max(0.0, time.time() - start)
-    # done: use latest agent-stream mtime
+    # done: latest activity signal still on disk
     end = start
-    try:
-        for s in (run_dir / "evidence").glob(f"{dim_id}_agent-*.stream"):
-            try:
-                end = max(end, s.stat().st_mtime)
-            except OSError:
-                continue
-    except OSError:
-        pass
+    if take_ts:
+        end = max(end, max(take_ts))
+    for candidate in (
+        run_dir / "evidence" / f"{dim_id}_evidence.jsonl",
+        *(run_dir / "evidence").glob(f"{dim_id}_agent-*.stream"),
+    ):
+        try:
+            end = max(end, candidate.stat().st_mtime)
+        except OSError:
+            continue
     return max(0.0, end - start)
 
 
@@ -206,6 +236,8 @@ def build_scan_progress(
     elif started_at and status.get("finalized_at"):
         try:
             end = datetime.fromisoformat(status["finalized_at"])
+            if end.tzinfo is None:
+                end = end.replace(tzinfo=timezone.utc)
             total_elapsed_s = max(0.0, (end - started_at).total_seconds())
         except (ValueError, TypeError):
             total_elapsed_s = None

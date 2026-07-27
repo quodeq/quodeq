@@ -23,3 +23,5 @@ class JobSnapshot:
     exit_reason: str | None = None
     ai_provider: str | None = None
     ai_model: str | None = None
+    # Run budget in seconds. 0 = explicitly unlimited, None = unknown.
+    time_limit_s: int | None = None

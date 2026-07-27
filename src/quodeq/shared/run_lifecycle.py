@@ -68,6 +68,7 @@ class RunLifecycleContext:
         self._phase: str | None = None
         self._current_dimension: str | None = None
         self._deadline_at: str | None = None
+        self._time_limit_s: int | None = None
         self._ai_provider = ai_provider
         self._ai_model = ai_model
         self._heartbeat = HeartbeatThread(run_dir, interval=heartbeat_interval)
@@ -155,6 +156,16 @@ class RunLifecycleContext:
         self._deadline_at = deadline_at
         self._write(self._current_state)
 
+    def set_time_limit(self, seconds: int | None) -> None:
+        """Record the run budget in seconds (0 = explicitly unlimited).
+
+        Persisted in status.json so index-served snapshots (external runs,
+        dashboard runs after a server restart) can surface the budget the
+        run was actually started with.
+        """
+        self._time_limit_s = seconds
+        self._write(self._current_state)
+
     def set_exit_reason(self, reason: str | None) -> None:
         """Record a non-failure exit reason to apply at the next terminal transition.
 
@@ -185,6 +196,7 @@ class RunLifecycleContext:
             deadline_at=self._deadline_at,
             ai_provider=self._ai_provider,
             ai_model=self._ai_model,
+            time_limit_s=self._time_limit_s,
         )
 
     def _seed_dimension_states(self) -> None:
@@ -235,6 +247,7 @@ class RunLifecycleContext:
                 deadline_at=self._deadline_at,
                 ai_provider=self._ai_provider,
                 ai_model=self._ai_model,
+                time_limit_s=self._time_limit_s,
             )
             self._current_state = RunState.CANCELLED
             raise SystemExit(128 + signum)
@@ -277,6 +290,7 @@ class RunLifecycleContext:
             deadline_at=self._deadline_at,
             ai_provider=self._ai_provider,
             ai_model=self._ai_model,
+            time_limit_s=self._time_limit_s,
         )
 
     def _deregister_atexit(self) -> None:

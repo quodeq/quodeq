@@ -128,7 +128,7 @@ def test_start_evaluation_forwards_provider_and_model(tmp_path: Path) -> None:
     captured: dict = {}
 
     class _SpyDispatcher:
-        def dispatch(self, cmd, *, cwd=None, env=None, ai_provider=None, ai_model=None):
+        def dispatch(self, cmd, *, cwd=None, env=None, ai_provider=None, ai_model=None, time_limit_s=None):
             captured["ai_provider"] = ai_provider
             captured["ai_model"] = ai_model
             return JobSnapshot(job_id="job-1", status="running")

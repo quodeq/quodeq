@@ -38,7 +38,14 @@ class FileQueue:
         cleanup_stale_lock(self._lock_path)
 
         if files is not None:
-            state: dict = {"version": _QUEUE_VERSION, "pending": list(files), "taken": []}
+            state: dict = {
+                "version": _QUEUE_VERSION,
+                "pending": list(files),
+                "taken": [],
+                # Dim-start timestamp for progress reporting. The file's own
+                # mtime can't serve: every take atomically rewrites the file.
+                "created_at": time.time(),
+            }
             if max_files_per_agent > 0:
                 state["max_files_per_agent"] = max_files_per_agent
             write_state(state, self._path)
