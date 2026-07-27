@@ -104,6 +104,11 @@ describe('DashboardPage first-load loading gate', () => {
       // not two, and it must not be sitting inside a dimmed container.
       expect(container.querySelectorAll('.loading-screen').length).toBe(1);
       expect(container.querySelector('.dashboard-loading')).toBeNull();
+      // Same message as the pre-grace loader it replaced: otherwise the
+      // message-bearing loader unmounts and a message-less one takes its
+      // place in the same frame, and the logo visibly shifts up by the
+      // message line's height on the handoff.
+      expect(container.querySelector('.loading-message')?.textContent).toBe('Loading p1…');
     } finally {
       vi.useRealTimers();
     }

@@ -280,7 +280,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
             other place, at this same top level, that a loader can render from --
             DashboardContent itself never makes this decision, so the two can't
             drift out of sync the way they did in the original bug. */}
-        {dashboard && !isLoading && !contentReady && <LoadingScreen variant="inline" />}
+        {dashboard && !isLoading && !contentReady && <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />}
         {dashboard && contentReady && (
           <DashboardContent
             runMode={runMode}
