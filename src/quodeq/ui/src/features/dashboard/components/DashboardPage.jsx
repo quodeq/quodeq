@@ -44,16 +44,14 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }
   );
 }
 
-function DashboardContent({ runMode, ready, data, focus, callbacks }) {
+function DashboardContent({ runMode, data, focus, callbacks }) {
   const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending } = data;
   const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
   const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick, onNavigate, onGranularityChange } = callbacks;
-  // Readiness is decided once, by the page (DashboardPage's isLoading/contentReady
-  // rule) -- this never re-derives it from `accumulated` on its own, so there is
-  // exactly one place a loader can be mounted from.
-  if (!ready) {
-    return <LoadingScreen variant="inline" />;
-  }
+  // No readiness check here on purpose: the page only mounts this component
+  // once contentReady is true (see DashboardPage's return), so there is
+  // exactly one place in the whole page that decides whether a loader is
+  // shown -- never a render decision split between here and the parent.
   if (runMode) {
     return (
       <RunOverviewPanel
@@ -276,10 +274,16 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : 'dashboard-ready'}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
         <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
         {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
-        {dashboard && !isLoading && (
+        {/* Grace elapsed but content still isn't ready (dashboard is in, accumulated
+            isn't yet): the page has already stopped showing its own full loader
+            above, but there's nothing ready to mount below either. This is the ONE
+            other place, at this same top level, that a loader can render from --
+            DashboardContent itself never makes this decision, so the two can't
+            drift out of sync the way they did in the original bug. */}
+        {dashboard && !isLoading && !contentReady && <LoadingScreen variant="inline" />}
+        {dashboard && contentReady && (
           <DashboardContent
             runMode={runMode}
-            ready={contentReady}
             data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending }}
             focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
             callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onNavigate, onGranularityChange }}

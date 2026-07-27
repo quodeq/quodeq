@@ -89,6 +89,12 @@ describe('DashboardPage first-load loading gate', () => {
       // After the grace elapses with scores still pending: drop to the partial page.
       act(() => { vi.advanceTimersByTime(800); });
       expect(container.querySelector('.dashboard-page').className).toContain('dashboard-ready');
+      // Reachable state: dashboard is in, accumulated still isn't, and the page
+      // has already stopped showing its own full loader. Exactly one loader must
+      // still be on screen (the page's own content-area fallback), not zero and
+      // not two, and it must not be sitting inside a dimmed container.
+      expect(container.querySelectorAll('.loading-screen').length).toBe(1);
+      expect(container.querySelector('.dashboard-loading')).toBeNull();
     } finally {
       vi.useRealTimers();
     }
