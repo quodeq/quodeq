@@ -51,6 +51,15 @@ describe('DashboardPage first-load loading gate', () => {
     expect(container.querySelectorAll('.loading-screen').length).toBe(1);
   });
 
+  // P2 containment: the page's own loader must use the contained variant
+  // (absolutely positioned within .dashboard via .loading-screen--inline in
+  // base.css, not fixed to the viewport) so a project switch never covers
+  // Sidebar/TopBar. Only the app-level cold-start loader stays fullscreen.
+  it('renders the inline (contained) loader variant, not the fullscreen one', () => {
+    const { container } = render(<DashboardPage data={overviewLoading} callbacks={{}} runMode={false} />);
+    expect(container.querySelector('.loading-screen').className).toContain('loading-screen--inline');
+  });
+
   // Scenario 8: the page-level loader must never be a descendant of the
   // `.dashboard-loading` (opacity .4) container -- otherwise the logo renders
   // at an effective 6% opacity while loading, then jumps to full opacity once
@@ -207,6 +216,7 @@ describe('DashboardPage runMode loading gate', () => {
       </SidePaneProvider>,
     );
     expect(container.querySelectorAll('.loading-screen').length).toBe(1);
+    expect(container.querySelector('.loading-screen').className).toContain('loading-screen--inline');
   });
 
   it('renders exactly one LoadingScreen once the run payload resolves without dimensions yet', () => {
