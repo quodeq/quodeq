@@ -5,14 +5,15 @@ import { terminalSocketUrl } from '../../api/terminal.js';
 // They mean a reconnect cannot succeed right now, so the hook reports the
 // state instead of retrying — a busy loop here would ping-pong against the
 // server's single-connection lock and spam the other window's terminal.
-const CLOSE_BUSY = 4002;     // another window holds the single PTY connection
+const CLOSE_BUSY = 4002;     // another window holds this session's connection
 const CLOSE_REFUSED = 4003;  // gate refused (non-loopback host / bad Origin)
+const CLOSE_GONE = 4004;     // unknown session id (e.g. server restarted)
 
 const RETRY_BASE_MS = 500;
 const RETRY_MAX_MS = 5000;
 
-// status: 'idle' | 'connecting' | 'open' | 'reconnecting' | 'busy' | 'refused'
-export function useTerminalSocket({ active, onData, onOpen, restartKey = 0 }) {
+// status: 'idle' | 'connecting' | 'open' | 'reconnecting' | 'busy' | 'refused' | 'gone'
+export function useTerminalSocket({ active, onData, onOpen, restartKey = 0, sessionId = null }) {
   const [status, setStatus] = useState('idle');
   // Bumped internally to open a fresh socket after an unexpected close.
   const [gen, setGen] = useState(0);
@@ -36,7 +37,7 @@ export function useTerminalSocket({ active, onData, onOpen, restartKey = 0 }) {
   // current socket and opens a fresh one (restart from Settings / auto-retry).
   useEffect(() => {
     if (!active) return undefined;
-    const ws = new WebSocket(terminalSocketUrl());
+    const ws = new WebSocket(terminalSocketUrl(window.location, sessionId));
     wsRef.current = ws;
     setStatus(attemptsRef.current > 0 ? 'reconnecting' : 'connecting');
     ws.onopen = () => {
@@ -50,6 +51,9 @@ export function useTerminalSocket({ active, onData, onOpen, restartKey = 0 }) {
       if (wsRef.current === ws) wsRef.current = null;
       if (e?.code === CLOSE_BUSY) { setStatus('busy'); return; }
       if (e?.code === CLOSE_REFUSED) { setStatus('refused'); return; }
+      // Session no longer exists server-side. Retrying this URL can never
+      // succeed; the owner reconciles against /terminal/sessions instead.
+      if (e?.code === CLOSE_GONE) { setStatus('gone'); return; }
       // Unexpected drop (server restart/crash/sleep). A dead socket swallows
       // keystrokes silently, so surface it and retry with capped exponential
       // backoff — the local server can come back at any moment.
@@ -71,7 +75,7 @@ export function useTerminalSocket({ active, onData, onOpen, restartKey = 0 }) {
       try { ws.close(); } catch { /* noop */ }
       if (wsRef.current === ws) wsRef.current = null;
     };
-  }, [active, restartKey, gen]);
+  }, [active, restartKey, gen, sessionId]);
 
   const send = useCallback((data) => {
     const ws = wsRef.current;

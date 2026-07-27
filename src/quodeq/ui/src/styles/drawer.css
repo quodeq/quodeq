@@ -79,10 +79,10 @@
   font-family: var(--font-mono, monospace);
 }
 
-/* ── Drawer-header chips ──────────────────────────────────────────────
+/* ── Panel-header chips ───────────────────────────────────────────────
    Visual identity comes from .badge--tag tones (badge.css); only layout
    and interactivity live here. */
-.assistant-drawer-header .badge {
+.assistant-panel-header .badge {
   align-self: center;
 }
 .drawer-changes-chip {

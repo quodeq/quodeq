@@ -1,41 +1,57 @@
 import React from 'react';
-import { VISIBLE_META_COMMANDS, pillsForView } from './commands.js';
+import { pillsForView } from './commands.js';
+import { QMarkIcon } from '../../components/QMarkIcon.jsx';
+
+// Dot tints cycle so neighboring cards read as distinct entry points.
+const DOT_TONES = ['info', 'accent', 'warning', 'success'];
 
 /**
- * Empty-transcript state of the assistant pane: a one-line intro, the
- * meta-command list, and skill pills (view-relevant first). Skills appear
- * only as pills, never as text lines. Pure UI, never persisted, never sent
- * to the model; reappears on every fresh session.
+ * Empty-transcript state of the assistant pane: an intro row, skill
+ * suggestions as tappable cards (view-relevant first), and the meta-command
+ * menu. Clicking anything pre-fills the composer, never sends. Pure UI,
+ * never persisted, never sent to the model; reappears on every fresh
+ * session.
  */
 export function AssistantWelcome({ catalog, view, onPick, readOnly = false }) {
   const pills = pillsForView(catalog, view, { readOnly });
   return (
     <div className="assistant-welcome">
-      <p className="assistant-welcome-intro">
-        {readOnly
-          ? 'I can explain scores and dig into findings for this remote project.'
-          : 'I can explain scores, dig into findings, and draft standards for this project.'}
-      </p>
-      <ul className="assistant-welcome-commands">
-        {VISIBLE_META_COMMANDS.map((c) => (
-          <li key={c.name}><code>/{c.name}</code> {c.description}</li>
-        ))}
-      </ul>
+      <div className="assistant-welcome-hero">
+        <span className="assistant-compass-block" aria-hidden="true">
+          <QMarkIcon className="assistant-compass" />
+        </span>
+        <p className="assistant-welcome-intro">
+          {readOnly
+            ? 'I can explain scores and dig into findings for this remote project.'
+            : 'I can explain scores, dig into findings, and draft standards for this project.'}
+          {' '}Pick a starting point or ask me anything.
+        </p>
+      </div>
       {pills.length > 0 && (
-        <div className="assistant-welcome-pills">
-          {pills.map((p) => (
-            <button
-              key={p.fill}
-              type="button"
-              className="assistant-pill"
-              title={p.description}
-              onClick={() => onPick(p.fill)}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="assistant-welcome-section">
+          <div className="assistant-welcome-label">Suggested</div>
+          <div className="assistant-suggest-grid">
+            {pills.map((p, i) => (
+              <button
+                key={p.fill}
+                type="button"
+                className="assistant-suggest-card"
+                aria-label={p.label}
+                title={p.description}
+                onClick={() => onPick(p.fill)}
+              >
+                <span className={`assistant-suggest-dot assistant-suggest-dot--${DOT_TONES[i % DOT_TONES.length]}`} aria-hidden="true" />
+                <span className="assistant-suggest-text">
+                  <span className="assistant-suggest-title">{p.label}</span>
+                  {p.description && <span className="assistant-suggest-desc">{p.description}</span>}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
+      {/* No slash-command list here: typing "/" in the composer opens the
+          live CommandMenu autocomplete, which is the same catalog searchable. */}
     </div>
   );
 }

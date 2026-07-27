@@ -55,7 +55,11 @@ def test_builtin_skills_have_views_and_hints():
 
 def test_verify_finding_skill_loads():
     skill = load_skills()["verify-finding"]
-    assert skill.views == ("violations",)
+    # No views: deliberately NOT offered as a suggestion card (the freeform
+    # paste-a-finding path it invites is the skill's slowest entry; a
+    # row-level "Verify with assistant" button is the planned promoted path).
+    # Still reachable as /verify-finding via the composer autocomplete.
+    assert skill.views == ()
     assert skill.argument_hint
 
 

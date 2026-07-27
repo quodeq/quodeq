@@ -1,0 +1,66 @@
+import React, { useRef, useState } from 'react';
+import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';
+import PanelSwitcher from '../drawer/PanelSwitcher.jsx';
+import {
+  COPY_FEEDBACK_MS, ChevronDownIcon, CopyIcon, MaximizeIcon, MinimizeIcon, PlusIcon,
+} from '../../components/CopyButton.jsx';
+
+/**
+ * The terminal panel's own header: panel switcher, identity, the sandbox
+ * pill, and the window controls (copy / maximize / hide) that used to live
+ * in the shared drawer header.
+ */
+export default function TerminalHeader({ onCopy, onNewSession }) {
+  const { maximized, toggleMaximized, closeActiveTab, openPanels } = useAssistantDrawer();
+  const [copied, setCopied] = useState(false);
+  const copyTimer = useRef(null);
+
+  const handleCopy = () => {
+    if (!onCopy?.()) return;
+    setCopied(true);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => { copyTimer.current = null; setCopied(false); }, COPY_FEEDBACK_MS);
+  };
+
+  return (
+    <header className="tty-panel-header">
+      <PanelSwitcher />
+      {/* Identity icon only while the switcher is absent (single open panel):
+          the switcher already shows a >_ glyph, never render it twice. */}
+      {openPanels.length < 2 && (
+        <span className="tty-icon-block" aria-hidden="true">&gt;_</span>
+      )}
+      <div className="tty-panel-title">Terminal</div>
+      {/* With a single session the tab strip is hidden and the "+" lives up
+          here; creating a second session reveals the strip, which carries its
+          own "+" from then on. */}
+      {onNewSession && (
+        <button type="button" className="tty-tab-add tty-header-add"
+          onClick={onNewSession}
+          aria-label="New session" title="New session">
+          <PlusIcon />
+        </button>
+      )}
+      <div className="tty-panel-controls">
+        <button type="button" className={`assistant-drawer-btn${copied ? ' tty-copy-btn--done' : ''}`}
+          onClick={handleCopy}
+          aria-label="Copy terminal output"
+          title={copied ? 'Copied' : 'Copy selection (or visible output)'}>
+          <CopyIcon />
+        </button>
+        <button type="button" className="assistant-drawer-btn" onClick={toggleMaximized}
+          aria-label={maximized ? 'Restore drawer' : 'Maximize drawer'}
+          aria-pressed={maximized}
+          title={maximized ? 'Restore' : 'Maximize'}>
+          {maximized ? <MinimizeIcon /> : <MaximizeIcon />}
+        </button>
+        {/* Chevron-down, NOT an ×: the shell keeps running server-side;
+            reopening the tab reattaches to it. */}
+        <button type="button" className="assistant-drawer-btn" onClick={closeActiveTab}
+          aria-label="Hide tab" title="Hide (keeps running in the background)">
+          <ChevronDownIcon />
+        </button>
+      </div>
+    </header>
+  );
+}

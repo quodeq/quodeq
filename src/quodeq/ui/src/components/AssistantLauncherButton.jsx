@@ -1,6 +1,6 @@
 import { useAssistantDrawer } from '../features/assistant/AssistantDrawerProvider.jsx';
 import useAssistantProvider from '../features/settings/hooks/useAssistantProvider.js';
-import { SparkleIcon } from './CopyButton.jsx';
+import { QMarkIcon } from './QMarkIcon.jsx';
 
 export function AssistantLauncherButton() {
   const { openPanels, toggleTopbar } = useAssistantDrawer();
@@ -22,7 +22,10 @@ export function AssistantLauncherButton() {
       title="Assistant (Ctrl+`)"
       onClick={() => toggleTopbar('assistant')}
     >
-      <SparkleIcon />
+      {/* 11px, not the 12px of the stroke icons: the Q fills its tight
+          viewBox edge-to-edge while stroke icons carry built-in padding, so
+          equal pixel sizes read visually larger. */}
+      <QMarkIcon size={11} />
     </button>
   );
 }

@@ -2,6 +2,17 @@ import React, { useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ActionPreviewCard } from './ActionPreviewCard.jsx';
+import { QMarkIcon } from '../../components/QMarkIcon.jsx';
+
+// Q-mark avatar column next to assistant-authored content.
+function CompassAvatar({ thinking = false }) {
+  return (
+    <span className="assistant-msg-avatar" aria-hidden="true">
+      {thinking && <span className="assistant-think-ring" />}
+      <QMarkIcon className={`assistant-compass${thinking ? ' assistant-compass--think' : ''}`} />
+    </span>
+  );
+}
 
 const mdComponents = {
   a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
@@ -18,10 +29,13 @@ function MessageItem({ message }) {
       return <div className="assistant-msg assistant-msg-user">{message.text}</div>;
     case 'assistant':
       return (
-        <div className="assistant-msg assistant-msg-assistant assistant-md">
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-            {message.text}
-          </ReactMarkdown>
+        <div className="assistant-msg-row">
+          <CompassAvatar />
+          <div className="assistant-msg assistant-msg-assistant assistant-md">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+              {message.text}
+            </ReactMarkdown>
+          </div>
         </div>
       );
     case 'tool':
@@ -72,9 +86,8 @@ export function MessageList({ messages, streaming }) {
       ))}
       {streaming && (
         <div className="assistant-streaming-indicator" role="status" aria-live="polite">
-          <span className="assistant-streaming-dot" />
-          <span className="assistant-streaming-dot" />
-          <span className="assistant-streaming-dot" />
+          <CompassAvatar thinking />
+          <span className="assistant-streaming-text" aria-hidden="true">Consulting the project…</span>
           <span className="sr-only">Assistant is responding…</span>
         </div>
       )}

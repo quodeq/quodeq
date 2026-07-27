@@ -25,12 +25,18 @@ it('shows a tab for each OPEN panel (both, since both are open)', () => {
   expect(screen.getByRole('tab', { name: /Terminal/ })).toBeInTheDocument();
 });
 
-it('only shows a tab for the single open panel when only one is open', () => {
+it('hides the switcher entirely when only one panel is open (identity icon instead, no duplicates)', () => {
   drawer.openPanels = ['assistant'];
-  render(<BottomDrawer uiState={{}} />);
-  expect(screen.getByRole('tab', { name: /Assistant/ })).toBeInTheDocument();
-  expect(screen.queryByRole('tab', { name: /Terminal/ })).toBeNull();
+  const { container } = render(<BottomDrawer uiState={{}} />);
+  expect(screen.queryByRole('tab')).toBeNull();
+  expect(container.querySelector('.assistant-panel-header .assistant-compass-block')).not.toBeNull();
   drawer.openPanels = ['assistant', 'terminal'];  // restore for other tests
+});
+
+it('hides the identity icon when both panels are open (the switcher already carries the glyph)', () => {
+  const { container } = render(<BottomDrawer uiState={{}} />);
+  expect(screen.getByRole('tab', { name: /Assistant/ })).toBeInTheDocument();
+  expect(container.querySelector('.assistant-panel-header .assistant-compass-block')).toBeNull();
 });
 
 it('clicking an inactive tab activates it (without deselecting the other)', () => {
@@ -70,11 +76,21 @@ it('the maximized-restore glyph is distinct from the hide chevron', () => {
   drawer.maximized = false;
 });
 
-it('the model chip sits with the tabs on the left, not in the right controls', () => {
+it('the model chip leads the right-side controls cluster', () => {
   render(<BottomDrawer uiState={{}} />);
-  const chip = screen.getByTitle('Ollama · m');
-  expect(chip.closest('.assistant-drawer-controls')).toBeNull();
-  expect(chip.previousElementSibling).toHaveClass('drawer-tabs');
+  const chip = screen.getByTitle(/Ollama · m/);
+  const controls = chip.closest('.assistant-drawer-controls');
+  expect(controls).not.toBeNull();
+  expect(controls.firstElementChild).toBe(chip);
+});
+
+it('the model chip opens Settings AND hides the panel (drawer must not cover the settings page)', () => {
+  const onOpenSettings = vi.fn();
+  drawer.closeActiveTab = vi.fn();
+  render(<BottomDrawer uiState={{}} onOpenSettings={onOpenSettings} />);
+  fireEvent.click(screen.getByTitle(/Ollama · m/));
+  expect(onOpenSettings).toHaveBeenCalled();
+  expect(drawer.closeActiveTab).toHaveBeenCalled();
 });
 
 it('shows the web toggle for web-capable providers and toggles it', () => {
@@ -108,26 +124,26 @@ it('disables the web toggle while a turn is streaming', () => {
 
 it('the new-conversation control resets the conversation', () => {
   render(<BottomDrawer uiState={{}} />);
-  fireEvent.click(screen.getByRole('button', { name: /new conversation/i }));
+  fireEvent.click(screen.getByRole('button', { name: "New conversation" }));
   expect(drawer.resetConversation).toHaveBeenCalled();
 });
 
 it('disables the new-conversation control while streaming and before a session exists', () => {
   drawer.streaming = true;
   const { unmount } = render(<BottomDrawer uiState={{}} />);
-  expect(screen.getByRole('button', { name: /new conversation/i })).toBeDisabled();
+  expect(screen.getByRole('button', { name: "New conversation" })).toBeDisabled();
   drawer.streaming = false;
   unmount();
   drawer.sessionReady = false;
   render(<BottomDrawer uiState={{}} />);
-  expect(screen.getByRole('button', { name: /new conversation/i })).toBeDisabled();
+  expect(screen.getByRole('button', { name: "New conversation" })).toBeDisabled();
   drawer.sessionReady = true;
 });
 
 it('hides the new-conversation control while the terminal tab is active', () => {
   drawer.activeTab = 'terminal';
   render(<BottomDrawer uiState={{}} />);
-  expect(screen.queryByRole('button', { name: /new conversation/i })).toBeNull();
+  expect(screen.queryByRole('button', { name: "New conversation" })).toBeNull();
   drawer.activeTab = 'assistant';
 });
 
@@ -148,9 +164,12 @@ it('warns with "no repo access" and the server reason when not attached', () => 
   drawer.repoInfo = null;
 });
 
-it('the model chip is an accent Badge', () => {
+it('the model chip shows a live status dot and the mono model label', () => {
   render(<BottomDrawer uiState={{}} />);
-  expect(screen.getByTitle('Ollama · m')).toHaveClass('badge', 'badge--tag', 'badge--accent', 'drawer-model-chip');
+  const chip = screen.getByTitle(/Ollama · m/);
+  expect(chip).toHaveClass('assistant-model-chip');
+  expect(chip.querySelector('.assistant-model-dot')).not.toBeNull();
+  expect(chip).toHaveTextContent('Ollama · m');
 });
 
 it('shows a read-only info badge when the session is read-only', () => {
