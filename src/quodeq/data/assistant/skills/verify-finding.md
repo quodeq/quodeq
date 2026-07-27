@@ -2,7 +2,6 @@
 name: verify-finding
 description: Adversarially verify a finding, then dismiss it or mark it verified
 argument_hint: [file:line or search terms]
-views: overview, violations
 requires_write: true
 ---
 The user wants to know whether one finding (usually the one selected in
