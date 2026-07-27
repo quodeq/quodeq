@@ -66,6 +66,7 @@ class EvaluationDispatcher(Protocol):
         env: dict[str, str] | None = None,
         ai_provider: str | None = None,
         ai_model: str | None = None,
+        time_limit_s: int | None = None,
     ) -> JobSnapshot:
         """Submit an evaluation command and return the initial job state."""
         ...
@@ -85,10 +86,12 @@ class SubprocessDispatcher:
         env: dict[str, str] | None = None,
         ai_provider: str | None = None,
         ai_model: str | None = None,
+        time_limit_s: int | None = None,
     ) -> JobSnapshot:
         return self._jobs.start_job(
             cmd, cwd=cwd, env=env,
             ai_provider=ai_provider, ai_model=ai_model,
+            time_limit_s=time_limit_s,
         )
 
 
@@ -386,6 +389,7 @@ class FsEvaluationMixin:
             cmd, cwd=cwd, env=env,
             ai_provider=options.ai_cmd,
             ai_model=options.ai_model,
+            time_limit_s=options.time_limit,
         )
 
     def get_evaluation_status(self, job_id: str, reports_dir: str | None = None) -> JobSnapshot | None:
@@ -434,7 +438,10 @@ class FsEvaluationMixin:
         reports_root = Path(reports_dir) if reports_dir else None
         job = self.get_evaluation_status(job_id, reports_dir=reports_dir)
         ok = self._jobs.cancel_job(job_id, reports_root=reports_root)
-        if ok and reports_dir and job:
+        # A job cancelled before the report_path marker landed has no
+        # output_project/output_run_id yet — there is no run dir to wait on,
+        # score, or discard.
+        if ok and reports_dir and job and job.output_project and job.output_run_id:
             run_dir = Path(reports_dir) / job.output_project / job.output_run_id
             _wait_for_terminal_status(run_dir)
             if discard_partial:

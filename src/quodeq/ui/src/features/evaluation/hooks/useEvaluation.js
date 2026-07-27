@@ -21,7 +21,7 @@
  *     terminal surface in the dashboard so users can close and reopen the UI
  *     without losing visibility into an in-progress scan.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { chooseDialog } from "../../../utils/chooseDialog.js";
@@ -38,6 +38,19 @@ import {
 const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === "true";
 const JOB_POLL_MS = 1500;
 const DIM_POLL_MS = 2000;
+
+/**
+ * Poll interval for the live findings query. Exported for tests.
+ *
+ * Polling must stop once the job is terminal: without the gate a finished
+ * run kept re-fetching every full evaluation/<dim>.json payload every 2s
+ * for as long as the Evaluate card stayed mounted.
+ */
+export function findingsRefetchInterval(job, sseEnabled = SSE_ENABLED) {
+  if (sseEnabled) return false;
+  if (job?.status && job.status !== "running") return false;
+  return DIM_POLL_MS;
+}
 const DEFAULT_OLLAMA_SUBAGENTS = "1";
 const DEFAULT_CLI_SUBAGENTS = String(DEFAULT_MAX_SUBAGENTS);
 const DEFAULT_OLLAMA_BUDGET = "0";
@@ -157,8 +170,24 @@ export function useEvaluation() {
     },
     enabled: !!jobId && (SSE_ENABLED || !!job?.outputProject),
     staleTime: SSE_ENABLED ? Infinity : 0,
-    refetchInterval: SSE_ENABLED ? false : DIM_POLL_MS,
+    refetchInterval: findingsRefetchInterval(job),
   });
+
+  // One final fetch on the running->terminal edge: the last dimension's
+  // report usually lands between the final running poll and the terminal
+  // transition, and stopping cold would freeze the feed just short of it.
+  const { refetch: refetchFindings } = findingsQuery;
+  const findingsSettledRef = useRef(false);
+  const isJobTerminal = !!job?.status && job.status !== "running";
+  useEffect(() => {
+    if (!jobId || SSE_ENABLED) return;
+    if (isJobTerminal && !findingsSettledRef.current) {
+      findingsSettledRef.current = true;
+      refetchFindings();
+    } else if (!isJobTerminal) {
+      findingsSettledRef.current = false;
+    }
+  }, [jobId, isJobTerminal, refetchFindings]);
 
   // Group findings into the legacy { [dim]: [violations] } shape.
   const findings = findingsQuery.data || [];
@@ -229,11 +258,15 @@ export function useEvaluation() {
     },
     onError: (err) => {
       // The backend returns 409 when the job is no longer cancellable
-      // (process gone, status already terminal, etc.). Without this handler
-      // the user is trapped: status stays "running", Cancel does nothing
-      // visible. Surface the message and clear locally so the panel closes.
+      // (process gone, status already terminal) and 404 when it is unknown.
+      // Only those mean the job is really over — clear it so the panel
+      // closes. A transient failure (500, network, the 30s request timeout
+      // racing the ~33s server-side kill path) must KEEP the job: clearing
+      // it hid a still-running scan and let a second concurrent scan start
+      // on the same project.
       const msg = err?.message || "Could not cancel evaluation";
       setJobError(msg);
+      if (err?.status !== 409 && err?.status !== 404) return;
       const id = jobId;
       if (id) queryClient.removeQueries({ queryKey: evaluationKeys.evaluation(id) });
       setJobId(null);

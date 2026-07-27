@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 
 from quodeq.core.types import ScoringResult
@@ -12,12 +14,29 @@ from quodeq.analysis._report_assembly import build_full_report, build_dashboard_
 
 
 def _persist_json(data: dict, path: Path) -> None:
-    """Write a report dict as formatted JSON to *path* (I/O adapter)."""
+    """Atomically write a report dict as formatted JSON to *path*.
+
+    Dashboard readers poll these files and treat a parse failure as "the
+    dimension does not exist", so the destination must never hold a partial
+    write: serialize to a same-directory temp file and publish via rename.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(
+        dir=str(path.parent), suffix=".tmp", prefix=f".{path.name}.",
+    )
     try:
-        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp_path, str(path))
+        tmp_path = None
     except OSError as exc:
         raise OSError(f"Failed to write report to {path}: {exc}") from exc
+    finally:
+        if tmp_path is not None:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 
 def write_reports(

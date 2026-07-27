@@ -125,10 +125,21 @@ export function useExplorerData(project, dimension, runId, refreshSignal, select
     // the previous run's data on screen and toggle isFetching so the
     // caller can dim the page during the background refetch (matches
     // the Overview placeholderData behaviour).
+    // The stale flag drops responses that resolve after a newer request
+    // (run-navigator clicks re-fire this effect); without it a slow earlier
+    // response could park another run's findings under the current header.
+    let stale = false;
     setIsFetching(true);
     fetchAndRescore(project, runId, dimension, fetchDimensionEval, fetchRunScores)
-      .then((data) => { setEvalData(data); setLoading(false); setIsFetching(false); })
-      .catch((err) => { setError(err.message); setLoading(false); setIsFetching(false); });
+      .then((data) => {
+        if (stale) return;
+        setEvalData(data); setLoading(false); setIsFetching(false);
+      })
+      .catch((err) => {
+        if (stale) return;
+        setError(err.message); setLoading(false); setIsFetching(false);
+      });
+    return () => { stale = true; };
   }, [project, dimension, runId, fetchDimensionEval, fetchRunScores]);
 
   const initialRef = useRef(refreshSignal);
@@ -164,6 +175,10 @@ export function useExplorerData(project, dimension, runId, refreshSignal, select
   const stats = useDerivedExplorerStats(evalData, allViolations);
   return {
     evalData, loading, isFetching, error,
+    // 202 sentinel: the run dir exists but evaluation/<dim>.json isn't
+    // written (yet). Callers must not render this as a real, zero-finding
+    // report.
+    waiting: !!evalData?.waiting,
     overallGrade, principleGrades, allViolations,
     applyRescoredPayload,
     ...stats,

@@ -315,3 +315,61 @@ def test_handle_review_excludes_dismissed_finding(tmp_path, monkeypatch, capsys)
     assert rc == 0
     out = capsys.readouterr().out
     assert "1 violation(s) found in diff" in out
+
+
+def test_handle_review_time_limit_zero_means_unlimited(tmp_path):
+    """--time-limit 0 is documented as unlimited; the `or 300` fallback must
+    not swallow it (same falsy-drop bug as the dashboard's unlimited runs)."""
+    from unittest.mock import MagicMock, patch
+    import json
+    import argparse
+
+    args = argparse.Namespace(
+        pr=None,
+        dimensions=None,
+        pool_budget=0,
+        output=str(tmp_path),
+        dry_run=True,
+    )
+
+    pr_result = MagicMock()
+    pr_result.stdout = json.dumps({"number": 7, "baseRefName": "main"})
+    repo_result = MagicMock()
+    repo_result.stdout = json.dumps({"owner": {"login": "org"}, "name": "repo"})
+
+    captured_argv = []
+
+    def fake_parse_args(argv):
+        captured_argv.extend(argv)
+        return argparse.Namespace(
+            dimensions=None,
+            repo=".",
+            incremental=True,
+            output=str(tmp_path),
+            pool_budget=0,
+            mode=None,
+            max_turns=None,
+            max_duration=None,
+            n_subagents=1,
+            no_verify=False,
+            no_consolidated=False,
+            dry_run=True,
+            evidence_only=False,
+            no_prescan=False,
+            language=None,
+            branch=None,
+            scope=None,
+        )
+
+    with patch("quodeq.ci.review.subprocess.run", side_effect=[pr_result, repo_result]), \
+         patch("quodeq.cli_parser.build_parser") as mock_build_parser, \
+         patch("quodeq._cli_evaluation.run_evaluate", return_value=0):
+        mock_parser = MagicMock()
+        mock_parser.parse_args.side_effect = fake_parse_args
+        mock_build_parser.return_value = mock_parser
+
+        from quodeq.ci.review import handle_review
+        handle_review(args)
+
+    idx = captured_argv.index("--time-limit")
+    assert captured_argv[idx + 1] == "0"

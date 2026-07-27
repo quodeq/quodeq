@@ -178,6 +178,54 @@ class TestGetAndListJobs:
         assert {j.job_id for j in jobs} == {"j1", "j2"}
 
 
+class TestDeleteJob:
+    # EvaluationsIndex.delete drops the run dir and index row, then calls
+    # JobManager.delete to remove the in-memory/persisted job entry. Before
+    # this method existed the hasattr-guarded call was a silent no-op, so a
+    # discarded run kept resurfacing in /api/evaluations for up to 24h from
+    # the persisted job store.
+    def test_delete_removes_terminal_job(self):
+        store = InMemoryJobStore()
+        store.put(Job("j1", "done", [], "now", "later", 0))
+        mgr = JobManager(job_store=store)
+        assert mgr.delete("j1") is True
+        assert mgr.get_job("j1") is None
+
+    def test_delete_refuses_running_job(self):
+        store = InMemoryJobStore()
+        store.put(Job("j1", "running", [], "now", None, None))
+        mgr = JobManager(job_store=store)
+        assert mgr.delete("j1") is False
+        assert mgr.get_job("j1") is not None
+
+    def test_delete_missing_job_returns_false(self):
+        mgr = JobManager(job_store=InMemoryJobStore())
+        assert mgr.delete("nope") is False
+
+
+class TestStartJobTimeLimit:
+    def test_time_limit_carried_into_snapshot(self):
+        # The progress route resolves the per-dim budget bar from the job
+        # snapshot; before this field existed it read a nonexistent
+        # `options` attribute and the budget was always None.
+        def bad_spawn(*args, **kwargs):
+            raise OSError("boom")
+
+        # Spawn-failure path avoids threads; time_limit_s is set before spawn
+        # so it must survive into the failure snapshot too.
+        mgr = JobManager(spawn_impl=bad_spawn, job_store=InMemoryJobStore())
+        snap = mgr.start_job(["cmd"], time_limit_s=600)
+        assert snap.time_limit_s == 600
+
+    def test_time_limit_zero_carried(self):
+        def bad_spawn(*args, **kwargs):
+            raise OSError("boom")
+
+        mgr = JobManager(spawn_impl=bad_spawn, job_store=InMemoryJobStore())
+        snap = mgr.start_job(["cmd"], time_limit_s=0)
+        assert snap.time_limit_s == 0
+
+
 # ---------------------------------------------------------------------------
 # _apply_marker
 # ---------------------------------------------------------------------------

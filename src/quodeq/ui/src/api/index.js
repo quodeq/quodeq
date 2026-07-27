@@ -189,7 +189,10 @@ export function getEvaluationProgress(jobId) {
  */
 export function cancelEvaluation(jobId, opts = {}) {
   const qs = opts.discard ? '?intent=cancel&discard=true' : '?intent=cancel';
-  return request(`/evaluations/${encodeURIComponent(jobId)}${qs}`, { method: 'DELETE' });
+  // The server-side cancel path can block for the full SIGTERM grace window
+  // (~30s) plus the terminal-status wait before responding; the default 30s
+  // request timeout aborted client-side right before the backend finished.
+  return request(`/evaluations/${encodeURIComponent(jobId)}${qs}`, { method: 'DELETE', timeout: 45000 });
 }
 
 /**

@@ -30,7 +30,11 @@ export async function request(path, options = {}) {
     const payload = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      throw new Error(payload.error || `Request failed: ${res.status}`);
+      const err = new Error(payload.error || `Request failed: ${res.status}`);
+      // Callers branch on this (e.g. the cancel flow treats 409 as "job no
+      // longer cancellable" but keeps the job on transient failures).
+      err.status = res.status;
+      throw err;
     }
 
     return payload;

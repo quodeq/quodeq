@@ -244,7 +244,11 @@ describe("useEvaluation", () => {
     expect(result.current.job).not.toBeNull();
   });
 
-  it("cancelEvaluation surfaces an error and clears the job when the API rejects", async () => {
+  it("cancelEvaluation surfaces an error and keeps the job on a status-less rejection", async () => {
+    // A rejection without an HTTP status (network drop, request timeout)
+    // is transient: the scan may still be running server-side, so the job
+    // must stay visible. Only 409/404 clear it (see the cancel failure
+    // handling suite below).
     fakeApi.startEvaluation.mockResolvedValue({
       jobId: "j-stuck",
       status: "running",
@@ -263,8 +267,8 @@ describe("useEvaluation", () => {
 
     await waitFor(() => {
       expect(result.current.jobError).toMatch(/cancel/i);
-      expect(result.current.job).toBeNull();
     });
+    expect(result.current.job?.jobId).toBe("j-stuck");
   });
 
   it("startEvaluation surfaces a useful error when no provider is configured", async () => {
@@ -323,5 +327,59 @@ describe("useEvaluation", () => {
     await waitFor(() => expect(fakeApi.listEvaluations).toHaveBeenCalled());
     expect(result.current.job).toBeNull();
     expect(result.current.jobError).toBeNull();
+  });
+});
+
+describe("findingsRefetchInterval", () => {
+  it("polls while the job runs, stops when it reaches any terminal status", async () => {
+    const { findingsRefetchInterval } = await import("./useEvaluation.js");
+    expect(findingsRefetchInterval({ status: "running" }, false)).toBe(2000);
+    expect(findingsRefetchInterval(null, false)).toBe(2000);
+    for (const status of ["done", "failed", "cancelled", "lost", "completed"]) {
+      expect(findingsRefetchInterval({ status }, false)).toBe(false);
+    }
+  });
+
+  it("never polls under SSE", async () => {
+    const { findingsRefetchInterval } = await import("./useEvaluation.js");
+    expect(findingsRefetchInterval({ status: "running" }, true)).toBe(false);
+  });
+});
+
+describe("cancel failure handling", () => {
+  async function startJob(result) {
+    fakeApi.startEvaluation.mockResolvedValue({ jobId: "j-c", status: "running", dimensions: [] });
+    await act(async () => {
+      await result.current.startEvaluation({ repo: "x", dimensions: [] });
+    });
+    await waitFor(() => expect(result.current.job?.jobId).toBe("j-c"));
+  }
+
+  it("keeps the job when cancel fails transiently (500/timeout)", async () => {
+    // Clearing the job on ANY rejection let a slow SIGTERM-ignoring run be
+    // dropped client-side (30s request timeout vs ~33s server cancel path),
+    // unblocking a second concurrent scan on the same project.
+    const err = new Error("boom");
+    err.status = 500;
+    fakeApi.cancelEvaluation.mockRejectedValue(err);
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await startJob(result);
+    await act(async () => {
+      await result.current.cancelEvaluation();
+    });
+    await waitFor(() => expect(result.current.jobError).toBeTruthy());
+    expect(result.current.job?.jobId).toBe("j-c");
+  });
+
+  it("drops the job when the backend says it is no longer cancellable (409)", async () => {
+    const err = new Error("not cancellable");
+    err.status = 409;
+    fakeApi.cancelEvaluation.mockRejectedValue(err);
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await startJob(result);
+    await act(async () => {
+      await result.current.cancelEvaluation();
+    });
+    await waitFor(() => expect(result.current.job).toBeNull());
   });
 });

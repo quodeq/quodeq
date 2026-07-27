@@ -194,8 +194,13 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
         if not entry.is_dir() or entry.name.startswith("."):
             continue
         run_dir = Path(entry.path)
-        manifest_exists = (run_dir / "evidence" / "manifest.json").exists()
-        if not manifest_exists:
+        # A run is real when it has a manifest OR a status.json. Runs started
+        # without a prescan never write evidence/manifest.json, and the SQLite
+        # index (History) already accepts any run with a status.json — the two
+        # enumerators must agree or the Overview 404s on runs History shows.
+        is_run = (run_dir / "evidence" / "manifest.json").exists() \
+            or (run_dir / "status.json").is_file()
+        if not is_run:
             continue
         # Status precedence:
         #   1. status.json state is terminal (done/failed/cancelled) → honor it,

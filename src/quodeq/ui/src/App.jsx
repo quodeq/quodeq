@@ -271,6 +271,7 @@ export function buildDashboardDataBundle({ state, sharedHasContent = false }) {
     selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
     projectsLoaded: state.projectsLoaded,
     dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
+    onRetry: state.refreshDashboardActive,
     scoresPending: state.scoresPending,
     sharedProjectInfo: state.sharedProjectInfo,
     availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
@@ -578,7 +579,7 @@ function ViolationsRoute({ params, props }) {
 // ROUTE_RENDERERS.file(params, props) just builds the React element tree; it
 // doesn't render, so the returned element's props can be asserted on directly.
 export const ROUTE_RENDERERS = {
-  overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect, onProjectsReload: props.navigation.loadProjects }} runMode={false} />,
+  overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect, onProjectsReload: props.navigation.loadProjects, onRetry: props.dashboardData.onRetry }} runMode={false} />,
   violations: (params, props) => <ViolationsRoute params={params} props={props} />,
   map: (params, props) => {
     const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
@@ -600,7 +601,7 @@ export const ROUTE_RENDERERS = {
       tabKey={params._tabKey || 0}
     />;
   },
-  run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
+  run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry }} runMode={true} />,
   history: (params, props) => {
     const trend = props.dashboardData.dashboard?.trend || [];
     const runs = props.dashboardData.availableRuns || [];
@@ -638,7 +639,7 @@ export const ROUTE_RENDERERS = {
       />
     );
   },
-  'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
+  'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry }} runMode={true} />,
   explorer: (params, props) => (
     <ExplorerPage
       project={params.fromProject || props.navigation.selectedProject}

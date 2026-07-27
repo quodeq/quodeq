@@ -338,6 +338,7 @@ class EvaluationsIndex:
         deadline_at: str | None = None
         ai_provider: str | None = None
         ai_model: str | None = None
+        time_limit_s: int | None = None
         if row.run_dir:
             run_dir_path = Path(row.run_dir)
             try:
@@ -356,6 +357,10 @@ class EvaluationsIndex:
                 ai_provider, ai_model = _read_provider_model_from_status(run_dir_path)
             except (OSError, ValueError):
                 ai_provider, ai_model = None, None
+            try:
+                time_limit_s = _read_time_limit_from_status(run_dir_path)
+            except (OSError, ValueError):
+                time_limit_s = None
         return JobSnapshot(
             job_id=row.job_id,
             status=row.state,
@@ -375,6 +380,7 @@ class EvaluationsIndex:
             exit_reason=row.exit_reason,
             ai_provider=ai_provider,
             ai_model=ai_model,
+            time_limit_s=time_limit_s,
         )
 
 
@@ -393,7 +399,14 @@ def _tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
 
 
 def _read_dimensions_from_status(run_dir: Path) -> list[str] | None:
-    """Read the `dimensions` list from status.json, or None if unavailable."""
+    """Read the `dimensions` list from status.json, or None if unavailable.
+
+    "All dimensions" runs record an empty list (the raw, unresolved CLI
+    filter is None). The UI fetches per-dim evals from this list, so an
+    empty one blanks the live findings feed for every full scan served via
+    the index. Recover the resolved list from the per-dim sidecars, the
+    same fallback scan_progress uses.
+    """
     status_path = run_dir / "status.json"
     if not status_path.is_file():
         return None
@@ -402,7 +415,31 @@ def _read_dimensions_from_status(run_dir: Path) -> list[str] | None:
     except (OSError, ValueError):
         return None
     dims = data.get("dimensions")
-    return dims if isinstance(dims, list) else None
+    if not isinstance(dims, list):
+        return None
+    if dims:
+        return dims
+    from quodeq.shared.dim_estimates_io import read_dim_estimates
+    from quodeq.shared.dimensions_state import read_dimensions
+    recovered: dict[str, None] = {}
+    dim_records = read_dimensions(run_dir).get("dimensions")
+    record_keys = dim_records.keys() if isinstance(dim_records, dict) else ()
+    for key in (*record_keys, *read_dim_estimates(run_dir).keys()):
+        recovered.setdefault(key, None)
+    return list(recovered) if recovered else dims
+
+
+def _read_time_limit_from_status(run_dir: Path) -> int | None:
+    """Read the run budget (`time_limit_s`) from status.json, or None."""
+    status_path = run_dir / "status.json"
+    if not status_path.is_file():
+        return None
+    try:
+        data = json.loads(status_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    raw = data.get("time_limit_s")
+    return raw if isinstance(raw, int) else None
 
 
 def _read_deadline_from_status(run_dir: Path) -> str | None:

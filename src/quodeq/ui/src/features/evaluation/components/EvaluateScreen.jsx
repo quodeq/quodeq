@@ -46,13 +46,24 @@ export function readBudgetSeconds(storage = localStorage) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+const TERMINAL_STATUSES = new Set(['done', 'failed', 'cancelled', 'lost', 'completed']);
+
 function EvaluateHeader({ job, onGoToSettings }) {
   // Page title stays steady ("evaluate"); the live "in progress / failed /
   // done" state is carried by the JobHeader card title below to avoid
   // doubling the same status on screen.
   const deadlineAt = job?.deadlineAt ?? null;
-  const phase = job?.phase ?? job?.status ?? null;
-  const budgetSeconds = readBudgetSeconds();
+  // job.phase never turns terminal (the CLI leaves it at "scoring"), so a
+  // finished run kept the countdown pinned at 0:00. Key off status once the
+  // run ends; phase still wins while it runs.
+  const phase = TERMINAL_STATUSES.has(job?.status)
+    ? job.status
+    : (job?.phase ?? job?.status ?? null);
+  // Prefer the running job's own budget (carried on the snapshot) so
+  // changing provider/limit in Settings mid-run can't alter or hide the
+  // countdown of an already-running scan. Settings remain the fallback for
+  // jobs that predate the field.
+  const budgetSeconds = typeof job?.timeLimitS === 'number' ? job.timeLimitS : readBudgetSeconds();
   return (
     <header className="evaluate-header evaluate-header--terminal">
       <div className="evaluate-header__left">

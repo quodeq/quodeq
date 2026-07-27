@@ -206,7 +206,7 @@ export function useAppState() {
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect, prefetchHandlers,
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
     historySelectedRun, setHistorySelectedRun,
-    evalLifecycle, settings, activeTab, showProjectHeader, showRunNav, refreshDashboard, scheduleDashboardReconcile,
+    evalLifecycle, settings, activeTab, showProjectHeader, showRunNav, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile,
     granularity, onGranularityChange: handleGranularityChange,
   };
 }
