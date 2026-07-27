@@ -100,11 +100,11 @@ export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRun
 // a mark-stale-only invalidation left behind (refreshDashboard's
 // refetchType:'none', or ordinary staleTime elapse): the Overview's
 // useDashboard observer is mounted at the app root and never remounts on tab
-// navigation (see the eval-completion effect below), and the desktop
-// pywebview window never fires the focus-refetch a browser tab gets on
-// refocus. `stale: true` keeps this a no-op when nothing is actually stale,
-// so switching tabs doesn't re-download the (potentially 10-20 MB) payload
-// on every visit — only a query already marked stale gets refetched here.
+// navigation, and the desktop pywebview window never fires the focus-refetch
+// a browser tab gets on refocus. `stale: true` keeps this a no-op when
+// nothing is actually stale, so switching tabs doesn't re-download the
+// (potentially 10-20 MB) payload on every visit — only a query already
+// marked stale gets refetched here.
 //
 // Gates on `rootTab` (navStack[0].page), NOT the derived `activeTab`.
 // `activeTab`'s fallback bucket defaults any untagged/unknown page to
@@ -171,23 +171,6 @@ export function useAppState() {
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: visibleDailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const prefetchHandlers = usePrefetchAdjacentRuns({ selectedProject, selectedSource, availableRuns: visibleDailyRuns, overviewRunIndex });
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun }, selectedProject });
-
-  // Refresh all dashboard data (including latestAccumulated) when an evaluation
-  // finishes. This uses the *active* refetch (not the lazy refreshDashboard the
-  // dismiss path uses): the Overview's useDashboard observer is mounted here at
-  // the app root and never remounts on tab navigation, so a mark-stale-only
-  // invalidation would never actually refetch while the user stays on the same
-  // project — leaving the Overview on the stale pre-run payload until a project
-  // switch. A completed run is exactly when a real refetch is warranted.
-  const evalRefreshedRef = useRef(null);
-  useEffect(() => {
-    const job = evalLifecycle.job;
-    const finished = job && job.status !== 'running' && job.outputRunId;
-    if (finished && evalRefreshedRef.current !== job.outputRunId) {
-      evalRefreshedRef.current = job.outputRunId;
-      refreshDashboardActive();
-    }
-  }, [evalLifecycle.job, refreshDashboardActive]);
 
   const activeTab = KNOWN_TABS.includes(activePage.page) ? activePage.page
     : activePage.sourceTab && KNOWN_TABS.includes(activePage.sourceTab) ? activePage.sourceTab

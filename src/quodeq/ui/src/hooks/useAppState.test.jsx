@@ -1,12 +1,30 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useOverviewReturnReconcile, TAB_OVERVIEW, KNOWN_TABS } from './useAppState.js';
+import { useAppState, useOverviewReturnReconcile, TAB_OVERVIEW, KNOWN_TABS } from './useAppState.js';
 import { useNavStack } from './useNavStack.js';
 import { useDashboard } from '../features/dashboard/hooks/useDashboard.js';
 import { ApiProvider } from '../api/ApiContext.jsx';
 import { projectKeys } from '../api/queryKeys.js';
+
+// useAppState composes useEvaluationLifecycle (-> useEvaluation) and
+// useServerHealth. Mocked the same way useEvaluationLifecycle.test.jsx mocks
+// useEvaluation, so the eval-completion regression below can drive `job`
+// directly without a real evaluation API, and without useServerHealth's
+// real network polling.
+const evaluationState = {
+  job: null, jobError: null, liveViolations: {},
+  startEvaluation: vi.fn(), clearJob: vi.fn(), cancelEvaluation: vi.fn(),
+  startedProject: null,
+};
+vi.mock('../features/evaluation/hooks/useEvaluation.js', () => ({
+  useEvaluation: () => evaluationState,
+  LOCAL_API_PROVIDERS: new Set(['ollama', 'llamacpp', 'omlx']),
+}));
+vi.mock('./useServerHealth.js', () => ({
+  useServerHealth: () => [true, vi.fn(), null],
+}));
 
 // Task 2 (stacked on Task 1's scheduleDashboardReconcile): the Overview's
 // useDashboard observer is mounted at the app root and never remounts on tab
@@ -249,5 +267,92 @@ describe('useOverviewReturnReconcile integration with useDashboard (stale gating
     rerender({ rootTab: TAB_OVERVIEW, selectedProject: 'p1', selectedSource: 'local' });
 
     await waitFor(() => expect(fakeApi.getDashboard).toHaveBeenCalledTimes(2));
+  });
+});
+
+// P5-T1: single refetch path on run completion. Before this task, useAppState
+// ran its OWN eval-completion effect (refreshDashboardActive, keyed off
+// job.outputRunId) in the same effect-flush as useEvaluationLifecycle's
+// selectProjectAndRun. That effect fired before selectedRun's state update
+// had committed, so its active invalidation hit the OLD (pre-run) dashboard
+// key — a redundant refetch. useEvaluationLifecycle is now the only
+// completion path: selectProjectAndRun mints the NEW query key, and that key
+// change is the only refetch a completed run causes.
+function makeAppStateFakeApi() {
+  return {
+    listProjects: vi.fn(async () => [{ id: 'project-a', name: 'Project A' }]),
+    getDashboard: vi.fn(async (project, run) => ({
+      project, run: run || 'latest', trend: [], summary: { score: 75 }, dimensions: [],
+      selectedRun: { runId: run || 'latest', dateLabel: '2026-05-01' },
+    })),
+    sharedGetDashboard: vi.fn(),
+    getProjectScores: vi.fn(async () => ({ accumulated: { score: 90 }, trend: [], availableRuns: [] })),
+    sharedGetProjectScores: vi.fn(),
+    sharedGetProjectInfo: vi.fn(),
+  };
+}
+
+describe('useAppState eval-completion: single refetch path (P5-T1)', () => {
+  beforeEach(() => {
+    evaluationState.job = null;
+    localStorage.setItem('quodeq_selected_project', 'project-a');
+    localStorage.setItem('quodeq_selected_source', 'local');
+  });
+  afterEach(() => {
+    localStorage.removeItem('quodeq_selected_project');
+    localStorage.removeItem('quodeq_selected_source');
+  });
+
+  it('refetches only the new run key on completion -- no redundant active refetch of the pre-run key', async () => {
+    const fakeApi = makeAppStateFakeApi();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+    });
+    const { result, rerender } = renderHook(() => useAppState(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>
+          <ApiProvider value={fakeApi}>{children}</ApiProvider>
+        </QueryClientProvider>
+      ),
+    });
+
+    await waitFor(() => expect(result.current.selectedProject).toBe('project-a'));
+    await waitFor(() => expect(fakeApi.getDashboard).toHaveBeenCalledTimes(1));
+    expect(fakeApi.getDashboard).toHaveBeenNthCalledWith(1, 'project-a', 'latest');
+
+    evaluationState.job = { jobId: 'j1', status: 'done', outputProject: 'project-a', outputRunId: 'run-2' };
+    rerender();
+
+    await waitFor(() => expect(result.current.selectedRun).toBe('run-2'));
+    await waitFor(() => expect(fakeApi.getDashboard).toHaveBeenCalledTimes(2));
+    expect(fakeApi.getDashboard).toHaveBeenNthCalledWith(2, 'project-a', 'run-2');
+    expect(fakeApi.getDashboard.mock.calls.filter(([p, r]) => p === 'project-a' && r === 'latest')).toHaveLength(1);
+
+    // Settle a beat longer to catch any late-firing redundant refetch.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(fakeApi.getDashboard).toHaveBeenCalledTimes(2);
+  });
+
+  it('still refreshes the project list and moves the selection on completion (selectProjectAndRun/loadProjects remain wired)', async () => {
+    const fakeApi = makeAppStateFakeApi();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+    });
+    const { result, rerender } = renderHook(() => useAppState(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>
+          <ApiProvider value={fakeApi}>{children}</ApiProvider>
+        </QueryClientProvider>
+      ),
+    });
+
+    await waitFor(() => expect(result.current.selectedProject).toBe('project-a'));
+    const listCallsBefore = fakeApi.listProjects.mock.calls.length;
+
+    evaluationState.job = { jobId: 'j1', status: 'done', outputProject: 'project-a', outputRunId: 'run-2' };
+    rerender();
+
+    await waitFor(() => expect(result.current.selectedRun).toBe('run-2'));
+    await waitFor(() => expect(fakeApi.listProjects.mock.calls.length).toBeGreaterThan(listCallsBefore));
   });
 });
