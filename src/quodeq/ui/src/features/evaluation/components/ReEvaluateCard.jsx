@@ -8,6 +8,7 @@ import CleanScanToggle from './CleanScanToggle.jsx';
 import DimensionSelector from './DimensionSelector.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import HelpHint from '../../../components/HelpHint.jsx';
+import EmptyState from '../../../components/EmptyState.jsx';
 
 const EVAL_OPTIONS_HINT = (
   <>
@@ -40,6 +41,7 @@ const flexButtonStyle = { flex: 1 };
 function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }) {
   const [info, setInfo] = useState(initialInfo || null);
   const [error, setError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [urlInput, setUrlInput] = useState('');
   const [urlError, setUrlError] = useState(null);
   const [urlSaving, setUrlSaving] = useState(false);
@@ -48,14 +50,19 @@ function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }
     if (!project) return;
     // Always fetch full info (listing doesn't include hasFingerprints)
     getProjectInfo(project)
-      .then(setInfo)
+      .then((result) => {
+        setInfo(result);
+        setError(null);
+      })
       .catch(() => {
         if (!initialInfo) {
           setInfo(null);
           setError('Could not load project info. The project may have been removed.');
         }
       });
-  }, [project]);
+  }, [project, reloadKey]);
+
+  const retry = () => setReloadKey((k) => k + 1);
 
   async function handleUrlRestore() {
     const url = urlInput.trim();
@@ -74,7 +81,7 @@ function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }
     }
   }
 
-  return { info, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore };
+  return { info, error, retry, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore };
 }
 
 function useDimensionSelection(allDimensions, info, branch, scopePath, onStart, onValidationFail, preselectDims = [], project = null) {
@@ -136,7 +143,7 @@ function useDimensionSelection(allDimensions, info, branch, scopePath, onStart, 
 function useReEvaluateCard(project, onStart, projectInfo, preselectDims) {
   const api = useApi();
   const { getProjectInfo, relocateProject } = api;
-  const { info, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo, { getProjectInfo, relocateProject });
+  const { info, error, retry, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo, { getProjectInfo, relocateProject });
   const { allDimensions } = usePluginDimensions();
   const { showToast } = useSidePane();
   const [branch, setBranch] = useState(null);
@@ -151,7 +158,7 @@ function useReEvaluateCard(project, onStart, projectInfo, preselectDims) {
     useDimensionSelection(allDimensions, info, branch, scopePath, onStart, showToast, preselectDims, project);
 
   return {
-    info, error, allDimensions, selectedDims,
+    info, error, retry, allDimensions, selectedDims,
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
     isLocal, scanData, branch, setBranch, scopePath, setScopePath,
@@ -280,13 +287,25 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
 
 export default function ReEvaluateCard({ project, projectInfo, onStart, disabled, preselectDims }) {
   const {
-    info, error, allDimensions, selectedDims,
+    info, error, retry, allDimensions, selectedDims,
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
     isLocal, scanData, branch, setBranch, scopePath, setScopePath,
   } = useReEvaluateCard(project, onStart, projectInfo, preselectDims);
 
-  if (error) return null;
+  if (error) return (
+    <div className="panel evaluate-panel evaluate-panel--terminal">
+      <div className="evaluate-panel__top">
+        <TermHeader name="evaluate" sub="error" />
+      </div>
+      <EmptyState
+        title="Couldn't load this project"
+        description={error}
+        actionLabel="Retry"
+        onAction={retry}
+      />
+    </div>
+  );
   if (!info) return (
     <div className="panel evaluate-panel evaluate-panel--terminal">
       <div className="evaluate-panel__top">

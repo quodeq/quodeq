@@ -188,38 +188,53 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     // repositories tab; the copy is what differs.
     if (sharedHasContent) {
       return (
-        <EmptyState
-          title="No local projects yet"
-          description="Your team’s online repository has published projects you can browse without scanning anything locally."
-          actionLabel="Browse remote repositories"
-          onAction={() => onNavigate?.('projects')}
-        />
+        <div className="dashboard-page dashboard-fade dashboard-ready">
+          <EmptyState
+            title="No local projects yet"
+            description="Your team’s online repository has published projects you can browse without scanning anything locally."
+            actionLabel="Browse remote repositories"
+            onAction={() => onNavigate?.('projects')}
+          />
+        </div>
       );
     }
     return (
-      <EmptyState
-        title="No projects yet"
-        description="Add a project to start analyzing code quality."
-        actionLabel="Add a project"
-        onAction={() => onNavigate?.('projects')}
-      />
+      <div className="dashboard-page dashboard-fade dashboard-ready">
+        <EmptyState
+          title="No projects yet"
+          description="Add a project to start analyzing code quality."
+          actionLabel="Add a project"
+          onAction={() => onNavigate?.('projects')}
+        />
+      </div>
     );
   }
   if (!selectedProject) {
     return (
-      <EmptyState
-        title="No project selected"
-        description="Pick a project to view its overview."
-        actionLabel="Choose project"
-        onAction={() => onNavigate?.('projects')}
-      />
+      <div className="dashboard-page dashboard-fade dashboard-ready">
+        <EmptyState
+          title="No project selected"
+          description="Pick a project to view its overview."
+          actionLabel="Choose project"
+          onAction={() => onNavigate?.('projects')}
+        />
+      </div>
     );
   }
   const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
-  if (!loading && !isFetching && !dashboard) {
+  if (!loading && !dashboard && (error || !isFetching)) {
     // A failed fetch also lands here (dashboard === null, queries settled).
     // It must render as an error: claiming "No evaluations yet" on a
     // 404/500/timeout tells the user their existing evaluations are gone.
+    // While a retry is in flight (error still set, isFetching true), show
+    // the loader instead so clicking Retry visibly does something.
+    if (error && isFetching) {
+      return (
+        <div className="dashboard-page dashboard-fade dashboard-ready">
+          <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />
+        </div>
+      );
+    }
     if (error) {
       return (
         <div className="dashboard-page dashboard-fade dashboard-ready">

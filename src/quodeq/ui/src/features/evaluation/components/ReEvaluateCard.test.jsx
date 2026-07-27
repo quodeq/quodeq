@@ -221,6 +221,39 @@ describe('ReEvaluateCard clean-scan once consumption', () => {
   });
 });
 
+describe('ReEvaluateCard error state', () => {
+  beforeEach(() => { invalidateDimensionCache(); });
+
+  it('renders visible error UI instead of vanishing when getProjectInfo rejects', async () => {
+    const api = makeFakeApi({ getProjectInfo: vi.fn().mockRejectedValue(new Error('boom')) });
+    renderCard({ project: 'uuid-err', projectInfo: null, api });
+
+    await waitFor(() => {
+      expect(screen.getByText(/could not load project info/i)).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('retry re-invokes the info load', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const getProjectInfo = vi.fn().mockRejectedValue(new Error('boom'));
+    const api = makeFakeApi({ getProjectInfo });
+    renderCard({ project: 'uuid-retry', projectInfo: null, api });
+
+    await waitFor(() => {
+      expect(screen.getByText(/could not load project info/i)).toBeInTheDocument();
+    });
+    expect(getProjectInfo).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => {
+      expect(getProjectInfo).toHaveBeenCalledTimes(2);
+    });
+  });
+});
+
 describe('ReEvaluateCard preselection seeding', () => {
   beforeEach(() => { invalidateDimensionCache(); });
 

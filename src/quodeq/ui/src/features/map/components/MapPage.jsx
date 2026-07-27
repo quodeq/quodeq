@@ -154,9 +154,9 @@ function MapVizContainer({ vizState, treeState, dimensions, callbacks, display }
   );
 }
 
-function MapEmpty({ sub, children }) {
+function MapEmpty({ sub, children, refreshing }) {
   return (
-    <div className="map-page map-page--terminal">
+    <div className={`map-page map-page--terminal${refreshing ? ' dashboard-refreshing' : ''}`}>
       <TermHeader name="map" sub={sub} />
       {children}
     </div>
@@ -165,8 +165,8 @@ function MapEmpty({ sub, children }) {
 
 export default function MapPage(props) {
   const { data = {}, callbacks = {} } = props;
-  const { projects = [], projectsLoaded, selectedProject, selectedSource = 'local', projectName, loading, isFetching } = data;
-  const { onNavigate } = callbacks;
+  const { projects = [], projectsLoaded, selectedProject, selectedSource = 'local', projectName, loading, isFetching, error } = data;
+  const { onNavigate, onRetry } = callbacks;
 
   // Call the hook unconditionally to keep hook order stable across renders.
   // The hook tolerates missing data — `state.allDimensions` is `[]` when there
@@ -198,15 +198,46 @@ export default function MapPage(props) {
       </MapEmpty>
     );
   }
+  const isRefreshing = isFetching && !loading;
   if (state.allDimensions.length === 0) {
-    if (loading || isFetching) return <LoadingScreen />;
+    if (loading) {
+      return (
+        <MapEmpty sub="loading…">
+          <LoadingScreen variant="inline" />
+        </MapEmpty>
+      );
+    }
+    // A failed fetch with nothing to show must render as an error, not the
+    // "no evaluations yet" empty state -- otherwise a 404/500/timeout tells
+    // the user their existing evaluations are gone. While a retry is in
+    // flight (error still set, isFetching true), show the loader instead so
+    // clicking Retry visibly does something.
+    if (error) {
+      if (isFetching) {
+        return (
+          <MapEmpty sub="loading…">
+            <LoadingScreen variant="inline" />
+          </MapEmpty>
+        );
+      }
+      return (
+        <MapEmpty sub="error">
+          <EmptyState
+            title="Couldn't load this project"
+            description={error}
+            actionLabel="Retry"
+            onAction={() => onRetry?.()}
+          />
+        </MapEmpty>
+      );
+    }
     // Shared projects are read-only in the app -- evaluations only ever run
     // locally, so "Start evaluation" has nowhere useful to send a
     // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
     // precedent this mirrors).
     if (selectedSource === 'shared') {
       return (
-        <MapEmpty sub="no evaluations yet">
+        <MapEmpty sub="no evaluations yet" refreshing={isRefreshing}>
           <EmptyState
             title="No completed evaluation yet"
             description="no completed evaluation in this remote project yet"
@@ -215,7 +246,7 @@ export default function MapPage(props) {
       );
     }
     return (
-      <MapEmpty sub="no evaluations yet">
+      <MapEmpty sub="no evaluations yet" refreshing={isRefreshing}>
         <EmptyState
           title="No evaluations yet"
           description={`Run an evaluation for ${projectName || selectedProject} to populate this page.`}
@@ -230,7 +261,7 @@ export default function MapPage(props) {
   const ratio = complianceRatio(viol, state.currentNode.compliance);
 
   return (
-    <div className="map-page map-page--terminal">
+    <div className={`map-page map-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
       <div className="map-page__top">
         <TermHeader
           name="map"

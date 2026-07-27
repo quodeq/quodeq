@@ -194,6 +194,18 @@ describe('DashboardPage fetch-failure state', () => {
     );
     expect(getByText('No evaluations yet')).toBeTruthy();
   });
+
+  // P4-T2: clicking Retry sets isFetching while loading stays false and
+  // error stays set (react-query's shape for a refetch of a query that's
+  // already settled into an error). That state used to render the error
+  // branch with no feedback at all -- Retry visibly did nothing.
+  it('shows the inline loader instead of the error state while a retry is in flight', () => {
+    const { container, queryByText } = render(
+      <DashboardPage data={{ ...errorData, isFetching: true }} callbacks={{}} runMode={false} />,
+    );
+    expect(queryByText("Couldn't load this project")).toBeNull();
+    expect(container.querySelector('.loading-screen')).toBeTruthy();
+  });
 });
 
 // Scenario 2 (collision): runMode renders RunOverviewPanel, which has its own
@@ -313,6 +325,66 @@ describe('DashboardPage, teammate persona: shared selection + zero local project
     );
     expect(getByText('No projects yet')).toBeTruthy();
     expect(getByText('Add a project')).toBeTruthy();
+  });
+});
+
+// P4: the Overview's frame must stay mounted across every state, including
+// the "no projects"/"no project selected" empty branches -- otherwise the
+// page jumps (no .dashboard-page wrapper, then one appears) the moment real
+// content shows up. The error and no-completed-evaluation branches already
+// wrap in .dashboard-page; these bare EmptyState returns did not.
+describe('DashboardPage frame stability in empty branches', () => {
+  const zeroLocalProjectsData = {
+    projectsLoaded: true,
+    projects: [],
+    selectedSource: 'local',
+    selectedProject: '',
+    sharedProjectInfo: null,
+    dashboard: null,
+    accumulated: { dimensions: [] },
+    loading: false,
+    isFetching: false,
+    error: null,
+    availableRuns: [],
+  };
+
+  it('wraps the no-local-projects (local source) empty state in .dashboard-page', () => {
+    const { container, getByText } = render(
+      <DashboardPage
+        data={{ ...zeroLocalProjectsData, sharedHasContent: false }}
+        callbacks={{}}
+        runMode={false}
+      />,
+    );
+    const page = container.querySelector('.dashboard-page');
+    expect(page).toBeTruthy();
+    expect(page.contains(getByText('No projects yet'))).toBe(true);
+  });
+
+  it('wraps the no-local-projects-but-shared-content empty state in .dashboard-page', () => {
+    const { container, getByText } = render(
+      <DashboardPage
+        data={{ ...zeroLocalProjectsData, sharedHasContent: true }}
+        callbacks={{}}
+        runMode={false}
+      />,
+    );
+    const page = container.querySelector('.dashboard-page');
+    expect(page).toBeTruthy();
+    expect(page.contains(getByText('No local projects yet'))).toBe(true);
+  });
+
+  it('wraps the no-project-selected empty state in .dashboard-page', () => {
+    const { container, getByText } = render(
+      <DashboardPage
+        data={{ projectsLoaded: true, projects: [{ id: 'p1', name: 'p1' }], selectedProject: '', loading: false, isFetching: false, error: null, availableRuns: [] }}
+        callbacks={{}}
+        runMode={false}
+      />,
+    );
+    const page = container.querySelector('.dashboard-page');
+    expect(page).toBeTruthy();
+    expect(page.contains(getByText('No project selected'))).toBe(true);
   });
 });
 

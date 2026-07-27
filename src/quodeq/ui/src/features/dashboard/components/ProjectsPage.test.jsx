@@ -58,6 +58,39 @@ describe('ProjectsPage', () => {
   });
 });
 
+// P4: ProjectsPage previously had no loading signal at all, so the empty
+// local-projects array during the initial fetch rendered the "Add your first
+// project" CTA -- a false-empty flash before the real list ever had a chance
+// to arrive. `projectsLoaded` now gates that, mirroring the other pages'
+// !projectsLoaded contract (frame stays, contained loader, no fullscreen).
+describe('ProjectsPage — initial loading gate (P4)', () => {
+  it('renders a contained loader inside the page frame while projectsLoaded is false, not the empty CTA', async () => {
+    const fakeApi = makeFakeApi();
+    const { container } = renderWithApi(
+      <ProjectsPage projects={[]} projectsLoaded={false} actions={{}} />,
+      fakeApi,
+    );
+    const frame = container.querySelector('.projects-page');
+    expect(frame).toBeTruthy();
+    const loader = frame.querySelector('.loading-screen--inline');
+    expect(loader).toBeTruthy();
+    expect(screen.queryByText('Add your first project')).not.toBeInTheDocument();
+    // The header must not claim "0 repositories evaluated" while the real
+    // count is still unknown -- match the "loading…" vocabulary used by
+    // the other pages' TermHeader subs (Violations/Map/History).
+    expect(screen.queryByText(/repositories evaluated/)).not.toBeInTheDocument();
+    expect(screen.getByText('loading…')).toBeInTheDocument();
+  });
+
+  it('renders the empty CTA once projectsLoaded is true and there are still no projects', async () => {
+    const fakeApi = makeFakeApi();
+    const { container } = renderWithApi(<ProjectsPage projects={[]} projectsLoaded actions={{}} />, fakeApi);
+    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
+    expect(screen.getByText('Add your first project')).toBeInTheDocument();
+    expect(container.querySelector('.loading-screen--inline')).not.toBeInTheDocument();
+  });
+});
+
 // Task 7: tabs are gone. Local and shared projects render together in one
 // list, filtered/sorted via a controlled toolbar (state lives in the nav
 // stack, see actions.onFiltersChange).

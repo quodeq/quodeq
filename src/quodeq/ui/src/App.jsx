@@ -555,6 +555,7 @@ function ViolationsRoute({ params, props }) {
         projectName: props.dashboardData.selectedDisplayName,
         loading: props.dashboardData.loading,
         isFetching: props.dashboardData.isFetching,
+        error: props.dashboardData.error,
         dismissRefreshKey: props.dismissRefreshKey,
       }}
       callbacks={{
@@ -583,6 +584,7 @@ function ViolationsRoute({ params, props }) {
         onRefresh: props.refreshDashboard,
         onReconcile: props.scheduleDashboardReconcile,
         onNavigate: nav,
+        onRetry: props.dashboardData.onRetry,
       }}
       isDirectNav={props.navigation.navStackLength === 1}
       tabKey={params._tabKey || 0}
@@ -612,8 +614,9 @@ export const ROUTE_RENDERERS = {
         selectedSource: props.navigation.selectedSource,
         loading: props.dashboardData.loading,
         isFetching: props.dashboardData.isFetching,
+        error: props.dashboardData.error,
       }}
-      callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard }}
+      callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard, onRetry: props.dashboardData.onRetry }}
       isDirectNav={isDirectNav}
       tabKey={params._tabKey || 0}
     />;
@@ -652,6 +655,8 @@ export const ROUTE_RENDERERS = {
         selectedSource={props.navigation.selectedSource}
         loading={props.dashboardData.loading}
         isFetching={props.dashboardData.isFetching}
+        error={props.dashboardData.error}
+        onRetry={props.dashboardData.onRetry}
         projectInfo={props.navigation.projects?.find((p) => (p.id || p.name) === props.navigation.selectedProject) || null}
       />
     );
@@ -738,7 +743,7 @@ export const ROUTE_RENDERERS = {
     }}
   />,
   'grade-formula': (params, props) => <GradeFormulaPage navigation={props.navigation} />,
-  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} filters={params.filters} actions={{ onSelect: (id, source) => { props.navigation.handleProjectChange(id, source); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup, onFiltersChange: (filters) => props.navigation.handleNavigateReplace('projects', { filters }), onProjectsReload: props.navigation.loadProjects }} />,
+  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} projectsLoaded={props.navigation.projectsLoaded} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} filters={params.filters} actions={{ onSelect: (id, source) => { props.navigation.handleProjectChange(id, source); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup, onFiltersChange: (filters) => props.navigation.handleNavigateReplace('projects', { filters }), onProjectsReload: props.navigation.loadProjects }} />,
   standards: (params, props) => <StandardsPage onRescan={(dims) => props.navigation.navTab('evaluate', { preselectDims: dims })} />,
   help: () => <HelpPage />,
 };

@@ -2131,6 +2131,7 @@
 /* ── Violations tab ─────────────────────────── */
 
 .violations-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -2331,6 +2332,7 @@
 /* ── Projects page ─────────────────────────────────────── */
 
 .projects-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);

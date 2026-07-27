@@ -193,8 +193,8 @@ export function ViolationsSubTabContent(props) {
 
 export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
   const { accumulatedDimensions = [], selectedProject, dismissRefreshKey = 0, selectedSource = 'local' } = data;
-  const { projects = [], projectsLoaded, projectName, loading, isFetching } = data;
-  const { onNavigate, onRefresh, onReconcile } = callbacks;
+  const { projects = [], projectsLoaded, projectName, loading, isFetching, error } = data;
+  const { onNavigate, onRefresh, onReconcile, onRetry } = callbacks;
 
   // Fresh tab click (tabKey changed) drops the cached navigation state so
   // the user lands at the default sub-tab / root path. Round-tripping
@@ -270,15 +270,49 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
     );
   }
   const hasAnyDimensionData = (accumulatedDimensions || []).length > 0;
+  const isRefreshing = isFetching && !loading;
   if (!hasAnyDimensionData) {
-    if (loading || isFetching) return <LoadingScreen />;
+    if (loading) {
+      return (
+        <div className="violations-page violations-page--terminal">
+          <TermHeader name="violations" sub="loading…" />
+          <LoadingScreen variant="inline" />
+        </div>
+      );
+    }
+    // A failed fetch with nothing to show must render as an error, not the
+    // "no evaluations yet" empty state -- otherwise a 404/500/timeout tells
+    // the user their existing evaluations are gone. While a retry is in
+    // flight (error still set, isFetching true), show the loader instead so
+    // clicking Retry visibly does something.
+    if (error) {
+      if (isFetching) {
+        return (
+          <div className="violations-page violations-page--terminal">
+            <TermHeader name="violations" sub="loading…" />
+            <LoadingScreen variant="inline" />
+          </div>
+        );
+      }
+      return (
+        <div className="violations-page violations-page--terminal">
+          <TermHeader name="violations" sub="error" />
+          <EmptyState
+            title="Couldn't load this project"
+            description={error}
+            actionLabel="Retry"
+            onAction={() => onRetry?.()}
+          />
+        </div>
+      );
+    }
     // Shared projects are read-only in the app -- evaluations only ever run
     // locally, so "Start evaluation" has nowhere useful to send a
     // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
     // precedent this mirrors).
     if (selectedSource === 'shared') {
       return (
-        <div className="violations-page violations-page--terminal">
+        <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
           <TermHeader name="violations" sub="no evaluations yet" />
           <EmptyState
             title="No completed evaluation yet"
@@ -288,7 +322,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
       );
     }
     return (
-      <div className="violations-page violations-page--terminal">
+      <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
         <TermHeader name="violations" sub="no evaluations yet" />
         <EmptyState
           title="No evaluations yet"
@@ -315,7 +349,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
   );
 
   return (
-    <div className="violations-page violations-page--terminal">
+    <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
       {restoreError && <div className="error-banner">{restoreError}</div>}
       <div className="violations-page__top">
         <TermHeader
