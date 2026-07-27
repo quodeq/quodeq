@@ -9,6 +9,7 @@ import pytest
 from flask import Flask
 
 from quodeq.api.terminal_routes import register_terminal_routes
+from quodeq.terminal.sessions import TerminalSessionRegistry
 from quodeq.terminal.links import (
     Editor,
     build_open_argv,
@@ -245,7 +246,11 @@ def app():
     app = Flask(__name__)
     app.config["QUODEQ_API_KEY"] = None
     app.config["QUODEQ_BIND_HOST"] = "127.0.0.1"
-    register_terminal_routes(app, manager=_FakeManager())
+    registry = TerminalSessionRegistry(manager_factory=_FakeManager)
+    # /resolve and /open with no explicit session fall back to the first LIVE
+    # session's pid — mirror the old always-present manager.
+    registry.create().manager._alive = True
+    register_terminal_routes(app, registry=registry)
     return app
 
 

@@ -1128,7 +1128,8 @@ export default function App() {
             <LlamaCppLogProvider>
               <VerifiedFindingsProvider project={state.selectedProject} source={state.selectedSource}>
               <AppShell
-          drawer={<BottomDrawer uiState={assistantCtx.uiState} />}
+          drawer={<BottomDrawer uiState={assistantCtx.uiState} projectName={resolvedDisplayName}
+            onOpenSettings={() => navTab('settings')} />}
           sidebar={
             <Sidebar
               activeTab={activeTab}

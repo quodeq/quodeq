@@ -6,6 +6,7 @@ import pytest
 from flask import Flask
 
 from quodeq.api.terminal_routes import _apply_control, register_terminal_routes
+from quodeq.terminal.sessions import TerminalSessionRegistry
 from tests._timeouts import budget
 
 try:
@@ -29,6 +30,8 @@ class _FakeManager:
     def kill(self): self.killed = True; self._alive = False
     @property
     def alive(self): return self._alive
+    @property
+    def pid(self): return None
 
 
 @pytest.fixture()
@@ -36,7 +39,9 @@ def app():
     app = Flask(__name__)
     app.config["QUODEQ_API_KEY"] = None
     app.config["QUODEQ_BIND_HOST"] = "127.0.0.1"
-    register_terminal_routes(app, manager=_FakeManager())
+    # Real registry, fake PTYs: the registry is cheap and its locking/naming
+    # behavior is part of what the routes rely on.
+    register_terminal_routes(app, registry=TerminalSessionRegistry(manager_factory=_FakeManager))
     return app
 
 
@@ -44,7 +49,9 @@ def test_status_allowed_on_loopback(app):
     c = app.test_client()
     r = c.get("/api/terminal/status", headers={"Origin": "http://localhost"}, base_url="http://localhost")
     assert r.status_code == 200
-    assert r.get_json()["enabled"] is True
+    body = r.get_json()
+    assert body["enabled"] is True
+    assert isinstance(body["shell"], str) and body["shell"]
 
 
 def test_status_enabled_without_origin_header(app):
@@ -73,12 +80,62 @@ def test_kill_refused_when_gated(app):
     assert r.status_code == 403
 
 
-def test_kill_ok_on_loopback(app):
-    manager = app.extensions["terminal_manager"]
+def test_kill_kills_all_sessions(app):
+    registry = app.extensions["terminal_registry"]
+    a = registry.create(); b = registry.create()
     c = app.test_client()
     r = c.post("/api/terminal/kill", headers={"Origin": "http://localhost"}, base_url="http://localhost")
     assert r.status_code == 200
-    assert manager.killed is True
+    assert a.manager.killed and b.manager.killed
+    assert registry.list() == []
+
+
+# --- session CRUD routes ---
+
+def test_sessions_list_without_origin_header(app):
+    # Same-origin GET like /status: must NOT require an Origin header.
+    c = app.test_client()
+    r = c.get("/api/terminal/sessions", base_url="http://localhost")
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["sessions"] == [] and body["max"] == TerminalSessionRegistry.MAX_SESSIONS
+
+
+def test_session_create_and_list(app):
+    c = app.test_client()
+    r = c.post("/api/terminal/sessions", headers={"Origin": "http://localhost"}, base_url="http://localhost")
+    assert r.status_code == 201
+    created = r.get_json()
+    assert created["id"] and "· 1" in created["name"]
+    listed = c.get("/api/terminal/sessions", base_url="http://localhost").get_json()["sessions"]
+    assert [s["id"] for s in listed] == [created["id"]]
+
+
+def test_session_create_refused_past_cap(app):
+    c = app.test_client()
+    for _ in range(TerminalSessionRegistry.MAX_SESSIONS):
+        assert c.post("/api/terminal/sessions", headers={"Origin": "http://localhost"},
+                      base_url="http://localhost").status_code == 201
+    r = c.post("/api/terminal/sessions", headers={"Origin": "http://localhost"}, base_url="http://localhost")
+    assert r.status_code == 409
+
+
+def test_session_kill_removes_only_that_session(app):
+    registry = app.extensions["terminal_registry"]
+    a = registry.create(); b = registry.create()
+    c = app.test_client()
+    r = c.post(f"/api/terminal/sessions/{a.id}/kill",
+               headers={"Origin": "http://localhost"}, base_url="http://localhost")
+    assert r.status_code == 200
+    assert a.manager.killed and not b.manager.killed
+    assert [s["id"] for s in registry.list()] == [b.id]
+
+
+def test_session_kill_unknown_is_404(app):
+    c = app.test_client()
+    r = c.post("/api/terminal/sessions/nope/kill",
+               headers={"Origin": "http://localhost"}, base_url="http://localhost")
+    assert r.status_code == 404
 
 
 class _ResizeRecorder:
@@ -120,7 +177,7 @@ def test_apply_control_clamps_out_of_range_resize(payload):
     assert 1 <= rows <= 65535
 
 
-# --- WebSocket integration (single-connection guard + spawn-failure handling) ---
+# --- WebSocket integration (per-session connection guard + spawn-failure handling) ---
 
 class _LiveManager:
     """Stays alive; scrollback is a sync beacon proving the handler holds the lock."""
@@ -134,6 +191,8 @@ class _LiveManager:
     def kill(self): self._alive = False
     @property
     def alive(self): return self._alive
+    @property
+    def pid(self): return None
 
 
 class _FlakyManager(_LiveManager):
@@ -149,28 +208,30 @@ class _FlakyManager(_LiveManager):
 
 
 @contextlib.contextmanager
-def _serve(manager):
+def _serve(manager_factory):
     app = Flask(__name__)
     app.config["QUODEQ_API_KEY"] = None
     app.config["QUODEQ_BIND_HOST"] = "127.0.0.1"
-    register_terminal_routes(app, manager=manager)
+    registry = TerminalSessionRegistry(manager_factory=manager_factory)
+    register_terminal_routes(app, registry=registry)
     srv = make_server("127.0.0.1", 0, app, threaded=True)
     t = threading.Thread(target=srv.serve_forever, daemon=True)
     t.start()
     try:
-        yield srv.server_port
+        yield srv.server_port, registry
     finally:
         srv.shutdown()
         t.join(timeout=budget(2))
 
 
 @contextlib.contextmanager
-def _connect(port):
+def _connect(port, session=None):
     # werkzeug's WS handshake exposes request.host without the port, so the
     # Origin must match that (browsers keep Host+Origin consistent for real).
-    c = _Client(
-        f"ws://127.0.0.1:{port}/api/terminal/ws",
-        headers={"Origin": "http://127.0.0.1"})
+    url = f"ws://127.0.0.1:{port}/api/terminal/ws"
+    if session is not None:
+        url += f"?session={session}"
+    c = _Client(url, headers={"Origin": "http://127.0.0.1"})
     try:
         yield c
     finally:
@@ -206,11 +267,11 @@ if _WS_OK:
 
 
 @_ws_test
-def test_ws_single_active_connection_refuses_second():
-    with _serve(_LiveManager()) as port:
-        with _connect(port) as a:
+def test_ws_single_active_connection_refuses_second_same_session():
+    with _serve(_LiveManager) as (port, _):
+        with _connect(port) as a:      # no id -> default session
             assert a.receive(timeout=budget(_RECV_TIMEOUT)) == "0ready\n"   # A acquired the conn lock
-            with _connect(port) as b:
+            with _connect(port) as b:  # no id -> SAME default session
                 msg = None
                 with contextlib.suppress(simple_websocket.ConnectionClosed):
                     msg = b.receive(timeout=budget(_RECV_TIMEOUT))
@@ -221,7 +282,7 @@ def test_ws_single_active_connection_refuses_second():
 def test_ws_busy_close_uses_dedicated_code():
     # The client must NOT auto-reconnect against a held lock (it would ping-pong
     # and spam the other window), so the refusal carries close code 4002.
-    with _serve(_LiveManager()) as port:
+    with _serve(_LiveManager) as (port, _):
         with _connect(port) as a:
             assert a.receive(timeout=budget(2)) == "0ready\n"
             with _connect(port) as b:
@@ -232,10 +293,33 @@ def test_ws_busy_close_uses_dedicated_code():
 
 
 @_ws_test
+def test_ws_two_sessions_stream_concurrently():
+    # The busy lock is per session: a client on session A must not block a
+    # client on session B.
+    with _serve(_LiveManager) as (port, registry):
+        sa = registry.create(); sb = registry.create()
+        with _connect(port, session=sa.id) as a:
+            assert a.receive(timeout=budget(_RECV_TIMEOUT)) == "0ready\n"
+            with _connect(port, session=sb.id) as b:
+                assert b.receive(timeout=budget(_RECV_TIMEOUT)) == "0ready\n"
+
+
+@_ws_test
+def test_ws_unknown_session_closes_with_not_found_code():
+    # Stale tab id (server restarted): close 4004 tells the client to reconcile
+    # via /sessions instead of retrying the dead URL.
+    with _serve(_LiveManager) as (port, _):
+        with _connect(port, session="deadbeef") as c:
+            with pytest.raises(simple_websocket.ConnectionClosed) as exc:
+                c.receive(timeout=budget(2))
+            assert exc.value.reason == 4004
+
+
+@_ws_test
 def test_ws_gate_refusal_close_uses_dedicated_code():
     # Bad Origin -> gate refuses the handshake with close code 4003 so the
     # client reports it instead of retrying forever.
-    with _serve(_LiveManager()) as port:
+    with _serve(_LiveManager) as (port, _):
         c = simple_websocket.Client(
             f"ws://127.0.0.1:{port}/api/terminal/ws",
             headers={"Origin": "http://evil.example"})
@@ -250,7 +334,7 @@ def test_ws_gate_refusal_close_uses_dedicated_code():
 
 @_ws_test
 def test_ws_spawn_failure_closes_cleanly_and_frees_lock():
-    with _serve(_FlakyManager()) as port:
+    with _serve(_FlakyManager) as (port, _):
         with _connect(port) as first:       # ensure_session raises -> clean close
             with contextlib.suppress(simple_websocket.ConnectionClosed):
                 first.receive(timeout=budget(_RECV_TIMEOUT))    # must not hang / must not 500

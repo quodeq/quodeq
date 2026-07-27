@@ -1,0 +1,198 @@
+/* Terminal panel chrome: its own header, session tab strip, and status bar
+   (the shared drawer header is gone — each panel carries its own). Class
+   prefix tty- matches drawer.css; everything themes through semantic tokens,
+   the mockup's hardcoded palette maps onto --color-accent and friends. */
+
+.tty-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+.tty-panel-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 1rem;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tty-icon-block {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 0.4rem;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-family: var(--font-data);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.tty-panel-title {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.tty-localhost-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.125rem 0.55rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-family: var(--font-data);
+  font-size: 0.625rem;
+  white-space: nowrap;
+}
+.tty-localhost-pill svg { color: var(--color-success); }
+
+.tty-panel-controls {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.tty-copy-btn--done {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+/* ── Session tab strip ──────────────────────────────────── */
+.tty-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 0.5rem;
+  background: var(--color-surface);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tty-tabs::-webkit-scrollbar { display: none; }
+
+.tty-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem 0.35rem;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  border-top: 2px solid transparent;
+  font-family: var(--font-data);
+  font-size: 0.75rem;
+  user-select: none;
+}
+.tty-tab:hover { color: var(--color-text); }
+.tty-tab:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+/* The active tab visually connects to the console below: same background,
+   accent rule on top. */
+.tty-tab--active {
+  background: var(--color-console-bg);
+  color: var(--color-console-text);
+  border-top-color: var(--color-accent);
+  border-left: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
+  border-radius: 0 0 2px 2px;
+}
+
+.tty-tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--color-border);
+}
+.tty-tab--active .tty-tab-dot { background: var(--color-success); }
+
+.tty-tab-close {
+  width: 1.05rem;
+  height: 1.05rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+.tty-tab-close:hover { color: var(--color-danger); }
+.tty-tab-close svg { width: 9px; height: 9px; }
+
+.tty-tab-add {
+  align-self: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  margin-left: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0.35rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+.tty-tab-add:hover:not(:disabled) {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+.tty-tab-add:disabled { opacity: 0.4; cursor: default; }
+
+/* The header-row "+" shown while the tab strip is hidden (single session). */
+.tty-header-add { margin-left: 0; }
+
+/* ── Session views ──────────────────────────────────────── */
+.tty-views {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* .tty-wrap keeps its 100%-height rules from drawer.css; inside the column
+   flexbox that means it fills whatever the chrome rows leave over. */
+.tty-views .tty-wrap { flex: 1 1 auto; height: auto; }
+
+/* ── Status bar ─────────────────────────────────────────── */
+.tty-statusbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 1rem;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  font-family: var(--font-data);
+  font-size: 0.625rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.tty-statusbar-sep { color: var(--color-border); }
+.tty-statusbar-spacer { flex: 1; }
+.tty-statusbar-cwd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40%;
+}
