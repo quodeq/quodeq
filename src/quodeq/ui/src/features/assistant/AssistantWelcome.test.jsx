@@ -12,12 +12,11 @@ const catalog = {
   actions: [],
 };
 
-it('lists meta commands as text, skills as pills only', () => {
+it('shows skills as suggestion cards and no slash-command list (the composer "/" menu covers that)', () => {
   render(<AssistantWelcome catalog={catalog} view="overview" onPick={() => {}} />);
-  expect(screen.getByText('/help')).toBeInTheDocument();
-  expect(screen.getByText('/clear')).toBeInTheDocument();
-  expect(screen.queryByText('/actions')).toBeNull(); // hidden meta stays out
-  expect(screen.queryByText('/explain-score')).toBeNull(); // skills are pills, not text
+  expect(screen.queryByText('/help')).toBeNull();
+  expect(screen.queryByText('/clear')).toBeNull();
+  expect(screen.queryByText('/explain-score')).toBeNull(); // skills are cards, not text
   expect(screen.getByRole('button', { name: 'Explain score' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Create standard' })).toBeInTheDocument();
 });
@@ -29,19 +28,11 @@ it('pill click pre-fills, does not send', () => {
   expect(onPick).toHaveBeenCalledWith('/explain-score ');
 });
 
-it('renders without a catalog (fetch failed)', () => {
+it('renders without a catalog (fetch failed): intro only, no cards', () => {
   const { container } = render(<AssistantWelcome catalog={null} view="overview" onPick={() => {}} />);
-  expect(screen.getByText('/help')).toBeInTheDocument();
-  // No suggestion cards without a catalog (slash-command rows still render).
+  expect(screen.getByText(/explain scores/i)).toBeInTheDocument();
   expect(container.querySelector('.assistant-suggest-card')).toBeNull();
   expect(screen.queryByText('Suggested')).toBeNull();
-});
-
-it('slash-command row click pre-fills the composer', () => {
-  const onPick = vi.fn();
-  render(<AssistantWelcome catalog={catalog} view="overview" onPick={onPick} />);
-  fireEvent.click(screen.getByText('/help'));
-  expect(onPick).toHaveBeenCalledWith('/help ');
 });
 
 const RO_CATALOG = { skills: [

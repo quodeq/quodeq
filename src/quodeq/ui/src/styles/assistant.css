@@ -727,42 +727,6 @@
   color: var(--color-text-muted);
 }
 
-/* Slash commands: a bordered menu of full-width rows. */
-.assistant-cmd-list {
-  border: 1px solid var(--color-border);
-  border-radius: 0.7rem;
-  overflow: hidden;
-}
-.assistant-cmd-row {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  width: 100%;
-  text-align: left;
-  padding: 0.55rem 0.8rem;
-  background: var(--color-surface);
-  border: none;
-  border-bottom: 1px solid var(--color-border);
-  cursor: pointer;
-}
-.assistant-cmd-row:last-child { border-bottom: none; }
-.assistant-cmd-row:hover { background: var(--color-surface-alt); }
-.assistant-cmd-badge {
-  font-family: var(--font-data);
-  font-size: 0.71875rem;
-  font-weight: 500;
-  color: var(--color-accent);
-  background: var(--color-accent-soft);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 20%, transparent);
-  border-radius: 0.375rem;
-  padding: 0.1rem 0.5rem;
-  flex-shrink: 0;
-}
-.assistant-cmd-desc {
-  font-family: var(--font-sans);
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-}
 
 .assistant-command-menu { position: absolute; bottom: 100%; left: 0; right: 0; margin-bottom: 4px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; overflow: hidden; z-index: 10; }
 .assistant-command-item { display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left; padding: 6px 10px; background: none; border: none; color: var(--color-text); cursor: pointer; font-size: 12px; }
