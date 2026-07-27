@@ -95,9 +95,9 @@ function DeltaText({ delta }) {
   return <span className={cls}>{sign}{trimTrailingZero(abs)}</span>;
 }
 
-function HistoryEmptyShell({ sub, children }) {
+function HistoryEmptyShell({ sub, children, refreshing }) {
   return (
-    <div className="history-page history-page--terminal">
+    <div className={`history-page history-page--terminal${refreshing ? ' dashboard-refreshing' : ''}`}>
       <TermHeader name="history" sub={sub} />
       {children}
     </div>
@@ -330,7 +330,7 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
   );
 }
 
-function HistoryContent({ data, callbacks, runNav, languageSub, selectedSource }) {
+function HistoryContent({ data, callbacks, runNav, languageSub, selectedSource, isRefreshing }) {
   const { trend, selectedRunId, availableRuns } = data;
   const { onRunClick, onRunHover, onRunHoverEnd, onRunChange, onDeleteRun } = callbacks;
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
@@ -358,7 +358,7 @@ function HistoryContent({ data, callbacks, runNav, languageSub, selectedSource }
   const deltas = useMemo(() => computeDeltas(visible), [visible]);
 
   return (
-    <div className="history-page history-page--terminal">
+    <div className={`history-page history-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
       <div className="history-page__top">
         <TermHeader
           name="history"
@@ -507,15 +507,22 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   // in-progress, minus hidden failures), not just `trend`. A project whose
   // only runs are cancelled has an empty trend but real rows to list, and
   // its scores already show on the Overview.
+  const isRefreshing = isFetching && !loading;
   if (visibleHistoryRows(availableRuns, trend).length === 0) {
-    if (loading || isFetching) return <LoadingScreen />;
+    if (loading) {
+      return (
+        <HistoryEmptyShell sub="loading…">
+          <LoadingScreen variant="inline" />
+        </HistoryEmptyShell>
+      );
+    }
     // Shared projects are read-only in the app -- evaluations only ever run
     // locally, so "Start evaluation" has nowhere useful to send a
     // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
     // precedent this mirrors).
     if (selectedSource === 'shared') {
       return (
-        <HistoryEmptyShell sub="no evaluations yet">
+        <HistoryEmptyShell sub="no evaluations yet" refreshing={isRefreshing}>
           <EmptyState
             title="No completed evaluation yet"
             description="no completed evaluation in this remote project yet"
@@ -525,7 +532,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
     }
     const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
     return (
-      <HistoryEmptyShell sub="no evaluations yet">
+      <HistoryEmptyShell sub="no evaluations yet" refreshing={isRefreshing}>
         <EmptyState
           title="No evaluations yet"
           description={`Run an evaluation for ${projectName} to populate this page.`}
@@ -539,6 +546,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   return (
     <HistoryContent
       data={{ trend, selectedRunId, availableRuns }}
+      isRefreshing={isRefreshing}
       callbacks={{
         onRunClick, onRunHover: prefetchRun, onRunHoverEnd: cancelPrefetch, onRunChange,
         // Shared-repo runs have no delete route on the backend (mutation is

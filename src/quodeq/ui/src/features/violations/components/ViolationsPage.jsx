@@ -270,15 +270,23 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
     );
   }
   const hasAnyDimensionData = (accumulatedDimensions || []).length > 0;
+  const isRefreshing = isFetching && !loading;
   if (!hasAnyDimensionData) {
-    if (loading || isFetching) return <LoadingScreen />;
+    if (loading) {
+      return (
+        <div className="violations-page violations-page--terminal">
+          <TermHeader name="violations" sub="loading…" />
+          <LoadingScreen variant="inline" />
+        </div>
+      );
+    }
     // Shared projects are read-only in the app -- evaluations only ever run
     // locally, so "Start evaluation" has nowhere useful to send a
     // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
     // precedent this mirrors).
     if (selectedSource === 'shared') {
       return (
-        <div className="violations-page violations-page--terminal">
+        <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
           <TermHeader name="violations" sub="no evaluations yet" />
           <EmptyState
             title="No completed evaluation yet"
@@ -288,7 +296,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
       );
     }
     return (
-      <div className="violations-page violations-page--terminal">
+      <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
         <TermHeader name="violations" sub="no evaluations yet" />
         <EmptyState
           title="No evaluations yet"
@@ -315,7 +323,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
   );
 
   return (
-    <div className="violations-page violations-page--terminal">
+    <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
       {restoreError && <div className="error-banner">{restoreError}</div>}
       <div className="violations-page__top">
         <TermHeader

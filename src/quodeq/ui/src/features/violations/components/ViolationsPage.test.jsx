@@ -156,6 +156,37 @@ describe('ViolationsPage — mount-effect onRefresh does not reach onReconcile (
   });
 });
 
+describe('ViolationsPage — scenario 9: loader gate, containment, refresh dim', () => {
+  it('background refetch over an empty project keeps the empty state, no loader', () => {
+    const { container } = renderPage(baseData({ loading: false, isFetching: true }));
+    expect(container.querySelector('.loading-screen')).toBeNull();
+    expect(screen.getByText('No completed evaluation yet')).toBeInTheDocument();
+  });
+
+  it('initial load renders exactly one inline loader inside the page frame', () => {
+    const { container } = renderPage(baseData({ loading: true, isFetching: true }));
+    expect(container.querySelectorAll('.loading-screen').length).toBe(1);
+    const loader = container.querySelector('.loading-screen--inline');
+    expect(loader).not.toBeNull();
+    const frame = container.querySelector('.violations-page--terminal');
+    expect(frame).not.toBeNull();
+    expect(frame.contains(loader)).toBe(true);
+  });
+
+  it('applies the refresh dim class to the empty state during a background refetch', () => {
+    const { container } = renderPage(baseData({ loading: false, isFetching: true }));
+    expect(container.querySelector('.violations-page--terminal').className).toContain('dashboard-refreshing');
+  });
+
+  it('applies the refresh dim class to real content during a background refetch', () => {
+    const { container } = renderPage(baseData({
+      accumulatedDimensions: [{ dimension: 'security', violations: [], compliance: [] }],
+      loading: false, isFetching: true,
+    }));
+    expect(container.querySelector('.violations-page--terminal').className).toContain('dashboard-refreshing');
+  });
+});
+
 describe('ViolationsPage — shared read-only chip (Finding 6)', () => {
   it('shows the chip for a shared project with data', () => {
     renderPage(baseData({
