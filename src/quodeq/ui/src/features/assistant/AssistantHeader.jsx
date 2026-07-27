@@ -50,19 +50,6 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
           {selectedProject ? `project · ${selectedProject}` : 'no project selected'}
         </div>
       </div>
-      {modelLabel && (
-        <button type="button" className="assistant-model-chip"
-          title={`${modelLabel} — change in Settings`}
-          onClick={() => {
-            // Jump to Settings AND tuck the panel away: the drawer would
-            // otherwise cover the provider section the user is heading to.
-            onOpenSettings?.();
-            closeActiveTab();
-          }}>
-          <span className="assistant-model-dot" aria-hidden="true" />
-          <span className="assistant-model-name">{modelLabel}</span>
-        </button>
-      )}
       {readOnly && (
         <Badge variant="tag" tone="info" title="Remote project session: read tools only">
           read-only
@@ -86,6 +73,21 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
         </button>
       )}
       <div className="assistant-drawer-controls">
+        {/* Model chip leads the right-side cluster, aligned with the action
+            buttons; status badges stay on the left with the identity. */}
+        {modelLabel && (
+          <button type="button" className="assistant-model-chip"
+            title={`${modelLabel} — change in Settings`}
+            onClick={() => {
+              // Jump to Settings AND tuck the panel away: the drawer would
+              // otherwise cover the provider section the user is heading to.
+              onOpenSettings?.();
+              closeActiveTab();
+            }}>
+            <span className="assistant-model-dot" aria-hidden="true" />
+            <span className="assistant-model-name">{modelLabel}</span>
+          </button>
+        )}
         <button type="button" className="assistant-drawer-btn"
           onClick={resetConversation}
           aria-label="New conversation"

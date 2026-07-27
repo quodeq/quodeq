@@ -45,7 +45,13 @@ export default function TerminalSessionView({ sessionId, active, live, onGone, r
     onOpen: () => {
       const term = termRef.current;
       if (!term) return;
-      try { term.reset(); } catch { /* noop */ }
+      try {
+        term.reset();
+        // One blank buffer row before the (re)played content: top breathing
+        // room that scrolls away with the scrollback instead of being a fixed
+        // viewport inset (which CSS padding on xterm would be).
+        term.write('\r\n');
+      } catch { /* noop */ }
       term.options.disableStdin = false;
     },
   });
