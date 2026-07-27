@@ -1,5 +1,6 @@
 import { VISIBLE_STANDARDS_STORAGE_KEY, DEFAULT_VISIBLE_STANDARDS } from '../constants.js';
 import { getStandardsVisibility, putStandardsVisibility } from '../api/standards.js';
+import { countBySeverity } from './severity.js';
 
 // Marks that the (per-browser, not per-project) cache has been reconciled
 // with SOME project's own real file -- either because that project already
@@ -150,12 +151,10 @@ export function computeSummaryFromDimensions(dimensions) {
     const violations = d.violations || [];
     totalViolations += violations.length;
     totalCompliance += d.compliance?.length || 0;
-    for (const v of violations) {
-      const s = (v.severity || '').toLowerCase();
-      if (s === 'critical') severity.critical++;
-      else if (s === 'major') severity.major++;
-      else if (s === 'minor') severity.minor++;
-    }
+    const counts = countBySeverity(violations);
+    severity.critical += counts.critical;
+    severity.major += counts.major;
+    severity.minor += counts.minor;
   }
   return { totalViolations, totalCompliance, severity };
 }

@@ -103,3 +103,34 @@ class TestResolveDimensionEval:
         (eval_dir / "security.json").write_text(json.dumps(eval_data))
         result = resolve_dimension_eval(base, "proj", "run-1", "security")
         assert result is not None
+
+
+class TestAggregateUnknownSeverity:
+    def test_unknown_bucket_folds_into_minor_so_chips_sum_to_total(self):
+        # build_totals puts missing/invalid severities in an 'unknown'
+        # bucket. The summary only exposes critical/major/minor, so unknown
+        # findings made critical+major+minor drift below the total.
+        from quodeq.services.violations import aggregate_violations
+
+        dashboard = {
+            "dimensions": [
+                {
+                    "totals": {
+                        "violationCount": 4,
+                        "severity": {"critical": 1, "major": 1, "minor": 1, "unknown": 1},
+                    },
+                    "violations": [
+                        {"file": "a.py", "severity": "critical"},
+                        {"file": "a.py", "severity": "major"},
+                        {"file": "a.py", "severity": "minor"},
+                        {"file": "a.py"},
+                    ],
+                },
+            ],
+        }
+        summary = aggregate_violations(dashboard)
+        assert summary.total == 4
+        assert summary.critical + summary.major + summary.minor == summary.total
+        assert summary.minor == 2
+        f = summary.files[0]
+        assert f.critical + f.major + f.minor == f.count

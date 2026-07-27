@@ -200,6 +200,37 @@ def _dim_elapsed_s(dim_id: str, run_dir: Path, state: str) -> float | None:
     return max(0.0, end - start)
 
 
+def _consolidated_dim_progress(run_dir: Path, time_limit_s: int | None) -> _DimProgress:
+    """Progress row for a live consolidated (grouped) pass.
+
+    Evidence counters are the raw cross-dimension tally: suppression
+    netting is per-dimension and cannot be applied to the combined stream,
+    so the live numbers may slightly over-read what the finished reports
+    will show.
+    """
+    evidence_dir = run_dir / "evidence"
+    queue = _read_json(evidence_dir / "consolidated_queue.json") or {}
+    taken = 0
+    for entry in queue.get("taken") or []:
+        fs = entry.get("files") if isinstance(entry, dict) else None
+        if isinstance(fs, list):
+            taken += len(fs)
+    pending = len(queue.get("pending") or [])
+    tally = tally_unique_findings(evidence_dir / "consolidated_evidence.jsonl")
+    budget = time_limit_s if (time_limit_s and time_limit_s > 0) else None
+    return _DimProgress(
+        id="consolidated",
+        state="running",
+        files={"taken": taken, "total": taken + pending},
+        violations=tally.violations,
+        compliance=tally.compliance,
+        duplicates=tally.duplicates,
+        elapsed_s=_dim_elapsed_s("consolidated", run_dir, "running"),
+        budget_s=budget,
+        active_agents=_active_agents(evidence_dir, "consolidated"),
+    )
+
+
 def build_scan_progress(
     job_id: str,
     run_dir: Path,
@@ -263,6 +294,29 @@ def build_scan_progress(
         dim_ids = list(recovered)
     evidence_dir = run_dir / "evidence"
     evaluators_dir = default_paths().evaluators_dir
+
+    # Consolidated (grouped) runs dispatch every dimension in one pass and
+    # write consolidated_* files — there are no per-dim queues, so the
+    # per-dim reader below would report 0% / "estimating…" for the whole
+    # run. While such a run is live, report the consolidated pass as one
+    # row with the real file counts. Once the run is terminal the per-dim
+    # evaluation files exist and normal per-dim classification applies.
+    consolidated_queue = evidence_dir / "consolidated_queue.json"
+    if (
+        not is_terminal
+        and consolidated_queue.is_file()
+        and not any((evidence_dir / f"{d}_queue.json").is_file() for d in dim_ids)
+    ):
+        return _ScanProgress(
+            job_id=job_id,
+            state=state,
+            phase=status.get("phase"),
+            current_dimension=status.get("current_dimension"),
+            project_files=project_files,
+            total_elapsed_s=total_elapsed_s,
+            dimensions=[_consolidated_dim_progress(run_dir, time_limit_s)],
+        )
+
     # The scanner re-finds everything the user has dismissed or deleted, so a
     # raw evidence tally can run several times the number the finished report
     # shows. Read the suppression stores once per tick and net them out here,

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
+import { countBySeverity } from '../../../utils/severity.js';
 
 export function computeAllViolations(evalData) {
   if (!evalData) return [];
@@ -17,12 +18,7 @@ export function computeAllViolations(evalData) {
 }
 
 export function computeSeverityCounts(allViolations) {
-  const counts = { critical: 0, major: 0, minor: 0 };
-  allViolations.forEach((v) => {
-    const s = (v.severity || 'minor').toLowerCase();
-    if (counts[s] !== undefined) counts[s]++;
-  });
-  return counts;
+  return countBySeverity(allViolations);
 }
 
 function computeComplianceByPrinciple(evalData) {

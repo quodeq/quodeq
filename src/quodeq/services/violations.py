@@ -222,7 +222,9 @@ def aggregate_violations(dashboard: dict[str, Any]) -> ViolationSummary:
         severity = dim.get("totals", {}).get("severity", {})
         critical += severity.get("critical", 0)
         major += severity.get("major", 0)
-        minor += severity.get("minor", 0)
+        # The summary exposes three buckets; fold build_totals' 'unknown'
+        # into minor so critical+major+minor always equals the total.
+        minor += severity.get("minor", 0) + severity.get("unknown", 0)
         for violation in dim.get("violations", []) or []:
             file_path = violation.get("file")
             if not file_path:
@@ -231,9 +233,8 @@ def aggregate_violations(dashboard: dict[str, Any]) -> ViolationSummary:
                 file_path, {"path": file_path, "count": 0, "critical": 0, "major": 0, "minor": 0}
             )
             entry["count"] += 1
-            sev = violation.get("severity", "minor")
-            if sev in entry:
-                entry[sev] += 1
+            sev = violation.get("severity") or "minor"
+            entry[sev if sev in ("critical", "major") else "minor"] += 1
     # _max_violation_files() reads from env at call time; the env injection
     # parameter exists for unit-testing _max_violation_files directly.
     top_files = sorted(

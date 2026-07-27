@@ -6,6 +6,7 @@
  */
 
 import { bucketKey, isBucketEligible } from './dailyGrouping.js';
+import { countBySeverity } from './severity.js';
 
 const roundOneDecimal = (n) => Math.round(n * 10) / 10;
 
@@ -166,17 +167,17 @@ export function computeSummaryFromFilteredDimensions(dimensions) {
       const sev = totals.severity || {};
       severity.critical += sev.critical || 0;
       severity.major += sev.major || 0;
-      severity.minor += sev.minor || 0;
+      // Fold the backend's 'unknown' bucket into minor so
+      // critical+major+minor always equals violationCount.
+      severity.minor += (sev.minor || 0) + (sev.unknown || 0);
     } else {
       const violations = d.violations || [];
       totalViolations += violations.length;
       totalCompliance += d.compliance?.length || 0;
-      for (const v of violations) {
-        const s = (v.severity || '').toLowerCase();
-        if (s === 'critical') severity.critical++;
-        else if (s === 'major') severity.major++;
-        else if (s === 'minor') severity.minor++;
-      }
+      const counts = countBySeverity(violations);
+      severity.critical += counts.critical;
+      severity.major += counts.major;
+      severity.minor += counts.minor;
     }
   }
   return { totalViolations, totalCompliance, severity };

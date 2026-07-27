@@ -17,6 +17,7 @@ import PrinciplesRadial from './PrinciplesRadial.jsx';
 import PrinciplesCardsRow from './PrinciplesCardsRow.jsx';
 import DimensionScoreHistoryPanel from './DimensionScoreHistoryPanel.jsx';
 import StatGrid2x2 from './StatGrid2x2.jsx';
+import { countBySeverity } from '../../../utils/severity.js';
 
 function buildRadialPrinciples(principleGrades) {
   return (principleGrades || []).map((pg) => {
@@ -43,11 +44,7 @@ function buildEnrichedPrinciples(principleGrades, allViolations, complianceByPri
   }
   return (principleGrades || []).map((pg) => {
     const vs = violationsByPrinciple.get(pg.principle) || [];
-    const severity = { critical: 0, major: 0, minor: 0 };
-    for (const v of vs) {
-      const s = (v.severity || 'minor').toLowerCase();
-      if (severity[s] !== undefined) severity[s]++;
-    }
+    const severity = countBySeverity(vs);
     const compliance = complianceByPrinciple?.get?.(pg.principle) || [];
     return {
       ...pg,
