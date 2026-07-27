@@ -152,6 +152,9 @@ it('resets xterm on every socket (re)open so a live-backend reconnect does not d
   expect(typeof lastSocketOpts.onOpen).toBe('function');
   lastSocketOpts.onOpen();
   expect(fakeTerm.reset).toHaveBeenCalled();
+  // Top breathing room: one blank buffer row ahead of the replayed content
+  // (scrolls away with the scrollback, unlike a fixed CSS inset).
+  expect(fakeTerm.write).toHaveBeenCalledWith('\r\n');
   expect(fakeTerm.options.disableStdin).toBe(false);
 });
 
