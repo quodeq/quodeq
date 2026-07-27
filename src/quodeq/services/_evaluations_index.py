@@ -80,14 +80,29 @@ class EvaluationsIndex:
             internal_jobs = self._jobs.list_jobs(reports_root=None)
         except (AttributeError, TypeError):
             internal_jobs = []
+        # 'lost' internal jobs are restart placeholders whose subprocess may
+        # still be alive: they must not shadow the truthful ext- row derived
+        # from the run's own status.json, and when such a row exists the
+        # placeholder itself is dropped in its favor.
         covered = {
             (j.output_project, j.output_run_id) for j in internal_jobs
-            if j.output_project and j.output_run_id
+            if j.output_project and j.output_run_id and j.status != "lost"
         }
+        row_keys = {
+            (s.output_project, s.output_run_id) for s in snapshots
+            if s.output_project and s.output_run_id
+        }
+        visible_internal = [
+            j for j in internal_jobs
+            if not (
+                j.status == "lost"
+                and (j.output_project, j.output_run_id) in row_keys
+            )
+        ]
         merged = [
             s for s in snapshots
             if (s.output_project, s.output_run_id) not in covered
-        ] + list(internal_jobs)
+        ] + visible_internal
         if states:
             merged = [s for s in merged if s.status in states]
         merged.sort(key=lambda s: s.started_at or "", reverse=True)

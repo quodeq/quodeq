@@ -183,3 +183,85 @@ def test_list_prefers_internal_over_indexed_external(tmp_path: Path) -> None:
         f"expected internal entry to win, got job_id={matching[0].job_id!r} "
         f"(source={matching[0].source!r})"
     )
+
+
+def test_lost_internal_job_yields_to_the_live_indexed_row(tmp_path: Path) -> None:
+    """After a server restart the internal job flips to 'lost' while the
+    subprocess keeps running and writing status.json. The truthful ext- row
+    must win the merge: before this fix the internal placeholder covered it,
+    the live scan disappeared from /api/evaluations, and cancel 409ed.
+    """
+    import os
+
+    reports_root = tmp_path / "reports"
+    project = "proj-uuid-2"
+    run_id = "run-uuid-2"
+    # Live PID: the surviving subprocess. A dead PID gets promoted to
+    # cancelled(stale_detected) by sync_index — correct, but not the
+    # scenario under test.
+    run_dir = reports_root / project / run_id
+    run_dir.mkdir(parents=True)
+    write_status(
+        run_dir,
+        state=RunState.RUNNING,
+        job_id=f"ext-{run_id}",
+        started_at="2026-05-22T19:00:00+00:00",
+        dimensions=["security"],
+        phase="analyzing",
+        pid=os.getpid(),
+    )
+
+    store = InMemoryJobStore()
+    store.put(
+        Job(
+            job_id="internal-uuid-2",
+            status="lost",
+            command=["python", "-m", "quodeq.cli", "evaluate"],
+            started_at="2026-05-22T19:00:00+00:00",
+            ended_at="2026-05-22T19:05:00+00:00",
+            exit_code=None,
+            output_project=project,
+            output_run_id=run_id,
+        ),
+    )
+    jobs = JobManager(job_store=store, reports_root=reports_root)
+    index = EvaluationsIndex(
+        jobs=jobs, index_db_path=tmp_path / "index.db", reports_root=reports_root,
+    )
+
+    entries = index.list(reports_dir=reports_root)
+    matching = [
+        e for e in entries
+        if e.output_project == project and e.output_run_id == run_id
+    ]
+    assert len(matching) == 1, [(e.job_id, e.status) for e in matching]
+    assert matching[0].job_id == f"ext-{run_id}"
+    assert matching[0].status == "running"
+
+
+def test_lost_internal_job_without_indexed_row_stays_visible(tmp_path: Path) -> None:
+    """A lost job whose run never produced a status.json has no truthful
+    replacement — keep the 'lost' placeholder so the user sees what happened."""
+    reports_root = tmp_path / "reports"
+    reports_root.mkdir(parents=True)
+
+    store = InMemoryJobStore()
+    store.put(
+        Job(
+            job_id="internal-uuid-3",
+            status="lost",
+            command=["python"],
+            started_at="2026-05-22T19:00:00+00:00",
+            ended_at="2026-05-22T19:05:00+00:00",
+            exit_code=None,
+            output_project="proj-x",
+            output_run_id="run-x",
+        ),
+    )
+    jobs = JobManager(job_store=store, reports_root=reports_root)
+    index = EvaluationsIndex(
+        jobs=jobs, index_db_path=tmp_path / "index.db", reports_root=reports_root,
+    )
+
+    entries = index.list(reports_dir=reports_root)
+    assert [e.status for e in entries] == ["lost"]
