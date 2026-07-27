@@ -44,10 +44,16 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }
   );
 }
 
-function DashboardContent({ runMode, data, focus, callbacks }) {
+function DashboardContent({ runMode, ready, data, focus, callbacks }) {
   const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending } = data;
   const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
   const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick, onNavigate, onGranularityChange } = callbacks;
+  // Readiness is decided once, by the page (DashboardPage's isLoading/contentReady
+  // rule) -- this never re-derives it from `accumulated` on its own, so there is
+  // exactly one place a loader can be mounted from.
+  if (!ready) {
+    return <LoadingScreen variant="inline" />;
+  }
   if (runMode) {
     return (
       <RunOverviewPanel
@@ -59,9 +65,6 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
         onNavigate={onNavigate}
       />
     );
-  }
-  if (!accumulated) {
-    return <LoadingScreen />;
   }
   if (accumulatedDimensions.length === 0) {
     // Project has runs (otherwise the upstream `!dashboard` empty
@@ -162,7 +165,10 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
 
   // What each view needs before it can render real content: run detail only
   // needs the dashboard payload; the Overview also needs the scores-derived
-  // `accumulated` block (DashboardContent returns a LoadingScreen without it).
+  // `accumulated` block. This is the single readiness rule for the whole page
+  // -- DashboardContent is only mounted once it holds, and never re-derives
+  // its own readiness from `accumulated`, so there is exactly one loader
+  // decision instead of two that can disagree.
   // These hooks MUST stay above the early returns below — calling them after a
   // conditional return changes the hook count between renders (React error
   // #310, a blank-crash on load).
@@ -257,23 +263,29 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   // the jarring full-screen LoadingScreen.
   const isRefreshing = isFetching && !!dashboard && !isLoading;
   return (
-    <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : 'dashboard-ready'}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
-      <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
-      {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
-      {/* Name the project being loaded. A project switch now clears the old
-          payload (placeholderData is project-scoped -- see
-          samePlaceholderScope), so this spinner is what the user sees right
-          after picking a project; saying which one makes the wait legible
-          instead of looking like the page hung. */}
-      {isLoading && <LoadingScreen message={projectName ? `Loading ${projectName}…` : undefined} />}
-      {dashboard && (
-        <DashboardContent
-          runMode={runMode}
-          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending }}
-          focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
-          callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onNavigate, onGranularityChange }}
-        />
-      )}
-    </div>
+    <>
+      {/* Sibling to .dashboard-page, not a child of it: that div carries the
+          `dashboard-loading` opacity-.4 class for exactly as long as this loader
+          is shown, and a loader dimmed by its own "still loading" state renders
+          its logo at an unreadable 6% opacity. Names the project being loaded --
+          a project switch now clears the old payload (placeholderData is
+          project-scoped -- see samePlaceholderScope), so this spinner is what
+          the user sees right after picking a project; saying which one makes
+          the wait legible instead of looking like the page hung. */}
+      {isLoading && <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />}
+      <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : 'dashboard-ready'}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
+        <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
+        {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
+        {dashboard && !isLoading && (
+          <DashboardContent
+            runMode={runMode}
+            ready={contentReady}
+            data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending }}
+            focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
+            callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onNavigate, onGranularityChange }}
+          />
+        )}
+      </div>
+    </>
   );
 }
