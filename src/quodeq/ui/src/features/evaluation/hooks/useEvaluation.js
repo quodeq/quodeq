@@ -30,10 +30,9 @@ import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
 import {
   ACTIVE_PROVIDER_KEY,
   providerKey,
-  DEFAULT_MAX_SUBAGENTS,
-  DEFAULT_TIME_LIMIT_S,
   LOCAL_API_PROVIDERS,
 } from "../../../constants.js";
+import { resolveProviderSettings } from "../../../utils/effectiveProviderSettings.js";
 
 const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === "true";
 const JOB_POLL_MS = 1500;
@@ -51,42 +50,39 @@ export function findingsRefetchInterval(job, sseEnabled = SSE_ENABLED) {
   if (job?.status && job.status !== "running") return false;
   return DIM_POLL_MS;
 }
-const DEFAULT_OLLAMA_SUBAGENTS = "1";
-const DEFAULT_CLI_SUBAGENTS = String(DEFAULT_MAX_SUBAGENTS);
-const DEFAULT_OLLAMA_BUDGET = "0";
-const DEFAULT_CLI_BUDGET = String(DEFAULT_TIME_LIMIT_S);
 // Re-exported for the existing importers; the set itself lives in constants.js
 // so the Evaluate header resolves unset limits exactly like the start payload.
 export { LOCAL_API_PROVIDERS };
 
 /**
  * Merge per-provider Settings (provider, model, subagents, budget, etc.)
- * from localStorage into the start-evaluation payload. Mirrors the legacy
- * useEvaluation behavior; throws a user-facing error if no provider/model
- * is configured.
+ * from localStorage into the start-evaluation payload.
+ *
+ * Caller-provided values win: a wizard launch names its provider/model and
+ * time limit explicitly, and those must not be silently overwritten by the
+ * active tab's Settings (the wizard's TIME LIMIT field used to be dead
+ * code because of exactly that). Per-provider settings are read from the
+ * payload's provider when one is named. Unset keys resolve through
+ * resolveProviderSettings — the same source of truth the Settings screen
+ * and the Evaluate header display. Throws a user-facing error if no
+ * provider/model is configured.
  */
 function preparePayload(payload, storage = localStorage) {
-  const activeProvider = storage.getItem(ACTIVE_PROVIDER_KEY) || "";
-  if (!activeProvider) throw new Error("No provider selected. Go to Settings to configure one.");
-  const get = (key) => storage.getItem(providerKey(activeProvider, key));
-  const model = get("model");
+  const provider = payload.aiCmd || storage.getItem(ACTIVE_PROVIDER_KEY) || "";
+  if (!provider) throw new Error("No provider selected. Go to Settings to configure one.");
+  const get = (key) => storage.getItem(providerKey(provider, key));
+  const model = payload.aiModel || get("model");
   if (!model) throw new Error("No model selected. Go to Settings and select one.");
-  const isLocalApi = LOCAL_API_PROVIDERS.has(activeProvider);
-  const subagents = parseInt(get("subagents") || (isLocalApi ? DEFAULT_OLLAMA_SUBAGENTS : DEFAULT_CLI_SUBAGENTS), 10);
-  // Read new key first; fall back to legacy 'pool-budget' for back-compat.
-  const timeLimit = parseInt(
-    get("time-limit") || get("pool-budget") || (isLocalApi ? DEFAULT_OLLAMA_BUDGET : DEFAULT_CLI_BUDGET),
-    10,
-  );
+  const settings = resolveProviderSettings(provider, storage);
   const result = {
     ...payload,
-    aiCmd: activeProvider,
+    aiCmd: provider,
     aiModel: model,
-    maxSubagents: subagents,
-    timeLimit,
+    maxSubagents: settings.subagents,
+    timeLimit: payload.timeLimit ?? settings.timeLimitS,
   };
-  if (get("per-dimension") === "true") result.perDimension = true;
-  if (get("verify") === "false") result.verifyFindings = false;
+  if (settings.perDimension) result.perDimension = true;
+  if (!settings.verify) result.verifyFindings = false;
   const apiKey = get("api-key");
   if (apiKey) result.apiKey = apiKey;
   const apiBase = get("api-base");

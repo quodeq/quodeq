@@ -15,6 +15,16 @@ const OLLAMA_MODEL_HINT = (
   </>
 );
 
+
+// Local-API tabs default to a single subagent; clamp commits to [MIN, MAX]
+// so an empty/garbage entry can't persist to storage.
+const LOCAL_DEFAULT_SUBAGENTS = '1';
+function clampSubagents(raw) {
+  const n = parseInt(raw, 10);
+  if (Number.isNaN(n)) return LOCAL_DEFAULT_SUBAGENTS;
+  return String(Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, n)));
+}
+
 function ModelSelector({ value, models, onChange }) {
   const needsModel = !value;
   return (
@@ -106,7 +116,7 @@ export default function OllamaTab({ state, update }) {
               <span className="settings-description">We make a guess based on your VRAM. Run a quick test for a more accurate number.</span>
             </div>
             <div className="settings-budget-control">
-              <input type="number" className="settings-model-input" min={MIN_SUBAGENTS} max={MAX_SUBAGENTS} value={state.subagents} onChange={(e) => update('subagents', e.target.value)} />
+              <input type="number" className="settings-model-input" min={MIN_SUBAGENTS} max={MAX_SUBAGENTS} value={state.subagents} onChange={(e) => update('subagents', e.target.value)} onBlur={(e) => { if (e.target.value !== '') update('subagents', clampSubagents(e.target.value)); }} />
               <button type="button" className="settings-action-btn" onClick={runTest} disabled={testing || !state.model}>
                 {testing ? 'Testing...' : 'Auto-detect'}
               </button>

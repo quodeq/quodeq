@@ -7,6 +7,7 @@ import {
   FIX_HINTS,
 } from './planConstants.js';
 import { KNOWN_SEVERITIES } from './constants.js';
+import { normalizeSeverity } from './severity.js';
 
 const PLAN_SNIPPET_MAX_LINES = 5;
 
@@ -62,10 +63,7 @@ export function getFixHint(req) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function normalizeSeverity(value) {
-  const normalized = String(value || 'unknown').toLowerCase();
-  return KNOWN_SEVERITIES.includes(normalized) ? normalized : 'unknown';
-}
+
 
 /** Collect unique files touched by violations. */
 function collectAffectedFiles(violations) {
