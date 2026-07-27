@@ -23,7 +23,7 @@ from quodeq.terminal.links import (
     resolve_path,
     safe_editor_path,
 )
-from quodeq.terminal.manager import TerminalManager
+from quodeq.terminal.sessions import TerminalSessionRegistry, shell_name
 
 _logger = logging.getLogger(__name__)
 
@@ -53,8 +53,9 @@ def _gate_reason() -> str | None:
 # App-specific WS close codes (4000-4999 range). The client's auto-reconnect
 # keys off these: a retry against a held lock or a closed gate can never
 # succeed, so it must not loop — only unexpected drops are retried.
-_WS_CLOSE_BUSY = 4002     # single-connection lock held by another window
-_WS_CLOSE_REFUSED = 4003  # terminal gate refused the handshake
+_WS_CLOSE_BUSY = 4002      # per-session connection lock held by another window
+_WS_CLOSE_REFUSED = 4003   # terminal gate refused the handshake
+_WS_CLOSE_NOT_FOUND = 4004  # unknown session id; client reconciles via /sessions
 
 
 def _coerce_int(value) -> int | None:
@@ -86,27 +87,55 @@ def _apply_control(manager, payload: str) -> None:
         return
 
 
-def register_terminal_routes(app: Flask, manager: TerminalManager | None = None) -> None:
+def register_terminal_routes(app: Flask, registry: TerminalSessionRegistry | None = None) -> None:
     sock = Sock(app)
-    manager = manager or TerminalManager()
-    app.extensions["terminal_manager"] = manager
-    # Don't let a live shell outlive the server process.
-    atexit.register(manager.kill)
-
-    # Only one WS client may drain the single PTY at a time; a second concurrent
-    # reader would race the first and produce garbled/doubled output.
-    _conn_lock = threading.Lock()
+    registry = registry or TerminalSessionRegistry()
+    app.extensions["terminal_registry"] = registry
+    # Don't let live shells outlive the server process.
+    atexit.register(registry.kill_all)
 
     @app.get("/api/terminal/status")
     def terminal_status():
         reason = _env_reason()
-        return jsonify({"enabled": reason is None, "running": manager.alive, "reason": reason})
+        return jsonify({
+            "enabled": reason is None,
+            "running": registry.any_alive,
+            "reason": reason,
+            "shell": shell_name(),
+        })
+
+    @app.get("/api/terminal/sessions")
+    def terminal_sessions():
+        # _env_reason, not the full gate: same-origin GETs carry no Origin
+        # header (same reasoning as /status).
+        if _env_reason() is not None:
+            return jsonify({"error": "forbidden"}), 403
+        return jsonify({"sessions": registry.list(), "max": registry.MAX_SESSIONS})
+
+    @app.post("/api/terminal/sessions")
+    def terminal_session_create():
+        if _gate_reason() is not None:
+            return jsonify({"error": "forbidden"}), 403
+        session = registry.create()
+        if session is None:
+            return jsonify({"error": "session limit reached"}), 409
+        return jsonify({"id": session.id, "name": session.name}), 201
+
+    @app.post("/api/terminal/sessions/<sid>/kill")
+    def terminal_session_kill(sid):
+        if _gate_reason() is not None:
+            return jsonify({"error": "forbidden"}), 403
+        if not registry.kill(sid):
+            return jsonify({"error": "unknown session"}), 404
+        return jsonify({"ok": True})
 
     @app.post("/api/terminal/kill")
     def terminal_kill():
+        # Kills EVERY session — this backs Settings' "Restart terminal", which
+        # is a full reset; the client reconciles its tabs via /sessions after.
         if _gate_reason() is not None:
             return jsonify({"error": "forbidden"}), 403
-        manager.kill()
+        registry.kill_all()
         return jsonify({"ok": True})
 
     @app.post("/api/terminal/resolve")
@@ -122,7 +151,8 @@ def register_terminal_routes(app: Flask, manager: TerminalManager | None = None)
         paths = body.get("paths")
         if not isinstance(paths, list):
             return jsonify({"error": "paths must be a list"}), 400
-        bases = resolve_bases(manager.pid)
+        sid = body.get("session")
+        bases = resolve_bases(registry.pid_for(sid if isinstance(sid, str) else None))
         resolved = []
         for token in paths:
             if not isinstance(token, str) or not token:
@@ -146,7 +176,10 @@ def register_terminal_routes(app: Flask, manager: TerminalManager | None = None)
         # cwd, server cwd, home) and normalize the untrusted path to its real,
         # canonical form. Everything below uses this sanitized value, never the
         # raw client string. Outside the bases -> refuse.
-        safe = safe_editor_path(path, resolve_bases(manager.pid))
+        sid = body.get("session")
+        safe = safe_editor_path(
+            path, resolve_bases(registry.pid_for(sid if isinstance(sid, str) else None))
+        )
         # Never launch on a non-file, even though the client only sends paths it
         # got back as exists=true — the state could have changed, and this is the
         # authoritative check before spawning a process.
@@ -174,7 +207,22 @@ def register_terminal_routes(app: Flask, manager: TerminalManager | None = None)
         if _gate_reason() is not None:
             ws.close(_WS_CLOSE_REFUSED)
             return
-        if not _conn_lock.acquire(blocking=False):
+        sid = request.args.get("session")
+        if sid:
+            session = registry.get(sid)
+            if session is None:
+                # Stale tab id (e.g. server restarted). The client must not
+                # retry this URL — it refetches /sessions and rebuilds tabs.
+                ws.close(_WS_CLOSE_NOT_FOUND)
+                return
+        else:
+            # Pre-multi-session clients connect without an id.
+            session = registry.get_or_create_default()
+        manager = session.manager
+        # Only one WS client may drain a session's PTY at a time; a second
+        # concurrent reader would race the first and produce garbled/doubled
+        # output. Other sessions are unaffected.
+        if not session.conn_lock.acquire(blocking=False):
             try:
                 ws.send("0\r\n[terminal already open in another window]\r\n")
             finally:
@@ -239,4 +287,4 @@ def register_terminal_routes(app: Flask, manager: TerminalManager | None = None)
                 # sleep), so this returns promptly; bound it regardless.
                 reader.join(timeout=2)
         finally:
-            _conn_lock.release()
+            session.conn_lock.release()
