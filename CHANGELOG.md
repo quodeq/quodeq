@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.3] - 2026-07-27
+
+### Features
+- **Multi-session terminal**: run up to 6 shell sessions as tabs, each its own shell with its own history. Sessions live server-side, so they survive page reloads and closing the drawer; closing a tab kills that shell. With a single session the tab strip stays out of the way and a + in the header opens the second.
+- **Terminal panel redesign**: the terminal gets its own header with a working copy button, session tabs, and a status bar showing the shell, session count, working directory and the localhost-only sandbox note.
+- **Assistant panel redesign**: new header with the Quodeq mark, project name and a model chip that jumps to Settings; tappable suggestion cards in the empty state; avatars and a thinking indicator in the transcript; a card-style composer with auto-grow and a proper send button.
+- **Terminal colors**: terminal output now renders with a full 16-color ANSI palette that follows the app theme in light and dark.
+
+### Improvements
+- **Faster assistant skills on local models**: providers without native tool-calling now receive the full tool catalog and exact action payload formats in the prompt instead of guessing them one failed attempt at a time. Suggested actions appear only on views where they can actually run.
+- **Drawer chrome**: the shared drawer header is gone; each panel carries its own controls, with a compact Assistant/Terminal switcher when both are open.
+
 ## [1.7.2] - 2026-07-26
 
 ### Features
