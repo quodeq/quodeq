@@ -360,7 +360,8 @@ export function buildWizardHandlers({ state, setWizardEntry, navTab }) {
       if (branch) payload.branch = branch;
       if (provider?.id) payload.aiCmd = provider.id;
       if (provider?.model) payload.aiModel = provider.model;
-      if (totalTimeLimitS) payload.timeLimit = totalTimeLimitS;
+      // != null keeps an explicit 0 ("Unlimited") — 0 is falsy but meaningful.
+      if (totalTimeLimitS != null) payload.timeLimit = totalTimeLimitS;
       state.evalLifecycle.handleStartEvaluation(payload);
       navTab('evaluate');
     },

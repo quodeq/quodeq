@@ -10,7 +10,9 @@ const DEFAULTS = {
   'model-thorough': '',
   'subagents': '1',
   'time-limit': '0',
-  'per-dimension': 'true',
+  // Grouped is the engine's actual default; the pill must not claim
+  // per-dimension for an untouched toggle.
+  'per-dimension': 'false',
   'verify': 'true',
   'api-key': '',
   'api-base': '',

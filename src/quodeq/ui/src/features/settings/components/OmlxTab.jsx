@@ -14,6 +14,16 @@ const OMLX_MODEL_HINT = (
   </>
 );
 
+
+// Local-API tabs default to a single subagent; clamp commits to [MIN, MAX]
+// so an empty/garbage entry can't persist to storage.
+const LOCAL_DEFAULT_SUBAGENTS = '1';
+function clampSubagents(raw) {
+  const n = parseInt(raw, 10);
+  if (Number.isNaN(n)) return LOCAL_DEFAULT_SUBAGENTS;
+  return String(Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, n)));
+}
+
 function ModelSelector({ value, models, onChange }) {
   const needsModel = !value;
   const hasModels = models.length > 0;
@@ -164,6 +174,7 @@ export default function OmlxTab({ state, update }) {
                 max={MAX_SUBAGENTS}
                 value={state.subagents}
                 onChange={(e) => update('subagents', e.target.value)}
+                onBlur={(e) => { if (e.target.value !== '') update('subagents', clampSubagents(e.target.value)); }}
               />
               <button
                 type="button"

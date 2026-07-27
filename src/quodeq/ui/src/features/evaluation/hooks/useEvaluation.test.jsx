@@ -383,3 +383,34 @@ describe("cancel failure handling", () => {
     await waitFor(() => expect(result.current.job).toBeNull());
   });
 });
+
+describe("preparePayload honors caller-provided values", () => {
+  it("keeps an explicit timeLimit (including 0) instead of overwriting from Settings", async () => {
+    // The wizard shows a TIME LIMIT field; its value used to be dead code
+    // because the payload merge unconditionally re-read localStorage.
+    localStorage.setItem("cc-ollama-time-limit", "600");
+    fakeApi.startEvaluation.mockResolvedValue({ jobId: "j-w", status: "pending", dimensions: [] });
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await act(async () => {
+      await result.current.startEvaluation({ repo: "x", dimensions: [], timeLimit: 0 });
+    });
+    expect(fakeApi.startEvaluation).toHaveBeenCalledWith(
+      expect.objectContaining({ timeLimit: 0 }),
+    );
+  });
+
+  it("uses the caller's provider and reads that provider's settings", async () => {
+    // Wizard-launched runs name their provider; per-provider settings must
+    // come from that provider's keys, not the active tab's.
+    localStorage.setItem("cc-claude-model", "sonnet");
+    localStorage.setItem("cc-claude-time-limit", "1200");
+    fakeApi.startEvaluation.mockResolvedValue({ jobId: "j-w2", status: "pending", dimensions: [] });
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await act(async () => {
+      await result.current.startEvaluation({ repo: "x", dimensions: [], aiCmd: "claude" });
+    });
+    expect(fakeApi.startEvaluation).toHaveBeenCalledWith(
+      expect.objectContaining({ aiCmd: "claude", aiModel: "sonnet", timeLimit: 1200 }),
+    );
+  });
+});

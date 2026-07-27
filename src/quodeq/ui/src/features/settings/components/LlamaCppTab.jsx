@@ -16,6 +16,16 @@ const LLAMACPP_MODEL_HINT = (
   </>
 );
 
+
+// Local-API tabs default to a single subagent; clamp commits to [MIN, MAX]
+// so an empty/garbage entry can't persist to storage.
+const LOCAL_DEFAULT_SUBAGENTS = '1';
+function clampSubagents(raw) {
+  const n = parseInt(raw, 10);
+  if (Number.isNaN(n)) return LOCAL_DEFAULT_SUBAGENTS;
+  return String(Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, n)));
+}
+
 function LoadedModel({ models }) {
   if (!models.length) {
     return <span className="settings-model-hint">No model loaded yet. Start llama-server with a GGUF file.</span>;
@@ -118,7 +128,7 @@ export default function LlamaCppTab({ state, update }) {
               <span className="settings-description">Estimated from your VRAM. Run a quick test for a more accurate number.</span>
             </div>
             <div className="settings-budget-control">
-              <input type="number" aria-label="Max parallel agents" className="settings-model-input" min={MIN_SUBAGENTS} max={MAX_SUBAGENTS} value={state.subagents} onChange={(e) => update('subagents', e.target.value)} />
+              <input type="number" aria-label="Max parallel agents" className="settings-model-input" min={MIN_SUBAGENTS} max={MAX_SUBAGENTS} value={state.subagents} onChange={(e) => update('subagents', e.target.value)} onBlur={(e) => { if (e.target.value !== '') update('subagents', clampSubagents(e.target.value)); }} />
               <button type="button" className="settings-action-btn" onClick={runTest} disabled={testing || !models.length}>
                 {testing ? 'Testing...' : 'Auto-detect'}
               </button>
