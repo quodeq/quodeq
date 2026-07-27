@@ -194,6 +194,18 @@ describe('DashboardPage fetch-failure state', () => {
     );
     expect(getByText('No evaluations yet')).toBeTruthy();
   });
+
+  // P4-T2: clicking Retry sets isFetching while loading stays false and
+  // error stays set (react-query's shape for a refetch of a query that's
+  // already settled into an error). That state used to render the error
+  // branch with no feedback at all -- Retry visibly did nothing.
+  it('shows the inline loader instead of the error state while a retry is in flight', () => {
+    const { container, queryByText } = render(
+      <DashboardPage data={{ ...errorData, isFetching: true }} callbacks={{}} runMode={false} />,
+    );
+    expect(queryByText("Couldn't load this project")).toBeNull();
+    expect(container.querySelector('.loading-screen')).toBeTruthy();
+  });
 });
 
 // Scenario 2 (collision): runMode renders RunOverviewPanel, which has its own

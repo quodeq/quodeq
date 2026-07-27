@@ -409,7 +409,7 @@ function HistoryContent({ data, callbacks, runNav, languageSub, selectedSource, 
   );
 }
 
-export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, selectedSource = 'local', loading, isFetching }) {
+export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, selectedSource = 'local', loading, isFetching, error, onRetry }) {
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
   const { deleteEvaluation } = useApi();
@@ -513,6 +513,30 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
       return (
         <HistoryEmptyShell sub="loading…">
           <LoadingScreen variant="inline" />
+        </HistoryEmptyShell>
+      );
+    }
+    // A failed fetch with nothing to show must render as an error, not the
+    // "no evaluations yet" empty state -- otherwise a 404/500/timeout tells
+    // the user their existing evaluations are gone. While a retry is in
+    // flight (error still set, isFetching true), show the loader instead so
+    // clicking Retry visibly does something.
+    if (error) {
+      if (isFetching) {
+        return (
+          <HistoryEmptyShell sub="loading…">
+            <LoadingScreen variant="inline" />
+          </HistoryEmptyShell>
+        );
+      }
+      return (
+        <HistoryEmptyShell sub="error">
+          <EmptyState
+            title="Couldn't load this project"
+            description={error}
+            actionLabel="Retry"
+            onAction={() => onRetry?.()}
+          />
         </HistoryEmptyShell>
       );
     }

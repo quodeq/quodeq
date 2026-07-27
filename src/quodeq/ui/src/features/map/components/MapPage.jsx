@@ -165,8 +165,8 @@ function MapEmpty({ sub, children, refreshing }) {
 
 export default function MapPage(props) {
   const { data = {}, callbacks = {} } = props;
-  const { projects = [], projectsLoaded, selectedProject, selectedSource = 'local', projectName, loading, isFetching } = data;
-  const { onNavigate } = callbacks;
+  const { projects = [], projectsLoaded, selectedProject, selectedSource = 'local', projectName, loading, isFetching, error } = data;
+  const { onNavigate, onRetry } = callbacks;
 
   // Call the hook unconditionally to keep hook order stable across renders.
   // The hook tolerates missing data — `state.allDimensions` is `[]` when there
@@ -204,6 +204,30 @@ export default function MapPage(props) {
       return (
         <MapEmpty sub="loading…">
           <LoadingScreen variant="inline" />
+        </MapEmpty>
+      );
+    }
+    // A failed fetch with nothing to show must render as an error, not the
+    // "no evaluations yet" empty state -- otherwise a 404/500/timeout tells
+    // the user their existing evaluations are gone. While a retry is in
+    // flight (error still set, isFetching true), show the loader instead so
+    // clicking Retry visibly does something.
+    if (error) {
+      if (isFetching) {
+        return (
+          <MapEmpty sub="loading…">
+            <LoadingScreen variant="inline" />
+          </MapEmpty>
+        );
+      }
+      return (
+        <MapEmpty sub="error">
+          <EmptyState
+            title="Couldn't load this project"
+            description={error}
+            actionLabel="Retry"
+            onAction={() => onRetry?.()}
+          />
         </MapEmpty>
       );
     }

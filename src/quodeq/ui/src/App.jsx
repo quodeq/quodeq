@@ -555,6 +555,7 @@ function ViolationsRoute({ params, props }) {
         projectName: props.dashboardData.selectedDisplayName,
         loading: props.dashboardData.loading,
         isFetching: props.dashboardData.isFetching,
+        error: props.dashboardData.error,
         dismissRefreshKey: props.dismissRefreshKey,
       }}
       callbacks={{
@@ -583,6 +584,7 @@ function ViolationsRoute({ params, props }) {
         onRefresh: props.refreshDashboard,
         onReconcile: props.scheduleDashboardReconcile,
         onNavigate: nav,
+        onRetry: props.dashboardData.onRetry,
       }}
       isDirectNav={props.navigation.navStackLength === 1}
       tabKey={params._tabKey || 0}
@@ -612,8 +614,9 @@ export const ROUTE_RENDERERS = {
         selectedSource: props.navigation.selectedSource,
         loading: props.dashboardData.loading,
         isFetching: props.dashboardData.isFetching,
+        error: props.dashboardData.error,
       }}
-      callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard }}
+      callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard, onRetry: props.dashboardData.onRetry }}
       isDirectNav={isDirectNav}
       tabKey={params._tabKey || 0}
     />;
@@ -652,6 +655,8 @@ export const ROUTE_RENDERERS = {
         selectedSource={props.navigation.selectedSource}
         loading={props.dashboardData.loading}
         isFetching={props.dashboardData.isFetching}
+        error={props.dashboardData.error}
+        onRetry={props.dashboardData.onRetry}
         projectInfo={props.navigation.projects?.find((p) => (p.id || p.name) === props.navigation.selectedProject) || null}
       />
     );

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import ViolationsPage, { ViolationsSubTabContent } from './ViolationsPage.jsx';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
@@ -184,6 +184,36 @@ describe('ViolationsPage — scenario 9: loader gate, containment, refresh dim',
       loading: false, isFetching: true,
     }));
     expect(container.querySelector('.violations-page--terminal').className).toContain('dashboard-refreshing');
+  });
+});
+
+describe('ViolationsPage — error state + retry feedback (P4-T2)', () => {
+  it('error + no data renders the framed error state with a working Retry', () => {
+    const onRetry = vi.fn();
+    renderPage(
+      baseData({ selectedSource: 'local', selectedProject: 'p1', projects: [{ id: 'p1', name: 'p1' }], error: 'Failed to load' }),
+      { onRetry },
+    );
+    expect(screen.getByText("Couldn't load this project")).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Retry'));
+    expect(onRetry).toHaveBeenCalled();
+  });
+
+  it('error + isFetching renders the inline loader instead of the error state', () => {
+    const { container } = renderPage(
+      baseData({ selectedSource: 'local', selectedProject: 'p1', projects: [{ id: 'p1', name: 'p1' }], error: 'Failed to load', isFetching: true }),
+    );
+    expect(screen.queryByText("Couldn't load this project")).toBeNull();
+    expect(container.querySelector('.loading-screen')).toBeTruthy();
+  });
+
+  it('data present with a stale error still renders the data, not the error screen', () => {
+    renderPage(baseData({
+      selectedSource: 'local', selectedProject: 'p1', projects: [{ id: 'p1', name: 'p1' }],
+      accumulatedDimensions: [{ dimension: 'security', violations: [], compliance: [] }],
+      error: 'Failed to load',
+    }));
+    expect(screen.queryByText("Couldn't load this project")).toBeNull();
   });
 });
 
