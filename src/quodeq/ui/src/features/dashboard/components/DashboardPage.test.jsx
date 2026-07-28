@@ -31,13 +31,16 @@ const overviewLoading = {
 };
 
 describe('DashboardPage first-load loading gate', () => {
-  it('keeps the Overview in the loading state until accumulated (scores) is ready', () => {
+  // P6: the Overview no longer dims .dashboard-page while isLoading -- the
+  // OverviewSkeleton rendered inside it IS the content (the dim existed to
+  // fade *stale* content under the loader overlay, and there is none here).
+  it('keeps the Overview showing the skeleton (not real content) until accumulated (scores) is ready, undimmed', () => {
     const { container } = render(<DashboardPage data={overviewLoading} callbacks={{}} runMode={false} />);
     const page = container.querySelector('.dashboard-page');
     expect(page).toBeTruthy();
-    // Must NOT flip to the ready fade before the data needed to render is present.
-    expect(page.className).toContain('dashboard-loading');
-    expect(page.className).not.toContain('dashboard-ready');
+    expect(page.className).not.toContain('dashboard-loading');
+    expect(page.className).toContain('dashboard-ready');
+    expect(page.querySelector('.overview-skeleton')).toBeTruthy();
   });
 
   // Scenario 1 (collision): dashboard has resolved but accumulated hasn't, so
@@ -46,29 +49,32 @@ describe('DashboardPage first-load loading gate', () => {
   // variant) and DashboardContent's own LoadingScreen mounted at once, two
   // overlapping pulsing logos. DashboardContent must not render a loader of
   // its own; readiness is a single decision made by the page.
-  it('renders exactly one LoadingScreen while dashboard is resolved but accumulated is not', () => {
+  // P6: the Overview's loader ladder is the OverviewSkeleton now, not
+  // LoadingScreen -- still exactly one, never both.
+  it('renders exactly one overview skeleton and no LoadingScreen while dashboard is resolved but accumulated is not', () => {
     const { container } = render(<DashboardPage data={overviewLoading} callbacks={{}} runMode={false} />);
-    expect(container.querySelectorAll('.loading-screen').length).toBe(1);
+    expect(container.querySelectorAll('.loading-screen').length).toBe(0);
+    expect(container.querySelectorAll('.overview-skeleton').length).toBe(1);
   });
 
-  // P2 containment: the page's own loader must use the contained variant
-  // (absolutely positioned within .dashboard via .loading-screen--inline in
-  // base.css, not fixed to the viewport) so a project switch never covers
-  // Sidebar/TopBar. Only the app-level cold-start loader stays fullscreen.
-  it('renders the inline (contained) loader variant, not the fullscreen one', () => {
+  // P2 containment, carried over to the skeleton: it renders inside
+  // .dashboard-page (never a fixed/fullscreen overlay), so a project switch
+  // never covers Sidebar/TopBar. Only the app-level cold-start loader stays
+  // fullscreen.
+  it('renders the skeleton contained within .dashboard-page, not a fullscreen loader', () => {
     const { container } = render(<DashboardPage data={overviewLoading} callbacks={{}} runMode={false} />);
-    expect(container.querySelector('.loading-screen').className).toContain('loading-screen--inline');
+    const page = container.querySelector('.dashboard-page');
+    expect(page.querySelector('.overview-skeleton')).toBeTruthy();
+    expect(container.querySelector('.loading-screen')).toBeNull();
   });
 
-  // Scenario 8: the page-level loader must never be a descendant of the
-  // `.dashboard-loading` (opacity .4) container -- otherwise the logo renders
-  // at an effective 6% opacity while loading, then jumps to full opacity once
-  // the container flips to `.dashboard-ready`.
-  it('does not nest the loader inside the dimmed .dashboard-loading container', () => {
+  // Scenario 8, carried over: the skeleton must never sit inside a dimmed
+  // `.dashboard-loading` (opacity .4) container -- there is none for the
+  // Overview any more, since the skeleton is the content, not an overlay.
+  it('does not dim the container the skeleton lives in', () => {
     const { container } = render(<DashboardPage data={overviewLoading} callbacks={{}} runMode={false} />);
-    const dimmed = container.querySelector('.dashboard-loading');
-    expect(dimmed).toBeTruthy();
-    expect(dimmed.querySelector('.loading-screen')).toBeNull();
+    expect(container.querySelector('.dashboard-loading')).toBeNull();
+    expect(container.querySelector('.overview-skeleton')).toBeTruthy();
   });
 
   // The flip side: a cold score cache can take several seconds to rebuild. We
@@ -89,26 +95,26 @@ describe('DashboardPage first-load loading gate', () => {
     }).not.toThrow();
   });
 
-  it('falls back to the partial page after a grace period if scores stays slow', () => {
+  // P6: the grace fallback no longer hands off from a skeleton to a
+  // LoadingScreen -- the same OverviewSkeleton continues across the flip, so
+  // there's no loader/skeleton swap for the user to notice.
+  it('continues the same overview skeleton across the grace period if scores stays slow (no loader handoff)', () => {
     vi.useFakeTimers();
     try {
       const { container } = render(<DashboardPage data={overviewLoading} callbacks={{}} runMode={false} />);
-      // Before the grace: still the full loading screen.
-      expect(container.querySelector('.dashboard-page').className).toContain('dashboard-loading');
-      // After the grace elapses with scores still pending: drop to the partial page.
+      // Before the grace: skeleton already showing, undimmed.
+      expect(container.querySelector('.dashboard-page').className).not.toContain('dashboard-loading');
+      expect(container.querySelectorAll('.overview-skeleton').length).toBe(1);
+      // After the grace elapses with scores still pending: same skeleton, still
+      // exactly one, no LoadingScreen ever mounts, no dim.
       act(() => { vi.advanceTimersByTime(800); });
       expect(container.querySelector('.dashboard-page').className).toContain('dashboard-ready');
-      // Reachable state: dashboard is in, accumulated still isn't, and the page
-      // has already stopped showing its own full loader. Exactly one loader must
-      // still be on screen (the page's own content-area fallback), not zero and
-      // not two, and it must not be sitting inside a dimmed container.
-      expect(container.querySelectorAll('.loading-screen').length).toBe(1);
+      expect(container.querySelectorAll('.overview-skeleton').length).toBe(1);
+      expect(container.querySelectorAll('.loading-screen').length).toBe(0);
       expect(container.querySelector('.dashboard-loading')).toBeNull();
-      // Same message as the pre-grace loader it replaced: otherwise the
-      // message-bearing loader unmounts and a message-less one takes its
-      // place in the same frame, and the logo visibly shifts up by the
-      // message line's height on the handoff.
-      expect(container.querySelector('.loading-message')?.textContent).toBe('Loading p1…');
+      // Same project-name signal the loader it replaced used to carry, now in
+      // the skeleton's TermHeader sub.
+      expect(container.querySelector('.term-header__sub')?.textContent).toBe('loading p1…');
     } finally {
       vi.useRealTimers();
     }
@@ -307,7 +313,7 @@ describe('DashboardPage no-runs -> first-run transition (P5-T2)', () => {
     expect(container.querySelector('.loading-screen')).toBeNull();
   });
 
-  it('resets the stickiness on a project switch: the loader shows, not the previous project\'s empty state', () => {
+  it('resets the stickiness on a project switch: the skeleton shows, not the previous project\'s empty state', () => {
     const { container, getByText, queryByText, rerender } = render(
       <SidePaneProvider>
         <DashboardPage data={baseNoRuns} callbacks={{}} runMode={false} />
@@ -331,7 +337,8 @@ describe('DashboardPage no-runs -> first-run transition (P5-T2)', () => {
       </SidePaneProvider>,
     );
     expect(queryByText('No evaluations yet')).toBeNull();
-    expect(container.querySelector('.loading-screen')).toBeTruthy();
+    expect(container.querySelector('.overview-skeleton')).toBeTruthy();
+    expect(container.querySelector('.loading-screen')).toBeNull();
   });
 
   it('runMode is excluded from the no-runs empty state, and instead renders a run-appropriate empty state (not a blank frame)', () => {
@@ -640,8 +647,12 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
       </SidePaneProvider>,
     );
     let page = container.querySelector('.dashboard-page');
-    expect(page.className).toContain('dashboard-loading');
+    // P6: the Overview never dims -- the skeleton is showing here, undimmed --
+    // but it's still "still loading" for the appear latch's purposes.
+    expect(page.className).not.toContain('dashboard-loading');
+    expect(page.className).toContain('dashboard-ready');
     expect(page.className).not.toContain('dashboard-appear');
+    expect(page.querySelector('.overview-skeleton')).toBeTruthy();
 
     rerender(
       <SidePaneProvider>
@@ -663,7 +674,13 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
     expect(page.className).not.toContain('dashboard-appear');
   });
 
-  it('does not replay dashboard-appear across the grace-fallback -> content-ready double flip', () => {
+  // P6 fix: the appear latch's read AND write are gated on `!showOverviewSkeleton`
+  // (DashboardPage.jsx, beside `dashboardAppearKey`). Before that gate, the
+  // grace-elapsed flip replayed a 400ms fade over the already-visible,
+  // unchanged skeleton (a flash) and spent the latch early, so real content
+  // got no fade at all. Now: no fade while the skeleton continues across the
+  // flip, and the fade is reserved for when DashboardContent actually mounts.
+  it('does not fade the skeleton at the grace-elapsed flip, and fires dashboard-appear once real content mounts', () => {
     vi.useFakeTimers();
     try {
       const { container, rerender } = render(
@@ -672,9 +689,54 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
         </SidePaneProvider>,
       );
       act(() => { vi.advanceTimersByTime(800); });
+      // Grace elapsed, accumulated still not in: the skeleton continues
+      // (same as before the flip) -- must not fade, that would flash it.
       let page = container.querySelector('.dashboard-page');
       expect(page.className).toContain('dashboard-ready');
+      expect(page.className).not.toContain('dashboard-appear');
+      expect(page.querySelector('.overview-skeleton')).toBeTruthy();
+
+      rerender(
+        <SidePaneProvider>
+          <DashboardPage data={readyOverview} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      // Real content mounts for the first time in this context: this is what
+      // gets the fade, not the earlier grace-elapsed flip.
+      page = container.querySelector('.dashboard-page');
+      expect(page.className).toContain('dashboard-ready');
       expect(page.className).toContain('dashboard-appear');
+      expect(page.querySelector('.overview-skeleton')).toBeNull();
+
+      rerender(
+        <SidePaneProvider>
+          <DashboardPage data={{ ...readyOverview, isFetching: true }} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      // Repeat render over the same context: no replay.
+      page = container.querySelector('.dashboard-page');
+      expect(page.className).not.toContain('dashboard-appear');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Fast path: content lands well before the grace timer would fire (the
+  // common case). isLoading and contentReady flip in the same render, so the
+  // showOverviewSkeleton gate never engages and the fade plays exactly as it
+  // did before this fix.
+  it('plays dashboard-appear normally when content arrives before the grace timer fires', () => {
+    vi.useFakeTimers();
+    try {
+      const { container, rerender } = render(
+        <SidePaneProvider>
+          <DashboardPage data={{ ...readyOverview, accumulated: null, loading: true }} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      // Partway through the grace window -- timer still pending, not fired.
+      act(() => { vi.advanceTimersByTime(300); });
+      let page = container.querySelector('.dashboard-page');
+      expect(page.className).not.toContain('dashboard-appear');
 
       rerender(
         <SidePaneProvider>
@@ -683,7 +745,7 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
       );
       page = container.querySelector('.dashboard-page');
       expect(page.className).toContain('dashboard-ready');
-      expect(page.className).not.toContain('dashboard-appear');
+      expect(page.className).toContain('dashboard-appear');
     } finally {
       vi.useRealTimers();
     }
