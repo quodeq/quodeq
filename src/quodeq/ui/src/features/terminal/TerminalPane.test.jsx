@@ -57,6 +57,7 @@ vi.mock('../assistant/AssistantDrawerProvider.jsx', () => ({
 import TerminalPane from './TerminalPane.jsx';
 
 beforeEach(() => {
+  window.localStorage.clear();
   fakeSessions = [{ id: 's1', name: 'zsh · 1', alive: true, cwd: '~/proj' }];
   nextSession = 2;
   listTerminalSessions.mockClear();
@@ -248,6 +249,35 @@ it('only the active session view is visible; the other stays mounted but hidden'
   const hidden = wraps.filter((w) => w.style.display === 'none');
   expect(wraps).toHaveLength(2);   // both mounted (PTYs survive the switch)
   expect(hidden).toHaveLength(1);  // exactly one hidden
+});
+
+it('restores the previously selected tab when the pane remounts (drawer closed and reopened)', async () => {
+  const { userEvent } = await import('@testing-library/user-event').then((m) => ({ userEvent: m.default }));
+  fakeSessions = [
+    { id: 's1', name: 'zsh · 1', alive: true, cwd: '~/proj' },
+    { id: 's5', name: 'zsh · 5', alive: true, cwd: '~/mid' },
+    { id: 's9', name: 'zsh · 9', alive: true, cwd: '~/other' },
+  ];
+  const first = render(<TerminalPane active />);
+  await screen.findByRole('tab', { name: /zsh · 5/ });
+  await userEvent.click(screen.getByRole('tab', { name: /zsh · 5/ }));
+  expect(screen.getByRole('tab', { name: /zsh · 5/ })).toHaveAttribute('aria-selected', 'true');
+  // Closing the drawer unmounts the whole pane; reopening mounts it fresh.
+  first.unmount();
+  render(<TerminalPane active />);
+  const tab = await screen.findByRole('tab', { name: /zsh · 5/ });
+  await waitFor(() => expect(tab).toHaveAttribute('aria-selected', 'true'));
+});
+
+it('falls back to the newest session when the stored selection no longer exists', async () => {
+  window.localStorage.setItem('quodeq.terminal.activeSession', 'dead-id');
+  fakeSessions = [
+    { id: 's1', name: 'zsh · 1', alive: true, cwd: '~/proj' },
+    { id: 's9', name: 'zsh · 9', alive: true, cwd: '~/other' },
+  ];
+  render(<TerminalPane active />);
+  const tab = await screen.findByRole('tab', { name: /zsh · 9/ });
+  await waitFor(() => expect(tab).toHaveAttribute('aria-selected', 'true'));
 });
 
 it('copy button copies the active session selection to the clipboard', async () => {

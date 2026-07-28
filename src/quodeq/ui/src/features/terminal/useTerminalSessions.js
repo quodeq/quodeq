@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { listTerminalSessions, createTerminalSession, killTerminalSession } from '../../api/terminal.js';
 
+// Closing the drawer unmounts the pane (and this hook), so the selected tab
+// must survive outside React state or reopening always lands on the newest
+// session. localStorage (not sessionStorage): the desktop shell can recreate
+// the webview page, and a stale id is harmless — reconcile validates it
+// against the server list and falls back.
+const ACTIVE_SESSION_KEY = 'quodeq.terminal.activeSession';
+
+function readStoredActive() {
+  try { return window.localStorage.getItem(ACTIVE_SESSION_KEY); } catch { return null; }
+}
+
 /**
  * Client side of the session tab strip. The SERVER owns the canonical session
  * list (sessions survive page reloads and drawer closes); this hook reconciles
@@ -34,7 +45,14 @@ export function useTerminalSessions({ enabled }) {
           const list = r.sessions || [];
           setSessions(list);
           if (r.max) setMax(r.max);
-          setActiveId((prev) => (list.some((s) => s.id === prev) ? prev : (list[list.length - 1]?.id ?? null)));
+          setActiveId((prev) => {
+            if (list.some((s) => s.id === prev)) return prev;
+            // Fresh mount (drawer reopened): restore the last selected tab if
+            // that session still exists, else fall back to the newest one.
+            const stored = readStoredActive();
+            if (list.some((s) => s.id === stored)) return stored;
+            return list[list.length - 1]?.id ?? null;
+          });
         } catch { /* server unreachable: keep current tabs; sockets surface it */ }
         finally { reconcilingRef.current = null; }
       })();
@@ -45,6 +63,13 @@ export function useTerminalSessions({ enabled }) {
   useEffect(() => {
     if (enabled) reconcile();
   }, [enabled, reconcile]);
+
+  // Persist every selection change (click, create, close-neighbor, restore)
+  // so the next mount of this hook starts from the same tab.
+  useEffect(() => {
+    if (!activeId) return;
+    try { window.localStorage.setItem(ACTIVE_SESSION_KEY, activeId); } catch { /* noop */ }
+  }, [activeId]);
 
   const openSession = useCallback(async () => {
     try {
