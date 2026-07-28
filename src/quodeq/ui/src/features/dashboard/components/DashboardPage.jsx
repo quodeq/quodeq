@@ -223,6 +223,12 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     if (!isLoading) dashboardAppearedKeyRef.current = dashboardAppearKey;
   }, [isLoading, dashboardAppearKey]);
   const dashboardAppearClass = dashboardAppearNow ? ' dashboard-appear' : '';
+  // Trade-off: the appear class only lives for the one render where it's computed
+  // above -- it doesn't stay latched until dashboardAppearKey next changes -- so any
+  // re-render inside the animation window (e.g. grace-fallback partial page then
+  // contentReady flipping true) drops it and snaps opacity to 1, cutting the fade
+  // short. Latching it across renders was rejected: it would fail to re-arm on a
+  // run switch without reintroducing a loading gap.
 
   // Sticky "no evaluations yet" latch: once that empty state is showing for
   // this project+source, stay on it through a subsequent load (the post-eval
@@ -261,6 +267,11 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     if (sharedHasContent) {
       return (
         <>
+          {/* This `{null}` pins .dashboard-page to Fragment child index 1 in every
+              early-return branch, matching the main return's two-child Fragment
+              (loader + div) below -- so switching between branches reconciles
+              against the same slot instead of remounting the subtree and
+              replaying the fade-in. Don't remove it. */}
           {null}
           <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
             <EmptyState
