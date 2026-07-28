@@ -62,4 +62,21 @@ describe('LiveViolationsFeed', () => {
     fireEvent.click(row);
     expect(row).toHaveAttribute('aria-expanded', 'true');
   });
+
+  it('counts only what it renders', () => {
+    renderFeed({ liveViolations: violations, hiddenCarriedCount: 5 });
+    expect(screen.getByText('2 across 1 dimension')).toBeInTheDocument();
+  });
+
+  it('keeps the header when the filter empties the list', () => {
+    // A fully-cached dimension produces zero new findings. Returning null
+    // here would make the feed vanish and read as "nothing found".
+    renderFeed({ liveViolations: {}, hiddenCarriedCount: 12 });
+    expect(screen.getByText(/12 carried forward hidden/)).toBeInTheDocument();
+  });
+
+  it('still renders nothing when there is genuinely nothing', () => {
+    const { container } = renderFeed({ liveViolations: {}, hiddenCarriedCount: 0 });
+    expect(container.firstChild).toBeNull();
+  });
 });
