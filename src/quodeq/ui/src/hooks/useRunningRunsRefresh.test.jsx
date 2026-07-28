@@ -32,7 +32,7 @@ function refreshCount(invalidateSpy, project = 'p1') {
 describe('useRunningRunsRefresh', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    import.meta.env.VITE_USE_SSE_EVENTS = 'false';
+    vi.stubEnv('VITE_USE_SSE_EVENTS', 'false');
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -192,7 +192,7 @@ describe('useRunningRunsRefresh', () => {
   });
 
   it('mount-time refresh fires regardless of VITE_USE_SSE_EVENTS', () => {
-    import.meta.env.VITE_USE_SSE_EVENTS = 'true';
+    vi.stubEnv('VITE_USE_SSE_EVENTS', 'true');
     const { Wrapper, invalidateSpy } = makeWrapper();
     renderHook(
       () =>
@@ -206,7 +206,7 @@ describe('useRunningRunsRefresh', () => {
   });
 
   it('suppresses recurring poll when VITE_USE_SSE_EVENTS=true', () => {
-    import.meta.env.VITE_USE_SSE_EVENTS = 'true';
+    vi.stubEnv('VITE_USE_SSE_EVENTS', 'true');
     const { Wrapper, invalidateSpy } = makeWrapper();
     renderHook(
       () =>
@@ -224,7 +224,7 @@ describe('useRunningRunsRefresh', () => {
   });
 
   it('still polls when VITE_USE_SSE_EVENTS is not "true"', () => {
-    import.meta.env.VITE_USE_SSE_EVENTS = 'false';
+    vi.stubEnv('VITE_USE_SSE_EVENTS', 'false');
     const { Wrapper, invalidateSpy } = makeWrapper();
     renderHook(
       () =>

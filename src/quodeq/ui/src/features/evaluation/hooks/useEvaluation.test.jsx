@@ -40,7 +40,7 @@ describe("useEvaluation", () => {
     Object.values(fakeApi).forEach((fn) => fn.mockReset?.());
     fakeApi.listEvaluations.mockResolvedValue([]);
     // Default: SSE off — refetchInterval path
-    import.meta.env.VITE_USE_SSE_EVENTS = "false";
+    vi.stubEnv("VITE_USE_SSE_EVENTS", "false");
     // preparePayload reads localStorage; seed a working provider+model.
     localStorage.setItem("cc-active-provider", "ollama");
     localStorage.setItem("cc-ollama-model", "llama3.1");
