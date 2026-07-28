@@ -101,7 +101,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
 
       <div className="evaluate-content">
         {!job && selectedProject && (
-          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={wrappedOnStart} disabled={false} preselectDims={preselectDims} onGoToSettings={onGoToSettings} />
+          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={wrappedOnStart} disabled={false} preselectDims={preselectDims} onGoToSettings={onGoToSettings} onGoToProjects={onGoToProjects} />
         )}
 
         {!job && !selectedProject && (

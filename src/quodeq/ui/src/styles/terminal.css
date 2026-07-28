@@ -2435,7 +2435,7 @@ button.term-sev-badge--clickable:focus-visible {
    Wrap the strip in a <div class="eval-job-stat-strip"> to
    shrink the cell padding and value font for the in-job header.
    ------------------------------------------------------------ */
-.eval-job-stat-strip { margin-bottom: var(--term-space-3); }
+.eval-job-stat-strip { margin-top: 20px; }
 .eval-job-stat-strip .term-stat-strip--cards .term-stat {
   padding: 14px 16px 15px;
   background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));

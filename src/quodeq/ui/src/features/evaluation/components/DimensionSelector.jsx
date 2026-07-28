@@ -72,7 +72,7 @@ export default function DimensionSelector({ allDimensions, selectedDims, onToggl
 
   if (isTerm) {
     return (
-      <div className="form-group">
+      <div className="form-group eval-dims-section">
         <div className="dimension-label-row dimension-label-row--terminal">
           <span className="eval-dims-heading">
             <label>dimensions</label>

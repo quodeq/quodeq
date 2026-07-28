@@ -3281,7 +3281,7 @@ button.eval-provider-badge--clickable:focus-visible {
   display: flex;
   align-items: stretch;
   flex-wrap: wrap;
-  margin-bottom: var(--term-space-3);
+  margin-top: 16px;
   background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
   border: 1px solid var(--color-border-soft, var(--color-border));
   border-radius: var(--eval-inner-radius, 8px);
@@ -3399,11 +3399,28 @@ button.eval-provider-badge--clickable:focus-visible {
   font-size: 11px;
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
-  margin: -6px 0 0;
+  margin: 10px 0 0;
+}
+
+/* ── Setup card sections: consistent dividers and rhythm ── */
+.eval-scan-mode,
+.eval-dims-section,
+.eval-budget,
+.eval-run-bar {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 45%, transparent);
+}
+
+/* Right-side "?" popovers would run off the screen edge when left-aligned;
+   anchor them to the hint's right edge instead. */
+.re-eval-toggle-row .help-hint-popover,
+.eval-mode-card__hint .help-hint-popover {
+  left: auto;
+  right: 0;
 }
 
 /* ── Scan-mode radio cards ── */
-.eval-scan-mode { margin-top: var(--term-space-3); }
 .eval-scan-mode__label,
 .eval-budget__label {
   font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
@@ -3412,7 +3429,71 @@ button.eval-provider-badge--clickable:focus-visible {
   text-transform: uppercase;
   color: var(--color-text-subtle, var(--color-text-muted));
 }
-.eval-scan-mode__label { display: block; margin-bottom: 11px; }
+.eval-scan-mode__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  min-height: 25px;
+}
+.eval-scan-mode__persist {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.eval-scan-mode__persist-label {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  color: var(--color-text-subtle, var(--color-text-muted));
+  white-space: nowrap;
+}
+.eval-scan-mode__seg {
+  display: inline-flex;
+  gap: 2px;
+  background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 2px;
+}
+.eval-scan-mode__seg-btn {
+  appearance: none;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.eval-scan-mode__seg-btn:hover { color: var(--color-accent); }
+.eval-scan-mode__seg-btn--on,
+.eval-scan-mode__seg-btn--on:hover {
+  color: var(--color-bg);
+  background: var(--color-accent);
+}
+.eval-scan-mode__note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 11px;
+  background: color-mix(in srgb, var(--color-warning) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 19%, transparent);
+  border-radius: var(--eval-inner-radius, 8px);
+  padding: 9px 13px;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--color-warning-text, var(--color-warning));
+}
+.eval-scan-mode__note-glyph {
+  color: var(--color-warning);
+  font-size: 11px;
+  line-height: 1.5;
+}
 .eval-scan-mode__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -3494,31 +3575,6 @@ button.eval-provider-badge--clickable:focus-visible {
   color: var(--color-accent);
   border-color: color-mix(in srgb, var(--color-accent) 27%, transparent);
 }
-.eval-scan-mode__sub {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-}
-.eval-scan-mode__sub-btn {
-  appearance: none;
-  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 4px 10px;
-  cursor: pointer;
-}
-.eval-scan-mode__sub-btn:hover { color: var(--color-accent); }
-.eval-scan-mode__sub-btn--on {
-  color: var(--color-accent);
-  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
-}
-
 /* ── Dimension checkbox cards ── */
 .eval-dims-heading {
   display: flex;
@@ -3544,7 +3600,7 @@ button.eval-provider-badge--clickable:focus-visible {
 .eval-dim-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 .eval-dim-card {
   appearance: none;
@@ -3556,7 +3612,7 @@ button.eval-provider-badge--clickable:focus-visible {
   background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
   border: 1px solid var(--color-border-soft, var(--color-border));
   border-radius: var(--eval-tile-radius, 10px);
-  padding: 12px 14px;
+  padding: 13px 15px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -3593,17 +3649,16 @@ button.eval-provider-badge--clickable:focus-visible {
 .eval-dim-card__body { min-width: 0; flex: 1; }
 .eval-dim-card__title-row {
   display: flex;
-  align-items: center;
-  gap: 7px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 7px;
   min-width: 0;
 }
 .eval-dim-card__name {
   font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
   font-size: 12.5px;
+  line-height: 1.3;
   color: var(--color-text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .eval-dim-card--selected .eval-dim-card__name { color: var(--color-text); }
 .eval-dim-card__std {
@@ -3638,12 +3693,12 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 
 /* ── Time-budget chips ── */
-.eval-budget { margin-top: var(--term-space-3); }
 .eval-budget__head {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  margin-bottom: 11px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
 }
 .eval-budget__sub {
   font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
@@ -3683,9 +3738,6 @@ button.eval-provider-badge--clickable:focus-visible {
   justify-content: space-between;
   gap: 20px;
   flex-wrap: wrap;
-  margin-top: 26px;
-  padding-top: 20px;
-  border-top: 1px solid var(--color-border-soft, var(--color-border));
 }
 .eval-run-bar__summary {
   font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);

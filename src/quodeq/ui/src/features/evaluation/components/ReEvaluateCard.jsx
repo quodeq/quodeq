@@ -314,7 +314,7 @@ function RunBar({ disabled, canStart, handleScan, selectedDims, estimates, clean
   );
 }
 
-function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scope, estimates, estimatesLoading, budget, onGoToSettings }) {
+function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scope, estimates, estimatesLoading, budget, onGoToSettings, onGoToProjects }) {
   const { all: allDimensions, selected: selectedDims } = dimensions;
   const {
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
@@ -361,7 +361,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
       </div>
 
       <IdentityStrip>
-        <IdentityCell label="repository" title={info.path}>{info.name || project}</IdentityCell>
+        <IdentityCell label="repository" title="Open projects" onClick={onGoToProjects}>{info.name || project}</IdentityCell>
         <IdentityCell
           label="scope"
           grow
@@ -454,7 +454,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
   );
 }
 
-export default function ReEvaluateCard({ project, projectInfo, onStart, disabled, preselectDims, onGoToSettings }) {
+export default function ReEvaluateCard({ project, projectInfo, onStart, disabled, preselectDims, onGoToSettings, onGoToProjects }) {
   const {
     info, error, retry, allDimensions, selectedDims,
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
@@ -499,6 +499,7 @@ export default function ReEvaluateCard({ project, projectInfo, onStart, disabled
       estimatesLoading={estimatesLoading}
       budget={{ timeLimitS, setTimeLimitS }}
       onGoToSettings={onGoToSettings}
+      onGoToProjects={onGoToProjects}
     />
   );
 }

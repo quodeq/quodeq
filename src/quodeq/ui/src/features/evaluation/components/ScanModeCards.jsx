@@ -93,7 +93,35 @@ export default function ScanModeCards({ value, onChange, disabled = false }) {
 
   return (
     <div className="eval-scan-mode">
-      <div className="eval-scan-mode__label">scan mode</div>
+      <div className="eval-scan-mode__head">
+        <span className="eval-scan-mode__label">scan mode</span>
+        {isClean && (
+          <span className="eval-scan-mode__persist">
+            <span className="eval-scan-mode__persist-label">apply clean scan to</span>
+            <span className="eval-scan-mode__seg" role="group" aria-label="Clean scan persistence">
+              <button
+                type="button"
+                className={`eval-scan-mode__seg-btn${value === 'once' ? ' eval-scan-mode__seg-btn--on' : ''}`}
+                onClick={pickOnce}
+                disabled={disabled}
+                aria-pressed={value === 'once'}
+              >
+                this scan only
+              </button>
+              <button
+                type="button"
+                className={`eval-scan-mode__seg-btn${value === 'permanent' ? ' eval-scan-mode__seg-btn--on' : ''}`}
+                onClick={pickPermanent}
+                disabled={disabled}
+                aria-pressed={value === 'permanent'}
+                title="Clean scan for every run, all projects"
+              >
+                always
+              </button>
+            </span>
+          </span>
+        )}
+      </div>
       <div className="eval-scan-mode__grid">
         <ModeCard id="incremental" checked={!isClean} onPick={pickIncremental} disabled={disabled} title="incremental" tag="recommended">
           re-analyzes only files changed since the last run and keeps earlier findings for everything else.
@@ -102,27 +130,11 @@ export default function ScanModeCards({ value, onChange, disabled = false }) {
           none of the previous findings are used. every file gets re-analyzed from scratch. use it after changing standards or a quodeq version.
         </ModeCard>
       </div>
-      {isClean && (
-        <div className="eval-scan-mode__sub" role="radiogroup" aria-label="Clean scan persistence">
-          <button
-            type="button"
-            className={`eval-scan-mode__sub-btn${value === 'once' ? ' eval-scan-mode__sub-btn--on' : ''}`}
-            onClick={pickOnce}
-            disabled={disabled}
-            aria-pressed={value === 'once'}
-          >
-            this scan only
-          </button>
-          <button
-            type="button"
-            className={`eval-scan-mode__sub-btn${value === 'permanent' ? ' eval-scan-mode__sub-btn--on' : ''}`}
-            onClick={pickPermanent}
-            disabled={disabled}
-            aria-pressed={value === 'permanent'}
-            title="Clean scan for every run, all projects"
-          >
-            always
-          </button>
+      {value === 'permanent' && (
+        <div className="eval-scan-mode__note">
+          <span className="eval-scan-mode__note-glyph" aria-hidden="true">▸</span>
+          every future scan of this repository will discard the cache and re-analyze every file.
+          slower, and it overrides incremental runs triggered from CI.
         </div>
       )}
     </div>
