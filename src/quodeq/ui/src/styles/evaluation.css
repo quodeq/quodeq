@@ -3820,6 +3820,14 @@ button.eval-provider-badge--clickable:focus-visible {
 .vdetail-row--major    .vlive-rail { background: color-mix(in srgb, var(--color-sev-major-text) 55%, transparent); }
 .vdetail-row--minor    .vlive-rail { background: color-mix(in srgb, var(--color-sev-minor-text) 55%, transparent); }
 .vlive-card .term-sev-badge { justify-self: stretch; text-align: center; }
+/* The file button is a grid item in the 1fr column, so it stretches to the
+   full column width by default and swallows clicks meant for the row
+   (FileCopyBtn stopPropagation's, so the row never toggles). Shrink it to
+   its label; the leftover column space is bare grid area owned by
+   .vdetail-row-main, which already carries the expand/collapse handler. */
+.vlive-card .vdetail-row-main.vlive-collapsible .vlive-detail-file-btn {
+  justify-self: start;
+}
 .vrow-rule {
   font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
   font-size: 11px;
