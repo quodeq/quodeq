@@ -45,3 +45,6 @@ class Finding:
     # True when the deterministic provenance gate (#639) de-escalated this
     # finding from critical to major. Audit marker surfaced in the DB/UI (#656).
     provenance_downgrade: bool = False
+    # True when this finding was replayed from the content-addressed cache
+    # rather than produced by the running scan (see Judgment.carried_forward).
+    carried_forward: bool = False

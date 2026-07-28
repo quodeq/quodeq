@@ -17,6 +17,10 @@ _FIELD_CONFIDENCE_INTERVAL_SNAKE = "confidence_interval"
 _VIOLATION_FIELDS = (
     "file", "line", "end_line", "title", "reason",
     "snippet", "context", "scope", "severity", "req", "req_refs",
+    # _flatten_findings copies ONLY these keys into evaluation/<dim>.json.
+    # Without this entry the cache-replay marker is dropped the moment a
+    # dimension finishes and its report is written.
+    "carried_forward",
 )
 _COMPLIANCE_FIELDS = (
     "file", "line", "end_line", "title", "reason",
