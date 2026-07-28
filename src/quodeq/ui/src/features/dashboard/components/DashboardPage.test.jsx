@@ -753,6 +753,52 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
     page = container.querySelector('.dashboard-page');
     expect(page.className).toContain('dashboard-appear');
   });
+
+  it('re-arms dashboard-appear on a run switch in run-detail, but not on a repeat render of the same run', () => {
+    const readyRun = (runId) => ({
+      projectsLoaded: true,
+      projects: [{ id: 'p1', name: 'p1' }],
+      selectedProject: 'p1',
+      selectedSource: 'local',
+      selectedRun: runId,
+      dashboard: {
+        dimensions: [{ dimension: 'Security', overallScore: '7.0/10', violations: [], compliance: [], principles: [] }],
+        trend: [],
+        selectedRun: { runId, dateLabel: '2026-05-01' },
+      },
+      accumulated: null,
+      loading: false,
+      isFetching: false,
+      error: null,
+      availableRuns: [{ runId, status: 'complete' }],
+    });
+
+    const { container, rerender } = render(
+      <SidePaneProvider>
+        <DashboardPage data={readyRun('r1')} callbacks={{}} runMode={true} />
+      </SidePaneProvider>,
+    );
+    let page = container.querySelector('.dashboard-page');
+    expect(page.className).toContain('dashboard-appear');
+
+    // Same run re-rendered (e.g. an unrelated prop changing): must not replay.
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage data={{ ...readyRun('r1'), isFetching: true }} callbacks={{}} runMode={true} />
+      </SidePaneProvider>,
+    );
+    page = container.querySelector('.dashboard-page');
+    expect(page.className).not.toContain('dashboard-appear');
+
+    // Switching to a different run in run-detail is a legitimate new context.
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage data={readyRun('r2')} callbacks={{}} runMode={true} />
+      </SidePaneProvider>,
+    );
+    page = container.querySelector('.dashboard-page');
+    expect(page.className).toContain('dashboard-appear');
+  });
 });
 
 // Finding 5 (final whole-branch review): projectInfo for a shared selection

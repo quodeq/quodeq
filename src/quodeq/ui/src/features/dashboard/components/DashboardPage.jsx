@@ -205,6 +205,17 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   // an effect (post-commit), never during render: mutating it inline would
   // make the appear decision depend on how many times React happens to
   // invoke this render (StrictMode double-invokes it in dev).
+  // isLoading, reused below as "was this render ready", isn't guaranteed
+  // false on every render of every early-return branch -- e.g. the no-runs
+  // sticky branch below CAN be reached with isLoading true, once
+  // wasNoRunsEmpty is already latched (a repeat render of an already-shown
+  // context, gated by showNoRunsEmpty's `!loading || wasNoRunsEmpty` below).
+  // What matters is narrower and does hold: on the render where a context's
+  // empty/error state genuinely first appears, `loading` is false --
+  // showNoRunsEmpty requires `!loading` until wasNoRunsEmpty is latched, and
+  // the error/runMode-empty branches gate on `!loading` outright -- so the
+  // latch is never consumed before real first-appearance content is on
+  // screen; isLoading being true only ever suppresses a repeat.
   const dashboardAppearKey = `${selectedProject}::${selectedSource}::${runMode ? selectedRunId : 'overview'}`;
   const dashboardAppearedKeyRef = useRef(null);
   const dashboardAppearNow = !isLoading && dashboardAppearedKeyRef.current !== dashboardAppearKey;
