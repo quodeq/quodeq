@@ -31,11 +31,18 @@ export function StatStrip({ children, cards = false }) {
  */
 export function Stat({ label, value, hint, trailing, tone = 'default', onClick, ariaLabel }) {
   const className = `term-stat term-stat--${tone}${onClick ? ' term-stat--clickable' : ''}`;
+  // Character count of the plain-text value, published to CSS so the value can
+  // size itself down to fit its card (see `.term-stat__value`). Numbers are
+  // short and stay at the max size; a long word like a dimension name shrinks
+  // instead of overflowing the card and widening the whole strip. Rich values
+  // (nodes) carry no measurable length — they keep the default.
+  const plain = typeof value === 'string' || typeof value === 'number' ? String(value) : null;
+  const valueStyle = plain ? { '--stat-value-len': plain.length } : undefined;
   const labelValue = (
     <>
-      <div className="term-stat__label">{label}</div>
+      <div className="term-stat__label" title={typeof label === 'string' ? label : undefined}>{label}</div>
       <div className="term-stat__value-row">
-        <span className="term-stat__value">{value}</span>
+        <span className="term-stat__value" style={valueStyle} title={plain ?? undefined}>{value}</span>
         {trailing != null && <span className="term-stat__trailing">{trailing}</span>}
       </div>
     </>

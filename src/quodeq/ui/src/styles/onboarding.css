@@ -311,6 +311,10 @@
   font-weight: 500;
   line-height: 1.4;
   word-break: break-all;
+  /* This strip wants prose that WRAPS (UUIDs, provider names), not the
+     single-line ellipsis the dashboard tiles use. */
+  white-space: normal;
+  overflow: visible;
 }
 .onboarding-step--standard-launch .term-stat__hint {
   font-size: 11px;

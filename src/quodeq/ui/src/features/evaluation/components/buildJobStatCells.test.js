@@ -54,9 +54,9 @@ test('buildJobStatCells: builds 4 cells for a running job with progress data', (
     scanMode: 'incremental',
   });
   assert.equal(cells.length, 4);
-  assert.equal(cells[0].label, 'analyzing · dimension 1 / 3');
+  assert.equal(cells[0].label, 'analyzing');
   assert.equal(cells[0].value, 'reliability');
-  assert.equal(cells[0].hint, 'next: usability');
+  assert.equal(cells[0].hint, 'dim 1/3 · next: usability');
   assert.equal(cells[0].tone, 'accent');
   assert.equal(cells[1].label, 'files this run');
   assert.equal(cells[1].value, 138);
@@ -76,13 +76,13 @@ test('buildJobStatCells: running analyzing tile falls back while dims are unknow
   assert.equal(cells[0].hint, 'preparing…');
 });
 
-test('buildJobStatCells: running last dimension says so instead of a next hint', () => {
+test('buildJobStatCells: running last dimension keeps the counter and drops the next hint', () => {
   const cells = buildJobStatCells('running', {
     ...baseInputs,
     dimCycle: { current: 'usability', index: 3, count: 3, next: null },
   });
-  assert.equal(cells[0].label, 'analyzing · dimension 3 / 3');
-  assert.equal(cells[0].hint, 'last dimension');
+  assert.equal(cells[0].label, 'analyzing');
+  assert.equal(cells[0].hint, 'dim 3/3');
 });
 
 test('buildJobStatCells: running files hint omits mode copy when mode is unknown', () => {

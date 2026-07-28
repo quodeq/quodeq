@@ -27,8 +27,12 @@ describe('JobStatStrip', () => {
       totalElapsedS: 134,
     });
     renderWithClient(<JobStatStrip job={runningJob} liveViolations={{ security: [{ severity: 'major' }, { severity: 'critical' }] }} />);
-    expect(await screen.findByText('analyzing · dimension 1 / 1')).toBeInTheDocument();
-    expect(screen.getByText('security')).toBeInTheDocument();
+    // Wait on the dimension name, not the "analyzing" label: the label is the
+    // same before and after the progress query lands, so it resolves against
+    // the pre-data render and asserts nothing.
+    expect(await screen.findByText('security')).toBeInTheDocument();
+    expect(screen.getByText('analyzing')).toBeInTheDocument();
+    expect(screen.getByText('dim 1/1')).toBeInTheDocument();
     expect(screen.getByText('files this run')).toBeInTheDocument();
     expect(screen.getByText('violations')).toBeInTheDocument();
     expect(screen.getByText('elapsed')).toBeInTheDocument();
