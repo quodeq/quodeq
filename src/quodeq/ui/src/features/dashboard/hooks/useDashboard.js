@@ -4,6 +4,8 @@ import { useApi } from "../../../api/ApiContext.jsx";
 import { useProjectScores } from "../../../hooks/useProjectScores.js";
 import { projectKeys, samePlaceholderScope } from "../../../api/queryKeys.js";
 
+const EMPTY_TREND = [];
+
 /**
  * @param {{
  *   selectedProject: string,
@@ -86,6 +88,18 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     placeholderData: keepPlaceholder ? keepInScope : undefined,
   });
 
+  // Trend to use for payloads that lack their own (older cached payloads /
+  // the grade-formula early-return path). Memoized on its own: scores and
+  // latestScores get new object identities on every refetch/resolution even
+  // when the trend array they carry hasn't changed, and dashboardWithTrend
+  // below needs a stable reference here to avoid busting its own memo.
+  // EMPTY_TREND is a module-level constant so the `|| []` default doesn't
+  // itself mint a fresh identity every render.
+  const fallbackTrend = useMemo(
+    () => scores?.trend || latestScores?.trend || EMPTY_TREND,
+    [scores, latestScores],
+  );
+
   const dashboardWithTrend = useMemo(() => {
     if (!dashboardQuery.data) return null;
     // The dashboard payload carries its OWN cache-backed, dismiss-adjusted
@@ -100,9 +114,8 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     // the payload lacks one (older cached payloads / the grade-formula
     // early-return path).
     if (dashboardQuery.data.trend?.length) return dashboardQuery.data;
-    const trend = scores?.trend || latestScores?.trend || [];
-    return { ...dashboardQuery.data, trend };
-  }, [dashboardQuery.data, scores, latestScores]);
+    return { ...dashboardQuery.data, trend: fallbackTrend };
+  }, [dashboardQuery.data, fallbackTrend]);
 
   const refreshDashboard = useCallback(() => {
     if (!selectedProject) return;
