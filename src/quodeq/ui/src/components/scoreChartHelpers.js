@@ -55,3 +55,7 @@ export const CHART_MARGIN = { top: 8, right: 0, bottom: 0, left: 0 };
 /** Opacity for the selected vs deselected bars across all score charts. */
 export const SELECTED_BAR_OPACITY = 0.85;
 export const DESELECTED_BAR_OPACITY = 0.4;
+
+/** Fixed chart height for the History tab's score chart (HistoryChartPanel),
+ * shared with its Suspense placeholder so the two never drift apart. */
+export const HISTORY_CHART_HEIGHT = 220;

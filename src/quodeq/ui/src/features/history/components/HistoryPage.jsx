@@ -6,6 +6,7 @@ import { useRunningRunsRefresh } from '../../../hooks/useRunningRunsRefresh.js';
 import { useHistoryRunLive } from '../hooks/useHistoryRunLive.js';
 import { formatLiveDimSummary } from '../utils/formatLiveDimSummary.js';
 const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
+import HistoryChartPanelPlaceholder from './HistoryChartPanelPlaceholder.jsx';
 
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
 import { useRunNavigator } from '../../../hooks/useRunNavigator.js';
@@ -382,7 +383,7 @@ function HistoryContent({ data, callbacks, runNav, languageSub, selectedSource, 
         )}
       </div>
 
-      <Suspense fallback={null}>
+      <Suspense fallback={<HistoryChartPanelPlaceholder />}>
         <HistoryChartPanel trend={trend} selectedRunId={selectedRunId} onBarClick={(runId) => onRunChange(runId)} />
       </Suspense>
 

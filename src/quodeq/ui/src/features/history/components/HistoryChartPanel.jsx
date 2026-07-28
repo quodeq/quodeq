@@ -21,10 +21,11 @@ import {
   CHART_MARGIN,
   SELECTED_BAR_OPACITY,
   DESELECTED_BAR_OPACITY,
+  HISTORY_CHART_HEIGHT,
 } from '../../../components/scoreChartHelpers.js';
 
 const MAX_CHART_RUNS = 40;
-const CHART_HEIGHT = 220;
+const CHART_HEIGHT = HISTORY_CHART_HEIGHT;
 const REF_LINE_FLOOR = 0;
 const REF_LINE_CEIL = 10;
 const HOVER_STROKE_WIDTH = 1.5;
