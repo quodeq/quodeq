@@ -3,6 +3,7 @@ import DimensionCard from './DimensionCard.jsx';
 import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
 import IncompleteSetupCard from './IncompleteSetupCard.jsx';
+import OverviewSkeleton from './OverviewSkeleton.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
 
@@ -403,6 +404,18 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   // The page dims itself slightly so the user sees "still working" without
   // the jarring full-screen LoadingScreen.
   const isRefreshing = isFetching && !!dashboard && !isLoading;
+  // Overview only: both loader windows (isLoading, and the grace fallback
+  // below) become one continuous OverviewSkeleton instead of a LoadingScreen
+  // -- from the user's perspective there's no handoff between the two, only
+  // the underlying reason it's still showing changes. runMode keeps the
+  // LoadingScreen ladder untouched (RunOverviewPanel has its own inline gate
+  // this skeleton was never meant to cover).
+  const showOverviewSkeleton = !runMode && (isLoading || (dashboard && !isLoading && !contentReady));
+  // The `dashboard-loading` 40% dim exists to fade *stale* content sitting
+  // under the loader overlay. For the Overview the skeleton IS the content
+  // (nothing stale is underneath it), so it never dims -- only a runMode
+  // load, which still uses the sibling LoadingScreen below, does.
+  const isDimmed = isLoading && runMode;
   return (
     <>
       {/* Sibling to .dashboard-page, not a child of it: that div carries the
@@ -412,18 +425,22 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
           a project switch now clears the old payload (placeholderData is
           project-scoped -- see samePlaceholderScope), so this spinner is what
           the user sees right after picking a project; saying which one makes
-          the wait legible instead of looking like the page hung. */}
-      {isLoading && <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />}
-      <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : `dashboard-ready${dashboardAppearClass}`}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
+          the wait legible instead of looking like the page hung. runMode only
+          -- the Overview shows the OverviewSkeleton (inside .dashboard-page,
+          see showOverviewSkeleton) instead. */}
+      {isLoading && runMode && <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />}
+      <div className={`dashboard-page dashboard-fade ${isDimmed ? 'dashboard-loading' : `dashboard-ready${dashboardAppearClass}`}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
         <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
         {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
+        {showOverviewSkeleton && <OverviewSkeleton projectName={projectName} />}
         {/* Grace elapsed but content still isn't ready (dashboard is in, accumulated
             isn't yet): the page has already stopped showing its own full loader
             above, but there's nothing ready to mount below either. This is the ONE
             other place, at this same top level, that a loader can render from --
             DashboardContent itself never makes this decision, so the two can't
-            drift out of sync the way they did in the original bug. */}
-        {dashboard && !isLoading && !contentReady && <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />}
+            drift out of sync the way they did in the original bug. runMode only --
+            the Overview's showOverviewSkeleton above already covers this window. */}
+        {runMode && dashboard && !isLoading && !contentReady && <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />}
         {dashboard && contentReady && (
           <DashboardContent
             runMode={runMode}
