@@ -18,6 +18,9 @@ function sumLiveViolations(liveViolations) {
 // The live feed already excludes dismissed/deleted findings (it reads the same
 // filtered dimension evals the report does), so FOUND is a net number. The
 // progress payload carries what was netted out, so the strip can say so.
+// The parent (EvaluationStatus) may also have filtered out carried-forward
+// findings before this component ever sees liveViolations, per the
+// live-findings-only setting, so FOUND can be net of those too.
 function sumSuppressed(progress) {
   return (progress?.dimensions || []).reduce((n, d) => n + (d?.suppressed || 0), 0);
 }

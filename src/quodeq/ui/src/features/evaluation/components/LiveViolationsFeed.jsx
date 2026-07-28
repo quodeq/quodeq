@@ -186,23 +186,25 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
           <span className="vlive-head-dim">{progress.currentDimension}</span>
         )}
       </div>
-      <div className="vlive-card">
-        {orderedDims.map(({ dim, violations }) => (
-          <DimensionGroup
-            key={dim}
-            dim={dim}
-            violations={violations}
-            open={openDim === dim}
-            onToggle={() => setOpenDim((cur) => (cur === dim ? null : dim))}
-          />
-        ))}
-        {isRunning && (
-          <div className="vlive-footer">
-            <span className="vlive-footer__dot" aria-hidden="true" />
-            scanning for more{queued != null ? <> · {queued} files queued</> : null}
-          </div>
-        )}
-      </div>
+      {(totalCount > 0 || isRunning) && (
+        <div className="vlive-card">
+          {orderedDims.map(({ dim, violations }) => (
+            <DimensionGroup
+              key={dim}
+              dim={dim}
+              violations={violations}
+              open={openDim === dim}
+              onToggle={() => setOpenDim((cur) => (cur === dim ? null : dim))}
+            />
+          ))}
+          {isRunning && (
+            <div className="vlive-footer">
+              <span className="vlive-footer__dot" aria-hidden="true" />
+              scanning for more{queued != null ? <> · {queued} files queued</> : null}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

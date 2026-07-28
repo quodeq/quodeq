@@ -9,7 +9,15 @@ import { NEW_FINDINGS_ONLY_KEY } from '../../settings/hooks/useLiveFeedSettings.
 // mocked like JobStatStrip. LiveViolationsFeed is left real below: the
 // live-findings-filter tests assert on what it renders.
 vi.mock('./ScanProgress.jsx', () => ({ default: () => null }));
-vi.mock('./JobStatStrip.jsx', () => ({ default: () => null }));
+// Probe instead of a null stub: renders the total violation count the strip
+// actually received, so a regression that reverts EvaluationStatus to pass
+// the unfiltered liveViolations to the strip (while the feed stays filtered)
+// shows up here instead of leaving every test green.
+vi.mock('./JobStatStrip.jsx', () => ({
+  default: ({ liveViolations }) => <i data-testid="strip-sum">{
+    Object.values(liveViolations || {}).reduce((n, vs) => n + (vs?.length || 0), 0)
+  }</i>,
+}));
 // The identity strip reads the shared progress query for its "mode" cell;
 // LiveViolationsFeed reads the same query for its streaming footer/header.
 vi.mock('../../../api/index.js', () => ({
@@ -143,6 +151,8 @@ describe('EvaluationStatus live-findings filter', () => {
     renderStatus();
     expect(screen.getByText('new.py:1')).toBeInTheDocument();
     expect(screen.queryByText('old-a.py:2')).not.toBeInTheDocument();
+    // The strip must see the same filtered set as the feed (1 fresh of 3).
+    expect(screen.getByTestId('strip-sum')).toHaveTextContent('1');
   });
 
   it('discloses how many are hidden rather than hiding them silently', () => {
@@ -155,6 +165,7 @@ describe('EvaluationStatus live-findings filter', () => {
     renderStatus();
     expect(screen.getByText('old-a.py:2')).toBeInTheDocument();
     expect(screen.queryByText(/carried forward hidden/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('strip-sum')).toHaveTextContent('3');
   });
 
   it('says nothing about carries when the run has none', () => {

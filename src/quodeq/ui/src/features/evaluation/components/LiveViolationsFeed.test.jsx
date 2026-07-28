@@ -79,4 +79,14 @@ describe('LiveViolationsFeed', () => {
     const { container } = renderFeed({ liveViolations: {}, hiddenCarriedCount: 0 });
     expect(container.firstChild).toBeNull();
   });
+
+  it('omits the bordered card when the filter emptied a terminal job, keeping only the disclosure', () => {
+    const { container } = renderFeed({
+      job: { jobId: 'j1', status: 'done' },
+      liveViolations: {},
+      hiddenCarriedCount: 12,
+    });
+    expect(screen.getByText(/12 carried forward hidden/)).toBeInTheDocument();
+    expect(container.querySelector('.vlive-card')).toBeNull();
+  });
 });
