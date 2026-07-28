@@ -174,8 +174,20 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   const contentReady = runMode ? !!dashboard : (!!dashboard && !!accumulated);
   // Grace state for the slow/cold-load fallback (consumed by isLoading below).
   const [graceElapsed, setGraceElapsed] = useState(false);
+  // Reset synchronously during render, not from the effect below: contentReady
+  // flipping true (or dashboard disappearing) and graceElapsed resetting are
+  // the same logical transition. Doing it from an effect meant a stale
+  // intermediate commit (graceElapsed still true) landed first and ran ITS
+  // OWN effects -- including the appear-fade latch's ref write further down
+  // -- before this effect got a chance to correct it; a second, cascading
+  // commit then found the latch already spent and dropped the fade it had
+  // just armed. Resetting here settles the transition in a single commit,
+  // before any effects run at all -- same "adjust state during render"
+  // pattern as noRunsEmptySticky below, safe under StrictMode's double-
+  // render for the same reason: idempotent once the condition clears.
+  if (graceElapsed && (contentReady || !dashboard)) setGraceElapsed(false);
   useEffect(() => {
-    if (contentReady || !dashboard) { setGraceElapsed(false); return undefined; }
+    if (contentReady || !dashboard) return undefined;
     const timer = setTimeout(() => setGraceElapsed(true), 700);
     return () => clearTimeout(timer);
   }, [contentReady, dashboard]);
@@ -193,6 +205,15 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   // it's consumed) because the fade-once latch below needs it for every branch,
   // not just the main one.
   const isLoading = loading && !contentReady && !(dashboard && graceElapsed);
+
+  // Overview only (!runMode): both loader windows below (isLoading itself,
+  // and the grace-fallback window once dashboard has landed but accumulated
+  // hasn't) render one continuous OverviewSkeleton instead of a LoadingScreen.
+  // Computed here, above the appear latch, rather than beside the return
+  // where it's consumed: the latch below needs to know a skeleton (not real
+  // content) is what's showing, for every branch, not just the main one --
+  // same reason `isLoading` itself is hoisted above the early returns.
+  const showOverviewSkeleton = !runMode && (isLoading || (dashboard && !isLoading && !contentReady));
 
   // Fade-once latch: `dashboard-fadein` should play when the page's content
   // first appears for this project/source/run context, not on every
@@ -217,19 +238,30 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   // the error/runMode-empty branches gate on `!loading` outright -- so the
   // latch is never consumed before real first-appearance content is on
   // screen; isLoading being true only ever suppresses a repeat.
+  // `!showOverviewSkeleton` gates both the read and the write: without it,
+  // the grace-elapsed flip (isLoading true -> false while the Overview's
+  // skeleton keeps showing, accumulated still pending) would (a) play the
+  // 400ms fade over a skeleton that was already fully visible and unchanged
+  // -- a flash the skeleton is supposed to avoid -- and (b) spend the latch
+  // early, so the *real* content that mounts once accumulated lands would
+  // get no fade at all. showOverviewSkeleton is false for every other branch
+  // (runMode, error, empty states, sticky no-runs), so this is a no-op there.
   const dashboardAppearKey = `${selectedProject}::${selectedSource}::${runMode ? selectedRunId : 'overview'}`;
   const dashboardAppearedKeyRef = useRef(null);
-  const dashboardAppearNow = !isLoading && dashboardAppearedKeyRef.current !== dashboardAppearKey;
+  const dashboardAppearNow = !isLoading && !showOverviewSkeleton && dashboardAppearedKeyRef.current !== dashboardAppearKey;
   useEffect(() => {
-    if (!isLoading) dashboardAppearedKeyRef.current = dashboardAppearKey;
-  }, [isLoading, dashboardAppearKey]);
+    if (!isLoading && !showOverviewSkeleton) dashboardAppearedKeyRef.current = dashboardAppearKey;
+  }, [isLoading, showOverviewSkeleton, dashboardAppearKey]);
   const dashboardAppearClass = dashboardAppearNow ? ' dashboard-appear' : '';
   // Trade-off: the appear class only lives for the one render where it's computed
   // above -- it doesn't stay latched until dashboardAppearKey next changes -- so any
-  // re-render inside the animation window (e.g. grace-fallback partial page then
-  // contentReady flipping true) drops it and snaps opacity to 1, cutting the fade
-  // short. Latching it across renders was rejected: it would fail to re-arm on a
-  // run switch without reintroducing a loading gap.
+  // *unrelated* re-render inside the animation window (e.g. isFetching flipping a
+  // moment after content first appears) drops it and snaps opacity to 1, cutting
+  // the fade short. Latching it across renders was rejected: it would fail to
+  // re-arm on a run switch without reintroducing a loading gap. (The
+  // grace-fallback -> content-ready flip used to be an example of this too, until
+  // the graceElapsed reset above moved to render-phase specifically to stop that
+  // one from self-inflicting a same-tick drop -- see the comment on graceElapsed.)
 
   // Sticky "no evaluations yet" latch: once that empty state is showing for
   // this project+source, stay on it through a subsequent load (the post-eval
@@ -404,13 +436,9 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   // The page dims itself slightly so the user sees "still working" without
   // the jarring full-screen LoadingScreen.
   const isRefreshing = isFetching && !!dashboard && !isLoading;
-  // Overview only: both loader windows (isLoading, and the grace fallback
-  // below) become one continuous OverviewSkeleton instead of a LoadingScreen
-  // -- from the user's perspective there's no handoff between the two, only
-  // the underlying reason it's still showing changes. runMode keeps the
-  // LoadingScreen ladder untouched (RunOverviewPanel has its own inline gate
-  // this skeleton was never meant to cover).
-  const showOverviewSkeleton = !runMode && (isLoading || (dashboard && !isLoading && !contentReady));
+  // showOverviewSkeleton is computed above (beside the appear latch, which
+  // needs it too) -- from the user's perspective this covers both loader
+  // windows as one continuous OverviewSkeleton, no handoff between them.
   // The `dashboard-loading` 40% dim exists to fade *stale* content sitting
   // under the loader overlay. For the Overview the skeleton IS the content
   // (nothing stale is underneath it), so it never dims -- only a runMode

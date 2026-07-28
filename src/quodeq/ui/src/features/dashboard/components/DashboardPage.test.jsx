@@ -674,7 +674,13 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
     expect(page.className).not.toContain('dashboard-appear');
   });
 
-  it('does not replay dashboard-appear across the grace-fallback -> content-ready double flip', () => {
+  // P6 fix: the appear latch's read AND write are gated on `!showOverviewSkeleton`
+  // (DashboardPage.jsx, beside `dashboardAppearKey`). Before that gate, the
+  // grace-elapsed flip replayed a 400ms fade over the already-visible,
+  // unchanged skeleton (a flash) and spent the latch early, so real content
+  // got no fade at all. Now: no fade while the skeleton continues across the
+  // flip, and the fade is reserved for when DashboardContent actually mounts.
+  it('does not fade the skeleton at the grace-elapsed flip, and fires dashboard-appear once real content mounts', () => {
     vi.useFakeTimers();
     try {
       const { container, rerender } = render(
@@ -683,9 +689,54 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
         </SidePaneProvider>,
       );
       act(() => { vi.advanceTimersByTime(800); });
+      // Grace elapsed, accumulated still not in: the skeleton continues
+      // (same as before the flip) -- must not fade, that would flash it.
       let page = container.querySelector('.dashboard-page');
       expect(page.className).toContain('dashboard-ready');
+      expect(page.className).not.toContain('dashboard-appear');
+      expect(page.querySelector('.overview-skeleton')).toBeTruthy();
+
+      rerender(
+        <SidePaneProvider>
+          <DashboardPage data={readyOverview} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      // Real content mounts for the first time in this context: this is what
+      // gets the fade, not the earlier grace-elapsed flip.
+      page = container.querySelector('.dashboard-page');
+      expect(page.className).toContain('dashboard-ready');
       expect(page.className).toContain('dashboard-appear');
+      expect(page.querySelector('.overview-skeleton')).toBeNull();
+
+      rerender(
+        <SidePaneProvider>
+          <DashboardPage data={{ ...readyOverview, isFetching: true }} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      // Repeat render over the same context: no replay.
+      page = container.querySelector('.dashboard-page');
+      expect(page.className).not.toContain('dashboard-appear');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Fast path: content lands well before the grace timer would fire (the
+  // common case). isLoading and contentReady flip in the same render, so the
+  // showOverviewSkeleton gate never engages and the fade plays exactly as it
+  // did before this fix.
+  it('plays dashboard-appear normally when content arrives before the grace timer fires', () => {
+    vi.useFakeTimers();
+    try {
+      const { container, rerender } = render(
+        <SidePaneProvider>
+          <DashboardPage data={{ ...readyOverview, accumulated: null, loading: true }} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      // Partway through the grace window -- timer still pending, not fired.
+      act(() => { vi.advanceTimersByTime(300); });
+      let page = container.querySelector('.dashboard-page');
+      expect(page.className).not.toContain('dashboard-appear');
 
       rerender(
         <SidePaneProvider>
@@ -694,7 +745,7 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
       );
       page = container.querySelector('.dashboard-page');
       expect(page.className).toContain('dashboard-ready');
-      expect(page.className).not.toContain('dashboard-appear');
+      expect(page.className).toContain('dashboard-appear');
     } finally {
       vi.useRealTimers();
     }

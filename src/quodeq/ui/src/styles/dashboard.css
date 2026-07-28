@@ -1915,7 +1915,9 @@
   opacity: 0.6;
 }
 .overview-skeleton__bar--label { width: 45%; height: 8px; }
-.overview-skeleton__bar--value { width: 55%; height: 22px; }
+/* 31px matches the real .term-stat__value box (font-size 28px, line-height
+   1.1, terminal.css:119-124) so the stat card's footprint doesn't shrink. */
+.overview-skeleton__bar--value { width: 55%; height: 31px; }
 .overview-skeleton__bar--hint { width: 70%; height: 8px; }
 .overview-skeleton__bar--name { width: 60%; height: 14px; }
 /* 100px matches DimensionGaugeCard's RING_SIZE (DimensionGaugeCard.jsx) so the
@@ -1924,6 +1926,14 @@
 .overview-skeleton__bar--gauge { width: 100px; height: 100px; border-radius: 50%; }
 .overview-skeleton__bar--meta { width: 50%; height: 8px; }
 .overview-skeleton__bar--sev { width: 40%; height: 12px; }
+
+/* The real .dim-gauge-card is cursor:pointer + hover/focus affordances
+   (dim-gauge-card.css) -- this card isn't clickable, so neutralize both
+   rather than let a placeholder look interactive. */
+.overview-skeleton .dim-gauge-card {
+  cursor: default;
+  pointer-events: none;
+}
 
 /* ── Project selector (in main content area) ──────────── */
 
