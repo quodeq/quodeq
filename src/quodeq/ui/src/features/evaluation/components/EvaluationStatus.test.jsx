@@ -6,6 +6,10 @@ import EvaluationStatus from './EvaluationStatus.jsx';
 vi.mock('./LiveViolationsFeed.jsx', () => ({ default: () => null }));
 vi.mock('./ScanProgress.jsx', () => ({ default: () => null }));
 vi.mock('./JobStatStrip.jsx', () => ({ default: () => null }));
+// The identity strip reads the shared progress query for its "mode" cell.
+vi.mock('../../../api/index.js', () => ({
+  getEvaluationProgress: vi.fn().mockResolvedValue(null),
+}));
 
 function renderWithClient(ui) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -20,7 +24,7 @@ const baseJob = {
   dimensions: [],
 };
 
-describe('JobIdLine', () => {
+describe('JobIdentityStrip', () => {
   it('renders the job ID with a copy button', () => {
     renderWithClient(<EvaluationStatus job={{ ...baseJob, jobId: 'job-123' }} />);
     expect(screen.getByText('job-123')).toBeInTheDocument();
@@ -50,16 +54,18 @@ describe('JobIdLine', () => {
     expect(screen.queryByTestId('job-runtime-chip')).toBeNull();
   });
 
-  it('renders the model chip on its own grid row below the job id', () => {
+  it('renders the model chip in its own labelled identity cell', () => {
     renderWithClient(
       <EvaluationStatus
         job={{ ...baseJob, aiProvider: 'llamacpp', aiModel: 'qwen3.6-27b' }}
       />,
     );
     const chip = screen.getByTestId('job-runtime-chip');
-    expect(chip).toHaveClass('evaluate-job-id-line__model');
-    // The chip is a direct grid child, not nested inside the id row.
-    expect(chip.parentElement).toHaveClass('evaluate-job-id-line');
+    const cell = chip.closest('.eval-identity__cell');
+    expect(cell).not.toBeNull();
+    expect(cell.textContent).toMatch(/model/);
+    // The chip lives in the strip, not in the job-id cell.
+    expect(cell.textContent).not.toMatch(/ext-test/);
   });
 });
 
@@ -101,7 +107,9 @@ describe('project label', () => {
         startedProjectInfo={null}
       />
     );
-    const header = document.querySelector('.evaluate-panel__top');
-    expect(header.textContent).not.toMatch(/Project [ABC]/);
+    expect(screen.queryByText(/Project [ABC]/)).toBeNull();
+    // The repository cell shows a dash instead — unknown beats wrong.
+    const strip = document.querySelector('.eval-identity');
+    expect(strip.textContent).toMatch(/repository—/);
   });
 });

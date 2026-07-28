@@ -1,0 +1,118 @@
+import { useEffect } from 'react';
+
+const STORAGE_KEY = 'quodeq.cleanScan.permanent';
+
+function readPermanent() {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writePermanent(on) {
+  try {
+    if (on) localStorage.setItem(STORAGE_KEY, '1');
+    else localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore quota / disabled storage */
+  }
+}
+
+function ModeCard({ id, checked, onPick, disabled, title, tag, children }) {
+  return (
+    <label className={`eval-mode-card${checked ? ' eval-mode-card--selected' : ''}${disabled ? ' eval-mode-card--disabled' : ''}`}>
+      <input
+        type="radio"
+        name="scan-mode"
+        value={id}
+        checked={checked}
+        onChange={onPick}
+        disabled={disabled}
+        className="eval-mode-card__input"
+      />
+      <span className="eval-mode-card__dot" aria-hidden="true"><span /></span>
+      <span className="eval-mode-card__body">
+        <span className="eval-mode-card__title-row">
+          <span className="eval-mode-card__title">{title}</span>
+          <span className="eval-mode-card__tag">{tag}</span>
+        </span>
+        <span className="eval-mode-card__desc">{children}</span>
+      </span>
+    </label>
+  );
+}
+
+/**
+ * Scan-mode radio cards: incremental vs clean scan. Same tri-state contract
+ * as the old CleanScanToggle — `value` is 'off' | 'once' | 'permanent' —
+ * so `buildScanPayload`'s cleanScan mapping and the one-shot "once"
+ * consumption in `useDimensionSelection` are untouched. Picking clean
+ * reveals a "this scan only / always" sub-choice; "always" persists to
+ * localStorage exactly like before.
+ */
+export default function ScanModeCards({ value, onChange, disabled = false }) {
+  useEffect(() => {
+    // First mount: hydrate 'permanent' from localStorage so the cards reflect
+    // the user's saved preference. Only when the parent passes 'off' as the
+    // initial value (no in-flight 'once' state to clobber).
+    if (value === 'off' && readPermanent()) onChange('permanent');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const isClean = value !== 'off';
+
+  function pickIncremental() {
+    writePermanent(false);
+    onChange('off');
+  }
+  function pickClean() {
+    // Default to one-shot; "always" is the explicit sub-choice.
+    if (!isClean) onChange('once');
+  }
+  function pickOnce() {
+    writePermanent(false);
+    onChange('once');
+  }
+  function pickPermanent() {
+    writePermanent(true);
+    onChange('permanent');
+  }
+
+  return (
+    <div className="eval-scan-mode">
+      <div className="eval-scan-mode__label">scan mode</div>
+      <div className="eval-scan-mode__grid">
+        <ModeCard id="incremental" checked={!isClean} onPick={pickIncremental} disabled={disabled} title="incremental" tag="recommended">
+          re-analyzes only files changed since the last run and keeps earlier findings for everything else.
+        </ModeCard>
+        <ModeCard id="clean" checked={isClean} onPick={pickClean} disabled={disabled} title="clean scan" tag="slow">
+          none of the previous findings are used — every file is re-analyzed from scratch. use after changing standards or a quodeq version.
+        </ModeCard>
+      </div>
+      {isClean && (
+        <div className="eval-scan-mode__sub" role="radiogroup" aria-label="Clean scan persistence">
+          <button
+            type="button"
+            className={`eval-scan-mode__sub-btn${value === 'once' ? ' eval-scan-mode__sub-btn--on' : ''}`}
+            onClick={pickOnce}
+            disabled={disabled}
+            aria-pressed={value === 'once'}
+          >
+            this scan only
+          </button>
+          <button
+            type="button"
+            className={`eval-scan-mode__sub-btn${value === 'permanent' ? ' eval-scan-mode__sub-btn--on' : ''}`}
+            onClick={pickPermanent}
+            disabled={disabled}
+            aria-pressed={value === 'permanent'}
+            title="Clean scan for every run, all projects"
+          >
+            always
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

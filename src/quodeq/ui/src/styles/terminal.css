@@ -135,6 +135,7 @@
 .term-stat--success .term-stat__value { color: var(--color-success); }
 .term-stat--warning .term-stat__value { color: var(--color-warning); }
 .term-stat--critical .term-stat__value { color: var(--color-sev-critical-text); }
+.term-stat--accent .term-stat__value { color: var(--color-accent); }
 
 /* Clickable variant — a Stat doubles as a navigation affordance. The card stays
    a <div>; an inner `.term-stat__hitbox` button is the actual click target so
@@ -2436,10 +2437,24 @@ button.term-sev-badge--clickable:focus-visible {
    ------------------------------------------------------------ */
 .eval-job-stat-strip { margin-bottom: var(--term-space-3); }
 .eval-job-stat-strip .term-stat-strip--cards .term-stat {
-  padding: 10px 12px;
+  padding: 14px 16px 15px;
+  background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
+  border-radius: var(--eval-tile-radius, 10px);
+}
+.eval-job-stat-strip .term-stat__label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--color-text-subtle, var(--color-text-muted));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .eval-job-stat-strip .term-stat__value {
-  font-size: 18px;
+  font-size: 24px;
+}
+.eval-job-stat-strip .term-stat__trailing {
+  font-size: 15px;
+  color: var(--color-text-subtle, var(--color-text-muted));
 }
 
 /* ------------------------------------------------------------

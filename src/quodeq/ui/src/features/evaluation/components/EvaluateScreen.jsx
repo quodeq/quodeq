@@ -1,38 +1,11 @@
 import { useState, useEffect } from 'react';
 import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
-import CountdownTimer from './CountdownTimer.jsx';
-import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
+import { ACTIVE_PROVIDER_KEY } from '../../../constants.js';
 import { resolveProviderSettings } from '../../../utils/effectiveProviderSettings.js';
 import { TermHeader } from '../../../components/terminal/index.js';
 
 const TOAST_DISMISS_TIMEOUT_MS = 5000;
-
-function ActiveProviderBadge({ storage = localStorage, onClick }) {
-  const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
-  const model = storage.getItem(providerKey(provider, 'model')) || '';
-  if (!provider) return null;
-  const content = (
-    <>
-      <span className="eval-provider-name">{provider}</span>
-      {model && <span className="eval-provider-sep" aria-hidden="true">·</span>}
-      {model && <span className="eval-provider-model">{model}</span>}
-    </>
-  );
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        className="eval-provider-badge eval-provider-badge--clickable"
-        onClick={onClick}
-        title="Open provider settings"
-      >
-        {content}
-      </button>
-    );
-  }
-  return <div className="eval-provider-badge">{content}</div>;
-}
 
 export function readBudgetSeconds(storage = localStorage) {
   const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
@@ -42,24 +15,11 @@ export function readBudgetSeconds(storage = localStorage) {
   return resolveProviderSettings(provider, storage).timeLimitS;
 }
 
-const TERMINAL_STATUSES = new Set(['done', 'failed', 'cancelled', 'lost', 'completed']);
-
-function EvaluateHeader({ job, onGoToSettings }) {
+function EvaluateHeader() {
   // Page title stays steady ("evaluate"); the live "in progress / failed /
   // done" state is carried by the JobHeader card title below to avoid
-  // doubling the same status on screen.
-  const deadlineAt = job?.deadlineAt ?? null;
-  // job.phase never turns terminal (the CLI leaves it at "scoring"), so a
-  // finished run kept the countdown pinned at 0:00. Key off status once the
-  // run ends; phase still wins while it runs.
-  const phase = TERMINAL_STATUSES.has(job?.status)
-    ? job.status
-    : (job?.phase ?? job?.status ?? null);
-  // Prefer the running job's own budget (carried on the snapshot) so
-  // changing provider/limit in Settings mid-run can't alter or hide the
-  // countdown of an already-running scan. Settings remain the fallback for
-  // jobs that predate the field.
-  const budgetSeconds = typeof job?.timeLimitS === 'number' ? job.timeLimitS : readBudgetSeconds();
+  // doubling the same status on screen. Budget lives in the progress footer
+  // while a run is on; the model lives in the cards' identity strips.
   return (
     <header className="evaluate-header evaluate-header--terminal">
       <div className="evaluate-header__left">
@@ -67,10 +27,6 @@ function EvaluateHeader({ job, onGoToSettings }) {
           name="evaluate"
           sub="run a comprehensive code quality evaluation on any repository"
         />
-      </div>
-      <div className="evaluate-header__right">
-        <CountdownTimer deadlineAt={deadlineAt} budgetSeconds={budgetSeconds} phase={phase} />
-        <ActiveProviderBadge onClick={onGoToSettings} />
       </div>
     </header>
   );
@@ -141,11 +97,11 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
 
   return (
     <section className="evaluate-screen">
-      <EvaluateHeader job={job} onGoToSettings={onGoToSettings} />
+      <EvaluateHeader />
 
       <div className="evaluate-content">
         {!job && selectedProject && (
-          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={wrappedOnStart} disabled={false} preselectDims={preselectDims} />
+          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={wrappedOnStart} disabled={false} preselectDims={preselectDims} onGoToSettings={onGoToSettings} />
         )}
 
         {!job && !selectedProject && (

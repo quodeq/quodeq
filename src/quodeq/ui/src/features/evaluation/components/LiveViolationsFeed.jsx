@@ -2,10 +2,12 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
 import { parseFileRef } from '../../../utils/formatters.js';
-import { SectionLabel } from '../../../components/terminal/index.js';
+import { SectionLabel, SevBadge } from '../../../components/terminal/index.js';
+import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 40;
 const ANIM_MAX_DELAY_MS = 400;
+const KNOWN_SEVERITIES = new Set(['critical', 'major', 'minor']);
 
 function severityOrder(s) {
   return s === 'critical' ? 0 : s === 'major' ? 1 : 2;
@@ -81,10 +83,12 @@ function ViolationLiveRow({ violation, index }) {
         onClick={() => setOpen(o => !o)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
       >
-        <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
-        {v.dimension && <span className="vrow-label">[{v.dimension}]</span>}
-        {v.principle && <span className="vrow-label">[{v.principle}]</span>}
-        {filename && <FileCopyBtn display={display} copyText={ref} />}
+        <span className="vlive-rail" aria-hidden="true" />
+        {KNOWN_SEVERITIES.has(v.severity)
+          ? <SevBadge level={v.severity} format="long" />
+          : <span className={`severity-tag ${v.severity}`}>{v.severity}</span>}
+        <span className="vrow-rule">{v.principle || ''}</span>
+        {filename ? <FileCopyBtn display={display} copyText={ref} /> : <span />}
         <svg
           className={`vlive-chevron${open ? ' open' : ''}`}
           width="14" height="14" viewBox="0 0 24 24"
@@ -120,9 +124,18 @@ function DimensionGroup({ dim, violations, open, onToggle }) {
   );
 }
 
-export default function LiveViolationsFeed({ liveViolations }) {
+export default function LiveViolationsFeed({ liveViolations, job = null }) {
   // Per-dim activity timestamps power "latest active dimension on top".
   const lastActivity = useDimensionActivity(liveViolations);
+
+  const isRunning = job?.status === 'running';
+  // Shares the progress query cache entry with the strip/progress — the hook
+  // adds no polling of its own. Only used for the streaming footer/header.
+  const { data: progress } = useEvaluationProgress(job?.jobId, !isRunning);
+  const runningDim = (progress?.dimensions || []).find((d) => d?.state === 'running');
+  const queued = runningDim?.files
+    ? Math.max(0, (runningDim.files.total ?? 0) - (runningDim.files.taken ?? 0))
+    : null;
 
   const orderedDims = useMemo(() => {
     return Object.entries(liveViolations ?? {})
@@ -155,19 +168,35 @@ export default function LiveViolationsFeed({ liveViolations }) {
 
   return (
     <div className="vlive-feed">
-      {totalCount > 0 && <SectionLabel>{`live_violations · ${totalCount}`}</SectionLabel>}
-      <div className="vlive-counter">
-        {totalCount} violation{totalCount !== 1 ? 's' : ''} found across {orderedDims.length} dimension{orderedDims.length !== 1 ? 's' : ''}
+      <div className="vlive-head">
+        <span className="vlive-head-left">
+          <SectionLabel>live violations</SectionLabel>
+          <span className="vlive-counter">
+            {totalCount} across {orderedDims.length} dimension{orderedDims.length !== 1 ? 's' : ''}
+            {isRunning && ' · streaming'}
+          </span>
+        </span>
+        {isRunning && progress?.currentDimension && (
+          <span className="vlive-head-dim">{progress.currentDimension}</span>
+        )}
       </div>
-      {orderedDims.map(({ dim, violations }) => (
-        <DimensionGroup
-          key={dim}
-          dim={dim}
-          violations={violations}
-          open={openDim === dim}
-          onToggle={() => setOpenDim((cur) => (cur === dim ? null : dim))}
-        />
-      ))}
+      <div className="vlive-card">
+        {orderedDims.map(({ dim, violations }) => (
+          <DimensionGroup
+            key={dim}
+            dim={dim}
+            violations={violations}
+            open={openDim === dim}
+            onToggle={() => setOpenDim((cur) => (cur === dim ? null : dim))}
+          />
+        ))}
+        {isRunning && (
+          <div className="vlive-footer">
+            <span className="vlive-footer__dot" aria-hidden="true" />
+            scanning for more{queued != null ? <> · {queued} files queued</> : null}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
