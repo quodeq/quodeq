@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState, useEffect, useRef } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
 import UpdateBanner from './features/updates/UpdateBanner.jsx';
 import { useSharedContentSignal } from './features/dashboard/hooks/useSharedProjects.js';
@@ -26,6 +26,8 @@ import { applyMutationDelta } from './api/applyMutationDelta.js';
 import { getGradeFormula } from './api/index.js';
 import { setGradeThresholds } from './utils/gradeThresholds.js';
 import { deriveEvaluatePreselect } from './utils/evaluatePreselect.js';
+import { useEvaluationProgress } from './features/evaluation/hooks/useEvaluationProgress.js';
+import { computeOverallProgress } from './features/evaluation/components/scanProgressTotals.js';
 import LoadingScreen from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import TopBar from './components/TopBar.jsx';
@@ -1042,7 +1044,7 @@ export default function App() {
   const sidebarModel = sidebarProvider && typeof localStorage !== 'undefined'
     ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
     : null;
-  const { activePage, navStack, navPop, navGoTo, navTab, activeTab } = state;
+  const { activePage, navStack, navPop, navGoTo, navSwapAt, navTab, activeTab } = state;
   // Initial landing: decided exactly once, the first render after both the
   // local projects list and the shared signal have settled (whatever the
   // outcome). Mid-session changes never re-trigger it.
@@ -1125,6 +1127,57 @@ export default function App() {
     () => filterAccumulatedByVisibleStandards(state.accumulated, visibleSet, filteredTrend, null),
     [state.accumulated, visibleSet, filteredTrend]
   );
+
+  // Breadcrumb jump-bar data: which siblings a given path segment can swap
+  // to. Two levels have a known sibling set — the root tab (the sidebar's
+  // main destinations) and the explorer dimension. Levels without one return
+  // null and stay plain links.
+  const breadcrumbSiblingsFor = useCallback((entry, index) => {
+    if (index === 0) {
+      if (!state.selectedProject) return null;
+      return ['overview', 'violations', 'map', 'history', 'evaluate'].map((id) => ({
+        key: id,
+        label: navLabelFor({ page: id }),
+        current: entry.page === id,
+        onSelect: () => (id === 'evaluate'
+          ? navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) })
+          : navTab(id)),
+      }));
+    }
+    if (entry.page === 'explorer') {
+      const dims = filteredAccumulated?.dimensions || [];
+      if (dims.length < 2) return null;
+      return dims.map((dim) => ({
+        key: dim.dimension,
+        label: (dim.dimension || '').toLowerCase(),
+        current: dim.dimension === entry.dimension,
+        onSelect: () => navSwapAt(index, {
+          page: 'explorer',
+          dimension: dim.dimension,
+          runId: dim.fromRunId,
+          dateLabel: dim.fromDateLabel,
+          fromProject: dim.fromProject,
+          sourceTab: entry.sourceTab || 'violations',
+        }),
+      }));
+    }
+    return null;
+  }, [state.selectedProject, navTab, navSwapAt, activePage, filteredAccumulated]);
+
+  // Live run progress for the topbar chrome (run chip + bottom hairline).
+  // Shares the JobStatStrip/ScanProgress query cache entry, so this adds no
+  // extra polling.
+  const evalJob = state.evalLifecycle?.job;
+  const { data: evalProgress } = useEvaluationProgress(isEvaluating ? evalJob?.jobId : undefined, !isEvaluating);
+  const topbarRunProgress = useMemo(() => {
+    if (!isEvaluating) return null;
+    const overall = computeOverallProgress(evalProgress);
+    const runningDim = (evalProgress?.dimensions || []).find((d) => d?.state === 'running');
+    return {
+      dimension: runningDim?.id ? String(runningDim.id).toLowerCase() : null,
+      percent: overall.totalFiles > 0 ? overall.overallPct : null,
+    };
+  }, [isEvaluating, evalProgress]);
 
   const contentProps = {
     dashboardData: buildDashboardDataBundle({ state, sharedHasContent: sharedSignal.hasContent }),
@@ -1215,6 +1268,7 @@ export default function App() {
               selectedSource={state.selectedSource}
               onEvaluate={shouldShowEvaluateButton(state.projects?.length, state.selectedSource) ? (() => navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) })) : null}
               evaluating={state.evalLifecycle?.job?.status === 'running'}
+              runProgress={topbarRunProgress}
               onProviderClick={() => navTab('settings')}
               onMenuToggle={() => setSidebarPinned((v) => !v)}
               onSelectProject={() => navTab('projects')}
@@ -1224,6 +1278,7 @@ export default function App() {
                   onGoTo={navGoTo}
                   projectName={resolvedDisplayName}
                   onSelectProject={() => navTab('projects')}
+                  siblingsFor={breadcrumbSiblingsFor}
                 />
               }
               mobileTitle={navStack.length ? navLabelFor(navStack[navStack.length - 1]) : (activeTab || '')}

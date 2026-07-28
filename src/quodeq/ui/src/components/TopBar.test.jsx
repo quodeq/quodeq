@@ -65,3 +65,35 @@ describe('TopBar source gating', () => {
     expect(screen.getByRole('button', { name: /Assistant/i })).toBeInTheDocument();
   });
 });
+
+describe('TopBar evaluate and run state', () => {
+  it('fires onEvaluate from the primary button when idle', () => {
+    const onEvaluate = vi.fn();
+    renderTopBar({ onEvaluate });
+    fireEvent.click(screen.getByRole('button', { name: 'Evaluate' }));
+    expect(onEvaluate).toHaveBeenCalledTimes(1);
+  });
+
+  it('dims Evaluate and moves the click to the run chip while a run is live', () => {
+    const onEvaluate = vi.fn();
+    renderTopBar({
+      onEvaluate,
+      evaluating: true,
+      runProgress: { dimension: 'reliability', percent: 41 },
+    });
+    const evalBtn = screen.getByRole('button', { name: 'Evaluate' });
+    expect(evalBtn).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(evalBtn);
+    expect(onEvaluate).not.toHaveBeenCalled();
+
+    const chip = screen.getByRole('button', { name: /reliability/ });
+    expect(chip).toHaveTextContent('41%');
+    fireEvent.click(chip);
+    expect(onEvaluate).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a placeholder on the run chip before the first progress poll lands', () => {
+    renderTopBar({ onEvaluate: () => {}, evaluating: true, runProgress: null });
+    expect(screen.getByRole('button', { name: /evaluating…/ })).toBeInTheDocument();
+  });
+});
