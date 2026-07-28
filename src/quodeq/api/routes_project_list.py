@@ -4,6 +4,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
+import os
 from http import HTTPStatus
 from pathlib import Path
 
@@ -247,12 +248,16 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         """
         validate_path_segment(project)
 
-        # Inline resolve + containment check: CodeQL only recognizes the
-        # path-injection barrier when the guard is in the same function as
-        # the join, so validate_resolved_within is not enough here.
-        root = Path(reports_dir()).resolve()
-        project_dir = (root / project).resolve()
-        if not project_dir.is_relative_to(root) or not project_dir.is_dir():
+        # Containment check in the exact normpath + startswith shape CodeQL
+        # recognizes as a path-injection barrier (pathlib's is_relative_to
+        # is not modeled and left the alerts open).
+        root = os.path.realpath(reports_dir())
+        candidate = os.path.normpath(os.path.join(root, project))
+        if not candidate.startswith(root + os.sep):
+            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+        project_dir = Path(candidate)
+        if not project_dir.is_dir():
             body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
 
