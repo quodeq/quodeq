@@ -87,6 +87,50 @@ describe("useEvaluationLifecycle background completion", () => {
   });
 });
 
+describe("handleEvalDismiss('view') cross-project jump", () => {
+  beforeEach(() => {
+    evaluationState.job = null;
+    evaluationState.jobError = null;
+    evaluationState.startedProject = null;
+  });
+
+  it("jumps to the evaluated project when another project is selected", () => {
+    // The completion effect leaves the selection alone on purpose; the
+    // view-results button is the explicit way to cross projects.
+    evaluationState.job = {
+      jobId: "j-done", status: "done",
+      outputProject: "project-a", outputRunId: "run-a1",
+    };
+    const selectProjectAndRun = vi.fn();
+    const { result } = renderLifecycle({ selectedProject: "project-b", selectProjectAndRun });
+    expect(selectProjectAndRun).not.toHaveBeenCalled();
+    act(() => result.current.handleEvalDismiss("view"));
+    expect(selectProjectAndRun).toHaveBeenCalledWith("project-a", "run-a1");
+  });
+
+  it("does not reselect when already on the evaluated project", () => {
+    evaluationState.job = {
+      jobId: "j-done", status: "done",
+      outputProject: "project-b", outputRunId: "run-b1",
+    };
+    const selectProjectAndRun = vi.fn();
+    const { result } = renderLifecycle({ selectedProject: "project-b", selectProjectAndRun });
+    // Once from the completion effect; the dismiss must not re-mint keys.
+    expect(selectProjectAndRun).toHaveBeenCalledTimes(1);
+    act(() => result.current.handleEvalDismiss("view"));
+    expect(selectProjectAndRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the started project when the job never resolved one", () => {
+    evaluationState.job = { jobId: "j-done", status: "done", outputProject: null, outputRunId: null };
+    evaluationState.startedProject = "project-c";
+    const selectProjectAndRun = vi.fn();
+    const { result } = renderLifecycle({ selectedProject: "project-b", selectProjectAndRun });
+    act(() => result.current.handleEvalDismiss("view"));
+    expect(selectProjectAndRun).toHaveBeenCalledWith("project-c", null);
+  });
+});
+
 // Finding 1 (P5 final review): removing useAppState's dashboard-key refetch
 // (69b67347) orphaned the scores side. projectKeys.scores(project, null,
 // source) -- the `latest` query behind useProjectScores's `accumulated` and

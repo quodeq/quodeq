@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { StatStrip, Stat } from '../../../components/terminal/index.js';
 import { computeOverallProgress } from './scanProgressTotals.js';
-import { buildJobStatCells, computeRate, buildEtaHint, msUntilNextSecond } from './buildJobStatCells.js';
+import {
+  buildJobStatCells, computeRate, buildEtaHint, msUntilNextSecond,
+  buildDimensionCycle, sumSeverities, deriveScanMode,
+} from './buildJobStatCells.js';
 import { recordRateSample, getRateSamples } from './rateSampleStore.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 
@@ -85,6 +88,9 @@ export default function JobStatStrip({ job, liveViolations }) {
     const suppressedCount = sumSuppressed(progress);
     return buildJobStatCells(job.status, {
       overallPct, takenFiles, totalFiles, elapsedS, liveCount, etaHint, suppressedCount,
+      dimCycle: buildDimensionCycle(progress),
+      sevCounts: sumSeverities(liveViolations),
+      scanMode: deriveScanMode(progress),
     });
     // `tick` drives the per-second recompute; the sample store is read (not a dep).
   }, [jobId, job?.status, job?.startedAt, job?.endedAt, isTerminal, progress, liveViolations, tick]);
@@ -95,7 +101,7 @@ export default function JobStatStrip({ job, liveViolations }) {
     <div className="eval-job-stat-strip">
       <StatStrip cards>
         {cells.map((c) => (
-          <Stat key={c.label} label={c.label} value={c.value} hint={c.hint} tone={c.tone} />
+          <Stat key={c.label} label={c.label} value={c.value} hint={c.hint} tone={c.tone} trailing={c.trailing} />
         ))}
       </StatStrip>
     </div>

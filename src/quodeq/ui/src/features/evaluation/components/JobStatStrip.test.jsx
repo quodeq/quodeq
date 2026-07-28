@@ -22,18 +22,23 @@ describe('JobStatStrip', () => {
 
   it('renders 4 stat cells for a running job', async () => {
     getEvaluationProgress.mockResolvedValue({
-      dimensions: [{ state: 'running', files: { taken: 138, total: 220 } }],
+      currentDimension: 'security',
+      dimensions: [{ id: 'security', state: 'running', files: { taken: 138, total: 220 } }],
       totalElapsedS: 134,
     });
-    renderWithClient(<JobStatStrip job={runningJob} liveViolations={{ security: [{}, {}] }} />);
-    expect(await screen.findByText('STATUS')).toBeInTheDocument();
-    expect(screen.getByText('PROGRESS')).toBeInTheDocument();
-    expect(screen.getByText('FOUND')).toBeInTheDocument();
-    expect(screen.getByText('ELAPSED')).toBeInTheDocument();
+    renderWithClient(<JobStatStrip job={runningJob} liveViolations={{ security: [{ severity: 'major' }, { severity: 'critical' }] }} />);
+    expect(await screen.findByText('analyzing · dimension 1 / 1')).toBeInTheDocument();
+    expect(screen.getByText('security')).toBeInTheDocument();
+    expect(screen.getByText('files this run')).toBeInTheDocument();
+    expect(screen.getByText('violations')).toBeInTheDocument();
+    expect(screen.getByText('elapsed')).toBeInTheDocument();
     // value cells
     expect(await screen.findByText('63%')).toBeInTheDocument();
+    expect(screen.getByText('138')).toBeInTheDocument();
+    expect(screen.getByText('/ 220')).toBeInTheDocument();
     expect(screen.getByText('2:14')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();    // FOUND count
+    expect(screen.getByText('2')).toBeInTheDocument();    // violations count
+    expect(screen.getByText('1 critical · 1 major')).toBeInTheDocument();
   });
 
   it('renders SCANNED + VIOLATIONS + DURATION for a done job', async () => {
@@ -53,9 +58,9 @@ describe('JobStatStrip', () => {
   it('renders fallback values when progress query has no data yet', () => {
     getEvaluationProgress.mockResolvedValue(null);
     renderWithClient(<JobStatStrip job={runningJob} liveViolations={{}} />);
-    // STATUS always renders
-    expect(screen.getByText('STATUS')).toBeInTheDocument();
-    expect(screen.getByText('running')).toBeInTheDocument();
+    // The analyzing tile always renders; unknown data reads as preparing.
+    expect(screen.getByText('analyzing')).toBeInTheDocument();
+    expect(screen.getAllByText('preparing…').length).toBeGreaterThan(0);
   });
 
   it('returns null when job is missing', () => {

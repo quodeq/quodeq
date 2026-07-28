@@ -1,8 +1,12 @@
 /* --- Evaluate Screen --- */
 .evaluate-screen {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1180px;
   margin: 0 auto;
+  /* Redesign radii, scoped so the global --term-radius stays untouched. */
+  --eval-card-radius: 12px;
+  --eval-tile-radius: 10px;
+  --eval-inner-radius: 8px;
 }
 
 .evaluate-header {
@@ -2705,16 +2709,81 @@ button.eval-provider-badge--clickable:focus-visible {
 
 /* ─── ScanProgress ─── */
 .scan-progress {
-  border-bottom: 1px solid var(--color-border-soft, var(--color-border));
+  margin-top: 26px;
+  container-type: inline-size;
+  container-name: scan-progress;
 }
 
-.scan-progress__row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
+/* Head: section label left, "% analyzed" right. */
+.scan-progress__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   gap: 16px;
-  width: 100%;
-  padding: 12px 8px;
+}
+.scan-progress__head-pct {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Legend under the coverage bar. */
+.scan-progress__legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 11px;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.scan-progress__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.scan-progress__legend-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.scan-progress__legend-swatch--cached {
+  background: var(--color-accent);
+  opacity: 0.35;
+}
+.scan-progress__legend-swatch--run {
+  background: var(--color-accent);
+}
+.scan-progress__legend-swatch--track {
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+}
+
+/* Footer: run summary left, detail/console toggles right. */
+.scan-progress__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid var(--color-border-soft, var(--color-border));
+}
+.scan-progress__foot-summary {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.scan-progress__foot-summary strong {
+  color: var(--color-text);
+  font-weight: 500;
 }
 
 .scan-progress__actions {
@@ -2732,9 +2801,9 @@ button.eval-provider-badge--clickable:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
-  border: 1px solid transparent;
-  border-radius: 2px;
+  padding: 5px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
   font-family: inherit;
   font-size: 10px;
   letter-spacing: 0.05em;
@@ -2789,19 +2858,13 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 
 
-.scan-progress__bar-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
 .scan-progress__bar {
   display: flex;
-  height: 6px;
+  height: 8px;
   background: var(--color-surface-alt);
-  border-radius: 3px;
+  border-radius: 4px;
   overflow: hidden;
+  margin-top: 10px;
 }
 .scan-progress__bar-fill {
   height: 100%;
@@ -2811,19 +2874,34 @@ button.eval-provider-badge--clickable:focus-visible {
 .scan-progress__bar-fill--done    { background: var(--color-success, #56d364); }
 .scan-progress__bar-fill--partial { background: var(--color-warning); }
 .scan-progress__bar-fill--cached  { background: var(--color-accent); opacity: 0.35; }
-
-.scan-progress__meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 10px;
-  color: var(--color-text-dim, var(--color-text-muted));
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
+/* The in-run segment: accent gradient + a moving shimmer while live. */
+.scan-progress__bar-fill--live {
+  position: relative;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-accent) 65%, var(--color-surface)),
+    var(--color-accent)
+  );
+  overflow: hidden;
 }
-.scan-progress__meta strong {
-  color: var(--color-text);
-  font-weight: 500;
+.scan-progress__bar-fill--live::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-text) 22%, transparent),
+    transparent
+  );
+  animation: eval-shimmer 2.2s linear infinite;
+}
+
+/* Mini per-dimension bar. */
+.scan-progress__bar--mini {
+  height: 4px;
+  border-radius: 2px;
+  margin-top: 0;
 }
 
 .scan-progress__dim-active {
@@ -2863,33 +2941,50 @@ button.eval-provider-badge--clickable:focus-visible {
   margin-bottom: 2px;
 }
 
-/* Dim row: [icon | name | progress bar (flex) | meta]. The meta column
+/* Dim row: [dot + name | count | mini bar (flex) | meta]. The meta column
    is `auto` — grid sizes it to the widest meta string across all rows,
-   keeping numbers vertically aligned (tabular-nums) without the ch-based
-   over-allocation that previously squashed the bar. */
+   keeping numbers vertically aligned (tabular-nums). */
 .scan-progress__dim {
   display: grid;
-  grid-template-columns: 14px 110px minmax(0, 1fr) auto;
+  grid-template-columns: 180px 108px minmax(80px, 1fr) auto;
   gap: 14px;
   align-items: center;
   font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
-  padding: 8px 4px;
+  padding: 9px 10px;
+  border-radius: 6px;
+}
+.scan-progress__dim:hover {
+  background: color-mix(in srgb, var(--color-bg) 55%, var(--color-surface));
 }
 .scan-progress__dim--pending { color: var(--color-text-dim, var(--color-text-muted)); }
 
-.scan-progress__dim-icon {
-  font-size: 11px;
-  color: var(--color-text-dim, var(--color-text-muted));
-  text-align: center;
-  line-height: 1;
+.scan-progress__dim-lead {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
 }
-.scan-progress__dim-icon--done    { color: var(--color-success, #56d364); }
-.scan-progress__dim-icon--running { color: var(--color-accent); }
-/* `partial` is no longer applied at runtime (done = green). Kept defined
-   so any stray markup doesn't fall back to default browser styling. */
-.scan-progress__dim-icon--partial { color: var(--color-success, #56d364); }
+.scan-progress__dim-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-border);
+  flex-shrink: 0;
+}
+.scan-progress__dim-dot--done    { background: var(--color-success, #56d364); }
+.scan-progress__dim-dot--running {
+  background: var(--color-accent);
+  animation: eval-pulse 1.6s ease-in-out infinite;
+}
+
+.scan-progress__dim-count {
+  text-align: right;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
 
 .scan-progress__dim-name {
   color: var(--color-text);
@@ -2956,8 +3051,13 @@ button.eval-provider-badge--clickable:focus-visible {
 .evaluate-panel--terminal {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--term-radius);
-  padding: var(--term-space-3);
+  border-radius: var(--eval-card-radius, var(--term-radius));
+  padding: 26px 28px 28px;
+}
+@media (max-width: 600px) {
+  .evaluate-panel--terminal {
+    padding: var(--term-space-3);
+  }
 }
 .evaluate-panel__top {
   margin-bottom: var(--term-space-2);
@@ -3106,3 +3206,667 @@ button.eval-provider-badge--clickable:focus-visible {
    the chip is absent. */
 .vdetail-row-main .vrow-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
 .vdetail-row-main .vrow-actions .fix-plan-btn { margin-left: 0; }
+
+/* ============================================================
+   Evaluate redesign (setup + running cards)
+   All colors via --color-* tokens; see terminal.css:1-15.
+   ============================================================ */
+
+@keyframes eval-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@keyframes eval-shimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(400%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .eval-run-pill__dot,
+  .vlive-footer__dot,
+  .eval-dim-card__meta--skeleton,
+  .scan-progress__dim-dot--running { animation: none; }
+  .scan-progress__bar-fill--live::after { animation: none; display: none; }
+}
+
+/* Screen head + card titles */
+.evaluate-header--terminal .term-header__name { font-size: 25px; }
+.evaluate-panel--terminal .term-header__name { font-size: 19px; }
+
+/* ── Status pill in the job card title ── */
+.eval-run-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 3px 9px;
+  margin-left: 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.eval-run-pill--running {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 24%, transparent);
+  padding-left: 7px;
+}
+.eval-run-pill--done {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-success) 24%, transparent);
+}
+.eval-run-pill--failed {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 24%, transparent);
+}
+.eval-run-pill--neutral {
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+}
+.eval-run-pill__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-warning);
+  animation: eval-pulse 1.6s ease-in-out infinite;
+}
+
+/* ── Identity strip (repository · job id / scope · model · mode) ── */
+.eval-identity {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
+  border: 1px solid var(--color-border-soft, var(--color-border));
+  border-radius: var(--eval-inner-radius, 8px);
+  overflow: hidden;
+}
+.eval-identity__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 11px 18px;
+  min-width: 0;
+  border-left: 1px solid var(--color-border-soft, var(--color-border));
+}
+.eval-identity__cell:first-child { border-left: 0; }
+.eval-identity__cell--grow { flex: 1; }
+.eval-identity__label {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle, var(--color-text-muted));
+  white-space: nowrap;
+}
+.eval-identity__value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 13px;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.eval-identity__value > * { min-width: 0; }
+/* Clickable cell (scope → folder browser, model → settings). The value is
+   the real <button>; its ::after stretches over the whole cell so the full
+   square is the hit target — same idiom as .term-stat__hitbox. Accessories
+   (the clear button) are raised above the overlay. */
+.eval-identity__cell--action {
+  position: relative;
+  cursor: pointer;
+}
+.eval-identity__value--action {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.eval-identity__value--action::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.eval-identity__cell--action:hover {
+  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+}
+.eval-identity__cell--action:hover .eval-identity__value--action,
+.eval-identity__cell--action:hover .eval-identity__code {
+  color: var(--color-accent);
+}
+.eval-identity__value--action:focus-visible {
+  outline: none;
+}
+.eval-identity__cell--action:has(.eval-identity__value--action:focus-visible) {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+.eval-identity__clear {
+  position: relative;
+  z-index: 1;
+}
+.eval-identity__value-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.eval-identity__value-row .eval-identity__value { flex: 1; }
+.eval-identity__code {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--color-text-muted);
+  background: none;
+  padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.eval-identity__branch {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.eval-identity__clear {
+  appearance: none;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1;
+  padding: 1px 6px 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.eval-identity__clear:hover {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 45%, transparent);
+}
+
+/* ── Detected-files line (setup card) ── */
+.eval-detected-line {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  margin: 10px 0 0;
+}
+
+/* ── Setup card sections: consistent dividers and rhythm ── */
+.eval-scan-mode,
+.eval-dims-section,
+.eval-budget,
+.eval-run-bar {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 45%, transparent);
+}
+
+/* Right-side "?" popovers would run off the screen edge when left-aligned;
+   anchor them to the hint's right edge instead. */
+.re-eval-toggle-row .help-hint-popover,
+.eval-mode-card__hint .help-hint-popover {
+  left: auto;
+  right: 0;
+}
+
+/* ── Scan-mode radio cards ── */
+.eval-scan-mode__label,
+.eval-budget__label {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle, var(--color-text-muted));
+}
+.eval-scan-mode__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  min-height: 25px;
+}
+.eval-scan-mode__persist {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.eval-scan-mode__persist-label {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  color: var(--color-text-subtle, var(--color-text-muted));
+  white-space: nowrap;
+}
+.eval-scan-mode__seg {
+  display: inline-flex;
+  gap: 2px;
+  background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 2px;
+}
+.eval-scan-mode__seg-btn {
+  appearance: none;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.eval-scan-mode__seg-btn:hover { color: var(--color-accent); }
+.eval-scan-mode__seg-btn--on,
+.eval-scan-mode__seg-btn--on:hover {
+  color: var(--color-bg);
+  background: var(--color-accent);
+}
+.eval-scan-mode__note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 11px;
+  background: color-mix(in srgb, var(--color-warning) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 19%, transparent);
+  border-radius: var(--eval-inner-radius, 8px);
+  padding: 9px 13px;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--color-warning-text, var(--color-warning));
+}
+.eval-scan-mode__note-glyph {
+  color: var(--color-warning);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.eval-scan-mode__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+.eval-mode-card {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
+  border: 1px solid var(--color-border-soft, var(--color-border));
+  border-radius: var(--eval-tile-radius, 10px);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.eval-mode-card__hint {
+  display: inline-flex;
+  line-height: 1;
+}
+.eval-mode-card:hover { border-color: var(--color-border); }
+.eval-mode-card--selected {
+  background: color-mix(in srgb, var(--color-accent) 7%, var(--color-bg));
+  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+.eval-mode-card--disabled { cursor: default; opacity: 0.6; }
+.eval-mode-card__input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.eval-mode-card:has(.eval-mode-card__input:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.eval-mode-card__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.eval-mode-card--selected .eval-mode-card__dot { border-color: var(--color-accent); }
+.eval-mode-card__dot > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: transparent;
+}
+.eval-mode-card--selected .eval-mode-card__dot > span { background: var(--color-accent); }
+.eval-mode-card__body { min-width: 0; }
+.eval-mode-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.eval-mode-card__title {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+}
+.eval-mode-card--selected .eval-mode-card__title { color: var(--color-text); }
+.eval-mode-card__tag {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle, var(--color-text-muted));
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+.eval-mode-card--selected .eval-mode-card__tag {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 27%, transparent);
+}
+/* ── Dimension checkbox cards ── */
+.eval-dims-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.eval-dims-heading label {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle, var(--color-text-muted));
+}
+.eval-dims-counter {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.eval-dim-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+}
+.eval-dim-card {
+  appearance: none;
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  text-align: left;
+  font: inherit;
+  background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
+  border: 1px solid var(--color-border-soft, var(--color-border));
+  border-radius: var(--eval-tile-radius, 10px);
+  padding: 13px 15px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.eval-dim-card:hover { border-color: var(--color-border); }
+.eval-dim-card:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.eval-dim-card--selected {
+  background: color-mix(in srgb, var(--color-accent) 7%, var(--color-bg));
+  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+.eval-dim-card__check {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 10px;
+  line-height: 1;
+  color: transparent;
+}
+.eval-dim-card--selected .eval-dim-card__check {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-bg);
+}
+.eval-dim-card__body { min-width: 0; flex: 1; }
+/* Inline flow (not flex): when a long name wraps, the std tag stays glued
+   after the last word instead of dropping to its own line. */
+.eval-dim-card__title-row {
+  display: block;
+  min-width: 0;
+  line-height: 1.35;
+}
+.eval-dim-card__name {
+  display: inline;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+.eval-dim-card--selected .eval-dim-card__name { color: var(--color-text); }
+.eval-dim-card__std {
+  display: inline-block;
+  margin-left: 7px;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  white-space: nowrap;
+}
+.eval-dim-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
+}
+.eval-dim-card__meta-line { white-space: nowrap; }
+/* Placeholder while pre-run estimates are computed. Sized like one line of
+   meta text so the card doesn't grow when the real value lands. */
+.eval-dim-card__meta--skeleton {
+  width: 110px;
+  height: 8px;
+  margin-top: 8px;
+  margin-bottom: 3px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-text-muted) 18%, transparent);
+  animation: eval-pulse 1.6s ease-in-out infinite;
+}
+
+/* ── Time-budget chips ── */
+.eval-budget__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.eval-budget__sub {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+.eval-budget-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.eval-budget-chips__chip {
+  appearance: none;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  padding: 7px 15px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.eval-budget-chips__chip:hover { color: var(--color-accent); }
+.eval-budget-chips__chip--selected,
+.eval-budget-chips__chip--selected:hover {
+  color: var(--color-bg);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+/* ── Run bar (setup card footer) ── */
+.eval-run-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.eval-run-bar__summary {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+}
+.eval-run-bar__summary-sub { color: var(--color-text-subtle, var(--color-text-muted)); }
+.eval-run-bar__scan { flex-shrink: 0; }
+
+/* ── Live violations card ── */
+.vlive-feed {
+  container-type: inline-size;
+  container-name: vlive-feed;
+}
+.vlive-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+.vlive-head-left {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.vlive-head-left .term-section-label { margin: 0; }
+.vlive-head-dim {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle, var(--color-text-muted));
+  white-space: nowrap;
+}
+.vlive-card {
+  background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
+  border: 1px solid var(--color-border-soft, var(--color-border));
+  border-radius: var(--eval-tile-radius, 10px);
+  overflow: hidden;
+}
+.vlive-card .vlive-dimension-group { margin: 0; }
+.vlive-card .vlive-dimension-label {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border-soft, var(--color-border));
+  background: color-mix(in srgb, var(--color-bg) 45%, var(--color-surface));
+}
+.vlive-card .vdetail-row {
+  margin-bottom: 0;
+  animation: none;
+}
+.vlive-card .vdetail-row-main.vlive-collapsible {
+  display: grid;
+  grid-template-columns: 4px 74px 190px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  padding: 0 16px 0 0;
+  border-radius: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 45%, transparent);
+  min-height: 38px;
+}
+.vlive-card .vdetail-row:last-of-type .vdetail-row-main.vlive-collapsible { border-bottom: 0; }
+.vlive-card .vdetail-row-main.vlive-collapsible:hover {
+  background: color-mix(in srgb, var(--color-bg) 40%, var(--color-surface));
+}
+.vlive-rail {
+  align-self: stretch;
+  background: var(--color-border);
+}
+.vdetail-row--critical .vlive-rail { background: var(--color-sev-critical-text); }
+.vdetail-row--major    .vlive-rail { background: color-mix(in srgb, var(--color-sev-major-text) 55%, transparent); }
+.vdetail-row--minor    .vlive-rail { background: color-mix(in srgb, var(--color-sev-minor-text) 55%, transparent); }
+.vlive-card .term-sev-badge { justify-self: stretch; text-align: center; }
+.vrow-rule {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  color: var(--color-text-subtle, var(--color-text-muted));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vlive-card .vlive-detail {
+  grid-column: 1 / -1;
+}
+.vlive-footer {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 16px;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  color: var(--color-text-subtle, var(--color-text-muted));
+  font-variant-numeric: tabular-nums;
+}
+.vlive-footer__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: eval-pulse 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+/* ── Container-query collapses ──
+   Scoped to elements with no fixed-position descendants (container-type
+   creates a containing block for fixed children, which would trap the
+   FolderBrowser overlay if set on the panel). These react to the actual
+   content width, so the console side-pane squeezing the screen triggers
+   them just like a narrow viewport. */
+@container scan-progress (max-width: 640px) {
+  .scan-progress__dim {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 6px;
+  }
+  .scan-progress__dim .scan-progress__bar--mini { grid-column: 1 / -1; }
+  .scan-progress__dim-meta { grid-column: 1 / -1; text-align: left; }
+}
+@container vlive-feed (max-width: 560px) {
+  .vlive-card .vdetail-row-main.vlive-collapsible {
+    grid-template-columns: 4px 74px minmax(0, 1fr) 16px;
+  }
+  .vrow-rule { display: none; }
+}

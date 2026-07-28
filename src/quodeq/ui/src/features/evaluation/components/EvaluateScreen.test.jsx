@@ -4,7 +4,6 @@ import { describe, it, expect, vi } from 'vitest';
 // Stub heavy sub-components used by EvaluateScreen
 vi.mock('./EvaluationStatus.jsx', () => ({ default: () => null }));
 vi.mock('./ReEvaluateCard.jsx', () => ({ default: () => null }));
-vi.mock('./CountdownTimer.jsx', () => ({ default: () => null }));
 vi.mock('../../../components/terminal/index.js', () => ({
   TermHeader: () => null,
 }));
