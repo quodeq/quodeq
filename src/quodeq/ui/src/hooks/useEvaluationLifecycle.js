@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEvaluation, LOCAL_API_PROVIDERS } from '../features/evaluation/hooks/useEvaluation.js';
 import { getLevels, STORAGE_KEY as POWER_KEY } from '../features/evaluation/components/powerLevels.js';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../constants.js';
+import { projectKeys } from '../api/queryKeys.js';
 
 const TIER_NAMES = ['fast', 'balanced', 'thorough'];
 const DEFAULT_ANALYSIS_POWER = 2;
@@ -17,6 +19,7 @@ export function useEvaluationLifecycle({ settings, navigation, projects, selecte
   const { navTab, navReset } = navigation;
   const { loadProjects, setProjects, selectProjectAndRun } = projects;
   const { job, jobError, liveViolations, startEvaluation, clearJob, cancelEvaluation, startedProject } = useEvaluation();
+  const queryClient = useQueryClient();
   // Set when a start request is refused because another evaluation is
   // already running. Surfaced through jobError so the Evaluate screen's
   // toast shows it; a silent refusal left users believing the visible
@@ -49,6 +52,25 @@ export function useEvaluationLifecycle({ settings, navigation, projects, selecte
       loadProjects()
         .then((list) => setProjects(list))
         .catch((err) => console.error('Failed to refresh projects:', err));
+      // useAppState's dashboard-key effect (removed as redundant: the
+      // selectProjectAndRun call below mints a new dashboard query key on its
+      // own) only ever covered the dashboard side. The scores side has its
+      // own key -- projectKeys.scores(project, null, source), the `latest`
+      // query in useProjectScores -- and it does NOT change when selectedRun
+      // flips, because `asOf` only resolves to the new run once
+      // `availableRuns` (itself sourced from this same query) already lists
+      // it. Left un-invalidated, a user parked on the Overview when a run
+      // completes never gets the refreshed `availableRuns`/`accumulated`:
+      // repeat-run projects show stale grades until a tab round-trip, and a
+      // first-run project never gets `accumulated`, so `contentReady` stays
+      // false and the page sits on the inline loader indefinitely. Evaluations
+      // only ever write to the
+      // local repo, so the 'local' source (the default) is always correct
+      // here regardless of which source tab the user has open elsewhere.
+      // Unconditional on outputProject: invalidating an inactive observer's
+      // query just marks it stale (no fetch), so this is a harmless no-op
+      // when nobody is looking at that project.
+      queryClient.invalidateQueries({ queryKey: projectKeys.scores(job.outputProject, null, 'local') });
       // Only move the selection to the finished run when the user is
       // already on that project (or has none selected, e.g. first-eval
       // onboarding). Unconditional switching yanked a user browsing

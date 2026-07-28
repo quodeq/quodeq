@@ -179,6 +179,33 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     return () => clearTimeout(timer);
   }, [contentReady, dashboard]);
 
+  // Sticky "no evaluations yet" latch: once that empty state is showing for
+  // this project+source, stay on it through a subsequent load (the post-eval
+  // selectedRun flip -- new dashboard key, loading true, dashboard still
+  // null) instead of popping to the full inline loader for a beat. Keyed off
+  // project+source so a project switch never inherits the previous
+  // project's stickiness (see the reset check below). runMode never shows
+  // this empty state, so it's excluded outright -- and a runMode render must
+  // never touch the latch at all: App.jsx doesn't always remount DashboardPage
+  // between the Overview and a run detail view for the same project+source,
+  // so writing `active: false` here on a runMode pass would clear a
+  // legitimately-active Overview latch out from under it.
+  const noRunsScopeKey = `${selectedProject}::${selectedSource}`;
+  const [noRunsEmptySticky, setNoRunsEmptySticky] = useState({ scopeKey: noRunsScopeKey, active: false });
+  const wasNoRunsEmpty = noRunsEmptySticky.scopeKey === noRunsScopeKey && noRunsEmptySticky.active;
+  // Latch on !contentReady, not !dashboard: releasing the latch the moment
+  // the dashboard payload lands (but before accumulated does) reopened the
+  // same pop this latch exists to close, just narrower -- empty(dimmed) ->
+  // inline spinner -> content instead of loader -> content. contentReady
+  // already folds in the accumulated wait for the Overview (runMode is
+  // excluded from this branch outright, so its own dashboard-only readiness
+  // never applies here), so holding the empty state open until BOTH payloads
+  // land closes the gap without a separate flag to keep in sync.
+  const showNoRunsEmpty = !runMode && !contentReady && !error && (!loading || wasNoRunsEmpty);
+  if (!runMode && (noRunsEmptySticky.scopeKey !== noRunsScopeKey || noRunsEmptySticky.active !== showNoRunsEmpty)) {
+    setNoRunsEmptySticky({ scopeKey: noRunsScopeKey, active: showNoRunsEmpty });
+  }
+
   const { projectsLoaded } = data;
   if (!projectsLoaded) return <LoadingScreen />;
   if (projects.length === 0 && selectedSource !== 'shared') {
@@ -222,39 +249,70 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     );
   }
   const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
-  if (!loading && !dashboard && (error || !isFetching)) {
+  if (!loading && !dashboard && error) {
     // A failed fetch also lands here (dashboard === null, queries settled).
     // It must render as an error: claiming "No evaluations yet" on a
     // 404/500/timeout tells the user their existing evaluations are gone.
     // While a retry is in flight (error still set, isFetching true), show
     // the loader instead so clicking Retry visibly does something.
-    if (error && isFetching) {
+    if (isFetching) {
       return (
         <div className="dashboard-page dashboard-fade dashboard-ready">
           <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />
         </div>
       );
     }
-    if (error) {
-      return (
-        <div className="dashboard-page dashboard-fade dashboard-ready">
-          <EmptyState
-            title="Couldn't load this project"
-            description={error}
-            actionLabel="Retry"
-            onAction={() => callbacks.onRetry?.()}
-          />
-        </div>
-      );
-    }
     return (
       <div className="dashboard-page dashboard-fade dashboard-ready">
+        <EmptyState
+          title="Couldn't load this project"
+          description={error}
+          actionLabel="Retry"
+          onAction={() => callbacks.onRetry?.()}
+        />
+      </div>
+    );
+  }
+  if (showNoRunsEmpty) {
+    // Covers both the settled no-runs state and a background refetch of an
+    // empty project (isFetching true, dashboard still null -- previously a
+    // visually blank .dashboard-page with no dim and no loader), plus the
+    // post-eval selectedRun flip while wasNoRunsEmpty is latched (loading
+    // true, dashboard still null): stay here, dimmed, until the payload
+    // lands rather than swapping to the full inline loader and back.
+    return (
+      <div className={`dashboard-page dashboard-fade dashboard-ready${isFetching ? ' dashboard-refreshing' : ''}`}>
         <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
         <EmptyState
           title="No evaluations yet"
           description={`Run an evaluation for ${projectName} to populate this page.`}
           actionLabel="Start evaluation"
           onAction={() => onNavigate?.('evaluate')}
+        />
+      </div>
+    );
+  }
+  if (runMode && !loading && !dashboard && !error) {
+    // createDashboard passes a falsy raw response through unchanged rather
+    // than throwing (models/dashboard.js), so "settled, no error, no
+    // dashboard" is a valid non-error outcome, not just a theoretical one --
+    // this run's data didn't come back. Without this branch it fell through
+    // every other check (all gated on runMode being false, or on dashboard
+    // being truthy) to a genuinely blank .dashboard-page.
+    if (isFetching) {
+      return (
+        <div className="dashboard-page dashboard-fade dashboard-ready">
+          <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />
+        </div>
+      );
+    }
+    return (
+      <div className="dashboard-page dashboard-fade dashboard-ready">
+        <EmptyState
+          title="Couldn't load this run"
+          description="This run's data didn't come back. Try refreshing."
+          actionLabel="Retry"
+          onAction={() => callbacks.onRetry?.()}
         />
       </div>
     );

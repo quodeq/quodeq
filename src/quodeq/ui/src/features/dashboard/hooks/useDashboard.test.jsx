@@ -111,10 +111,10 @@ describe("useDashboard", () => {
     expect(fakeApi.getDashboard).toHaveBeenCalledTimes(1);
   });
 
-  // The eval-completion path must actively refetch the always-mounted Overview
-  // observer — otherwise a freshly-finished run leaves the Overview showing the
-  // stale (often null) pre-run payload until the user switches projects.
-  it("refreshDashboardActive refetches the mounted observer (eval-completion path)", async () => {
+  // refreshDashboardActive must actively refetch the always-mounted Overview
+  // observer — e.g. the manual retry path (App.jsx's onRetry) — otherwise a
+  // stale (often null) payload lingers until the user switches projects.
+  it("refreshDashboardActive refetches the mounted observer (manual retry path)", async () => {
     const fakeApi = makeFakeApi();
     const { result } = renderHook(
       () => useDashboard({ selectedProject: "p1", selectedRun: null }),
@@ -204,7 +204,7 @@ describe("useDashboard scheduleDashboardReconcile (debounced active reconcile)",
 
   // Regression pin: the debounced reconcile is additive, not a replacement.
   // refreshDashboard must keep its lazy refetchType:'none' contract for its
-  // other callers (evaluation-completion effect, run deletion, etc.).
+  // other callers (wizard project registration, dismiss/restore, etc.).
   it("refreshDashboard keeps mark-stale-only behavior (regression pin)", () => {
     const { result, spy } = renderWithSpy();
     act(() => result.current.refreshDashboard());
