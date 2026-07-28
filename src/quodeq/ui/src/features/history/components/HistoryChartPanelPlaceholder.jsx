@@ -14,6 +14,8 @@ export default function HistoryChartPanelPlaceholder() {
       data-testid="history-chart-panel-placeholder"
     >
       <div className="run-history-panel__header">
+        {/* Deliberately omits the real header's LATEST/AVG/MIN/MAX stats —
+            both are single-line flex rows, so leaving them out doesn't change height. */}
         <span className="term-section-label__text">SCORE_HISTORY</span>
       </div>
       <div className="chart-with-kbd" style={{ height: HISTORY_CHART_HEIGHT }} />

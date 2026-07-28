@@ -18,10 +18,10 @@ describe('RunHistoryPanelPlaceholder', () => {
     expect(el.querySelector('.run-history-panel__header')).not.toBeNull();
   });
 
-  it('gives the body the recharts-responsive-container class that carries flex:1/min-height:160px', () => {
+  it('gives the body the run-history-panel__chart-slot class that carries flex:1/min-height:160px', () => {
     render(<RunHistoryPanelPlaceholder />);
     const el = screen.getByTestId('run-history-panel-placeholder');
-    expect(el.querySelector('.recharts-responsive-container')).not.toBeNull();
+    expect(el.querySelector('.run-history-panel__chart-slot')).not.toBeNull();
   });
 
   it('is quiet: no spinner or pulsing indicator, hidden from assistive tech', () => {

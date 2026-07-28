@@ -2179,7 +2179,8 @@
   flex-direction: column;
 }
 
-.run-history-panel .recharts-responsive-container {
+.run-history-panel .recharts-responsive-container,
+.run-history-panel .run-history-panel__chart-slot {
   flex: 1;
   min-height: 160px;
 }
