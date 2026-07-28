@@ -119,6 +119,14 @@ export function useEvaluationLifecycle({ settings, navigation, projects, selecte
 
   function handleEvalDismiss(action) {
     if (action === 'view') {
+      // The completion effect deliberately leaves the selection alone when
+      // the user browsed to another project mid-run; this button is the
+      // explicit jump to the evaluated project's results. Prefer the job's
+      // resolved project, fall back to the one it was started for.
+      const target = job?.outputProject || startedProject || null;
+      if (target && target !== selectedProject) {
+        selectProjectAndRun(target, job?.outputRunId || null);
+      }
       navReset();
     }
     setBlockedStartError(null);
