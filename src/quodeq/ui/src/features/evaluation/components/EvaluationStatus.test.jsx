@@ -168,6 +168,28 @@ describe('EvaluationStatus live-findings filter', () => {
     expect(screen.getByTestId('strip-sum')).toHaveTextContent('3');
   });
 
+  it('hides snake_case carried_forward findings too (SSE payloads with no violation-model mapping)', () => {
+    // Under VITE_USE_SSE_EVENTS, findings land in the cache as raw wire
+    // payloads, so they carry `carried_forward` instead of `carriedForward`.
+    const QC = withQueryClient();
+    render(
+      <QC>
+        <EvaluationStatus
+          job={filterJob}
+          liveViolations={{
+            security: [
+              { severity: 'major', principle: 'P1', file: 'new.py', line: 1, carried_forward: false },
+              { severity: 'major', principle: 'P2', file: 'old-a.py', line: 2, carried_forward: true },
+            ],
+          }}
+        />
+      </QC>
+    );
+    expect(screen.getByText('new.py:1')).toBeInTheDocument();
+    expect(screen.queryByText('old-a.py:2')).not.toBeInTheDocument();
+    expect(screen.getByText(/1 carried forward hidden/)).toBeInTheDocument();
+  });
+
   it('says nothing about carries when the run has none', () => {
     const QC = withQueryClient();
     render(

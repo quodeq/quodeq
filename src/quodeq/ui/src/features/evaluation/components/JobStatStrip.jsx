@@ -40,7 +40,7 @@ function deriveElapsedS(startedAt, endedAt, isTerminal, fallbackElapsed) {
   return null;
 }
 
-export default function JobStatStrip({ job, liveViolations }) {
+export default function JobStatStrip({ job, liveViolations, hiddenCarriedCount = 0 }) {
   const jobId = job?.jobId;
   const isTerminal = TERMINAL_STATES.has(job?.status);
 
@@ -91,12 +91,13 @@ export default function JobStatStrip({ job, liveViolations }) {
     const suppressedCount = sumSuppressed(progress);
     return buildJobStatCells(job.status, {
       overallPct, takenFiles, totalFiles, elapsedS, liveCount, etaHint, suppressedCount,
+      carriedCount: hiddenCarriedCount,
       dimCycle: buildDimensionCycle(progress),
       sevCounts: sumSeverities(liveViolations),
       scanMode: deriveScanMode(progress),
     });
     // `tick` drives the per-second recompute; the sample store is read (not a dep).
-  }, [jobId, job?.status, job?.startedAt, job?.endedAt, isTerminal, progress, liveViolations, tick]);
+  }, [jobId, job?.status, job?.startedAt, job?.endedAt, isTerminal, progress, liveViolations, hiddenCarriedCount, tick]);
 
   if (!jobId) return null;
 

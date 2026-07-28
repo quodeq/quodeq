@@ -10,6 +10,7 @@ import {
   buildEtaHint,
   msUntilNextSecond,
   suppressedSuffix,
+  carriedSuffix,
   buildDimensionCycle,
   sumSeverities,
   formatSevHint,
@@ -301,6 +302,46 @@ test('suppressedSuffix: ignores negative and non-numeric counts', () => {
   assert.equal(suppressedSuffix(-5), '');
   assert.equal(suppressedSuffix(undefined), '');
   assert.equal(suppressedSuffix('lots'), '');
+});
+
+// ---------------------------------------------------------------------------
+// carried-forward hint — the live-findings-only preference filters FOUND
+// before the strip ever sees it, so say what was filtered out
+// ---------------------------------------------------------------------------
+
+test('buildJobStatCells: violations hint reports the carried-forward count while running', () => {
+  const cells = buildJobStatCells('running', {
+    ...baseInputs, liveCount: 1, carriedCount: 12,
+    sevCounts: { critical: 0, major: 1, minor: 0 },
+  });
+  assert.equal(cells[2].label, 'violations');
+  assert.equal(cells[2].hint, '1 major · 12 carried forward');
+});
+
+test('buildJobStatCells: VIOLATIONS hint reports the carried-forward count on a finished job too', () => {
+  const cells = buildJobStatCells('done', { ...baseInputs, liveCount: 1, carriedCount: 12 });
+  assert.equal(cells[2].label, 'VIOLATIONS');
+  assert.ok(cells[2].hint.endsWith('12 carried forward'), `got: ${cells[2].hint}`);
+});
+
+test('buildJobStatCells: no carried-forward hint when nothing was filtered', () => {
+  const running = buildJobStatCells('running', { ...baseInputs, carriedCount: 0 });
+  const missing = buildJobStatCells('running', baseInputs);
+  assert.equal(running[2].hint, 'none yet');
+  assert.equal(missing[2].hint, 'none yet');
+});
+
+test('buildJobStatCells: suppressed and carried-forward suffixes combine', () => {
+  const cells = buildJobStatCells('done', {
+    ...baseInputs, liveCount: 1, suppressedCount: 5, carriedCount: 12,
+  });
+  assert.equal(cells[2].hint, '1 total · 5 suppressed · 12 carried forward');
+});
+
+test('carriedSuffix: ignores negative and non-numeric counts', () => {
+  assert.equal(carriedSuffix(-5), '');
+  assert.equal(carriedSuffix(undefined), '');
+  assert.equal(carriedSuffix('lots'), '');
 });
 
 // ---------------------------------------------------------------------------

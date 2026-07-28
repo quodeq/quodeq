@@ -14,6 +14,14 @@ _FIELD_CONFIDENCE_INTERVAL_SNAKE = "confidence_interval"
 # intentionally NOT here (#640): it is a UI/triage signal (it drives the
 # dashboard's "Low confidence" grouping), not a grade input. Keeping it out
 # keeps the grade objective and non-gameable. See tests/core/test_confidence_not_scored.py.
+#
+# "Reads" here means two different things, and they don't have to agree:
+# a key just needs to be copied into the report JSON to reach the UI (that's
+# how `carried_forward` survives from the cache-replay walk to the API and
+# the live feed), while scoring itself never reads this JSON at all — it
+# reads findings via the SQLite projection and tallies purely on `vt`
+# (verdict). So a UI-only signal can live in this tuple without touching a
+# grade.
 _VIOLATION_FIELDS = (
     "file", "line", "end_line", "title", "reason",
     "snippet", "context", "scope", "severity", "req", "req_refs",

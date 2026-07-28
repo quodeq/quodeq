@@ -94,7 +94,11 @@ export default function EvaluationStatus({ job, jobProjectInfo, startedProjectIn
     const next = {};
     let hidden = 0;
     for (const [dim, vs] of Object.entries(liveViolations || {})) {
-      const fresh = (vs || []).filter((v) => !v.carriedForward);
+      // The SSE stream (VITE_USE_SSE_EVENTS) writes raw wire payloads
+      // straight into the findings cache with no violation-model mapping,
+      // so those entries carry snake_case `carried_forward` instead of
+      // `carriedForward`. Accept both spellings here.
+      const fresh = (vs || []).filter((v) => !(v.carriedForward ?? v.carried_forward));
       hidden += (vs || []).length - fresh.length;
       if (fresh.length) next[dim] = fresh;
     }
@@ -116,7 +120,7 @@ export default function EvaluationStatus({ job, jobProjectInfo, startedProjectIn
     <div className="panel evaluate-panel--terminal">
       <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
       <JobIdentityStrip job={job} projectLabel={projectLabel} />
-      <JobStatStrip job={job} liveViolations={shown} />
+      <JobStatStrip job={job} liveViolations={shown} hiddenCarriedCount={hiddenCarriedCount} />
       <ScanProgress job={job} hasEvaluations={hasEvaluations} />
       <LiveViolationsFeed job={job} liveViolations={shown} hiddenCarriedCount={hiddenCarriedCount} />
     </div>

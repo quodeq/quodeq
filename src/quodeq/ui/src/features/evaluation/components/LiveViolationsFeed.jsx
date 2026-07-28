@@ -175,7 +175,9 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
         <span className="vlive-head-left">
           <SectionLabel>live violations</SectionLabel>
           <span className="vlive-counter">
-            {totalCount} across {orderedDims.length} dimension{orderedDims.length !== 1 ? 's' : ''}
+            {totalCount > 0
+              ? <>{totalCount} across {orderedDims.length} dimension{orderedDims.length !== 1 ? 's' : ''}</>
+              : 'no new findings'}
             {hiddenCarriedCount > 0 && (
               <span className="vlive-counter-hidden"> · {hiddenCarriedCount} carried forward hidden</span>
             )}

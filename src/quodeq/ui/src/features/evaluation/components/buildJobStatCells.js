@@ -201,11 +201,22 @@ export function suppressedSuffix(suppressedCount) {
   return ` · ${suppressedCount} suppressed`;
 }
 
-function foundCell(liveCount, label = 'FOUND', hint = 'live violations', suppressedCount = 0) {
+/**
+ * The count of findings this run re-discovered that the live-findings-only
+ * preference filtered out before FOUND ever saw them, as a hint suffix.
+ * Without it the cell silently drops a number the feed already discloses
+ * next to the list, so the strip and the feed can look like they disagree.
+ */
+export function carriedSuffix(carriedCount) {
+  if (!(carriedCount > 0)) return '';
+  return ` · ${carriedCount} carried forward`;
+}
+
+function foundCell(liveCount, label = 'FOUND', hint = 'live violations', suppressedCount = 0, carriedCount = 0) {
   return {
     label,
     value: liveCount,
-    hint: `${hint}${suppressedSuffix(suppressedCount)}`,
+    hint: `${hint}${suppressedSuffix(suppressedCount)}${carriedSuffix(carriedCount)}`,
     tone: liveCount > 0 ? 'critical' : 'default',
   };
 }
@@ -219,6 +230,7 @@ function foundCell(liveCount, label = 'FOUND', hint = 'live violations', suppres
  * @param {number|null|undefined} inputs.elapsedS
  * @param {number} inputs.liveCount
  * @param {number} [inputs.suppressedCount] — re-found findings already dismissed/deleted
+ * @param {number} [inputs.carriedCount] — carried-forward findings the live-feed preference hid
  * @param {object|null} [inputs.dimCycle] — from buildDimensionCycle (running only)
  * @param {object} [inputs.sevCounts] — from sumSeverities (running only)
  * @param {string|null} [inputs.scanMode] — from deriveScanMode (running only)
@@ -232,7 +244,7 @@ export function buildJobStatCells(status, inputs) {
     return [
       statusCell,
       { label: 'SCANNED', value: inputs.totalFiles > 0 ? inputs.totalFiles : '—', hint: 'files', tone: 'default' },
-      foundCell(inputs.liveCount, 'VIOLATIONS', severityHint(inputs.liveCount), inputs.suppressedCount),
+      foundCell(inputs.liveCount, 'VIOLATIONS', severityHint(inputs.liveCount), inputs.suppressedCount, inputs.carriedCount),
       elapsedCell(inputs.elapsedS, 'DURATION', 'total'),
     ];
   }
@@ -258,7 +270,7 @@ export function buildJobStatCells(status, inputs) {
         hint: runKnown ? `${inputs.overallPct}%${modeHint}` : 'preparing…',
         tone: 'default',
       },
-      foundCell(inputs.liveCount, 'violations', formatSevHint(inputs.sevCounts), inputs.suppressedCount),
+      foundCell(inputs.liveCount, 'violations', formatSevHint(inputs.sevCounts), inputs.suppressedCount, inputs.carriedCount),
       elapsedCell(inputs.elapsedS, 'elapsed', inputs.etaHint ?? null),
     ];
   }
@@ -267,7 +279,7 @@ export function buildJobStatCells(status, inputs) {
   return [
     statusCell,
     progressCell(inputs),
-    foundCell(inputs.liveCount, 'FOUND', 'live violations', inputs.suppressedCount),
+    foundCell(inputs.liveCount, 'FOUND', 'live violations', inputs.suppressedCount, inputs.carriedCount),
     elapsedCell(inputs.elapsedS, 'ELAPSED', inputs.etaHint ?? null),
   ];
 }

@@ -1923,6 +1923,10 @@ button.eval-provider-badge--clickable:focus-visible {
   padding: 0 4px;
 }
 
+.vlive-counter-hidden {
+  color: var(--color-text-subtle);
+}
+
 .vlive-dimension-group {
 }
 

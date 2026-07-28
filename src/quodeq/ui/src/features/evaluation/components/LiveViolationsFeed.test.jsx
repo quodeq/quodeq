@@ -70,9 +70,13 @@ describe('LiveViolationsFeed', () => {
 
   it('keeps the header when the filter empties the list', () => {
     // A fully-cached dimension produces zero new findings. Returning null
-    // here would make the feed vanish and read as "nothing found".
+    // here would make the feed vanish and read as "nothing found". The
+    // "0 across 0 dimensions" phrasing would be confusing, so a wholly
+    // filtered-out run says "no new findings" instead.
     renderFeed({ liveViolations: {}, hiddenCarriedCount: 12 });
+    expect(screen.getByText(/no new findings/)).toBeInTheDocument();
     expect(screen.getByText(/12 carried forward hidden/)).toBeInTheDocument();
+    expect(screen.queryByText(/across 0 dimension/)).toBeNull();
   });
 
   it('still renders nothing when there is genuinely nothing', () => {
