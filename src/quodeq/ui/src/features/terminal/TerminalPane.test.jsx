@@ -83,7 +83,10 @@ it('focuses xterm when it is the active tab so the user can type without clickin
   fakeTerm.focus.mockClear();
   render(<TerminalPane active />);
   await screen.findByTestId('tty-root');
-  expect(fakeTerm.focus).toHaveBeenCalled();
+  // waitFor, not a plain assert: focus() runs in a post-commit effect, so it
+  // can land a beat after tty-root appears under CI load (flaked on develop,
+  // same race the mount test above was hardened against).
+  await waitFor(() => expect(fakeTerm.focus).toHaveBeenCalled());
 });
 
 it('does not focus xterm while backgrounded (active=false)', async () => {
