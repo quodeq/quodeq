@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import HelpHint from '../../../components/HelpHint.jsx';
 
 const STORAGE_KEY = 'quodeq.cleanScan.permanent';
 
@@ -20,6 +21,9 @@ function writePermanent(on) {
 }
 
 function ModeCard({ id, checked, onPick, disabled, title, tag, children }) {
+  // The explanation lives behind the app's "?" hint, top-right of the card.
+  // A button inside a <label> is excluded from label activation, so opening
+  // the hint does not also pick the radio.
   return (
     <label className={`eval-mode-card${checked ? ' eval-mode-card--selected' : ''}${disabled ? ' eval-mode-card--disabled' : ''}`}>
       <input
@@ -36,8 +40,10 @@ function ModeCard({ id, checked, onPick, disabled, title, tag, children }) {
         <span className="eval-mode-card__title-row">
           <span className="eval-mode-card__title">{title}</span>
           <span className="eval-mode-card__tag">{tag}</span>
+          <span className="eval-mode-card__hint">
+            <HelpHint label={`About ${title}`}>{children}</HelpHint>
+          </span>
         </span>
-        <span className="eval-mode-card__desc">{children}</span>
       </span>
     </label>
   );

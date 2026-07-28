@@ -3315,7 +3315,14 @@ button.eval-provider-badge--clickable:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 .eval-identity__value > * { min-width: 0; }
-/* Clickable value (scope → folder browser, model → settings). */
+/* Clickable cell (scope → folder browser, model → settings). The value is
+   the real <button>; its ::after stretches over the whole cell so the full
+   square is the hit target — same idiom as .term-stat__hitbox. Accessories
+   (the clear button) are raised above the overlay. */
+.eval-identity__cell--action {
+  position: relative;
+  cursor: pointer;
+}
 .eval-identity__value--action {
   appearance: none;
   border: 0;
@@ -3324,13 +3331,28 @@ button.eval-provider-badge--clickable:focus-visible {
   text-align: left;
   cursor: pointer;
 }
-.eval-identity__value--action:hover,
-.eval-identity__value--action:hover .eval-identity__code {
+.eval-identity__value--action::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.eval-identity__cell--action:hover {
+  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+}
+.eval-identity__cell--action:hover .eval-identity__value--action,
+.eval-identity__cell--action:hover .eval-identity__code {
   color: var(--color-accent);
 }
 .eval-identity__value--action:focus-visible {
+  outline: none;
+}
+.eval-identity__cell--action:has(.eval-identity__value--action:focus-visible) {
   outline: 1px solid var(--color-accent);
-  outline-offset: 2px;
+  outline-offset: -1px;
+}
+.eval-identity__clear {
+  position: relative;
+  z-index: 1;
 }
 .eval-identity__value-row {
   display: flex;
@@ -3396,15 +3418,20 @@ button.eval-provider-badge--clickable:focus-visible {
   gap: 12px;
 }
 .eval-mode-card {
+  position: relative;
   display: flex;
   gap: 12px;
-  align-items: flex-start;
+  align-items: center;
   background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
   border: 1px solid var(--color-border-soft, var(--color-border));
   border-radius: var(--eval-tile-radius, 10px);
   padding: 14px 16px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
+}
+.eval-mode-card__hint {
+  display: inline-flex;
+  line-height: 1;
 }
 .eval-mode-card:hover { border-color: var(--color-border); }
 .eval-mode-card--selected {
@@ -3427,7 +3454,6 @@ button.eval-provider-badge--clickable:focus-visible {
   border-radius: 50%;
   border: 1px solid var(--color-border);
   flex-shrink: 0;
-  margin-top: 2px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3466,15 +3492,6 @@ button.eval-provider-badge--clickable:focus-visible {
 .eval-mode-card--selected .eval-mode-card__tag {
   color: var(--color-accent);
   border-color: color-mix(in srgb, var(--color-accent) 27%, transparent);
-}
-.eval-mode-card__desc {
-  display: block;
-  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
-  font-size: 11px;
-  color: var(--color-text-muted);
-  margin-top: 6px;
-  line-height: 1.5;
-  font-variant-numeric: tabular-nums;
 }
 .eval-scan-mode__sub {
   display: flex;
