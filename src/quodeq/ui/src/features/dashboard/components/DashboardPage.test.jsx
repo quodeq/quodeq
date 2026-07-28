@@ -570,6 +570,237 @@ describe('DashboardPage frame stability in empty branches', () => {
   });
 });
 
+// P3-T2: the page-level frame must survive every branch transition (no
+// div<->Fragment root-type flip), and `dashboard-fadein` must play once per
+// project/source/run context instead of replaying on every loading<->ready
+// flip or branch swap over unchanged content.
+describe('DashboardPage frame stability and fade-once across branch transitions (P3-T2)', () => {
+  const readyOverview = {
+    projectsLoaded: true,
+    projects: [{ id: 'p1', name: 'p1' }],
+    selectedProject: 'p1',
+    selectedSource: 'local',
+    dashboard: {
+      dimensions: [{ dimension: 'Security', overallScore: '7.0/10', violations: [], compliance: [], principles: [] }],
+      trend: [],
+      selectedRun: { runId: 'r1', dateLabel: '2026-05-01' },
+    },
+    accumulated: { dimensions: [{ dimension: 'Security', overallScore: '7.0/10' }] },
+    loading: false,
+    isFetching: false,
+    error: null,
+    availableRuns: [{ runId: 'r1', status: 'complete' }],
+  };
+
+  it('keeps the same .dashboard-page DOM node across a transition from an early-return branch to the main content branch', () => {
+    const { container, rerender } = render(
+      <SidePaneProvider>
+        <DashboardPage data={{ projectsLoaded: true, projects: [{ id: 'p1', name: 'p1' }], selectedProject: '', loading: false, isFetching: false, error: null, availableRuns: [] }} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    const nodeBefore = container.querySelector('.dashboard-page');
+    expect(nodeBefore).toBeTruthy();
+
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage data={readyOverview} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    const nodeAfter = container.querySelector('.dashboard-page');
+    expect(nodeAfter).toBeTruthy();
+    expect(nodeAfter).toBe(nodeBefore);
+  });
+
+  it('keeps the same .dashboard-page DOM node across a transition from the error branch to the main content branch', () => {
+    const { container, rerender } = render(
+      <SidePaneProvider>
+        <DashboardPage
+          data={{ projectsLoaded: true, projects: [{ id: 'p1', name: 'p1' }], selectedProject: 'p1', dashboard: null, accumulated: null, loading: false, isFetching: false, error: 'boom', availableRuns: [] }}
+          callbacks={{}}
+          runMode={false}
+        />
+      </SidePaneProvider>,
+    );
+    const nodeBefore = container.querySelector('.dashboard-page');
+    expect(nodeBefore).toBeTruthy();
+
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage data={readyOverview} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    const nodeAfter = container.querySelector('.dashboard-page');
+    expect(nodeAfter).toBe(nodeBefore);
+  });
+
+  it('carries dashboard-appear on first content appearance, not while still loading, and not on a second ready render over the same context', () => {
+    const { container, rerender } = render(
+      <SidePaneProvider>
+        <DashboardPage data={{ ...readyOverview, accumulated: null, loading: true }} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    let page = container.querySelector('.dashboard-page');
+    expect(page.className).toContain('dashboard-loading');
+    expect(page.className).not.toContain('dashboard-appear');
+
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage data={readyOverview} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    page = container.querySelector('.dashboard-page');
+    expect(page.className).toContain('dashboard-ready');
+    expect(page.className).toContain('dashboard-appear');
+
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage data={{ ...readyOverview, isFetching: true }} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    page = container.querySelector('.dashboard-page');
+    expect(page.className).toContain('dashboard-ready');
+    expect(page.className).toContain('dashboard-refreshing');
+    expect(page.className).not.toContain('dashboard-appear');
+  });
+
+  it('does not replay dashboard-appear across the grace-fallback -> content-ready double flip', () => {
+    vi.useFakeTimers();
+    try {
+      const { container, rerender } = render(
+        <SidePaneProvider>
+          <DashboardPage data={{ ...readyOverview, accumulated: null, loading: true }} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      act(() => { vi.advanceTimersByTime(800); });
+      let page = container.querySelector('.dashboard-page');
+      expect(page.className).toContain('dashboard-ready');
+      expect(page.className).toContain('dashboard-appear');
+
+      rerender(
+        <SidePaneProvider>
+          <DashboardPage data={readyOverview} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      page = container.querySelector('.dashboard-page');
+      expect(page.className).toContain('dashboard-ready');
+      expect(page.className).not.toContain('dashboard-appear');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not replay dashboard-appear when the sticky no-runs empty state hands off to real content', () => {
+    const baseNoRuns = {
+      projectsLoaded: true,
+      projects: [{ id: 'p1', name: 'p1' }],
+      selectedProject: 'p1',
+      selectedSource: 'local',
+      dashboard: null,
+      accumulated: null,
+      loading: false,
+      isFetching: false,
+      error: null,
+      availableRuns: [],
+    };
+    const { container, rerender, getByText, queryByText } = render(
+      <SidePaneProvider>
+        <DashboardPage data={baseNoRuns} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    expect(getByText('No evaluations yet')).toBeTruthy();
+    let page = container.querySelector('.dashboard-page');
+    expect(page.className).toContain('dashboard-appear');
+
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage data={{ ...readyOverview, selectedProject: 'p1', selectedSource: 'local' }} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    expect(queryByText('No evaluations yet')).toBeNull();
+    page = container.querySelector('.dashboard-page');
+    expect(page.className).toContain('dashboard-ready');
+    expect(page.className).not.toContain('dashboard-appear');
+  });
+
+  it('re-arms dashboard-appear on a project switch (a new context gets its own fade)', () => {
+    const { container, rerender } = render(
+      <SidePaneProvider>
+        <DashboardPage data={readyOverview} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    let page = container.querySelector('.dashboard-page');
+    expect(page.className).toContain('dashboard-appear');
+
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage data={{ ...readyOverview, isFetching: true }} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    page = container.querySelector('.dashboard-page');
+    expect(page.className).not.toContain('dashboard-appear');
+
+    const project2 = {
+      ...readyOverview,
+      selectedProject: 'p2',
+      projects: [{ id: 'p2', name: 'p2' }],
+      dashboard: { ...readyOverview.dashboard, selectedRun: { runId: 'r2', dateLabel: '2026-06-01' } },
+    };
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage data={project2} callbacks={{}} runMode={false} />
+      </SidePaneProvider>,
+    );
+    page = container.querySelector('.dashboard-page');
+    expect(page.className).toContain('dashboard-appear');
+  });
+
+  it('re-arms dashboard-appear on a run switch in run-detail, but not on a repeat render of the same run', () => {
+    const readyRun = (runId) => ({
+      projectsLoaded: true,
+      projects: [{ id: 'p1', name: 'p1' }],
+      selectedProject: 'p1',
+      selectedSource: 'local',
+      selectedRun: runId,
+      dashboard: {
+        dimensions: [{ dimension: 'Security', overallScore: '7.0/10', violations: [], compliance: [], principles: [] }],
+        trend: [],
+        selectedRun: { runId, dateLabel: '2026-05-01' },
+      },
+      accumulated: null,
+      loading: false,
+      isFetching: false,
+      error: null,
+      availableRuns: [{ runId, status: 'complete' }],
+    });
+
+    const { container, rerender } = render(
+      <SidePaneProvider>
+        <DashboardPage data={readyRun('r1')} callbacks={{}} runMode={true} />
+      </SidePaneProvider>,
+    );
+    let page = container.querySelector('.dashboard-page');
+    expect(page.className).toContain('dashboard-appear');
+
+    // Same run re-rendered (e.g. an unrelated prop changing): must not replay.
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage data={{ ...readyRun('r1'), isFetching: true }} callbacks={{}} runMode={true} />
+      </SidePaneProvider>,
+    );
+    page = container.querySelector('.dashboard-page');
+    expect(page.className).not.toContain('dashboard-appear');
+
+    // Switching to a different run in run-detail is a legitimate new context.
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage data={readyRun('r2')} callbacks={{}} runMode={true} />
+      </SidePaneProvider>,
+    );
+    page = container.querySelector('.dashboard-page');
+    expect(page.className).toContain('dashboard-appear');
+  });
+});
+
 // Finding 5 (final whole-branch review): projectInfo for a shared selection
 // must come from the shared-repo fetch (sharedProjectInfo, see useDashboard),
 // never the LOCAL projects list -- a shared selection's id can collide with

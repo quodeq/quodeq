@@ -179,6 +179,57 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     return () => clearTimeout(timer);
   }, [contentReady, dashboard]);
 
+  // Hold the full LoadingScreen until the content is ready, so we don't fade in
+  // a half-drawn page and then pop the real content in a beat later (the
+  // first-load flicker). BUT a cold score cache can take several seconds to
+  // rebuild (e.g. right after a dismiss/restore/formula change invalidates it);
+  // sitting on a blank spinner that whole time reads as "not opening". So once
+  // the dashboard payload is in and the grace has elapsed (graceElapsed, set
+  // above), fall back to the partial page (frame + a content spinner) so a slow
+  // load shows progress instead of a hang. The grace comfortably exceeds a warm
+  // load, so the fast path still gets one clean transition.
+  // Hoisted above the early returns (rather than kept by the main return where
+  // it's consumed) because the fade-once latch below needs it for every branch,
+  // not just the main one.
+  const isLoading = loading && !contentReady && !(dashboard && graceElapsed);
+
+  // Fade-once latch: `dashboard-fadein` should play when the page's content
+  // first appears for this project/source/run context, not on every
+  // loading<->ready flip within it (grace-fallback then content-ready, an
+  // error settling, the no-runs sticky state handing off to real content).
+  // Keyed like noRunsScopeKey below, but the run is folded in too so a run
+  // switch on run-detail gets its own fade. The animation itself lives on a
+  // separate `dashboard-appear` class (kept apart from the `dashboard-ready`
+  // state class) so re-adding `dashboard-ready` alone -- e.g. dropping
+  // `dashboard-refreshing` -- never replays it. The ref is only written from
+  // an effect (post-commit), never during render: mutating it inline would
+  // make the appear decision depend on how many times React happens to
+  // invoke this render (StrictMode double-invokes it in dev).
+  // isLoading, reused below as "was this render ready", isn't guaranteed
+  // false on every render of every early-return branch -- e.g. the no-runs
+  // sticky branch below CAN be reached with isLoading true, once
+  // wasNoRunsEmpty is already latched (a repeat render of an already-shown
+  // context, gated by showNoRunsEmpty's `!loading || wasNoRunsEmpty` below).
+  // What matters is narrower and does hold: on the render where a context's
+  // empty/error state genuinely first appears, `loading` is false --
+  // showNoRunsEmpty requires `!loading` until wasNoRunsEmpty is latched, and
+  // the error/runMode-empty branches gate on `!loading` outright -- so the
+  // latch is never consumed before real first-appearance content is on
+  // screen; isLoading being true only ever suppresses a repeat.
+  const dashboardAppearKey = `${selectedProject}::${selectedSource}::${runMode ? selectedRunId : 'overview'}`;
+  const dashboardAppearedKeyRef = useRef(null);
+  const dashboardAppearNow = !isLoading && dashboardAppearedKeyRef.current !== dashboardAppearKey;
+  useEffect(() => {
+    if (!isLoading) dashboardAppearedKeyRef.current = dashboardAppearKey;
+  }, [isLoading, dashboardAppearKey]);
+  const dashboardAppearClass = dashboardAppearNow ? ' dashboard-appear' : '';
+  // Trade-off: the appear class only lives for the one render where it's computed
+  // above -- it doesn't stay latched until dashboardAppearKey next changes -- so any
+  // re-render inside the animation window (e.g. grace-fallback partial page then
+  // contentReady flipping true) drops it and snaps opacity to 1, cutting the fade
+  // short. Latching it across renders was rejected: it would fail to re-arm on a
+  // run switch without reintroducing a loading gap.
+
   // Sticky "no evaluations yet" latch: once that empty state is showing for
   // this project+source, stay on it through a subsequent load (the post-eval
   // selectedRun flip -- new dashboard key, loading true, dashboard still
@@ -215,37 +266,51 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     // repositories tab; the copy is what differs.
     if (sharedHasContent) {
       return (
-        <div className="dashboard-page dashboard-fade dashboard-ready">
-          <EmptyState
-            title="No local projects yet"
-            description="Your team’s online repository has published projects you can browse without scanning anything locally."
-            actionLabel="Browse remote repositories"
-            onAction={() => onNavigate?.('projects')}
-          />
-        </div>
+        <>
+          {/* This `{null}` pins .dashboard-page to Fragment child index 1 in every
+              early-return branch, matching the main return's two-child Fragment
+              (loader + div) below -- so switching between branches reconciles
+              against the same slot instead of remounting the subtree and
+              replaying the fade-in. Don't remove it. */}
+          {null}
+          <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
+            <EmptyState
+              title="No local projects yet"
+              description="Your team’s online repository has published projects you can browse without scanning anything locally."
+              actionLabel="Browse remote repositories"
+              onAction={() => onNavigate?.('projects')}
+            />
+          </div>
+        </>
       );
     }
     return (
-      <div className="dashboard-page dashboard-fade dashboard-ready">
-        <EmptyState
-          title="No projects yet"
-          description="Add a project to start analyzing code quality."
-          actionLabel="Add a project"
-          onAction={() => onNavigate?.('projects')}
-        />
-      </div>
+      <>
+        {null}
+        <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
+          <EmptyState
+            title="No projects yet"
+            description="Add a project to start analyzing code quality."
+            actionLabel="Add a project"
+            onAction={() => onNavigate?.('projects')}
+          />
+        </div>
+      </>
     );
   }
   if (!selectedProject) {
     return (
-      <div className="dashboard-page dashboard-fade dashboard-ready">
-        <EmptyState
-          title="No project selected"
-          description="Pick a project to view its overview."
-          actionLabel="Choose project"
-          onAction={() => onNavigate?.('projects')}
-        />
-      </div>
+      <>
+        {null}
+        <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
+          <EmptyState
+            title="No project selected"
+            description="Pick a project to view its overview."
+            actionLabel="Choose project"
+            onAction={() => onNavigate?.('projects')}
+          />
+        </div>
+      </>
     );
   }
   const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
@@ -257,20 +322,26 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     // the loader instead so clicking Retry visibly does something.
     if (isFetching) {
       return (
-        <div className="dashboard-page dashboard-fade dashboard-ready">
-          <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />
-        </div>
+        <>
+          {null}
+          <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
+            <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />
+          </div>
+        </>
       );
     }
     return (
-      <div className="dashboard-page dashboard-fade dashboard-ready">
-        <EmptyState
-          title="Couldn't load this project"
-          description={error}
-          actionLabel="Retry"
-          onAction={() => callbacks.onRetry?.()}
-        />
-      </div>
+      <>
+        {null}
+        <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
+          <EmptyState
+            title="Couldn't load this project"
+            description={error}
+            actionLabel="Retry"
+            onAction={() => callbacks.onRetry?.()}
+          />
+        </div>
+      </>
     );
   }
   if (showNoRunsEmpty) {
@@ -281,15 +352,18 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     // true, dashboard still null): stay here, dimmed, until the payload
     // lands rather than swapping to the full inline loader and back.
     return (
-      <div className={`dashboard-page dashboard-fade dashboard-ready${isFetching ? ' dashboard-refreshing' : ''}`}>
-        <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
-        <EmptyState
-          title="No evaluations yet"
-          description={`Run an evaluation for ${projectName} to populate this page.`}
-          actionLabel="Start evaluation"
-          onAction={() => onNavigate?.('evaluate')}
-        />
-      </div>
+      <>
+        {null}
+        <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}${isFetching ? ' dashboard-refreshing' : ''}`}>
+          <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
+          <EmptyState
+            title="No evaluations yet"
+            description={`Run an evaluation for ${projectName} to populate this page.`}
+            actionLabel="Start evaluation"
+            onAction={() => onNavigate?.('evaluate')}
+          />
+        </div>
+      </>
     );
   }
   if (runMode && !loading && !dashboard && !error) {
@@ -301,33 +375,29 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     // being truthy) to a genuinely blank .dashboard-page.
     if (isFetching) {
       return (
-        <div className="dashboard-page dashboard-fade dashboard-ready">
-          <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />
-        </div>
+        <>
+          {null}
+          <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
+            <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />
+          </div>
+        </>
       );
     }
     return (
-      <div className="dashboard-page dashboard-fade dashboard-ready">
-        <EmptyState
-          title="Couldn't load this run"
-          description="This run's data didn't come back. Try refreshing."
-          actionLabel="Retry"
-          onAction={() => callbacks.onRetry?.()}
-        />
-      </div>
+      <>
+        {null}
+        <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
+          <EmptyState
+            title="Couldn't load this run"
+            description="This run's data didn't come back. Try refreshing."
+            actionLabel="Retry"
+            onAction={() => callbacks.onRetry?.()}
+          />
+        </div>
+      </>
     );
   }
 
-  // Hold the full LoadingScreen until the content is ready, so we don't fade in
-  // a half-drawn page and then pop the real content in a beat later (the
-  // first-load flicker). BUT a cold score cache can take several seconds to
-  // rebuild (e.g. right after a dismiss/restore/formula change invalidates it);
-  // sitting on a blank spinner that whole time reads as "not opening". So once
-  // the dashboard payload is in and the grace has elapsed (graceElapsed, set
-  // above), fall back to the partial page (frame + a content spinner) so a slow
-  // load shows progress instead of a hang. The grace comfortably exceeds a warm
-  // load, so the fast path still gets one clean transition.
-  const isLoading = loading && !contentReady && !(dashboard && graceElapsed);
   // True while a *background* fetch is running but we're already showing
   // data (placeholderData kept the previous run on screen during a switch).
   // The page dims itself slightly so the user sees "still working" without
@@ -344,7 +414,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
           the user sees right after picking a project; saying which one makes
           the wait legible instead of looking like the page hung. */}
       {isLoading && <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />}
-      <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : 'dashboard-ready'}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
+      <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : `dashboard-ready${dashboardAppearClass}`}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
         <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
         {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
         {/* Grace elapsed but content still isn't ready (dashboard is in, accumulated

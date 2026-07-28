@@ -4,6 +4,7 @@ import DimensionCardsGrid from './DimensionCardsGrid.jsx';
 import { formatRunId, gradeLetter, complianceRatio, extDisplayName } from '../../../utils/formatters.js';
 import { collapseByPeriod, collectPeriodDimensions, bucketKey, extractDimensionPeriodSeries, sliceTrendAtRun } from '../../../utils/dailyGrouping.js';
 const RunHistoryPanel = lazy(() => import('./RunHistoryPanel.jsx'));
+import RunHistoryPanelPlaceholder from './RunHistoryPanelPlaceholder.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import { buildTopOffendingFiles, buildProjectRootFile } from '../../../utils/explorerUtils.js';
@@ -289,7 +290,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
       />
 
       <div className="history-panels-row">
-        <Suspense fallback={null}>
+        <Suspense fallback={<RunHistoryPanelPlaceholder />}>
           {chartMountable && (
             <RunHistoryPanel
               trend={filteredPeriodTrend}
