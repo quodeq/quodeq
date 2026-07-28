@@ -27,6 +27,7 @@
  * @property {string|null}   dimension
  * @property {string|null}   violationType
  * @property {boolean}       provenanceDowngrade  true when the provenance gate (#639) de-escalated this from critical to major
+ * @property {boolean}       carriedForward  true when replayed from the incremental cache rather than produced by the running scan
  */
 
 /**
@@ -57,6 +58,7 @@ export function createViolation(raw) {
     dimension:     raw.dimension ?? null,
     violationType: raw.violationType ?? raw.violation_type ?? null,
     provenanceDowngrade: raw.provenanceDowngrade ?? raw.provenance_downgrade ?? false,
+    carriedForward: raw.carriedForward ?? raw.carried_forward ?? false,
   };
 }
 

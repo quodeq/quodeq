@@ -20,3 +20,18 @@ test('createViolation defaults provenanceDowngrade to false when absent', () => 
   const v = createViolation({ severity: 'minor' });
   assert.equal(v.provenanceDowngrade, false);
 });
+
+test('createViolation maps carriedForward (camelCase from API)', () => {
+  const v = createViolation({ severity: 'major', carriedForward: true });
+  assert.equal(v.carriedForward, true);
+});
+
+test('createViolation maps carried_forward (snake_case from raw JSON)', () => {
+  const v = createViolation({ severity: 'major', carried_forward: true });
+  assert.equal(v.carriedForward, true);
+});
+
+test('createViolation defaults carriedForward to false when absent', () => {
+  const v = createViolation({ severity: 'major' });
+  assert.equal(v.carriedForward, false);
+});
