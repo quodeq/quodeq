@@ -175,47 +175,70 @@
   user-select: none;
 }
 
+/* Segments never wrap — only the current (last) segment is allowed to
+   shrink, so the two ends of the address always stay readable. */
 .nav-breadcrumb__crumbs {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 2px;
+  flex-wrap: nowrap;
   list-style: none;
   margin: 0;
   padding: 0;
   min-width: 0;
-  overflow: hidden;
+  /* visible, not hidden: the jump-bar menus hang below this list; each
+     segment clips its own text instead. */
+  overflow: visible;
 }
 
 .nav-breadcrumb__sep {
+  flex: 0 0 auto;
   color: var(--color-text-subtle);
   opacity: 0.55;
   font-weight: 400;
+  margin: 0 3px;
 }
 
 .nav-breadcrumb__crumb {
+  position: relative;
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   min-width: 0;
+}
+.nav-breadcrumb__crumb.is-current {
+  flex: 0 1 auto;
 }
 .nav-breadcrumb__crumb > button,
 .nav-breadcrumb__crumb > span {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
   background: transparent;
   border: 0;
-  padding: 0;
+  padding: 3px 6px;
+  border-radius: 5px;
   font: inherit;
   color: inherit;
   white-space: nowrap;
+}
+.nav-breadcrumb__crumb > span,
+.nav-breadcrumb__crumb > button {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .nav-breadcrumb__crumb > button {
   cursor: pointer;
-  transition: color 120ms ease;
+  transition: color 120ms ease, background 120ms ease;
 }
-.nav-breadcrumb__crumb > button:hover {
+.nav-breadcrumb__crumb > button:hover,
+.nav-breadcrumb__crumb > button[aria-expanded='true'] {
   color: var(--color-text);
-  text-decoration: underline;
+  background: var(--color-surface-alt);
+}
+.nav-breadcrumb__crumb > button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 .nav-breadcrumb__crumb.is-current > span,
 .nav-breadcrumb__crumb.is-current > button {
@@ -224,8 +247,7 @@
 }
 
 /* Project root — the persistent "which project" indicator. Accent-colored
-   and clickable (opens the Projects tab). Kept as plain text per this
-   breadcrumb's no-chips convention. */
+   and clickable (opens the Projects tab). */
 .nav-breadcrumb__crumb--project > button,
 .nav-breadcrumb__crumb--project > span {
   color: var(--color-accent);
@@ -233,7 +255,90 @@
 }
 .nav-breadcrumb__crumb--project > button:hover {
   color: var(--color-accent-hover);
-  text-decoration: underline;
+}
+
+/* "…" chip — stands in for the collapsed middle of a deep path. Carries a
+   resting surface so it reads as a control, not a typo. */
+.nav-breadcrumb__crumb--ellipsis > button {
+  padding: 3px 8px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+}
+.nav-breadcrumb__crumb--ellipsis > button:hover,
+.nav-breadcrumb__crumb--ellipsis > button[aria-expanded='true'] {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text-muted) 16%, transparent);
+}
+
+/* ▾ affordance on jump-bar segments — invisible at rest (Xcode-style),
+   revealed by hover, keyboard focus, or an open menu. */
+.nav-breadcrumb__caret {
+  flex: 0 0 auto;
+  margin-left: 5px;
+  font-size: 8px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.nav-breadcrumb__crumb--menu > button:hover .nav-breadcrumb__caret,
+.nav-breadcrumb__crumb--menu > button:focus-visible .nav-breadcrumb__caret,
+.nav-breadcrumb__crumb--menu > button[aria-expanded='true'] .nav-breadcrumb__caret {
+  opacity: 0.7;
+}
+
+/* Dropdown shared by the ancestor ("…") and sibling menus. */
+.nav-breadcrumb__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  min-width: 176px;
+  padding: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg, 0 14px 30px rgba(0, 0, 0, 0.35));
+}
+.nav-breadcrumb__menu > button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 28px;
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  font: inherit;
+  color: var(--color-text-muted);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+.nav-breadcrumb__menu > button:hover {
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+}
+.nav-breadcrumb__menu > button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+/* Sibling menus are a choice, not a path: each row carries a state dot and
+   the current sibling is marked. The ancestor menu stays a plain list. */
+.nav-breadcrumb__menu-dot {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-right: 8px;
+  background: color-mix(in srgb, var(--color-text-muted) 45%, transparent);
+}
+.nav-breadcrumb__menu--siblings > button[aria-checked='true'] {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+.nav-breadcrumb__menu--siblings > button[aria-checked='true'] .nav-breadcrumb__menu-dot {
+  background: var(--color-accent);
 }
 
 /* Legacy chip-trail classes — kept inert in case a stray consumer

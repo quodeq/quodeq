@@ -13,7 +13,7 @@ const defaultHistoryAdapter = {
 /**
  * Manages a browser-history-backed navigation stack.
  *
- * Returns { navStack, activePage, navPush, navPop, navReplace, navGoTo, navReset, navTab }.
+ * Returns { navStack, activePage, navPush, navPop, navReplace, navGoTo, navSwapAt, navReset, navTab }.
  */
 function handlePopState(e, setNavStack) {
   const targetIndex = e.state?.navIndex ?? 0;
@@ -55,6 +55,22 @@ function createNavActions(setNavStack, navStackRef, history) {
     if (steps > 0) history.go(-steps);
   }
 
+  function navSwapAt(index, entry) {
+    // Lateral move within one level of the path (the breadcrumb's sibling
+    // menus): replace the entry at `index` and drop everything deeper.
+    // Same shape as navTab: truncate state synchronously, then walk browser
+    // history back — the resulting popstate finds the stack already cut and
+    // no-ops (see handlePopState).
+    const prev = navStackRef.current;
+    const stepsBack = prev.length - 1 - index;
+    if (stepsBack <= 0) {
+      navReplace(entry);
+      return;
+    }
+    setNavStack([...prev.slice(0, index), entry]);
+    history.go(-stepsBack);
+  }
+
   function navReset() {
     const stepsBack = navStackRef.current.length - 1;
     setNavStack([{ page: DEFAULT_PAGE }]);
@@ -72,7 +88,7 @@ function createNavActions(setNavStack, navStackRef, history) {
     if (stepsBack > 0) history.go(-stepsBack);
   }
 
-  return { navPush, navPop, navReplace, navGoTo, navReset, navTab };
+  return { navPush, navPop, navReplace, navGoTo, navSwapAt, navReset, navTab };
 }
 
 export function useNavStack({ historyAdapter } = {}) {
@@ -91,7 +107,7 @@ export function useNavStack({ historyAdapter } = {}) {
     return () => window.removeEventListener('popstate', handler);
   }, []);
 
-  const { navPush, navPop, navReplace, navGoTo, navReset, navTab } = createNavActions(setNavStack, navStackRef, history);
+  const { navPush, navPop, navReplace, navGoTo, navSwapAt, navReset, navTab } = createNavActions(setNavStack, navStackRef, history);
   const activePage = navStack[navStack.length - 1];
 
   useEffect(() => {
@@ -103,5 +119,5 @@ export function useNavStack({ historyAdapter } = {}) {
     else window.scrollTo({ top: 0 });
   }, [activePage]);
 
-  return { navStack, activePage, navPush, navPop, navReplace, navGoTo, navReset, navTab };
+  return { navStack, activePage, navPush, navPop, navReplace, navGoTo, navSwapAt, navReset, navTab };
 }

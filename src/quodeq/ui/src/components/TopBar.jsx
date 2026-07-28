@@ -2,7 +2,12 @@
  * TopBar — global app header sitting above the page content.
  *
  * Desktop layout (left → right):
- *   [ breadcrumb (projectName / page / …) ]        [ provider pill | Report | + Evaluate ]
+ *   [ address (projectName / … / page) ]
+ *   [ status | fix plan · report | theme · assistant · terminal | model | ▸ evaluate ]
+ * Action buttons show their icon at rest and expand their label on hover;
+ * the cluster is right-anchored so expansion pushes leftward and the primary
+ * never moves. While a run is live a progress chip replaces the (dimmed)
+ * Evaluate button and a hairline progress line runs along the bottom edge.
  *
  * Mobile layout (left → right):
  *   [ ‹ back ]  [ current page title ]                                          [ burger ]
@@ -35,7 +40,7 @@ function SidePaneSpecButton({ type, label, icon, modifier }) {
       }}
     >
       {icon}
-      <span>{label}</span>
+      <span className="topbar-btn__label">{label}</span>
     </button>
   );
 }
@@ -91,6 +96,10 @@ export default function TopBar({
   model,
   onEvaluate,
   evaluating = false,
+  /* {dimension, percent} while a run is live — feeds the run chip and the
+     progress hairline along the bar's bottom edge. Either field may be null
+     before the first progress poll lands. */
+  runProgress = null,
   onProviderClick,
   onMenuToggle,
   onSelectProject,
@@ -151,8 +160,11 @@ export default function TopBar({
 
       <div className="topbar-actions">
         <ServerStatusDot connected={serverConnected} url={serverUrl} />
+        <span className="topbar-divider" aria-hidden="true" />
+
         <FixPlanToolbarButton />
         <ReportToolbarButton />
+        <span className="topbar-divider" aria-hidden="true" />
 
         {onToggleTheme && (
           <button
@@ -163,11 +175,13 @@ export default function TopBar({
             title={effectiveDark ? 'Switch to light theme' : 'Switch to dark theme'}
           >
             {effectiveDark ? <SunIcon /> : <MoonIcon />}
+            <span className="topbar-btn__label">{effectiveDark ? 'light' : 'dark'}</span>
           </button>
         )}
 
         <AssistantLauncherButton />
         <TerminalLauncherButton />
+        <span className="topbar-divider" aria-hidden="true" />
 
         {(provider || model) && (
           onProviderClick ? (
@@ -177,9 +191,22 @@ export default function TopBar({
               onClick={onProviderClick}
               title="Open Settings to change provider or model"
             >
-              {provider && <span>{provider}</span>}
-              {provider && model && <span className="topbar-pill-sep">·</span>}
-              {model && <span className="topbar-pill-muted">{model}</span>}
+              {provider && model
+                ? (
+                  <>
+                    {/* Model at rest; the provider prefix pays for its label
+                        only under the cursor (5a — icon at rest, label on
+                        hover, expanding leftward so the primary never moves) */}
+                    <span className="topbar-btn__label topbar-btn__label--lead">{provider} ·</span>
+                    <span className="topbar-pill-muted">{model}</span>
+                  </>
+                )
+                : (
+                  <>
+                    {provider && <span>{provider}</span>}
+                    {model && <span className="topbar-pill-muted">{model}</span>}
+                  </>
+                )}
             </button>
           ) : (
             <span className="topbar-pill">
@@ -190,24 +217,36 @@ export default function TopBar({
           )
         )}
 
+        {onEvaluate && evaluating && (
+          <button
+            type="button"
+            className="topbar-run-chip"
+            onClick={onEvaluate}
+            title="View running evaluation"
+          >
+            <span className="topbar-run-chip__dot" aria-hidden="true" />
+            <span className="topbar-run-chip__dim">{runProgress?.dimension || 'evaluating…'}</span>
+            {runProgress?.percent != null && (
+              <>
+                <span className="topbar-run-chip__bar" aria-hidden="true">
+                  <span style={{ width: `${runProgress.percent}%` }} />
+                </span>
+                <span className="topbar-run-chip__pct">{runProgress.percent}%</span>
+              </>
+            )}
+          </button>
+        )}
         {onEvaluate && (
           <button
             type="button"
             className={`topbar-btn topbar-btn--evaluate${evaluating ? ' topbar-btn--evaluate--running' : ''}`}
-            onClick={onEvaluate}
+            onClick={evaluating ? undefined : onEvaluate}
+            aria-disabled={evaluating || undefined}
+            title={evaluating ? 'An evaluation is already running' : undefined}
             aria-live="polite"
           >
-            {evaluating ? (
-              <>
-                <span className="topbar-btn__spinner" aria-hidden="true" />
-                <span>Evaluating…</span>
-              </>
-            ) : (
-              <>
-                <span className="topbar-btn__plus" aria-hidden="true">+</span>
-                <span>Evaluate</span>
-              </>
-            )}
+            <span className="topbar-btn__play" aria-hidden="true">▸</span>
+            <span>Evaluate</span>
           </button>
         )}
 
@@ -223,6 +262,14 @@ export default function TopBar({
           </button>
         )}
       </div>
+
+      {/* Run-aware chrome: a 2px hairline along the bar's bottom edge carries
+          overall progress, so a long run stays visible from any page. */}
+      {evaluating && runProgress?.percent != null && (
+        <span className="topbar-progress" aria-hidden="true">
+          <span style={{ width: `${runProgress.percent}%` }} />
+        </span>
+      )}
     </header>
   );
 }
