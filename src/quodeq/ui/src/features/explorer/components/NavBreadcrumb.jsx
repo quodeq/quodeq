@@ -154,7 +154,11 @@ export default function NavBreadcrumb({ stack = [], onGoTo, projectName, onSelec
                           type="button"
                           role="menuitemradio"
                           aria-checked={!!item.current}
-                          onClick={() => { setOpenKey(null); if (!item.current) item.onSelect(); }}
+                          // Picking the current sibling means "back to this
+                          // level" — from a deeper page it's the only way up
+                          // to it, since the segment itself opens the menu.
+                          // onGoTo no-ops when this is already the last entry.
+                          onClick={() => { setOpenKey(null); if (item.current) onGoTo(seg.index); else item.onSelect(); }}
                         >
                           <span className="nav-breadcrumb__menu-dot" aria-hidden="true" />
                           {item.label}
