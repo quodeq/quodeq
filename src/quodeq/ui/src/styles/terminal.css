@@ -84,6 +84,16 @@
   flex-direction: column;
   gap: var(--term-space-1);
 }
+/* Grid items default to `min-width: auto`, so a long unbreakable value (a
+   dimension name like "maintainability" at 28px) grows its track past 1fr and
+   pushes the whole strip — and the page — wider than the pane. Pinning the
+   min to 0 keeps the track honest; the value shrinks to fit instead (see
+   `.term-stat__value`). `container-type` makes each card a query container so
+   the value can size itself against the card's own content box. */
+.term-stat {
+  min-width: 0;
+  container-type: inline-size;
+}
 
 /* Tablet/mobile — drop card padding and shrink the value font so the stat
    strip stays readable when it wraps to two columns or stacks. */
@@ -95,7 +105,7 @@
   .term-stat-strip--cards .term-stat {
     padding: var(--term-space-2);
   }
-  .term-stat__value { font-size: 22px; }
+  .term-stat__value { --stat-value-max: 22px; }
   .term-stat__label { margin-bottom: 0; }
 }
 
@@ -117,22 +127,43 @@
   display: flex;
   align-items: baseline;
   gap: var(--term-space-2);
+  min-width: 0;
 }
+/* Fit-to-card sizing. `--stat-value-len` is the character count, set inline by
+   <Stat>; 0.62em is the advance width of the mono face, so the division is the
+   largest size at which the value still fits the card's content box (100cqw).
+   Numbers stay at --stat-value-max — only long words (dimension names) shrink,
+   and only on cards too narrow to hold them. The floor keeps them legible; the
+   ellipsis is the backstop below it, and where container queries are
+   unsupported the whole clamp is dropped and --stat-value-max applies. */
 .term-stat__value {
-  font-size: 28px;
+  --stat-value-max: 28px;
+  font-size: clamp(13px, calc(100cqw / (var(--stat-value-len, 4) * 0.62)), var(--stat-value-max));
   font-weight: 500;
   color: var(--color-text);
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* `overflow: hidden` clips against the line box, and at line-height 1.1 that
+     shaves the descenders off "reliability" / "usability". Pad the box out and
+     pull the same amount back off the flow so nothing else moves. */
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
 }
 .term-stat__trailing {
   font-size: 12px;
   color: var(--color-text-muted);
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .term-stat__hint {
   margin-top: var(--term-space-1);
   font-size: 11px;
   color: var(--color-text-muted);
+  overflow-wrap: anywhere;
 }
 .term-stat--success .term-stat__value { color: var(--color-success); }
 .term-stat--warning .term-stat__value { color: var(--color-warning); }
@@ -2466,7 +2497,7 @@ button.term-sev-badge--clickable:focus-visible {
 @media (max-width: 480px) {
   .dashboard { padding: var(--term-space-2); }
   .term-header__name { font-size: 17px; }
-  .term-stat__value { font-size: 22px; }
+  .term-stat__value { --stat-value-max: 22px; }
 }
 
 /* ------------------------------------------------------------
@@ -2589,7 +2620,7 @@ button.term-sev-badge--clickable:focus-visible {
   text-overflow: ellipsis;
 }
 .eval-job-stat-strip .term-stat__value {
-  font-size: 24px;
+  --stat-value-max: 24px;
 }
 .eval-job-stat-strip .term-stat__trailing {
   font-size: 15px;

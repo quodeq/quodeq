@@ -47,6 +47,24 @@ describe('Stat with interactive hint', () => {
     expect(onStat).not.toHaveBeenCalled();
   });
 
+  it('publishes the value length so CSS can fit it to the card', () => {
+    // The fit-to-card font size in terminal.css divides the card width by this
+    // count. Without it a long word (a dimension name) overflows its card and
+    // widens the whole strip.
+    const { container } = render(
+      <StatStrip cards>
+        <Stat label="analyzing" value="maintainability" hint="next: performance" />
+        <Stat label="files this run" value={285} trailing="/ 1037" />
+        <Stat label="score" value={<em>9.0</em>} />
+      </StatStrip>,
+    );
+    const values = [...container.querySelectorAll('.term-stat__value')];
+    expect(values[0].style.getPropertyValue('--stat-value-len')).toBe('15');
+    expect(values[1].style.getPropertyValue('--stat-value-len')).toBe('3');
+    // Rich values carry no measurable length — no property, CSS default applies.
+    expect(values[2].style.getPropertyValue('--stat-value-len')).toBe('');
+  });
+
   it('renders a plain (non-button) card when not clickable', () => {
     const { container } = render(
       <StatStrip cards>

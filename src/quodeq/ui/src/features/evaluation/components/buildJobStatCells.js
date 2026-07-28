@@ -246,9 +246,15 @@ export function buildJobStatCells(status, inputs) {
       : inputs.scanMode === 'clean scan' ? ' · full rescan' : '';
     return [
       {
-        label: dc ? `analyzing · dimension ${dc.index} / ${dc.count}` : 'analyzing',
+        // The counter lives in the hint, not the label. Tile labels are a
+        // single ellipsized line, and "analyzing · dimension 3 / 4" doesn't fit
+        // a quarter-width card — it truncated to "analyzing · dimen…", hiding
+        // the only part that carries information. The hint wraps, so it can.
+        label: 'analyzing',
         value: dc?.current ?? '—',
-        hint: dc ? (dc.next ? `next: ${dc.next}` : (dc.count > 1 ? 'last dimension' : null)) : 'preparing…',
+        hint: dc
+          ? `dim ${dc.index}/${dc.count}${dc.next ? ` · next: ${dc.next}` : ''}`
+          : 'preparing…',
         tone: 'accent',
       },
       {
