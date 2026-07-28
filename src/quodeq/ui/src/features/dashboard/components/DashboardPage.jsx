@@ -193,7 +193,15 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   const noRunsScopeKey = `${selectedProject}::${selectedSource}`;
   const [noRunsEmptySticky, setNoRunsEmptySticky] = useState({ scopeKey: noRunsScopeKey, active: false });
   const wasNoRunsEmpty = noRunsEmptySticky.scopeKey === noRunsScopeKey && noRunsEmptySticky.active;
-  const showNoRunsEmpty = !runMode && !dashboard && !error && (!loading || wasNoRunsEmpty);
+  // Latch on !contentReady, not !dashboard: releasing the latch the moment
+  // the dashboard payload lands (but before accumulated does) reopened the
+  // same pop this latch exists to close, just narrower -- empty(dimmed) ->
+  // inline spinner -> content instead of loader -> content. contentReady
+  // already folds in the accumulated wait for the Overview (runMode is
+  // excluded from this branch outright, so its own dashboard-only readiness
+  // never applies here), so holding the empty state open until BOTH payloads
+  // land closes the gap without a separate flag to keep in sync.
+  const showNoRunsEmpty = !runMode && !contentReady && !error && (!loading || wasNoRunsEmpty);
   if (!runMode && (noRunsEmptySticky.scopeKey !== noRunsScopeKey || noRunsEmptySticky.active !== showNoRunsEmpty)) {
     setNoRunsEmptySticky({ scopeKey: noRunsScopeKey, active: showNoRunsEmpty });
   }

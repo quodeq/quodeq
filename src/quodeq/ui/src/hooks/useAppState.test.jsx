@@ -355,4 +355,60 @@ describe('useAppState eval-completion: single refetch path (P5-T1)', () => {
     await waitFor(() => expect(result.current.selectedRun).toBe('run-2'));
     await waitFor(() => expect(fakeApi.listProjects.mock.calls.length).toBeGreaterThan(listCallsBefore));
   });
+
+  // Finding 1 (P5 final review): P5-T1 above only proved the DASHBOARD key
+  // refetches on completion. It missed that the SCORES key -- the `latest`
+  // query behind `accumulated`/`availableRuns` -- has no dependency on
+  // selectedRun at all, so nothing refetched it once useAppState stopped
+  // calling refreshDashboardActive. This fake, unlike makeAppStateFakeApi
+  // above, is run-aware: getProjectScores returns an empty availableRuns
+  // (and a stale accumulated) until the fake's "backend" is told the new run
+  // exists, mirroring what the real API would return once a run completes.
+  function makeRunAwareFakeApi() {
+    const backend = { newRun: null };
+    return {
+      listProjects: vi.fn(async () => [{ id: 'project-a', name: 'Project A' }]),
+      getDashboard: vi.fn(async (project, run) => ({
+        project, run: run || 'latest', trend: [], summary: { score: 75 }, dimensions: [],
+        selectedRun: { runId: run || 'latest', dateLabel: '2026-05-01' },
+      })),
+      sharedGetDashboard: vi.fn(),
+      getProjectScores: vi.fn(async () => (
+        backend.newRun
+          ? { accumulated: { score: 95 }, trend: [], availableRuns: [{ runId: backend.newRun, dateLabel: '2026-07-01', status: 'complete' }] }
+          : { accumulated: { score: 70 }, trend: [], availableRuns: [] }
+      )),
+      sharedGetProjectScores: vi.fn(),
+      sharedGetProjectInfo: vi.fn(),
+      backend,
+    };
+  }
+
+  it('refetches scores on completion -- accumulated and availableRuns pick up the new run without a tab round-trip', async () => {
+    const fakeApi = makeRunAwareFakeApi();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+    });
+    const { result, rerender } = renderHook(() => useAppState(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>
+          <ApiProvider value={fakeApi}>{children}</ApiProvider>
+        </QueryClientProvider>
+      ),
+    });
+
+    await waitFor(() => expect(result.current.selectedProject).toBe('project-a'));
+    await waitFor(() => expect(result.current.accumulated).toEqual({ score: 70 }));
+    const scoresCallsBefore = fakeApi.getProjectScores.mock.calls.length;
+
+    // The run completes: the backend now knows about it, and the job
+    // transitions to done in the same tick a real completion would.
+    fakeApi.backend.newRun = 'run-2';
+    evaluationState.job = { jobId: 'j1', status: 'done', outputProject: 'project-a', outputRunId: 'run-2' };
+    rerender();
+
+    await waitFor(() => expect(fakeApi.getProjectScores.mock.calls.length).toBeGreaterThan(scoresCallsBefore));
+    await waitFor(() => expect(result.current.accumulated).toEqual({ score: 95 }));
+    await waitFor(() => expect(result.current.availableRuns.some((r) => r.runId === 'run-2')).toBe(true));
+  });
 });

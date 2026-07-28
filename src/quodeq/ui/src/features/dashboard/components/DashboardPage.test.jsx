@@ -260,6 +260,33 @@ describe('DashboardPage no-runs -> first-run transition (P5-T2)', () => {
     expect(container.querySelector('.dashboard-page').className).toContain('dashboard-refreshing');
 
     const dims = [{ dimension: 'maintainability', overallScore: '7.0/10' }];
+
+    // Finding 2 (P5 final review): the dashboard query settles before the
+    // scores query does -- dashboard payload is in, accumulated isn't yet.
+    // Releasing the latch here (the pre-fix !dashboard check) swapped the
+    // dimmed empty state for the full inline loader for a beat before
+    // content landed: a narrower version of the pop this latch exists to
+    // close. It must stay on the dimmed empty state instead.
+    rerender(
+      <SidePaneProvider>
+        <DashboardPage
+          data={{
+            ...baseNoRuns,
+            dashboard: { dimensions: dims, trend: [], selectedRun: { runId: 'r1', dateLabel: '2026-07-01' } },
+            accumulated: null,
+            loading: true,
+            isFetching: true,
+            availableRuns: [{ runId: 'r1', status: 'complete' }],
+          }}
+          callbacks={{}}
+          runMode={false}
+        />
+      </SidePaneProvider>,
+    );
+    expect(getByText('No evaluations yet')).toBeTruthy();
+    expect(container.querySelector('.loading-screen')).toBeNull();
+    expect(container.querySelector('.dashboard-page').className).toContain('dashboard-refreshing');
+
     rerender(
       <SidePaneProvider>
         <DashboardPage
