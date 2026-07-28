@@ -197,9 +197,20 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     @app.get("/api/projects/<project>/scan")
     def project_scan(project: str) -> Response | tuple[Response, int]:
         """Return scan data for a project. Triggers scan if needed for local projects."""
-        validate_path_segment(project)
+        try:
+            validate_path_segment(project)
+        except ValueError:
+            body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
 
-        project_dir = Path(reports_dir()) / project
+        # Same containment shape as project_estimates below — the normpath +
+        # startswith form is the one CodeQL/Snyk recognize as a barrier.
+        root = os.path.realpath(reports_dir())
+        candidate = os.path.normpath(os.path.join(root, project))
+        if not candidate.startswith(root + os.sep):
+            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+        project_dir = Path(candidate)
         if not project_dir.is_dir():
             body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
@@ -246,7 +257,11 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         cleanScan=true each dimension reports count=total and cached=0.
         Never creates a run or writes to disk.
         """
-        validate_path_segment(project)
+        try:
+            validate_path_segment(project)
+        except ValueError:
+            body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
 
         # Containment check in the exact normpath + startswith shape CodeQL
         # recognizes as a path-injection barrier (pathlib's is_relative_to

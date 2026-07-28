@@ -294,3 +294,17 @@ def test_sse_filters_resources_lines(tmp_path, app) -> None:
     payloads = [e["data"] for e in events if "data" in e]
     assert all("[resources]" not in line for line in payloads)
     assert any("[security]" in line for line in payloads)
+
+
+def test_plain_logs_rejects_traversal_job_id(tmp_path, app) -> None:
+    client = app.test_client()
+    resp = client.get("/api/jobs/../logs")
+    assert resp.status_code == HTTPStatus.BAD_REQUEST
+    assert resp.get_json()["code"] == "INVALID_INPUT"
+
+
+def test_stream_logs_rejects_traversal_job_id(tmp_path, app) -> None:
+    client = app.test_client()
+    resp = client.get("/api/jobs/../logs/stream")
+    assert resp.status_code == HTTPStatus.BAD_REQUEST
+    assert resp.get_json()["code"] == "INVALID_INPUT"

@@ -167,6 +167,11 @@ class TestProjectScan:
         resp = client.get("/api/projects/nonexistent/scan")
         assert resp.status_code == 404
 
+    def test_rejects_traversal_project_name(self, client):
+        resp = client.get("/api/projects/../scan")
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_INPUT"
+
     def test_returns_cached_scan(self, client, tmp_path):
         proj_dir = tmp_path / "my-proj"
         proj_dir.mkdir()
@@ -324,6 +329,11 @@ class TestProjectEstimates:
         resp = client.get("/api/projects/nonexistent/estimates")
         assert resp.status_code == 404
         assert resp.get_json()["code"] == "NOT_FOUND"
+
+    def test_rejects_traversal_project_name(self, client):
+        resp = client.get("/api/projects/../estimates")
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_INPUT"
 
     def test_happy_path_with_dimensions_param(self, client, tmp_path):
         self._setup_project(tmp_path)

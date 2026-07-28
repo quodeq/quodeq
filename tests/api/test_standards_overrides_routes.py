@@ -347,3 +347,16 @@ def test_evaluator_only_override_not_in_changed_dimensions(client_with_custom, p
     assert resp.get_json()["changedDimensions"] == []
     saved = json.loads((project_root / ".quodeq" / "standards-overrides.json").read_text())
     assert saved["overrides"]["CUST-1"] == {"max_items": 50}
+
+
+def test_get_rejects_traversal_project_id(client):
+    resp = client.get("/api/projects/../standards-overrides")
+    assert resp.status_code == 400
+    assert resp.get_json()["code"] == "bad_request"
+
+
+def test_put_rejects_traversal_project_id(client):
+    resp = client.put("/api/projects/../standards-overrides", json={"overrides": {}},
+                      headers=_LOCALHOST)
+    assert resp.status_code == 400
+    assert resp.get_json()["code"] == "bad_request"
