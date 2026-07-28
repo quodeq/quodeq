@@ -39,10 +39,17 @@ function DimensionCard({ dim, isSelected, onToggle, meta, metaLoading }) {
       <span className="eval-dim-card__body">
         <span className="eval-dim-card__title-row">
           <span className="eval-dim-card__name">{dim.label || dim.id}</span>
-          <span className={`eval-dim-card__std ${info.className}`}>{info.label.toLowerCase()}</span>
+          {/* Plain bordered tag on purpose: the legacy dimension-chip-type--*
+              classes paint a tinted pill that fights the card style and
+              drops contrast on several themes. */}
+          <span className="eval-dim-card__std">{info.label.toLowerCase()}</span>
         </span>
         {meta != null ? (
-          <span className="eval-dim-card__meta">{meta}</span>
+          <span className="eval-dim-card__meta">
+            {meta.map((line) => (
+              <span key={line} className="eval-dim-card__meta-line">{line}</span>
+            ))}
+          </span>
         ) : metaLoading ? (
           // Estimates take a few seconds; a quiet placeholder keeps the card
           // from growing when the real meta lands.
@@ -56,7 +63,7 @@ function DimensionCard({ dim, isSelected, onToggle, meta, metaLoading }) {
 /**
  * @param {object} props
  * @param {object} [props.dimMetas] terminal variant only: dim id → pre-run
- *   meta label ("312 files to analyze · 85% analyzed"); null/missing → omitted.
+ *   meta lines (["312 files to analyze", "85% analyzed"]); null/missing → omitted.
  * @param {boolean} [props.metasLoading] terminal variant only: estimates are
  *   still being computed — cards show a small placeholder instead of nothing.
  */

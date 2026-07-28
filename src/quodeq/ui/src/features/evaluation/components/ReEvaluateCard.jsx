@@ -327,22 +327,22 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
   const activeModel = readActiveProviderModel();
   const isClean = cleanScan !== 'off';
 
-  // Per-dimension meta, matching the selected scan mode: how much work is
-  // left ("312 files to analyze"), how much the cache already covers
-  // ("· 85% analyzed"), or "up to date" when every current fingerprint
-  // already has a cached result.
+  // Per-dimension meta lines, matching the selected scan mode: how much
+  // work is left ("312 files to analyze"), how much the cache already
+  // covers ("85% analyzed"), or "up to date" when every current
+  // fingerprint already has a cached result. One entry per line — a single
+  // string would wrap unevenly across cards on wide screens.
   const dimMetas = estimates?.dimensions
     ? Object.fromEntries(Object.entries(estimates.dimensions).map(([id, est]) => {
         const total = est.total ?? 0;
         if (!(total > 0)) return [id, null];
         const count = isClean ? total : (est.count ?? 0);
         const cached = isClean ? 0 : (est.cached ?? 0);
-        if (count === 0) return [id, 'up to date'];
+        if (count === 0) return [id, ['up to date']];
         const pct = Math.round((cached / total) * 100);
-        const label = pct > 0
-          ? `${count.toLocaleString()} files to analyze · ${pct}% analyzed`
-          : `${count.toLocaleString()} files to analyze`;
-        return [id, label];
+        const lines = [`${count.toLocaleString()} files to analyze`];
+        if (pct > 0) lines.push(`${pct}% analyzed`);
+        return [id, lines];
       }))
     : null;
 
