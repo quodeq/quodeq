@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import HelpHint from '../../../components/HelpHint.jsx';
+import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 
 const STORAGE_KEY = 'quodeq.cleanScan.permanent';
 
@@ -58,6 +59,8 @@ function ModeCard({ id, checked, onPick, disabled, title, tag, children }) {
  * localStorage exactly like before.
  */
 export default function ScanModeCards({ value, onChange, disabled = false }) {
+  const { showToast } = useSidePane();
+
   useEffect(() => {
     // First mount: hydrate 'permanent' from localStorage so the cards reflect
     // the user's saved preference. Only when the parent passes 'off' as the
@@ -74,7 +77,10 @@ export default function ScanModeCards({ value, onChange, disabled = false }) {
   }
   function pickClean() {
     // Default to one-shot; "always" is the explicit sub-choice.
-    if (!isClean) onChange('once');
+    if (isClean) return;
+    onChange('once');
+    // Auto-dismissing heads-up: switching to clean is easy to underestimate.
+    showToast('Clean scan discards all previous findings and re-analyzes every file. Expect higher token usage.');
   }
   function pickOnce() {
     writePermanent(false);
@@ -93,7 +99,7 @@ export default function ScanModeCards({ value, onChange, disabled = false }) {
           re-analyzes only files changed since the last run and keeps earlier findings for everything else.
         </ModeCard>
         <ModeCard id="clean" checked={isClean} onPick={pickClean} disabled={disabled} title="clean scan" tag="slow">
-          none of the previous findings are used — every file is re-analyzed from scratch. use after changing standards or a quodeq version.
+          none of the previous findings are used. every file gets re-analyzed from scratch. use it after changing standards or a quodeq version.
         </ModeCard>
       </div>
       {isClean && (

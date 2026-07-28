@@ -25,7 +25,7 @@ function DimensionChip({ dim, isSelected, onToggle }) {
   );
 }
 
-function DimensionCard({ dim, isSelected, onToggle, meta }) {
+function DimensionCard({ dim, isSelected, onToggle, meta, metaLoading }) {
   const info = typeInfo(dim);
   return (
     <button
@@ -41,9 +41,13 @@ function DimensionCard({ dim, isSelected, onToggle, meta }) {
           <span className="eval-dim-card__name">{dim.label || dim.id}</span>
           <span className={`eval-dim-card__std ${info.className}`}>{info.label.toLowerCase()}</span>
         </span>
-        {meta != null && (
+        {meta != null ? (
           <span className="eval-dim-card__meta">{meta}</span>
-        )}
+        ) : metaLoading ? (
+          // Estimates take a few seconds; a quiet placeholder keeps the card
+          // from growing when the real meta lands.
+          <span className="eval-dim-card__meta eval-dim-card__meta--skeleton" title="estimating…" aria-hidden="true" />
+        ) : null}
       </span>
     </button>
   );
@@ -53,8 +57,10 @@ function DimensionCard({ dim, isSelected, onToggle, meta }) {
  * @param {object} props
  * @param {object} [props.dimMetas] terminal variant only: dim id → pre-run
  *   meta label ("312 files to analyze · 85% analyzed"); null/missing → omitted.
+ * @param {boolean} [props.metasLoading] terminal variant only: estimates are
+ *   still being computed — cards show a small placeholder instead of nothing.
  */
-export default function DimensionSelector({ allDimensions, selectedDims, onToggle, onSelectAll, onClearAll, variant, dimMetas = null }) {
+export default function DimensionSelector({ allDimensions, selectedDims, onToggle, onSelectAll, onClearAll, variant, dimMetas = null, metasLoading = false }) {
   const sorted = useMemo(() => [...allDimensions].sort((a, b) => {
     const oa = (TYPE_CONFIG[a.standardType] || DEFAULT_TYPE_CONFIG).order;
     const ob = (TYPE_CONFIG[b.standardType] || DEFAULT_TYPE_CONFIG).order;
@@ -88,6 +94,7 @@ export default function DimensionSelector({ allDimensions, selectedDims, onToggl
               isSelected={selectedDims.has(dim.id)}
               onToggle={onToggle}
               meta={dimMetas?.[dim.id] ?? null}
+              metaLoading={metasLoading}
             />
           ))}
         </div>

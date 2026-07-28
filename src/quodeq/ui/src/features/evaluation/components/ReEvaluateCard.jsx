@@ -176,7 +176,7 @@ function useReEvaluateCard(project, onStart, projectInfo, preselectDims) {
 
   const isLocal = info?.location === 'local';
   const { scanData } = useScanData(isLocal ? project : null);
-  const { estimates } = useScanEstimates(project, isLocal && !info?.pathMissing);
+  const { estimates, loading: estimatesLoading } = useScanEstimates(project, isLocal && !info?.pathMissing);
 
   const { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan } =
     useDimensionSelection(allDimensions, info, branch, scopePath, onStart, showToast, preselectDims, project, timeLimitS);
@@ -185,7 +185,7 @@ function useReEvaluateCard(project, onStart, projectInfo, preselectDims) {
     info, error, retry, allDimensions, selectedDims,
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
-    isLocal, scanData, estimates, branch, setBranch, scopePath, setScopePath,
+    isLocal, scanData, estimates, estimatesLoading, branch, setBranch, scopePath, setScopePath,
     timeLimitS, setTimeLimitS,
   };
 }
@@ -314,7 +314,7 @@ function RunBar({ disabled, canStart, handleScan, selectedDims, estimates, clean
   );
 }
 
-function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scope, estimates, budget, onGoToSettings }) {
+function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scope, estimates, estimatesLoading, budget, onGoToSettings }) {
   const { all: allDimensions, selected: selectedDims } = dimensions;
   const {
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
@@ -435,6 +435,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
           onSelectAll={selectAll}
           onClearAll={clearAll}
           dimMetas={dimMetas}
+          metasLoading={estimatesLoading}
         />
       )}
 
@@ -458,7 +459,7 @@ export default function ReEvaluateCard({ project, projectInfo, onStart, disabled
     info, error, retry, allDimensions, selectedDims,
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
-    isLocal, scanData, estimates, branch, setBranch, scopePath, setScopePath,
+    isLocal, scanData, estimates, estimatesLoading, branch, setBranch, scopePath, setScopePath,
     timeLimitS, setTimeLimitS,
   } = useReEvaluateCard(project, onStart, projectInfo, preselectDims);
 
@@ -495,6 +496,7 @@ export default function ReEvaluateCard({ project, projectInfo, onStart, disabled
       }}
       scope={{ isLocal, scanData, branch, setBranch, scopePath, setScopePath }}
       estimates={estimates}
+      estimatesLoading={estimatesLoading}
       budget={{ timeLimitS, setTimeLimitS }}
       onGoToSettings={onGoToSettings}
     />

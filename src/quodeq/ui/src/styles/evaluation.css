@@ -3223,6 +3223,7 @@ button.eval-provider-badge--clickable:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .eval-run-pill__dot,
   .vlive-footer__dot,
+  .eval-dim-card__meta--skeleton,
   .scan-progress__dim-dot--running { animation: none; }
   .scan-progress__bar-fill--live::after { animation: none; display: none; }
 }
@@ -3623,6 +3624,17 @@ button.eval-provider-badge--clickable:focus-visible {
   color: var(--color-text-muted);
   margin-top: 5px;
   font-variant-numeric: tabular-nums;
+}
+/* Placeholder while pre-run estimates are computed. Sized like one line of
+   meta text so the card doesn't grow when the real value lands. */
+.eval-dim-card__meta--skeleton {
+  width: 110px;
+  height: 8px;
+  margin-top: 8px;
+  margin-bottom: 3px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-text-muted) 18%, transparent);
+  animation: eval-pulse 1.6s ease-in-out infinite;
 }
 
 /* ── Time-budget chips ── */
