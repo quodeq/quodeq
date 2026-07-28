@@ -76,7 +76,7 @@ export default function OverviewSkeleton({ projectName }) {
           {STAT_SLOTS.map((slot) => <SkeletonStat key={slot} slot={slot} />)}
         </StatStrip>
       </section>
-      <section className="quality-dimensions" aria-label="Quality dimensions">
+      <section className="quality-dimensions" aria-hidden="true">
         <div className="quality-dimensions__head">
           <SectionLabel>quality_dimensions</SectionLabel>
         </div>

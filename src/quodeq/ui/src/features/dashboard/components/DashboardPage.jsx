@@ -213,7 +213,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   // where it's consumed: the latch below needs to know a skeleton (not real
   // content) is what's showing, for every branch, not just the main one --
   // same reason `isLoading` itself is hoisted above the early returns.
-  const showOverviewSkeleton = !runMode && (isLoading || (dashboard && !isLoading && !contentReady));
+  const showOverviewSkeleton = !runMode && !!(isLoading || (dashboard && !isLoading && !contentReady));
 
   // Fade-once latch: `dashboard-fadein` should play when the page's content
   // first appears for this project/source/run context, not on every
@@ -461,14 +461,11 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
         <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
         {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
         {showOverviewSkeleton && <OverviewSkeleton projectName={projectName} />}
-        {/* Grace elapsed but content still isn't ready (dashboard is in, accumulated
-            isn't yet): the page has already stopped showing its own full loader
-            above, but there's nothing ready to mount below either. This is the ONE
-            other place, at this same top level, that a loader can render from --
-            DashboardContent itself never makes this decision, so the two can't
-            drift out of sync the way they did in the original bug. runMode only --
-            the Overview's showOverviewSkeleton above already covers this window. */}
-        {runMode && dashboard && !isLoading && !contentReady && <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />}
+        {/* No runMode equivalent of the Overview's grace-fallback loader: in
+            runMode contentReady is `!!dashboard`, so the instant dashboard lands
+            contentReady is already true -- there's no window where dashboard is
+            in but content isn't ready yet. The `isLoading && runMode`
+            LoadingScreen above is the only loader runMode needs. */}
         {dashboard && contentReady && (
           <DashboardContent
             runMode={runMode}
