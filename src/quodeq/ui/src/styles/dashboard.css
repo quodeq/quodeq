@@ -19,7 +19,7 @@
   opacity: 0.4;
 }
 
-.dashboard-ready {
+.dashboard-appear {
   animation: dashboard-fadein 400ms ease;
 }
 
