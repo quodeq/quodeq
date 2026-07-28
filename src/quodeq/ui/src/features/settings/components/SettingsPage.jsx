@@ -5,6 +5,7 @@ import AppearanceSection from './AppearanceSection.jsx';
 import UpdatesSection from './UpdatesSection.jsx';
 import ProviderTabs from './ProviderTabs.jsx';
 import AssistantProviderTabs from './AssistantProviderTabs.jsx';
+import EvaluationSection from './EvaluationSection.jsx';
 import TerminalSection from './TerminalSection.jsx';
 import ServerSection from './ServerSection.jsx';
 import SharedRepoSection from './SharedRepoSection.jsx';
@@ -40,6 +41,7 @@ export default function SettingsPage({ theme, onOpenGradeFormula, onSharedDiscon
       <div className="settings-grid">
         <ProviderTabs providerConfigs={providerConfigs} />
         <AssistantProviderTabs providerConfigs={providerConfigs} />
+        <EvaluationSection />
         <TerminalSection />
         <ServerSection />
         <SharedRepoSection onDisconnected={onSharedDisconnected} />
