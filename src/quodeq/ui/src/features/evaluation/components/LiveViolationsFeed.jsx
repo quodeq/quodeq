@@ -124,7 +124,7 @@ function DimensionGroup({ dim, violations, open, onToggle }) {
   );
 }
 
-export default function LiveViolationsFeed({ liveViolations, job = null }) {
+export default function LiveViolationsFeed({ liveViolations, job = null, hiddenCarriedCount = 0 }) {
   // Per-dim activity timestamps power "latest active dimension on top".
   const lastActivity = useDimensionActivity(liveViolations);
 
@@ -164,7 +164,10 @@ export default function LiveViolationsFeed({ liveViolations, job = null }) {
   }, [topDim]);
 
   const totalCount = orderedDims.reduce((sum, d) => sum + d.violations.length, 0);
-  if (!totalCount) return null;
+  // A fully-cached dimension yields zero NEW findings. Bailing out here
+  // would make the feed disappear and read as "nothing found", so keep the
+  // header whenever the filter is what emptied the list.
+  if (!totalCount && !hiddenCarriedCount) return null;
 
   return (
     <div className="vlive-feed">
@@ -172,7 +175,12 @@ export default function LiveViolationsFeed({ liveViolations, job = null }) {
         <span className="vlive-head-left">
           <SectionLabel>live violations</SectionLabel>
           <span className="vlive-counter">
-            {totalCount} across {orderedDims.length} dimension{orderedDims.length !== 1 ? 's' : ''}
+            {totalCount > 0
+              ? <>{totalCount} across {orderedDims.length} dimension{orderedDims.length !== 1 ? 's' : ''}</>
+              : 'no new findings'}
+            {hiddenCarriedCount > 0 && (
+              <span className="vlive-counter-hidden"> · {hiddenCarriedCount} carried forward hidden</span>
+            )}
             {isRunning && ' · streaming'}
           </span>
         </span>
@@ -180,23 +188,25 @@ export default function LiveViolationsFeed({ liveViolations, job = null }) {
           <span className="vlive-head-dim">{progress.currentDimension}</span>
         )}
       </div>
-      <div className="vlive-card">
-        {orderedDims.map(({ dim, violations }) => (
-          <DimensionGroup
-            key={dim}
-            dim={dim}
-            violations={violations}
-            open={openDim === dim}
-            onToggle={() => setOpenDim((cur) => (cur === dim ? null : dim))}
-          />
-        ))}
-        {isRunning && (
-          <div className="vlive-footer">
-            <span className="vlive-footer__dot" aria-hidden="true" />
-            scanning for more{queued != null ? <> · {queued} files queued</> : null}
-          </div>
-        )}
-      </div>
+      {(totalCount > 0 || isRunning) && (
+        <div className="vlive-card">
+          {orderedDims.map(({ dim, violations }) => (
+            <DimensionGroup
+              key={dim}
+              dim={dim}
+              violations={violations}
+              open={openDim === dim}
+              onToggle={() => setOpenDim((cur) => (cur === dim ? null : dim))}
+            />
+          ))}
+          {isRunning && (
+            <div className="vlive-footer">
+              <span className="vlive-footer__dot" aria-hidden="true" />
+              scanning for more{queued != null ? <> · {queued} files queued</> : null}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

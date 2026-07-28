@@ -63,6 +63,7 @@ def parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
         confidence=_jsonl_confidence(obj.get("confidence")),
         req_refs=req_refs,
         provenance_downgrade=bool(obj.get("provenance_downgrade")),
+        carried_forward=bool(obj.get("carried_forward")),
     )
     return j, obj.get("refs")
 
@@ -97,6 +98,10 @@ def judgment_to_dict(j: Judgment) -> dict:
     # confidence -- keeps the common (un-downgraded) finding dict compact.
     if j.provenance_downgrade:
         d["provenance_downgrade"] = True
+    # Emit only when set, mirroring confidence / provenance_downgrade, so
+    # the common (freshly-scanned) finding dict stays compact.
+    if j.carried_forward:
+        d["carried_forward"] = True
     return d
 
 

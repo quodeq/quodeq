@@ -206,13 +206,22 @@ def _write_findings(
     # safe to apply unconditionally to every cached finding.
     for finding in findings:
         apply_provenance_gate(finding)
+    # Every caller of this function is a cache replay -- the dispatcher
+    # writes its own fresh findings and never comes through here. Stamp the
+    # origin so the live evaluation feed can show only what this scan is
+    # actually producing.
+    #
+    # Copy, do not mutate: these dicts are owned by the cache entries, and
+    # the periodic-persist watcher could otherwise write the flag back into
+    # the cache, making a later fresh scan of the same file look carried.
+    stamped = [{**finding, "carried_forward": True} for finding in findings]
     jsonl.parent.mkdir(parents=True, exist_ok=True)
     mode = "a" if append else "w"
     with jsonl.open(mode, encoding="utf-8") as out:
-        for finding in findings:
+        for finding in stamped:
             out.write(json.dumps(finding) + "\n")
     if emit_events:
-        _emit_cached_findings(_events_log_path(jsonl), findings)
+        _emit_cached_findings(_events_log_path(jsonl), stamped)
 
 
 def process_dimension_with_cache(

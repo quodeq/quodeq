@@ -161,6 +161,7 @@ def _payload_as_sse_finding(payload: Any, finding_id: int) -> dict[str, Any]:
         "snippet": payload.snippet,
         "confidence": payload.confidence,
         "provenance_downgrade": getattr(payload, "provenance_downgrade", False),
+        "carried_forward": getattr(payload, "carried_forward", False),
     }
 
 

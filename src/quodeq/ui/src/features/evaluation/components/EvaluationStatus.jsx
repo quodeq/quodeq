@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
 import ScanProgress from './ScanProgress.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
@@ -7,6 +8,7 @@ import JobStatStrip from './JobStatStrip.jsx';
 import { IdentityStrip, IdentityCell } from './IdentityStrip.jsx';
 import { deriveScanMode } from './buildJobStatCells.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
+import useLiveFeedSettings from '../../settings/hooks/useLiveFeedSettings.js';
 
 const STATUS = { RUNNING: 'running', DONE: 'done', FAILED: 'failed', LOST: 'lost' };
 const TERMINAL_STATES = new Set(['done', 'completed', 'failed', 'cancelled', 'lost']);
@@ -83,6 +85,26 @@ function JobIdentityStrip({ job, projectLabel }) {
 }
 
 export default function EvaluationStatus({ job, jobProjectInfo, startedProjectInfo, liveViolations = {}, onDismiss, onCancel, hasEvaluations }) {
+  const { newOnly } = useLiveFeedSettings();
+  // Filter ONCE, above both consumers. JobStatStrip derives its violations
+  // cell from the same object the feed lists, so filtering in each child
+  // separately is how the counter and the list drift apart (see #878).
+  const { shown, hiddenCarriedCount } = useMemo(() => {
+    if (!newOnly) return { shown: liveViolations, hiddenCarriedCount: 0 };
+    const next = {};
+    let hidden = 0;
+    for (const [dim, vs] of Object.entries(liveViolations || {})) {
+      // The SSE stream (VITE_USE_SSE_EVENTS) writes raw wire payloads
+      // straight into the findings cache with no violation-model mapping,
+      // so those entries carry snake_case `carried_forward` instead of
+      // `carriedForward`. Accept both spellings here.
+      const fresh = (vs || []).filter((v) => !(v.carriedForward ?? v.carried_forward));
+      hidden += (vs || []).length - fresh.length;
+      if (fresh.length) next[dim] = fresh;
+    }
+    return { shown: next, hiddenCarriedCount: hidden };
+  }, [liveViolations, newOnly]);
+
   if (!job) return null;
   // Prefer the running job's own project so the card stays accurate when the
   // UI's global selection points at a different project than the job is
@@ -98,9 +120,9 @@ export default function EvaluationStatus({ job, jobProjectInfo, startedProjectIn
     <div className="panel evaluate-panel--terminal">
       <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
       <JobIdentityStrip job={job} projectLabel={projectLabel} />
-      <JobStatStrip job={job} liveViolations={liveViolations} />
+      <JobStatStrip job={job} liveViolations={shown} hiddenCarriedCount={hiddenCarriedCount} />
       <ScanProgress job={job} hasEvaluations={hasEvaluations} />
-      <LiveViolationsFeed job={job} liveViolations={liveViolations} />
+      <LiveViolationsFeed job={job} liveViolations={shown} hiddenCarriedCount={hiddenCarriedCount} />
     </div>
   );
 }

@@ -1,14 +1,27 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import EvaluationStatus from './EvaluationStatus.jsx';
+import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
+import { NEW_FINDINGS_ONLY_KEY } from '../../settings/hooks/useLiveFeedSettings.js';
 
-vi.mock('./LiveViolationsFeed.jsx', () => ({ default: () => null }));
+// ScanProgress reads EvalLogContext directly (no provider here), so it stays
+// mocked like JobStatStrip. LiveViolationsFeed is left real below: the
+// live-findings-filter tests assert on what it renders.
 vi.mock('./ScanProgress.jsx', () => ({ default: () => null }));
-vi.mock('./JobStatStrip.jsx', () => ({ default: () => null }));
-// The identity strip reads the shared progress query for its "mode" cell.
+// Probe instead of a null stub: renders the total violation count the strip
+// actually received, so a regression that reverts EvaluationStatus to pass
+// the unfiltered liveViolations to the strip (while the feed stays filtered)
+// shows up here instead of leaving every test green.
+vi.mock('./JobStatStrip.jsx', () => ({
+  default: ({ liveViolations }) => <i data-testid="strip-sum">{
+    Object.values(liveViolations || {}).reduce((n, vs) => n + (vs?.length || 0), 0)
+  }</i>,
+}));
+// The identity strip reads the shared progress query for its "mode" cell;
+// LiveViolationsFeed reads the same query for its streaming footer/header.
 vi.mock('../../../api/index.js', () => ({
-  getEvaluationProgress: vi.fn().mockResolvedValue(null),
+  getEvaluationProgress: vi.fn().mockResolvedValue({ dimensions: [] }),
 }));
 
 function renderWithClient(ui) {
@@ -111,5 +124,82 @@ describe('project label', () => {
     // The repository cell shows a dash instead — unknown beats wrong.
     const strip = document.querySelector('.eval-identity');
     expect(strip.textContent).toMatch(/repository—/);
+  });
+});
+
+const filterJob = { jobId: 'j1', status: 'running', dimensions: ['security'] };
+
+const filterLiveViolations = {
+  security: [
+    { severity: 'major', principle: 'P1', file: 'new.py', line: 1, carriedForward: false },
+    { severity: 'major', principle: 'P2', file: 'old-a.py', line: 2, carriedForward: true },
+    { severity: 'minor', principle: 'P3', file: 'old-b.py', line: 3, carriedForward: true },
+  ],
+};
+
+function renderStatus(props = {}) {
+  const QC = withQueryClient();
+  return render(
+    <QC><EvaluationStatus job={filterJob} liveViolations={filterLiveViolations} {...props} /></QC>
+  );
+}
+
+describe('EvaluationStatus live-findings filter', () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  it('hides carried-forward findings by default', () => {
+    renderStatus();
+    expect(screen.getByText('new.py:1')).toBeInTheDocument();
+    expect(screen.queryByText('old-a.py:2')).not.toBeInTheDocument();
+    // The strip must see the same filtered set as the feed (1 fresh of 3).
+    expect(screen.getByTestId('strip-sum')).toHaveTextContent('1');
+  });
+
+  it('discloses how many are hidden rather than hiding them silently', () => {
+    renderStatus();
+    expect(screen.getByText(/2 carried forward hidden/)).toBeInTheDocument();
+  });
+
+  it('shows everything when the preference is off', () => {
+    localStorage.setItem(NEW_FINDINGS_ONLY_KEY, 'false');
+    renderStatus();
+    expect(screen.getByText('old-a.py:2')).toBeInTheDocument();
+    expect(screen.queryByText(/carried forward hidden/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('strip-sum')).toHaveTextContent('3');
+  });
+
+  it('hides snake_case carried_forward findings too (SSE payloads with no violation-model mapping)', () => {
+    // Under VITE_USE_SSE_EVENTS, findings land in the cache as raw wire
+    // payloads, so they carry `carried_forward` instead of `carriedForward`.
+    const QC = withQueryClient();
+    render(
+      <QC>
+        <EvaluationStatus
+          job={filterJob}
+          liveViolations={{
+            security: [
+              { severity: 'major', principle: 'P1', file: 'new.py', line: 1, carried_forward: false },
+              { severity: 'major', principle: 'P2', file: 'old-a.py', line: 2, carried_forward: true },
+            ],
+          }}
+        />
+      </QC>
+    );
+    expect(screen.getByText('new.py:1')).toBeInTheDocument();
+    expect(screen.queryByText('old-a.py:2')).not.toBeInTheDocument();
+    expect(screen.getByText(/1 carried forward hidden/)).toBeInTheDocument();
+  });
+
+  it('says nothing about carries when the run has none', () => {
+    const QC = withQueryClient();
+    render(
+      <QC>
+        <EvaluationStatus
+          job={filterJob}
+          liveViolations={{ security: [{ severity: 'major', principle: 'P1', file: 'a.py', line: 1 }] }}
+        />
+      </QC>
+    );
+    expect(screen.queryByText(/carried forward hidden/)).not.toBeInTheDocument();
   });
 });

@@ -39,6 +39,7 @@ def build_finding(item: dict, *, include_severity: bool) -> Finding:
         context=item.get("context"),
         scope=item.get("scope"),
         include_severity=include_severity,
+        carried_forward=bool(item.get("carried_forward")),
     ))
 
 
