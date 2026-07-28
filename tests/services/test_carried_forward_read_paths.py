@@ -5,12 +5,9 @@ evidence JSONL. A running dimension has only the JSONL; a finished one has
 the JSON. The live feed crosses that boundary mid-run, so a gap in either
 parser makes carried findings reappear as each dimension completes.
 """
-import json
-from pathlib import Path
-
 from quodeq.analysis._report_constants import _VIOLATION_FIELDS
+from quodeq.analysis._report_findings import _flatten_findings
 from quodeq.data.fs.report_parser._report_parsing import build_finding
-from quodeq.services.violation_context import ViolationContext
 from quodeq.services.violations_parsing import _build_finding_entry
 
 
@@ -39,7 +36,22 @@ def test_report_json_path_carries_the_flag():
     assert build_finding(item, include_severity=True).carried_forward is True
 
 
-def test_report_write_whitelist_includes_the_flag():
-    """_flatten_findings keeps ONLY these keys when writing
-    evaluation/<dim>.json. Omission here drops the flag silently."""
-    assert "carried_forward" in _VIOLATION_FIELDS
+def test_report_write_whitelist_carries_the_flag_through_flatten():
+    """_flatten_findings keeps ONLY the keys listed in _VIOLATION_FIELDS when
+    writing evaluation/<dim>.json. Omission here drops the flag silently."""
+    items = [
+        {
+            "file": "a.py", "line": 1, "severity": "minor",
+            "title": "t", "reason": "r", "carried_forward": True,
+        },
+        {
+            "file": "b.py", "line": 2, "severity": "minor",
+            "title": "t", "reason": "r",
+        },
+    ]
+
+    flattened = _flatten_findings(items, "P1", _VIOLATION_FIELDS)
+
+    carried, not_carried = flattened
+    assert carried["carried_forward"] is True
+    assert "carried_forward" not in not_carried
