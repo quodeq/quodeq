@@ -205,7 +205,7 @@ class _FakeDispatcher:
     def __init__(self):
         self.calls = []
 
-    def dispatch(self, cmd, *, cwd=None, env=None, ai_provider=None, ai_model=None):
+    def dispatch(self, cmd, *, cwd=None, env=None, ai_provider=None, ai_model=None, time_limit_s=None):
         self.calls.append(cmd)
         return {"id": "fake-job"}
 

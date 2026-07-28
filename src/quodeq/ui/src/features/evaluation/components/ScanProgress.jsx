@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useEvalLog } from '../eval-log/EvalLogContext.js';
 import { pct, computeOverallProgress } from './scanProgressTotals.js';
+import { deriveScanMode } from './buildJobStatCells.js';
 import ConsoleButton from '../../../components/ConsoleButton.jsx';
 import { SectionLabel } from '../../../components/terminal/index.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 
 const TERMINAL_STATES = new Set(['done', 'failed', 'cancelled']);
-const STATUS_MARKERS = { arrow: '\u2192', check: '\u2713', error: 'Error:', failed: 'failed' };
+const STATUS_MARKERS = { arrow: '→', check: '✓', error: 'Error:', failed: 'failed' };
 
 function formatClock(s) {
   if (s == null || !Number.isFinite(s)) return '—';
@@ -57,21 +58,20 @@ function DimRow({ dim }) {
   const isRunning = dim.state === 'running';
   const p = isDone ? 100 : pct(taken, total);
 
-  let icon = '○';
-  let iconClass = '';
-  if (isDone) {
-    icon = '✓';
-    iconClass = 'scan-progress__dim-icon--done';
-  } else if (isRunning) {
-    icon = '▶';
-    iconClass = 'scan-progress__dim-icon--running';
+  const dotClass = isDone ? ' scan-progress__dim-dot--done' : isRunning ? ' scan-progress__dim-dot--running' : '';
+
+  let count;
+  if (isPending) {
+    count = total > 0
+      ? <span className="scan-progress__dim-meta-projected">0 / {total}</span>
+      : <span className="scan-progress__dim-meta-projected">estimating…</span>;
+  } else {
+    count = <>{taken} / {total || '—'}</>;
   }
 
   let meta;
   if (isPending) {
-    meta = total > 0
-      ? <span className="scan-progress__dim-meta-projected">0 / {total}{reasonBadge}</span>
-      : <span className="scan-progress__dim-meta-projected">estimating…</span>;
+    meta = <span className="scan-progress__dim-meta-projected">queued{reasonBadge}</span>;
   } else if (isDone) {
     const coveragePct = total > 0 ? Math.round((taken / total) * 100) : null;
     const isPartial = typeof dim.exitReason === 'string' && dim.exitReason !== 'done';
@@ -80,42 +80,32 @@ function DimRow({ dim }) {
       : undefined;
     meta = (
       <>
-        {total > 0 ? `${taken} files` : ''}
-        {dim.violations > 0 && <> · <span className="scan-progress__v">{dim.violations}v</span></>}
-        {dim.compliance > 0 && <> · <span className="scan-progress__c">{dim.compliance}c</span></>}
+        {dim.violations > 0 && <><span className="scan-progress__v">{dim.violations}v</span> · </>}
+        {dim.compliance > 0 && <><span className="scan-progress__c">{dim.compliance}c</span> · </>}
         {coveragePct !== null && (
-          <> · <span
+          <><span
             className={`scan-progress__coverage${isPartial ? ' scan-progress__coverage--partial' : ''}`}
             title={partialTooltip}
-          >{coveragePct}%</span></>
+          >{coveragePct}%</span>{dim.elapsedS != null && ' · '}</>
         )}
-        {dim.elapsedS != null && <> · {formatClock(dim.elapsedS)}</>}
+        {dim.elapsedS != null && formatClock(dim.elapsedS)}
       </>
     );
   } else {
     // Only show a clock segment when we actually have a number to print.
     // Without this guard, a running dim with no elapsed time yields a
-    // dangling "· —" tail.
-    let budgetPart = null;
-    if (dim.budgetS) {
-      const overrun = dim.elapsedS != null && dim.elapsedS > dim.budgetS;
-      const cls = overrun ? 'scan-progress__budget scan-progress__budget--overrun' : 'scan-progress__budget';
-      budgetPart = (
-        <span className={cls}>
-          {formatClock(dim.elapsedS)} / {formatClock(dim.budgetS)} budget
-        </span>
-      );
-    } else if (dim.elapsedS != null) {
-      budgetPart = <span className="scan-progress__budget">{formatClock(dim.elapsedS)}</span>;
-    }
+    // dangling "· —" tail. The time budget is run-level (shared across
+    // dimensions, shown in the footer), so rows only get their elapsed.
+    const clockPart = dim.elapsedS != null
+      ? <span className="scan-progress__budget">{formatClock(dim.elapsedS)}</span>
+      : null;
     meta = (
       <>
-        {`${taken} / ${total}`}
+        {dim.activeAgents > 0 && <>{dim.activeAgents} agents</>}
         {reasonBadge}
-        {dim.activeAgents > 0 && <> · {dim.activeAgents} agents</>}
         {dim.violations > 0 && <> · <span className="scan-progress__v">{dim.violations}v</span></>}
         {dim.compliance > 0 && <> · <span className="scan-progress__c">{dim.compliance}c</span></>}
-        {budgetPart && <> · {budgetPart}</>}
+        {clockPart && <> · {clockPart}</>}
       </>
     );
   }
@@ -124,9 +114,12 @@ function DimRow({ dim }) {
 
   return (
     <div className={`scan-progress__dim${isPending ? ' scan-progress__dim--pending' : ''}`}>
-      <span className={`scan-progress__dim-icon ${iconClass}`}>{icon}</span>
-      <span className="scan-progress__dim-name">{dim.id}</span>
-      <div className="scan-progress__bar">
+      <span className="scan-progress__dim-lead">
+        <span className={`scan-progress__dim-dot${dotClass}`} aria-hidden="true" />
+        <span className="scan-progress__dim-name">{dim.id}</span>
+      </span>
+      <span className="scan-progress__dim-count">{count}</span>
+      <div className="scan-progress__bar scan-progress__bar--mini">
         <div className={`scan-progress__bar-fill ${fillClass}`} style={{ width: `${p}%` }} />
       </div>
       <span className="scan-progress__dim-meta">{meta}</span>
@@ -172,6 +165,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   // guarantees per-dim cached <= total, so summed cachedFiles <= projectTotal.
   const cachedPctWidth = showCoverage ? (cachedFiles / projectTotal) * 100 : 0;
   const runPctWidth = showCoverage ? ((coveredFiles - cachedFiles) / projectTotal) * 100 : 0;
+  const scanMode = deriveScanMode(progress);
   const inlineLabel = progress?.currentDimension
     ? <>running <span className="scan-progress__dim-active">{progress.currentDimension}</span></>
     : progress?.phase
@@ -196,41 +190,77 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
       ? <div className="scan-progress__error">Server restarted, job tracking lost</div>
       : null;
 
+  // The time limit is one deadline for the whole run, shared across all
+  // selected dimensions — so the countdown pairs total elapsed with the
+  // run-level budget. Overrun can show briefly: the watchdog allows a
+  // short grace past the deadline before killing the job.
+  const runBudgetS = progress?.budgetS;
+  const overrun = runBudgetS > 0 && progress?.totalElapsedS > runBudgetS;
+  const clockPart = isRunning && runBudgetS > 0
+    ? (
+      <> · <span className={overrun ? 'scan-progress__budget scan-progress__budget--overrun' : 'scan-progress__budget'}>
+        {formatClock(progress.totalElapsedS)} of {formatClock(runBudgetS)} budget
+      </span></>
+    )
+    : progress?.totalElapsedS != null
+      ? <> · {formatClock(progress.totalElapsedS)} total</>
+      : null;
+
+  let summary;
+  if (showCoverage) {
+    summary = totalFiles > 0
+      ? <>this run targets <strong>{totalFiles}</strong> changed files · {takenFiles} done ({overallPct}%){excludedFiles > 0 && <> · {excludedFiles} excluded (size cap)</>}{clockPart}</>
+      : <>nothing new this run{clockPart}</>;
+  } else if (totalFiles > 0) {
+    summary = scanMode === 'clean scan'
+      ? <>this run re-analyzes all <strong>{totalFiles}</strong> files · {takenFiles} done ({overallPct}%){excludedFiles > 0 && <> · {excludedFiles} excluded (size cap)</>}{clockPart}</>
+      : <><strong>{takenFiles} / {totalFiles}</strong> checks · {overallPct}%{isRunning && inlineLabel && <> · {inlineLabel}</>}{clockPart}</>;
+  } else {
+    summary = <><strong>preparing…</strong>{isRunning && inlineLabel && <> · {inlineLabel}</>}</>;
+  }
+
   return (
     <div className="scan-progress">
-      <SectionLabel>progress</SectionLabel>
+      <div className="scan-progress__head">
+        <SectionLabel>
+          {showCoverage ? <>repository coverage · {projectTotal} files</> : 'progress'}
+        </SectionLabel>
+        {showCoverage && <span className="scan-progress__head-pct">{coveredPct}% analyzed</span>}
+      </div>
       {errorBanner}
-      <div className="scan-progress__row">
-        <div className="scan-progress__bar-wrap">
+      <div
+        className="scan-progress__bar"
+        title={showCoverage ? `${cachedFiles} files analyzed in previous runs` : undefined}
+      >
+        {showCoverage && (
           <div
-            className="scan-progress__bar"
-            title={showCoverage ? `${cachedFiles} files analyzed in previous runs` : undefined}
-          >
-            {showCoverage && (
-              <div
-                className="scan-progress__bar-fill scan-progress__bar-fill--cached"
-                style={{ width: `${cachedPctWidth}%` }}
-              />
-            )}
-            <div
-              className="scan-progress__bar-fill"
-              style={{ width: showCoverage ? `${runPctWidth}%` : `${overallPct}%` }}
-            />
-          </div>
-          <div className="scan-progress__meta">
-            <span>
-              {showCoverage ? (
-                <><strong>{coveredFiles} / {projectTotal}</strong> files · {coveredPct}% total{excludedFiles > 0 && <> · {excludedFiles} excluded (size cap)</>}{totalFiles > 0 ? <> · this run {takenFiles} / {totalFiles}</> : <> · nothing new this run</>}</>
-              ) : totalFiles > 0 ? (
-                <><strong>{takenFiles} / {totalFiles}</strong> checks · {overallPct}%</>
-              ) : <strong>preparing…</strong>}
-              {isRunning && inlineLabel && <> · {inlineLabel}</>}
-            </span>
-            {progress?.totalElapsedS != null && (
-              <span><strong>{formatClock(progress.totalElapsedS)}</strong> total</span>
-            )}
-          </div>
+            className="scan-progress__bar-fill scan-progress__bar-fill--cached"
+            style={{ width: `${cachedPctWidth}%` }}
+          />
+        )}
+        <div
+          className={`scan-progress__bar-fill${isRunning ? ' scan-progress__bar-fill--live' : ''}`}
+          style={{ width: showCoverage ? `${runPctWidth}%` : `${overallPct}%` }}
+        />
+      </div>
+      {showCoverage && (
+        <div className="scan-progress__legend">
+          <span className="scan-progress__legend-item">
+            <span className="scan-progress__legend-swatch scan-progress__legend-swatch--cached" aria-hidden="true" />
+            {cachedFiles} cached from earlier runs
+          </span>
+          <span className="scan-progress__legend-item">
+            <span className="scan-progress__legend-swatch scan-progress__legend-swatch--run" aria-hidden="true" />
+            {takenFiles} analyzed in this run
+          </span>
+          <span className="scan-progress__legend-item">
+            <span className="scan-progress__legend-swatch scan-progress__legend-swatch--track" aria-hidden="true" />
+            {Math.max(0, projectTotal - coveredFiles)} not yet analyzed
+          </span>
         </div>
+      )}
+      <div className="scan-progress__foot">
+        <span className="scan-progress__foot-summary">{summary}</span>
         <div className="scan-progress__actions">
           <button
             type="button"
@@ -242,10 +272,10 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
           >
             <span className="scan-progress__detail-label">
               {/* Ghost label reserves the width of the longest label so the
-                  button (and therefore the progress bar to its left) doesn't
-                  reflow when toggling between "details" and "hide". */}
-              <span className="scan-progress__detail-label-ghost" aria-hidden="true">details</span>
-              <span className="scan-progress__detail-label-active">{detailOpen ? 'hide' : 'details'}</span>
+                  button (and therefore the layout to its left) doesn't
+                  reflow when toggling between "show detail" and "hide detail". */}
+              <span className="scan-progress__detail-label-ghost" aria-hidden="true">show detail</span>
+              <span className="scan-progress__detail-label-active">{detailOpen ? 'hide detail' : 'show detail'}</span>
             </span>
             <span className={`scan-progress__caret${detailOpen ? ' scan-progress__caret--open' : ''}`} aria-hidden="true">▸</span>
           </button>
@@ -254,7 +284,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
       </div>
       {detailOpen && dims.length > 0 && (
         <div className="scan-progress__expanded" id={`scan-progress-detail-${jobId}`}>
-          <div className="scan-progress__expanded-label">Per-dimension</div>
+          <div className="scan-progress__expanded-label">per dimension</div>
           {dims.map((d) => <DimRow key={d.id} dim={d} />)}
         </div>
       )}

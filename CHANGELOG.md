@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.8.0] - 2026-07-29
+
+### Features
+- **Standards visibility**: choose per project which standards count. The selection now lives with the project on the server instead of in the browser, so it survives reloads, and the AI assistant honors it everywhere: hidden standards drop out of its scores, findings, overviews and standards list, and hidden dimension names stay out of its error messages. Standard ids now match case-insensitively across the standards and scan surfaces.
+- **Live feed shows what's new**: findings carried over from previous runs are now marked at the source, and the live feed can show only findings that are new to the current scan. A new Evaluation section in Settings holds the preference, and the feed disclosure explains when carried-over findings are hidden.
+- **Evaluate screen redesign**: new setup and running cards with estimate placeholders while sizes compute, a heads-up toast when the scan comes back clean, better spacing and tag contrast, dimension cards that use wide screens, and View results jumps to the evaluated project.
+- **Toolbar redesign**: a jump-bar address in the topbar with run-aware chrome.
+
+### Improvements
+- **Loading and transitions**: one loader per route, loaders stay inside the content area (sidebar counts no longer jump), the Overview shows a loading skeleton on project switch, chart placeholders hold their height, empty states stay stable through the first-run load, and Violations, Map and History render real error states with a working Retry.
+- **Severity consistency**: one severity vocabulary across the app, so severity chips always sum to the violation total (unknown severities fold into minor in summaries).
+- **Live progress for grouped runs**: a consolidated run reports one real progress row (files taken, evidence tally, elapsed, active agents) instead of per-dimension rows stuck at 0%.
+
+### Fixes
+- **Evaluation pipeline audit**: cancelling a just-started job no longer errors, completed dimensions show their real elapsed time instead of 0:00, report writes are atomic so a mid-write read cannot drop a dimension, discarded runs stop resurfacing in the evaluations list, the live findings feed works for index-served full scans, and the run budget is plumbed end to end so the budget bar can render.
+- **Effective settings tell the truth**: Settings, the Evaluate header, and the start payload now agree on what a run actually uses; the wizard's time limit (including unlimited) reaches the server; unlimited (0) propagates to the scan subprocess; cloud provider API keys are exported to the scan subprocess.
+- **Countdown and post-run state**: the countdown hides when the run ends, binds to the running job's own budget so changing Settings mid-run cannot alter it, scores refresh as soon as an evaluation completes, and live-findings polling stops once the run is terminal.
+- **Job lifecycle**: a server restart marks running jobs "lost" instead of "failed", and a transient error during cancel no longer drops a still-running job.
+- **Run ordering**: dimensions run in the order you selected them.
+- **History and Overview agree**: runs started without a prescan appear in both, so a pinned finished run no longer lands on "No evaluations yet"; fetch failures render an error state with Retry instead of claiming there are no evaluations.
+- **Explorer**: a not-yet-ready report shows "Report not ready" instead of a fake clean report, and a slow earlier request can no longer park another run's findings under the current header.
+- **API hardening**: scan, logs and overrides routes reject invalid path segments, and path containment checks were tightened.
+- **Terminal**: the selected tab is remembered across drawer close and reopen.
+- **UI details**: the breadcrumb's current item navigates back to its level, long stat values stay inside their tiles, the live feed copy button targets just the file label, and the evaluate screen describes the time budget as one total for the run.
+
 ## [1.7.3] - 2026-07-27
 
 ### Features

@@ -44,8 +44,10 @@ export function createJob(raw) {
     deadlineAt:       raw.deadlineAt ?? null,
     exitCode:         raw.exitCode ?? null,
     error:            raw.error ?? null,
+    exitReason:       raw.exitReason ?? null,
     source:           raw.source ?? 'internal',
     aiProvider:       raw.aiProvider ?? null,
     aiModel:          raw.aiModel ?? null,
+    timeLimitS:       typeof raw.timeLimitS === 'number' ? raw.timeLimitS : null,
   };
 }

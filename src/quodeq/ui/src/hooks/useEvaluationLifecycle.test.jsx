@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
+import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { projectKeys } from "../api/queryKeys.js";
 
 // The lifecycle hook composes useEvaluation; mock it so tests can control
-// the job state without a QueryClient or API layer.
+// the job state without a real API layer. A real QueryClient is still needed
+// -- the hook now calls useQueryClient() to invalidate the scores key on
+// completion (see the "eval completion: scores refetch" describe below).
 const evaluationState = {
   job: null,
   jobError: null,
@@ -19,19 +24,25 @@ vi.mock("../features/evaluation/hooks/useEvaluation.js", () => ({
 
 import { useEvaluationLifecycle } from "./useEvaluationLifecycle.js";
 
-function renderLifecycle({ selectedProject = null, selectProjectAndRun = vi.fn() } = {}) {
-  return renderHook(() =>
-    useEvaluationLifecycle({
-      settings: {},
-      navigation: { navTab: vi.fn(), navReset: vi.fn() },
-      projects: {
-        loadProjects: vi.fn().mockResolvedValue([]),
-        setProjects: vi.fn(),
-        selectProjectAndRun,
-      },
-      selectedProject,
-    }),
+function renderLifecycle({ selectedProject = null, selectProjectAndRun = vi.fn(), client } = {}) {
+  const queryClient = client || new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+  });
+  const utils = renderHook(
+    () =>
+      useEvaluationLifecycle({
+        settings: {},
+        navigation: { navTab: vi.fn(), navReset: vi.fn() },
+        projects: {
+          loadProjects: vi.fn().mockResolvedValue([]),
+          setProjects: vi.fn(),
+          selectProjectAndRun,
+        },
+        selectedProject,
+      }),
+    { wrapper: ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider> },
   );
+  return { ...utils, queryClient };
 }
 
 describe("useEvaluationLifecycle background completion", () => {
@@ -73,6 +84,101 @@ describe("useEvaluationLifecycle background completion", () => {
     const selectProjectAndRun = vi.fn();
     renderLifecycle({ selectedProject: null, selectProjectAndRun });
     expect(selectProjectAndRun).toHaveBeenCalledWith("project-a", "run-a1");
+  });
+});
+
+describe("handleEvalDismiss('view') cross-project jump", () => {
+  beforeEach(() => {
+    evaluationState.job = null;
+    evaluationState.jobError = null;
+    evaluationState.startedProject = null;
+  });
+
+  it("jumps to the evaluated project when another project is selected", () => {
+    // The completion effect leaves the selection alone on purpose; the
+    // view-results button is the explicit way to cross projects.
+    evaluationState.job = {
+      jobId: "j-done", status: "done",
+      outputProject: "project-a", outputRunId: "run-a1",
+    };
+    const selectProjectAndRun = vi.fn();
+    const { result } = renderLifecycle({ selectedProject: "project-b", selectProjectAndRun });
+    expect(selectProjectAndRun).not.toHaveBeenCalled();
+    act(() => result.current.handleEvalDismiss("view"));
+    expect(selectProjectAndRun).toHaveBeenCalledWith("project-a", "run-a1");
+  });
+
+  it("does not reselect when already on the evaluated project", () => {
+    evaluationState.job = {
+      jobId: "j-done", status: "done",
+      outputProject: "project-b", outputRunId: "run-b1",
+    };
+    const selectProjectAndRun = vi.fn();
+    const { result } = renderLifecycle({ selectedProject: "project-b", selectProjectAndRun });
+    // Once from the completion effect; the dismiss must not re-mint keys.
+    expect(selectProjectAndRun).toHaveBeenCalledTimes(1);
+    act(() => result.current.handleEvalDismiss("view"));
+    expect(selectProjectAndRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the started project when the job never resolved one", () => {
+    evaluationState.job = { jobId: "j-done", status: "done", outputProject: null, outputRunId: null };
+    evaluationState.startedProject = "project-c";
+    const selectProjectAndRun = vi.fn();
+    const { result } = renderLifecycle({ selectedProject: "project-b", selectProjectAndRun });
+    act(() => result.current.handleEvalDismiss("view"));
+    expect(selectProjectAndRun).toHaveBeenCalledWith("project-c", null);
+  });
+});
+
+// Finding 1 (P5 final review): removing useAppState's dashboard-key refetch
+// (69b67347) orphaned the scores side. projectKeys.scores(project, null,
+// source) -- the `latest` query behind useProjectScores's `accumulated` and
+// `availableRuns` -- never changes key when selectedRun flips to the new
+// run, so nothing refetched it: repeat-run projects showed stale grades
+// until a tab round-trip, and first-run projects never got `accumulated` at
+// all (contentReady stuck false, page stuck on the inline loader).
+describe("useEvaluationLifecycle background completion: scores refetch", () => {
+  beforeEach(() => {
+    evaluationState.job = null;
+    evaluationState.jobError = null;
+    evaluationState.startEvaluation = vi.fn();
+  });
+
+  it("invalidates the completed project's local scores query on completion", () => {
+    evaluationState.job = {
+      jobId: "j-done", status: "done",
+      outputProject: "project-a", outputRunId: "run-a1",
+    };
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+    });
+    const spy = vi.spyOn(client, "invalidateQueries");
+    renderLifecycle({ selectedProject: "project-a", client });
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: projectKeys.scores("project-a", null, "local") }),
+    );
+  });
+
+  it("invalidates the scores query even when the finished project is not the one currently viewed", () => {
+    // Unconditional on outputProject: a mark-stale/no-op invalidation of an
+    // inactive observer's query is harmless, and this is the only path back
+    // to fresh data for the Overview if the user switches to that project
+    // later without a round-trip through another tab.
+    evaluationState.job = {
+      jobId: "j-done", status: "done",
+      outputProject: "project-a", outputRunId: "run-a1",
+    };
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+    });
+    const spy = vi.spyOn(client, "invalidateQueries");
+    renderLifecycle({ selectedProject: "project-b", client });
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: projectKeys.scores("project-a", null, "local") }),
+    );
   });
 });
 

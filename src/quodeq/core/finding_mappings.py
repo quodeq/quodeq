@@ -62,6 +62,7 @@ def wire_dict_to_judgment(d: dict[str, Any]) -> Judgment:
         req_refs=_coerce_req_refs(d.get("req_refs")),
         cwe=d.get("cwe"),
         provenance_downgrade=bool(d.get("provenance_downgrade")),
+        carried_forward=bool(d.get("carried_forward")),
     )
 
 

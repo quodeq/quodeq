@@ -41,7 +41,6 @@ class _DimProgress:
     suppressed: int = 0  # re-found findings already dismissed/deleted in the dashboard
     quarantined: int = 0  # findings whose principle is not in the dimension's standard
     elapsed_s: float | None = None
-    budget_s: int | None = None
     active_agents: int = 0
     estimate_reason: str | None = None  # see _dim_estimates module docstring
     exit_reason: str | None = None
@@ -58,6 +57,9 @@ class _ScanProgress:
     current_dimension: str | None
     project_files: int
     total_elapsed_s: float | None
+    # The time limit is one deadline for the whole run, shared across all
+    # selected dimensions — never a per-dimension allowance.
+    budget_s: int | None = None
     dimensions: list[_DimProgress] = field(default_factory=list)
 
 
@@ -134,40 +136,99 @@ def _parse_started_at(status: dict) -> datetime | None:
     if not isinstance(raw, str) or not raw:
         return None
     try:
-        return datetime.fromisoformat(raw)
+        parsed = datetime.fromisoformat(raw)
     except ValueError:
         return None
+    # Legacy status files can carry naive timestamps; subtracting one from an
+    # aware now() raises TypeError. Treat naive as UTC.
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _queue_take_timestamps(qstate: dict) -> list[float]:
+    """Extract valid take-log timestamps from a queue state dict."""
+    taken = qstate.get("taken")
+    if not isinstance(taken, list):
+        return []
+    return [
+        e["ts"] for e in taken
+        if isinstance(e, dict) and isinstance(e.get("ts"), (int, float))
+    ]
 
 
 def _dim_elapsed_s(dim_id: str, run_dir: Path, state: str) -> float | None:
-    """Per-dim elapsed time, derived from queue file mtime / status timing.
+    """Per-dim elapsed time, derived from queue-state timestamps.
 
-    Best-effort: queue creation time approximates the dimension start. For done
-    dims we use the youngest agent-stream mtime as the end. For running dims we
-    use now. For pending dims we return None.
+    The queue file is atomically rewritten on every take (new inode, fresh
+    mtime), so its mtime tracks the *last* take, not the dim start — using it
+    as the start made the running clock reset toward zero on every take.
+    Start comes from the queue's ``created_at`` (stamped at init), falling
+    back to the earliest take timestamp, then the file mtime for legacy
+    queues. For done dims the end is the latest activity signal we still
+    have: last take, evidence-file mtime, or any surviving agent streams
+    (streams are deleted at dim completion, so they rarely survive).
     """
     if state == "pending":
         return None
     queue = run_dir / "evidence" / f"{dim_id}_queue.json"
-    if not queue.is_file():
+    qstate = _read_json(queue)
+    if qstate is None:
         return None
-    try:
-        start = queue.stat().st_mtime
-    except OSError:
-        return None
+    take_ts = _queue_take_timestamps(qstate)
+    start = qstate.get("created_at")
+    if not isinstance(start, (int, float)):
+        if take_ts:
+            start = min(take_ts)
+        else:
+            try:
+                start = queue.stat().st_mtime
+            except OSError:
+                return None
     if state == "running":
         return max(0.0, time.time() - start)
-    # done: use latest agent-stream mtime
+    # done: latest activity signal still on disk
     end = start
-    try:
-        for s in (run_dir / "evidence").glob(f"{dim_id}_agent-*.stream"):
-            try:
-                end = max(end, s.stat().st_mtime)
-            except OSError:
-                continue
-    except OSError:
-        pass
+    if take_ts:
+        end = max(end, max(take_ts))
+    for candidate in (
+        run_dir / "evidence" / f"{dim_id}_evidence.jsonl",
+        *(run_dir / "evidence").glob(f"{dim_id}_agent-*.stream"),
+    ):
+        try:
+            end = max(end, candidate.stat().st_mtime)
+        except OSError:
+            continue
     return max(0.0, end - start)
+
+
+def _consolidated_dim_progress(run_dir: Path) -> _DimProgress:
+    """Progress row for a live consolidated (grouped) pass.
+
+    Evidence counters are the raw cross-dimension tally: suppression
+    netting is per-dimension and cannot be applied to the combined stream,
+    so the live numbers may slightly over-read what the finished reports
+    will show.
+    """
+    evidence_dir = run_dir / "evidence"
+    queue = _read_json(evidence_dir / "consolidated_queue.json") or {}
+    taken = 0
+    for entry in queue.get("taken") or []:
+        fs = entry.get("files") if isinstance(entry, dict) else None
+        if isinstance(fs, list):
+            taken += len(fs)
+    pending = len(queue.get("pending") or [])
+    tally = tally_unique_findings(evidence_dir / "consolidated_evidence.jsonl")
+    return _DimProgress(
+        id="consolidated",
+        state="running",
+        files={"taken": taken, "total": taken + pending},
+        violations=tally.violations,
+        compliance=tally.compliance,
+        duplicates=tally.duplicates,
+        elapsed_s=_dim_elapsed_s("consolidated", run_dir, "running"),
+        active_agents=_active_agents(evidence_dir, "consolidated"),
+    )
 
 
 def build_scan_progress(
@@ -206,12 +267,15 @@ def build_scan_progress(
     elif started_at and status.get("finalized_at"):
         try:
             end = datetime.fromisoformat(status["finalized_at"])
+            if end.tzinfo is None:
+                end = end.replace(tzinfo=timezone.utc)
             total_elapsed_s = max(0.0, (end - started_at).total_seconds())
         except (ValueError, TypeError):
             total_elapsed_s = None
     else:
         total_elapsed_s = None
 
+    run_budget_s = time_limit_s if (time_limit_s and time_limit_s > 0) else None
     project_files = _project_total_files(run_dir)
     dim_estimates = read_dim_estimates(run_dir)
     dim_records = read_dimensions(run_dir).get("dimensions") or {}
@@ -231,6 +295,30 @@ def build_scan_progress(
         dim_ids = list(recovered)
     evidence_dir = run_dir / "evidence"
     evaluators_dir = default_paths().evaluators_dir
+
+    # Consolidated (grouped) runs dispatch every dimension in one pass and
+    # write consolidated_* files — there are no per-dim queues, so the
+    # per-dim reader below would report 0% / "estimating…" for the whole
+    # run. While such a run is live, report the consolidated pass as one
+    # row with the real file counts. Once the run is terminal the per-dim
+    # evaluation files exist and normal per-dim classification applies.
+    consolidated_queue = evidence_dir / "consolidated_queue.json"
+    if (
+        not is_terminal
+        and consolidated_queue.is_file()
+        and not any((evidence_dir / f"{d}_queue.json").is_file() for d in dim_ids)
+    ):
+        return _ScanProgress(
+            job_id=job_id,
+            state=state,
+            phase=status.get("phase"),
+            current_dimension=status.get("current_dimension"),
+            project_files=project_files,
+            total_elapsed_s=total_elapsed_s,
+            budget_s=run_budget_s,
+            dimensions=[_consolidated_dim_progress(run_dir)],
+        )
+
     # The scanner re-finds everything the user has dismissed or deleted, so a
     # raw evidence tally can run several times the number the finished report
     # shows. Read the suppression stores once per tick and net them out here,
@@ -286,7 +374,6 @@ def build_scan_progress(
             resolver=build_principle_resolver(dim_id, evaluators_dir, compiled_dir),
         )
         elapsed = _dim_elapsed_s(dim_id, run_dir, d_state)
-        budget = time_limit_s if (d_state == "running" and time_limit_s and time_limit_s > 0) else None
         active = _active_agents(evidence_dir, dim_id) if d_state == "running" else 0
 
         dim_results.append(_DimProgress(
@@ -299,7 +386,6 @@ def build_scan_progress(
             suppressed=tally.suppressed,
             quarantined=tally.quarantined,
             elapsed_s=elapsed,
-            budget_s=budget,
             active_agents=active,
             estimate_reason=estimate_reason,
             exit_reason=exit_reason,
@@ -315,6 +401,7 @@ def build_scan_progress(
         current_dimension=status.get("current_dimension"),
         project_files=project_files,
         total_elapsed_s=total_elapsed_s,
+        budget_s=run_budget_s,
         dimensions=dim_results,
     )
 

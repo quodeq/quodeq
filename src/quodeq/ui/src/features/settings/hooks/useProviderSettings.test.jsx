@@ -84,3 +84,19 @@ describe('useProviderSettings', () => {
     warnSpy.mockRestore();
   });
 });
+
+describe('useProviderSettings effective defaults', () => {
+  it('unset per-dimension displays Grouped (the mode a run actually uses)', () => {
+    const mockStorage = {
+      getItem: vi.fn().mockReturnValue(null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    };
+    const { result } = renderHook(() =>
+      useProviderSettings('claude', {}, { storage: mockStorage })
+    );
+    // The engine defaults to one grouped/consolidated pass; a highlighted
+    // "Per-dimension" pill for an untouched toggle was a lie.
+    expect(result.current.state['per-dimension']).toBe('false');
+  });
+});

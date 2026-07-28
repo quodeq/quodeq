@@ -1,6 +1,7 @@
 """SQLite implementation of FindingsRepository (per-run evaluation.db)."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -111,16 +112,45 @@ class SqliteFindingsRepository:
             ).fetchall()
         return {dim: n for dim, n in rows}
 
-    def search(self, query: str, limit: int = 100) -> list[Finding]:
+    def search(
+        self,
+        query: str,
+        limit: int = 100,
+        *,
+        exclude_dimensions: Iterable[str] | None = None,
+    ) -> list[Finding]:
+        """Full-text search, optionally excluding whole dimensions.
+
+        ``exclude_dimensions``, when given, adds a ``dimension NOT IN (...)``
+        clause BEFORE ``LIMIT`` is applied, matching case-insensitively via
+        SQLite's ``LOWER()`` (stored ``dimension`` values are not guaranteed
+        to be lowercase, and a custom standard's id has no charset
+        constraint). Note ``LOWER()`` is ASCII-only, so a non-ASCII uppercase
+        stored dimension would not match. This lets a caller exclude
+        hidden-standard rows inside the query itself, rather than
+        over-fetching and filtering after the fact -- rows are ordered by
+        insertion order (``id``), and evaluators insert per dimension in
+        batches, so a fixed over-fetch factor can still be exhausted entirely
+        by excluded rows that happen to precede the ones the caller wants.
+        Default ``None`` leaves every existing caller unaffected.
+        """
         self._ensure_fresh()
         fts_query = _quote_fts_query(query)
+        where = ["id IN (SELECT rowid FROM findings_fts WHERE findings_fts MATCH ?)"]
+        params: list[Any] = [fts_query]
+        excluded = [d.strip().lower() for d in (exclude_dimensions or []) if d and d.strip()]
+        if excluded:
+            placeholders = ", ".join("?" for _ in excluded)
+            where.append(f"LOWER(dimension) NOT IN ({placeholders})")
+            params.extend(excluded)
+        params.append(limit)
         with open_evaluation_db(self._run_dir) as conn:
             conn.row_factory = _dict_row
             rows = conn.execute(
                 f"SELECT {_SELECT_COLUMNS} FROM findings "
-                "WHERE id IN (SELECT rowid FROM findings_fts WHERE findings_fts MATCH ?) "
+                f"WHERE {' AND '.join(where)} "
                 "ORDER BY id LIMIT ?",
-                (fts_query, limit),
+                params,
             ).fetchall()
         return [row_to_finding(r) for r in rows]
 

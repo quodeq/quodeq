@@ -127,26 +127,30 @@ describe('ScanProgress total coverage (incremental runs)', () => {
   it('shows total coverage plus this-run detail when a cached portion exists', async () => {
     getEvaluationProgress.mockResolvedValue(coveragePayload());
     withEvalLog(<ScanProgress job={baseJob} />, ctx);
-    // 80 cached + 8 taken = 88 of 100 → 88% total; this run 8 / 20.
-    expect(await screen.findByText('88 / 100')).toBeInTheDocument();
-    expect(screen.getByText(/88% total/)).toBeInTheDocument();
-    expect(screen.getByText(/this run 8 \/ 20/)).toBeInTheDocument();
+    // 80 cached + 8 taken = 88 of 100 → 88% analyzed; this run 8 / 20 (40%).
+    expect(await screen.findByText(/repository coverage · 100 files/)).toBeInTheDocument();
+    expect(screen.getByText('88% analyzed')).toBeInTheDocument();
+    expect(screen.getByText(/80 cached from earlier runs/)).toBeInTheDocument();
+    expect(screen.getByText(/8 analyzed in this run/)).toBeInTheDocument();
+    expect(screen.getByText(/12 not yet analyzed/)).toBeInTheDocument();
+    expect(screen.getByText(/this run targets/)).toBeInTheDocument();
+    expect(screen.getByText(/8 done \(40%\)/)).toBeInTheDocument();
   });
 
   it('renders a dim cached segment and a bright run segment', async () => {
     getEvaluationProgress.mockResolvedValue(coveragePayload());
     const { container } = withEvalLog(<ScanProgress job={baseJob} />, ctx);
-    await screen.findByText('88 / 100');
+    await screen.findByText('88% analyzed');
     const cached = container.querySelector('.scan-progress__bar-fill--cached');
     expect(cached).not.toBeNull();
     expect(cached.style.width).toBe('80%');
-    const fills = container.querySelectorAll('.scan-progress__bar-wrap .scan-progress__bar-fill:not(.scan-progress__bar-fill--cached)');
+    const fills = container.querySelectorAll('.scan-progress__bar-fill:not(.scan-progress__bar-fill--cached)');
     expect(fills[0].style.width).toBe('8%');
-    expect(container.querySelector('.scan-progress__bar-wrap .scan-progress__bar'))
+    expect(container.querySelector('.scan-progress__bar'))
       .toHaveAttribute('title', '80 files analyzed in previous runs');
   });
 
-  it('collapses to the run-only display when there is no cached portion', async () => {
+  it('collapses to the full-rescan display when there is no cached portion', async () => {
     getEvaluationProgress.mockResolvedValue({
       runId: 'r1', phase: 'analyzing', currentDimension: 'security',
       totalElapsedS: 60, projectFiles: 60, state: 'running',
@@ -156,11 +160,12 @@ describe('ScanProgress total coverage (incremental runs)', () => {
       ],
     });
     const { container } = withEvalLog(<ScanProgress job={baseJob} />, ctx);
-    expect(await screen.findByText('12 / 60')).toBeInTheDocument();
-    expect(screen.getByText(/checks · 20%/)).toBeInTheDocument();
-    expect(screen.queryByText(/this run/)).toBeNull();
+    // Coverage known but zero cached → this is a clean scan.
+    expect(await screen.findByText(/this run re-analyzes all/)).toBeInTheDocument();
+    expect(screen.getByText(/12 done \(20%\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/this run targets/)).toBeNull();
     expect(container.querySelector('.scan-progress__bar-fill--cached')).toBeNull();
-    expect(container.querySelector('.scan-progress__bar-wrap .scan-progress__bar'))
+    expect(container.querySelector('.scan-progress__bar'))
       .not.toHaveAttribute('title');
   });
 
@@ -174,6 +179,7 @@ describe('ScanProgress total coverage (incremental runs)', () => {
     });
     const { container } = withEvalLog(<ScanProgress job={baseJob} />, ctx);
     expect(await screen.findByText('12 / 60')).toBeInTheDocument();
+    expect(screen.getByText(/checks · 20%/)).toBeInTheDocument();
     expect(container.querySelector('.scan-progress__bar-fill--cached')).toBeNull();
   });
 
@@ -182,7 +188,7 @@ describe('ScanProgress total coverage (incremental runs)', () => {
     payload.dimensions[0].filesExcluded = 3;
     getEvaluationProgress.mockResolvedValue(payload);
     withEvalLog(<ScanProgress job={baseJob} />, ctx);
-    expect(await screen.findByText('88 / 100')).toBeInTheDocument();
+    expect(await screen.findByText(/this run targets/)).toBeInTheDocument();
     expect(screen.getByText(/3 excluded \(size cap\)/)).toBeInTheDocument();
   });
 
@@ -191,14 +197,14 @@ describe('ScanProgress total coverage (incremental runs)', () => {
     payload.dimensions[0].filesExcluded = 0;
     getEvaluationProgress.mockResolvedValue(payload);
     withEvalLog(<ScanProgress job={baseJob} />, ctx);
-    expect(await screen.findByText('88 / 100')).toBeInTheDocument();
+    expect(await screen.findByText(/this run targets/)).toBeInTheDocument();
     expect(screen.queryByText(/excluded/)).toBeNull();
   });
 
   it('shows no excluded segment on legacy payloads without the field', async () => {
     getEvaluationProgress.mockResolvedValue(coveragePayload());
     withEvalLog(<ScanProgress job={baseJob} />, ctx);
-    expect(await screen.findByText('88 / 100')).toBeInTheDocument();
+    expect(await screen.findByText(/this run targets/)).toBeInTheDocument();
     expect(screen.queryByText(/excluded/)).toBeNull();
   });
 
@@ -213,10 +219,43 @@ describe('ScanProgress total coverage (incremental runs)', () => {
       ],
     });
     withEvalLog(<ScanProgress job={baseJob} />, ctx);
-    expect(await screen.findByText('100 / 100')).toBeInTheDocument();
-    expect(screen.getByText(/100% total/)).toBeInTheDocument();
+    expect(await screen.findByText('100% analyzed')).toBeInTheDocument();
     expect(screen.getByText(/nothing new this run/)).toBeInTheDocument();
-    expect(screen.queryByText(/this run 0 \/ 0/)).toBeNull();
+    expect(screen.getByText(/100 cached from earlier runs/)).toBeInTheDocument();
     expect(screen.queryByText('preparing…')).toBeNull();
+  });
+
+  it('shows run elapsed against the total run budget in the footer', async () => {
+    const payload = coveragePayload();
+    payload.budgetS = 600;
+    payload.totalElapsedS = 78;
+    getEvaluationProgress.mockResolvedValue(payload);
+    withEvalLog(<ScanProgress job={baseJob} />, ctx);
+    expect(await screen.findByText(/1:18 of 10:00 budget/)).toBeInTheDocument();
+  });
+
+  it('marks the footer budget as overrun once elapsed passes it', async () => {
+    const payload = coveragePayload();
+    payload.budgetS = 600;
+    payload.totalElapsedS = 640;
+    getEvaluationProgress.mockResolvedValue(payload);
+    const { container } = withEvalLog(<ScanProgress job={baseJob} />, ctx);
+    await screen.findByText(/10:40 of 10:00 budget/);
+    expect(container.querySelector('.scan-progress__budget--overrun')).not.toBeNull();
+  });
+
+  it('never shows a per-dimension budget in the detail rows', async () => {
+    const payload = coveragePayload();
+    payload.budgetS = 600;
+    // Legacy payloads carried the run budget on the running dim; it must
+    // not render as if the dimension had its own allowance.
+    payload.dimensions[0].budgetS = 600;
+    payload.dimensions[0].elapsedS = 78;
+    getEvaluationProgress.mockResolvedValue(payload);
+    withEvalLog(<ScanProgress job={baseJob} />, ctx);
+    fireEvent.click(await screen.findByTitle('Show per-dimension detail'));
+    const row = (await screen.findByText('security')).closest('.scan-progress__dim');
+    expect(row.textContent).toContain('1:18');
+    expect(row.textContent).not.toContain('budget');
   });
 });

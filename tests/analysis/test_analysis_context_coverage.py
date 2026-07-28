@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis._analysis_context import _load_custom_dimensions
+from quodeq.analysis._analysis_context import _load_custom_dimensions, load_analysis_context
+from quodeq.analysis._types import AnalysisOptions, RunConfig
 
 
 def _enable_propagation():
@@ -16,6 +17,33 @@ def _enable_propagation():
     original = logger.propagate
     logger.propagate = True
     return logger, original
+
+
+def _config(tmp_path: Path, requested: list[str]) -> RunConfig:
+    return RunConfig(
+        src=tmp_path,
+        language="python",
+        options=AnalysisOptions(dimensions=requested),
+        dimensions_data={
+            "applies": [{"id": "security"}, {"id": "maintainability"}, {"id": "flexibility"}],
+        },
+        evaluators_dir=tmp_path / "no-evaluators",
+    )
+
+
+class TestDimensionResolutionOrder:
+    def test_requested_order_is_preserved(self, tmp_path: Path):
+        """#912 — dims must run in the order the user selected, not config order."""
+        dimensions, _ctx = load_analysis_context(_config(tmp_path, ["flexibility", "maintainability"]))
+        assert dimensions == ["flexibility", "maintainability"]
+
+    def test_unknown_dimensions_are_dropped_without_reordering(self, tmp_path: Path):
+        dimensions, _ctx = load_analysis_context(_config(tmp_path, ["flexibility", "bogus", "security"]))
+        assert dimensions == ["flexibility", "security"]
+
+    def test_duplicate_requests_are_deduped(self, tmp_path: Path):
+        dimensions, _ctx = load_analysis_context(_config(tmp_path, ["flexibility", "flexibility"]))
+        assert dimensions == ["flexibility"]
 
 
 class TestLoadCustomDimensions:

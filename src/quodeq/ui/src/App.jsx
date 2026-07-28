@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState, useEffect, useRef } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
 import UpdateBanner from './features/updates/UpdateBanner.jsx';
 import { useSharedContentSignal } from './features/dashboard/hooks/useSharedProjects.js';
@@ -26,6 +26,8 @@ import { applyMutationDelta } from './api/applyMutationDelta.js';
 import { getGradeFormula } from './api/index.js';
 import { setGradeThresholds } from './utils/gradeThresholds.js';
 import { deriveEvaluatePreselect } from './utils/evaluatePreselect.js';
+import { useEvaluationProgress } from './features/evaluation/hooks/useEvaluationProgress.js';
+import { computeOverallProgress } from './features/evaluation/components/scanProgressTotals.js';
 import LoadingScreen from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import TopBar from './components/TopBar.jsx';
@@ -33,7 +35,7 @@ import { ACTIVE_PROVIDER_KEY, providerKey } from './constants.js';
 import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { useNativeNavBridge } from './hooks/useNativeNavBridge.js';
-import { readVisibleStandardIds } from './utils/visibleStandards.js';
+import { readVisibleStandardIds, hydrateVisibleStandardIds } from './utils/visibleStandards.js';
 import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
 import { syncNativeTitlebar } from './utils/nativeTitlebar.js';
@@ -248,6 +250,22 @@ export function shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, s
 }
 
 /**
+ * Sidebar violations/history badge counts. `accumulated` and `dashboard`
+ * reset to null the instant the selected project changes (placeholderData is
+ * scoped to project+source -- see samePlaceholderScope in api/queryKeys.js),
+ * so reading straight off them here is what clears the badges immediately on
+ * a project switch instead of leaving the outgoing project's numbers on
+ * screen until the new project's fetch lands. Exported so this contract is
+ * unit-testable without mounting the whole App.
+ */
+export function selectSidebarCounts({ filteredAccumulated, accumulated, filteredTrend, dashboard }) {
+  return {
+    violationsCount: filteredAccumulated?.summary?.totalViolations ?? accumulated?.summary?.totalViolations ?? null,
+    historyCount: (filteredTrend || []).length || dashboard?.trend?.length || null,
+  };
+}
+
+/**
  * Build the `navigation` prop bundle ROUTE_RENDERERS consume. Every
  * navigation key a route renderer reads MUST be forwarded here -- a route
  * consuming a key the bundle lacks fails silently at click time (the
@@ -271,6 +289,7 @@ export function buildDashboardDataBundle({ state, sharedHasContent = false }) {
     selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
     projectsLoaded: state.projectsLoaded,
     dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
+    onRetry: state.refreshDashboardActive,
     scoresPending: state.scoresPending,
     sharedProjectInfo: state.sharedProjectInfo,
     availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
@@ -359,7 +378,8 @@ export function buildWizardHandlers({ state, setWizardEntry, navTab }) {
       if (branch) payload.branch = branch;
       if (provider?.id) payload.aiCmd = provider.id;
       if (provider?.model) payload.aiModel = provider.model;
-      if (totalTimeLimitS) payload.timeLimit = totalTimeLimitS;
+      // != null keeps an explicit 0 ("Unlimited") — 0 is falsy but meaningful.
+      if (totalTimeLimitS != null) payload.timeLimit = totalTimeLimitS;
       state.evalLifecycle.handleStartEvaluation(payload);
       navTab('evaluate');
     },
@@ -537,6 +557,7 @@ function ViolationsRoute({ params, props }) {
         projectName: props.dashboardData.selectedDisplayName,
         loading: props.dashboardData.loading,
         isFetching: props.dashboardData.isFetching,
+        error: props.dashboardData.error,
         dismissRefreshKey: props.dismissRefreshKey,
       }}
       callbacks={{
@@ -565,6 +586,7 @@ function ViolationsRoute({ params, props }) {
         onRefresh: props.refreshDashboard,
         onReconcile: props.scheduleDashboardReconcile,
         onNavigate: nav,
+        onRetry: props.dashboardData.onRetry,
       }}
       isDirectNav={props.navigation.navStackLength === 1}
       tabKey={params._tabKey || 0}
@@ -578,7 +600,7 @@ function ViolationsRoute({ params, props }) {
 // ROUTE_RENDERERS.file(params, props) just builds the React element tree; it
 // doesn't render, so the returned element's props can be asserted on directly.
 export const ROUTE_RENDERERS = {
-  overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect, onProjectsReload: props.navigation.loadProjects }} runMode={false} />,
+  overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect, onProjectsReload: props.navigation.loadProjects, onRetry: props.dashboardData.onRetry }} runMode={false} />,
   violations: (params, props) => <ViolationsRoute params={params} props={props} />,
   map: (params, props) => {
     const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
@@ -594,13 +616,14 @@ export const ROUTE_RENDERERS = {
         selectedSource: props.navigation.selectedSource,
         loading: props.dashboardData.loading,
         isFetching: props.dashboardData.isFetching,
+        error: props.dashboardData.error,
       }}
-      callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard }}
+      callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard, onRetry: props.dashboardData.onRetry }}
       isDirectNav={isDirectNav}
       tabKey={params._tabKey || 0}
     />;
   },
-  run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
+  run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry }} runMode={true} />,
   history: (params, props) => {
     const trend = props.dashboardData.dashboard?.trend || [];
     const runs = props.dashboardData.availableRuns || [];
@@ -634,11 +657,13 @@ export const ROUTE_RENDERERS = {
         selectedSource={props.navigation.selectedSource}
         loading={props.dashboardData.loading}
         isFetching={props.dashboardData.isFetching}
+        error={props.dashboardData.error}
+        onRetry={props.dashboardData.onRetry}
         projectInfo={props.navigation.projects?.find((p) => (p.id || p.name) === props.navigation.selectedProject) || null}
       />
     );
   },
-  'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
+  'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry }} runMode={true} />,
   explorer: (params, props) => (
     <ExplorerPage
       project={params.fromProject || props.navigation.selectedProject}
@@ -720,7 +745,7 @@ export const ROUTE_RENDERERS = {
     }}
   />,
   'grade-formula': (params, props) => <GradeFormulaPage navigation={props.navigation} />,
-  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} filters={params.filters} actions={{ onSelect: (id, source) => { props.navigation.handleProjectChange(id, source); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup, onFiltersChange: (filters) => props.navigation.handleNavigateReplace('projects', { filters }), onProjectsReload: props.navigation.loadProjects }} />,
+  projects: (params, props) => <ProjectsPage projects={props.navigation.projects} projectsLoaded={props.navigation.projectsLoaded} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} filters={params.filters} actions={{ onSelect: (id, source) => { props.navigation.handleProjectChange(id, source); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup, onFiltersChange: (filters) => props.navigation.handleNavigateReplace('projects', { filters }), onProjectsReload: props.navigation.loadProjects }} />,
   standards: (params, props) => <StandardsPage onRescan={(dims) => props.navigation.navTab('evaluate', { preselectDims: dims })} />,
   help: () => <HelpPage />,
 };
@@ -1019,7 +1044,7 @@ export default function App() {
   const sidebarModel = sidebarProvider && typeof localStorage !== 'undefined'
     ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
     : null;
-  const { activePage, navStack, navPop, navGoTo, navTab, activeTab } = state;
+  const { activePage, navStack, navPop, navGoTo, navSwapAt, navTab, activeTab } = state;
   // Initial landing: decided exactly once, the first render after both the
   // local projects list and the shared signal have settled (whatever the
   // outcome). Mid-session changes never re-trigger it.
@@ -1053,6 +1078,30 @@ export default function App() {
     if (main) main.scrollTop = 0;
   }, [state.selectedProject]);
 
+  // Sync the visible-standards cache (localStorage) with the server's
+  // per-project file whenever the selected project settles. This is the
+  // earliest point at which "the current project" is known, so it runs
+  // before any newly-mounted page reads readVisibleStandardIds() for that
+  // project. It migrates a pre-existing local selection up to the server on
+  // first run and never throws (see hydrateVisibleStandardIds). Note: pages
+  // already mounted with a memoized visible-standards Set (e.g. the sidebar
+  // trend/accumulated filters below, keyed with empty deps) do not
+  // recompute from this — that is a pre-existing limitation of those read
+  // sites, not something this hydration fixes.
+  //
+  // isStale guards a real race: switching A -> B before A's request resolves
+  // must not let A's (now-stale) response overwrite B's selection in the
+  // single, per-browser cache. hydrateVisibleStandardIds checks isStale()
+  // right before every write it makes (including the migration PUT), so
+  // flipping `cancelled` in the cleanup is enough to make a stale response a
+  // no-op.
+  useEffect(() => {
+    if (!state.selectedProject) return;
+    let cancelled = false;
+    hydrateVisibleStandardIds(state.selectedProject, { isStale: () => cancelled });
+    return () => { cancelled = true; };
+  }, [state.selectedProject]);
+
   const currentDayLabel = useMemo(
     () => formatDayLabel(state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex),
     [state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex]
@@ -1078,6 +1127,57 @@ export default function App() {
     () => filterAccumulatedByVisibleStandards(state.accumulated, visibleSet, filteredTrend, null),
     [state.accumulated, visibleSet, filteredTrend]
   );
+
+  // Breadcrumb jump-bar data: which siblings a given path segment can swap
+  // to. Two levels have a known sibling set — the root tab (the sidebar's
+  // main destinations) and the explorer dimension. Levels without one return
+  // null and stay plain links.
+  const breadcrumbSiblingsFor = useCallback((entry, index) => {
+    if (index === 0) {
+      if (!state.selectedProject) return null;
+      return ['overview', 'violations', 'map', 'history', 'evaluate'].map((id) => ({
+        key: id,
+        label: navLabelFor({ page: id }),
+        current: entry.page === id,
+        onSelect: () => (id === 'evaluate'
+          ? navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) })
+          : navTab(id)),
+      }));
+    }
+    if (entry.page === 'explorer') {
+      const dims = filteredAccumulated?.dimensions || [];
+      if (dims.length < 2) return null;
+      return dims.map((dim) => ({
+        key: dim.dimension,
+        label: (dim.dimension || '').toLowerCase(),
+        current: dim.dimension === entry.dimension,
+        onSelect: () => navSwapAt(index, {
+          page: 'explorer',
+          dimension: dim.dimension,
+          runId: dim.fromRunId,
+          dateLabel: dim.fromDateLabel,
+          fromProject: dim.fromProject,
+          sourceTab: entry.sourceTab || 'violations',
+        }),
+      }));
+    }
+    return null;
+  }, [state.selectedProject, navTab, navSwapAt, activePage, filteredAccumulated]);
+
+  // Live run progress for the topbar chrome (run chip + bottom hairline).
+  // Shares the JobStatStrip/ScanProgress query cache entry, so this adds no
+  // extra polling.
+  const evalJob = state.evalLifecycle?.job;
+  const { data: evalProgress } = useEvaluationProgress(isEvaluating ? evalJob?.jobId : undefined, !isEvaluating);
+  const topbarRunProgress = useMemo(() => {
+    if (!isEvaluating) return null;
+    const overall = computeOverallProgress(evalProgress);
+    const runningDim = (evalProgress?.dimensions || []).find((d) => d?.state === 'running');
+    return {
+      dimension: runningDim?.id ? String(runningDim.id).toLowerCase() : null,
+      percent: overall.totalFiles > 0 ? overall.overallPct : null,
+    };
+  }, [isEvaluating, evalProgress]);
 
   const contentProps = {
     dashboardData: buildDashboardDataBundle({ state, sharedHasContent: sharedSignal.hasContent }),
@@ -1120,6 +1220,10 @@ export default function App() {
     selectedProject: state.selectedProject,
   });
 
+  const sidebarCounts = selectSidebarCounts({
+    filteredAccumulated, accumulated: state.accumulated, filteredTrend, dashboard: state.dashboard,
+  });
+
   return (
     <>
       <EvalLogProvider>
@@ -1146,8 +1250,8 @@ export default function App() {
                 meta: state.headerMeta,
               }}
               version={APP_VERSION}
-              violationsCount={filteredAccumulated?.summary?.totalViolations ?? state.accumulated?.summary?.totalViolations ?? null}
-              historyCount={filteredTrend.length || state.dashboard?.trend?.length || null}
+              violationsCount={sidebarCounts.violationsCount}
+              historyCount={sidebarCounts.historyCount}
               lastEvalAt={state.accumulated?.summary?.lastEvaluatedAt || state.accumulated?.summary?.createdAt || null}
               isPinned={sidebarPinned}
               onPinChange={setSidebarPinned}
@@ -1164,6 +1268,7 @@ export default function App() {
               selectedSource={state.selectedSource}
               onEvaluate={shouldShowEvaluateButton(state.projects?.length, state.selectedSource) ? (() => navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) })) : null}
               evaluating={state.evalLifecycle?.job?.status === 'running'}
+              runProgress={topbarRunProgress}
               onProviderClick={() => navTab('settings')}
               onMenuToggle={() => setSidebarPinned((v) => !v)}
               onSelectProject={() => navTab('projects')}
@@ -1173,6 +1278,7 @@ export default function App() {
                   onGoTo={navGoTo}
                   projectName={resolvedDisplayName}
                   onSelectProject={() => navTab('projects')}
+                  siblingsFor={breadcrumbSiblingsFor}
                 />
               }
               mobileTitle={navStack.length ? navLabelFor(navStack[navStack.length - 1]) : (activeTab || '')}

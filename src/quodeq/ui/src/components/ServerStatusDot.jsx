@@ -21,6 +21,11 @@ export default function ServerStatusDot({ connected, url }) {
         className={`topbar-dot ${connected ? 'topbar-dot--ok' : 'topbar-dot--err'}`}
         aria-hidden="true"
       />
+      {/* Dot at rest; the word slides out under the cursor (5a). The full
+          state already lives in aria-label/title, so this is presentational. */}
+      <span className="topbar-btn__label" aria-hidden="true">
+        {connected ? 'connected' : 'offline'}
+      </span>
     </span>
   );
 }

@@ -102,6 +102,44 @@ def test_search_respects_limit(tmp_path: Path):
     assert len(hits) == 3
 
 
+def test_search_exclude_dimensions_applied_before_limit(tmp_path: Path):
+    """25 excluded-dimension matches inserted before 3 kept ones, with a limit
+    smaller than the excluded count: the excluded rows must not consume the
+    limit window (ORDER BY id LIMIT applies AFTER the exclusion, not before)."""
+    repo = SqliteFindingsRepository(tmp_path)
+    for i in range(25):
+        repo.insert_finding(_finding(p=f"hidden-{i}", d="reliability", line=i,
+                                      reason="widget flaky"))
+    for i in range(3):
+        repo.insert_finding(_finding(p=f"kept-{i}", d="security", line=100 + i,
+                                      reason="widget insecure"))
+    hits = repo.search("widget", limit=20, exclude_dimensions=["reliability"])
+    assert len(hits) == 3
+    assert {h.dimension for h in hits} == {"security"}
+
+
+def test_search_exclude_dimensions_case_insensitive(tmp_path: Path):
+    """Stored `dimension` values are not guaranteed lowercase; the exclusion
+    must match regardless of casing on either side."""
+    repo = SqliteFindingsRepository(tmp_path)
+    repo.insert_finding(_finding(p="P1", d="Security", reason="widget flaky"))
+    repo.insert_finding(_finding(p="P2", d="reliability", line=2,
+                                  reason="widget solid"))
+    hits = repo.search("widget", exclude_dimensions=["security"])
+    assert {h.practice_id for h in hits} == {"P2"}
+
+
+def test_search_exclude_dimensions_none_unaffected(tmp_path: Path):
+    """The default (no exclusion) must return exactly what it did before the
+    parameter was added."""
+    repo = SqliteFindingsRepository(tmp_path)
+    repo.insert_finding(_finding(p="P1", d="security", reason="widget flaky"))
+    repo.insert_finding(_finding(p="P2", d="reliability", line=2,
+                                  reason="widget solid"))
+    hits = repo.search("widget", exclude_dimensions=None)
+    assert {h.practice_id for h in hits} == {"P1", "P2"}
+
+
 class _SpyProjector(Projector):
     """Projector that records ensure_projected invocations."""
 

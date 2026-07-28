@@ -10,6 +10,11 @@ import {
   buildEtaHint,
   msUntilNextSecond,
   suppressedSuffix,
+  carriedSuffix,
+  buildDimensionCycle,
+  sumSeverities,
+  formatSevHint,
+  deriveScanMode,
 } from './buildJobStatCells.js';
 
 const baseInputs = {
@@ -44,19 +49,59 @@ test('formatClock: returns "—" for null/undefined/non-finite', () => {
 // ---------------------------------------------------------------------------
 
 test('buildJobStatCells: builds 4 cells for a running job with progress data', () => {
-  const cells = buildJobStatCells('running', baseInputs);
+  const cells = buildJobStatCells('running', {
+    ...baseInputs,
+    dimCycle: { current: 'reliability', index: 1, count: 3, next: 'usability' },
+    scanMode: 'incremental',
+  });
   assert.equal(cells.length, 4);
-  assert.equal(cells[0].label, 'STATUS');
-  assert.equal(cells[0].value, 'running');
-  assert.equal(cells[0].tone, 'warning');
-  assert.equal(cells[1].label, 'PROGRESS');
-  assert.equal(cells[1].value, '62%');
-  assert.ok(cells[1].hint.includes('138 / 220'), `hint should contain "138 / 220", got: ${cells[1].hint}`);
-  assert.equal(cells[2].label, 'FOUND');
+  assert.equal(cells[0].label, 'analyzing');
+  assert.equal(cells[0].value, 'reliability');
+  assert.equal(cells[0].hint, 'dim 1/3 · next: usability');
+  assert.equal(cells[0].tone, 'accent');
+  assert.equal(cells[1].label, 'files this run');
+  assert.equal(cells[1].value, 138);
+  assert.equal(cells[1].trailing, '/ 220');
+  assert.equal(cells[1].hint, '62% · changed since last scan');
+  assert.equal(cells[2].label, 'violations');
   assert.equal(cells[2].value, 2);
   assert.equal(cells[2].tone, 'critical');
-  assert.equal(cells[3].label, 'ELAPSED');
+  assert.equal(cells[3].label, 'elapsed');
   assert.equal(cells[3].value, '2:14');
+});
+
+test('buildJobStatCells: running analyzing tile falls back while dims are unknown', () => {
+  const cells = buildJobStatCells('running', baseInputs);
+  assert.equal(cells[0].label, 'analyzing');
+  assert.equal(cells[0].value, '—');
+  assert.equal(cells[0].hint, 'preparing…');
+});
+
+test('buildJobStatCells: running last dimension keeps the counter and drops the next hint', () => {
+  const cells = buildJobStatCells('running', {
+    ...baseInputs,
+    dimCycle: { current: 'usability', index: 3, count: 3, next: null },
+  });
+  assert.equal(cells[0].label, 'analyzing');
+  assert.equal(cells[0].hint, 'dim 3/3');
+});
+
+test('buildJobStatCells: running files hint omits mode copy when mode is unknown', () => {
+  const cells = buildJobStatCells('running', baseInputs);
+  assert.equal(cells[1].hint, '62%');
+});
+
+test('buildJobStatCells: running files hint says full rescan on clean scans', () => {
+  const cells = buildJobStatCells('running', { ...baseInputs, scanMode: 'clean scan' });
+  assert.equal(cells[1].hint, '62% · full rescan');
+});
+
+test('buildJobStatCells: running violations hint reports severity buckets', () => {
+  const cells = buildJobStatCells('running', {
+    ...baseInputs,
+    sevCounts: { critical: 1, major: 4, minor: 0 },
+  });
+  assert.equal(cells[2].hint, '1 critical · 4 major');
 });
 
 test('buildJobStatCells: builds done-state cells with SCANNED + VIOLATIONS + DURATION', () => {
@@ -75,7 +120,6 @@ test('buildJobStatCells: builds done-state cells with SCANNED + VIOLATIONS + DUR
 });
 
 test('buildJobStatCells: uses correct tone for STATUS by status', () => {
-  assert.equal(buildJobStatCells('running',   baseInputs)[0].tone, 'warning');
   assert.equal(buildJobStatCells('done',      baseInputs)[0].tone, 'success');
   assert.equal(buildJobStatCells('completed', baseInputs)[0].tone, 'success');
   assert.equal(buildJobStatCells('failed',    baseInputs)[0].tone, 'critical');
@@ -197,9 +241,9 @@ test('buildEtaHint: "~rate files/min · ~eta" when estimate is available', () =>
   );
 });
 
-test('buildJobStatCells: running ELAPSED cell carries the etaHint as its subtext', () => {
+test('buildJobStatCells: running elapsed cell carries the etaHint as its subtext', () => {
   const cells = buildJobStatCells('running', { ...baseInputs, etaHint: '~6 files/min · ~5h left' });
-  assert.equal(cells[3].label, 'ELAPSED');
+  assert.equal(cells[3].label, 'elapsed');
   assert.equal(cells[3].hint, '~6 files/min · ~5h left');
 });
 
@@ -231,11 +275,14 @@ test('msUntilNextSecond: normalizes negatives and defaults non-finite to 1000', 
 // suppressed hint — the live counters are net, so say what was netted out
 // ---------------------------------------------------------------------------
 
-test('buildJobStatCells: FOUND hint reports the suppressed count while running', () => {
-  const cells = buildJobStatCells('running', { ...baseInputs, liveCount: 122, suppressedCount: 339 });
-  assert.equal(cells[2].label, 'FOUND');
+test('buildJobStatCells: violations hint reports the suppressed count while running', () => {
+  const cells = buildJobStatCells('running', {
+    ...baseInputs, liveCount: 122, suppressedCount: 339,
+    sevCounts: { critical: 2, major: 120, minor: 0 },
+  });
+  assert.equal(cells[2].label, 'violations');
   assert.equal(cells[2].value, 122);
-  assert.equal(cells[2].hint, 'live violations · 339 suppressed');
+  assert.equal(cells[2].hint, '2 critical · 120 major · 339 suppressed');
 });
 
 test('buildJobStatCells: VIOLATIONS hint reports it on a finished job too', () => {
@@ -247,12 +294,117 @@ test('buildJobStatCells: VIOLATIONS hint reports it on a finished job too', () =
 test('buildJobStatCells: no suppressed hint on a project with nothing suppressed', () => {
   const running = buildJobStatCells('running', { ...baseInputs, suppressedCount: 0 });
   const missing = buildJobStatCells('running', baseInputs);
-  assert.equal(running[2].hint, 'live violations');
-  assert.equal(missing[2].hint, 'live violations');
+  assert.equal(running[2].hint, 'none yet');
+  assert.equal(missing[2].hint, 'none yet');
 });
 
 test('suppressedSuffix: ignores negative and non-numeric counts', () => {
   assert.equal(suppressedSuffix(-5), '');
   assert.equal(suppressedSuffix(undefined), '');
   assert.equal(suppressedSuffix('lots'), '');
+});
+
+// ---------------------------------------------------------------------------
+// carried-forward hint — the live-findings-only preference filters FOUND
+// before the strip ever sees it, so say what was filtered out
+// ---------------------------------------------------------------------------
+
+test('buildJobStatCells: violations hint reports the carried-forward count while running', () => {
+  const cells = buildJobStatCells('running', {
+    ...baseInputs, liveCount: 1, carriedCount: 12,
+    sevCounts: { critical: 0, major: 1, minor: 0 },
+  });
+  assert.equal(cells[2].label, 'violations');
+  assert.equal(cells[2].hint, '1 major · 12 carried forward');
+});
+
+test('buildJobStatCells: VIOLATIONS hint reports the carried-forward count on a finished job too', () => {
+  const cells = buildJobStatCells('done', { ...baseInputs, liveCount: 1, carriedCount: 12 });
+  assert.equal(cells[2].label, 'VIOLATIONS');
+  assert.ok(cells[2].hint.endsWith('12 carried forward'), `got: ${cells[2].hint}`);
+});
+
+test('buildJobStatCells: no carried-forward hint when nothing was filtered', () => {
+  const running = buildJobStatCells('running', { ...baseInputs, carriedCount: 0 });
+  const missing = buildJobStatCells('running', baseInputs);
+  assert.equal(running[2].hint, 'none yet');
+  assert.equal(missing[2].hint, 'none yet');
+});
+
+test('buildJobStatCells: suppressed and carried-forward suffixes combine', () => {
+  const cells = buildJobStatCells('done', {
+    ...baseInputs, liveCount: 1, suppressedCount: 5, carriedCount: 12,
+  });
+  assert.equal(cells[2].hint, '1 total · 5 suppressed · 12 carried forward');
+});
+
+test('carriedSuffix: ignores negative and non-numeric counts', () => {
+  assert.equal(carriedSuffix(-5), '');
+  assert.equal(carriedSuffix(undefined), '');
+  assert.equal(carriedSuffix('lots'), '');
+});
+
+// ---------------------------------------------------------------------------
+// buildDimensionCycle / sumSeverities / formatSevHint / deriveScanMode
+// ---------------------------------------------------------------------------
+
+const cycleProgress = {
+  currentDimension: 'reliability',
+  dimensions: [
+    { id: 'reliability', state: 'running' },
+    { id: 'usability', state: 'pending' },
+    { id: 'clean-architecture', state: 'pending' },
+  ],
+};
+
+test('buildDimensionCycle: running dim, 1-based index, next pending dim', () => {
+  assert.deepEqual(buildDimensionCycle(cycleProgress), {
+    current: 'reliability', index: 1, count: 3, next: 'usability',
+  });
+});
+
+test('buildDimensionCycle: falls back to done-count when nothing is running', () => {
+  const progress = {
+    dimensions: [
+      { id: 'a', state: 'done' },
+      { id: 'b', state: 'pending' },
+    ],
+  };
+  assert.deepEqual(buildDimensionCycle(progress), {
+    current: 'b', index: 2, count: 2, next: null,
+  });
+});
+
+test('buildDimensionCycle: null without dimensions', () => {
+  assert.equal(buildDimensionCycle(null), null);
+  assert.equal(buildDimensionCycle({ dimensions: [] }), null);
+});
+
+test('sumSeverities: buckets across dimensions, ignores unknown severities', () => {
+  const counts = sumSeverities({
+    reliability: [{ severity: 'critical' }, { severity: 'major' }, { severity: 'weird' }],
+    usability: [{ severity: 'MAJOR' }, { severity: 'minor' }],
+  });
+  assert.deepEqual(counts, { critical: 1, major: 2, minor: 1 });
+});
+
+test('formatSevHint: omits zero buckets, "none yet" when empty', () => {
+  assert.equal(formatSevHint({ critical: 1, major: 4, minor: 0 }), '1 critical · 4 major');
+  assert.equal(formatSevHint({ critical: 0, major: 0, minor: 0 }), 'none yet');
+  assert.equal(formatSevHint(null), 'none yet');
+});
+
+test('deriveScanMode: incremental with cached files, clean scan without', () => {
+  const dim = (cached) => ({
+    id: 'a', state: 'running',
+    files: { taken: 1, total: 10 },
+    filesCached: cached, filesProjectTotal: 100,
+  });
+  assert.equal(deriveScanMode({ dimensions: [dim(40)] }), 'incremental');
+  assert.equal(deriveScanMode({ dimensions: [dim(0)] }), 'clean scan');
+});
+
+test('deriveScanMode: null when coverage is unknown', () => {
+  assert.equal(deriveScanMode(null), null);
+  assert.equal(deriveScanMode({ dimensions: [{ id: 'a', state: 'running', files: { taken: 1, total: 10 } }] }), null);
 });

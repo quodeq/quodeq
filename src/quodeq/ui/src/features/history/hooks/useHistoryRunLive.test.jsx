@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useHistoryRunLive } from './useHistoryRunLive.js';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
@@ -8,7 +8,7 @@ describe('useHistoryRunLive', () => {
   beforeEach(() => {
     global.EventSource = MockEventSource;
     MockEventSource.last = null;
-    import.meta.env.VITE_USE_SSE_EVENTS = 'true';
+    vi.stubEnv('VITE_USE_SSE_EVENTS', 'true');
   });
 
   it('returns empty defaults when no events have arrived', () => {
@@ -70,7 +70,7 @@ describe('useHistoryRunLive', () => {
   });
 
   it('returns empty defaults and opens no EventSource when SSE is off', () => {
-    import.meta.env.VITE_USE_SSE_EVENTS = 'false';
+    vi.stubEnv('VITE_USE_SSE_EVENTS', 'false');
     const wrapper = withQueryClient();
     const { result } = renderHook(() => useHistoryRunLive('run-sseoff'), { wrapper });
     expect(MockEventSource.last).toBeNull();

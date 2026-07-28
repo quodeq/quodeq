@@ -26,6 +26,7 @@ export function AssistantLauncherButton() {
           viewBox edge-to-edge while stroke icons carry built-in padding, so
           equal pixel sizes read visually larger. */}
       <QMarkIcon size={11} />
+      <span className="topbar-btn__label">assistant</span>
     </button>
   );
 }

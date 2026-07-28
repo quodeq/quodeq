@@ -33,6 +33,7 @@ class FindingSpec:
     include_severity: bool = True
     confidence: int = 100
     provenance_downgrade: bool = False
+    carried_forward: bool = False
 
 
 def build_finding_base(spec: FindingSpec) -> Finding:
@@ -63,6 +64,7 @@ def build_finding_base(spec: FindingSpec) -> Finding:
         scope=spec.scope if spec.scope else None,
         confidence=spec.confidence,
         provenance_downgrade=spec.provenance_downgrade,
+        carried_forward=spec.carried_forward,
     )
 
 

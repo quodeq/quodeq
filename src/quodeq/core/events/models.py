@@ -69,6 +69,11 @@ class Judgment(BaseModel):
     # finding from critical to major. UI/DB-visible audit marker (#656); the
     # severity flip already drives the grade, this just makes it auditable.
     provenance_downgrade: bool = False
+    # True when this finding was replayed from the content-addressed cache
+    # rather than produced by the running scan. Lets the live evaluation
+    # feed show only what this scan is actually finding (the rest of the
+    # app still shows every finding in the run).
+    carried_forward: bool = False
 
     @field_validator("req_refs", mode="before")
     @classmethod

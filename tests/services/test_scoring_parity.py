@@ -294,7 +294,7 @@ def test_assistant_tools_agree_after_dismissal(tmp_path):
     # Run scope: get_scores / get_report / get_violations.
     run_ctx = _assistant_ctx(tmp_path, reports_root, project, run_dir)
     run_reg = build_registry(run_ctx)
-    scores = run_reg.dispatch("get_scores", {})["result"]
+    scores = run_reg.dispatch("get_scores", {})["result"]["scores"]
     assert _num(scores[_DIM]["score"]) == accumulated, (
         f"assistant run-scope get_scores {scores[_DIM]['score']} != accumulated {accumulated}")
 
@@ -309,7 +309,7 @@ def test_assistant_tools_agree_after_dismissal(tmp_path):
     # Overview (accumulated) scope: get_scores + get_overview.
     over_ctx = dc_replace(run_ctx, run_dir=None)
     over_reg = build_registry(over_ctx)
-    over_scores = over_reg.dispatch("get_scores", {})["result"]
+    over_scores = over_reg.dispatch("get_scores", {})["result"]["scores"]
     assert _num(over_scores[_DIM]["score"]) == accumulated, (
         f"assistant overview get_scores {over_scores[_DIM]['score']} != accumulated {accumulated}")
 

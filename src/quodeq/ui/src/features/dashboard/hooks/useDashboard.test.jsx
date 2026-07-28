@@ -111,10 +111,10 @@ describe("useDashboard", () => {
     expect(fakeApi.getDashboard).toHaveBeenCalledTimes(1);
   });
 
-  // The eval-completion path must actively refetch the always-mounted Overview
-  // observer — otherwise a freshly-finished run leaves the Overview showing the
-  // stale (often null) pre-run payload until the user switches projects.
-  it("refreshDashboardActive refetches the mounted observer (eval-completion path)", async () => {
+  // refreshDashboardActive must actively refetch the always-mounted Overview
+  // observer — e.g. the manual retry path (App.jsx's onRetry) — otherwise a
+  // stale (often null) payload lingers until the user switches projects.
+  it("refreshDashboardActive refetches the mounted observer (manual retry path)", async () => {
     const fakeApi = makeFakeApi();
     const { result } = renderHook(
       () => useDashboard({ selectedProject: "p1", selectedRun: null }),
@@ -204,7 +204,7 @@ describe("useDashboard scheduleDashboardReconcile (debounced active reconcile)",
 
   // Regression pin: the debounced reconcile is additive, not a replacement.
   // refreshDashboard must keep its lazy refetchType:'none' contract for its
-  // other callers (evaluation-completion effect, run deletion, etc.).
+  // other callers (wizard project registration, dismiss/restore, etc.).
   it("refreshDashboard keeps mark-stale-only behavior (regression pin)", () => {
     const { result, spy } = renderWithSpy();
     act(() => result.current.refreshDashboard());
@@ -468,6 +468,86 @@ describe("useDashboard frozen historical runs", () => {
 
     expect(result.current.dashboard).toBe(before); // identity stable => no flicker
     expect(result.current.dashboard.trend).toBe(dashTrend);
+  });
+
+  // Fallback path: older cached payloads / the grade-formula early-return path
+  // carry no trend of their own, so the hook folds in scores.trend. That must
+  // not reintroduce the flicker: a new (but equivalent) scores object whose
+  // trend array is the SAME reference must not mint a new dashboard identity.
+  it("keeps a stable dashboard identity in the fallback path when the trend reference is unchanged", async () => {
+    const fakeApi = makeFakeApi();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 60_000 }, mutations: { retry: false } },
+    });
+    const sharedTrend = [
+      { runId: "r1", dimensionDetails: [{ dimension: "security", delta: 0.2, score: 7 }] },
+    ];
+    // No trend on the payload itself => fallback path.
+    client.setQueryData(
+      projectKeys.dashboard("p1", "r1"),
+      {
+        marker: "dash",
+        trend: [],
+        dimensions: [{ dimension: "Security", overallScore: "7.0/10", violations: [], compliance: [] }],
+        selectedRun: { runId: "r1", dateLabel: "2026-05-01" },
+      },
+      { updatedAt: Date.now() },
+    );
+    client.setQueryData(
+      projectKeys.scores("p1", null),
+      {
+        accumulated: { score: 90 },
+        trend: sharedTrend,
+        availableRuns: [{ runId: "r1", status: "complete" }],
+      },
+      { updatedAt: Date.now() },
+    );
+    // Pre-seed the scoped query too (same reference), so the initial mount
+    // is already resolved and doesn't race the fakeApi mock's own fetch.
+    client.setQueryData(
+      projectKeys.scores("p1", "r1"),
+      { accumulated: { score: 90 }, trend: sharedTrend },
+      { updatedAt: Date.now() },
+    );
+
+    const { result } = renderHook(
+      () => useDashboard({ selectedProject: "p1", selectedRun: "r1", keepPlaceholder: false }),
+      { wrapper: wrapWith(client, fakeApi) },
+    );
+
+    await waitFor(() => expect(result.current.dashboard?.marker).toBe("dash"));
+    const before = result.current.dashboard;
+    expect(before.trend).toBe(sharedTrend);
+
+    // The scoped scores query resolves a beat later with a DIFFERENT scores
+    // object, but the SAME trend array reference. Must not mint a new dashboard.
+    await act(async () => {
+      client.setQueryData(
+        projectKeys.scores("p1", "r1"),
+        { accumulated: { score: 90 }, trend: sharedTrend },
+        { updatedAt: Date.now() },
+      );
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(result.current.dashboard).toBe(before);
+    expect(result.current.dashboard.trend).toBe(sharedTrend);
+
+    // Now the trend reference genuinely changes: the data must flow.
+    const newTrend = [
+      { runId: "r1", dimensionDetails: [{ dimension: "security", delta: 0.5, score: 8 }] },
+    ];
+    await act(async () => {
+      client.setQueryData(
+        projectKeys.scores("p1", "r1"),
+        { accumulated: { score: 90 }, trend: newTrend },
+        { updatedAt: Date.now() },
+      );
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(result.current.dashboard).not.toBe(before);
+    expect(result.current.dashboard.trend[0].dimensionDetails[0].delta).toBe(0.5);
   });
 
   // placeholderData is observer-scoped, not key-scoped — an unguarded

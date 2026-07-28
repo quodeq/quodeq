@@ -14,6 +14,7 @@ export function TerminalLauncherButton() {
       aria-pressed={on} aria-label="Terminal (Ctrl+Shift+`)" title="Terminal (Ctrl+Shift+`)"
       onClick={() => toggleTopbar('terminal')}>
       <TerminalIcon />
+      <span className="topbar-btn__label">terminal</span>
     </button>
   );
 }

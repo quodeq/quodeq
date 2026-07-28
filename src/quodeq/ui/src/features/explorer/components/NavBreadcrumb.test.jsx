@@ -60,3 +60,114 @@ describe('NavBreadcrumb project crumb', () => {
     expect(screen.queryByText('my-project')).toBeNull();
   });
 });
+
+describe('NavBreadcrumb collapse and jump bar', () => {
+  it('collapses deep paths behind a "…" chip whose menu lists hidden ancestors', () => {
+    const onGoTo = vi.fn();
+    render(
+      <NavBreadcrumb
+        stack={[
+          { page: 'violations' },
+          { page: 'explorer', dimension: 'Security' },
+          { page: 'principle', label: 'modularity' },
+          { page: 'file', label: 'HomeVC.swift' },
+        ]}
+        onGoTo={onGoTo}
+        projectName="repo"
+        onSelectProject={() => {}}
+      />
+    );
+    // repo / … / modularity / HomeVC.swift — the middle is one click away
+    expect(screen.queryByText('violations')).toBeNull();
+    expect(screen.queryByText('security')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show hidden path segments' }));
+    expect(screen.getByRole('menuitem', { name: 'security' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'violations' }));
+    expect(onGoTo).toHaveBeenCalledWith(0);
+  });
+
+  it('drops intermediate run-date segments from the visible path but keeps them reachable', () => {
+    render(
+      <NavBreadcrumb
+        stack={[
+          { page: 'history' },
+          { page: 'history-run', dateLabel: '28 jul 2026' },
+          { page: 'explorer', dimension: 'Security' },
+        ]}
+        onGoTo={() => {}}
+        projectName="repo"
+        onSelectProject={() => {}}
+      />
+    );
+    expect(screen.queryByText('28 jul 2026')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show hidden path segments' }));
+    expect(screen.getByRole('menuitem', { name: '28 jul 2026' })).toBeInTheDocument();
+  });
+
+  it('opens a sibling menu with the current item marked when siblingsFor supplies one', () => {
+    const onSelect = vi.fn();
+    const siblingsFor = (entry) => (entry.page === 'explorer'
+      ? [
+          { key: 'Security', label: 'security', current: true, onSelect: () => {} },
+          { key: 'Maintainability', label: 'maintainability', current: false, onSelect },
+        ]
+      : null);
+    render(
+      <NavBreadcrumb
+        stack={[{ page: 'violations' }, { page: 'explorer', dimension: 'Security' }]}
+        onGoTo={() => {}}
+        projectName="repo"
+        onSelectProject={() => {}}
+        siblingsFor={siblingsFor}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'security' }));
+    expect(screen.getByRole('menuitemradio', { name: 'security' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'maintainability' }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('navigates back to the level when the current sibling is picked from a deeper page', () => {
+    // Regression: from a detail page, the ancestor dimension crumb only opened
+    // the sibling menu and its current item was a no-op, so there was no way
+    // back up to that level.
+    const onGoTo = vi.fn();
+    const siblingsFor = (entry) => (entry.page === 'explorer'
+      ? [
+          { key: 'Security', label: 'security', current: true, onSelect: () => {} },
+          { key: 'Maintainability', label: 'maintainability', current: false, onSelect: () => {} },
+        ]
+      : null);
+    render(
+      <NavBreadcrumb
+        stack={[
+          { page: 'violations' },
+          { page: 'explorer', dimension: 'Security' },
+          { page: 'file', label: 'HomeVC.swift' },
+        ]}
+        onGoTo={onGoTo}
+        projectName="repo"
+        onSelectProject={() => {}}
+        siblingsFor={siblingsFor}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'security' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'security' }));
+    expect(onGoTo).toHaveBeenCalledWith(1);
+  });
+
+  it('stays a plain link when siblingsFor returns null for the level', () => {
+    const onGoTo = vi.fn();
+    render(
+      <NavBreadcrumb
+        stack={[{ page: 'violations' }, { page: 'explorer', dimension: 'Security' }]}
+        onGoTo={onGoTo}
+        projectName="repo"
+        onSelectProject={() => {}}
+        siblingsFor={() => null}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'violations' }));
+    expect(onGoTo).toHaveBeenCalledWith(0);
+  });
+});

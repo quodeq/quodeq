@@ -75,6 +75,17 @@ describe('buildScanPayload', () => {
     const payload = buildScanPayload({ ...baseState });
     expect(payload).not.toHaveProperty('uiProject');
   });
+
+  it('carries the per-run time budget, including 0 for no limit', () => {
+    expect(buildScanPayload({ ...baseState, timeLimitS: 600 }).timeLimit).toBe(600);
+    // 0 must survive: preparePayload treats a present timeLimit as
+    // authoritative, and 0 means "no limit" — not "use Settings".
+    expect(buildScanPayload({ ...baseState, timeLimitS: 0 }).timeLimit).toBe(0);
+  });
+
+  it('omits timeLimit when no budget was chosen', () => {
+    expect(buildScanPayload({ ...baseState })).not.toHaveProperty('timeLimit');
+  });
 });
 
 function makeFakeApi(overrides = {}) {
@@ -155,9 +166,9 @@ describe('ReEvaluateCard ephemeral gating', () => {
     });
     renderCard({ project: 'uuid-2', projectInfo, api });
 
-    // Wait for info to render (path appears in the panel)
+    // Wait for info to render (path appears in the identity strip's scope cell)
     await waitFor(() => {
-      expect(screen.getByText('/repos/myproj')).toBeInTheDocument();
+      expect(screen.getByText(/\/repos\/myproj/)).toBeInTheDocument();
     });
 
     // No ephemeral note
@@ -183,9 +194,10 @@ describe('ReEvaluateCard clean-scan once consumption', () => {
   });
 
   async function armOnceToggle(user) {
-    await user.click(screen.getByRole('button', { name: /clean scan/i }));
-    await user.click(screen.getByRole('button', { name: /just this scan/i }));
-    expect(screen.getByRole('button', { name: /clean scan/i })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByRole('radio', { name: /clean scan/i }));
+    expect(screen.getByRole('radio', { name: /clean scan/i })).toBeChecked();
+    // Picking the clean card defaults to one-shot; the sub-choice reflects it.
+    expect(screen.getByRole('button', { name: /this scan only/i })).toHaveAttribute('aria-pressed', 'true');
   }
 
   it('keeps the once toggle armed when the start is blocked', async () => {
@@ -202,7 +214,7 @@ describe('ReEvaluateCard clean-scan once consumption', () => {
     await user.click(screen.getByRole('button', { name: /^▸\s*scan$|^scan$/i }));
 
     expect(onStart).toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: /clean scan/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('radio', { name: /clean scan/i })).toBeChecked();
   });
 
   it('consumes the once toggle when the start goes through', async () => {
@@ -216,8 +228,73 @@ describe('ReEvaluateCard clean-scan once consumption', () => {
     await user.click(screen.getByRole('button', { name: /^▸\s*scan$|^scan$/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /clean scan/i })).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByRole('radio', { name: /clean scan/i })).not.toBeChecked();
+      expect(screen.getByRole('radio', { name: /incremental/i })).toBeChecked();
     });
+  });
+});
+
+describe('ReEvaluateCard error state', () => {
+  beforeEach(() => { invalidateDimensionCache(); });
+
+  it('renders visible error UI instead of vanishing when getProjectInfo rejects', async () => {
+    const api = makeFakeApi({ getProjectInfo: vi.fn().mockRejectedValue(new Error('boom')) });
+    renderCard({ project: 'uuid-err', projectInfo: null, api });
+
+    await waitFor(() => {
+      expect(screen.getByText(/could not load project info/i)).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('retry re-invokes the info load', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const getProjectInfo = vi.fn().mockRejectedValue(new Error('boom'));
+    const api = makeFakeApi({ getProjectInfo });
+    renderCard({ project: 'uuid-retry', projectInfo: null, api });
+
+    await waitFor(() => {
+      expect(screen.getByText(/could not load project info/i)).toBeInTheDocument();
+    });
+    expect(getProjectInfo).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => {
+      expect(getProjectInfo).toHaveBeenCalledTimes(2);
+    });
+  });
+});
+
+describe('ReEvaluateCard time budget copy', () => {
+  beforeEach(() => { invalidateDimensionCache(); });
+
+  const localInfo = { name: 'demo', path: '/repos/myproj', location: 'local', ephemeral: false, evaluable: true };
+  const apiWithDims = () => makeFakeApi({
+    getProjectInfo: vi.fn().mockResolvedValue(localInfo),
+    listPlugins: vi.fn().mockResolvedValue([{ dimensions: [
+      { id: 'security', label: 'Security' },
+    ] }]),
+  });
+
+  it('describes the budget as a total for the run, not per dimension', async () => {
+    renderCard({ project: 'p-budget', projectInfo: localInfo, api: apiWithDims() });
+    await waitFor(() => expect(screen.getByText('time budget')).toBeInTheDocument());
+    expect(screen.getByText(/total for the run/i)).toBeInTheDocument();
+    expect(screen.queryByText(/per dimension/i)).not.toBeInTheDocument();
+  });
+
+  it('summarizes a picked budget as the run total, never "each"', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    renderCard({ project: 'p-budget2', projectInfo: localInfo, api: apiWithDims(), preselectDims: ['security'] });
+    await waitFor(() => expect(screen.getByRole('button', { name: /security/i })).toHaveAttribute('aria-pressed', 'true'));
+
+    await user.click(screen.getByRole('button', { name: '10:00' }));
+
+    expect(screen.getByText(/10:00 total budget/)).toBeInTheDocument();
+    expect(screen.queryByText(/budget each/)).not.toBeInTheDocument();
   });
 });
 

@@ -19,7 +19,7 @@
   opacity: 0.4;
 }
 
-.dashboard-ready {
+.dashboard-appear {
   animation: dashboard-fadein 400ms ease;
 }
 
@@ -1902,6 +1902,39 @@
   flex-direction: column;
 }
 
+/* ── Overview loading skeleton ──────────────────────────
+   Static dimmed blocks (no shimmer/animation -- house idiom, see
+   SidePane.css:186-201) standing in for the stat-strip and dimension-card
+   content areas while the Overview is loading. OverviewSkeleton.jsx rides
+   the real .term-stat / .dim-gauge-card classes for layout; only these bar
+   elements are skeleton-specific. */
+.overview-skeleton__bar {
+  display: inline-block;
+  border-radius: 4px;
+  background: var(--color-surface-alt);
+  opacity: 0.6;
+}
+.overview-skeleton__bar--label { width: 45%; height: 8px; }
+/* 31px matches the real .term-stat__value box (font-size 28px, line-height
+   1.1, terminal.css:119-124) so the stat card's footprint doesn't shrink. */
+.overview-skeleton__bar--value { width: 55%; height: 31px; }
+.overview-skeleton__bar--hint { width: 70%; height: 8px; }
+.overview-skeleton__bar--name { width: 60%; height: 14px; }
+/* 100px matches DimensionGaugeCard's RING_SIZE (DimensionGaugeCard.jsx) so the
+   card's overall height footprint lines up with the real gauge, not just the
+   head/sev-row min-heights. */
+.overview-skeleton__bar--gauge { width: 100px; height: 100px; border-radius: 50%; }
+.overview-skeleton__bar--meta { width: 50%; height: 8px; }
+.overview-skeleton__bar--sev { width: 40%; height: 12px; }
+
+/* The real .dim-gauge-card is cursor:pointer + hover/focus affordances
+   (dim-gauge-card.css) -- this card isn't clickable, so neutralize both
+   rather than let a placeholder look interactive. */
+.overview-skeleton .dim-gauge-card {
+  cursor: default;
+  pointer-events: none;
+}
+
 /* ── Project selector (in main content area) ──────────── */
 
 .project-selector {
@@ -2131,6 +2164,7 @@
 /* ── Violations tab ─────────────────────────── */
 
 .violations-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -2178,7 +2212,8 @@
   flex-direction: column;
 }
 
-.run-history-panel .recharts-responsive-container {
+.run-history-panel .recharts-responsive-container,
+.run-history-panel .run-history-panel__chart-slot {
   flex: 1;
   min-height: 160px;
 }
@@ -2331,6 +2366,7 @@
 /* ── Projects page ─────────────────────────────────────── */
 
 .projects-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);

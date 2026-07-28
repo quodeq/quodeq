@@ -492,6 +492,10 @@ def _run_pipeline_with_cleanup(
                     # Resolve from CLI args OR env vars — dashboard runs pass
                     # QUODEQ_TIME_LIMIT via env, not the CLI flag.
                     budget_s = _resolve_time_limit(args)
+                    if budget_s is not None:
+                        # Persist the budget itself (0 = unlimited) so
+                        # index-served snapshots can surface it.
+                        lifecycle.set_time_limit(budget_s)
                     if budget_s is not None and budget_s > 0:
                         from datetime import datetime, timedelta, timezone
                         deadline_iso = (

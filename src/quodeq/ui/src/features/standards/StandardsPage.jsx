@@ -41,8 +41,8 @@ function StandardsListView({ grouped, loading, error, actions, customizedCounts 
 
 export default function StandardsPage({ onRescan }) {
   const { grouped, loading, error, refresh, handleDelete, handleDuplicate } = useStandards();
-  const { isVisible, toggle, add: addVisible, remove: removeVisible } = useVisibleStandards();
   const { selectedProject } = useAppState();
+  const { isVisible, toggle, add: addVisible, remove: removeVisible } = useVisibleStandards({ projectId: selectedProject });
   const { counts: customizedCounts } = useStandardsOverrides(selectedProject);
   const {
     view,

@@ -75,3 +75,22 @@ class TestMaxFilesPerAgent:
         # Only 2 left in budget even though requesting 5
         batch2 = q.take(5, agent_id="agent-0")
         assert len(batch2) == 2
+
+
+class TestQueueCreatedAt:
+    def test_init_stamps_created_at_and_takes_preserve_it(self, tmp_path):
+        # scan_progress uses created_at as the dim-start clock; the file's
+        # mtime can't serve because every take rewrites the file.
+        import json
+        import time
+
+        queue_path = tmp_path / "queue.json"
+        before = time.time()
+        FileQueue(queue_path, ["a.py", "b.py"])
+        state = json.loads(queue_path.read_text(encoding="utf-8"))
+        assert before <= state["created_at"] <= time.time()
+
+        created = state["created_at"]
+        FileQueue(queue_path).take(1, agent_id="agent-0")
+        state = json.loads(queue_path.read_text(encoding="utf-8"))
+        assert state["created_at"] == created

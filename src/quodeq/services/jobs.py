@@ -102,7 +102,7 @@ class JobManager:
         """
         self._reports_root = path
 
-    def start_job(self, cmd: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None, ai_provider: str | None = None, ai_model: str | None = None) -> JobSnapshot:
+    def start_job(self, cmd: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None, ai_provider: str | None = None, ai_model: str | None = None, time_limit_s: int | None = None) -> JobSnapshot:
         """Spawn a subprocess and return its initial job state."""
         job_id = str(uuid.uuid4())
         job = Job(
@@ -114,6 +114,7 @@ class JobManager:
             exit_code=None,
             ai_provider=ai_provider,
             ai_model=ai_model,
+            time_limit_s=time_limit_s,
         )
 
         try:
@@ -216,6 +217,20 @@ class JobManager:
             if not job:
                 return None
             return job.to_dict()
+
+    def delete(self, job_id: str) -> bool:
+        """Drop a terminal job from the store. Refuses running jobs.
+
+        Called by ``EvaluationsIndex.delete`` after a discard-cancel removes
+        the run dir and index row, so the job stops resurfacing in
+        ``/api/evaluations`` from the persisted job store.
+        """
+        with self._lock:
+            job = self._store.get(job_id)
+            if not job or job.status == STATUS_RUNNING:
+                return False
+            self._store.delete(job_id)
+            return True
 
     def list_jobs(
         self,

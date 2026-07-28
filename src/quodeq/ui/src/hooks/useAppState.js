@@ -69,7 +69,7 @@ function useProjects({ onNoProjects }) {
 
 function useAppNavigation() {
   const [serverConnected, setServerConnected, serverVersion] = useServerHealth();
-  const { navStack, activePage, navPush, navPop, navReplace, navGoTo, navReset, navTab } = useNavStack();
+  const { navStack, activePage, navPush, navPop, navReplace, navGoTo, navSwapAt, navReset, navTab } = useNavStack();
   const projectBundle = useProjects({ onNoProjects: () => { /* wizard handles fresh-user UX in App.jsx */ } });
   const { selectedRun, setSelectedRun, handleRunChange } = projectBundle;
   const [historySelectedRun, setHistorySelectedRun] = useState('latest');
@@ -83,7 +83,7 @@ function useAppNavigation() {
     // repositories local/online tabs): history must not grow per flip.
     navReplace({ page, ...params });
   }
-  return { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPush, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun, setHistorySelectedRun };
+  return { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPush, navPop, navGoTo, navSwapAt, navReset, navTab, projectBundle, handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun, setHistorySelectedRun };
 }
 
 export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRunIndex) {
@@ -100,11 +100,11 @@ export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRun
 // a mark-stale-only invalidation left behind (refreshDashboard's
 // refetchType:'none', or ordinary staleTime elapse): the Overview's
 // useDashboard observer is mounted at the app root and never remounts on tab
-// navigation (see the eval-completion effect below), and the desktop
-// pywebview window never fires the focus-refetch a browser tab gets on
-// refocus. `stale: true` keeps this a no-op when nothing is actually stale,
-// so switching tabs doesn't re-download the (potentially 10-20 MB) payload
-// on every visit — only a query already marked stale gets refetched here.
+// navigation, and the desktop pywebview window never fires the focus-refetch
+// a browser tab gets on refocus. `stale: true` keeps this a no-op when
+// nothing is actually stale, so switching tabs doesn't re-download the
+// (potentially 10-20 MB) payload on every visit — only a query already
+// marked stale gets refetched here.
 //
 // Gates on `rootTab` (navStack[0].page), NOT the derived `activeTab`.
 // `activeTab`'s fallback bucket defaults any untagged/unknown page to
@@ -135,7 +135,7 @@ export function useOverviewReturnReconcile({ rootTab, selectedProject, selectedS
 
 export function useAppState() {
   const nav = useAppNavigation();
-  const { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
+  const { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navSwapAt, navReset, navTab, projectBundle, handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
   const {
     projects, projectsLoaded, setProjects, selectedProject, selectedSource,
     selectedRun, setSelectedRun, loadProjects, handleProjectChange,
@@ -172,23 +172,6 @@ export function useAppState() {
   const prefetchHandlers = usePrefetchAdjacentRuns({ selectedProject, selectedSource, availableRuns: visibleDailyRuns, overviewRunIndex });
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun }, selectedProject });
 
-  // Refresh all dashboard data (including latestAccumulated) when an evaluation
-  // finishes. This uses the *active* refetch (not the lazy refreshDashboard the
-  // dismiss path uses): the Overview's useDashboard observer is mounted here at
-  // the app root and never remounts on tab navigation, so a mark-stale-only
-  // invalidation would never actually refetch while the user stays on the same
-  // project — leaving the Overview on the stale pre-run payload until a project
-  // switch. A completed run is exactly when a real refetch is warranted.
-  const evalRefreshedRef = useRef(null);
-  useEffect(() => {
-    const job = evalLifecycle.job;
-    const finished = job && job.status !== 'running' && job.outputRunId;
-    if (finished && evalRefreshedRef.current !== job.outputRunId) {
-      evalRefreshedRef.current = job.outputRunId;
-      refreshDashboardActive();
-    }
-  }, [evalLifecycle.job, refreshDashboardActive]);
-
   const activeTab = KNOWN_TABS.includes(activePage.page) ? activePage.page
     : activePage.sourceTab && KNOWN_TABS.includes(activePage.sourceTab) ? activePage.sourceTab
     : activePage.page === TAB_HISTORY_RUN ? 'history'
@@ -199,14 +182,14 @@ export function useAppState() {
   useOverviewReturnReconcile({ rootTab: navStack[0]?.page, selectedProject, selectedSource });
 
   return {
-    serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navTab,
+    serverConnected, setServerConnected, serverVersion, navStack, activePage, navPop, navGoTo, navSwapAt, navTab,
     projects, projectsLoaded, selectedProject, selectedSource, selectedRun, loadProjects, handleProjectChange, handleNavigate, handleNavigateReplace,
     handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject,
     dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, scoresPending, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex, sharedProjectInfo,
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect, prefetchHandlers,
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
     historySelectedRun, setHistorySelectedRun,
-    evalLifecycle, settings, activeTab, showProjectHeader, showRunNav, refreshDashboard, scheduleDashboardReconcile,
+    evalLifecycle, settings, activeTab, showProjectHeader, showRunNav, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile,
     granularity, onGranularityChange: handleGranularityChange,
   };
 }

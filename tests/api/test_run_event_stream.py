@@ -83,6 +83,33 @@ def test_payload_as_sse_finding_includes_provenance_downgrade():
     assert payload["provenance_downgrade"] is True
 
 
+def test_payload_as_sse_finding_includes_carried_forward():
+    # The live feed's carried-forward filter needs this flag on the SSE
+    # path too, or every finding reads as new under VITE_USE_SSE_EVENTS.
+    from quodeq.api._run_event_stream import _payload_as_sse_finding
+    from quodeq.core.events.models import Judgment
+
+    j = Judgment(
+        practice_id="R-FT-2", verdict="violation", dimension="security",
+        file="f.py", line=1, reason="r", severity="major",
+        carried_forward=True,
+    )
+    payload = _payload_as_sse_finding(j, finding_id=1)
+    assert payload["carried_forward"] is True
+
+
+def test_payload_as_sse_finding_defaults_carried_forward_false():
+    from quodeq.api._run_event_stream import _payload_as_sse_finding
+    from quodeq.core.events.models import Judgment
+
+    j = Judgment(
+        practice_id="R-FT-2", verdict="violation", dimension="security",
+        file="f.py", line=1, reason="r", severity="major",
+    )
+    payload = _payload_as_sse_finding(j, finding_id=1)
+    assert payload["carried_forward"] is False
+
+
 # ---------------------------------------------------------------------------
 # WatcherState tests
 # ---------------------------------------------------------------------------

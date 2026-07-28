@@ -207,7 +207,7 @@ class TestSerialization:
             "job_id", "status", "command", "started_at", "ended_at",
             "exit_code", "logs", "output_project", "output_run_id",
             "phase", "deadline_at", "current_dimension", "dimensions",
-            "ai_provider", "ai_model",
+            "ai_provider", "ai_model", "time_limit_s",
         }
         assert set(data.keys()) == expected_keys
 
@@ -293,7 +293,12 @@ class TestFileJobStore:
         assert job is not None
         assert job.status == "completed"
 
-    def test_running_jobs_marked_failed_on_load(self, tmp_path: Path):
+    def test_running_jobs_marked_lost_on_load(self, tmp_path: Path):
+        # The subprocess is spawned start_new_session=True and survives a
+        # server restart — the run is usually still alive and writing. It
+        # is "lost" (tracking gone), not "failed": marking it failed showed
+        # a live scan as dead and (via list dedup) hid the truthful ext-
+        # index row that could still track and cancel it.
         data = {
             "job_id": "j1",
             "status": "running",
@@ -304,8 +309,8 @@ class TestFileJobStore:
         store = FileJobStore(persist_dir=tmp_path)
         job = store.get("j1")
         assert job is not None
-        assert job.status == "failed"
-        assert job.exit_code == -1
+        assert job.status == "lost"
+        assert job.exit_code is None
 
     def test_corrupt_file_skipped(self, tmp_path: Path):
         (tmp_path / "bad.json").write_text("not json{{{")
@@ -370,7 +375,7 @@ class TestFileJobStore:
         }
         (tmp_path / "j1.json").write_text(json.dumps(data))
         store = FileJobStore(persist_dir=tmp_path)
-        # Running -> failed on load, but should still exist
+        # Running -> lost on load, but should still exist
         assert store.get("j1") is not None
 
     def test_stale_cleanup_skips_no_ended_at(self, tmp_path: Path):
@@ -386,7 +391,7 @@ class TestFileJobStore:
         assert store.get("j1") is not None
 
     def test_flipped_running_job_gets_ended_at(self, tmp_path: Path):
-        """A crashed 'running' job flipped to failed must get an ended_at.
+        """A 'running' job flipped to lost must get an ended_at.
 
         Without it, _cleanup_stale skips the job forever (it only prunes
         jobs with ended_at), so crash/test leftovers accumulate until they
@@ -402,7 +407,7 @@ class TestFileJobStore:
         store = FileJobStore(persist_dir=tmp_path)
         job = store.get("j1")
         assert job is not None
-        assert job.status == "failed"
+        assert job.status == "lost"
         assert job.ended_at, "flipped jobs must be prunable by _cleanup_stale"
         on_disk = json.loads((tmp_path / "j1.json").read_text())
         assert on_disk["ended_at"], "the flip must be persisted with ended_at"

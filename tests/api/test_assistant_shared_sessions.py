@@ -99,15 +99,17 @@ def test_shared_get_scores_matches_shared_route(client, app, shared_clone_fixtur
     #   - ToolRegistry.dispatch wraps the handler's return in {"ok", "result"};
     #     it never itself nests a "dimensions" key, so the tool payload is
     #     read from tool_result["result"], not tool_result["dimensions"].
-    #   - _get_scores (tools/_read_tools.py) returns a dict KEYED BY dimension
-    #     name (`{"Security": {"score": ..., "grade": ..., "fromRun": ...}}`),
-    #     not a list of {"dimension": ...} objects -- so the tool's dimension
-    #     set is the dict's keys.
+    #   - _get_scores (tools/_read_tools.py) returns {"scores": {dimension:
+    #     {"score": ..., "grade": ..., "fromRun": ...}}, "hiddenStandardIds":
+    #     [...]} -- the per-dimension map moved under "scores" so it can sit
+    #     alongside "hiddenStandardIds" without mixing a non-dimension key
+    #     into a dict callers iterate. The tool's dimension set is
+    #     result["scores"]'s keys, not result's own keys.
     #   - GET /api/shared/projects/<project>/scores (get_project_scores) nests
     #     its dimension list under "accumulated" (`{"accumulated": {"dimensions":
     #     [...]}, "trend": [...], "availableRuns": [...]}`), not at the
     #     response's top level.
-    tool_dims = set(tool_result.get("result", {}).keys())
+    tool_dims = set(tool_result.get("result", {}).get("scores", {}).keys())
     route_dims = {d.get("dimension") for d in route.get("accumulated", {}).get("dimensions", [])}
     assert tool_dims == route_dims and "Security" in tool_dims
     # Score-cache isolation: rescoring under the override hits the per-clone

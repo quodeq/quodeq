@@ -1,11 +1,17 @@
+import { useMemo } from 'react';
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
 import ScanProgress from './ScanProgress.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { TermHeader } from '../../../components/terminal/index.js';
 import JobStatStrip from './JobStatStrip.jsx';
+import { IdentityStrip, IdentityCell } from './IdentityStrip.jsx';
+import { deriveScanMode } from './buildJobStatCells.js';
+import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
+import useLiveFeedSettings from '../../settings/hooks/useLiveFeedSettings.js';
 
 const STATUS = { RUNNING: 'running', DONE: 'done', FAILED: 'failed', LOST: 'lost' };
+const TERMINAL_STATES = new Set(['done', 'completed', 'failed', 'cancelled', 'lost']);
 
 function termNameForStatus(status) {
   if (status === STATUS.RUNNING) return 'evaluation_in_progress';
@@ -15,12 +21,25 @@ function termNameForStatus(status) {
   return 'evaluation_cancelled';
 }
 
-function JobHeader({ job, projectLabel, onDismiss, onCancel }) {
+function RunPill({ status }) {
+  const mod = status === STATUS.RUNNING ? 'running'
+    : status === STATUS.DONE ? 'done'
+    : (status === STATUS.FAILED || status === STATUS.LOST) ? 'failed'
+    : 'neutral';
+  return (
+    <span className={`eval-run-pill eval-run-pill--${mod}`}>
+      {status === STATUS.RUNNING && <span className="eval-run-pill__dot" aria-hidden="true" />}
+      {status}
+    </span>
+  );
+}
+
+function JobHeader({ job, onDismiss, onCancel }) {
   const isRunning = job.status === STATUS.RUNNING;
   const isDone = job.status === STATUS.DONE;
   return (
     <div className="evaluate-panel__top evaluate-panel__top--row">
-      <TermHeader name={termNameForStatus(job.status)} sub={projectLabel || undefined} />
+      <TermHeader name={termNameForStatus(job.status)} badge={<RunPill status={job.status} />} />
       <div className="evaluate-panel__top-actions">
         {isRunning && (
           <button type="button" className="term-btn term-btn--ghost term-btn--sm" onClick={onCancel}>cancel</button>
@@ -38,30 +57,54 @@ function JobHeader({ job, projectLabel, onDismiss, onCancel }) {
   );
 }
 
-function JobIdLine({ jobId, aiProvider, aiModel }) {
+function JobIdentityStrip({ job, projectLabel }) {
+  const isTerminal = TERMINAL_STATES.has(job.status);
+  // Shares the strip/progress query cache entry — no extra polling.
+  const { data: progress } = useEvaluationProgress(job.jobId, isTerminal);
+  const mode = deriveScanMode(progress);
   return (
-    <div className="evaluate-job-id-line">
-      <span className="evaluate-job-id-line__label">job</span>
-      <span className="evaluate-job-id-line__value">
-        <code>{jobId}</code>
-        <CopyButton aria-label="Copy job ID" onClick={() => copyToClipboard(jobId)} />
-      </span>
-      {aiProvider && aiModel && (
-        <>
-          {/* empty first-column cell so the chip lands under the id */}
-          <span aria-hidden="true" />
-          <span data-testid="job-runtime-chip" className="evaluate-job-id-line__model">
-            {aiProvider}
+    <IdentityStrip>
+      {/* "Unknown beats wrong": a dash, never the global selection. */}
+      <IdentityCell label="repository">{projectLabel ?? '—'}</IdentityCell>
+      <IdentityCell label="job id" grow title={job.jobId}>
+        <code className="eval-identity__code">{job.jobId}</code>
+        <CopyButton aria-label="Copy job ID" onClick={() => copyToClipboard(job.jobId)} />
+      </IdentityCell>
+      {job.aiProvider && job.aiModel && (
+        <IdentityCell label="model">
+          <span data-testid="job-runtime-chip">
+            {job.aiProvider}
             <span className="eval-provider-sep" aria-hidden="true"> · </span>
-            {aiModel}
+            {job.aiModel}
           </span>
-        </>
+        </IdentityCell>
       )}
-    </div>
+      <IdentityCell label="mode">{mode ?? '—'}</IdentityCell>
+    </IdentityStrip>
   );
 }
 
 export default function EvaluationStatus({ job, jobProjectInfo, startedProjectInfo, liveViolations = {}, onDismiss, onCancel, hasEvaluations }) {
+  const { newOnly } = useLiveFeedSettings();
+  // Filter ONCE, above both consumers. JobStatStrip derives its violations
+  // cell from the same object the feed lists, so filtering in each child
+  // separately is how the counter and the list drift apart (see #878).
+  const { shown, hiddenCarriedCount } = useMemo(() => {
+    if (!newOnly) return { shown: liveViolations, hiddenCarriedCount: 0 };
+    const next = {};
+    let hidden = 0;
+    for (const [dim, vs] of Object.entries(liveViolations || {})) {
+      // The SSE stream (VITE_USE_SSE_EVENTS) writes raw wire payloads
+      // straight into the findings cache with no violation-model mapping,
+      // so those entries carry snake_case `carried_forward` instead of
+      // `carriedForward`. Accept both spellings here.
+      const fresh = (vs || []).filter((v) => !(v.carriedForward ?? v.carried_forward));
+      hidden += (vs || []).length - fresh.length;
+      if (fresh.length) next[dim] = fresh;
+    }
+    return { shown: next, hiddenCarriedCount: hidden };
+  }, [liveViolations, newOnly]);
+
   if (!job) return null;
   // Prefer the running job's own project so the card stays accurate when the
   // UI's global selection points at a different project than the job is
@@ -75,11 +118,11 @@ export default function EvaluationStatus({ job, jobProjectInfo, startedProjectIn
 
   return (
     <div className="panel evaluate-panel--terminal">
-      <JobHeader job={job} projectLabel={projectLabel} onDismiss={onDismiss} onCancel={onCancel} />
-      <JobStatStrip job={job} liveViolations={liveViolations} />
-      <JobIdLine jobId={job.jobId} aiProvider={job.aiProvider} aiModel={job.aiModel} />
+      <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
+      <JobIdentityStrip job={job} projectLabel={projectLabel} />
+      <JobStatStrip job={job} liveViolations={shown} hiddenCarriedCount={hiddenCarriedCount} />
       <ScanProgress job={job} hasEvaluations={hasEvaluations} />
-      <LiveViolationsFeed liveViolations={liveViolations} />
+      <LiveViolationsFeed job={job} liveViolations={shown} hiddenCarriedCount={hiddenCarriedCount} />
     </div>
   );
 }

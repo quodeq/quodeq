@@ -3,6 +3,8 @@
  * No React, no network, no DOM — drop-in testable.
  */
 
+import { computeOverallProgress } from './scanProgressTotals.js';
+
 // Throughput estimate tuning. The eval completes only a few files per MINUTE
 // (one slow LLM call per file), so the rate is shown per minute and measured
 // over a wide window: at ~3-10 files/min a short window sees too few files to
@@ -100,6 +102,64 @@ export function formatClock(s) {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
+/**
+ * Where the run is in its dimension sequence, for the "analyzing" KPI tile.
+ * Returns null when the progress payload carries no dimensions. `index` is
+ * 1-based; `next` is the first pending dim after the running one (null on the
+ * last dimension). The display name prefers `progress.currentDimension` —
+ * it flips slightly ahead of the per-dim states during handover.
+ * @returns {{current:string|null, index:number, count:number, next:string|null}|null}
+ */
+export function buildDimensionCycle(progress) {
+  const dims = progress?.dimensions || [];
+  if (dims.length === 0) return null;
+  let runningIdx = dims.findIndex((d) => d?.state === 'running');
+  if (runningIdx === -1) {
+    const doneCount = dims.filter((d) => d?.state === 'done').length;
+    runningIdx = Math.min(doneCount, dims.length - 1);
+  }
+  const next = dims.slice(runningIdx + 1).find((d) => d?.state === 'pending')?.id ?? null;
+  return {
+    current: progress?.currentDimension ?? dims[runningIdx]?.id ?? null,
+    index: runningIdx + 1,
+    count: dims.length,
+    next,
+  };
+}
+
+/** Severity buckets across the live feed's `{dim: Violation[]}` map. */
+export function sumSeverities(liveViolations) {
+  const counts = { critical: 0, major: 0, minor: 0 };
+  for (const vs of Object.values(liveViolations || {})) {
+    for (const v of vs || []) {
+      const sev = String(v?.severity || '').toLowerCase();
+      if (sev in counts) counts[sev] += 1;
+    }
+  }
+  return counts;
+}
+
+/** "1 critical · 4 major" — zero buckets omitted; "none yet" when all zero. */
+export function formatSevHint(counts) {
+  const parts = ['critical', 'major', 'minor']
+    .filter((k) => counts?.[k] > 0)
+    .map((k) => `${counts[k]} ${k}`);
+  return parts.length > 0 ? parts.join(' · ') : 'none yet';
+}
+
+/**
+ * The run's scan mode, derived from coverage. The job/progress payloads don't
+ * echo the cleanScan flag back, but coverage tells the same story: cached
+ * results exist only on incremental runs. Null while coverage is unknown
+ * (legacy dims, preparing) — callers show a placeholder.
+ */
+export function deriveScanMode(progress) {
+  if (!progress) return null;
+  const { cachedFiles, projectTotal } = computeOverallProgress(progress);
+  if (cachedFiles == null || !(projectTotal > 0)) return null;
+  return cachedFiles > 0 ? 'incremental' : 'clean scan';
+}
+
 const STATUS_TONE = {
   running: 'warning',
   done: 'success',
@@ -141,11 +201,22 @@ export function suppressedSuffix(suppressedCount) {
   return ` · ${suppressedCount} suppressed`;
 }
 
-function foundCell(liveCount, label = 'FOUND', hint = 'live violations', suppressedCount = 0) {
+/**
+ * The count of findings this run re-discovered that the live-findings-only
+ * preference filtered out before FOUND ever saw them, as a hint suffix.
+ * Without it the cell silently drops a number the feed already discloses
+ * next to the list, so the strip and the feed can look like they disagree.
+ */
+export function carriedSuffix(carriedCount) {
+  if (!(carriedCount > 0)) return '';
+  return ` · ${carriedCount} carried forward`;
+}
+
+function foundCell(liveCount, label = 'FOUND', hint = 'live violations', suppressedCount = 0, carriedCount = 0) {
   return {
     label,
     value: liveCount,
-    hint: `${hint}${suppressedSuffix(suppressedCount)}`,
+    hint: `${hint}${suppressedSuffix(suppressedCount)}${carriedSuffix(carriedCount)}`,
     tone: liveCount > 0 ? 'critical' : 'default',
   };
 }
@@ -159,7 +230,11 @@ function foundCell(liveCount, label = 'FOUND', hint = 'live violations', suppres
  * @param {number|null|undefined} inputs.elapsedS
  * @param {number} inputs.liveCount
  * @param {number} [inputs.suppressedCount] — re-found findings already dismissed/deleted
- * @returns {Array<{label,value,hint,tone}>} exactly 4 cells.
+ * @param {number} [inputs.carriedCount] — carried-forward findings the live-feed preference hid
+ * @param {object|null} [inputs.dimCycle] — from buildDimensionCycle (running only)
+ * @param {object} [inputs.sevCounts] — from sumSeverities (running only)
+ * @param {string|null} [inputs.scanMode] — from deriveScanMode (running only)
+ * @returns {Array<{label,value,hint,tone,trailing?}>} exactly 4 cells.
  */
 export function buildJobStatCells(status, inputs) {
   const tone = statusTone(status);
@@ -169,15 +244,48 @@ export function buildJobStatCells(status, inputs) {
     return [
       statusCell,
       { label: 'SCANNED', value: inputs.totalFiles > 0 ? inputs.totalFiles : '—', hint: 'files', tone: 'default' },
-      foundCell(inputs.liveCount, 'VIOLATIONS', severityHint(inputs.liveCount), inputs.suppressedCount),
+      foundCell(inputs.liveCount, 'VIOLATIONS', severityHint(inputs.liveCount), inputs.suppressedCount, inputs.carriedCount),
       elapsedCell(inputs.elapsedS, 'DURATION', 'total'),
     ];
   }
-  // running / failed / lost / cancelled — same shape, status-tone differs
+
+  if (status === 'running') {
+    // Running state lives in the card header's pill, so all four tiles carry
+    // progress data instead of repeating "running".
+    const dc = inputs.dimCycle ?? null;
+    const runKnown = inputs.totalFiles > 0;
+    const modeHint = inputs.scanMode === 'incremental' ? ' · changed since last scan'
+      : inputs.scanMode === 'clean scan' ? ' · full rescan' : '';
+    return [
+      {
+        // The counter lives in the hint, not the label. Tile labels are a
+        // single ellipsized line, and "analyzing · dimension 3 / 4" doesn't fit
+        // a quarter-width card — it truncated to "analyzing · dimen…", hiding
+        // the only part that carries information. The hint wraps, so it can.
+        label: 'analyzing',
+        value: dc?.current ?? '—',
+        hint: dc
+          ? `dim ${dc.index}/${dc.count}${dc.next ? ` · next: ${dc.next}` : ''}`
+          : 'preparing…',
+        tone: 'accent',
+      },
+      {
+        label: 'files this run',
+        value: runKnown ? inputs.takenFiles : '—',
+        trailing: runKnown ? `/ ${inputs.totalFiles}` : null,
+        hint: runKnown ? `${inputs.overallPct}%${modeHint}` : 'preparing…',
+        tone: 'default',
+      },
+      foundCell(inputs.liveCount, 'violations', formatSevHint(inputs.sevCounts), inputs.suppressedCount, inputs.carriedCount),
+      elapsedCell(inputs.elapsedS, 'elapsed', inputs.etaHint ?? null),
+    ];
+  }
+
+  // failed / lost / cancelled — same shape as before, status-tone differs
   return [
     statusCell,
     progressCell(inputs),
-    foundCell(inputs.liveCount, 'FOUND', 'live violations', inputs.suppressedCount),
+    foundCell(inputs.liveCount, 'FOUND', 'live violations', inputs.suppressedCount, inputs.carriedCount),
     elapsedCell(inputs.elapsedS, 'ELAPSED', inputs.etaHint ?? null),
   ];
 }

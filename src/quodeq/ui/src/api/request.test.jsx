@@ -27,3 +27,22 @@ it('aborts on the internal timeout when no caller signal is given', async () => 
   await expect(p).rejects.toThrow();
   vi.useRealTimers();
 });
+
+it('attaches the HTTP status to thrown errors so callers can branch on it', async () => {
+  // The cancel flow needs to distinguish "409 job no longer cancellable"
+  // (drop the job) from a transient 500/timeout (keep it); a bare Error
+  // forced callers to treat every failure as fatal.
+  const fetchMock = vi.fn(async () => ({
+    ok: false,
+    status: 409,
+    json: async () => ({ error: 'not cancellable' }),
+  }));
+  vi.stubGlobal('fetch', fetchMock);
+  await request('/x').then(
+    () => { throw new Error('expected rejection'); },
+    (err) => {
+      expect(err.message).toBe('not cancellable');
+      expect(err.status).toBe(409);
+    },
+  );
+});

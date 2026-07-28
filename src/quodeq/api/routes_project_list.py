@@ -4,6 +4,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
+import os
 from http import HTTPStatus
 from pathlib import Path
 
@@ -196,9 +197,20 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     @app.get("/api/projects/<project>/scan")
     def project_scan(project: str) -> Response | tuple[Response, int]:
         """Return scan data for a project. Triggers scan if needed for local projects."""
-        validate_path_segment(project)
+        try:
+            validate_path_segment(project)
+        except ValueError:
+            body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
 
-        project_dir = Path(reports_dir()) / project
+        # Same containment shape as project_estimates below — the normpath +
+        # startswith form is the one CodeQL/Snyk recognize as a barrier.
+        root = os.path.realpath(reports_dir())
+        candidate = os.path.normpath(os.path.join(root, project))
+        if not candidate.startswith(root + os.sep):
+            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+        project_dir = Path(candidate)
         if not project_dir.is_dir():
             body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
@@ -234,6 +246,45 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
         result = scan_project(project_path, output_dir=project_dir)
         return jsonify(dataclasses.asdict(result))
+
+    @app.get("/api/projects/<project>/estimates")
+    def project_estimates(project: str) -> Response | tuple[Response, int]:
+        """Return read-only pre-run per-dimension file estimates for a project.
+
+        Query params: ``dimensions`` = comma-separated dimension ids (omitted
+        or empty → all dimensions available for the project; unknown ids are
+        ignored), ``cleanScan`` = "true"/"false" (default false). With
+        cleanScan=true each dimension reports count=total and cached=0.
+        Never creates a run or writes to disk.
+        """
+        try:
+            validate_path_segment(project)
+        except ValueError:
+            body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
+
+        # Containment check in the exact normpath + startswith shape CodeQL
+        # recognizes as a path-injection barrier (pathlib's is_relative_to
+        # is not modeled and left the alerts open).
+        root = os.path.realpath(reports_dir())
+        candidate = os.path.normpath(os.path.join(root, project))
+        if not candidate.startswith(root + os.sep):
+            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+        project_dir = Path(candidate)
+        if not project_dir.is_dir():
+            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+
+        # Lazy import: pulls in the analysis pipeline, which the API process
+        # should not pay for at startup. Layer exception is baselined — same
+        # seam as api/_evaluation_routes.py.
+        from quodeq.analysis.estimates import project_estimates_payload
+
+        raw_dims = request.args.get("dimensions", "")
+        requested = [d.strip() for d in raw_dims.split(",") if d.strip()] or None
+        clean_scan = request.args.get("cleanScan", "false").strip().lower() == "true"
+        return jsonify(project_estimates_payload(project_dir, requested, clean_scan))
 
     @app.post("/api/projects")
     def create_project() -> Response | tuple[Response, int]:

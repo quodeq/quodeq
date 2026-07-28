@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { StatStrip, Stat } from '../../../components/terminal/index.js';
 import { computeOverallProgress } from './scanProgressTotals.js';
-import { buildJobStatCells, computeRate, buildEtaHint, msUntilNextSecond } from './buildJobStatCells.js';
+import {
+  buildJobStatCells, computeRate, buildEtaHint, msUntilNextSecond,
+  buildDimensionCycle, sumSeverities, deriveScanMode,
+} from './buildJobStatCells.js';
 import { recordRateSample, getRateSamples } from './rateSampleStore.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 
@@ -15,6 +18,9 @@ function sumLiveViolations(liveViolations) {
 // The live feed already excludes dismissed/deleted findings (it reads the same
 // filtered dimension evals the report does), so FOUND is a net number. The
 // progress payload carries what was netted out, so the strip can say so.
+// The parent (EvaluationStatus) may also have filtered out carried-forward
+// findings before this component ever sees liveViolations, per the
+// live-findings-only setting, so FOUND can be net of those too.
 function sumSuppressed(progress) {
   return (progress?.dimensions || []).reduce((n, d) => n + (d?.suppressed || 0), 0);
 }
@@ -34,7 +40,7 @@ function deriveElapsedS(startedAt, endedAt, isTerminal, fallbackElapsed) {
   return null;
 }
 
-export default function JobStatStrip({ job, liveViolations }) {
+export default function JobStatStrip({ job, liveViolations, hiddenCarriedCount = 0 }) {
   const jobId = job?.jobId;
   const isTerminal = TERMINAL_STATES.has(job?.status);
 
@@ -85,9 +91,13 @@ export default function JobStatStrip({ job, liveViolations }) {
     const suppressedCount = sumSuppressed(progress);
     return buildJobStatCells(job.status, {
       overallPct, takenFiles, totalFiles, elapsedS, liveCount, etaHint, suppressedCount,
+      carriedCount: hiddenCarriedCount,
+      dimCycle: buildDimensionCycle(progress),
+      sevCounts: sumSeverities(liveViolations),
+      scanMode: deriveScanMode(progress),
     });
     // `tick` drives the per-second recompute; the sample store is read (not a dep).
-  }, [jobId, job?.status, job?.startedAt, job?.endedAt, isTerminal, progress, liveViolations, tick]);
+  }, [jobId, job?.status, job?.startedAt, job?.endedAt, isTerminal, progress, liveViolations, hiddenCarriedCount, tick]);
 
   if (!jobId) return null;
 
@@ -95,7 +105,7 @@ export default function JobStatStrip({ job, liveViolations }) {
     <div className="eval-job-stat-strip">
       <StatStrip cards>
         {cells.map((c) => (
-          <Stat key={c.label} label={c.label} value={c.value} hint={c.hint} tone={c.tone} />
+          <Stat key={c.label} label={c.label} value={c.value} hint={c.hint} tone={c.tone} trailing={c.trailing} />
         ))}
       </StatStrip>
     </div>

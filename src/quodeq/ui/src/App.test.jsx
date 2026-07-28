@@ -5,7 +5,7 @@ import {
   buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
   resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldRedirectToRemoteRepositories, shouldShowProjectTabs,
   buildNavigationBundle, buildDashboardDataBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
-  buildAssistantActionAppliedHandler, resolveProjectDisplayName,
+  buildAssistantActionAppliedHandler, resolveProjectDisplayName, selectSidebarCounts,
 } from './App.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
@@ -232,6 +232,63 @@ describe('ViolationsRoute onRefresh/onReconcile wiring (Dismissed tab reconcile)
     const props = violationsProps();
     const inner = renderViolationsRoute(props);
     expect(inner.props.callbacks.onReconcile).toBe(props.scheduleDashboardReconcile);
+  });
+});
+
+// P4-T2: Violations/Map/History previously never received the dashboard
+// bundle's error/onRetry (see App.jsx's buildDashboardDataBundle) -- a fetch
+// failure on those routes had no way to surface an error state or a working
+// Retry. These pin the threading only; the pages' own render decisions are
+// covered in their own test files.
+describe('error/onRetry threading to Violations/Map/History (P4-T2)', () => {
+  it('ViolationsRoute threads error and onRetry from the dashboard data bundle', () => {
+    const props = {
+      dashboardData: {
+        latestAccumulated: null, accumulated: null, selectedDisplayName: 'p1',
+        loading: false, isFetching: false, error: 'boom', onRetry: vi.fn(),
+      },
+      navigation: { selectedProject: 'proj1', selectedSource: 'local', projects: [], projectsLoaded: true, handleNavigate: vi.fn(), navStackLength: 1 },
+      dismissRefreshKey: 0,
+      refreshDashboard: vi.fn(),
+      scheduleDashboardReconcile: vi.fn(),
+    };
+    const outer = ROUTE_RENDERERS.violations({}, props);
+    const inner = outer.type(outer.props);
+    expect(inner.props.data.error).toBe('boom');
+    expect(inner.props.callbacks.onRetry).toBe(props.dashboardData.onRetry);
+  });
+
+  it('the map renderer threads error and onRetry from the dashboard data bundle', () => {
+    const props = {
+      dashboardData: {
+        latestAccumulated: null, accumulated: null, dashboard: null, selectedDisplayName: 'p1',
+        loading: false, isFetching: false, error: 'boom', onRetry: vi.fn(),
+      },
+      navigation: { selectedProject: 'proj1', selectedSource: 'local', projects: [], projectsLoaded: true, handleNavigate: vi.fn(), navStackLength: 1 },
+      refreshDashboard: vi.fn(),
+    };
+    const el = ROUTE_RENDERERS.map({}, props);
+    expect(el.props.data.error).toBe('boom');
+    expect(el.props.callbacks.onRetry).toBe(props.dashboardData.onRetry);
+  });
+
+  it('the history renderer threads error and onRetry from the dashboard data bundle', () => {
+    const props = {
+      dashboardData: {
+        dashboard: { trend: [] }, availableRuns: [], overviewRunIndex: 0,
+        accumulated: null, loading: false, isFetching: false, error: 'boom', onRetry: vi.fn(),
+      },
+      navigation: {
+        selectedProject: 'proj1', selectedSource: 'local', projects: [],
+        projectsLoaded: true, handleNavigate: vi.fn(), historySelectedRun: null,
+        setHistorySelectedRun: vi.fn(),
+      },
+      refreshDashboard: vi.fn(),
+      scheduleDashboardReconcile: vi.fn(),
+    };
+    const el = ROUTE_RENDERERS.history({}, props);
+    expect(el.props.error).toBe('boom');
+    expect(el.props.onRetry).toBe(props.dashboardData.onRetry);
   });
 });
 
@@ -489,6 +546,47 @@ describe('shouldShowProjectTabs', () => {
     expect(shouldShowProjectTabs({
       selectedSource: 'local', hasCurrentProjectRuns: false, sharedProjectInfo: { id: 'team-proj' },
     })).toBe(false);
+  });
+});
+
+// Scenario 7 (collision): the sidebar's violations/history badges must not
+// keep showing the OUTGOING project's numbers once a project switch is in
+// flight. `accumulated`/`dashboard` already reset to null the instant
+// `selectedProject` changes (samePlaceholderScope, api/queryKeys.js), so
+// reading straight off them here is what clears the badges immediately
+// instead of holding onto stale numbers until the new project's fetch lands.
+describe('selectSidebarCounts', () => {
+  it('reads violations/history counts off the filtered view when present', () => {
+    const result = selectSidebarCounts({
+      filteredAccumulated: { summary: { totalViolations: 12 } },
+      accumulated: { summary: { totalViolations: 99 } },
+      filteredTrend: [{ runId: 'r1' }, { runId: 'r2' }],
+      dashboard: { trend: [{ runId: 'r1' }] },
+    });
+    expect(result.violationsCount).toBe(12);
+    expect(result.historyCount).toBe(2);
+  });
+
+  it('falls back to the unfiltered accumulated/dashboard when the filtered view has nothing', () => {
+    const result = selectSidebarCounts({
+      filteredAccumulated: null,
+      accumulated: { summary: { totalViolations: 7 } },
+      filteredTrend: [],
+      dashboard: { trend: [{ runId: 'r1' }, { runId: 'r2' }] },
+    });
+    expect(result.violationsCount).toBe(7);
+    expect(result.historyCount).toBe(2);
+  });
+
+  it('clears both counts on a project switch, before the new project data lands', () => {
+    const result = selectSidebarCounts({
+      filteredAccumulated: null,
+      accumulated: null,
+      filteredTrend: [],
+      dashboard: null,
+    });
+    expect(result.violationsCount).toBeNull();
+    expect(result.historyCount).toBeNull();
   });
 });
 

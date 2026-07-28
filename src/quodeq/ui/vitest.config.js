@@ -6,6 +6,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    unstubEnvs: true,
     setupFiles: ['./vitest.setup.js'],
     // Only discover component/JSX tests. Pure-JS utility tests in `.test.js`
     // files use Node's native `node:test` runner (see `npm test`) and must

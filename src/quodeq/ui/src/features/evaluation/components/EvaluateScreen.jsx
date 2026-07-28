@@ -1,58 +1,25 @@
 import { useState, useEffect } from 'react';
 import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
-import CountdownTimer from './CountdownTimer.jsx';
-import { ACTIVE_PROVIDER_KEY, DEFAULT_TIME_LIMIT_S, LOCAL_API_PROVIDERS, providerKey } from '../../../constants.js';
+import { ACTIVE_PROVIDER_KEY } from '../../../constants.js';
+import { resolveProviderSettings } from '../../../utils/effectiveProviderSettings.js';
 import { TermHeader } from '../../../components/terminal/index.js';
 
 const TOAST_DISMISS_TIMEOUT_MS = 5000;
 
-function ActiveProviderBadge({ storage = localStorage, onClick }) {
-  const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
-  const model = storage.getItem(providerKey(provider, 'model')) || '';
-  if (!provider) return null;
-  const content = (
-    <>
-      <span className="eval-provider-name">{provider}</span>
-      {model && <span className="eval-provider-sep" aria-hidden="true">·</span>}
-      {model && <span className="eval-provider-model">{model}</span>}
-    </>
-  );
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        className="eval-provider-badge eval-provider-badge--clickable"
-        onClick={onClick}
-        title="Open provider settings"
-      >
-        {content}
-      </button>
-    );
-  }
-  return <div className="eval-provider-badge">{content}</div>;
-}
-
 export function readBudgetSeconds(storage = localStorage) {
   const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
   if (!provider) return 0;
-  // Read new key first; fall back to legacy 'pool-budget' for back-compat.
-  const raw = storage.getItem(providerKey(provider, 'time-limit'))
-    ?? storage.getItem(providerKey(provider, 'pool-budget'));
-  // Same unset-key defaults the start payload uses (see preparePayload in
-  // useEvaluation.js) so the header can never claim a limit the run won't get.
-  if (raw === null || raw === undefined) return LOCAL_API_PROVIDERS.has(provider) ? 0 : DEFAULT_TIME_LIMIT_S;
-  const parsed = parseInt(raw, 10);
-  return Number.isFinite(parsed) ? parsed : 0;
+  // Same resolution the start payload and the Settings screen use, so the
+  // header can never claim a limit the run won't get.
+  return resolveProviderSettings(provider, storage).timeLimitS;
 }
 
-function EvaluateHeader({ job, onGoToSettings }) {
+function EvaluateHeader() {
   // Page title stays steady ("evaluate"); the live "in progress / failed /
   // done" state is carried by the JobHeader card title below to avoid
-  // doubling the same status on screen.
-  const deadlineAt = job?.deadlineAt ?? null;
-  const phase = job?.phase ?? job?.status ?? null;
-  const budgetSeconds = readBudgetSeconds();
+  // doubling the same status on screen. Budget lives in the progress footer
+  // while a run is on; the model lives in the cards' identity strips.
   return (
     <header className="evaluate-header evaluate-header--terminal">
       <div className="evaluate-header__left">
@@ -60,10 +27,6 @@ function EvaluateHeader({ job, onGoToSettings }) {
           name="evaluate"
           sub="run a comprehensive code quality evaluation on any repository"
         />
-      </div>
-      <div className="evaluate-header__right">
-        <CountdownTimer deadlineAt={deadlineAt} budgetSeconds={budgetSeconds} phase={phase} />
-        <ActiveProviderBadge onClick={onGoToSettings} />
       </div>
     </header>
   );
@@ -134,11 +97,11 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
 
   return (
     <section className="evaluate-screen">
-      <EvaluateHeader job={job} onGoToSettings={onGoToSettings} />
+      <EvaluateHeader />
 
       <div className="evaluate-content">
         {!job && selectedProject && (
-          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={wrappedOnStart} disabled={false} preselectDims={preselectDims} />
+          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={wrappedOnStart} disabled={false} preselectDims={preselectDims} onGoToSettings={onGoToSettings} onGoToProjects={onGoToProjects} />
         )}
 
         {!job && !selectedProject && (

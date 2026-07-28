@@ -8,6 +8,7 @@ from pathlib import Path
 from flask import Flask, Response, current_app, jsonify, request
 
 from quodeq.api._sse_log_helpers import sse_tail_generator as _sse_tail_generator
+from quodeq.shared.validation import validate_path_segment
 
 # Lines containing this marker are kept in run.log for forensics but suppressed
 # from the dashboard's live console — they're per-minute resource snapshots
@@ -115,6 +116,10 @@ def register_log_stream_routes(app: Flask) -> None:
 
     @app.get("/api/jobs/<job_id>/logs")
     def plain_logs(job_id: str) -> Response | tuple[Response, int]:
+        try:
+            validate_path_segment(job_id)
+        except ValueError:
+            return jsonify({"error": "invalid job id", "code": "INVALID_INPUT"}), HTTPStatus.BAD_REQUEST
         log_path, err = _resolve_run_log(job_id)
         if log_path is None:
             return jsonify({"error": "log unavailable", "code": "NOT_FOUND"}), err
@@ -128,6 +133,10 @@ def register_log_stream_routes(app: Flask) -> None:
 
     @app.get("/api/jobs/<job_id>/logs/stream")
     def stream_logs(job_id: str) -> Response | tuple[Response, int]:
+        try:
+            validate_path_segment(job_id)
+        except ValueError:
+            return jsonify({"error": "invalid job id", "code": "INVALID_INPUT"}), HTTPStatus.BAD_REQUEST
         provider = current_app.config.get("_provider")
         log_path, err = _resolve_run_log(job_id)
         # If run.log isn't on disk yet but the job is still preparing

@@ -17,6 +17,7 @@ import PrinciplesRadial from './PrinciplesRadial.jsx';
 import PrinciplesCardsRow from './PrinciplesCardsRow.jsx';
 import DimensionScoreHistoryPanel from './DimensionScoreHistoryPanel.jsx';
 import StatGrid2x2 from './StatGrid2x2.jsx';
+import { countBySeverity } from '../../../utils/severity.js';
 
 function buildRadialPrinciples(principleGrades) {
   return (principleGrades || []).map((pg) => {
@@ -43,11 +44,7 @@ function buildEnrichedPrinciples(principleGrades, allViolations, complianceByPri
   }
   return (principleGrades || []).map((pg) => {
     const vs = violationsByPrinciple.get(pg.principle) || [];
-    const severity = { critical: 0, major: 0, minor: 0 };
-    for (const v of vs) {
-      const s = (v.severity || 'minor').toLowerCase();
-      if (severity[s] !== undefined) severity[s]++;
-    }
+    const severity = countBySeverity(vs);
     const compliance = complianceByPrinciple?.get?.(pg.principle) || [];
     return {
       ...pg,
@@ -126,6 +123,18 @@ export default function ExplorerPage({
 
   if (d.loading) return <LoadingScreen />;
   if (d.error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;
+  if (d.waiting) {
+    // 202 from the backend: the run exists but this dimension's report
+    // isn't written (still running, or the run stopped before reaching it).
+    // Rendering it as data would show SCORE — / 0 violations and read as a
+    // clean pass.
+    return (
+      <div className="empty-state">
+        <h2>Report not ready</h2>
+        <p>This dimension has no written report yet. The run may still be in progress, or it stopped before this dimension was scored.</p>
+      </div>
+    );
+  }
   if (!d.evalData) return <div className="empty-state"><h2>No data found</h2></div>;
 
   const dim = String(d.evalData.dimension || '').toLowerCase();

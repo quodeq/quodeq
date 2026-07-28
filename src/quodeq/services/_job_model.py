@@ -45,6 +45,7 @@ class Job:
     dimensions: list[str] | None = None
     ai_provider: str | None = None
     ai_model: str | None = None
+    time_limit_s: int | None = None  # 0 = unlimited, None = unknown
 
     def complete(self, exit_code: int, ended_at: str) -> None:
         """Transition job to a terminal state based on exit code."""
@@ -87,6 +88,7 @@ class Job:
             dimensions=self.dimensions,
             ai_provider=self.ai_provider,
             ai_model=self.ai_model,
+            time_limit_s=self.time_limit_s,
         )
 
 
@@ -190,6 +192,7 @@ def _job_to_json(job: Job) -> dict:
         "dimensions": job.dimensions,
         "ai_provider": job.ai_provider,
         "ai_model": job.ai_model,
+        "time_limit_s": job.time_limit_s,
     }
 
 
@@ -212,6 +215,7 @@ def _job_from_json(data: dict) -> Job:
         dimensions=data.get("dimensions"),
         ai_provider=data.get("ai_provider"),
         ai_model=data.get("ai_model"),
+        time_limit_s=data.get("time_limit_s"),
     )
 
 
@@ -281,10 +285,16 @@ class FileJobStore:
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
                 job = _job_from_json(data)
-                # Jobs that were 'running' when we crashed are effectively failed.
+                # Jobs that were 'running' when the server went down lose
+                # their monitor thread, but the subprocess itself was
+                # spawned start_new_session=True and usually survives — the
+                # run may well still be alive and writing status.json. Mark
+                # the job 'lost' (tracking gone), NOT 'failed': the merged
+                # evaluations list then yields to the truthful ext- index
+                # row for the same run, which can still track and cancel it.
                 if job.status == "running":
-                    job.status = "failed"
-                    job.exit_code = -1
+                    job.status = "lost"
+                    job.exit_code = None
                     # Stamp an end time or _cleanup_stale (which only prunes
                     # jobs with ended_at) keeps the flipped job forever.
                     if not job.ended_at:

@@ -3,6 +3,7 @@ import CopyButton from '../../../components/CopyButton.jsx';
 import { gradeLabel, gradeLetter, extDisplayName } from '../../../utils/formatters.js';
 import { TermHeader } from '../../../components/terminal/index.js';
 import { relativeTime } from '../../../components/LastFetchedLine.jsx';
+import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import { useSharedProjects } from '../hooks/useSharedProjects.js';
 import { usePublish } from '../hooks/usePublish.js';
 import { useMergedProjects } from '../hooks/useMergedProjects.js';
@@ -571,7 +572,7 @@ function SyncedIndicator({ configured, lastSynced, stale, error, refreshing, onR
   );
 }
 
-export default function ProjectsPage({ projects = [], selectedProject, isEvaluating = false, filters, actions }) {
+export default function ProjectsPage({ projects = [], projectsLoaded = true, selectedProject, isEvaluating = false, filters, actions }) {
   const {
     onSelect, onDelete, onExport, onRelocate, onAddProject, onImportProject,
     onResumeSetup, onFiltersChange, onProjectsReload,
@@ -762,7 +763,11 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
       <div className="projects-page__header">
         <TermHeader
           name="repositories"
-          sub={`${projects.length} ${projects.length === 1 ? 'repository' : 'repositories'} evaluated`}
+          sub={
+            projectsLoaded
+              ? `${projects.length} ${projects.length === 1 ? 'repository' : 'repositories'} evaluated`
+              : 'loading…'
+          }
         />
         {!isEmpty && (
           <div className="projects-page__header-actions">
@@ -793,7 +798,9 @@ export default function ProjectsPage({ projects = [], selectedProject, isEvaluat
           </div>
         )}
       </div>
-      {isEmpty ? (
+      {!projectsLoaded ? (
+        <LoadingScreen variant="inline" />
+      ) : isEmpty ? (
         <EmptyProjectsCTA onAddProject={onAddProject} onImportProject={onImportProject} isEvaluating={isEvaluating} />
       ) : (
         <>

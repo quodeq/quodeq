@@ -82,9 +82,10 @@ jobs:
         id: snyk_code
         if: env.SNYK_TOKEN != ''
         continue-on-error: true
-        # Scoped to src/quodeq: tests/ and benchmarks/ hold intentionally
-        # vulnerable fixtures that would always fail a repo-wide SAST scan.
-        run: snyk code test src/quodeq --severity-threshold=high --sarif-file-output=snyk-code.sarif
+        # Runs from the repo root so SARIF paths match repo paths and alerts
+        # link to files in the Security tab. tests/ and benchmarks/ hold
+        # intentionally vulnerable fixtures; excluded via .snyk.
+        run: snyk code test --severity-threshold=high --sarif-file-output=snyk-code.sarif
 
       # Distinct categories keep the three analyses from overwriting each other
       # in the code scanning tab. hashFiles guards against a scan erroring out
@@ -110,12 +111,16 @@ jobs:
           sarif_file: snyk-code.sarif
           category: snyk-code
 
-      - name: Fail if any Snyk scan found high-severity issues
+      # Snyk Code is report-only (SARIF still uploads above): it models Flask
+      # routes as HTML-rendering and flags jsonify returns as XSS, and this
+      # plan has no .snyk ignore support for Code findings, so its exit code
+      # cannot be made clean without dropping real coverage. CodeQL is the
+      # SAST gate; the deps scans below stay blocking.
+      - name: Fail if a Snyk dependency scan found high-severity issues
         if: >-
           env.SNYK_TOKEN != '' &&
           (steps.snyk_python.outcome == 'failure' ||
-           steps.snyk_ui.outcome == 'failure' ||
-           steps.snyk_code.outcome == 'failure')
+           steps.snyk_ui.outcome == 'failure')
         run: |
-          echo "One or more Snyk scans reported high-severity issues. See the Security tab."
+          echo "A Snyk dependency scan reported high-severity issues. See the Security tab."
           exit 1

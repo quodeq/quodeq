@@ -90,6 +90,7 @@ def write_status(
     deadline_at: str | None = None,
     ai_provider: str | None = None,
     ai_model: str | None = None,
+    time_limit_s: int | None = None,
 ) -> None:
     """Atomically write status.json with *state* and metadata.
 
@@ -115,6 +116,8 @@ def write_status(
         "exit_reason": exit_reason,
         "deadline_at": deadline_at,
     }
+    if time_limit_s is not None:
+        payload["time_limit_s"] = time_limit_s
     if ai_provider is not None:
         payload["ai_provider"] = ai_provider
     if ai_model is not None:

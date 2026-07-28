@@ -1869,6 +1869,15 @@ textarea:focus {
   animation: loading-fadein 500ms ease;
 }
 
+/* Contained variant for loaders mounted within an already-rendered page (see
+   LoadingScreen.jsx's `variant` prop). Scoped to the nearest positioned
+   ancestor -- `main.dashboard` -- instead of the viewport, so it never covers
+   Sidebar/TopBar and both stay interactive while it's up. */
+.loading-screen--inline {
+  position: absolute;
+  z-index: 2;
+}
+
 .loading-message {
   margin: 0;
   font-size: var(--text-sm);

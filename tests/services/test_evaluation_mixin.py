@@ -154,12 +154,16 @@ class TestBuildEvalEnv:
         env = m._build_eval_env("/repo", opts, env={})
         assert env["QUODEQ_TIME_LIMIT"] == str(_DEFAULT_TIME_LIMIT)
 
-    def test_unlimited_time_limit_not_set(self):
-        # 0 means "unlimited" — no deadline should be propagated.
+    def test_unlimited_time_limit_propagated_as_zero(self):
+        # 0 means "unlimited". It must reach the subprocess explicitly:
+        # with the env var absent the CLI resolves the limit to None and
+        # the pool substitutes the 600s default, so "unlimited" runs died
+        # at exactly 10 minutes. Downstream treats 0 as unlimited and
+        # sets no deadline.
         m = self._mixin()
         opts = EvaluationOptions(time_limit=0)
         env = m._build_eval_env("/repo", opts, env={})
-        assert "QUODEQ_TIME_LIMIT" not in env
+        assert env["QUODEQ_TIME_LIMIT"] == "0"
 
     def test_per_dimension(self):
         m = self._mixin()
@@ -172,6 +176,24 @@ class TestBuildEvalEnv:
         opts = EvaluationOptions(context_size=128000)
         env = m._build_eval_env("/repo", opts, env={})
         assert env["QUODEQ_CONTEXT_SIZE"] == "128000"
+
+    def test_cloud_provider_api_key_exported(self):
+        # The subprocess resolves cloud keys from the env var named by the
+        # provider's api_key_env. Only omlx used to get its key exported, so
+        # an OpenRouter key typed in Settings was silently discarded.
+        m = self._mixin()
+        opts = EvaluationOptions(ai_cmd="openrouter", provider_api_key="sk-or-1")
+        env = m._build_eval_env("/repo", opts, env={})
+        assert env["OPENROUTER_API_KEY"] == "sk-or-1"
+
+    def test_omlx_key_and_base_still_exported(self):
+        m = self._mixin()
+        opts = EvaluationOptions(
+            ai_cmd="omlx", provider_api_key="k1", provider_api_base="http://h:1/v1",
+        )
+        env = m._build_eval_env("/repo", opts, env={})
+        assert env["OMLX_API_KEY"] == "k1"
+        assert env["OMLX_BASE_URL"] == "http://h:1/v1"
 
     def test_zero_context_size_not_set(self):
         m = self._mixin()
@@ -195,7 +217,15 @@ class TestSubprocessDispatcher:
         assert result == expected
         mock_mgr.start_job.assert_called_once_with(
             ["cmd"], cwd="/tmp", env={"A": "1"}, ai_provider=None, ai_model=None,
+            time_limit_s=None,
         )
+
+    def test_forwards_time_limit(self):
+        mock_mgr = MagicMock()
+        mock_mgr.start_job.return_value = JobSnapshot(job_id="j1", status="running")
+        dispatcher = SubprocessDispatcher(mock_mgr)
+        dispatcher.dispatch(["cmd"], time_limit_s=0)
+        assert mock_mgr.start_job.call_args.kwargs["time_limit_s"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -245,6 +275,15 @@ class TestStartEvaluation:
         opts = EvaluationOptions()
         snap = m.start_evaluation(str(tmp_path), str(tmp_path / "reports"), opts)
         assert snap.job_id == "j1"
+
+    @patch("quodeq.services.evaluation_mixin._register_project")
+    def test_start_passes_time_limit_to_dispatcher(self, mock_reg, tmp_path: Path):
+        # The job snapshot is the only channel through which the progress
+        # route and the UI can learn the run's budget.
+        m = self._setup_mixin()
+        opts = EvaluationOptions(time_limit=900)
+        m.start_evaluation(str(tmp_path), str(tmp_path / "reports"), opts)
+        assert m._dispatcher.dispatch.call_args.kwargs["time_limit_s"] == 900
 
     def test_nonexistent_local_path_raises(self):
         m = self._setup_mixin()
@@ -297,6 +336,23 @@ class TestCancelEvaluation:
         m._jobs.get_job.return_value = JobSnapshot(job_id="j1", status="running")
         result = m.cancel_evaluation("j1")
         assert result is True
+
+    def test_cancel_before_report_path_marker_does_not_raise(self):
+        # A job cancelled in its first seconds has no output_project /
+        # output_run_id yet (the report_path marker hasn't been parsed).
+        # Building the run_dir path with None segments raised TypeError and
+        # turned the cancel into an HTTP 500 after the process was already
+        # killed.
+        m = FsEvaluationMixin()
+        m._jobs = MagicMock()
+        m._jobs.cancel_job.return_value = True
+        m._jobs.get_job.return_value = JobSnapshot(job_id="j1", status="running")
+        with patch("quodeq.services.evaluation_mixin._score_completed_evidence") as mock_score, \
+             patch("quodeq.services.evaluation_mixin._wait_for_terminal_status") as mock_wait:
+            result = m.cancel_evaluation("j1", reports_dir="/reports")
+        assert result is True
+        mock_wait.assert_not_called()
+        mock_score.assert_not_called()
 
     def test_cancel_scores_external_jobs_via_get_evaluation_status(self):
         """External (ext-) cancels must still score completed dimensions.

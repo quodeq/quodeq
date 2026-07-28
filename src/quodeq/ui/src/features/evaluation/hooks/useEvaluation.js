@@ -21,7 +21,7 @@
  *     terminal surface in the dashboard so users can close and reopen the UI
  *     without losing visibility into an in-progress scan.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { chooseDialog } from "../../../utils/chooseDialog.js";
@@ -30,50 +30,59 @@ import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
 import {
   ACTIVE_PROVIDER_KEY,
   providerKey,
-  DEFAULT_MAX_SUBAGENTS,
-  DEFAULT_TIME_LIMIT_S,
   LOCAL_API_PROVIDERS,
 } from "../../../constants.js";
+import { resolveProviderSettings } from "../../../utils/effectiveProviderSettings.js";
 
 const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === "true";
 const JOB_POLL_MS = 1500;
 const DIM_POLL_MS = 2000;
-const DEFAULT_OLLAMA_SUBAGENTS = "1";
-const DEFAULT_CLI_SUBAGENTS = String(DEFAULT_MAX_SUBAGENTS);
-const DEFAULT_OLLAMA_BUDGET = "0";
-const DEFAULT_CLI_BUDGET = String(DEFAULT_TIME_LIMIT_S);
+
+/**
+ * Poll interval for the live findings query. Exported for tests.
+ *
+ * Polling must stop once the job is terminal: without the gate a finished
+ * run kept re-fetching every full evaluation/<dim>.json payload every 2s
+ * for as long as the Evaluate card stayed mounted.
+ */
+export function findingsRefetchInterval(job, sseEnabled = SSE_ENABLED) {
+  if (sseEnabled) return false;
+  if (job?.status && job.status !== "running") return false;
+  return DIM_POLL_MS;
+}
 // Re-exported for the existing importers; the set itself lives in constants.js
 // so the Evaluate header resolves unset limits exactly like the start payload.
 export { LOCAL_API_PROVIDERS };
 
 /**
  * Merge per-provider Settings (provider, model, subagents, budget, etc.)
- * from localStorage into the start-evaluation payload. Mirrors the legacy
- * useEvaluation behavior; throws a user-facing error if no provider/model
- * is configured.
+ * from localStorage into the start-evaluation payload.
+ *
+ * Caller-provided values win: a wizard launch names its provider/model and
+ * time limit explicitly, and those must not be silently overwritten by the
+ * active tab's Settings (the wizard's TIME LIMIT field used to be dead
+ * code because of exactly that). Per-provider settings are read from the
+ * payload's provider when one is named. Unset keys resolve through
+ * resolveProviderSettings — the same source of truth the Settings screen
+ * and the Evaluate header display. Throws a user-facing error if no
+ * provider/model is configured.
  */
 function preparePayload(payload, storage = localStorage) {
-  const activeProvider = storage.getItem(ACTIVE_PROVIDER_KEY) || "";
-  if (!activeProvider) throw new Error("No provider selected. Go to Settings to configure one.");
-  const get = (key) => storage.getItem(providerKey(activeProvider, key));
-  const model = get("model");
+  const provider = payload.aiCmd || storage.getItem(ACTIVE_PROVIDER_KEY) || "";
+  if (!provider) throw new Error("No provider selected. Go to Settings to configure one.");
+  const get = (key) => storage.getItem(providerKey(provider, key));
+  const model = payload.aiModel || get("model");
   if (!model) throw new Error("No model selected. Go to Settings and select one.");
-  const isLocalApi = LOCAL_API_PROVIDERS.has(activeProvider);
-  const subagents = parseInt(get("subagents") || (isLocalApi ? DEFAULT_OLLAMA_SUBAGENTS : DEFAULT_CLI_SUBAGENTS), 10);
-  // Read new key first; fall back to legacy 'pool-budget' for back-compat.
-  const timeLimit = parseInt(
-    get("time-limit") || get("pool-budget") || (isLocalApi ? DEFAULT_OLLAMA_BUDGET : DEFAULT_CLI_BUDGET),
-    10,
-  );
+  const settings = resolveProviderSettings(provider, storage);
   const result = {
     ...payload,
-    aiCmd: activeProvider,
+    aiCmd: provider,
     aiModel: model,
-    maxSubagents: subagents,
-    timeLimit,
+    maxSubagents: settings.subagents,
+    timeLimit: payload.timeLimit ?? settings.timeLimitS,
   };
-  if (get("per-dimension") === "true") result.perDimension = true;
-  if (get("verify") === "false") result.verifyFindings = false;
+  if (settings.perDimension) result.perDimension = true;
+  if (!settings.verify) result.verifyFindings = false;
   const apiKey = get("api-key");
   if (apiKey) result.apiKey = apiKey;
   const apiBase = get("api-base");
@@ -157,8 +166,24 @@ export function useEvaluation() {
     },
     enabled: !!jobId && (SSE_ENABLED || !!job?.outputProject),
     staleTime: SSE_ENABLED ? Infinity : 0,
-    refetchInterval: SSE_ENABLED ? false : DIM_POLL_MS,
+    refetchInterval: findingsRefetchInterval(job),
   });
+
+  // One final fetch on the running->terminal edge: the last dimension's
+  // report usually lands between the final running poll and the terminal
+  // transition, and stopping cold would freeze the feed just short of it.
+  const { refetch: refetchFindings } = findingsQuery;
+  const findingsSettledRef = useRef(false);
+  const isJobTerminal = !!job?.status && job.status !== "running";
+  useEffect(() => {
+    if (!jobId || SSE_ENABLED) return;
+    if (isJobTerminal && !findingsSettledRef.current) {
+      findingsSettledRef.current = true;
+      refetchFindings();
+    } else if (!isJobTerminal) {
+      findingsSettledRef.current = false;
+    }
+  }, [jobId, isJobTerminal, refetchFindings]);
 
   // Group findings into the legacy { [dim]: [violations] } shape.
   const findings = findingsQuery.data || [];
@@ -229,11 +254,15 @@ export function useEvaluation() {
     },
     onError: (err) => {
       // The backend returns 409 when the job is no longer cancellable
-      // (process gone, status already terminal, etc.). Without this handler
-      // the user is trapped: status stays "running", Cancel does nothing
-      // visible. Surface the message and clear locally so the panel closes.
+      // (process gone, status already terminal) and 404 when it is unknown.
+      // Only those mean the job is really over — clear it so the panel
+      // closes. A transient failure (500, network, the 30s request timeout
+      // racing the ~33s server-side kill path) must KEEP the job: clearing
+      // it hid a still-running scan and let a second concurrent scan start
+      // on the same project.
       const msg = err?.message || "Could not cancel evaluation";
       setJobError(msg);
+      if (err?.status !== 409 && err?.status !== 404) return;
       const id = jobId;
       if (id) queryClient.removeQueries({ queryKey: evaluationKeys.evaluation(id) });
       setJobId(null);
