@@ -94,26 +94,18 @@ function DimRow({ dim }) {
   } else {
     // Only show a clock segment when we actually have a number to print.
     // Without this guard, a running dim with no elapsed time yields a
-    // dangling "· —" tail.
-    let budgetPart = null;
-    if (dim.budgetS) {
-      const overrun = dim.elapsedS != null && dim.elapsedS > dim.budgetS;
-      const cls = overrun ? 'scan-progress__budget scan-progress__budget--overrun' : 'scan-progress__budget';
-      budgetPart = (
-        <span className={cls}>
-          {formatClock(dim.elapsedS)} / {formatClock(dim.budgetS)} budget
-        </span>
-      );
-    } else if (dim.elapsedS != null) {
-      budgetPart = <span className="scan-progress__budget">{formatClock(dim.elapsedS)}</span>;
-    }
+    // dangling "· —" tail. The time budget is run-level (shared across
+    // dimensions, shown in the footer), so rows only get their elapsed.
+    const clockPart = dim.elapsedS != null
+      ? <span className="scan-progress__budget">{formatClock(dim.elapsedS)}</span>
+      : null;
     meta = (
       <>
         {dim.activeAgents > 0 && <>{dim.activeAgents} agents</>}
         {reasonBadge}
         {dim.violations > 0 && <> · <span className="scan-progress__v">{dim.violations}v</span></>}
         {dim.compliance > 0 && <> · <span className="scan-progress__c">{dim.compliance}c</span></>}
-        {budgetPart && <> · {budgetPart}</>}
+        {clockPart && <> · {clockPart}</>}
       </>
     );
   }
@@ -198,11 +190,18 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
       ? <div className="scan-progress__error">Server restarted, job tracking lost</div>
       : null;
 
-  // The old header countdown moved here: while a dimension runs, its elapsed
-  // vs its own budget (the limit is per-dimension); otherwise total elapsed.
-  const runningDim = dims.find((d) => d?.state === 'running');
-  const clockPart = isRunning && runningDim?.budgetS > 0
-    ? <> · {formatClock(runningDim.elapsedS)} of {formatClock(runningDim.budgetS)} budget</>
+  // The time limit is one deadline for the whole run, shared across all
+  // selected dimensions — so the countdown pairs total elapsed with the
+  // run-level budget. Overrun can show briefly: the watchdog allows a
+  // short grace past the deadline before killing the job.
+  const runBudgetS = progress?.budgetS;
+  const overrun = runBudgetS > 0 && progress?.totalElapsedS > runBudgetS;
+  const clockPart = isRunning && runBudgetS > 0
+    ? (
+      <> · <span className={overrun ? 'scan-progress__budget scan-progress__budget--overrun' : 'scan-progress__budget'}>
+        {formatClock(progress.totalElapsedS)} of {formatClock(runBudgetS)} budget
+      </span></>
+    )
     : progress?.totalElapsedS != null
       ? <> · {formatClock(progress.totalElapsedS)} total</>
       : null;

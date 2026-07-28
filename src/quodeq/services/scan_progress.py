@@ -41,7 +41,6 @@ class _DimProgress:
     suppressed: int = 0  # re-found findings already dismissed/deleted in the dashboard
     quarantined: int = 0  # findings whose principle is not in the dimension's standard
     elapsed_s: float | None = None
-    budget_s: int | None = None
     active_agents: int = 0
     estimate_reason: str | None = None  # see _dim_estimates module docstring
     exit_reason: str | None = None
@@ -58,6 +57,9 @@ class _ScanProgress:
     current_dimension: str | None
     project_files: int
     total_elapsed_s: float | None
+    # The time limit is one deadline for the whole run, shared across all
+    # selected dimensions — never a per-dimension allowance.
+    budget_s: int | None = None
     dimensions: list[_DimProgress] = field(default_factory=list)
 
 
@@ -200,7 +202,7 @@ def _dim_elapsed_s(dim_id: str, run_dir: Path, state: str) -> float | None:
     return max(0.0, end - start)
 
 
-def _consolidated_dim_progress(run_dir: Path, time_limit_s: int | None) -> _DimProgress:
+def _consolidated_dim_progress(run_dir: Path) -> _DimProgress:
     """Progress row for a live consolidated (grouped) pass.
 
     Evidence counters are the raw cross-dimension tally: suppression
@@ -217,7 +219,6 @@ def _consolidated_dim_progress(run_dir: Path, time_limit_s: int | None) -> _DimP
             taken += len(fs)
     pending = len(queue.get("pending") or [])
     tally = tally_unique_findings(evidence_dir / "consolidated_evidence.jsonl")
-    budget = time_limit_s if (time_limit_s and time_limit_s > 0) else None
     return _DimProgress(
         id="consolidated",
         state="running",
@@ -226,7 +227,6 @@ def _consolidated_dim_progress(run_dir: Path, time_limit_s: int | None) -> _DimP
         compliance=tally.compliance,
         duplicates=tally.duplicates,
         elapsed_s=_dim_elapsed_s("consolidated", run_dir, "running"),
-        budget_s=budget,
         active_agents=_active_agents(evidence_dir, "consolidated"),
     )
 
@@ -275,6 +275,7 @@ def build_scan_progress(
     else:
         total_elapsed_s = None
 
+    run_budget_s = time_limit_s if (time_limit_s and time_limit_s > 0) else None
     project_files = _project_total_files(run_dir)
     dim_estimates = read_dim_estimates(run_dir)
     dim_records = read_dimensions(run_dir).get("dimensions") or {}
@@ -314,7 +315,8 @@ def build_scan_progress(
             current_dimension=status.get("current_dimension"),
             project_files=project_files,
             total_elapsed_s=total_elapsed_s,
-            dimensions=[_consolidated_dim_progress(run_dir, time_limit_s)],
+            budget_s=run_budget_s,
+            dimensions=[_consolidated_dim_progress(run_dir)],
         )
 
     # The scanner re-finds everything the user has dismissed or deleted, so a
@@ -372,7 +374,6 @@ def build_scan_progress(
             resolver=build_principle_resolver(dim_id, evaluators_dir, compiled_dir),
         )
         elapsed = _dim_elapsed_s(dim_id, run_dir, d_state)
-        budget = time_limit_s if (d_state == "running" and time_limit_s and time_limit_s > 0) else None
         active = _active_agents(evidence_dir, dim_id) if d_state == "running" else 0
 
         dim_results.append(_DimProgress(
@@ -385,7 +386,6 @@ def build_scan_progress(
             suppressed=tally.suppressed,
             quarantined=tally.quarantined,
             elapsed_s=elapsed,
-            budget_s=budget,
             active_agents=active,
             estimate_reason=estimate_reason,
             exit_reason=exit_reason,
@@ -401,6 +401,7 @@ def build_scan_progress(
         current_dimension=status.get("current_dimension"),
         project_files=project_files,
         total_elapsed_s=total_elapsed_s,
+        budget_s=run_budget_s,
         dimensions=dim_results,
     )
 

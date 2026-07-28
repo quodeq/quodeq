@@ -21,7 +21,7 @@ const EVAL_OPTIONS_HINT = (
     <div><strong>Scope</strong>: click the scope cell to restrict the evaluation to a subfolder. Default is the whole project.</div>
     <div><strong>Model</strong>: click the model cell to pick the provider/model in Settings.</div>
     <div><strong>Scan mode</strong>: incremental re-analyzes only files changed since the last run; clean scan re-evaluates everything from scratch.</div>
-    <div><strong>Time budget</strong>: per-dimension limit for this run. It auto-scales up for large file sets.</div>
+    <div><strong>Time budget</strong>: total limit for the whole run, shared across the selected dimensions. Whatever doesn't finish in time is picked up by the next run.</div>
   </>
 );
 
@@ -238,7 +238,7 @@ function BudgetChips({ valueS, onChange, disabled }) {
     <div className="eval-budget">
       <div className="eval-budget__head">
         <span className="eval-budget__label">time budget</span>
-        <span className="eval-budget__sub">per dimension · auto-scales for large file sets</span>
+        <span className="eval-budget__sub">total for the run · shared across dimensions</span>
       </div>
       <div className="eval-budget-chips">
         {BUDGET_CHOICES_S.map((s) => (
@@ -281,7 +281,7 @@ function RunBar({ disabled, canStart, handleScan, selectedDims, estimates, clean
       }, null)
     : null;
 
-  const budgetPart = timeLimitS > 0 ? `${formatBudgetLabel(timeLimitS)} budget each` : 'no time limit';
+  const budgetPart = timeLimitS > 0 ? `${formatBudgetLabel(timeLimitS)} total budget` : 'no time limit';
   const line1 = picked > 0
     ? [
         `${picked} dimension${picked === 1 ? '' : 's'}`,

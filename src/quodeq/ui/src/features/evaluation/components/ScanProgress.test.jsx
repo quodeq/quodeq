@@ -225,12 +225,37 @@ describe('ScanProgress total coverage (incremental runs)', () => {
     expect(screen.queryByText('preparing…')).toBeNull();
   });
 
-  it('shows the running dimension budget in the footer', async () => {
+  it('shows run elapsed against the total run budget in the footer', async () => {
     const payload = coveragePayload();
+    payload.budgetS = 600;
+    payload.totalElapsedS = 78;
+    getEvaluationProgress.mockResolvedValue(payload);
+    withEvalLog(<ScanProgress job={baseJob} />, ctx);
+    expect(await screen.findByText(/1:18 of 10:00 budget/)).toBeInTheDocument();
+  });
+
+  it('marks the footer budget as overrun once elapsed passes it', async () => {
+    const payload = coveragePayload();
+    payload.budgetS = 600;
+    payload.totalElapsedS = 640;
+    getEvaluationProgress.mockResolvedValue(payload);
+    const { container } = withEvalLog(<ScanProgress job={baseJob} />, ctx);
+    await screen.findByText(/10:40 of 10:00 budget/);
+    expect(container.querySelector('.scan-progress__budget--overrun')).not.toBeNull();
+  });
+
+  it('never shows a per-dimension budget in the detail rows', async () => {
+    const payload = coveragePayload();
+    payload.budgetS = 600;
+    // Legacy payloads carried the run budget on the running dim; it must
+    // not render as if the dimension had its own allowance.
     payload.dimensions[0].budgetS = 600;
     payload.dimensions[0].elapsedS = 78;
     getEvaluationProgress.mockResolvedValue(payload);
     withEvalLog(<ScanProgress job={baseJob} />, ctx);
-    expect(await screen.findByText(/1:18 of 10:00 budget/)).toBeInTheDocument();
+    fireEvent.click(await screen.findByTitle('Show per-dimension detail'));
+    const row = (await screen.findByText('security')).closest('.scan-progress__dim');
+    expect(row.textContent).toContain('1:18');
+    expect(row.textContent).not.toContain('budget');
   });
 });

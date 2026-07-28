@@ -53,7 +53,7 @@ export function detectedLanguages(languages, limit = 4) {
     .slice(0, limit);
 }
 
-/** Preset per-dimension time budgets, in seconds. 0 = no limit. */
+/** Preset total run time budgets, in seconds. 0 = no limit. */
 export const BUDGET_CHOICES_S = [300, 600, 1200, 1800, 0];
 
 /** "10:00" for seconds, "no limit" for 0/negative. */
