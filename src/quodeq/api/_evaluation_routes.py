@@ -198,9 +198,9 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
         if run_dir is None:
             body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
-        # Time limit for the running dim's bar. The snapshot carries the
+        # Total time limit for the whole run. The snapshot carries the
         # budget for both internal jobs (JobManager) and index-served runs
-        # (read from status.json). 0 = unlimited -> no bar.
+        # (read from status.json). 0 = unlimited -> no budget shown.
         time_limit_s: int | None = None
         snapshot = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
         if snapshot is not None:

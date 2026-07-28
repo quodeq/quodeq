@@ -112,8 +112,11 @@ def test_budget_resolved_from_snapshot(reports_root: Path):
     client = create_app(_make_provider(run_dir, 600)).test_client()
     response = client.get("/api/evaluations/job-1/progress")
     assert response.status_code == 200
-    dims = response.get_json()["dimensions"]
-    assert dims[0]["budgetS"] == 600
+    body = response.get_json()
+    # The time limit is one deadline for the whole run, so the budget is
+    # reported at run level, never per dimension.
+    assert body["budgetS"] == 600
+    assert body["dimensions"][0].get("budgetS") is None
 
 
 def test_unlimited_budget_stays_absent(reports_root: Path):
@@ -121,5 +124,6 @@ def test_unlimited_budget_stays_absent(reports_root: Path):
     client = create_app(_make_provider(run_dir, 0)).test_client()
     response = client.get("/api/evaluations/job-1/progress")
     assert response.status_code == 200
-    dims = response.get_json()["dimensions"]
-    assert dims[0].get("budgetS") is None
+    body = response.get_json()
+    assert body.get("budgetS") is None
+    assert body["dimensions"][0].get("budgetS") is None
