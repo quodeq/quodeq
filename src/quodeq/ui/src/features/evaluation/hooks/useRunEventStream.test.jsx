@@ -41,13 +41,13 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("opens an EventSource against the events endpoint when SSE is enabled", () => {
-    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     renderStreamAndQuery("job-123", evaluationKeys.status("job-123"));
     expect(MockEventSource.last.url).toBe("/api/evaluations/job-123/events");
   });
 
   it("writes status events into evaluationKeys.status cache slot", async () => {
-    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const { result } = renderStreamAndQuery("job-1", evaluationKeys.status("job-1"));
     act(() => {
       MockEventSource.last.emit("status", { state: "running", phase: "analyzing" });
@@ -58,7 +58,7 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("appends finding events into evaluationKeys.findings cache slot", async () => {
-    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const { result } = renderStreamAndQuery("job-1", evaluationKeys.findings("job-1"));
     act(() => {
       MockEventSource.last.emit("finding", { id: 1, practice_id: "P1" });
@@ -73,7 +73,7 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("writes dimension-completed events as a map keyed by dimension", async () => {
-    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const { result } = renderStreamAndQuery("job-1", evaluationKeys.dimensions("job-1"));
     act(() => {
       MockEventSource.last.emit("dimension-completed", {
@@ -88,7 +88,7 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("closes the source on done event", async () => {
-    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     renderStreamAndQuery("job-1", evaluationKeys.status("job-1"));
     act(() => {
       MockEventSource.last.emit("done", { state: "done" });
@@ -97,19 +97,19 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("does not open EventSource when jobId is empty", () => {
-    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     renderStreamAndQuery("", evaluationKeys.status(""));
     expect(MockEventSource.last).toBeNull();
   });
 
   it("is a no-op when VITE_USE_SSE_EVENTS is not 'true'", () => {
-    import.meta.env.VITE_USE_SSE_EVENTS = "false";
+    vi.stubEnv("VITE_USE_SSE_EVENTS", "false");
     renderStreamAndQuery("job-1", evaluationKeys.status("job-1"));
     expect(MockEventSource.last).toBeNull();
   });
 
   it("invalidates project trend on terminal status (done)", () => {
-    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const { invalidateSpy } = renderStreamWithSpy("job-term-1");
     act(() => {
       MockEventSource.last.emit("status", { state: "done" });
@@ -118,7 +118,7 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("invalidates project trend on terminal status (failed)", () => {
-    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const { invalidateSpy } = renderStreamWithSpy("job-term-2");
     act(() => {
       MockEventSource.last.emit("status", { state: "failed" });
@@ -127,7 +127,7 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("invalidates project trend on terminal status (cancelled)", () => {
-    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const { invalidateSpy } = renderStreamWithSpy("job-term-3");
     act(() => {
       MockEventSource.last.emit("status", { state: "cancelled" });
@@ -136,7 +136,7 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("does NOT invalidate project trend on non-terminal status", () => {
-    import.meta.env.VITE_USE_SSE_EVENTS = "true";
+    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const { invalidateSpy } = renderStreamWithSpy("job-running");
     act(() => {
       MockEventSource.last.emit("status", { state: "running" });
