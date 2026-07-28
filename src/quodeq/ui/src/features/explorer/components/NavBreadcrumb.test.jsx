@@ -127,6 +127,35 @@ describe('NavBreadcrumb collapse and jump bar', () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
+  it('navigates back to the level when the current sibling is picked from a deeper page', () => {
+    // Regression: from a detail page, the ancestor dimension crumb only opened
+    // the sibling menu and its current item was a no-op, so there was no way
+    // back up to that level.
+    const onGoTo = vi.fn();
+    const siblingsFor = (entry) => (entry.page === 'explorer'
+      ? [
+          { key: 'Security', label: 'security', current: true, onSelect: () => {} },
+          { key: 'Maintainability', label: 'maintainability', current: false, onSelect: () => {} },
+        ]
+      : null);
+    render(
+      <NavBreadcrumb
+        stack={[
+          { page: 'violations' },
+          { page: 'explorer', dimension: 'Security' },
+          { page: 'file', label: 'HomeVC.swift' },
+        ]}
+        onGoTo={onGoTo}
+        projectName="repo"
+        onSelectProject={() => {}}
+        siblingsFor={siblingsFor}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'security' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'security' }));
+    expect(onGoTo).toHaveBeenCalledWith(1);
+  });
+
   it('stays a plain link when siblingsFor returns null for the level', () => {
     const onGoTo = vi.fn();
     render(
