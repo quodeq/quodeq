@@ -131,8 +131,7 @@ def _dim_state(
     return "pending"
 
 
-def _parse_started_at(status: dict) -> datetime | None:
-    raw = status.get("started_at")
+def _parse_iso_utc(raw: object) -> datetime | None:
     if not isinstance(raw, str) or not raw:
         return None
     try:
@@ -146,6 +145,10 @@ def _parse_started_at(status: dict) -> datetime | None:
     return parsed
 
 
+def _parse_started_at(status: dict) -> datetime | None:
+    return _parse_iso_utc(status.get("started_at"))
+
+
 def _queue_take_timestamps(qstate: dict) -> list[float]:
     """Extract valid take-log timestamps from a queue state dict."""
     taken = qstate.get("taken")
@@ -157,20 +160,53 @@ def _queue_take_timestamps(qstate: dict) -> list[float]:
     ]
 
 
-def _dim_elapsed_s(dim_id: str, run_dir: Path, state: str) -> float | None:
-    """Per-dim elapsed time, derived from queue-state timestamps.
+def _stamped_elapsed_s(record: dict | None, state: str) -> float | None:
+    """Per-dim elapsed from the transition timestamps in dimensions.json.
 
-    The queue file is atomically rewritten on every take (new inode, fresh
-    mtime), so its mtime tracks the *last* take, not the dim start — using it
-    as the start made the running clock reset toward zero on every take.
-    Start comes from the queue's ``created_at`` (stamped at init), falling
-    back to the earliest take timestamp, then the file mtime for legacy
-    queues. For done dims the end is the latest activity signal we still
-    have: last take, evidence-file mtime, or any surviving agent streams
-    (streams are deleted at dim completion, so they rarely survive).
+    write_dim_state stamps ``started_at`` when the dimension starts and
+    ``completed_at`` / ``interrupted_at`` when it stops, so the duration is a
+    subtraction of two explicit values — no file-system forensics. None when
+    the record lacks the needed stamps (legacy runs, hard kills that never
+    reached the terminal write): the caller falls back to reconstruction.
+    """
+    if not isinstance(record, dict):
+        return None
+    start = _parse_iso_utc(record.get("started_at"))
+    if start is None:
+        return None
+    if state == "running":
+        return max(0.0, (datetime.now(timezone.utc) - start).total_seconds())
+    end = _parse_iso_utc(record.get("completed_at")) or _parse_iso_utc(record.get("interrupted_at"))
+    if end is None:
+        return None
+    return max(0.0, (end - start).total_seconds())
+
+
+def _dim_elapsed_s(dim_id: str, run_dir: Path, state: str, record: dict | None = None) -> float | None:
+    """Per-dim elapsed time.
+
+    Prefers the transition timestamps stamped in dimensions.json (see
+    _stamped_elapsed_s). The queue-state reconstruction below remains as a
+    fallback for run dirs written before those stamps were preserved,
+    external runs from older CLI versions, the consolidated pseudo-dim
+    (which has no dimensions.json entry), and dims that died without a
+    terminal transition.
+
+    Reconstruction notes: the queue file is atomically rewritten on every
+    take (new inode, fresh mtime), so its mtime tracks the *last* take, not
+    the dim start — using it as the start made the running clock reset
+    toward zero on every take. Start comes from the queue's ``created_at``
+    (stamped at init), falling back to the earliest take timestamp, then the
+    file mtime for legacy queues. For done dims the end is the latest
+    activity signal we still have: last take, evidence-file mtime, or any
+    surviving agent streams (streams are deleted at dim completion, so they
+    rarely survive).
     """
     if state == "pending":
         return None
+    stamped = _stamped_elapsed_s(record, state)
+    if stamped is not None:
+        return stamped
     queue = run_dir / "evidence" / f"{dim_id}_queue.json"
     qstate = _read_json(queue)
     if qstate is None:
@@ -373,7 +409,7 @@ def build_scan_progress(
             suppressed=matcher.is_suppressed if matcher.active else None,
             resolver=build_principle_resolver(dim_id, evaluators_dir, compiled_dir),
         )
-        elapsed = _dim_elapsed_s(dim_id, run_dir, d_state)
+        elapsed = _dim_elapsed_s(dim_id, run_dir, d_state, record)
         active = _active_agents(evidence_dir, dim_id) if d_state == "running" else 0
 
         dim_results.append(_DimProgress(

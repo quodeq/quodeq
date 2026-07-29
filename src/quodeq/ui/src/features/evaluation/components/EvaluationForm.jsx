@@ -127,7 +127,9 @@ export default function EvaluationForm({ onStart, disabled, selectedProject }) {
     cleanScan, setCleanScan,
   } = useEvaluationForm(onStart, showToast);
 
-  const isLocalRepo = !!repo && !repo.startsWith('http') && !repo.startsWith('git@') && !repo.includes('github.com');
+  // Anchored: a schemeless paste like "github.com/org/repo" is remote, but a
+  // local folder whose path merely contains "github.com" is not.
+  const isLocalRepo = !!repo && !repo.startsWith('http') && !repo.startsWith('git@') && !/^(www\.)?github\.com\//i.test(repo);
   const { scanData } = useScanData(null, isLocalRepo ? repo : null);
 
   // Submit stays clickable when no standards are selected so the snackbar

@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.8.1] - 2026-07-29
+
+### Features
+- **Live feed**: findings from a run that never finished (cancelled, failed, or killed) now show up as new on your next scan instead of being hidden as carried over. Only runs that actually completed mark their findings as carried forward.
+
+### Improvements
+- **Readable times on the evaluate screen**: elapsed times and budgets read in human units, so a long run shows `4h 15m 12s` instead of `255:12` and a budget shows `10m` instead of `10:00`.
+
+### Fixes
+- **Evaluate screen clocks**: the ELAPSED tile and the progress footer now share one clock anchored to the server, so the two no longer disagree on screen, the footer is no longer blank until the first poll, and a skewed clock on your machine cannot throw the tile off. Per-dimension elapsed now comes from the run's own state transitions instead of being inferred from file timestamps.
+- **Overview grades**: hidden standards no longer move the numbers you see. The hero grade letter and the project card grade are both derived from the standards you left visible, so the headline, its letter, and the card agree.
+- **Stale scores after a run**: opening a project's scores while a scan was still running could freeze a partial set of dimensions in the cache, leaving the Overview on raw scores while the dimension pages showed the dismiss-adjusted ones. Partial results are no longer cached or persisted.
+- **Multi-module projects**: repos whose root belongs to no detected subproject keep their full source tree instead of dropping every file outside a subproject. Kotlin Multiplatform repos were scanning zero files.
+- **Android detection**: projects that declare the Android Gradle plugin through a version catalog alias are now recognized as Android.
+- **Terminal**: clicking a link in the terminal opens it in your browser, instead of a warning dialog whose OK button did nothing.
+- **Security**: the evaluations route rejects repo paths outside the project, credential stripping in URLs runs in linear time on hostile input, and the remote-repo check no longer treats any URL merely containing github.com as remote.
+
 ## [1.8.0] - 2026-07-29
 
 ### Features

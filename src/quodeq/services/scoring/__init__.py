@@ -479,6 +479,15 @@ def _rescore_runs_by_dimension(
     return rescored_by_dim
 
 
+def _dims_expecting_rescore(dims: list[dict]) -> set[str]:
+    """Dimension keys that carry a source run and therefore expect a rescore."""
+    return {
+        (d.get("dimension") or "").lower()
+        for d in dims
+        if (d.get("dimension") or "") and (d.get("fromRunId") or d.get("runId"))
+    }
+
+
 def _merge_rescored_dims(dims: list[dict], rescored_by_dim: dict[str, dict]) -> list[dict]:
     """Merge rescored data into accumulated dimensions."""
     new_dims = []
@@ -500,34 +509,60 @@ def _merge_rescored_dims(dims: list[dict], rescored_by_dim: dict[str, dict]) -> 
     return new_dims
 
 
+def _rescore_accumulated_with_coverage(
+    accumulated: dict[str, Any],
+    reports_root: Path,
+    project: str,
+    params: ScoringParams = DEFAULT_PARAMS,
+) -> tuple[dict[str, Any], bool]:
+    """Apply rescore to an accumulated response dict (in-place compatible shape).
+
+    Filters dismissed violations from each dimension, recalculates scores,
+    and recomputes the summary.
+
+    Returns ``(payload, complete)``. ``complete`` is False when at least one
+    dimension that has a source run got no rescored entry back (e.g. the run
+    read returned a partial dim set), in which case the missing dimensions
+    keep their raw baked scores and the payload MUST NOT be persisted: its
+    version hash cannot tell it apart from a fully rescored one.
+    """
+    project_dir = reports_root / project
+    dismissed = dismissed_keys(project_dir)
+    deleted = deleted_keys(project_dir)
+    if (not dismissed and not deleted) or not accumulated:
+        return accumulated, True
+
+    dims = accumulated.get("dimensions", [])
+    if not dims:
+        return accumulated, True
+
+    rescored_by_dim = _rescore_runs_by_dimension(
+        dims, reports_root, project, dismissed, deleted, params=params,
+    )
+    missing = _dims_expecting_rescore(dims) - set(rescored_by_dim)
+    if missing:
+        _logger.warning(
+            "accumulated rescore for %s covered %d of %d dimensions (missing: %s); "
+            "serving the partial result without caching it",
+            project, len(rescored_by_dim), len(dims), sorted(missing),
+        )
+    new_dims = _merge_rescored_dims(dims, rescored_by_dim)
+
+    new_summary = recompute_summary(new_dims, accumulated.get("summary", {}), params=params)
+    return {**accumulated, "dimensions": new_dims, "summary": new_summary}, not missing
+
+
 def _rescore_accumulated_response(
     accumulated: dict[str, Any],
     reports_root: Path,
     project: str,
     params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, Any]:
-    """Apply rescore to an accumulated response dict (in-place compatible shape).
-
-    Filters dismissed violations from each dimension, recalculates scores,
-    and recomputes the summary.
-    """
-    project_dir = reports_root / project
-    dismissed = dismissed_keys(project_dir)
-    deleted = deleted_keys(project_dir)
-    if (not dismissed and not deleted) or not accumulated:
-        return accumulated
-
-    dims = accumulated.get("dimensions", [])
-    if not dims:
-        return accumulated
-
-    rescored_by_dim = _rescore_runs_by_dimension(
-        dims, reports_root, project, dismissed, deleted, params=params,
+    """`_rescore_accumulated_with_coverage` for callers that don't persist."""
+    payload, _complete = _rescore_accumulated_with_coverage(
+        accumulated, reports_root, project, params=params,
     )
-    new_dims = _merge_rescored_dims(dims, rescored_by_dim)
-
-    new_summary = recompute_summary(new_dims, accumulated.get("summary", {}), params=params)
-    return {**accumulated, "dimensions": new_dims, "summary": new_summary}
+    return payload
 
 
 def rescore_accumulated(
@@ -579,12 +614,21 @@ def get_project_scores(
             "availableRuns": [],
         }
 
-    # Build accumulated using the existing service (returns full data with violations)
+    # Build accumulated using the existing service (returns full data with
+    # violations). The rescore-coverage flag rides in a cell so the cacheable
+    # gate below can see it: a payload whose rescore missed dimensions must be
+    # served but never persisted (its version hash can't self-invalidate).
+    rescore_complete = [True]
+
     def _compute_accumulated_payload() -> dict:
         acc = compute_accumulated(str(reports_root), project, as_of, params=params)
         if acc is None:
             acc = {"dimensions": [], "summary": {}}
-        return _rescore_accumulated_response(acc, reports_root, project, params=params)
+        payload, complete = _rescore_accumulated_with_coverage(
+            acc, reports_root, project, params=params,
+        )
+        rescore_complete[0] = complete
+        return payload
 
     if find_children(reports_root, project):
         # Parent aggregation pulls child projects' dismissals/runs into the
@@ -598,7 +642,10 @@ def get_project_scores(
                              [(r.run_id, r.status) for r in all_runs]),
             as_of,
         )
-        accumulated = cached_accumulated(project, acc_version, _compute_accumulated_payload)
+        accumulated = cached_accumulated(
+            project, acc_version, _compute_accumulated_payload,
+            cacheable=lambda _payload: rescore_complete[0],
+        )
 
     # Build trend using the appropriate fetcher: scalar fast path when there
     # are no active dismissals/deletions, rescoring (findings) path otherwise.

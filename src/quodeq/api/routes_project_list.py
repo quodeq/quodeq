@@ -10,38 +10,16 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import error_response, scan_target_error as _scan_target_error
 from quodeq.api.import_project import import_project as _import_project
 from quodeq.api.routes_common import reports_dir
 from quodeq.api.zip import export_project_zip
 from quodeq.services._fs_clone import CloneError
 from quodeq.services._fs_scan import scan_project
 from quodeq.services.base import ActionProvider
-from quodeq.shared.validation import validate_path_segment
+from quodeq.shared.validation import validate_path_segment, validate_relative_scope
 
 _logger = logging.getLogger(__name__)
-_BLOCKED_SCAN_PATHS = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
-
-
-def _scan_target_error(target_path: Path, reports_root: str) -> tuple[dict, int] | None:
-    """Validate a resolved directory path against the scan allowlist.
-
-    Shared by /api/scan and create_project's local-repo branch so both enforce
-    the same rules: the path must live under the user's home or the
-    evaluations directory, and must not be a blocked system path. Returns an
-    ``error_response`` tuple on rejection, or None when the path is allowed.
-    """
-    _home = Path.home().resolve()
-    _eval_dir = Path(reports_root).resolve()
-    _allowed_roots = (_home, _eval_dir)
-    if not any(target_path == root or target_path.is_relative_to(root) for root in _allowed_roots):
-        return error_response(
-            "Scan path must be under home directory", HTTPStatus.FORBIDDEN, "FORBIDDEN",
-        )
-    # Block scanning system directories to prevent information disclosure
-    if any(str(target_path).startswith(b) for b in _BLOCKED_SCAN_PATHS):
-        return error_response("Cannot scan system directories", HTTPStatus.FORBIDDEN, "FORBIDDEN")
-    return None
 
 
 def _find_existing_project(reports_root: str, repo: str, scope_path: str | None) -> str | None:
@@ -163,6 +141,11 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     @app.patch("/api/projects/<project>/path")
     def update_project_path(project: str) -> Response | tuple[Response, int]:
         """Update the local filesystem path for a project."""
+        try:
+            validate_path_segment(project)
+        except ValueError:
+            body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
         return _handle_update_project_path(provider)
 
     @app.get("/api/projects/<project>/export")
@@ -183,11 +166,21 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     @app.delete("/api/projects/<project>")
     def delete_project(project: str) -> Response | tuple[Response, int]:
         """Delete a project and all its run data."""
+        try:
+            validate_path_segment(project)
+        except ValueError:
+            body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
         return _handle_delete_project(provider)
 
     @app.get("/api/projects/<project>/info")
     def project_info(project: str) -> Response | tuple[Response, int]:
         """Return repository metadata for a project."""
+        try:
+            validate_path_segment(project)
+        except ValueError:
+            body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
         info = provider.get_project_info(reports_dir(), project)
         if not info:
             body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
@@ -306,6 +299,12 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             return jsonify(body), status
 
         scope_path = data.get("scopePath") or None
+        if scope_path is not None:
+            try:
+                validate_relative_scope(str(scope_path))
+            except ValueError as exc:
+                body, status = error_response(str(exc), HTTPStatus.BAD_REQUEST, "INVALID_SCOPE")
+                return jsonify(body), status
         discipline = data.get("discipline") or None
         clone_dest = data.get("cloneDest") or None
         ephemeral = bool(data.get("ephemeral", False))

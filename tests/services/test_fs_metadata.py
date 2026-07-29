@@ -198,7 +198,7 @@ class TestReadAccumulatedSummary:
         mock_read.return_value = [
             DimensionResult(dimension="security", overall_score="8.0", source_file_count=10),
             DimensionResult(dimension="reliability", overall_score="7.0"),
-            DimensionResult(dimension="clean-architecture", overall_score="4.0"),
+            DimensionResult(dimension="performance", overall_score="4.0"),
         ]
         mock_summarize.return_value = type(
             "S", (), {"overall_grade": "A", "numeric_average": 7.5},
@@ -207,11 +207,115 @@ class TestReadAccumulatedSummary:
         runs = [RunInfo(run_id="run-new", date_iso="2026-01-02", date_label="Jan 02")]
         _read_accumulated_summary(reports_root, project, runs)
 
-        # summarize_dimensions must see ALL dims, including the one missing
-        # from the latest config.
+        # summarize_dimensions must see ALL (visible) dims, including the one
+        # missing from the latest config.
         called_dims = mock_summarize.call_args[0][0]
         names = sorted(d.dimension for d in called_dims)
-        assert names == ["clean-architecture", "reliability", "security"], names
+        assert names == ["performance", "reliability", "security"], names
+
+    @patch("quodeq.services._fs_metadata.summarize_dimensions")
+    @patch("quodeq.services._fs_metadata.read_run_data")
+    def test_card_summary_excludes_hidden_standards(
+        self, mock_read, mock_summarize, tmp_path, monkeypatch,
+    ):
+        """Dims outside the visible-standards selection must not move the
+        card grade: the Overview headline excludes them (the client filters
+        the accumulated payload by the same selection)."""
+        from quodeq.core.standards.visibility import save_visible_standard_ids
+        from quodeq.core.types import DimensionResult
+        from quodeq.services.ports import RunInfo
+
+        monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
+        reports_root = tmp_path / "evaluations"
+        project = "proj"
+        (reports_root / project / "run-new").mkdir(parents=True)
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        save_visible_standard_ids(repo, ["security"])
+        (reports_root / project / "repository_info.json").write_text(
+            json.dumps({"name": project, "path": str(repo), "location": "local"}),
+            encoding="utf-8",
+        )
+        mock_read.return_value = [
+            DimensionResult(dimension="Security", overall_score="8.0"),
+            DimensionResult(dimension="reliability", overall_score="7.0"),
+        ]
+        mock_summarize.return_value = type(
+            "S", (), {"overall_grade": "A", "numeric_average": 8.0},
+        )()
+
+        runs = [RunInfo(run_id="run-new", date_iso="2026-01-02", date_label="Jan 02")]
+        _read_accumulated_summary(reports_root, project, runs)
+
+        # Matching is case-insensitive (the selection stores lowercase ids).
+        called_dims = mock_summarize.call_args[0][0]
+        assert [d.dimension for d in called_dims] == ["Security"]
+
+    @patch("quodeq.services._fs_metadata.summarize_dimensions")
+    @patch("quodeq.services._fs_metadata.read_run_data")
+    def test_card_summary_default_selection_hides_non_iso_dims(
+        self, mock_read, mock_summarize, tmp_path, monkeypatch,
+    ):
+        """Without a visibility file the six ISO defaults apply, so a retired
+        non-default dim (clean-architecture) no longer drags the card grade
+        while being invisible on the Overview."""
+        from quodeq.core.types import DimensionResult
+        from quodeq.services.ports import RunInfo
+
+        monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
+        reports_root = tmp_path / "evaluations"
+        project = "proj"
+        (reports_root / project / "run-new").mkdir(parents=True)
+        mock_read.return_value = [
+            DimensionResult(dimension="security", overall_score="8.0"),
+            DimensionResult(dimension="clean-architecture", overall_score="4.0"),
+        ]
+        mock_summarize.return_value = type(
+            "S", (), {"overall_grade": "A", "numeric_average": 8.0},
+        )()
+
+        runs = [RunInfo(run_id="run-new", date_iso="2026-01-02", date_label="Jan 02")]
+        _read_accumulated_summary(reports_root, project, runs)
+
+        called_dims = mock_summarize.call_args[0][0]
+        assert [d.dimension for d in called_dims] == ["security"]
+
+    @patch("quodeq.services._fs_metadata.read_run_data")
+    def test_card_summary_recomputes_when_visibility_changes(
+        self, mock_read, tmp_path, monkeypatch,
+    ):
+        """The selection is folded into the cache version: editing
+        standards-visibility.json must invalidate the persisted card summary,
+        not serve the grade computed under the previous selection."""
+        from quodeq.core.standards.visibility import save_visible_standard_ids
+        from quodeq.core.types import DimensionResult
+        from quodeq.services.ports import RunInfo
+
+        monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+        reports_root = tmp_path / "evaluations"
+        project = "proj"
+        (reports_root / project / "run-new").mkdir(parents=True)
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (reports_root / project / "repository_info.json").write_text(
+            json.dumps({"name": project, "path": str(repo), "location": "local"}),
+            encoding="utf-8",
+        )
+        mock_read.return_value = [
+            DimensionResult(dimension="security", overall_score="9.0",
+                            overall_grade="Exemplary"),
+            DimensionResult(dimension="reliability", overall_score="5.0",
+                            overall_grade="Adequate"),
+        ]
+        runs = [RunInfo(run_id="run-new", date_iso="2026-01-02", date_label="Jan 02")]
+
+        save_visible_standard_ids(repo, ["security", "reliability"])
+        _, score_both, _ = _read_accumulated_summary(reports_root, project, runs)
+        save_visible_standard_ids(repo, ["security"])
+        _, score_one, _ = _read_accumulated_summary(reports_root, project, runs)
+
+        assert score_both == 7.0
+        assert score_one == 9.0
 
     def test_project_card_reflects_overlaid_sql_grades_and_loaded_params(
         self, tmp_path, monkeypatch,

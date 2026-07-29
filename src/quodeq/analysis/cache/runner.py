@@ -128,6 +128,9 @@ def analyze_unit(
             standards_hash=unit.standards_hash,
             effective_params=unit.effective_params,
         ),
+        # Born unconsolidated: no completed run has these findings in its
+        # report yet. mark_run_consolidated flips it when this run ends done.
+        consolidated=False,
     )
     cache.put(key, entry)
     return UnitResult(entry=entry, cache_hit=False)

@@ -67,6 +67,12 @@ def write_dim_state(
     Optional ``exit_reason`` attaches to the per-dim record on DONE, e.g.
     "done", "time_limit", "failure_streak", "cancelled", "error". The UI
     treats anything other than "done" as a partial-coverage signal.
+
+    Each transition merges into the existing record instead of replacing
+    it, so ``started_at`` (stamped on RUNNING) survives the DONE/INCOMPLETE
+    write — progress reads ``completed_at - started_at`` for a dimension's
+    duration. Safe because DONE and INCOMPLETE are terminal: no transition
+    can ever need a field cleared.
     """
     with _lock:
         data = read_dimensions(run_dir)
@@ -84,7 +90,8 @@ def write_dim_state(
                 raise IllegalDimTransitionError(
                     f"{dimension}: {prev.value} -> {state.value} not permitted",
                 )
-        entry: dict[str, Any] = {"state": state.value}
+        entry: dict[str, Any] = dict(existing) if isinstance(existing, dict) else {}
+        entry["state"] = state.value
         if state == DimState.RUNNING:
             entry["started_at"] = _now_iso()
         elif state == DimState.DONE:

@@ -264,6 +264,45 @@ export function mostFrequentGrade(grades) {
   return capitalizeGrade(maxGrade);
 }
 
+/**
+ * Human-readable duration from seconds: "42s", "12m 34s", "4h 15m 12s".
+ * Floors to whole seconds so a ticking clock advances evenly; "—" when the
+ * value is unknown.
+ *
+ * @param {number|null|undefined} s
+ * @returns {string}
+ */
+export function formatDuration(s) {
+  if (s == null || !Number.isFinite(s)) return '—';
+  const total = Math.max(0, Math.floor(s));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  if (h > 0) return `${h}h ${m}m ${sec}s`;
+  if (m > 0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+/**
+ * Duration for round targets like time budgets: zero components are dropped
+ * ("2h", "1h 30m", "45m"), so a 2-hour budget never reads "2h 0m 0s". Seconds
+ * appear only under a minute.
+ *
+ * @param {number|null|undefined} s
+ * @returns {string}
+ */
+export function formatDurationCoarse(s) {
+  if (s == null || !Number.isFinite(s)) return '—';
+  const total = Math.max(0, Math.round(s));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const parts = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0) parts.push(`${m}m`);
+  if (parts.length === 0) parts.push(`${total % 60}s`);
+  return parts.join(' ');
+}
+
 const PERIOD_MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',

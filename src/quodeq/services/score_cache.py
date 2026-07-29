@@ -41,7 +41,15 @@ _BUSY_TIMEOUT_MS = 5000
 # formula to the run's own evidence jsonl (services/evidence_rescore), so
 # scores cached by the prior writer differ for the SAME suppression state and
 # params; this bump rebuilds them on the evidence basis once.
-_CACHE_WRITER_EPOCH = "5"
+# "6": three scoring read paths built their run-dimension fetcher without the
+# staleness guards (in-progress bypass + eval-file-count validation), so a
+# request landing mid-run could freeze a partial dim list in the process LRU;
+# later writes built from it persisted half-rescored accumulated payloads and
+# partial scalar sets whose version hash can never self-invalidate. The guards
+# now live in the shared fetcher and the accumulated writer refuses
+# partial-coverage payloads; this bump rebuilds rows the prior writer may have
+# poisoned.
+_CACHE_WRITER_EPOCH = "6"
 
 # Shared-root isolation seam (Phase 2): when serving read endpoints from a
 # second (shared) clone, the score cache must not mix rows with the local
@@ -327,6 +335,7 @@ def load_run_keys(
 def accumulated_cache_version(
     project_dir: Path, params: ScoringParams,
     run_versions: list[tuple], as_of: str | None,
+    visible_dims: tuple[str, ...] | None = None,
 ) -> str:
     """Version for the accumulated cache: params + the per-run fingerprints +
     *as_of*. Composing per-run fingerprints means a dismiss/delete on one run
@@ -340,6 +349,12 @@ def accumulated_cache_version(
     params + intersecting suppressions — so without status folded in, a run
     completing mid-poll would recompute the same version and serve a stale
     payload that omitted the just-finished (now eligible) run.
+
+    *visible_dims* is folded in only by payloads that are COMPUTED over the
+    visible-standards selection (the project-card summary): toggling a
+    standard must invalidate them. Payloads that return every dimension and
+    leave filtering to the client (the accumulated Overview) pass None, so
+    their hashes are unaffected by visibility edits.
     """
     payload = json.dumps({
         # Bump when the accumulated / project-card computation changes, so
@@ -354,6 +369,7 @@ def accumulated_cache_version(
         "params": _params_fingerprint(params),
         "runs": sorted(list(t) for t in run_versions),
         "as_of": as_of or "",
+        **({} if visible_dims is None else {"visible": sorted(visible_dims)}),
     }, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -405,11 +421,18 @@ def per_run_versions(
 
 def cached_accumulated(
     project: str, version: str, compute: Callable[[], dict],
+    cacheable: Callable[[dict], bool] | None = None,
 ) -> dict:
     """Read-through cache for the accumulated payload.
 
     Hit -> return the deserialized cached payload. Miss (or kill switch / cache
     error) -> call *compute*, cache the result best-effort, return it.
+
+    *cacheable*, when given, is called with the computed result before it is
+    persisted; returning False serves the result without caching it. This lets
+    the caller withhold payloads it knows are incomplete (e.g. a rescore that
+    covered only part of the dimensions), which would otherwise freeze under a
+    version hash that cannot self-invalidate.
     """
     if score_cache_disabled():
         return compute()
@@ -421,6 +444,8 @@ def cached_accumulated(
     except sqlite3.Error:
         return compute()
     result = compute()
+    if cacheable is not None and not cacheable(result):
+        return result
     try:
         with open_score_cache() as conn:
             write_cached_accumulated(conn, project, version, result)

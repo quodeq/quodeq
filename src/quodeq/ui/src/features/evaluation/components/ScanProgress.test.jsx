@@ -231,7 +231,7 @@ describe('ScanProgress total coverage (incremental runs)', () => {
     payload.totalElapsedS = 78;
     getEvaluationProgress.mockResolvedValue(payload);
     withEvalLog(<ScanProgress job={baseJob} />, ctx);
-    expect(await screen.findByText(/1:18 of 10:00 budget/)).toBeInTheDocument();
+    expect(await screen.findByText(/1m 18s of 10m budget/)).toBeInTheDocument();
   });
 
   it('marks the footer budget as overrun once elapsed passes it', async () => {
@@ -240,7 +240,7 @@ describe('ScanProgress total coverage (incremental runs)', () => {
     payload.totalElapsedS = 640;
     getEvaluationProgress.mockResolvedValue(payload);
     const { container } = withEvalLog(<ScanProgress job={baseJob} />, ctx);
-    await screen.findByText(/10:40 of 10:00 budget/);
+    await screen.findByText(/10m 40s of 10m budget/);
     expect(container.querySelector('.scan-progress__budget--overrun')).not.toBeNull();
   });
 
@@ -255,7 +255,7 @@ describe('ScanProgress total coverage (incremental runs)', () => {
     withEvalLog(<ScanProgress job={baseJob} />, ctx);
     fireEvent.click(await screen.findByTitle('Show per-dimension detail'));
     const row = (await screen.findByText('security')).closest('.scan-progress__dim');
-    expect(row.textContent).toContain('1:18');
+    expect(row.textContent).toContain('1m 18s');
     expect(row.textContent).not.toContain('budget');
   });
 });

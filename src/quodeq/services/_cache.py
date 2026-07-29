@@ -5,6 +5,7 @@ duplicate I/O when multiple threads request the same uncached key.
 """
 from __future__ import annotations
 
+import json
 import logging
 import threading
 from collections import OrderedDict
@@ -34,6 +35,61 @@ class _CacheContext:
     def get_reader(self) -> _Reader:
         """Return the configured reader, defaulting to read_run_data."""
         return self.reader if self.reader is not None else read_run_data
+
+
+# Terminal status.json states, mirroring data/fs/report_parser/runs.py. Any
+# other state means the run's evaluation/ set may still be growing.
+_TERMINAL_RUN_STATES = frozenset({"done", "failed", "cancelled"})
+
+
+def _count_eval_files(reports_root: Path, project: str, run_id: str) -> int:
+    """Count ``evaluation/*.json`` files on disk for a run.
+
+    Used to detect a stale cache: if the cached dim list has a different
+    count from what's currently on disk, the cache is wrong and must be
+    evicted. One ``listdir`` per cached lookup -- cheap.
+    """
+    eval_dir = reports_root / project / run_id / "evaluation"
+    if not eval_dir.is_dir():
+        return 0
+    try:
+        return sum(1 for p in eval_dir.iterdir() if p.suffix == ".json")
+    except OSError:
+        return 0
+
+
+def _run_is_in_progress(reports_root: Path, project: str, run_id: str) -> bool:
+    """True when the run's ``status.json`` reports a non-terminal state.
+
+    A missing or unreadable status.json counts as terminal: legacy runs never
+    wrote one and their data is immutable. The PID-liveness refinement in
+    ``data/fs/report_parser/runs.py`` is deliberately not replicated here -- a
+    run that crashed without flipping its state reads fresh forever, which is
+    the safe direction for a cache guard.
+    """
+    status_path = reports_root / project / run_id / "status.json"
+    if not status_path.is_file():
+        return False
+    try:
+        data = json.loads(status_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    state = data.get("state") if isinstance(data, dict) else None
+    return isinstance(state, str) and state not in _TERMINAL_RUN_STATES
+
+
+def _cached_entry_is_stale(
+    reports_root: Path, project: str, run_id: str, cached: list[DimensionResult],
+) -> bool:
+    """True when the cached dim count disagrees with ``evaluation/*.json`` on disk.
+
+    Anchored on the evaluation/ directory existing: without disk state to
+    compare against (unit tests that pre-seed the cache), the entry is trusted.
+    """
+    eval_dir = reports_root / project / run_id / "evaluation"
+    if not eval_dir.is_dir():
+        return False
+    return len(cached) != _count_eval_files(reports_root, project, run_id)
 
 
 def _fetch_dimensions_from_disk(
@@ -119,6 +175,19 @@ def make_lru_dimension_fetcher(
     that at most one thread performs disk I/O for any given cache key.  Other
     threads that request the same key while I/O is in progress wait on the
     event and then read the result from the cache.
+
+    Self-healing guards (every caller inherits them, so a request landing
+    mid-run can never freeze a partial dim list in the cache):
+
+    1. **On-disk count validation.** A cached entry whose dim count disagrees
+       with the run's ``evaluation/*.json`` count is stale (e.g. it was
+       populated while the run was still writing dims) -- evict and re-read.
+       Only applies when an evaluation/ directory exists on disk; entries
+       pre-seeded without disk state (test stubs) are trusted.
+
+    2. **In-progress bypass.** Runs whose ``status.json`` state is non-terminal
+       have a growing evaluation/ set. Read directly from disk and don't
+       cache, so the next request also reads fresh.
     """
     ctx = _CacheContext(cache=cache, lock=lock, max_size=max_size, reader=reader)
 
@@ -127,7 +196,15 @@ def make_lru_dimension_fetcher(
 
         cached = _cache_lookup(key, ctx)
         if cached is not None:
-            return cached
+            if not _cached_entry_is_stale(reports_root, project, run_id, cached):
+                return cached
+            with ctx.lock:
+                ctx.cache.pop(key, None)
+
+        if _run_is_in_progress(reports_root, project, run_id):
+            return _fetch_dimensions_from_disk(
+                reports_root, project, run_id, ctx.get_reader(),
+            )
 
         with ctx.lock:
             if key in ctx.cache:

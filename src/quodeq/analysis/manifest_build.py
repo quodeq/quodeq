@@ -140,7 +140,10 @@ def _walk_and_group(
     walk_root = src
     if scope_path:
         candidate = src / scope_path
-        if candidate.is_dir():
+        # Containment mirrors the CLI --scope guard (_cli_resolution): a
+        # scope that resolves outside the repo (traversal segments or a
+        # symlink) must not widen the walk; fall back to the full repo.
+        if candidate.is_dir() and candidate.resolve().is_relative_to(src.resolve()):
             walk_root = candidate
 
     ignore_patterns = ignore_patterns or []
@@ -182,8 +185,9 @@ def _walk_and_partition_by_scope(
     """Walk *src* once, bucketing files by their owning subproject scope.
 
     Each file is assigned to the deepest scope path that contains it. Files outside
-    every scope are silently dropped — they don't belong to any classified
-    subproject and shouldn't appear in any target.
+    every scope are dropped — they don't belong to any classified subproject and
+    shouldn't appear in any target. Callers that must not lose unclassified source
+    pass ``"."`` among *scope_paths* as a catch-all (see _build_multi_scope_manifest).
     """
     ignore_patterns = ignore_patterns or []
     files_by_scope_lang: dict[str, dict[str, list[str]]] = {s: {} for s in scope_paths}
@@ -227,6 +231,17 @@ def _build_multi_scope_manifest(
     """Produce a manifest with one target group per detected subproject scope."""
     scope_paths = [rel for rel, _ in sub_results]
     matches_by_scope = {rel: matches for rel, matches in sub_results}
+    if "." not in matches_by_scope:
+        # No rule classified the repo root, but source can still live outside every
+        # detected subproject — e.g. a Kotlin Multiplatform repo where only
+        # ``iosApp/`` matches (via *.xcodeproj) while the Gradle/Kotlin root does
+        # not. Without a catch-all root scope those files are dropped and the
+        # manifest comes back with no targets, which downstream reads as "no
+        # source files". "." is depth 0 in _deepest_scope, so it only claims files
+        # no more specific scope owns, and _MIN_FILES_PER_TARGET still keeps a
+        # handful of stray root files from becoming a target.
+        scope_paths.append(".")
+        matches_by_scope["."] = []
     files_by_scope, ext_counts_overall, ext_counts_by_scope_lang = _walk_and_partition_by_scope(
         src, ext_map, skip_dirs, skip_patterns, scope_paths,
         ignore_patterns=ignore_patterns,

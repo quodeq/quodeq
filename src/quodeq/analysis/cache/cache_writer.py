@@ -117,6 +117,9 @@ def build_cache_writer(
                 standards_hash=standards_hash, version=version,
                 effective_params=effective_params,
             ),
+            # Born unconsolidated: no completed run has these findings in its
+            # report yet. mark_run_consolidated flips it when this run ends done.
+            consolidated=False,
         )
         cache.put(key, entry)
 
