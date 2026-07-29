@@ -282,6 +282,53 @@ def test_build_monorepo_partitions_files_by_subproject(
     assert all(f.startswith("apps/web/") for f in web.source_files)
 
 
+def test_monorepo_keeps_source_outside_detected_subprojects(tmp_path: Path) -> None:
+    """A repo whose only *detected* subproject is a nested one must not lose the
+    source tree living outside it.
+
+    Kotlin Multiplatform is the real-world case: ``iosApp/`` is recognised via
+    ``*.xcodeproj``, but the Gradle/Kotlin root is not (its plugins come from a
+    version catalog, so no ``com.android`` literal appears in build.gradle.kts).
+    Without a catch-all root scope every ``.kt`` file is dropped and the manifest
+    comes back empty, which downstream reads as "no source files".
+    """
+    from quodeq.config.paths import default_paths
+
+    kmp_detection = {
+        "extensions": {".kt": "kotlin", ".swift": "swift"},
+        "skip_dirs": ["build", ".gradle"],
+        "skip_patterns": [],
+    }
+
+    _write(tmp_path / "settings.gradle.kts", 'rootProject.name = "app"\n')
+    _write(
+        tmp_path / "build.gradle.kts",
+        "plugins {\n    alias(libs.plugins.androidApplication) apply false\n}\n",
+    )
+    for name in ("App", "Main", "Repo", "Model"):
+        _write(tmp_path / f"composeApp/src/commonMain/kotlin/{name}.kt", "class X\n")
+
+    _write(tmp_path / "iosApp/iosApp.xcodeproj/project.pbxproj", "// pbxproj\n")
+    for name in ("ContentView", "iosAppApp", "Theme"):
+        _write(tmp_path / f"iosApp/iosApp/{name}.swift", "import SwiftUI\n")
+
+    disciplines_conf = default_paths().disciplines_conf
+    if not disciplines_conf.exists():
+        pytest.skip("disciplines.conf not installed")
+
+    manifest = build_manifest(tmp_path, kmp_detection, disciplines_conf=disciplines_conf)
+
+    kotlin_files = [
+        f for t in manifest.targets if t.language == "kotlin" for f in t.source_files
+    ]
+    assert len(kotlin_files) == 4
+    assert manifest.total_files == 7
+    assert manifest.language_stats == {".kt": 4, ".swift": 3}
+
+    swift = next(t for t in manifest.targets if t.language == "swift")
+    assert swift.scope_path == "iosApp"
+
+
 def test_monorepo_walk_applies_skip_patterns(tmp_path: Path, detection: dict) -> None:
     """The multi-scope (monorepo) walk honours skip_patterns too."""
     from quodeq.config.paths import default_paths
