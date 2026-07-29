@@ -6,6 +6,7 @@ import { useTerminalSocket } from './useTerminalSocket.js';
 import { resolveTerminalPaths, openInEditor } from '../../api/terminal.js';
 import { createUrlLinkProvider, createFileLinkProvider } from './terminalLinks.js';
 import { themeFromCss } from './xtermTheme.js';
+import { openExternal } from '../updates/openExternal.js';
 
 // Two drawer chords are reserved for the host; return false so xterm lets them
 // bubble to the window handler instead of typing into the shell.
@@ -125,6 +126,13 @@ export default function TerminalSessionView({ sessionId, active, live, onGone, r
         cursorBlink: true,
         cursorStyle: 'bar',     // sleeker than the default square block
         theme: themeFromCss(),
+        // OSC 8 hyperlinks (emitted by gh, npm, coding CLIs…) are handled by
+        // xterm itself, not by our link providers below. Without a linkHandler
+        // xterm falls back to its built-in one, which confirms and then calls
+        // window.open() with no URL — and window.open always returns null
+        // inside pywebview's WKWebView, so clicking OK does nothing at all.
+        // Route them through openExternal, which prefers the pywebview bridge.
+        linkHandler: { activate: (_event, uri) => openExternal(uri) },
       });
       const fit = new FitAddon();
       term.loadAddon(fit);
@@ -142,7 +150,9 @@ export default function TerminalSessionView({ sessionId, active, live, onGone, r
       linkProviders.push(
         term.registerLinkProvider(createUrlLinkProvider({
           readLine,
-          openUrl: (url) => window.open(url, '_blank', 'noopener,noreferrer'),
+          // Not window.open: it returns null in the desktop app's WKWebView,
+          // so a cmd-clicked URL silently did nothing there.
+          openUrl: (url) => openExternal(url),
         })),
         term.registerLinkProvider(createFileLinkProvider({
           readLine,

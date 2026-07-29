@@ -294,6 +294,33 @@ it('copy button copies the active session selection to the clipboard', async () 
   expect(writeText).toHaveBeenCalledWith('picked text');
 });
 
+// OSC 8 hyperlinks are activated by xterm itself. Without an explicit
+// linkHandler xterm uses its built-in one, which confirms and then calls
+// window.open() with no URL — null inside pywebview's WKWebView, so clicking OK
+// did nothing. The handler must reach the pywebview bridge instead.
+it('routes OSC 8 hyperlink clicks through the pywebview bridge, not window.open', async () => {
+  const { Terminal } = await import('@xterm/xterm');
+  Terminal.mockClear();
+  const open_browser = vi.fn();
+  window.pywebview = { api: { open_browser } };
+  const windowOpen = vi.spyOn(window, 'open').mockReturnValue(null);
+  try {
+    render(<TerminalPane active />);
+    await screen.findByTestId('tty-root');
+    await waitFor(() => expect(Terminal).toHaveBeenCalled());
+
+    const { linkHandler } = Terminal.mock.calls[0][0];
+    expect(linkHandler).toBeTruthy();
+    linkHandler.activate({}, 'https://example.com/release');
+
+    expect(open_browser).toHaveBeenCalledWith('https://example.com/release');
+    expect(windowOpen).not.toHaveBeenCalled();
+  } finally {
+    windowOpen.mockRestore();
+    delete window.pywebview;
+  }
+});
+
 it('shows shell, session count, sandbox note and active cwd in the status bar', async () => {
   render(<TerminalPane active />);
   await screen.findByTestId('tty-root');
