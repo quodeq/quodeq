@@ -259,3 +259,82 @@ def test_no_sidecar_when_every_hit_is_already_consolidated(tmp_path: Path, cache
 
     sidecar = (config.work_dir or config.src) / "security_replayed_unconsolidated_keys.json"
     assert not sidecar.exists()
+
+
+def test_cancelled_run_findings_stay_new_until_a_run_completes(tmp_path: Path):
+    """The user story.
+
+    Run 1 is cancelled with "keep findings", so its findings never reach an
+    Overview. Run 2 replays them: they must read as THIS scan's findings,
+    because the user has still never been shown them consolidated. Run 2
+    completes, which consolidates them. Run 3 replays them as carried.
+    """
+    from quodeq.analysis.cache.consolidation import mark_run_consolidated
+    from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+    from quodeq.analysis.cache.local import LocalFileBackend
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.py").write_text("x")
+    shared_cache = LocalFileBackend(root=tmp_path / "cache")
+
+    def _run_config(run_id: str):
+        """A config whose work_dir IS <run_dir>/evidence, so the sidecars land
+        where mark_run_consolidated looks for them."""
+        from tests.analysis.cache.test_dimension_runner import _make_config
+        run_dir = tmp_path / "reports" / "proj" / run_id
+        (run_dir / "evidence").mkdir(parents=True, exist_ok=True)
+        return _make_config(
+            src, work_dir=run_dir / "evidence", file_names=["a.py"],
+        ), run_dir
+
+    def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+        jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
+        jsonl.parent.mkdir(parents=True, exist_ok=True)
+        with jsonl.open("a") as out:
+            out.write(json.dumps(dict(_finding("found-a"), file="a.py")) + "\n")
+            out.write(json.dumps({"_marker": "file_done", "file": "a.py", "status": "ok"}) + "\n")
+        return _make_dummy_evidence(files_read=1)
+
+    def _titles_with_flag(config) -> dict:
+        jsonl = (config.work_dir or config.src) / "security_evidence.jsonl"
+        lines = [json.loads(ln) for ln in jsonl.read_text().splitlines() if ln.strip()]
+        return {
+            ln["w"]: ln.get("carried_forward", False)
+            for ln in lines if "_marker" not in ln
+        }
+
+    # Run 1: dispatches a.py, then the user cancels with "keep findings".
+    # A cancelled run never calls mark_run_consolidated.
+    config1, run_dir1 = _run_config("run1")
+    with patch(
+        "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+        new=fake_dispatch,
+    ):
+        process_dimension_with_cache(
+            config1, "security", 1, _make_ctx(), _make_callbacks(), cache=shared_cache,
+        )
+    (run_dir1 / "status.json").write_text(json.dumps({"state": "cancelled"}))
+    mark_run_consolidated(run_dir1, shared_cache)  # no-op: not done
+
+    # Run 2: a.py is now a cache hit, but an UNCONSOLIDATED one.
+    config2, run_dir2 = _run_config("run2")
+    process_dimension_with_cache(
+        config2, "security", 1, _make_ctx(), _make_callbacks(), cache=shared_cache,
+    )
+    assert _titles_with_flag(config2) == {"found-a": False}, (
+        "a cancelled run's findings must still read as new"
+    )
+
+    # Run 2 completes, which consolidates the entry it replayed.
+    (run_dir2 / "status.json").write_text(json.dumps({"state": "done"}))
+    mark_run_consolidated(run_dir2, shared_cache)
+
+    # Run 3: the same hit now reads as carried forward.
+    config3, _run_dir3 = _run_config("run3")
+    process_dimension_with_cache(
+        config3, "security", 1, _make_ctx(), _make_callbacks(), cache=shared_cache,
+    )
+    assert _titles_with_flag(config3) == {"found-a": True}, (
+        "a completed run consolidated these findings; they are carried now"
+    )
