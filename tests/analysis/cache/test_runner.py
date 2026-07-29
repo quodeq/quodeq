@@ -258,3 +258,26 @@ class TestEmptyResults:
         assert second.cache_hit is True
         assert second.entry.findings == []
         assert len(dispatcher.calls) == 1
+
+
+def test_analyze_unit_marks_a_dispatched_entry_unconsolidated(cache: LocalFileBackend):
+    """The three cache write sites must agree. analyze_unit is not on a
+    production path today, but entry.build_provenance's docstring asserts the
+    three stay identical, so it moves with them."""
+    dispatcher = _RecordingDispatcher()
+    result = analyze_unit(_unit(), cache=cache, dispatcher=dispatcher)
+    assert result.entry.consolidated is False
+
+
+def test_analyze_unit_preserves_consolidated_on_a_hit(cache: LocalFileBackend):
+    """A hit returns the stored entry untouched, whatever its state."""
+    dispatcher = _RecordingDispatcher()
+    unit = _unit()
+    first = analyze_unit(unit, cache=cache, dispatcher=dispatcher)
+    stored = cache.get(first.entry.key)
+    stored.consolidated = True
+    cache.put(first.entry.key, stored)
+
+    second = analyze_unit(unit, cache=cache, dispatcher=dispatcher)
+    assert second.cache_hit is True
+    assert second.entry.consolidated is True

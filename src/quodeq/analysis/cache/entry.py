@@ -43,7 +43,8 @@ def build_provenance(
 
     Single source of truth for the provenance shape, so the three cache-write
     sites (cache_writer, persist_dispatch_results, runner.analyze_unit) stay
-    identical. ``version`` defaults to the current quodeq version.
+    identical. Those three sites also all pass ``consolidated=False``.
+    ``version`` defaults to the current quodeq version.
     ``effective_params`` records the resolved threshold params the findings
     were judged under (``{req_id: {param: value}}``; ``{}`` when unknown)."""
     return {
@@ -79,6 +80,16 @@ class CacheEntry:
     provenance: dict = field(default_factory=dict)
     created_at: str = field(default_factory=_utc_now)
     cache_format_version: int = ENTRY_FORMAT_VERSION
+    # Whether a COMPLETED run has consolidated these findings into its
+    # report. Written False at creation and flipped to True by
+    # consolidation.mark_run_consolidated when a run reaches state=done.
+    # A run that was cancelled with "keep findings", failed, or was killed
+    # never flips its entries, so a later run replays their findings as
+    # this scan's own rather than hiding them as carried forward.
+    #
+    # Defaults True so entries written before this field existed load as
+    # consolidated and behave exactly as they did before.
+    consolidated: bool = True
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), separators=(",", ":"))

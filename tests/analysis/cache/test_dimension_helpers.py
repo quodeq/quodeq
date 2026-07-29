@@ -547,3 +547,35 @@ class TestRoundTrip:
         second = classify_files_via_cache(config, "security", files, cache)
         assert second.misses == []
         assert {f["file"] for f in second.cached_findings} == set(files)
+
+
+def test_persist_dispatch_results_marks_entries_unconsolidated(tmp_path):
+    """The periodic-persist watcher path must agree with the synchronous
+    cache_writer path: both produce unconsolidated entries."""
+    import json as _json
+
+    from quodeq.analysis.cache.dimension_helpers import (
+        build_cache_key_for_file,
+        persist_dispatch_results,
+    )
+    from quodeq.analysis.cache.local import LocalFileBackend
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.py").write_text("x")
+    config = _make_config(src)
+
+    jsonl = tmp_path / "security_evidence.jsonl"
+    jsonl.write_text(
+        _json.dumps({"file": "a.py", "line": 1, "t": "violation", "p": "P1"}) + "\n"
+        + _json.dumps({"_marker": "file_done", "file": "a.py", "status": "ok"}) + "\n"
+    )
+
+    cache = LocalFileBackend(root=tmp_path / "cache")
+    key = build_cache_key_for_file(config, "a.py", "security")
+    persist_dispatch_results(
+        config, "security", miss_files=["a.py"],
+        jsonl_path=jsonl, miss_keys={"a.py": key}, cache=cache,
+    )
+
+    assert cache.get(key).consolidated is False

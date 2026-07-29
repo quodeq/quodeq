@@ -134,3 +134,31 @@ class TestProvenanceEffectiveParams:
             model_id="m", prompts_hash="p", standards_hash="s", version="1.0",
         )
         assert prov["effective_params"] == {}
+
+
+def test_entry_without_consolidated_key_loads_as_consolidated():
+    """Entries written before consolidation tracking existed must keep
+    replaying as carried forward, so the first run after an upgrade behaves
+    exactly as it did before. Defaulting to False instead would surface every
+    pre-existing cache entry as a brand new finding, once, on every project."""
+    payload = json.dumps({
+        "key": "abc123",
+        "schema_version": 1,
+        "findings": [],
+        "files_read": 1,
+        "file_path": "a.py",
+        "dimension": "security",
+        "model_id": "claude-opus-4-7",
+    })
+    assert CacheEntry.from_json(payload).consolidated is True
+
+
+def test_consolidated_false_survives_the_json_round_trip():
+    entry = _make(consolidated=False)
+    assert CacheEntry.from_json(entry.to_json()).consolidated is False
+
+
+def test_entry_format_version_is_unchanged_by_the_consolidated_field():
+    """from_json tolerates missing and unknown keys in both directions, so
+    adding a field needs no format bump and no migration."""
+    assert ENTRY_FORMAT_VERSION == 2
