@@ -201,22 +201,6 @@ def _rescore_run_dimensions(
     ]
 
 
-def _count_eval_files(reports_root: Path, project: str, run_id: str) -> int:
-    """Count ``evaluation/*.json`` files on disk for a run.
-
-    Used to detect a stale cache: if the cached dim list has a different
-    count from what's currently on disk, the cache is wrong and must be
-    evicted. One ``listdir`` per cached lookup -- cheap.
-    """
-    eval_dir = reports_root / project / run_id / "evaluation"
-    if not eval_dir.is_dir():
-        return 0
-    try:
-        return sum(1 for p in eval_dir.iterdir() if p.suffix == ".json")
-    except OSError:
-        return 0
-
-
 def _make_status_aware_fetcher(
     reports_root: Path,
     project: str,
@@ -226,48 +210,23 @@ def _make_status_aware_fetcher(
     max_size: int | None = None,
     version: str = "",
 ) -> Callable[[str], list[DimensionResult]]:
-    """Return a fetcher with two self-healing properties on top of the LRU cache.
+    """Return a fetcher that reads in-progress runs fresh, never from cache.
 
-    1. **In-progress bypass.** Runs with status=in_progress have a mutable
-       on-disk evaluation/ set as dims finish. We read directly from disk
-       and don't write to cache, so the next request also reads fresh.
-
-    2. **On-disk count validation for terminal runs.** Even after a run
-       completes, the cache may hold a stale partial dim set -- e.g. if
-       it was populated by a request that fired between dims being scored
-       (a window opened by the BrokenPipe-during-success-log regression
-       PR #481 fixed). On lookup, we count evaluation/*.json files and
-       compare against the cached length. Mismatch -> evict, re-read.
-
-    Cost: one extra ``listdir`` per cached lookup. Cheap (eval/ is small).
+    The base LRU fetcher (``make_lru_dimension_fetcher``) already self-heals:
+    on-disk count validation plus a status.json in-progress bypass. This
+    wrapper adds the richer status from *runs* (``list_runs`` folds in a
+    PID-liveness check that status.json alone can't see), so a run whose
+    process is still alive reads fresh even before its state flips.
     """
-    resolved_cache = cache if cache is not None else _SHARED_RUN_DIM_CACHE
-    resolved_lock = lock if lock is not None else _SHARED_RUN_DIM_LOCK
     cached = _make_run_dimension_fetcher(
         reports_root, project,
-        cache=resolved_cache, lock=resolved_lock, max_size=max_size, version=version,
+        cache=cache, lock=lock, max_size=max_size, version=version,
     )
     status_by_id = {r.run_id: r.status for r in runs}
 
     def fetch(run_id: str) -> list[DimensionResult]:
         if status_by_id.get(run_id) == "in_progress":
             return read_run_data(reports_root, project, run_id)
-        # Validate any cached entry against the on-disk count. If they
-        # disagree, the cache is stale -- evict so the cached() call below
-        # re-reads from disk and re-caches with the correct value. We only
-        # validate when an actual evaluation/ directory exists on disk:
-        # without that anchor we'd evict every test stub that pre-seeds
-        # the cache without creating disk state.
-        key = (reports_root, project, run_id, version)
-        with resolved_lock:
-            cached_dims = resolved_cache.get(key)
-        if cached_dims is not None:
-            eval_dir = reports_root / project / run_id / "evaluation"
-            if eval_dir.is_dir():
-                on_disk = _count_eval_files(reports_root, project, run_id)
-                if len(cached_dims) != on_disk:
-                    with resolved_lock:
-                        resolved_cache.pop(key, None)
         return cached(run_id)
 
     return fetch
