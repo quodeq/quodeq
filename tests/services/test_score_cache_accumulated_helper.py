@@ -39,6 +39,24 @@ def test_version_stable_regardless_of_run_order(tmp_path, monkeypatch):
     assert a == b  # run-set is order-independent (sorted)
 
 
+def test_version_folds_visible_dims_only_when_given(tmp_path, monkeypatch):
+    """visible_dims invalidates visibility-scoped payloads (project card) on a
+    selection change, while None-passing callers (accumulated Overview, which
+    returns every dim and lets the client filter) keep their hashes."""
+    _patch_keys(monkeypatch)
+    pd = tmp_path / "proj"; pd.mkdir()
+    runs = [("r1", "complete")]
+    base = accumulated_cache_version(pd, DEFAULT_PARAMS, runs, None)
+    six = accumulated_cache_version(
+        pd, DEFAULT_PARAMS, runs, None, visible_dims=("security", "reliability"))
+    one = accumulated_cache_version(
+        pd, DEFAULT_PARAMS, runs, None, visible_dims=("security",))
+    assert len({base, six, one}) == 3
+    # Selection is order-independent (sorted before hashing).
+    assert six == accumulated_cache_version(
+        pd, DEFAULT_PARAMS, runs, None, visible_dims=("reliability", "security"))
+
+
 def test_cached_accumulated_miss_then_hit(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     calls = []

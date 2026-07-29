@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from quodeq.core.standards.visibility import load_visible_standard_ids
 from quodeq.services.ports import RunInfo, read_run_data, safe_read_dir, summarize_dimensions
 from quodeq.shared.validation import validate_path_segment
 
@@ -62,6 +63,24 @@ def _read_repo_info(reports_root: Path, entry_name: str) -> dict[str, Any]:
         return {}
 
 
+def _local_repo_root(reports_root: Path, entry_name: str) -> Path | None:
+    """The analyzed repo's local working copy, or None when there isn't one.
+
+    Same gate as the API's ``repo_attach_info``: a recorded path that is not
+    an online URL and still exists as a directory. Online projects and moved
+    working copies resolve to None, which downstream visibility lookups treat
+    as "use the default selection".
+    """
+    info = _read_repo_info(reports_root, entry_name)
+    path = info.get("path")
+    if not path or not isinstance(path, str):
+        return None
+    if str(info.get("location", "")).lower() == "online" or "://" in path:
+        return None
+    root = Path(path)
+    return root if root.is_dir() else None
+
+
 def _read_accumulated_summary(
     reports_root: Path, entry_name: str, runs: list[RunInfo],
     params: "ScoringParams | None" = None,
@@ -73,6 +92,13 @@ def _read_accumulated_summary(
     repositories-screen grade agrees with the Overview / explorer / trend.
     *params* (loaded from the saved formula when None) keeps the aggregate
     threshold labels and dimension weights consistent with the dashboard.
+
+    The card also scopes to the project's visible-standards selection: the
+    Overview headline averages only visible dimensions (the client filters
+    the accumulated payload), so a card computed over ALL dimensions shows a
+    different grade whenever a hidden dimension's score diverges. The
+    selection is folded into the cache version so toggling a standard
+    invalidates the cached card.
     """
     if params is None:
         from quodeq.services import grade_formula  # noqa: PLC0415
@@ -82,9 +108,12 @@ def _read_accumulated_summary(
         accumulated_cache_version, cached_project_summary, per_run_versions,
     )
     project_dir = reports_root / entry_name
+    visible = load_visible_standard_ids(_local_repo_root(reports_root, entry_name))
+    visible_set = set(visible)
     run_versions = per_run_versions(
         project_dir, entry_name, params, [(r.run_id, r.status) for r in runs])
-    version = accumulated_cache_version(project_dir, params, run_versions, as_of=None)
+    version = accumulated_cache_version(
+        project_dir, params, run_versions, as_of=None, visible_dims=visible)
 
     def _compute() -> dict:
         try:
@@ -109,8 +138,11 @@ def _read_accumulated_summary(
                     # Same trust gate as the accumulated Overview
                     # (_has_valid_score): skip a coverage-0 stub so the card
                     # falls through to a real older run instead of showing
-                    # the stub's inflated grade.
-                    if d.dimension and d.dimension not in latest_by_dim and _has_valid_score(d):
+                    # the stub's inflated grade. Hidden standards are skipped
+                    # entirely: the Overview headline excludes them, and a
+                    # dimension the user cannot see must not move the grade.
+                    if (d.dimension and d.dimension.lower() in visible_set
+                            and d.dimension not in latest_by_dim and _has_valid_score(d)):
                         latest_by_dim[d.dimension] = d
                         validate_path_segment(run.run_id)
                         run_dir_by_dim[d.dimension] = project_dir / run.run_id
