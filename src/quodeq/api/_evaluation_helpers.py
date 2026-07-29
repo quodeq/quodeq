@@ -12,7 +12,10 @@ from quodeq.api.helpers import error_response
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.services.base import _DEFAULT_MAX_SUBAGENTS, _DEFAULT_TIME_LIMIT
 
-_CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")
+# Userinfo cannot contain an unencoded "/", so excluding it keeps matches
+# identical while a failing scan stays linear (no polynomial backtracking
+# on inputs like repeated "http://" runs).
+_CREDENTIALS_RE = re.compile(r"(https?://)([^/@]+)@")
 _logger = logging.getLogger(__name__)
 
 # Bounds for user-supplied evaluation parameters
