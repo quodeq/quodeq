@@ -209,3 +209,53 @@ def test_three_way_split_carried_pending_and_fresh(tmp_path: Path, cache):
     assert by_title["carry-a"].get("carried_forward") is True
     assert by_title["pending-b"].get("carried_forward", False) is False
     assert by_title["fresh-c"].get("carried_forward", False) is False
+
+
+def test_replayed_unconsolidated_keys_sidecar_is_written_on_the_all_hits_path(
+    tmp_path: Path, cache,
+):
+    """A fully cached dimension dispatches nothing, so it writes no
+    dispatch_keys sidecar. Without this one it would never flip its entries
+    and its findings would replay as new forever."""
+    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
+    from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+
+    config, _src = _setup(tmp_path, {"a.py": "x"})
+
+    key = build_cache_key_for_file(config, "a.py", "security")
+    cache.put(key, CacheEntry(
+        key=key, schema_version=1,
+        findings=[dict(_finding("pending-a"), file="a.py")],
+        files_read=1, file_path="a.py", dimension="security",
+        model_id="test-model", consolidated=False,
+    ))
+
+    process_dimension_with_cache(
+        config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+    )
+
+    sidecar = (config.work_dir or config.src) / "security_replayed_unconsolidated_keys.json"
+    assert sidecar.is_file()
+    assert json.loads(sidecar.read_text()) == {"a.py": key}
+
+
+def test_no_sidecar_when_every_hit_is_already_consolidated(tmp_path: Path, cache):
+    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
+    from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+
+    config, _src = _setup(tmp_path, {"a.py": "x"})
+
+    key = build_cache_key_for_file(config, "a.py", "security")
+    cache.put(key, CacheEntry(
+        key=key, schema_version=1,
+        findings=[dict(_finding("carry-a"), file="a.py")],
+        files_read=1, file_path="a.py", dimension="security",
+        model_id="test-model", consolidated=True,
+    ))
+
+    process_dimension_with_cache(
+        config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+    )
+
+    sidecar = (config.work_dir or config.src) / "security_replayed_unconsolidated_keys.json"
+    assert not sidecar.exists()

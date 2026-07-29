@@ -24,7 +24,7 @@ import pytest
 
 from quodeq.analysis.cache import CacheEntry, LocalFileBackend
 from quodeq.core.types import JobSnapshot
-from quodeq.services.evaluation_mixin import FsEvaluationMixin
+from quodeq.services.evaluation_mixin import FsEvaluationMixin, _discard_run_state
 from quodeq.services.filesystem import FilesystemActionProvider
 from quodeq.shared.dimensions_state import DimState, write_dim_state
 from quodeq.shared.run_status import RunState, write_status
@@ -385,3 +385,46 @@ class TestRouteDiscardBlocksScoringResurrection:
             assert not scored.wait(timeout=0.3), (
                 "status GET resurrected scoring for a discarded run"
             )
+
+
+def test_discard_removes_the_replayed_keys_sidecar(tmp_path: Path):
+    """Every per-dim scratch file must go, or the status-GET scoring path can
+    resurrect state from leftovers."""
+    reports = tmp_path / "reports"
+    evidence = reports / "proj" / "run1" / "evidence"
+    evidence.mkdir(parents=True)
+    sidecar = evidence / "security_replayed_unconsolidated_keys.json"
+    sidecar.write_text(json.dumps({"a.py": "key-a"}))
+
+    _discard_run_state(str(reports), {"outputProject": "proj", "outputRunId": "run1"})
+
+    assert not sidecar.exists()
+
+
+def test_discard_does_not_delete_replayed_cache_entries(tmp_path: Path, monkeypatch):
+    """The replayed entries were written by an EARLIER run. Discard wipes only
+    what this run created; deleting these would destroy a prior kept run's
+    cached work."""
+    reports = tmp_path / "reports"
+    evidence = reports / "proj" / "run1" / "evidence"
+    evidence.mkdir(parents=True)
+    (evidence / "security_dispatch_keys.json").write_text(
+        json.dumps({"b.py": "key-mine"})
+    )
+    (evidence / "security_replayed_unconsolidated_keys.json").write_text(
+        json.dumps({"a.py": "key-theirs"})
+    )
+
+    deleted: list[str] = []
+
+    class _FakeCache:
+        def delete(self, key: str) -> None:
+            deleted.append(key)
+
+    monkeypatch.setattr(
+        "quodeq.services.evaluation_mixin._open_cache", lambda: _FakeCache(),
+    )
+
+    _discard_run_state(str(reports), {"outputProject": "proj", "outputRunId": "run1"})
+
+    assert deleted == ["key-mine"]

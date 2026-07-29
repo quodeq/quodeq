@@ -116,6 +116,26 @@ def _jsonl_path(config: RunConfig, dim_id: str) -> Path:
     return _evidence_dir(config) / f"{dim_id}_evidence.jsonl"
 
 
+def _write_replayed_keys_sidecar(
+    config: RunConfig, dim_id: str, keys: dict[str, str],
+) -> None:
+    """Record which unconsolidated cache entries this dim replayed.
+
+    A run that reaches ``done`` consolidates not only the entries it wrote
+    but the unconsolidated ones it replayed: those findings are now in a
+    completed run's report. ``consolidation.mark_run_consolidated`` reads
+    this sidecar alongside ``<dim>_dispatch_keys.json``.
+
+    Skipped when there is nothing to record, so a run that replays only
+    consolidated entries leaves no file behind.
+    """
+    if not keys:
+        return
+    sidecar = _evidence_dir(config) / f"{dim_id}_replayed_unconsolidated_keys.json"
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    sidecar.write_text(json.dumps(keys, indent=2), encoding="utf-8")
+
+
 def _compute_files_read(
     classify: ClassifyResult, jsonl_path: Path, all_files: list[str],
 ) -> int:
@@ -319,6 +339,11 @@ def process_dimension_with_cache(
     )
 
     jsonl = _jsonl_path(config, dim_id)
+
+    # Written BEFORE the all-hits branch so one call site covers both replay
+    # paths. A fully cached dimension writes no dispatch_keys sidecar (it
+    # never dispatches), so without this it would never flip its entries.
+    _write_replayed_keys_sidecar(config, dim_id, classify.unconsolidated_hit_keys)
 
     # All-hits short-circuit: no dispatch needed.
     # We append (not overwrite) because callers may invoke us multiple times
