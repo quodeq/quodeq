@@ -411,6 +411,107 @@ class TestDimElapsed:
         assert 115 <= dim.elapsed_s <= 130
 
 
+class TestDimElapsedFromStamps:
+    """Transition timestamps in dimensions.json beat queue reconstruction.
+
+    write_dim_state stamps started_at/completed_at at the actual state
+    transitions, so when both ends exist the duration is exact — the
+    queue/mtime forensics stay fallback-only.
+    """
+
+    def _write_queue(self, run_dir: Path, dim: str, payload: dict) -> None:
+        (run_dir / "evidence" / f"{dim}_queue.json").write_text(
+            json.dumps(payload), encoding="utf-8",
+        )
+
+    def _write_dim_record(self, run_dir: Path, dim: str, record: dict) -> None:
+        (run_dir / "dimensions.json").write_text(
+            json.dumps({"schema_version": 1, "dimensions": {dim: record}}),
+            encoding="utf-8",
+        )
+
+    def test_running_dim_prefers_stamped_started_at(self, tmp_path: Path) -> None:
+        import time as _t
+        from datetime import datetime, timezone
+        run_dir = _make_run(tmp_path)
+        _write_status(run_dir, dimensions=["security"])
+        now = _t.time()
+        # Queue says the dim started 300s ago; the stamped record says 600s.
+        self._write_queue(run_dir, "security", {
+            "created_at": now - 300,
+            "taken": [{"files": ["a.py"], "agent": "a1", "ts": now - 2}],
+            "pending": ["b.py"],
+        })
+        started = datetime.fromtimestamp(now - 600, tz=timezone.utc).isoformat()
+        self._write_dim_record(run_dir, "security", {"state": "running", "started_at": started})
+        dim = build_scan_progress("j1", run_dir).dimensions[0]
+        assert dim.state == "running"
+        assert dim.elapsed_s is not None
+        assert 595 <= dim.elapsed_s <= 610
+
+    def test_done_dim_duration_is_stamp_subtraction(self, tmp_path: Path) -> None:
+        import time as _t
+        from datetime import datetime, timezone
+        run_dir = _make_run(tmp_path)
+        _write_status(run_dir, dimensions=["security"], state="done")
+        now = _t.time()
+        # Take log would reconstruct >=300s; the stamps say exactly 250s.
+        self._write_queue(run_dir, "security", {
+            "created_at": now - 400,
+            "taken": [
+                {"files": ["a.py"], "agent": "a1", "ts": now - 350},
+                {"files": ["b.py"], "agent": "a1", "ts": now - 100},
+            ],
+            "pending": [],
+        })
+        iso = lambda s: datetime.fromtimestamp(now - s, tz=timezone.utc).isoformat()  # noqa: E731
+        self._write_dim_record(run_dir, "security", {
+            "state": "done", "started_at": iso(350), "completed_at": iso(100),
+        })
+        dim = build_scan_progress("j1", run_dir).dimensions[0]
+        assert dim.state == "done"
+        assert dim.elapsed_s == 250.0
+
+    def test_interrupted_dim_uses_interrupted_at_as_end(self, tmp_path: Path) -> None:
+        import time as _t
+        from datetime import datetime, timezone
+        run_dir = _make_run(tmp_path)
+        _write_status(run_dir, dimensions=["security"], state="cancelled")
+        now = _t.time()
+        self._write_queue(run_dir, "security", {
+            "created_at": now - 400,
+            "taken": [{"files": ["a.py"], "agent": "a1", "ts": now - 350}],
+            "pending": ["b.py"],
+        })
+        iso = lambda s: datetime.fromtimestamp(now - s, tz=timezone.utc).isoformat()  # noqa: E731
+        self._write_dim_record(run_dir, "security", {
+            "state": "incomplete", "started_at": iso(300), "interrupted_at": iso(120),
+        })
+        dim = build_scan_progress("j1", run_dir).dimensions[0]
+        assert dim.elapsed_s == 180.0
+
+    def test_done_dim_without_end_stamp_falls_back_to_reconstruction(self, tmp_path: Path) -> None:
+        # A hard kill can leave started_at with no terminal stamp; the queue
+        # take-log reconstruction must still produce a number.
+        import time as _t
+        from datetime import datetime, timezone
+        run_dir = _make_run(tmp_path)
+        _write_status(run_dir, dimensions=["security"], state="done")
+        now = _t.time()
+        self._write_queue(run_dir, "security", {
+            "created_at": now - 400,
+            "taken": [{"files": ["a.py"], "agent": "a1", "ts": now - 100}],
+            "pending": [],
+        })
+        started = datetime.fromtimestamp(now - 350, tz=timezone.utc).isoformat()
+        self._write_dim_record(run_dir, "security", {"state": "running", "started_at": started})
+        dim = build_scan_progress("j1", run_dir).dimensions[0]
+        assert dim.state == "done"
+        # created_at (now-400) -> last take (now-100): reconstruction, not stamps.
+        assert dim.elapsed_s is not None
+        assert dim.elapsed_s >= 295
+
+
 class TestConsolidatedProgress:
     """Consolidated (grouped) runs write consolidated_* files, not per-dim
     queues, so the per-dim reader showed 0% / "estimating…" for the whole

@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { StatStrip, Stat } from '../../../components/terminal/index.js';
 import { computeOverallProgress } from './scanProgressTotals.js';
 import {
-  buildJobStatCells, computeRate, buildEtaHint, msUntilNextSecond,
+  buildJobStatCells, computeRate, buildEtaHint,
   buildDimensionCycle, sumSeverities, deriveScanMode,
 } from './buildJobStatCells.js';
 import { recordRateSample, getRateSamples } from './rateSampleStore.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
+import { useRunElapsed } from '../hooks/useRunElapsed.js';
 
 const TERMINAL_STATES = new Set(['done', 'completed', 'failed', 'cancelled', 'lost']);
 
@@ -25,45 +26,14 @@ function sumSuppressed(progress) {
   return (progress?.dimensions || []).reduce((n, d) => n + (d?.suppressed || 0), 0);
 }
 
-// Live elapsed from wall-clock so the cell ticks every second between the 2s
-// progress polls. Falls back to the backend-reported elapsed only when the job
-// carries no usable startedAt.
-function deriveElapsedS(startedAt, endedAt, isTerminal, fallbackElapsed) {
-  if (startedAt) {
-    const start = Date.parse(startedAt);
-    if (!Number.isNaN(start)) {
-      const end = isTerminal && endedAt ? Date.parse(endedAt) : Date.now();
-      if (!Number.isNaN(end)) return Math.max(0, (end - start) / 1000);
-    }
-  }
-  if (fallbackElapsed != null && Number.isFinite(fallbackElapsed)) return fallbackElapsed;
-  return null;
-}
-
 export default function JobStatStrip({ job, liveViolations, hiddenCarriedCount = 0 }) {
   const jobId = job?.jobId;
   const isTerminal = TERMINAL_STATES.has(job?.status);
 
   const { data: progress, dataUpdatedAt } = useEvaluationProgress(jobId, isTerminal);
-
-  // Re-render aligned to each whole-second boundary of wall-clock elapsed, so
-  // ELAPSED ticks *evenly*. A fixed setInterval(1000) has its phase fixed at
-  // mount and beats against the second boundary as timer jitter drifts it,
-  // producing visible double/skip ticks. A self-correcting timeout recomputes
-  // the delay from absolute `now` each tick — it re-aligns to the boundary and
-  // never accumulates drift. Inactive on terminal states / without a startedAt
-  // (the elapsed value is then poll-derived and can't tick per-second anyway).
-  const [tick, setTick] = useState(0);
-  const startMs = job?.startedAt ? Date.parse(job.startedAt) : NaN;
-  useEffect(() => {
-    if (isTerminal || !jobId || Number.isNaN(startMs)) return undefined;
-    let id;
-    const schedule = () => {
-      id = setTimeout(() => { setTick((t) => t + 1); schedule(); }, msUntilNextSecond(Date.now() - startMs));
-    };
-    schedule();
-    return () => clearTimeout(id);
-  }, [isTerminal, jobId, startMs]);
+  // Server-anchored, per-second-ticking elapsed shared with ScanProgress, so
+  // the ELAPSED tile and the footer clock always agree.
+  const elapsedS = useRunElapsed(job, progress, dataUpdatedAt);
 
   // Throughput samples live in a module-level store (rateSampleStore.js) keyed
   // by jobId, so the sliding-window rate SURVIVES navigating out of and back
@@ -81,7 +51,6 @@ export default function JobStatStrip({ job, liveViolations, hiddenCarriedCount =
   const cells = useMemo(() => {
     if (!jobId) return [];
     const { takenFiles, totalFiles, overallPct } = computeOverallProgress(progress);
-    const elapsedS = deriveElapsedS(job?.startedAt, job?.endedAt, isTerminal, progress?.totalElapsedS);
     const liveCount = sumLiveViolations(liveViolations);
     // Current throughput from the persisted sliding window (null → "estimating…"
     // until ~30s of samples accumulate). No whole-run average: it over-reads
@@ -96,8 +65,8 @@ export default function JobStatStrip({ job, liveViolations, hiddenCarriedCount =
       sevCounts: sumSeverities(liveViolations),
       scanMode: deriveScanMode(progress),
     });
-    // `tick` drives the per-second recompute; the sample store is read (not a dep).
-  }, [jobId, job?.status, job?.startedAt, job?.endedAt, isTerminal, progress, liveViolations, hiddenCarriedCount, tick]);
+    // `elapsedS` advances once per second via useRunElapsed; the sample store is read (not a dep).
+  }, [jobId, job?.status, isTerminal, progress, liveViolations, hiddenCarriedCount, elapsedS]);
 
   if (!jobId) return null;
 

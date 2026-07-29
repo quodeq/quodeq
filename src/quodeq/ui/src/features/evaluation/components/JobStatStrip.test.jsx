@@ -40,7 +40,7 @@ describe('JobStatStrip', () => {
     expect(await screen.findByText('63%')).toBeInTheDocument();
     expect(screen.getByText('138')).toBeInTheDocument();
     expect(screen.getByText('/ 220')).toBeInTheDocument();
-    expect(screen.getByText('2:14')).toBeInTheDocument();
+    expect(screen.getByText('2m 14s')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();    // violations count
     expect(screen.getByText('1 critical · 1 major')).toBeInTheDocument();
   });
@@ -56,7 +56,7 @@ describe('JobStatStrip', () => {
     expect(screen.getByText('DURATION')).toBeInTheDocument();
     expect(await screen.findByText('220')).toBeInTheDocument();
     expect(screen.getByText('13')).toBeInTheDocument();
-    expect(screen.getByText('4:32')).toBeInTheDocument();
+    expect(screen.getByText('4m 32s')).toBeInTheDocument();
   });
 
   it('renders fallback values when progress query has no data yet', () => {
@@ -132,20 +132,34 @@ describe('JobStatStrip', () => {
     nowSpy.mockRestore();
   });
 
-  it('ELAPSED reflects wall-clock from startedAt (not backend elapsed)', async () => {
+  it('ELAPSED is anchored to the server-reported elapsed, not client wall-clock', async () => {
+    // The client's clock disagrees with the server by hours (skew, suspended
+    // laptop): startedAt reads as 5s ago, but the server has measured 9999s
+    // of run time. The server value wins — every clock on the screen derives
+    // from it, so skew can't corrupt the display.
     const now = new Date('2026-06-08T10:00:00Z').getTime();
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
     getEvaluationProgress.mockResolvedValue({
       dimensions: [{ state: 'running', files: { taken: 10, total: 1000 } }],
-      totalElapsedS: 9999, // would show 166:39 if backend value were used
+      totalElapsedS: 9999,
     });
     const job = { jobId: 'job-4', status: 'running', startedAt: new Date(now - 5000).toISOString() };
     renderWithClient(<JobStatStrip job={job} liveViolations={{}} />);
-    // Wait for the poll to resolve (PROGRESS shows 1%) so we assert the
-    // post-resolution value: with the old code this would flip to backend
-    // 9999s (166:39); the new code keeps wall-clock 0:05.
     expect(await screen.findByText('1%')).toBeInTheDocument();
-    expect(screen.getByText('0:05')).toBeInTheDocument();
+    expect(screen.getByText('2h 46m 39s')).toBeInTheDocument();
+    nowSpy.mockRestore();
+  });
+
+  it('ELAPSED falls back to job wall-clock before any progress payload lands', async () => {
+    const now = new Date('2026-06-08T10:00:00Z').getTime();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    getEvaluationProgress.mockResolvedValue({
+      dimensions: [{ state: 'running', files: { taken: 10, total: 1000 } }],
+    });
+    const job = { jobId: 'job-4b', status: 'running', startedAt: new Date(now - 5000).toISOString() };
+    renderWithClient(<JobStatStrip job={job} liveViolations={{}} />);
+    expect(await screen.findByText('1%')).toBeInTheDocument();
+    expect(screen.getByText('5s')).toBeInTheDocument();
     nowSpy.mockRestore();
   });
 
@@ -160,9 +174,9 @@ describe('JobStatStrip', () => {
       const job = { jobId: 'job-5', status: 'running', startedAt: new Date(t0 - 5000).toISOString() };
       renderWithClient(<JobStatStrip job={job} liveViolations={{}} />);
       await vi.advanceTimersByTimeAsync(0);     // flush the initial fetch
-      expect(screen.getByText('0:05')).toBeInTheDocument();
+      expect(screen.getByText('5s')).toBeInTheDocument();
       await vi.advanceTimersByTimeAsync(2000);  // two 1s ticks
-      expect(screen.getByText('0:07')).toBeInTheDocument();
+      expect(screen.getByText('7s')).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

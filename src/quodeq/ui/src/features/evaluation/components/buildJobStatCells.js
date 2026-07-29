@@ -4,6 +4,7 @@
  */
 
 import { computeOverallProgress } from './scanProgressTotals.js';
+import { formatDuration } from '../../../utils/formatters.js';
 
 // Throughput estimate tuning. The eval completes only a few files per MINUTE
 // (one slow LLM call per file), so the rate is shown per minute and measured
@@ -94,12 +95,40 @@ export function msUntilNextSecond(elapsedMs) {
   return 1000 - rem;
 }
 
-export function formatClock(s) {
-  if (s == null || !Number.isFinite(s)) return '—';
-  const total = Math.max(0, Math.floor(s));
-  const m = Math.floor(total / 60);
-  const sec = total % 60;
-  return `${m}:${String(sec).padStart(2, '0')}`;
+/**
+ * One elapsed value for the whole evaluate screen, anchored to the SERVER's
+ * clock. The progress payload reports totalElapsedS computed from the run's
+ * own status.json timestamps; the client only extrapolates forward by the
+ * time since that payload landed. Anchoring to the server (instead of
+ * Date.parse(job.startedAt) vs client Date.now()) makes the clock immune to
+ * client/server clock skew and keeps every clock on the screen in lock-step
+ * — the stat strip and the footer previously mixed client wall-clock with
+ * 2s-stale poll data and visibly disagreed.
+ *
+ * Fallback order when the server hasn't reported an elapsed yet (first
+ * render before any poll, legacy runs): job wall-clock timestamps, else null.
+ * Non-running jobs freeze on the server value (or startedAt→endedAt).
+ *
+ * @param {object} args
+ * @param {boolean} args.running
+ * @param {number|null|undefined} args.serverElapsedS — progress.totalElapsedS
+ * @param {number|null|undefined} args.serverUpdatedAtMs — when that payload landed (epoch ms)
+ * @param {number} args.nowMs
+ * @param {string|null|undefined} args.startedAt — ISO, fallback only
+ * @param {string|null|undefined} args.endedAt — ISO, fallback only
+ * @returns {number|null} seconds
+ */
+export function deriveRunElapsedS({ running, serverElapsedS, serverUpdatedAtMs, nowMs, startedAt, endedAt }) {
+  if (Number.isFinite(serverElapsedS)) {
+    if (!running) return serverElapsedS;
+    const sinceMs = Number.isFinite(serverUpdatedAtMs) ? Math.max(0, nowMs - serverUpdatedAtMs) : 0;
+    return serverElapsedS + sinceMs / 1000;
+  }
+  const start = startedAt ? Date.parse(startedAt) : NaN;
+  if (Number.isNaN(start)) return null;
+  const end = !running && endedAt ? Date.parse(endedAt) : nowMs;
+  if (Number.isNaN(end)) return null;
+  return Math.max(0, (end - start) / 1000);
 }
 
 /**
@@ -184,7 +213,7 @@ function progressCell({ overallPct, takenFiles, totalFiles }) {
 function elapsedCell(elapsedS, label = 'ELAPSED', hint = null) {
   return {
     label,
-    value: formatClock(elapsedS),
+    value: formatDuration(elapsedS),
     hint,
     tone: 'default',
   };

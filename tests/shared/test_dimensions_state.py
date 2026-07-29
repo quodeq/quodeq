@@ -58,6 +58,34 @@ class TestStateMachine:
         assert not (tmp_path / "dimensions.json.tmp").exists()
 
 
+class TestTransitionTimestampsPreserved:
+    """Transitions merge into the record; earlier stamps survive.
+
+    Progress derives a dimension's duration as completed_at - started_at,
+    which only works if the DONE write doesn't wipe the RUNNING stamp."""
+
+    def test_started_at_survives_done(self, tmp_path: Path):
+        write_dim_state(tmp_path, "security", DimState.PENDING)
+        write_dim_state(tmp_path, "security", DimState.RUNNING)
+        started = read_dimensions(tmp_path)["dimensions"]["security"]["started_at"]
+        write_dim_state(tmp_path, "security", DimState.DONE, exit_reason="done")
+        entry = read_dimensions(tmp_path)["dimensions"]["security"]
+        assert entry["state"] == "done"
+        assert entry["started_at"] == started
+        assert entry["completed_at"]
+        assert entry["exit_reason"] == "done"
+
+    def test_started_at_survives_incomplete(self, tmp_path: Path):
+        write_dim_state(tmp_path, "security", DimState.PENDING)
+        write_dim_state(tmp_path, "security", DimState.RUNNING)
+        started = read_dimensions(tmp_path)["dimensions"]["security"]["started_at"]
+        write_dim_state(tmp_path, "security", DimState.INCOMPLETE, reason="cancelled_by_user")
+        entry = read_dimensions(tmp_path)["dimensions"]["security"]
+        assert entry["started_at"] == started
+        assert entry["interrupted_at"]
+        assert entry["reason"] == "cancelled_by_user"
+
+
 class TestRead:
     def test_missing_file_returns_empty(self, tmp_path: Path):
         assert read_dimensions(tmp_path) == {"schema_version": 1, "dimensions": {}}
