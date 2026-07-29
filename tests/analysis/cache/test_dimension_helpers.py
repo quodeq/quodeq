@@ -543,10 +543,14 @@ class TestRoundTrip:
             jsonl_path=jsonl, miss_keys=first.miss_keys, cache=cache,
         )
 
-        # Second call: cache should be fully populated → all hits.
+        # Second call: cache should be fully populated → all hits. The
+        # entries persist_dispatch_results just wrote are unconsolidated
+        # (no COMPLETED run has consolidated them yet), so they land in
+        # unconsolidated_findings, not cached_findings.
         second = classify_files_via_cache(config, "security", files, cache)
         assert second.misses == []
-        assert {f["file"] for f in second.cached_findings} == set(files)
+        assert second.cached_findings == []
+        assert {f["file"] for f in second.unconsolidated_findings} == set(files)
 
 
 def test_persist_dispatch_results_marks_entries_unconsolidated(tmp_path):
@@ -579,3 +583,100 @@ def test_persist_dispatch_results_marks_entries_unconsolidated(tmp_path):
     )
 
     assert cache.get(key).consolidated is False
+
+
+def test_classify_splits_hits_by_consolidation_state(tmp_path):
+    """A hit from a run that never completed must stay out of cached_findings,
+    so the replay path does not stamp it carried_forward."""
+    from quodeq.analysis.cache.dimension_helpers import (
+        build_cache_key_for_file,
+        classify_files_via_cache,
+    )
+    from quodeq.analysis.cache.entry import CacheEntry
+    from quodeq.analysis.cache.local import LocalFileBackend
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.py").write_text("x")
+    (src / "b.py").write_text("y")
+    config = _make_config(src)
+
+    cache = LocalFileBackend(root=tmp_path / "cache")
+    for name, consolidated in (("a.py", True), ("b.py", False)):
+        key = build_cache_key_for_file(config, name, "security")
+        cache.put(key, CacheEntry(
+            key=key, schema_version=1,
+            findings=[{"file": name, "line": 1, "t": "violation", "p": "P1"}],
+            files_read=1, file_path=name, dimension="security",
+            model_id="test-model", consolidated=consolidated,
+        ))
+
+    result = classify_files_via_cache(
+        config, "security", ["a.py", "b.py"], cache,
+    )
+
+    assert result.misses == []
+    assert [f["file"] for f in result.cached_findings] == ["a.py"]
+    assert [f["file"] for f in result.unconsolidated_findings] == ["b.py"]
+    assert set(result.unconsolidated_hit_keys) == {"b.py"}
+    assert result.unconsolidated_hit_keys["b.py"] == build_cache_key_for_file(
+        config, "b.py", "security",
+    )
+
+
+def test_classify_leaves_unconsolidated_fields_empty_when_all_hits_consolidated(tmp_path):
+    from quodeq.analysis.cache.dimension_helpers import (
+        build_cache_key_for_file,
+        classify_files_via_cache,
+    )
+    from quodeq.analysis.cache.entry import CacheEntry
+    from quodeq.analysis.cache.local import LocalFileBackend
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.py").write_text("x")
+    config = _make_config(src)
+
+    cache = LocalFileBackend(root=tmp_path / "cache")
+    key = build_cache_key_for_file(config, "a.py", "security")
+    cache.put(key, CacheEntry(
+        key=key, schema_version=1,
+        findings=[{"file": "a.py", "line": 1, "t": "violation", "p": "P1"}],
+        files_read=1, file_path="a.py", dimension="security",
+        model_id="test-model", consolidated=True,
+    ))
+
+    result = classify_files_via_cache(config, "security", ["a.py"], cache)
+
+    assert result.unconsolidated_findings == []
+    assert result.unconsolidated_hit_keys == {}
+
+
+def test_classify_treats_a_legacy_entry_as_consolidated(tmp_path):
+    """An entry stored before the field existed has no consolidated key.
+    from_json defaults it True, so it must land in cached_findings."""
+    from quodeq.analysis.cache.dimension_helpers import (
+        build_cache_key_for_file,
+        classify_files_via_cache,
+    )
+    from quodeq.analysis.cache.entry import CacheEntry
+    from quodeq.analysis.cache.local import LocalFileBackend
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.py").write_text("x")
+    config = _make_config(src)
+
+    cache = LocalFileBackend(root=tmp_path / "cache")
+    key = build_cache_key_for_file(config, "a.py", "security")
+    cache.put(key, CacheEntry(
+        key=key, schema_version=1,
+        findings=[{"file": "a.py", "line": 1, "t": "violation", "p": "P1"}],
+        files_read=1, file_path="a.py", dimension="security",
+        model_id="test-model",
+    ))
+
+    result = classify_files_via_cache(config, "security", ["a.py"], cache)
+
+    assert [f["file"] for f in result.cached_findings] == ["a.py"]
+    assert result.unconsolidated_findings == []
