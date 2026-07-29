@@ -22,6 +22,7 @@ from quodeq.core.standards.visibility import (
     validate_visible_ids,
 )
 from quodeq.services.standards import StandardsService
+from quodeq.shared.validation import validate_path_segment
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,10 @@ def register_visibility_routes(app: Flask) -> None:
 
     @app.get("/api/projects/<project_id>/standards-visibility")
     def get_standards_visibility(project_id: str) -> Response:
+        try:
+            validate_path_segment(project_id)
+        except ValueError:
+            return error_response("Invalid project id", HTTPStatus.BAD_REQUEST, "bad_request")
         root = _repo_root(project_id)
         if root is None:
             return error_response("Project has no local repository",
@@ -59,6 +64,10 @@ def register_visibility_routes(app: Flask) -> None:
 
     @app.put("/api/projects/<project_id>/standards-visibility")
     def put_standards_visibility(project_id: str) -> Response:
+        try:
+            validate_path_segment(project_id)
+        except ValueError:
+            return error_response("Invalid project id", HTTPStatus.BAD_REQUEST, "bad_request")
         root = _repo_root(project_id)
         if root is None:
             return error_response("Project has no local repository",

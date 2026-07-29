@@ -154,10 +154,13 @@ class TestApiRouteSubagentModel:
         app = create_app(self._make_capturing_provider(captured))
         client = app.test_client()
 
-        response = client.post("/api/evaluations", json={
-            "repo": str(tmp_path),
-            "subagentModel": _MODEL_SONNET,
-        }, headers={"Origin": "http://localhost"})
+        # tmp_path is outside the real home dir; the route's scan allowlist
+        # only admits paths under home or the evaluations dir.
+        with patch("pathlib.Path.home", new=classmethod(lambda cls: tmp_path)):
+            response = client.post("/api/evaluations", json={
+                "repo": str(tmp_path),
+                "subagentModel": _MODEL_SONNET,
+            }, headers={"Origin": "http://localhost"})
         assert response.status_code == 202
         assert captured.get("options") is not None
         assert captured["options"].subagent_model == _MODEL_SONNET
@@ -169,9 +172,10 @@ class TestApiRouteSubagentModel:
         app = create_app(self._make_capturing_provider(captured))
         client = app.test_client()
 
-        response = client.post("/api/evaluations", json={
-            "repo": str(tmp_path),
-        }, headers={"Origin": "http://localhost"})
+        with patch("pathlib.Path.home", new=classmethod(lambda cls: tmp_path)):
+            response = client.post("/api/evaluations", json={
+                "repo": str(tmp_path),
+            }, headers={"Origin": "http://localhost"})
         assert captured.get("options") is not None
         assert captured["options"].subagent_model is None
 

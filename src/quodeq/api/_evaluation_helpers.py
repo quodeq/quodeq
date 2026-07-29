@@ -11,8 +11,12 @@ from flask import Response, jsonify, request
 from quodeq.api.helpers import error_response
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.services.base import _DEFAULT_MAX_SUBAGENTS, _DEFAULT_TIME_LIMIT
+from quodeq.shared.validation import validate_relative_scope
 
-_CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")
+# Userinfo cannot contain an unencoded "/", so excluding it keeps matches
+# identical while a failing scan stays linear (no polynomial backtracking
+# on inputs like repeated "http://" runs).
+_CREDENTIALS_RE = re.compile(r"(https?://)([^/@]+)@")
 _logger = logging.getLogger(__name__)
 
 # Bounds for user-supplied evaluation parameters
@@ -97,6 +101,10 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     ai_model = payload.get("aiModel") or None
     subagent_model = payload.get("subagentModel") or ai_model  # default to orchestrator
     clean_scan = _resolve_clean_scan(payload)
+    scope_path = payload.get("scopePath") or None
+    if scope_path is not None:
+        # ValueError propagates to the route's 400 INVALID_INPUT handler.
+        validate_relative_scope(str(scope_path))
     return EvaluationOptions(
         discipline=payload.get("discipline"),
         dimensions=payload.get("dimensions") or "",
@@ -111,7 +119,7 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
         per_dimension=bool(payload.get("perDimension", False)),
         context_size=max(0, min(_MAX_CONTEXT_SIZE, _coerce_int(payload.get("contextSize"), 0))),
         branch=payload.get("branch") or None,
-        scope_path=payload.get("scopePath") or None,
+        scope_path=scope_path,
         provider_api_key=str(payload.get("apiKey") or ""),
         provider_api_base=str(payload.get("apiBase") or ""),
     )

@@ -140,7 +140,10 @@ def _walk_and_group(
     walk_root = src
     if scope_path:
         candidate = src / scope_path
-        if candidate.is_dir():
+        # Containment mirrors the CLI --scope guard (_cli_resolution): a
+        # scope that resolves outside the repo (traversal segments or a
+        # symlink) must not widen the walk; fall back to the full repo.
+        if candidate.is_dir() and candidate.resolve().is_relative_to(src.resolve()):
             walk_root = candidate
 
     ignore_patterns = ignore_patterns or []

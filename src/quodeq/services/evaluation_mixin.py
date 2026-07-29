@@ -38,7 +38,10 @@ _LOCATION_LOCAL = "local"
 # Mirrors _CREDENTIALS_RE in quodeq.api._evaluation_helpers. Not imported from
 # there: services must not depend on the api layer (no other services module
 # does), so the pattern is duplicated here rather than layered across.
-_CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")
+# Userinfo cannot contain an unencoded "/", so excluding it keeps matches
+# identical while a failing scan stays linear (no polynomial backtracking
+# on inputs like repeated "http://" runs).
+_CREDENTIALS_RE = re.compile(r"(https?://)([^/@]+)@")
 
 
 def _strip_credentials(url: str) -> str:
