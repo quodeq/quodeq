@@ -5,17 +5,11 @@ import { deriveScanMode } from './buildJobStatCells.js';
 import ConsoleButton from '../../../components/ConsoleButton.jsx';
 import { SectionLabel } from '../../../components/terminal/index.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
+import { useRunElapsed } from '../hooks/useRunElapsed.js';
+import { formatDuration, formatDurationCoarse } from '../../../utils/formatters.js';
 
 const TERMINAL_STATES = new Set(['done', 'failed', 'cancelled']);
 const STATUS_MARKERS = { arrow: '→', check: '✓', error: 'Error:', failed: 'failed' };
-
-function formatClock(s) {
-  if (s == null || !Number.isFinite(s)) return '—';
-  const total = Math.max(0, Math.floor(s));
-  const m = Math.floor(total / 60);
-  const sec = total % 60;
-  return `${m}:${String(sec).padStart(2, '0')}`;
-}
 
 function isStatusLine(line) {
   const prefixes = [STATUS_MARKERS.arrow, STATUS_MARKERS.check, STATUS_MARKERS.error];
@@ -88,7 +82,7 @@ function DimRow({ dim }) {
             title={partialTooltip}
           >{coveragePct}%</span>{dim.elapsedS != null && ' · '}</>
         )}
-        {dim.elapsedS != null && formatClock(dim.elapsedS)}
+        {dim.elapsedS != null && formatDuration(dim.elapsedS)}
       </>
     );
   } else {
@@ -97,7 +91,7 @@ function DimRow({ dim }) {
     // dangling "· —" tail. The time budget is run-level (shared across
     // dimensions, shown in the footer), so rows only get their elapsed.
     const clockPart = dim.elapsedS != null
-      ? <span className="scan-progress__budget">{formatClock(dim.elapsedS)}</span>
+      ? <span className="scan-progress__budget">{formatDuration(dim.elapsedS)}</span>
       : null;
     meta = (
       <>
@@ -144,6 +138,9 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   // Best-effort: surface the last successful payload, ignore errors silently
   // (progress is purely informational and should never block the UI).
   const progress = progressQuery.data ?? null;
+  // Same server-anchored ticking clock the stat strip shows, so the footer
+  // total can never disagree with the ELAPSED tile.
+  const elapsedS = useRunElapsed(job, progress, progressQuery.dataUpdatedAt);
 
   useEffect(() => {
     if (evalLog.activeJobId === jobId) {
@@ -195,15 +192,15 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   // run-level budget. Overrun can show briefly: the watchdog allows a
   // short grace past the deadline before killing the job.
   const runBudgetS = progress?.budgetS;
-  const overrun = runBudgetS > 0 && progress?.totalElapsedS > runBudgetS;
+  const overrun = runBudgetS > 0 && elapsedS > runBudgetS;
   const clockPart = isRunning && runBudgetS > 0
     ? (
       <> · <span className={overrun ? 'scan-progress__budget scan-progress__budget--overrun' : 'scan-progress__budget'}>
-        {formatClock(progress.totalElapsedS)} of {formatClock(runBudgetS)} budget
+        {formatDuration(elapsedS)} of {formatDurationCoarse(runBudgetS)} budget
       </span></>
     )
-    : progress?.totalElapsedS != null
-      ? <> · {formatClock(progress.totalElapsedS)} total</>
+    : elapsedS != null
+      ? <> · {formatDuration(elapsedS)} total</>
       : null;
 
   let summary;

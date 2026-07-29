@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildJobStatCells,
-  formatClock,
+  deriveRunElapsedS,
   computeRate,
   RATE_WINDOW_MS,
   formatRate,
@@ -21,27 +21,62 @@ const baseInputs = {
   overallPct: 62,
   takenFiles: 138,
   totalFiles: 220,
-  elapsedS: 134,         // 02:14
+  elapsedS: 134,         // 2m 14s
   liveCount: 2,
 };
 
 // ---------------------------------------------------------------------------
-// formatClock
+// deriveRunElapsedS
 // ---------------------------------------------------------------------------
 
-test('formatClock: formats seconds as m:ss', () => {
-  assert.equal(formatClock(0), '0:00');
-  assert.equal(formatClock(59), '0:59');
-  assert.equal(formatClock(60), '1:00');
-  assert.equal(formatClock(134), '2:14');
-  assert.equal(formatClock(3661), '61:01');
+const T0 = Date.parse('2026-06-08T10:00:00Z');
+
+test('deriveRunElapsedS: running — server elapsed extrapolated by time since the poll', () => {
+  const s = deriveRunElapsedS({
+    running: true, serverElapsedS: 134, serverUpdatedAtMs: T0 - 1500, nowMs: T0,
+    startedAt: null, endedAt: null,
+  });
+  assert.equal(s, 135.5);
 });
 
-test('formatClock: returns "—" for null/undefined/non-finite', () => {
-  assert.equal(formatClock(null), '—');
-  assert.equal(formatClock(undefined), '—');
-  assert.equal(formatClock(NaN), '—');
-  assert.equal(formatClock(Infinity), '—');
+test('deriveRunElapsedS: server elapsed wins over job wall-clock timestamps (skew immunity)', () => {
+  // Client thinks the run started 5s ago; server says 9999s. Server wins.
+  const s = deriveRunElapsedS({
+    running: true, serverElapsedS: 9999, serverUpdatedAtMs: T0, nowMs: T0,
+    startedAt: new Date(T0 - 5000).toISOString(), endedAt: null,
+  });
+  assert.equal(s, 9999);
+});
+
+test('deriveRunElapsedS: non-running freezes on the server value, no extrapolation', () => {
+  const s = deriveRunElapsedS({
+    running: false, serverElapsedS: 272, serverUpdatedAtMs: T0 - 60000, nowMs: T0,
+    startedAt: null, endedAt: null,
+  });
+  assert.equal(s, 272);
+});
+
+test('deriveRunElapsedS: falls back to job timestamps before any progress payload', () => {
+  const running = deriveRunElapsedS({
+    running: true, serverElapsedS: undefined, serverUpdatedAtMs: undefined, nowMs: T0,
+    startedAt: new Date(T0 - 5000).toISOString(), endedAt: null,
+  });
+  assert.equal(running, 5);
+  const ended = deriveRunElapsedS({
+    running: false, serverElapsedS: null, serverUpdatedAtMs: undefined, nowMs: T0,
+    startedAt: new Date(T0 - 90000).toISOString(), endedAt: new Date(T0 - 30000).toISOString(),
+  });
+  assert.equal(ended, 60);
+});
+
+test('deriveRunElapsedS: null when nothing is knowable, clamped at 0 for clock regressions', () => {
+  assert.equal(deriveRunElapsedS({ running: true, nowMs: T0, startedAt: null, endedAt: null }), null);
+  assert.equal(deriveRunElapsedS({ running: true, nowMs: T0, startedAt: 'not-a-date', endedAt: null }), null);
+  const s = deriveRunElapsedS({
+    running: true, serverElapsedS: undefined, nowMs: T0,
+    startedAt: new Date(T0 + 5000).toISOString(), endedAt: null,
+  });
+  assert.equal(s, 0);
 });
 
 // ---------------------------------------------------------------------------
@@ -67,7 +102,7 @@ test('buildJobStatCells: builds 4 cells for a running job with progress data', (
   assert.equal(cells[2].value, 2);
   assert.equal(cells[2].tone, 'critical');
   assert.equal(cells[3].label, 'elapsed');
-  assert.equal(cells[3].value, '2:14');
+  assert.equal(cells[3].value, '2m 14s');
 });
 
 test('buildJobStatCells: running analyzing tile falls back while dims are unknown', () => {
@@ -116,7 +151,7 @@ test('buildJobStatCells: builds done-state cells with SCANNED + VIOLATIONS + DUR
   assert.equal(cells[2].value, 13);
   assert.equal(cells[2].tone, 'critical');
   assert.equal(cells[3].label, 'DURATION');
-  assert.equal(cells[3].value, '4:32');
+  assert.equal(cells[3].value, '4m 32s');
 });
 
 test('buildJobStatCells: uses correct tone for STATUS by status', () => {
