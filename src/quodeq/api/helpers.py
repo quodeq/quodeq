@@ -1,6 +1,7 @@
 """Shared helpers for action API modules."""
 from __future__ import annotations
 
+import os
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
@@ -16,24 +17,26 @@ def error_response(message: str, status: int, code: str) -> tuple[dict[str, Any]
 _BLOCKED_SCAN_PATHS = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
 
 
-def scan_target_error(target_path: Path, reports_root: str) -> tuple[dict[str, Any], int] | None:
-    """Validate a resolved directory path against the scan allowlist.
+def scan_target_error(target_path: Path | str, reports_root: str) -> tuple[dict[str, Any], int] | None:
+    """Validate a directory path against the scan allowlist.
 
     Shared by /api/scan, create_project's local-repo branch, and
     start_evaluation so all enforce the same rules: the path must live under
     the user's home or the evaluations directory, and must not be a blocked
     system path. Returns an ``error_response`` tuple on rejection, or None
     when the path is allowed.
+
+    Uses the realpath + startswith form (not pathlib is_relative_to) — it is
+    the containment shape CodeQL/Snyk recognize as a barrier.
     """
-    _home = Path.home().resolve()
-    _eval_dir = Path(reports_root).resolve()
-    _allowed_roots = (_home, _eval_dir)
-    if not any(target_path == root or target_path.is_relative_to(root) for root in _allowed_roots):
+    candidate = os.path.realpath(str(target_path))
+    _allowed_roots = (os.path.realpath(str(Path.home())), os.path.realpath(reports_root))
+    if not any(candidate == root or candidate.startswith(root + os.sep) for root in _allowed_roots):
         return error_response(
             "Scan path must be under home directory", HTTPStatus.FORBIDDEN, "FORBIDDEN",
         )
     # Block scanning system directories to prevent information disclosure
-    if any(str(target_path).startswith(b) for b in _BLOCKED_SCAN_PATHS):
+    if any(candidate.startswith(b) for b in _BLOCKED_SCAN_PATHS):
         return error_response("Cannot scan system directories", HTTPStatus.FORBIDDEN, "FORBIDDEN")
     return None
 

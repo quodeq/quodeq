@@ -145,7 +145,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
             body, status = error_response("Invalid repo URL", HTTPStatus.BAD_REQUEST, "INVALID_REPO_URL")
             return jsonify(body), status
         if not is_url:
-            err = scan_target_error(Path(str(repo)).resolve(), _reports_dir())
+            err = scan_target_error(str(repo), _reports_dir())
             if err is not None:
                 body, status = err
                 return jsonify(body), status
