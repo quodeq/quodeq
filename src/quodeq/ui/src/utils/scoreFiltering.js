@@ -6,6 +6,7 @@
  */
 
 import { bucketKey, isBucketEligible } from './dailyGrouping.js';
+import { scoreToGradeLabel } from './gradeThresholds.js';
 import { countBySeverity } from './severity.js';
 
 const roundOneDecimal = (n) => Math.round(n * 10) / 10;
@@ -140,6 +141,11 @@ export function filterAccumulatedByVisibleStandards(accumulated, visibleSet, fil
       ...accumulated.summary,
       numericAverage,
       previousNumericAverage: prevAvg,
+      // Re-derive the grade word from the recomputed average: the backend's
+      // overallGrade is computed over ALL dimensions, so passing it through
+      // lets a hidden dimension's score set the letter next to a number it
+      // no longer matches (score from visible dims, grade from everything).
+      overallGrade: scoreToGradeLabel(numericAverage),
       totalViolations,
       totalCompliance,
       severity,

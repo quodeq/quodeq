@@ -335,6 +335,7 @@ def load_run_keys(
 def accumulated_cache_version(
     project_dir: Path, params: ScoringParams,
     run_versions: list[tuple], as_of: str | None,
+    visible_dims: tuple[str, ...] | None = None,
 ) -> str:
     """Version for the accumulated cache: params + the per-run fingerprints +
     *as_of*. Composing per-run fingerprints means a dismiss/delete on one run
@@ -348,6 +349,12 @@ def accumulated_cache_version(
     params + intersecting suppressions — so without status folded in, a run
     completing mid-poll would recompute the same version and serve a stale
     payload that omitted the just-finished (now eligible) run.
+
+    *visible_dims* is folded in only by payloads that are COMPUTED over the
+    visible-standards selection (the project-card summary): toggling a
+    standard must invalidate them. Payloads that return every dimension and
+    leave filtering to the client (the accumulated Overview) pass None, so
+    their hashes are unaffected by visibility edits.
     """
     payload = json.dumps({
         # Bump when the accumulated / project-card computation changes, so
@@ -362,6 +369,7 @@ def accumulated_cache_version(
         "params": _params_fingerprint(params),
         "runs": sorted(list(t) for t in run_versions),
         "as_of": as_of or "",
+        **({} if visible_dims is None else {"visible": sorted(visible_dims)}),
     }, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
