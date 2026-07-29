@@ -79,3 +79,133 @@ def test_only_cache_replays_are_flagged(tmp_path: Path, cache):
     by_title = {ln["w"]: ln for ln in lines if "_marker" not in ln}
     assert by_title["carry-a"].get("carried_forward") is True
     assert by_title["fresh-b"].get("carried_forward", False) is False
+
+
+def test_write_findings_does_not_stamp_unconsolidated_replays(tmp_path: Path):
+    """A finding produced by a run that never completed was never consolidated
+    into an Overview. Replaying it must read as this scan's own finding."""
+    jsonl = tmp_path / "security_evidence.jsonl"
+    _write_findings(
+        jsonl, [_finding("carry-a")], append=False, emit_events=False,
+        unconsolidated=[dict(_finding("pending-b"), file="b.py")],
+    )
+    written = [json.loads(ln) for ln in jsonl.read_text().splitlines() if ln.strip()]
+    by_title = {ln["w"]: ln for ln in written}
+    assert by_title["carry-a"]["carried_forward"] is True
+    assert "carried_forward" not in by_title["pending-b"]
+
+
+def test_write_findings_orders_consolidated_replays_first(tmp_path: Path):
+    """Foundation-then-new ordering in the JSONL, matching the existing
+    carried-before-fresh contract."""
+    jsonl = tmp_path / "security_evidence.jsonl"
+    _write_findings(
+        jsonl, [_finding("carry-a")], append=False, emit_events=False,
+        unconsolidated=[dict(_finding("pending-b"), file="b.py")],
+    )
+    written = [json.loads(ln) for ln in jsonl.read_text().splitlines() if ln.strip()]
+    assert [ln["w"] for ln in written] == ["carry-a", "pending-b"]
+
+
+def test_write_findings_does_not_stamp_the_unconsolidated_source_dicts(tmp_path: Path):
+    jsonl = tmp_path / "security_evidence.jsonl"
+    source = [dict(_finding("pending-b"), file="b.py")]
+    _write_findings(
+        jsonl, [], append=False, emit_events=False, unconsolidated=source,
+    )
+    assert "carried_forward" not in source[0]
+
+
+def test_write_findings_accepts_only_unconsolidated(tmp_path: Path):
+    """A dimension whose every hit is unconsolidated still writes findings."""
+    jsonl = tmp_path / "security_evidence.jsonl"
+    _write_findings(
+        jsonl, [], append=False, emit_events=False,
+        unconsolidated=[dict(_finding("pending-b"), file="b.py")],
+    )
+    written = [json.loads(ln) for ln in jsonl.read_text().splitlines() if ln.strip()]
+    assert [ln["w"] for ln in written] == ["pending-b"]
+
+
+def test_all_unconsolidated_hits_are_still_written(tmp_path: Path, cache):
+    """Two truthiness guards used to test classify.cached_findings to decide
+    whether to write anything. Splitting the list makes both false when every
+    hit is unconsolidated, which would silently DROP those findings from the
+    run rather than merely mis-flagging them."""
+    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
+    from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+
+    config, _src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
+
+    key = build_cache_key_for_file(config, "a.py", "security")
+    cache.put(key, CacheEntry(
+        key=key, schema_version=1,
+        findings=[dict(_finding("pending-a"), file="a.py")],
+        files_read=1, file_path="a.py", dimension="security",
+        model_id="test-model", consolidated=False,
+    ))
+
+    def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+        jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
+        jsonl.parent.mkdir(parents=True, exist_ok=True)
+        with jsonl.open("a") as out:
+            out.write(json.dumps(dict(_finding("fresh-b"), file="b.py", p="P2")) + "\n")
+            out.write(json.dumps({"_marker": "file_done", "file": "b.py", "status": "ok"}) + "\n")
+        return _make_dummy_evidence(files_read=1)
+
+    with patch(
+        "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+        new=fake_dispatch,
+    ):
+        process_dimension_with_cache(
+            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+        )
+
+    jsonl_path = (config.work_dir or config.src) / "security_evidence.jsonl"
+    lines = [json.loads(ln) for ln in jsonl_path.read_text().splitlines() if ln.strip()]
+    titles = {ln["w"] for ln in lines if "_marker" not in ln}
+    assert "pending-a" in titles, "unconsolidated hit was dropped from the run"
+
+
+def test_three_way_split_carried_pending_and_fresh(tmp_path: Path, cache):
+    """The headline case: a consolidated hit is carried, an unconsolidated hit
+    is not, and a dispatched finding is not."""
+    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
+    from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+
+    config, _src = _setup(tmp_path, {"a.py": "x", "b.py": "y", "c.py": "z"})
+
+    for name, title, consolidated in (
+        ("a.py", "carry-a", True),
+        ("b.py", "pending-b", False),
+    ):
+        key = build_cache_key_for_file(config, name, "security")
+        cache.put(key, CacheEntry(
+            key=key, schema_version=1,
+            findings=[dict(_finding(title), file=name)],
+            files_read=1, file_path=name, dimension="security",
+            model_id="test-model", consolidated=consolidated,
+        ))
+
+    def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+        jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
+        jsonl.parent.mkdir(parents=True, exist_ok=True)
+        with jsonl.open("a") as out:
+            out.write(json.dumps(dict(_finding("fresh-c"), file="c.py", p="P2")) + "\n")
+            out.write(json.dumps({"_marker": "file_done", "file": "c.py", "status": "ok"}) + "\n")
+        return _make_dummy_evidence(files_read=1)
+
+    with patch(
+        "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+        new=fake_dispatch,
+    ):
+        process_dimension_with_cache(
+            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+        )
+
+    jsonl_path = (config.work_dir or config.src) / "security_evidence.jsonl"
+    lines = [json.loads(ln) for ln in jsonl_path.read_text().splitlines() if ln.strip()]
+    by_title = {ln["w"]: ln for ln in lines if "_marker" not in ln}
+    assert by_title["carry-a"].get("carried_forward") is True
+    assert by_title["pending-b"].get("carried_forward", False) is False
+    assert by_title["fresh-c"].get("carried_forward", False) is False
