@@ -342,6 +342,15 @@ def persist_dispatch_results(
             ),
             # Born unconsolidated: no completed run has these findings in its
             # report yet. mark_run_consolidated flips it when this run ends done.
+            #
+            # Accepted race: two concurrent runs on one project can both treat
+            # file X as a miss. If run A reaches done and flips X to
+            # consolidated, run B's periodic-persist watcher can then rewrite
+            # X here with consolidated=False. If B is later cancelled, X reads
+            # as unconsolidated even though A already put those findings in a
+            # completed Overview, so the next run surfaces them as "new" once.
+            # Cosmetic, requires concurrent runs on one project, and
+            # self-heals on the next done run. Not fixing.
             consolidated=False,
         )
         cache.put(key, entry)

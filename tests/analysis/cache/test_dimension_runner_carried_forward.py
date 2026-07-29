@@ -167,6 +167,50 @@ def test_all_unconsolidated_hits_are_still_written(tmp_path: Path, cache):
     assert "pending-a" in titles, "unconsolidated hit was dropped from the run"
 
 
+def test_salvage_path_keeps_unconsolidated_hits_when_dispatch_returns_none(
+    tmp_path: Path, cache,
+):
+    """The ``miss_evidence is None`` salvage branch has its own truthiness
+    guard (``replayed_anything``). Like the pre-dispatch write guard above,
+    it used to test only ``classify.cached_findings``, so a dimension whose
+    every hit is unconsolidated would compute ``replayed_anything=False`` and
+    return None -- discarding an unconsolidated finding that was already
+    sitting in the JSONL."""
+    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
+    from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+
+    config, _src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
+
+    key = build_cache_key_for_file(config, "a.py", "security")
+    cache.put(key, CacheEntry(
+        key=key, schema_version=1,
+        findings=[dict(_finding("pending-a"), file="a.py")],
+        files_read=1, file_path="a.py", dimension="security",
+        model_id="test-model", consolidated=False,
+    ))
+    # b.py has no cache entry, so it lands in classify.misses and dispatch is
+    # actually attempted (and not the all-hits short-circuit above).
+
+    def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+        return None
+
+    with patch(
+        "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+        new=fake_dispatch,
+    ):
+        evidence = process_dimension_with_cache(
+            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+        )
+
+    assert evidence is not None, (
+        "salvage-path guard dropped an all-unconsolidated dimension's findings"
+    )
+    jsonl_path = (config.work_dir or config.src) / "security_evidence.jsonl"
+    lines = [json.loads(ln) for ln in jsonl_path.read_text().splitlines() if ln.strip()]
+    titles = {ln["w"] for ln in lines if "_marker" not in ln}
+    assert "pending-a" in titles, "unconsolidated hit was dropped from the run"
+
+
 def test_three_way_split_carried_pending_and_fresh(tmp_path: Path, cache):
     """The headline case: a consolidated hit is carried, an unconsolidated hit
     is not, and a dispatched finding is not."""

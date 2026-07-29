@@ -143,8 +143,8 @@ def _compute_files_read(
     this run ends.
 
     A source file is "reproducible" if either:
-      - it was a cache hit (``classify.cached_findings`` already carried it
-        forward — its cache entry already exists), or
+      - it was a cache hit (the file was replayed from a cache entry,
+        consolidated or not — its cache entry already exists), or
       - it was dispatched and the worker emitted ``file_done="ok"``
         (which triggers a synchronous cache write via
         ``build_cache_writer``, or the watcher's next persist tick).

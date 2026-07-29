@@ -174,7 +174,7 @@ def test_a_raising_backend_never_propagates(tmp_path: Path, caplog):
         mark_run_consolidated(run_dir, backend)
 
     assert backend.touched == 1, "the backend was never consulted"
-    assert "disk on fire" in caplog.text
+    assert "Could not consolidate cache entry" in caplog.text
 
 
 def test_missing_evidence_dir_is_a_no_op(tmp_path: Path):
