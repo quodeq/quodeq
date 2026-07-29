@@ -593,16 +593,25 @@ def run_evaluate(args: argparse.Namespace) -> int:
             _cleanup_worktree(worktree_origin, worktree_dir)
         raise
     result = _run_pipeline_with_cleanup(args, inputs, paths)
+    _, _evidence_dir, evaluation_dir = paths
+    # --diff-from / --evidence-only produce no scored reports: nothing to
+    # export and nothing consolidated into the Overview.
+    no_scored_reports = bool(
+        getattr(args, "diff_from", None) or getattr(args, "evidence_only", False)
+    )
+    # Fail-soft consolidation pass, OUTSIDE the run lifecycle (it has fully
+    # closed by now), so a failure here can never flip the run state. Marks
+    # this run's cache entries consolidated so the NEXT run replays their
+    # findings as carried forward. Gated internally on status.json reading
+    # "done", which is why a run cancelled with "keep findings", a failed
+    # run, and a killed process all leave their entries unconsolidated and
+    # their findings still read as new in the live feed.
+    if not no_scored_reports:
+        from quodeq.analysis.cache.consolidation import mark_run_consolidated
+        mark_run_consolidated(evaluation_dir.parent)
     # Fail-soft SARIF export, OUTSIDE the run lifecycle (it has fully closed by
     # now), only on success and only when scored reports exist. A SARIF error
-    # here can never flip the run state. --diff-from / --evidence-only produce
-    # no scored reports, so skip them.
-    if (
-        result == 0
-        and getattr(args, "sarif", None)
-        and not getattr(args, "diff_from", None)
-        and not getattr(args, "evidence_only", False)
-    ):
-        _, _evidence_dir, evaluation_dir = paths
+    # here can never flip the run state.
+    if result == 0 and getattr(args, "sarif", None) and not no_scored_reports:
         _write_sarif_if_requested(args, evaluation_dir)
     return result
