@@ -41,7 +41,15 @@ _BUSY_TIMEOUT_MS = 5000
 # formula to the run's own evidence jsonl (services/evidence_rescore), so
 # scores cached by the prior writer differ for the SAME suppression state and
 # params; this bump rebuilds them on the evidence basis once.
-_CACHE_WRITER_EPOCH = "5"
+# "6": three scoring read paths built their run-dimension fetcher without the
+# staleness guards (in-progress bypass + eval-file-count validation), so a
+# request landing mid-run could freeze a partial dim list in the process LRU;
+# later writes built from it persisted half-rescored accumulated payloads and
+# partial scalar sets whose version hash can never self-invalidate. The guards
+# now live in the shared fetcher and the accumulated writer refuses
+# partial-coverage payloads; this bump rebuilds rows the prior writer may have
+# poisoned.
+_CACHE_WRITER_EPOCH = "6"
 
 # Shared-root isolation seam (Phase 2): when serving read endpoints from a
 # second (shared) clone, the score cache must not mix rows with the local
@@ -405,11 +413,18 @@ def per_run_versions(
 
 def cached_accumulated(
     project: str, version: str, compute: Callable[[], dict],
+    cacheable: Callable[[dict], bool] | None = None,
 ) -> dict:
     """Read-through cache for the accumulated payload.
 
     Hit -> return the deserialized cached payload. Miss (or kill switch / cache
     error) -> call *compute*, cache the result best-effort, return it.
+
+    *cacheable*, when given, is called with the computed result before it is
+    persisted; returning False serves the result without caching it. This lets
+    the caller withhold payloads it knows are incomplete (e.g. a rescore that
+    covered only part of the dimensions), which would otherwise freeze under a
+    version hash that cannot self-invalidate.
     """
     if score_cache_disabled():
         return compute()
@@ -421,6 +436,8 @@ def cached_accumulated(
     except sqlite3.Error:
         return compute()
     result = compute()
+    if cacheable is not None and not cacheable(result):
+        return result
     try:
         with open_score_cache() as conn:
             write_cached_accumulated(conn, project, version, result)
