@@ -553,9 +553,10 @@ def _discard_run_state(reports_dir: str, job: dict) -> None:
     only this run's dispatched (cache-miss) keys, so entries written by
     earlier kept runs are not touched.
 
-    All per-dim scratch (queue, fingerprint, evidence JSONL, sidecar) is
-    removed so the status-GET scoring path cannot resurrect a report from
-    leftover evidence. The caller removes the run directory itself.
+    All per-dim scratch (queue, fingerprint, evidence JSONL, dispatch-keys
+    and replayed-keys sidecars) is removed so the status-GET scoring path
+    cannot resurrect a report from leftover evidence. The caller removes the
+    run directory itself.
     """
     project = job.get("outputProject")
     run_id = job.get("outputRunId")
@@ -587,6 +588,9 @@ def _discard_run_state(reports_dir: str, job: dict) -> None:
     scratch_patterns = (
         "*_queue.json", "*_fingerprint.json",
         "*_evidence.jsonl", "*_dispatch_keys.json",
+        # Entries listed here belong to EARLIER runs, so they are cleaned up
+        # as scratch but deliberately not fed to the cache-deletion loop above.
+        "*_replayed_unconsolidated_keys.json",
     )
     for pattern in scratch_patterns:
         for victim in evidence_dir.glob(pattern):

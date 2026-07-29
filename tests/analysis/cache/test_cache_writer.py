@@ -335,3 +335,37 @@ def test_written_entry_records_effective_params(tmp_path):
     entry = LocalFileBackend(root=cache_root).get(key)
     assert entry is not None
     assert entry.provenance["effective_params"]["M-ANA-2"]["max_lines"] == 60
+
+
+def test_cache_writer_marks_the_entry_unconsolidated(tmp_path):
+    """A freshly produced finding has not reached any completed run's report
+    yet. The entry is born unconsolidated and stays that way until the run
+    that produced it reaches done."""
+    from quodeq.analysis.cache.cache_writer import build_cache_writer
+    from quodeq.analysis.cache.local import LocalFileBackend
+
+    src_root = tmp_path / "src"
+    src_root.mkdir()
+    (src_root / "Foo.kt").write_text("class Foo")
+
+    cache_root = tmp_path / "cache"
+    write = build_cache_writer(
+        cache_root=cache_root,
+        src_root=src_root,
+        standards_dir=None,
+        dimension="security",
+        model_id="sonnet",
+        language="kotlin",
+    )
+    write("Foo.kt", [{"file": "Foo.kt", "line": 1, "t": "violation"}])
+
+    backend = LocalFileBackend(root=cache_root)
+    entries = [
+        # LocalFileBackend shards keys as <root>/key[:2]/key[2:]/entry.json,
+        # so the full key is the two parent directory names concatenated.
+        backend.get(p.parent.parent.name + p.parent.name)
+        for p in cache_root.rglob("entry.json")
+    ]
+    written = [e for e in entries if e is not None]
+    assert written, "expected the writer to persist one entry"
+    assert all(e.consolidated is False for e in written)

@@ -71,6 +71,15 @@ class ClassifyResult:
     # many reused findings predate the current model / standards / prompts,
     # so reuse across those boundaries is never silent.
     provenance_drift: dict = field(default_factory=dict)
+    # Hits from entries no COMPLETED run has consolidated yet: the producing
+    # run was cancelled with "keep findings", failed, or was killed, so the
+    # user was never shown these findings in an Overview. Kept apart from
+    # cached_findings so the replay path leaves them unstamped and the live
+    # feed shows them as this scan's own.
+    unconsolidated_findings: list[dict] = field(default_factory=list)
+    # file -> cache key for those same entries, so a run that reaches done
+    # can flip them to consolidated.
+    unconsolidated_hit_keys: dict[str, str] = field(default_factory=dict)
 
 
 # Provenance fields compared at classify time, in display order.
@@ -216,6 +225,8 @@ def classify_files_via_cache(
     misses: list[str] = []
     miss_keys: dict[str, str] = {}
     provenance_drift: dict = {}
+    unconsolidated_findings: list[dict] = []
+    unconsolidated_hit_keys: dict[str, str] = {}
     current_prov: dict | None = None  # computed lazily, only if there are hits
     for f in files:
         key = build_cache_key_for_file(config, f, dimension)
@@ -224,7 +235,11 @@ def classify_files_via_cache(
             misses.append(f)
             miss_keys[f] = key
         else:
-            cached_findings.extend(hit.findings)
+            if hit.consolidated:
+                cached_findings.extend(hit.findings)
+            else:
+                unconsolidated_findings.extend(hit.findings)
+                unconsolidated_hit_keys[f] = key
             if current_prov is None:
                 current_prov = _current_provenance(config, dimension)
             _accumulate_drift(provenance_drift, hit.provenance or {}, current_prov)
@@ -233,6 +248,8 @@ def classify_files_via_cache(
         misses=misses,
         miss_keys=miss_keys,
         provenance_drift=provenance_drift,
+        unconsolidated_findings=unconsolidated_findings,
+        unconsolidated_hit_keys=unconsolidated_hit_keys,
     )
     if not bypass_reads and run_cache is not None:
         run_cache[dimension] = (files_tuple, result)
@@ -323,5 +340,17 @@ def persist_dispatch_results(
                 standards_hash=standards_hash, version=version,
                 effective_params=effective_params,
             ),
+            # Born unconsolidated: no completed run has these findings in its
+            # report yet. mark_run_consolidated flips it when this run ends done.
+            #
+            # Accepted race: two concurrent runs on one project can both treat
+            # file X as a miss. If run A reaches done and flips X to
+            # consolidated, run B's periodic-persist watcher can then rewrite
+            # X here with consolidated=False. If B is later cancelled, X reads
+            # as unconsolidated even though A already put those findings in a
+            # completed Overview, so the next run surfaces them as "new" once.
+            # Cosmetic, requires concurrent runs on one project, and
+            # self-heals on the next done run. Not fixing.
+            consolidated=False,
         )
         cache.put(key, entry)

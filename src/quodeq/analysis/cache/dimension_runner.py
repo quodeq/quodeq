@@ -116,6 +116,26 @@ def _jsonl_path(config: RunConfig, dim_id: str) -> Path:
     return _evidence_dir(config) / f"{dim_id}_evidence.jsonl"
 
 
+def _write_replayed_keys_sidecar(
+    config: RunConfig, dim_id: str, keys: dict[str, str],
+) -> None:
+    """Record which unconsolidated cache entries this dim replayed.
+
+    A run that reaches ``done`` consolidates not only the entries it wrote
+    but the unconsolidated ones it replayed: those findings are now in a
+    completed run's report. ``consolidation.mark_run_consolidated`` reads
+    this sidecar alongside ``<dim>_dispatch_keys.json``.
+
+    Skipped when there is nothing to record, so a run that replays only
+    consolidated entries leaves no file behind.
+    """
+    if not keys:
+        return
+    sidecar = _evidence_dir(config) / f"{dim_id}_replayed_unconsolidated_keys.json"
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    sidecar.write_text(json.dumps(keys, indent=2), encoding="utf-8")
+
+
 def _compute_files_read(
     classify: ClassifyResult, jsonl_path: Path, all_files: list[str],
 ) -> int:
@@ -123,8 +143,8 @@ def _compute_files_read(
     this run ends.
 
     A source file is "reproducible" if either:
-      - it was a cache hit (``classify.cached_findings`` already carried it
-        forward — its cache entry already exists), or
+      - it was a cache hit (the file was replayed from a cache entry,
+        consolidated or not — its cache entry already exists), or
       - it was dispatched and the worker emitted ``file_done="ok"``
         (which triggers a synchronous cache write via
         ``build_cache_writer``, or the watcher's next persist tick).
@@ -196,7 +216,24 @@ def _emit_cached_findings(events_log: Path, findings: list[dict]) -> None:
 def _write_findings(
     jsonl: Path, findings: list[dict], *, append: bool,
     emit_events: bool = True,
+    unconsolidated: list[dict] | None = None,
 ) -> None:
+    """Replay cached findings into this run's evidence JSONL.
+
+    *findings* come from consolidated cache entries: a completed run already
+    put them in its report and the user has seen them in an Overview. Those
+    are stamped ``carried_forward`` so the live feed can hide them.
+
+    *unconsolidated* come from entries no completed run has consolidated yet,
+    because the run that produced them was cancelled with "keep findings",
+    failed, or was killed. The user was never shown those in an Overview, so
+    they are written verbatim and read as this scan's own findings.
+
+    Both groups are re-gated and both are mirrored to events.jsonl. Skipping
+    the unconsolidated group in the event log would resurrect the UI-vs-CLI
+    score disagreement that _emit_cached_findings exists to prevent.
+    """
+    pending = list(unconsolidated or [])
     # Re-gate cached findings on the replay path (issue #657). The live
     # finding path gates in FindingEnricher.enrich(); cache replay bypasses
     # enrich(), so a stale, un-gated critical R-FT-2/S-AUT-3 finding written
@@ -206,6 +243,8 @@ def _write_findings(
     # safe to apply unconditionally to every cached finding.
     for finding in findings:
         apply_provenance_gate(finding)
+    for finding in pending:
+        apply_provenance_gate(finding)
     # Every caller of this function is a cache replay -- the dispatcher
     # writes its own fresh findings and never comes through here. Stamp the
     # origin so the live evaluation feed can show only what this scan is
@@ -214,7 +253,11 @@ def _write_findings(
     # Copy, do not mutate: these dicts are owned by the cache entries, and
     # the periodic-persist watcher could otherwise write the flag back into
     # the cache, making a later fresh scan of the same file look carried.
+    #
+    # Consolidated first, then unconsolidated, so the JSONL keeps reading
+    # foundation-then-new.
     stamped = [{**finding, "carried_forward": True} for finding in findings]
+    stamped += [dict(finding) for finding in pending]
     jsonl.parent.mkdir(parents=True, exist_ok=True)
     mode = "a" if append else "w"
     with jsonl.open(mode, encoding="utf-8") as out:
@@ -297,6 +340,11 @@ def process_dimension_with_cache(
 
     jsonl = _jsonl_path(config, dim_id)
 
+    # Written BEFORE the all-hits branch so one call site covers both replay
+    # paths. A fully cached dimension writes no dispatch_keys sidecar (it
+    # never dispatches), so without this it would never flip its entries.
+    _write_replayed_keys_sidecar(config, dim_id, classify.unconsolidated_hit_keys)
+
     # All-hits short-circuit: no dispatch needed.
     # We append (not overwrite) because callers may invoke us multiple times
     # within the same dim (e.g. V1's backfill phase under stacked migration).
@@ -304,7 +352,10 @@ def process_dimension_with_cache(
     # Dedup runs after to handle any overlap from a same-run repeat.
     if not classify.misses:
         from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
-        _write_findings(jsonl, classify.cached_findings, append=True)
+        _write_findings(
+            jsonl, classify.cached_findings, append=True,
+            unconsolidated=classify.unconsolidated_findings,
+        )
         if jsonl.exists():
             deduplicate_jsonl(jsonl)
         return parse_evidence_from_jsonl(
@@ -327,8 +378,14 @@ def process_dimension_with_cache(
     #     ONE final "Deduplicated ...: N unique findings" log line. Pre-fix
     #     the user saw two confusing counts -- "27 unique" (dispatch only)
     #     followed by "55 unique" (after we appended cached findings).
-    if classify.cached_findings:
-        _write_findings(jsonl, classify.cached_findings, append=True)
+    # A dimension whose every hit is unconsolidated has an EMPTY
+    # cached_findings, so guarding on that alone would skip this write and
+    # silently drop those findings from the run.
+    if classify.cached_findings or classify.unconsolidated_findings:
+        _write_findings(
+            jsonl, classify.cached_findings, append=True,
+            unconsolidated=classify.unconsolidated_findings,
+        )
 
     # Persist the per-file cache keys to a sidecar so the discard path can
     # locate this dim's V2 cache entries even after the process exits. Without
@@ -429,7 +486,12 @@ def process_dimension_with_cache(
         # watcher, so any partial completion is preserved. If we have
         # cached findings already in the JSONL (pre-written above), parse
         # them so the run still has SOMETHING to score; otherwise None.
-        if classify.cached_findings and jsonl.exists():
+        # Both replay groups count: an all-unconsolidated dimension has
+        # findings in the JSONL even though cached_findings is empty.
+        replayed_anything = bool(
+            classify.cached_findings or classify.unconsolidated_findings
+        )
+        if replayed_anything and jsonl.exists():
             return parse_evidence_from_jsonl(
                 config, dim_id, ctx, jsonl,
                 files_read=_compute_files_read(classify, jsonl, files),
