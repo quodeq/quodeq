@@ -16,7 +16,7 @@ from quodeq.api._evaluation_helpers import (
     _sanitize_url,
     _validate_ai_cmd,
 )
-from quodeq.api.helpers import error_response, validate_evaluation_payload
+from quodeq.api.helpers import error_response, scan_target_error, validate_evaluation_payload
 from quodeq.core.types import to_camel_dict
 from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.api.routes import _reports_dir
@@ -24,6 +24,7 @@ from quodeq.services.base import ActionProvider
 from quodeq.services.evaluation_mixin import _score_completed_evidence
 from quodeq.services.scan_progress import build_scan_progress, progress_to_dict
 from quodeq.shared.dimensions_state import read_dimensions
+from quodeq.shared.utils import is_repo_url
 
 _logger = logging.getLogger(__name__)
 
@@ -134,6 +135,20 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         except ValueError as exc:
             body, status = error_response(str(exc), HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
+        # Same allowlist as /api/scan and POST /api/projects: starting an
+        # evaluation registers + scans the directory and persists its file
+        # tree, so an unvalidated local path would leak arbitrary readable
+        # directories through project endpoints.
+        try:
+            is_url = is_repo_url(str(repo))
+        except ValueError:
+            body, status = error_response("Invalid repo URL", HTTPStatus.BAD_REQUEST, "INVALID_REPO_URL")
+            return jsonify(body), status
+        if not is_url:
+            err = scan_target_error(Path(str(repo)).resolve(), _reports_dir())
+            if err is not None:
+                body, status = err
+                return jsonify(body), status
         try:
             job = provider.start_evaluation(repo=repo, reports_dir=_reports_dir(), options=options)
         except (FileNotFoundError, ValueError):

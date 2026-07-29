@@ -13,6 +13,31 @@ def error_response(message: str, status: int, code: str) -> tuple[dict[str, Any]
     return {"error": message, "code": code}, status
 
 
+_BLOCKED_SCAN_PATHS = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
+
+
+def scan_target_error(target_path: Path, reports_root: str) -> tuple[dict[str, Any], int] | None:
+    """Validate a resolved directory path against the scan allowlist.
+
+    Shared by /api/scan, create_project's local-repo branch, and
+    start_evaluation so all enforce the same rules: the path must live under
+    the user's home or the evaluations directory, and must not be a blocked
+    system path. Returns an ``error_response`` tuple on rejection, or None
+    when the path is allowed.
+    """
+    _home = Path.home().resolve()
+    _eval_dir = Path(reports_root).resolve()
+    _allowed_roots = (_home, _eval_dir)
+    if not any(target_path == root or target_path.is_relative_to(root) for root in _allowed_roots):
+        return error_response(
+            "Scan path must be under home directory", HTTPStatus.FORBIDDEN, "FORBIDDEN",
+        )
+    # Block scanning system directories to prevent information disclosure
+    if any(str(target_path).startswith(b) for b in _BLOCKED_SCAN_PATHS):
+        return error_response("Cannot scan system directories", HTTPStatus.FORBIDDEN, "FORBIDDEN")
+    return None
+
+
 def validate_evaluation_payload(payload: dict[str, Any]) -> str | None:
     """Validate the evaluate request payload.
 
