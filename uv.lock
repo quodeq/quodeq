@@ -852,6 +852,7 @@ dependencies = [
     { name = "jsonschema" },
     { name = "openai" },
     { name = "packaging" },
+    { name = "pydantic" },
     { name = "pywebview" },
     { name = "pywinpty", marker = "sys_platform == 'win32'" },
 ]
@@ -867,13 +868,14 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "flask", specifier = "==3.1.3" },
-    { name = "flask-sock", specifier = ">=0.7" },
-    { name = "httpx", specifier = ">=0.27" },
+    { name = "flask-sock", specifier = ">=0.7.0,<0.8" },
+    { name = "httpx", specifier = ">=0.28.1,<0.29" },
     { name = "jsonschema", specifier = "==4.26.0" },
-    { name = "openai", specifier = ">=1.0" },
-    { name = "packaging", specifier = ">=23" },
-    { name = "pywebview", specifier = ">=6.2" },
-    { name = "pywinpty", marker = "sys_platform == 'win32'", specifier = ">=3.0.5" },
+    { name = "openai", specifier = ">=2.44.0,<3" },
+    { name = "packaging", specifier = ">=26.2,<27" },
+    { name = "pydantic", specifier = ">=2.13.4,<3" },
+    { name = "pywebview", specifier = ">=6.2.1,<7" },
+    { name = "pywinpty", marker = "sys_platform == 'win32'", specifier = ">=3.0.5,<4" },
 ]
 
 [package.metadata.requires-dev]
