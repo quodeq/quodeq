@@ -2,8 +2,22 @@ version: 2
 # Cooldown defers PRs until a release has settled, defending against
 # compromised versions that get yanked within hours of publication.
 # See: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file#cooldown
+#
+# SCOPE: every `directory`/`directories` value below is deliberately narrow.
+# tests/fixtures/discipline_corpus/ holds ~40 synthetic manifests (package.json,
+# pyproject.toml, go.mod, Cargo.toml, Gemfile, Dockerfile, requirements.txt)
+# that exist ONLY as inputs to language/framework detection tests. Their pinned
+# versions are assertions. Do NOT widen these paths or use wildcards to "get
+# full coverage": Dependabot would open PRs against fixtures, break detection
+# tests, and bury the real updates in noise.
 updates:
-  - package-ecosystem: "pip"
+  # This project is uv-managed: pyproject.toml declares loose floors and
+  # uv.lock holds the versions we actually ship. The "pip" ecosystem opened
+  # ZERO PRs in the repo's entire history (vs 14 npm, 7 github-actions),
+  # because a floor like `openai>=1.0` already permits every newer release,
+  # so pip sees nothing to bump, and uv.lock is not a pip-ecosystem artifact.
+  # "uv" reads uv.lock, so the 58 locked packages are finally monitored.
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
@@ -44,6 +58,13 @@ updates:
           - "@types/react"
           - "@types/react-dom"
           - "@testing-library/react"
+      # TanStack ships react-query and its devtools in lockstep and expects
+      # matching versions. They drifted apart once already (react-query
+      # 5.101.4 against react-query-devtools 5.101.3) because nothing kept
+      # them together. Same failure class as react/react-dom above.
+      tanstack:
+        patterns:
+          - "@tanstack/*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
