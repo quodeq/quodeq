@@ -63,7 +63,7 @@ class TestDiscardSkipsScoring:
             job_id="j1", status="running",
             output_project="proj", output_run_id="run1",
         )
-        with patch("quodeq.services.evaluation_mixin._score_completed_evidence") as mock_score, \
+        with patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
              patch("quodeq.services.evaluation_mixin._discard_run_state") as mock_discard, \
              patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"):
             result = m.cancel_evaluation(
@@ -82,7 +82,7 @@ class TestDiscardSkipsScoring:
             job_id="j1", status="running",
             output_project="proj", output_run_id="run1",
         )
-        with patch("quodeq.services.evaluation_mixin._score_completed_evidence") as mock_score, \
+        with patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
              patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"):
             result = m.cancel_evaluation("j1", reports_dir="/reports")
         assert result is True
@@ -376,7 +376,7 @@ class TestRouteDiscardBlocksScoringResurrection:
         )
         scored = threading.Event()
         with patch(
-            "quodeq.api._evaluation_routes._score_completed_evidence",
+            "quodeq.api._evaluation_routes.score_completed_evidence",
             side_effect=lambda *a, **k: scored.set(),
         ):
             get_resp = client.get("/api/evaluations/j-disc")

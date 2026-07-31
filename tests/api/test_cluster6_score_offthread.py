@@ -109,7 +109,7 @@ def test_get_evaluation_returns_before_scoring_completes(client):
         scoring_may_finish.wait(timeout=budget(5))
 
     with patch(
-        "quodeq.api._evaluation_routes._score_completed_evidence",
+        "quodeq.api._evaluation_routes.score_completed_evidence",
         side_effect=_slow_score,
     ):
         resp = client.get("/api/evaluations/j1")
@@ -136,7 +136,7 @@ def test_get_evaluation_scores_only_once_for_same_job(client):
         call_count += 1
 
     with patch(
-        "quodeq.api._evaluation_routes._score_completed_evidence",
+        "quodeq.api._evaluation_routes.score_completed_evidence",
         side_effect=_count_score,
     ):
         client.get("/api/evaluations/j1")

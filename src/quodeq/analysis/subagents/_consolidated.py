@@ -7,7 +7,7 @@ from typing import Any
 
 from quodeq.analysis._types import RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig
-from quodeq.shared.constants import _DEFAULT_TIME_LIMIT
+from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence_by_dimension
 from quodeq.analysis.subagents.file_queue import FileQueue
@@ -52,7 +52,7 @@ def _build_consolidated_config(
         ai_model=subagent_model,
         dimension=",".join(dimensions),
         max_files_per_agent=files_per_agent,
-        time_limit=time_limit_val if time_limit_val is not None else _DEFAULT_TIME_LIMIT,
+        time_limit=time_limit_val if time_limit_val is not None else DEFAULT_TIME_LIMIT,
         deadline_at=config.options.deadline_at,
     )
 

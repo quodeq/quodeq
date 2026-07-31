@@ -284,7 +284,7 @@ class TestCreateProjectLocalPathValidation:
         repo_dir = tmp_path / "myrepo"
         repo_dir.mkdir()
         with patch(
-            "quodeq.services.evaluation_mixin._register_project",
+            "quodeq.services.project_registration.register_project",
             return_value="uuid-1",
         ):
             resp = client.post("/api/projects", json={"repo": str(repo_dir)})

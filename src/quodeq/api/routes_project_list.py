@@ -289,7 +289,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         or ``ephemeral: true``. For local-path repos: ``cloneDest`` and
         ``ephemeral`` are ignored.
         """
-        from quodeq.services.evaluation_mixin import _register_project
+        from quodeq.services.project_registration import register_project
         from quodeq.shared.utils import is_repo_url
 
         data = request.get_json(silent=True) or {}
@@ -382,7 +382,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         )
 
         try:
-            project_uuid = _register_project(
+            project_uuid = register_project(
                 repo,
                 discipline,
                 reports_root,
@@ -427,7 +427,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         # list as soon as it closes).
         provider.invalidate_projects_cache()
 
-        # scan.json is now always present after _register_project succeeds.
+        # scan.json is now always present after register_project succeeds.
         scan_path = Path(reports_root) / project_uuid / "scan.json"
         try:
             scan_data = json.loads(scan_path.read_text(encoding="utf-8"))

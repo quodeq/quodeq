@@ -15,14 +15,14 @@ from quodeq.analysis.subagents._pool_launcher import (
     _UNLIMITED_BUDGET,
     _resolve_time_limit,
 )
-from quodeq.shared.constants import _DEFAULT_TIME_LIMIT
+from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 
 
 class TestResolveTimeLimit:
     def test_small_queue_uses_user_budget_as_floor(self) -> None:
         # 30 files × 12 s/file = 360s, which is below the default 600s
         # floor → return the floor unchanged.
-        assert _resolve_time_limit(None, 30) == _DEFAULT_TIME_LIMIT
+        assert _resolve_time_limit(None, 30) == DEFAULT_TIME_LIMIT
 
     def test_large_queue_extends_budget(self) -> None:
         # 800 files × 12 s/file = 9600s, capped at 7200s (2h).
@@ -48,7 +48,7 @@ class TestResolveTimeLimit:
 
     def test_zero_or_negative_queue_returns_base(self) -> None:
         # Defensive: an empty file list shouldn't produce a 0-second budget.
-        assert _resolve_time_limit(None, 0) == _DEFAULT_TIME_LIMIT
+        assert _resolve_time_limit(None, 0) == DEFAULT_TIME_LIMIT
         assert _resolve_time_limit(900, 0) == 900
 
     def test_runaway_queue_capped_at_max(self) -> None:

@@ -9,7 +9,7 @@ from typing import Any
 from quodeq.analysis._types import RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
-from quodeq.shared.constants import _DEFAULT_TIME_LIMIT
+from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 from quodeq.shared.logging import log_info
 from quodeq.shared.utils import get_ai_cmd
 
@@ -33,12 +33,12 @@ _UNLIMITED_BUDGET = 0
 def _resolve_time_limit(user_budget: int | None, queue_size: int) -> int:
     """Compute the effective time limit for a queue of *queue_size* files.
 
-    The user's `time_limit` (or `_DEFAULT_TIME_LIMIT` if unset) is treated
+    The user's `time_limit` (or `DEFAULT_TIME_LIMIT` if unset) is treated
     as a floor. For large queues we extend it to give each file a fair
     slice of wallclock time, capped at `_MAX_AUTO_POOL_BUDGET`. A user-set
     limit of 0 means "unlimited" and is preserved verbatim.
     """
-    base = user_budget if user_budget is not None else _DEFAULT_TIME_LIMIT
+    base = user_budget if user_budget is not None else DEFAULT_TIME_LIMIT
     if base == _UNLIMITED_BUDGET:
         return _UNLIMITED_BUDGET
     if queue_size <= 0:
@@ -80,7 +80,7 @@ def _launch_pool(
     subagent_model = config.options.subagent_model or _default_subagent_model() or config.options.ai_model
     queue_size = len(params.all_files) if params.all_files is not None else 0
     time_limit = _resolve_time_limit(config.options.time_limit, queue_size)
-    base_user_budget = config.options.time_limit if config.options.time_limit is not None else _DEFAULT_TIME_LIMIT
+    base_user_budget = config.options.time_limit if config.options.time_limit is not None else DEFAULT_TIME_LIMIT
     if time_limit != base_user_budget and time_limit != _UNLIMITED_BUDGET:
         log_info(
             f"  [{dim_id}] Time limit auto-scaled: {base_user_budget}s → {time_limit}s"
