@@ -441,6 +441,13 @@ def _run_api_analysis_bridge(
                 api_base=api_base,
                 api_key=api_key,
                 context_size=cfg.context_size,
+                n_subagents=max(
+                    1,
+                    getattr(
+                        getattr(cfg.run_config, "options", None),
+                        "max_subagents", 1,
+                    ),
+                ),
             ),
             compiled_dir=cfg.compiled_dir,
             dimension=cfg.dimension,

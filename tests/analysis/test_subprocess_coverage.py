@@ -354,6 +354,45 @@ class TestRunApiAnalysisBridge:
             mock_api.assert_called_once()
             assert stream.read_text().strip() != ""
 
+    def test_passes_subagent_count_from_run_config(self, tmp_path):
+        """The pool's RunConfig carrier feeds max_subagents into the API
+        runner config so the read timeout can scale with queue depth."""
+        from types import SimpleNamespace
+
+        stream = tmp_path / "stream.json"
+        jsonl = tmp_path / "evidence.jsonl"
+        (tmp_path / "main.py").write_text("x = 1")
+
+        run_config = SimpleNamespace(options=SimpleNamespace(max_subagents=3))
+        cfg = AnalysisConfig(
+            ai_cmd="ollama", ai_model="llama3.1",
+            jsonl_file=jsonl, run_config=run_config,
+        )
+        provider = {"ollama": {"type": "api", "model": "llama3.1", "api_base": "http://localhost:11434/v1"}}
+
+        with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
+             patch("quodeq.analysis.api_prompt_assembly.assemble_api_prompt", return_value="prompt"), \
+             patch("quodeq.analysis._api_runner.run_api_analysis") as mock_api:
+            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
+
+        assert mock_api.call_args.kwargs["config"].n_subagents == 3
+
+    def test_defaults_subagent_count_without_run_config(self, tmp_path):
+        """Legacy callers pass no RunConfig carrier: timeout stays unscaled."""
+        stream = tmp_path / "stream.json"
+        jsonl = tmp_path / "evidence.jsonl"
+        (tmp_path / "main.py").write_text("x = 1")
+
+        cfg = AnalysisConfig(ai_cmd="ollama", ai_model="llama3.1", jsonl_file=jsonl)
+        provider = {"ollama": {"type": "api", "model": "llama3.1", "api_base": "http://localhost:11434/v1"}}
+
+        with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
+             patch("quodeq.analysis.api_prompt_assembly.assemble_api_prompt", return_value="prompt"), \
+             patch("quodeq.analysis._api_runner.run_api_analysis") as mock_api:
+            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
+
+        assert mock_api.call_args.kwargs["config"].n_subagents == 1
+
 
 # ---------------------------------------------------------------------------
 # run_analysis dispatch
