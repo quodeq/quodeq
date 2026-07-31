@@ -434,6 +434,24 @@ def _record_deadline_if_hit(lifecycle: "RunLifecycleContext", config: "RunConfig
         lifecycle.set_exit_reason("deadline")
 
 
+def _record_provider_fatal_if_cancelled(lifecycle: "RunLifecycleContext") -> None:
+    """Tag a completed run that a dead provider cut short.
+
+    ``_raise_on_fatal_cancel`` lets the pipeline finish when files were
+    already analysed before the provider died (partial data is worth
+    keeping). Without this hook such a run finalizes with
+    ``exit_reason=null``, indistinguishable from a clean completion, and
+    the UI can't warn that the results are partial. Runs after the
+    deadline hook so the provider failure, being the actual cause, wins.
+    """
+    from quodeq.shared import cancellation
+    reason = cancellation.cancel_reason() or ""
+    if reason.startswith("provider_fatal"):
+        lifecycle.set_exit_reason("provider_fatal")
+    elif reason == "agent_failure_streak":
+        lifecycle.set_exit_reason("failure_streak")
+
+
 def _run_pipeline_with_cleanup(
     args: argparse.Namespace, inputs: ResolvedInputs, paths: tuple[Path, Path, Path],
 ) -> int:
@@ -508,6 +526,7 @@ def _run_pipeline_with_cleanup(
                     # the dashboard can distinguish a deadline-truncated run
                     # from a clean completion (exit_reason=null vs "deadline").
                     _record_deadline_if_hit(lifecycle, config)
+                    _record_provider_fatal_if_cancelled(lifecycle)
                     # run_full writes per-dimension reports as each dimension
                     # completes, so by the time it returns scoring is already
                     # done. Record the last pre-finalize phase as "scoring"

@@ -28,6 +28,7 @@ from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.subagents.file_queue import FileQueue
+from quodeq.shared import cancellation
 from quodeq.shared.utils import get_ai_cmd
 
 
@@ -414,6 +415,11 @@ def _run_api_analysis_bridge(
     standards_text = _load_standards_text(cfg.compiled_dir, cfg.dimension, overrides=overrides)
 
     for batch in _batch_files_by_size(source_files, _api_prompt_char_budget()):
+        # A cancelled run (signal, breaker, fatal provider error) must not
+        # keep burning model calls on the remaining batches.
+        if cancellation.is_cancelled():
+            _log.info("Cancellation requested -- stopping API batch dispatch")
+            break
         api_prompt = assemble_api_prompt(
             source_files=batch,
             standards_text=standards_text,

@@ -16,11 +16,13 @@ from quodeq.analysis.subagents._pool_models import (
 from quodeq.analysis.subagents._pool_scaling import (
     EvidencePaths,
     ScaleUpContext,
+    check_agent_failure_streak,
     collect_done,
     maybe_scale_up,
     should_respawn,
 )
 from quodeq.analysis.subagents.file_queue import WorkQueue
+from quodeq.shared import cancellation
 
 _SCOUT_BUDGET_FRACTION = 0.5
 
@@ -52,9 +54,13 @@ def scout_loop(ctx: LoopContext) -> None:
         pool_start=ctx.pool_start, max_duration=ctx.max_duration, scout_timeout=scout_timeout,
     )
     ev_paths = EvidencePaths(ctx.shared_jsonl_path, ctx.evidence_dir, ctx.dimension_key)
+    if cancellation.is_cancelled():
+        return
     ctx.submit_fn()
     while ctx.futures:
         done = collect_done(ctx.futures, ctx.finished, ctx.results, ev_paths)
+        if done:
+            check_agent_failure_streak(ctx.results)
         scale_ctx = ScaleUpContext(
             ctx.queue, ctx.queue_path, ctx.submit_fn,
             deadline_at=ctx.deadline_at,
@@ -78,6 +84,8 @@ def scout_loop(ctx: LoopContext) -> None:
 def immediate_loop(ctx: LoopContext) -> None:
     """Launch all agents immediately, respawning as they complete."""
     ev_paths = EvidencePaths(ctx.shared_jsonl_path, ctx.evidence_dir, ctx.dimension_key)
+    if cancellation.is_cancelled():
+        return
     for _ in range(ctx.n_agents):
         ctx.submit_fn()
     while ctx.futures:
@@ -85,6 +93,8 @@ def immediate_loop(ctx: LoopContext) -> None:
         # threads. Enforcement is the spawn-gate in should_respawn() plus
         # the per-agent max_duration clamp set in build_agent_config().
         done = collect_done(ctx.futures, ctx.finished, ctx.results, ev_paths)
+        if done:
+            check_agent_failure_streak(ctx.results)
         if not done:
             time.sleep(_FUTURE_POLL_INTERVAL_S)
             continue

@@ -29,6 +29,7 @@ import openai
 from pydantic import BaseModel, Field
 
 from quodeq.analysis._drop_stats import record as _record_drop_stats
+from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
 
 if TYPE_CHECKING:
@@ -236,6 +237,30 @@ def _parse_findings(raw_json: str) -> tuple[list[dict], int]:
     return findings, len(dropped)
 
 
+def _classify_fatal_api_error(exc: Exception) -> tuple[str, str] | None:
+    """Return ``(reason_code, detail)`` when no retry can fix *exc*, else None.
+
+    The OpenAI SDK normalizes every OpenAI-compatible provider's errors into
+    typed exceptions with a status code, so one classifier covers ollama,
+    llamacpp, openrouter, and custom endpoints alike. 429 is fatal only when
+    the body says quota/credits (OpenAI ``insufficient_quota``, OpenRouter
+    out-of-credits): a bare 429 is a transient rate limit and stays on the
+    lossy-retry path.
+    """
+    if isinstance(exc, openai.AuthenticationError):
+        return "auth", "authentication failed (401)"
+    if isinstance(exc, openai.PermissionDeniedError):
+        return "auth", "permission denied (403)"
+    if isinstance(exc, openai.APIStatusError):
+        if exc.status_code == 402:
+            return "payment", "out of credits (402 payment required)"
+        if exc.status_code == 429:
+            reason = classify_fatal_provider_message(str(exc))
+            if reason in ("quota", "payment"):
+                return reason, "quota/credits exhausted (429)"
+    return None
+
+
 def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     """Call the LLM raw, validate each finding independently, return ``(findings, was_lossy)``.
 
@@ -303,6 +328,16 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
             response = client.chat.completions.create(**create_kwargs)
         except Exception as exc:
             elapsed = time.monotonic() - start
+            fatal = _classify_fatal_api_error(exc)
+            if fatal is not None:
+                reason_code, detail = fatal
+                _log.error(
+                    "Model %s: %s -- no retry can succeed, aborting: %s",
+                    config.model, detail, str(exc)[:300],
+                )
+                raise FatalProviderError(
+                    f"{detail}: {str(exc)[:300]}", reason=reason_code,
+                ) from exc
             if isinstance(exc, (httpx.TimeoutException, openai.APITimeoutError)):
                 _log.warning(
                     "Model %s call timed out after %.0fs. Likely causes: "
@@ -481,7 +516,15 @@ def run_api_analysis(
     marker writes its per-file cache entry to disk before returning. Legacy
     callers that omit either remain unchanged -- no cache is written.
     """
-    findings, was_lossy = _call_api(prompt, config)
+    # A fatal provider error (quota/auth/billing) still writes 'error'
+    # markers first -- the breaker and reachability guard rely on them --
+    # then re-raises so the pool layer can cancel the run instead of
+    # respawning agents against a dead provider.
+    fatal_exc: FatalProviderError | None = None
+    try:
+        findings, was_lossy = _call_api(prompt, config)
+    except FatalProviderError as exc:
+        fatal_exc, findings, was_lossy = exc, [], True
 
     if source_file_paths:
         findings = _resolve_file_paths(findings, source_file_paths)
@@ -541,6 +584,12 @@ def run_api_analysis(
             # but lets the failure-streak breaker and the post-run
             # reachability guard see the failure and fail the run loudly.
             status = "error" if was_lossy else "ok"
-            reason = "model call failed (unreachable or errored)" if was_lossy else None
+            reason = None
+            if fatal_exc is not None:
+                reason = f"fatal provider error ({fatal_exc.reason}): {fatal_exc}"
+            elif was_lossy:
+                reason = "model call failed (unreachable or errored)"
             for path in source_file_paths:
                 router.mark_file_done(file=path, status=status, reason=reason)
+    if fatal_exc is not None:
+        raise fatal_exc

@@ -1,6 +1,7 @@
 """Scaling logic: respawn decisions, scale-up computation, future collection."""
 from __future__ import annotations
 
+import os
 import time
 from collections import OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -16,6 +17,7 @@ from quodeq.analysis.subagents._pool_models import (
     _DEFAULT_FILES_PER_AGENT,
 )
 from quodeq.analysis.subagents.file_queue import FileQueue, WorkQueue
+from quodeq.shared import cancellation
 from quodeq.shared.logging import log_warning
 
 
@@ -80,6 +82,13 @@ def should_respawn(
     do useful work.
     """
     remaining = get_queue(queue, queue_path).remaining()
+    if cancellation.is_cancelled():
+        if remaining > 0:
+            log_warning(
+                f"  Run cancelled -- {remaining} files left, "
+                f"not spawning new agents"
+            )
+        return 0
     if deadline_at is not None and time.monotonic() >= deadline_at:
         if remaining > 0:
             log_warning(
@@ -98,6 +107,48 @@ def should_respawn(
             )
         return 0
     return remaining
+
+
+_DEFAULT_AGENT_FAILURE_STREAK = 5
+
+
+def _agent_failure_streak_limit() -> int:
+    """Consecutive whole-agent failures tolerated before the run is cancelled.
+
+    Env override QUODEQ_AGENT_FAILURE_STREAK; 0 disables the backstop.
+    """
+    raw = os.environ.get("QUODEQ_AGENT_FAILURE_STREAK", "").strip()
+    try:
+        return int(raw) if raw else _DEFAULT_AGENT_FAILURE_STREAK
+    except ValueError:
+        return _DEFAULT_AGENT_FAILURE_STREAK
+
+
+def check_agent_failure_streak(results: list[SubagentResult]) -> None:
+    """Cancel the run when every recent agent died without a single success.
+
+    Provider-agnostic backstop for failure modes the fatal-error
+    classification doesn't recognize: N consecutive dead agents means the
+    provider cannot serve this run, and respawning only burns wall-clock and
+    spams the console. Cancellation is enforced by the spawn gate
+    (``should_respawn``) and the dimension loops.
+    """
+    limit = _agent_failure_streak_limit()
+    if limit <= 0 or cancellation.is_cancelled():
+        return
+    streak = 0
+    for result in reversed(results):
+        if result.success:
+            break
+        streak += 1
+    if streak >= limit:
+        last_error = results[-1].error or "unknown error"
+        log_warning(
+            f"  {streak} consecutive subagent failures (last: {last_error}) "
+            f"-- cancelling run, provider appears unable to serve requests. "
+            f"Adjust with QUODEQ_AGENT_FAILURE_STREAK (0 disables)."
+        )
+        cancellation.request_cancel(reason="agent_failure_streak")
 
 
 def compute_scale_up(

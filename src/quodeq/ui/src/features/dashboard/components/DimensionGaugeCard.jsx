@@ -7,6 +7,7 @@ import TrendBadge from '../../../components/TrendBadge.jsx';
 import { SevBadge } from '../../../components/terminal/index.js';
 import { splitScore, scoreGradeColorVar, complianceRatio, formatRunId } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
+import { exitReasonLabel, exitReasonHint } from '../../../models/exitReason.js';
 
 /**
  * Build a coverage record for the gauge card's footer line.
@@ -44,12 +45,14 @@ function buildPartialTooltip({ filesRead, sourceFileCount, exitReason }) {
     parts.push(`${filesRead.toLocaleString()} of ${sourceFileCount.toLocaleString()} files`);
   }
   if (typeof exitReason === 'string') {
-    parts.push(`stopped: ${exitReason}`);
+    parts.push(`stopped: ${exitReasonLabel(exitReason)}`);
     // A failure-streak (circuit-breaker) dimension is salvaged and shown with a
     // provisional score, but kept out of the overall grade. Say so explicitly.
     if (exitReason === 'failure_streak') {
       parts.push('excluded from grade');
     }
+    const hint = exitReasonHint(exitReason);
+    if (hint) parts.push(hint);
   }
   return parts.join(' · ');
 }
