@@ -12,7 +12,6 @@ from pathlib import Path
 
 LAYER_RULES = {
     "core": {"core"},
-    "engine": {"core", "analysis"},
     "data": {"core"},
     "services": {"core", "data"},
     # `update` is a self-contained version-check notifier: it imports nothing
@@ -20,7 +19,7 @@ LAYER_RULES = {
     # Empty rule + the implicit self/cross-cutting allowances keep it a leaf.
     "update": set(),
     "api": {"core", "services", "update", "assistant", "terminal"},
-    "analysis": {"core", "engine", "data", "services", "context"},
+    "analysis": {"core", "data", "services", "context"},
     "dashboard": {"services", "api", "update"},
     "assistant": {"core", "data", "services", "llm_bridge"},
     "terminal": {"core"},

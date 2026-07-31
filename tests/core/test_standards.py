@@ -1,4 +1,17 @@
-from quodeq.engine.standards import load_dimension, load_asvs_l1, load_cisq
+from functools import partial
+
+from quodeq.config.paths import default_paths
+from quodeq.core.standards.loader import (
+    load_asvs_l1 as _load_asvs_l1,
+    load_cisq as _load_cisq,
+    load_dimension as _load_dimension,
+)
+
+# The deleted engine.standards wrapper only injected default_paths; these
+# partials preserve that contract so the tests keep exercising the bundled data.
+load_dimension = partial(_load_dimension, paths_fn=default_paths)
+load_asvs_l1 = partial(_load_asvs_l1, paths_fn=default_paths)
+load_cisq = partial(_load_cisq, paths_fn=default_paths)
 
 
 def test_load_maintainability_dimension():

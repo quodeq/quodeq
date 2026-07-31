@@ -5,12 +5,11 @@
 | Layer | Purpose | Dependencies |
 |-------|---------|--------------|
 | `core/` | Domain logic: evidence models, scoring algorithms, standards definitions, type definitions | None (stdlib only) |
-| `engine/` | Infrastructure and execution: pipeline orchestration, markers, runner utilities | core/, analysis/ |
 | `data/` | Data access: filesystem repositories, web API clients, report parsers | core/ |
 | `services/` | Business logic: dashboard, accumulated views, dismissals, standards CRUD | core/, data/ (via `services/ports.py`) |
 | `assistant/` | Embedded LLM assistant: sessions, tool registry, provider turn adapters, guard | core/, data/, services/, llm_bridge/ |
 | `api/` | HTTP layer: Flask routes, security, rate limiting | core/, services/, update/, assistant/ |
-| `analysis/` | Evaluation pipeline: AI orchestration, subagents, prompts, MCP | core/, engine/, data/, services/, context/ |
+| `analysis/` | Evaluation pipeline: AI orchestration, subagents, prompts, MCP, markers, scoring pipeline | core/, data/, services/, context/ |
 | `dashboard/` | Server/process management: build UI, start API, health checks | services/, api/, update/ |
 | `llm_bridge/` | LLM provider bridge: Ollama, OpenRouter, CLI-tool providers | (nothing — leaf; one grandfathered analysis import) |
 | `terminal/` | Embedded-terminal PTY backends (Unix pty / Windows ConPTY) + manager | core/ |
@@ -25,12 +24,11 @@
 
 ```
 core/          -> core/
-engine/        -> core/, analysis/
 data/          -> core/
 services/      -> core/, data/ (by convention via services/ports.py)
 assistant/     -> core/, data/, services/, llm_bridge/
 api/           -> core/, services/, update/, assistant/, terminal/
-analysis/      -> core/, engine/, data/, services/, context/
+analysis/      -> core/, data/, services/, context/
 dashboard/     -> services/, api/, update/
 terminal/      -> core/
 update/        -> (nothing)
