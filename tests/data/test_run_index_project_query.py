@@ -1,5 +1,5 @@
 from __future__ import annotations
-from quodeq.services.run_index import open_index, list_runs_for_project
+from quodeq.data.sqlite.run_index import open_index, list_runs_for_project
 
 def _insert(db, *, job_id, project, run_id, state, started_at):
     db.execute(

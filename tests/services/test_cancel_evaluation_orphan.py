@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.services.filesystem import FilesystemActionProvider
-from quodeq.services.run_index import open_index
+from quodeq.data.sqlite.run_index import open_index
 from quodeq.shared.run_status import RunState, write_status
 
 
@@ -152,7 +152,7 @@ def test_cancel_live_pid_unchanged_behavior(tmp_path: Path) -> None:
     # on POSIX, taskkill on Windows). Also simulate SIGTERM being honored so
     # the grace-period poll doesn't burn 30s.
     import quodeq.services._external_jobs as _ext_mod
-    import quodeq.services._index_sync as _sync_mod
+    import quodeq.data.sqlite._index_sync as _sync_mod
     original_kill_tree = _ext_mod._kill_tree
     original_alive = _sync_mod._is_pid_alive
     sent_signals: list[tuple[int, int]] = []

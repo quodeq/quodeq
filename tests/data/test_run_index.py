@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from quodeq.services.run_index import (
+from quodeq.data.sqlite.run_index import (
     RunRow,
     SCHEMA_VERSION,
     open_index,
@@ -128,7 +128,7 @@ def test_get_index_db_path_default_and_env(tmp_path, monkeypatch) -> None:
 
 
 from quodeq.shared.run_status import RunState, write_status
-from quodeq.services.run_index import (
+from quodeq.data.sqlite.run_index import (
     get_run, list_runs, rebuild_index, sync_index, sync_index_for_run,
 )
 

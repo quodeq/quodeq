@@ -2,7 +2,7 @@
 overall grade, but leaves other partial reasons (time_limit, ...) counting."""
 from __future__ import annotations
 
-from quodeq.services.scoring.projector_scoring import compute_run_score
+from quodeq.core.scoring.projector_scoring import compute_run_score
 
 
 def test_excludes_failure_streak_dim_from_overall():

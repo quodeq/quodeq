@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from quodeq.services.run_dates import project_run_dates
+from quodeq.data.fs.report_parser.run_dates import project_run_dates
 
 
 def _write_status(run_dir: Path, started_at: str):

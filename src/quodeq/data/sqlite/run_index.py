@@ -16,7 +16,7 @@ import time as _time
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.services._index_sync import (
+from quodeq.data.sqlite._index_sync import (
     _check_stale_and_promote,
     _delete_orphan_non_terminal_rows,
     _sync_legacy_run,

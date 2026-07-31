@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from quodeq.core.scoring._principle import compute_tallies
 from quodeq.core.types.finding import Finding
-from quodeq.services.scoring.projector_scoring import compute_principle_grade
+from quodeq.core.scoring.projector_scoring import compute_principle_grade
 
 
 def _v(severity: str, reason: str, vt: str | None = None) -> dict:

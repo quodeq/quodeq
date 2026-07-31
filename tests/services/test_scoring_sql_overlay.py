@@ -38,7 +38,7 @@ _STRICT = dataclasses.replace(
 @pytest.fixture
 def formula_path(tmp_path, monkeypatch):
     path = tmp_path / "grade_formula.json"
-    monkeypatch.setattr(grade_formula, "grade_formula_path", lambda: path)
+    monkeypatch.setenv("QUODEQ_GRADE_FORMULA_PATH", str(path))
     return path
 
 

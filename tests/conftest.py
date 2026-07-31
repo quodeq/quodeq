@@ -40,6 +40,11 @@ def _isolate_quodeq_home(tmp_path_factory: pytest.TempPathFactory,
     # touch the real ~/.quodeq/run/jobs again (it was wedged with fake jobs
     # named job-wire/sample-project that surfaced in the real dashboard).
     monkeypatch.setenv("QUODEQ_JOB_PERSIST_DIR", str(home / "run" / "jobs"))
+    # A developer's real custom grade formula (~/.quodeq/grade_formula.json)
+    # must never leak into score assertions — 2026-07-31: two rescore-path
+    # tests failed machine-locally the moment the Grade Formula Editor saved
+    # custom params.
+    monkeypatch.setenv("QUODEQ_GRADE_FORMULA_PATH", str(home / "grade_formula.json"))
 
 
 class DummyProcess:
