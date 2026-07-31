@@ -20,6 +20,21 @@ def test_no_new_import_violations():
     )
 
 
+# Revise DOWNWARD as clean-architecture workstreams burn entries; NEVER raise
+# without a justification reviewed in the PR that raises it.
+BASELINE_CEILING = 35
+
+
+def test_baseline_only_shrinks():
+    """The grandfathered list is a burn-down list, not a dumping ground."""
+    count = len(check_imports.load_baseline())
+    assert count <= BASELINE_CEILING, (
+        f"Baseline grew to {count} entries (ceiling {BASELINE_CEILING}). "
+        "Fix the new import instead of grandfathering it. If growth is truly "
+        "justified, raise BASELINE_CEILING in the same PR and explain why."
+    )
+
+
 def test_baseline_has_no_stale_entries():
     """Fixing a violation must shrink the baseline, keeping it honest."""
     current = {check_imports.violation_key(v) for v in check_imports.collect_violations()}
