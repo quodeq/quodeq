@@ -17,7 +17,7 @@
 | `ci/` | CI integration: report posting, evidence reading, SARIF export | core/, services/, analysis/, context/ |
 | `context/` | Context enrichment: path-role classification, project shape, precedent fingerprinting | core/, data/, llm_bridge/ |
 | `ui/` | React + Vite dashboard frontend (npm project, served by the Flask API) | n/a (JavaScript) |
-| `shared/` | Cross-cutting utilities: config, logging, env helpers | None (stdlib only) |
+| `shared/` | Cross-cutting utilities: config, logging, env helpers | core/ (pure helper re-exports) |
 | `config/` | Configuration: paths, discipline detection, standards fetching | shared/ |
 
 ## Import Rules
@@ -33,7 +33,7 @@ dashboard/     -> services/, api/, update/
 terminal/      -> core/
 update/        -> (nothing)
 context/       -> core/, data/, llm_bridge/
-shared/        -> (nothing; strict — no cross-cutting blanket)
+shared/        -> core/ (strict — no cross-cutting blanket)
 llm_bridge/    -> (nothing)
 ci/            -> core/, services/, analysis/, context/
 ```

@@ -221,7 +221,7 @@ class TestReadAccumulatedSummary:
         """Dims outside the visible-standards selection must not move the
         card grade: the Overview headline excludes them (the client filters
         the accumulated payload by the same selection)."""
-        from quodeq.core.standards.visibility import save_visible_standard_ids
+        from quodeq.data.fs.standards_prefs import save_visible_standard_ids
         from quodeq.core.types import DimensionResult
         from quodeq.services.ports import RunInfo
 
@@ -287,7 +287,7 @@ class TestReadAccumulatedSummary:
         """The selection is folded into the cache version: editing
         standards-visibility.json must invalidate the persisted card summary,
         not serve the grade computed under the previous selection."""
-        from quodeq.core.standards.visibility import save_visible_standard_ids
+        from quodeq.data.fs.standards_prefs import save_visible_standard_ids
         from quodeq.core.types import DimensionResult
         from quodeq.services.ports import RunInfo
 

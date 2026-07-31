@@ -4,14 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def validate_path_segment(*segments: str) -> None:
-    """Raise ValueError if any segment contains path traversal or separator characters."""
-    for seg in segments:
-        if ".." in seg or "/" in seg or "\\" in seg or "\0" in seg:
-            raise ValueError(
-                f"Invalid path segment: {seg!r}. "
-                f"Use only alphanumeric characters, hyphens, underscores, and dots."
-            )
+from quodeq.core.utils.io import validate_path_segment  # noqa: F401 — moved inward to core
 
 
 def validate_relative_scope(scope: str) -> None:

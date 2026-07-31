@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
-from quodeq.core.events.writer import EventLogWriter
+from quodeq.data.events.writer import EventLogWriter
 from quodeq.data.projection.projector import Projector
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 from quodeq.services.scoring import get_scores_raw, get_scores_slim

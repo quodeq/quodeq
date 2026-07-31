@@ -17,9 +17,11 @@ from quodeq.api._assistant_helpers import resolve_repo_root
 from quodeq.api.helpers import error_response
 from quodeq.core.standards.visibility import (
     VISIBILITY_RELPATH,
+    validate_visible_ids,
+)
+from quodeq.services.standards_prefs import (
     load_visible_standard_ids,
     save_visible_standard_ids,
-    validate_visible_ids,
 )
 from quodeq.services.standards import StandardsService
 from quodeq.shared.validation import validate_path_segment

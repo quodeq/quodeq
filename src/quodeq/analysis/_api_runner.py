@@ -550,7 +550,7 @@ def run_api_analysis(
     events_log = jsonl_file.parent.parent / "events.jsonl"
 
     jsonl_file.parent.mkdir(parents=True, exist_ok=True)
-    from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
+    from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
     event_log = EventLogWriter(events_log)
 
     cache_writer = None

@@ -22,7 +22,7 @@ def test_no_new_import_violations():
 
 # Revise DOWNWARD as clean-architecture workstreams burn entries; NEVER raise
 # without a justification reviewed in the PR that raises it.
-BASELINE_CEILING = 28
+BASELINE_CEILING = 23
 
 
 def test_baseline_only_shrinks():

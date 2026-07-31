@@ -16,10 +16,8 @@ from flask import Flask
 
 from quodeq.api._assistant_helpers import build_tool_context
 from quodeq.assistant.tools._context import ToolContext
-from quodeq.core.standards.visibility import (
-    DEFAULT_VISIBLE_STANDARDS,
-    save_visible_standard_ids,
-)
+from quodeq.core.standards.visibility import DEFAULT_VISIBLE_STANDARDS
+from quodeq.data.fs.standards_prefs import save_visible_standard_ids
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 from quodeq.services.shared_settings import SharedSettings
 

@@ -21,7 +21,7 @@ from quodeq.analysis.mcp.enricher import (
 from typing import TYPE_CHECKING, TextIO
 
 if TYPE_CHECKING:
-    from quodeq.core.events.writer import EventLogWriter
+    from quodeq.data.events.writer import EventLogWriter
 
 _logger = logging.getLogger(__name__)
 

@@ -10,11 +10,6 @@ src/quodeq/api/llm_bridge_routes.py:8:llm_bridge
 src/quodeq/api/routes_project_list.py:275:analysis
 src/quodeq/ci/review.py:129:cli_parser
 src/quodeq/ci/review.py:147:_cli_evaluation
-src/quodeq/core/evidence/_jsonl.py:13:shared
-src/quodeq/core/evidence/parser.py:9:shared
-src/quodeq/core/standards/loader.py:10:shared
-src/quodeq/core/standards/loader.py:9:shared
-src/quodeq/core/standards/refs.py:16:shared
 src/quodeq/data/fs/repo_clone.py:19:context
 src/quodeq/llm_bridge/_providers.py:6:analysis
 src/quodeq/services/_external_jobs.py:21:analysis

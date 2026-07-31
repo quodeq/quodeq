@@ -8,7 +8,7 @@ from typing import Union
 from pydantic import BaseModel
 
 from quodeq.core.events.models import BaseEvent
-from quodeq.core.utils.locking import get_file_lock
+from quodeq.data.locking import get_file_lock
 
 
 _logger = logging.getLogger(__name__)

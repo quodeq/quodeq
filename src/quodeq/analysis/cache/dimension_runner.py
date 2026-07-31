@@ -197,7 +197,7 @@ def _emit_cached_findings(events_log: Path, findings: list[dict]) -> None:
     if not findings:
         return
     from quodeq.core.events.models import JudgmentCreatedEvent  # noqa: PLC0415
-    from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
+    from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
     from quodeq.core.finding_mappings import wire_dict_to_judgment  # noqa: PLC0415
 
     writer = EventLogWriter(events_log)

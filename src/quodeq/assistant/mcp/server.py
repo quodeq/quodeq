@@ -13,7 +13,7 @@ from quodeq.assistant.tools import ToolContext, build_registry
 from quodeq.assistant.tools._registry import ToolRegistry
 from quodeq.assistant.tools._write_tools import register_write_tools
 from quodeq.assistant import AssistantRepository
-from quodeq.core.standards.visibility import load_visible_standard_ids
+from quodeq.data.fs.standards_prefs import load_visible_standard_ids
 
 _PROTOCOL = "2024-11-05"
 _SERVER_NAME = "quodeq-assistant"

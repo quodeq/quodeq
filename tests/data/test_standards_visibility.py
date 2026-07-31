@@ -6,10 +6,12 @@ import pytest
 from quodeq.core.standards.visibility import (
     DEFAULT_VISIBLE_STANDARDS,
     VISIBILITY_RELPATH,
-    load_visible_standard_ids,
     partition_visible,
-    save_visible_standard_ids,
     validate_visible_ids,
+)
+from quodeq.data.fs.standards_prefs import (
+    load_visible_standard_ids,
+    save_visible_standard_ids,
 )
 
 

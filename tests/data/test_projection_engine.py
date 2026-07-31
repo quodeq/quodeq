@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 
 from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
-from quodeq.core.events.writer import EventLogWriter
+from quodeq.data.events.writer import EventLogWriter
 from quodeq.data.projection.engine import ProjectionEngine
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore

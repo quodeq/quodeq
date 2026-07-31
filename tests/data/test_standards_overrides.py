@@ -2,12 +2,14 @@ import json
 
 from quodeq.core.standards.overrides import (
     OVERRIDES_RELPATH,
-    collect_declared_params,
     dimension_params,
     effective_params,
-    load_project_overrides,
     resolve_requirement_text,
     validate_overrides,
+)
+from quodeq.data.fs.standards_prefs import (
+    collect_declared_params,
+    load_project_overrides,
 )
 
 REQ = {
