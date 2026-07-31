@@ -13,7 +13,7 @@ from pathlib import Path
 from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services._job_model import InMemoryJobStore
 from quodeq.services.jobs import JobManager
-from quodeq.shared.run_status import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, write_status
 
 
 def _make_index(tmp_path: Path, reports_root: Path) -> EvaluationsIndex:

@@ -435,7 +435,7 @@ def _read_dimensions_from_status(run_dir: Path) -> list[str] | None:
     if dims:
         return dims
     from quodeq.shared.dim_estimates_io import read_dim_estimates
-    from quodeq.shared.dimensions_state import read_dimensions
+    from quodeq.data.fs.dimensions_state_store import read_dimensions
     recovered: dict[str, None] = {}
     dim_records = read_dimensions(run_dir).get("dimensions")
     record_keys = dim_records.keys() if isinstance(dim_records, dict) else ()

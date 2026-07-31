@@ -105,7 +105,7 @@ class TestResolveRepo:
         assert "Invalid URL" in capsys.readouterr().err
 
     @patch("quodeq._cli_resolution.is_repo_url", return_value=True)
-    @patch("quodeq.shared.repo_handler.prepare_repository", side_effect=OSError("clone failed"))
+    @patch("quodeq.data.fs.repo_handler.prepare_repository", side_effect=OSError("clone failed"))
     def test_remote_clone_failure(self, mock_prep, mock_is_url, capsys):
         from quodeq.cli import _resolve_repo
         args = argparse.Namespace(repo="https://github.com/x/y")
@@ -114,7 +114,7 @@ class TestResolveRepo:
         assert "Failed to clone" in capsys.readouterr().err
 
     @patch("quodeq._cli_resolution.is_repo_url", return_value=True)
-    @patch("quodeq.shared.repo_handler.prepare_repository")
+    @patch("quodeq.data.fs.repo_handler.prepare_repository")
     def test_remote_clone_success(self, mock_prep, mock_is_url, tmp_path):
         from quodeq.cli import _resolve_repo
         repo_dir = tmp_path / "cloned"

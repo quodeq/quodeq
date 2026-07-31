@@ -27,7 +27,7 @@ from typing import Any
 from quodeq.shared import cancellation
 from quodeq.shared.resource_sampler import ResourceSampler
 from quodeq.shared.run_heartbeat import HeartbeatThread
-from quodeq.shared.run_status import (
+from quodeq.data.fs.run_status_store import (
     RunState,
     TERMINAL_STATES,
     read_status,
@@ -207,7 +207,7 @@ class RunLifecycleContext:
 
     def _seed_dimension_states(self) -> None:
         """Initialise dimensions.json with one PENDING entry per dim."""
-        from quodeq.shared.dimensions_state import DimState, write_dim_state
+        from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
         for dim in self._dimensions:
             try:
                 write_dim_state(self._run_dir, dim, DimState.PENDING)

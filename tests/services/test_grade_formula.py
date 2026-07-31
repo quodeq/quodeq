@@ -288,7 +288,7 @@ def test_event_log_runs_tolerates_future_schema_version(tmp_path):
     """A run whose status.json has a schema_version newer than supported must
     not raise; it falls back to mtime ordering and the other runs are unaffected.
     """
-    from quodeq.shared.run_status import SCHEMA_VERSION
+    from quodeq.data.fs.run_status_store import SCHEMA_VERSION
     from quodeq.services.grade_formula import _event_log_runs  # noqa: PLC0415
 
     project_dir = tmp_path / "proj"

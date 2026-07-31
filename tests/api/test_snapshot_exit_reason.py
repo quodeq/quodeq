@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.shared.run_status import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, write_status
 
 
 def _seed_stale_run(reports: Path, project: str, run_id: str) -> Path:

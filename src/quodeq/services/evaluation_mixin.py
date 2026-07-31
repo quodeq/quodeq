@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Callable, Protocol
 
 from quodeq.core.types import JobSnapshot
 from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_TIME_LIMIT
-from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
+from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.core.evidence.parser import parse_jsonl_to_evidence, EvidenceContext
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.services.grade_formula import load_params
@@ -669,7 +669,7 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
     from quodeq.services.evidence_rescore import standard_dirs  # noqa: PLC0415
     compiled_dir, evaluators_dir = standard_dirs()
 
-    from quodeq.shared.dimensions_state import read_dimensions
+    from quodeq.data.fs.dimensions_state_store import read_dimensions
     dim_states = read_dimensions(Path(reports_dir) / project / run_id).get("dimensions", {})
 
     for jsonl_path in evidence_dir.glob("*_evidence.jsonl"):

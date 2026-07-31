@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.shared.run_status import RunState, read_status
-from quodeq.shared.run_lifecycle import RunLifecycleContext
+from quodeq.data.fs.run_status_store import RunState, read_status
+from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
 # os.kill(pid, SIGTERM) on Windows calls TerminateProcess directly — it does
 # not invoke Python signal handlers, so any test that signals its own process
@@ -97,7 +97,7 @@ def test_signal_handlers_installed_before_first_status_write(tmp_path: Path) -> 
     installing handlers, a signal landing in that gap would hit the default
     handler and kill the run with the status stuck at pending.
     """
-    from quodeq.shared import run_lifecycle as rl
+    from quodeq.analysis import run_lifecycle as rl
 
     order: list[str] = []
     real_signal = signal.signal
@@ -192,7 +192,7 @@ def test_transition_methods(tmp_path: Path) -> None:
 
 def test_lifecycle_seeds_dimensions_pending(tmp_path: Path) -> None:
     """RunLifecycleContext seeds dimensions.json with PENDING entries on enter."""
-    from quodeq.shared.dimensions_state import read_dimensions
+    from quodeq.data.fs.dimensions_state_store import read_dimensions
 
     with RunLifecycleContext(run_dir=tmp_path, job_id="j1", dimensions=["a", "b"]):
         data = read_dimensions(tmp_path)

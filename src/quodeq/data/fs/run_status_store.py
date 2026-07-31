@@ -1,7 +1,6 @@
-"""Authoritative per-run lifecycle state.
+"""Reads/writes ``{run_dir}/status.json`` (state machine in core/run/state).
 
-Single helper module for reading and writing ``{run_dir}/status.json``. All
-state transitions go through ``validate_transition``; hand-rolled JSON is
+All state transitions go through ``validate_transition``; hand-rolled JSON is
 never written to disk by any other code path.
 
 Failure philosophy: file reads return ``None`` on missing/corrupt; writes
@@ -10,7 +9,6 @@ propagate.
 """
 from __future__ import annotations
 
-import enum
 import json
 import logging
 import os
@@ -19,33 +17,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from quodeq.core.run.state import (  # noqa: F401 — re-exported API
+    SCHEMA_VERSION,
+    STATUS_FILENAME,
+    TERMINAL_STATES,
+    IllegalTransitionError,
+    RunState,
+    UnsupportedSchemaError,
+    validate_transition,
+)
+
 _logger = logging.getLogger(__name__)
-
-SCHEMA_VERSION = 2
-STATUS_FILENAME = "status.json"
-
-
-class RunState(str, enum.Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    FINALIZING = "finalizing"
-    DONE = "done"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-TERMINAL_STATES: frozenset[RunState] = frozenset({RunState.DONE, RunState.FAILED, RunState.CANCELLED})
-
-# Allowed transitions (src -> set of dst). All other transitions raise.
-_ALLOWED_TRANSITIONS: dict[RunState, frozenset[RunState]] = {
-    RunState.PENDING: frozenset({RunState.RUNNING, RunState.CANCELLED, RunState.FAILED}),
-    RunState.RUNNING: frozenset({RunState.FINALIZING, RunState.CANCELLED, RunState.FAILED}),
-    RunState.FINALIZING: frozenset({RunState.DONE, RunState.CANCELLED, RunState.FAILED}),
-    # Terminal states accept no further transitions.
-    RunState.DONE: frozenset(),
-    RunState.FAILED: frozenset(),
-    RunState.CANCELLED: frozenset(),
-}
 
 # Reentrant: the lifecycle SIGINT/SIGTERM handler runs on the main thread and
 # writes status itself. A plain Lock deadlocks when the signal interrupts a
@@ -54,21 +36,6 @@ _ALLOWED_TRANSITIONS: dict[RunState, frozenset[RunState]] = {
 # consistent (the handler raises SystemExit, so the interrupted write's
 # remaining statements never run).
 _write_lock = threading.RLock()
-
-
-class IllegalTransitionError(RuntimeError):
-    """Raised when a state transition is not permitted by the state machine."""
-
-
-class UnsupportedSchemaError(RuntimeError):
-    """Raised when status.json has a schema_version newer than this code supports."""
-
-
-def validate_transition(src: RunState, dst: RunState) -> None:
-    """Raise IllegalTransitionError if *src → dst* is not permitted."""
-    allowed = _ALLOWED_TRANSITIONS.get(src, frozenset())
-    if dst not in allowed:
-        raise IllegalTransitionError(f"{src.value} → {dst.value} is not a permitted transition")
 
 
 def _now_iso() -> str:

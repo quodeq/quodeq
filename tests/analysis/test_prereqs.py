@@ -3,10 +3,17 @@ from unittest.mock import patch
 
 import pytest
 
+from quodeq.analysis.prereqs import (
+    _check_api_provider,
+    _check_cli_provider,
+    _is_provider_explicitly_configured,
+    check_evaluate_prereqs,
+)
 from quodeq.shared.prereqs import (
-    check_node, check_npm, check_dashboard_dev_prereqs, check_evaluate_prereqs,
-    _check_cli_provider, _check_api_provider, _is_provider_explicitly_configured,
     _run_version_cmd,
+    check_dashboard_dev_prereqs,
+    check_node,
+    check_npm,
 )
 
 
@@ -77,14 +84,14 @@ class TestCheckApiProvider:
     def test_keyless_api_provider_passes(self):
         # API providers that don't require a key have no connectivity check
         cfg = {"custom": {"type": "api", "api_key_env": "AI_API_KEY"}}
-        with patch("quodeq.shared.prereqs.get_provider_configs", return_value=cfg):
+        with patch("quodeq.analysis.prereqs.get_provider_configs", return_value=cfg):
             _check_api_provider("custom", env={"PATH": "/usr/bin"})
 
     def test_openrouter_missing_key_raises(self):
         cfg = {"openrouter": {
             "type": "api", "api_key_env": "OPENROUTER_API_KEY", "api_key_required": True,
         }}
-        with patch("quodeq.shared.prereqs.get_provider_configs", return_value=cfg):
+        with patch("quodeq.analysis.prereqs.get_provider_configs", return_value=cfg):
             with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY"):
                 _check_api_provider("openrouter", env={"PATH": "/usr/bin"})
 
@@ -92,7 +99,7 @@ class TestCheckApiProvider:
         cfg = {"openrouter": {
             "type": "api", "api_key_env": "OPENROUTER_API_KEY", "api_key_required": True,
         }}
-        with patch("quodeq.shared.prereqs.get_provider_configs", return_value=cfg):
+        with patch("quodeq.analysis.prereqs.get_provider_configs", return_value=cfg):
             _check_api_provider("openrouter", env={"OPENROUTER_API_KEY": "sk-or-x"})
 
 
@@ -173,7 +180,7 @@ class TestProviderInjection:
 
 class TestInstallHints:
     def test_gemini_hint_uses_google_npm_scope(self):
-        from quodeq.shared.prereqs import _CLI_INSTALL_HINTS
+        from quodeq.analysis.prereqs import _CLI_INSTALL_HINTS
 
         assert "@google/gemini-cli" in _CLI_INSTALL_HINTS["gemini"]
         assert "@anthropic-ai/gemini-cli" not in _CLI_INSTALL_HINTS["gemini"]

@@ -19,7 +19,7 @@ from quodeq.analysis._runner_markers import emit_marker
 # NOTE: logging in inner layer - tracked for middleware extraction
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared import cancellation
-from quodeq.shared.dimensions_state import DimState, write_dim_state, IllegalDimTransitionError
+from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state, IllegalDimTransitionError
 
 
 def _safe_write_dim_state(

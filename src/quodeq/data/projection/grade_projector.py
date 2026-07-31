@@ -137,7 +137,7 @@ def recompute_grades(run_dir: Path, params: ScoringParams | None = None) -> None
     # authoritative dim-state file so the grade layer can flag/exclude
     # interrupted dimensions. Match case-insensitively: findings carry the
     # dimension label, dimensions.json carries the dimension id.
-    from quodeq.shared.dimensions_state import read_dimensions  # noqa: PLC0415
+    from quodeq.data.fs.dimensions_state_store import read_dimensions  # noqa: PLC0415
     dim_states = read_dimensions(run_dir).get("dimensions", {})
     if not isinstance(dim_states, dict):
         dim_states = {}

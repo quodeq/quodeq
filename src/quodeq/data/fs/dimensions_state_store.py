@@ -1,12 +1,10 @@
-"""Per-dimension lifecycle state for an evaluation run.
+"""Reads/writes ``{run_dir}/dimensions.json`` (state machine in core/run/dimensions).
 
-Mirrors run_status.py for the per-dim layer. Lives in a sibling
-dimensions.json so per-dim writers don't contend with the run-level
-status writer's lock.
+Lives in a sibling dimensions.json so per-dim writers don\'t contend with the
+run-level status writer\'s lock.
 """
 from __future__ import annotations
 
-import enum
 import json
 import logging
 import threading
@@ -14,33 +12,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from quodeq.core.run.dimensions import (  # noqa: F401 — re-exported API
+    FILENAME,
+    SCHEMA_VERSION,
+    DimState,
+    IllegalDimTransitionError,
+    validate_dim_transition,
+)
+
 _logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 1
-FILENAME = "dimensions.json"
-
-
-class DimState(str, enum.Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    DONE = "done"
-    INCOMPLETE = "incomplete"
-
-
-_ALLOWED: dict[DimState, frozenset[DimState]] = {
-    DimState.PENDING: frozenset({DimState.RUNNING, DimState.INCOMPLETE}),
-    DimState.RUNNING: frozenset({DimState.DONE, DimState.INCOMPLETE}),
-    DimState.DONE: frozenset(),
-    DimState.INCOMPLETE: frozenset(),
-}
-
-
-class IllegalDimTransitionError(RuntimeError):
-    pass
-
-
 _lock = threading.Lock()
-
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -86,10 +68,7 @@ def write_dim_state(
                     existing.get("state"), dimension,
                 )
                 prev = DimState.PENDING
-            if state not in _ALLOWED[prev]:
-                raise IllegalDimTransitionError(
-                    f"{dimension}: {prev.value} -> {state.value} not permitted",
-                )
+            validate_dim_transition(dimension, prev, state)
         entry: dict[str, Any] = dict(existing) if isinstance(existing, dict) else {}
         entry["state"] = state.value
         if state == DimState.RUNNING:

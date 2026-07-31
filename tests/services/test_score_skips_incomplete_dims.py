@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.shared.dimensions_state import DimState, write_dim_state
+from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
 
 
 def _seed_run(tmp_path: Path) -> tuple[Path, Path]:
@@ -92,7 +92,7 @@ def test_cancelled_run_scoring_quarantines_off_standard_findings(tmp_path: Path,
     re-entering the grade as phantom principles.
     """
     from quodeq.services.evaluation_mixin import _score_completed_evidence
-    from quodeq.shared.dimensions_state import DimState, write_dim_state
+    from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
 
     monkeypatch.setenv("QUODEQ_EVALUATORS_DIR", str(tmp_path / "no-evals"))
     reports, run = _seed_run(tmp_path)

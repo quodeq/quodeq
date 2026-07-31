@@ -26,8 +26,8 @@ from quodeq.analysis.cache import CacheEntry, LocalFileBackend
 from quodeq.core.types import JobSnapshot
 from quodeq.services.evaluation_mixin import FsEvaluationMixin, _discard_run_state
 from quodeq.services.filesystem import FilesystemActionProvider
-from quodeq.shared.dimensions_state import DimState, write_dim_state
-from quodeq.shared.run_status import RunState, write_status
+from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
+from quodeq.data.fs.run_status_store import RunState, write_status
 
 
 def _seed_cache_entries(cache_root: Path, keys: list[str]) -> LocalFileBackend:

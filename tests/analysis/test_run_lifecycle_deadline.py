@@ -1,8 +1,8 @@
 """Tests for set_deadline propagating into status.json via the lifecycle."""
 from pathlib import Path
 
-from quodeq.shared.run_lifecycle import RunLifecycleContext
-from quodeq.shared.run_status import read_status
+from quodeq.analysis.run_lifecycle import RunLifecycleContext
+from quodeq.data.fs.run_status_store import read_status
 
 
 def test_set_deadline_writes_to_status_json(tmp_path: Path) -> None:

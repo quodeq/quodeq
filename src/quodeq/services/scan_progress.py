@@ -25,7 +25,7 @@ from quodeq.config.paths import default_paths
 from quodeq.core.evidence._req_mapping import build_principle_resolver
 from quodeq.services.suppression import build_matcher, project_suppressions
 from quodeq.shared.dim_estimates_io import read_dim_estimates
-from quodeq.shared.dimensions_state import read_dimensions
+from quodeq.data.fs.dimensions_state_store import read_dimensions
 
 _AGENT_ACTIVE_WINDOW_S = 30
 

@@ -28,15 +28,15 @@ from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.evidence_rescore import score_dimension_from_evidence, standard_dirs
 from quodeq.services.suppression import is_deleted, is_dismissed
 from quodeq.services.grade_formula import load_params
-from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
+from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.logging import log_error, log_info, log_warning
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo, write_text
-from quodeq.shared.repo_handler import cleanup_cloned_repo
+from quodeq.data.fs.repo_handler import cleanup_cloned_repo
 from quodeq.analysis._runner_markers import emit_marker
-from quodeq.shared.prereqs import check_evaluate_prereqs
+from quodeq.analysis.prereqs import check_evaluate_prereqs
 from quodeq.analysis._dimension_aliases import expand_dimension_aliases
 from quodeq.analysis._diff_resolver import DiffResolveError, resolve_diff_files
-from quodeq.shared.run_lifecycle import RunLifecycleContext
+from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
 # Re-export resolution helpers — keep the public API stable
 from quodeq._cli_resolution import (  # noqa: F401

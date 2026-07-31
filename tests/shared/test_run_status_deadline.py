@@ -1,7 +1,7 @@
 """Tests for deadline_at in status.json writes."""
 from pathlib import Path
 
-from quodeq.shared.run_status import RunState, read_status, write_status
+from quodeq.data.fs.run_status_store import RunState, read_status, write_status
 
 
 def _common(run_dir: Path):

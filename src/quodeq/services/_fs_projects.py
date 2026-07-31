@@ -22,7 +22,7 @@ from quodeq.services._fs_project_helpers import (
     _max_projects_listed,
 )
 from quodeq.services.ports import list_runs, safe_read_dir
-from quodeq.shared.repo_handler import is_valid_repo_url
+from quodeq.data.fs.repo_handler import is_valid_repo_url
 from quodeq.shared.utils import is_repo_url
 
 _logger = logging.getLogger(__name__)

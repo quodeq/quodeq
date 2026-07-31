@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 from quodeq.shared.run_heartbeat import HEARTBEAT_FILENAME
-from quodeq.shared.run_status import (
+from quodeq.data.fs.run_status_store import (
     RunState,
     STATUS_FILENAME,
     TERMINAL_STATES,

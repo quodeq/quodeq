@@ -118,7 +118,7 @@ def _cleanup_worktree(repo_dir: Path, worktree_dir: Path) -> None:
 
 def _resolve_repo(args: argparse.Namespace) -> Path | None:
     """Resolve the repo argument to a local path (cloning if needed)."""
-    from quodeq.shared.repo_handler import cleanup_cloned_repo, prepare_repository
+    from quodeq.data.fs.repo_handler import cleanup_cloned_repo, prepare_repository
 
     repo_path = args.repo
     try:
