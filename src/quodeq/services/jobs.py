@@ -55,9 +55,13 @@ _DEFAULT_LIST_LIMIT = 100
 # which only lands in job state after the analyzing_start marker — so a
 # blocking wait(timeout=full_budget) at spawn time can't see it.
 _WATCHDOG_POLL_INTERVAL_S = 1.0
-# Grace window past deadline_at before SIGKILL — gives the analysis side's
-# graceful-cancel path time to score completed dimensions.
-_WATCHDOG_DEADLINE_GRACE_S = 60
+# Grace window past deadline_at before the kill. The watchdog exists to
+# reap HUNG runs, never to cut loaded agents: past the deadline the pool
+# stops dispatching and in-flight model calls drain. The longest
+# legitimate in-flight call is one scaled local read timeout (500s per
+# subagent, realistically up to 3), so the grace must exceed that or a
+# healthy drain gets SIGTERMed and the batch's work is lost.
+_WATCHDOG_DEADLINE_GRACE_S = 1800
 
 # Canonical job status strings.
 STATUS_RUNNING = "running"

@@ -39,11 +39,14 @@ class TestResolveTimeLimit:
         # the 7200s ceiling → return the proportional value.
         assert _resolve_time_limit(None, 200) == 200 * _SECONDS_PER_FILE_AUTOSCALE
 
-    def test_explicit_user_budget_is_floor_not_cap(self) -> None:
-        # User wants at least 1800s; queue would only need 600s → keep 1800.
+    def test_explicit_user_budget_is_a_hard_cap(self) -> None:
+        # An explicitly chosen limit is respected verbatim: the run stops
+        # dispatching at the cap and carries the remainder forward. Only
+        # the implicit default is auto-scaled. (A 60s limit that silently
+        # became a 2h run was the opposite of what the user asked for.)
         assert _resolve_time_limit(1800, 30) == 1800
-        # User wants 1800s but queue needs 3600s → extend to 3600.
-        assert _resolve_time_limit(1800, 300) == 300 * _SECONDS_PER_FILE_AUTOSCALE
+        assert _resolve_time_limit(1800, 300) == 1800
+        assert _resolve_time_limit(60, 837) == 60
 
     def test_unlimited_budget_is_preserved(self) -> None:
         # time_limit=0 means "no cap"; auto-scaling must not turn that
@@ -59,7 +62,8 @@ class TestResolveTimeLimit:
 
     def test_runaway_queue_capped_at_max(self) -> None:
         assert _resolve_time_limit(None, 100_000) == _MAX_AUTO_POOL_BUDGET
-        assert _resolve_time_limit(900, 100_000) == _MAX_AUTO_POOL_BUDGET
+        # Explicit budgets are never scaled, not even for runaway queues.
+        assert _resolve_time_limit(900, 100_000) == 900
 
 
 class TestExtendRunDeadline:

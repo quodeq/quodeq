@@ -20,12 +20,13 @@ _MAX_FILES_PER_AGENT = 30
 _MAX_FILES_PER_AGENT_CAP = 50
 _NON_SCOUT_PROVIDERS = tuple(os.environ.get("QUODEQ_NON_SCOUT_PROVIDERS", "codex,gemini").split(","))
 
-# Auto-scale the time limit so large queues don't get killed mid-run.
-# A fixed 600s cap chokes any dim with a queue larger than ~80 files
-# (observed throughput ≈ 7-12 s/file with 8 agents); the surviving
-# pending files keep haunting the next run via the not_analyzed sweep
-# and the dim never converges. The user's explicit time_limit is a
-# FLOOR — we only ever extend it upward, never shrink it.
+# Auto-scale the IMPLICIT default time limit so large queues don't get
+# killed mid-run: a fixed 600s budget chokes any dim with a queue larger
+# than ~80 files (observed throughput ≈ 7-12 s/file with 8 agents) and
+# the surviving pending files keep haunting the next run via the
+# not_analyzed sweep. An EXPLICITLY chosen time_limit is a HARD CAP and
+# is never scaled: the run stops dispatching at the cap, loaded agents
+# drain, and the remainder carries over to the next run.
 _SECONDS_PER_FILE_AUTOSCALE = 12
 # Hard upper bound so a runaway queue can't lock up the run for days.
 _MAX_AUTO_POOL_BUDGET = 7200  # 2 hours
@@ -36,18 +37,19 @@ _UNLIMITED_BUDGET = 0
 def _resolve_time_limit(user_budget: int | None, queue_size: int) -> int:
     """Compute the effective time limit for a queue of *queue_size* files.
 
-    The user's `time_limit` (or `DEFAULT_TIME_LIMIT` if unset) is treated
-    as a floor. For large queues we extend it to give each file a fair
-    slice of wallclock time, capped at `_MAX_AUTO_POOL_BUDGET`. A user-set
-    limit of 0 means "unlimited" and is preserved verbatim.
+    An explicitly set `time_limit` is a HARD CAP and is returned verbatim
+    (0 means "unlimited"): the user asked for that number, so the run
+    dispatches until the cap and carries the remainder forward. Only when
+    no limit was chosen (`None`) do we auto-scale the `DEFAULT_TIME_LIMIT`
+    to give each file a fair slice of wallclock time, capped at
+    `_MAX_AUTO_POOL_BUDGET`.
     """
-    base = user_budget if user_budget is not None else DEFAULT_TIME_LIMIT
-    if base == _UNLIMITED_BUDGET:
-        return _UNLIMITED_BUDGET
+    if user_budget is not None:
+        return user_budget
     if queue_size <= 0:
-        return base
+        return DEFAULT_TIME_LIMIT
     needed = queue_size * _SECONDS_PER_FILE_AUTOSCALE
-    return min(_MAX_AUTO_POOL_BUDGET, max(base, needed))
+    return min(_MAX_AUTO_POOL_BUDGET, max(DEFAULT_TIME_LIMIT, needed))
 
 
 def _extend_run_deadline(options: AnalysisOptions, time_limit: int) -> None:
