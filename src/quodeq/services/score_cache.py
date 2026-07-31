@@ -364,8 +364,12 @@ def accumulated_cache_version(
         # only status-independent scoped versions and lost that guard). v5:
         # dimensions are no longer scoped to the last-5-runs configured
         # standard; payloads written with scoping omit dimensions whose last
-        # valid run is older and must rebuild.
-        "algo": 5,
+        # valid run is older and must rebuild. v6: heal rows poisoned before
+        # PR #924's partial-dim guards — a mid-run partial rescore persisted
+        # under algo 5 hashes identically to a correct recompute, so without
+        # this bump it is served forever (tests/services/
+        # test_accumulated_version_heals_poison.py pins the keyspace exit).
+        "algo": 6,
         "params": _params_fingerprint(params),
         "runs": sorted(list(t) for t in run_versions),
         "as_of": as_of or "",
