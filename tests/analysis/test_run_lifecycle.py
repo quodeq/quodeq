@@ -277,3 +277,57 @@ def test_lifecycle_context_threads_provider_to_status(tmp_path: Path) -> None:
     data = read_status(tmp_path)
     assert data["ai_provider"] == "ollama"
     assert data["ai_model"] == "gemma4:26b-mlx"
+
+
+@_POSIX_SIGNALS
+def test_sigterm_after_deadline_labels_time_limit_not_cancel(tmp_path: Path) -> None:
+    """The watchdog enforcing the run's own time limit is not a user cancel.
+
+    2026-07-31 incident: a 5-min-limit run drained its in-flight agent past
+    deadline+grace, the JobManager watchdog SIGTERMed it, and the handler
+    wrote ``cancelled/signal_SIGTERM`` — the UI showed a cancelled ERROR for
+    a run that ended exactly as budgeted. When the deadline has passed, the
+    signal must be recorded as ``deadline`` (UI: "time limit reached", not an
+    error) and running dims must flip to INCOMPLETE instead of sticking at
+    ``running`` forever. State stays ``cancelled``: the salvage-scoring
+    triggers key off terminal failed/cancelled and must keep firing.
+    """
+    import os
+    from datetime import datetime, timedelta, timezone
+
+    from quodeq.data.fs.dimensions_state_store import DimState, read_dimensions, write_dim_state
+
+    past = (datetime.now(timezone.utc) - timedelta(seconds=90)).isoformat()
+    with pytest.raises(SystemExit):
+        with RunLifecycleContext(
+            run_dir=tmp_path, job_id="ext-deadline", dimensions=["clean-architecture"],
+        ) as ctx:
+            ctx.set_deadline(past)
+            write_dim_state(tmp_path, "clean-architecture", DimState.RUNNING)
+            os.kill(os.getpid(), signal.SIGTERM)
+
+    status = read_status(tmp_path)
+    assert status["state"] == "cancelled"
+    assert status["exit_reason"] == "deadline"
+    entry = read_dimensions(tmp_path)["dimensions"]["clean-architecture"]
+    assert entry["state"] == "incomplete"
+    assert entry["reason"] == "time_limit"
+
+
+@_POSIX_SIGNALS
+def test_sigterm_before_deadline_stays_a_real_cancel(tmp_path: Path) -> None:
+    """A SIGTERM while the deadline is still ahead is a genuine user cancel."""
+    import os
+    from datetime import datetime, timedelta, timezone
+
+    future = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    with pytest.raises(SystemExit):
+        with RunLifecycleContext(
+            run_dir=tmp_path, job_id="ext-user-cancel", dimensions=["security"],
+        ) as ctx:
+            ctx.set_deadline(future)
+            os.kill(os.getpid(), signal.SIGTERM)
+
+    status = read_status(tmp_path)
+    assert status["state"] == "cancelled"
+    assert status["exit_reason"] == "signal_SIGTERM"

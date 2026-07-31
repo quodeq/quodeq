@@ -230,12 +230,50 @@ class RunLifecycleContext:
     def _is_circuit_breaker_error(exc_type: type[BaseException] | None) -> bool:
         return RunLifecycleContext._is_named_error(exc_type, "CircuitBreakerError")
 
+    def _deadline_has_passed(self) -> bool:
+        """True when the run's own deadline is set and already behind us."""
+        if not self._deadline_at:
+            return False
+        try:
+            deadline = datetime.fromisoformat(self._deadline_at)
+        except (TypeError, ValueError):
+            return False
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) >= deadline
+
+    def _mark_running_dims_incomplete(self, reason: str) -> None:
+        """Flip still-running dims to INCOMPLETE so none sticks at 'running' forever."""
+        from quodeq.data.fs.dimensions_state_store import (  # noqa: PLC0415 — signal path
+            DimState,
+            read_dimensions,
+            write_dim_state,
+        )
+        try:
+            entries = read_dimensions(self._run_dir).get("dimensions", {})
+        except Exception:  # noqa: BLE001 — a failing flip must not mask the exit
+            return
+        for dim, entry in entries.items():
+            if isinstance(entry, dict) and entry.get("state") == "running":
+                try:
+                    write_dim_state(self._run_dir, dim, DimState.INCOMPLETE, reason=reason)
+                except Exception as exc:  # noqa: BLE001
+                    _logger.warning("failed to mark dim %s incomplete: %s", dim, exc)
+
     def _install_signal_handlers(self) -> None:
         def _handle(signum: int, frame: Any) -> None:
             try:
                 name = signal.Signals(signum).name
             except ValueError:
                 name = f"signal_{signum}"
+            # A signal landing AFTER the run's own deadline is the watchdog
+            # enforcing the time budget (SIGTERM at deadline+grace), not a
+            # user cancel. Label it "deadline" — the UI maps that to "time
+            # limit reached", not an error — and close out running dims. The
+            # state stays CANCELLED either way: salvage scoring triggers key
+            # off terminal failed/cancelled and must keep firing.
+            deadline_enforced = self._deadline_has_passed()
+            exit_reason = "deadline" if deadline_enforced else f"signal_{name}"
             # Signal worker threads (subagent pool, AI CLI subprocess monitors)
             # to stop waiting on long-running operations and terminate promptly.
             cancellation.request_cancel()
@@ -250,13 +288,15 @@ class RunLifecycleContext:
                 dimensions=self._dimensions,
                 phase=self._phase,
                 current_dimension=self._current_dimension,
-                exit_reason=f"signal_{name}",
+                exit_reason=exit_reason,
                 deadline_at=self._deadline_at,
                 ai_provider=self._ai_provider,
                 ai_model=self._ai_model,
                 time_limit_s=self._time_limit_s,
             )
             self._current_state = RunState.CANCELLED
+            if deadline_enforced:
+                self._mark_running_dims_incomplete("time_limit")
             raise SystemExit(128 + signum)
 
         for sig in _SIGNALS_TO_HANDLE:
