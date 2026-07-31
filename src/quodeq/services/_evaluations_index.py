@@ -15,7 +15,7 @@ import shutil
 from pathlib import Path
 
 from quodeq.core.types.job import JobSnapshot
-from quodeq.services import run_index as _run_index
+from quodeq.data.sqlite import run_index as _run_index
 from quodeq.services._external_jobs import is_safe_run_segment
 from quodeq.services.jobs import JobManager
 
@@ -211,7 +211,7 @@ class EvaluationsIndex:
         if snapshot.status != "running":
             return False
 
-        from quodeq.services._index_sync import force_promote_to_cancelled_stale
+        from quodeq.data.sqlite._index_sync import force_promote_to_cancelled_stale
 
         run_dir: Path | None = None
         if snapshot.output_project and snapshot.output_run_id and reports_dir:

@@ -5,7 +5,7 @@ import json
 import pytest
 
 from quodeq.api.app import create_app
-from quodeq.services.run_index import open_index
+from quodeq.data.sqlite.run_index import open_index
 
 
 @pytest.fixture(autouse=True)

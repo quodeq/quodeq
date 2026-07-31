@@ -20,18 +20,20 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from quodeq.data.fs.report_parser._date_utils import normalize_date
+from quodeq.data.sqlite.run_index import (
+    list_runs_for_project,
+    open_index,
+    sync_project_dates,
+)
+from quodeq.shared._env import get_index_db_path
+
 _logger = logging.getLogger(__name__)
 
 
 def project_run_dates(reports_root: Path, project: str) -> dict[str, tuple[str, str]]:
     """Return ``{run_id: (date_iso, date_label)}`` from the run index, or ``{}``."""
     try:
-        from quodeq.data.fs.report_parser._date_utils import normalize_date  # noqa: PLC0415
-        from quodeq.services.run_index import (  # noqa: PLC0415
-            list_runs_for_project, open_index, sync_project_dates,
-        )
-        from quodeq.shared._env import get_index_db_path  # noqa: PLC0415
-
         db = open_index(Path(get_index_db_path()))
         try:
             sync_project_dates(db, Path(reports_root) / project, project)

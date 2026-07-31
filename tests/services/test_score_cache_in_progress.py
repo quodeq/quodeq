@@ -54,6 +54,9 @@ def test_in_progress_run_not_persisted_but_complete_run_is(tmp_path, monkeypatch
     def fake_pid(project, run_id, root):
         return 4242 if run_id == live_run else None
     monkeypatch.setattr(_external_jobs, "resolve_external_pid", fake_pid)
+    # list_runs binds the data-layer function at import time; patch its binding too.
+    from quodeq.data.fs.report_parser import runs as _runs_mod
+    monkeypatch.setattr(_runs_mod, "resolve_external_pid", fake_pid)
 
     scores = get_project_scores(reports, "proj")
     trend_ids = {e["runId"] for e in scores["trend"]}

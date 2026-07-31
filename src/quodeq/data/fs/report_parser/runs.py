@@ -13,6 +13,7 @@ from pathlib import Path
 from quodeq.core.types import DimensionResult
 from quodeq.core.types.mappers import parse_dimension_result
 from quodeq.data.fs.report_parser._evaluations import load_evaluations
+from quodeq.data.fs.report_parser._external_pid import resolve_external_pid
 from quodeq.data.fs.report_parser._evidence import load_evidence_map
 from quodeq.data.fs.report_parser._repository import (
     build_repository_info as build_repository_info,
@@ -22,6 +23,7 @@ from quodeq.data.fs.report_parser._run_info import (
     parse_run_date,
     safe_read_dir as safe_read_dir,
 )
+from quodeq.data.fs.report_parser.run_dates import project_run_dates
 from quodeq.data.fs.report_parser._run_lookup import (
     RunLookupCache as RunLookupCache,
     _get_previous_run_for_dimension as _get_previous_run_for_dimension,
@@ -187,7 +189,6 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
     """
     validate_path_segment(project)
     project_dir = reports_root / project
-    from quodeq.services.run_dates import project_run_dates  # noqa: PLC0415
     index_dates = project_run_dates(reports_root, project)
     run_infos: list[RunInfo] = []
     for entry in safe_read_dir(project_dir):
@@ -213,7 +214,6 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
         if terminal_status is not None:
             status = terminal_status
         else:
-            from quodeq.services._external_jobs import resolve_external_pid  # noqa: PLC0415
             pid = resolve_external_pid(project_dir.name, entry.name, reports_root)
             status = "in_progress" if pid is not None else "complete"
         cached = index_dates.get(entry.name)

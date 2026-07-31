@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.services.ports import most_frequent_grade, parse_numeric_score, read_run_scalars
-from quodeq.services.run_index import (
+from quodeq.data.sqlite.run_index import (
     RunRow,
     list_runs_for_project,
     open_index,

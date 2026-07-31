@@ -15,15 +15,9 @@ src/quodeq/core/evidence/parser.py:9:shared
 src/quodeq/core/standards/loader.py:10:shared
 src/quodeq/core/standards/loader.py:9:shared
 src/quodeq/core/standards/refs.py:16:shared
-src/quodeq/data/fs/project_resolver.py:17:services
 src/quodeq/data/fs/repo_clone.py:19:context
-src/quodeq/data/fs/report_parser/runs.py:190:services
-src/quodeq/data/fs/report_parser/runs.py:216:services
-src/quodeq/data/projection/grade_projector.py:132:services
-src/quodeq/data/projection/grade_projector.py:20:services
-src/quodeq/data/sqlite/state_store.py:272:services
 src/quodeq/llm_bridge/_providers.py:6:analysis
-src/quodeq/services/_external_jobs.py:22:analysis
+src/quodeq/services/_external_jobs.py:21:analysis
 src/quodeq/services/_violations_jsonl.py:12:analysis
 src/quodeq/services/_violations_stream.py:10:analysis
 src/quodeq/services/_violations_stream.py:11:analysis

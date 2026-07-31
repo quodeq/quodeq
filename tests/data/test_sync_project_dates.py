@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from quodeq.services.run_index import open_index, sync_project_dates, list_runs_for_project
+from quodeq.data.sqlite.run_index import open_index, sync_project_dates, list_runs_for_project
 
 
 def _write_status(run_dir: Path, started_at: str):
@@ -30,7 +30,7 @@ def test_syncs_started_at_and_is_mtime_gated(tmp_path, monkeypatch):
         }
         # Second call, nothing changed on disk -> no upserts (mtime gate).
         calls = {"n": 0}
-        import quodeq.services.run_index as ri
+        import quodeq.data.sqlite.run_index as ri
         real = ri._upsert_from_status
         def counting(*a, **k):
             calls["n"] += 1

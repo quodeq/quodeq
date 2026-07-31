@@ -289,7 +289,7 @@ def shared_score_cache_path(url: str, env: dict | None = None) -> Path:
 
 
 def sync_shared_index(url: str, env: dict | None = None) -> None:
-    from quodeq.services.run_index import open_index, sync_index
+    from quodeq.data.sqlite.run_index import open_index, sync_index
 
     root = shared_evaluations_root(url, env)
     if not root.is_dir():
