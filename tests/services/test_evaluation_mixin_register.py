@@ -3,7 +3,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 import pytest
-from quodeq.services.evaluation_mixin import _register_project
+from quodeq.services.project_registration import register_project as _register_project
 
 
 def _read_info(reports_root: Path, uuid: str) -> dict:
@@ -36,7 +36,7 @@ def test_register_url_clones_to_dest_then_scans(tmp_path):
         (Path(dest) / "README.md").write_text("# fake\n")
         (Path(dest) / ".git").mkdir()
 
-    with patch("quodeq.services.evaluation_mixin.run_git_clone", side_effect=fake_clone):
+    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
         uuid = _register_project(
             "https://github.com/example/repo.git",
             None,
@@ -63,7 +63,7 @@ def test_register_url_ephemeral_clones_under_clones_root(tmp_path, monkeypatch):
         (Path(dest) / "README.md").write_text("# fake\n")
         (Path(dest) / ".git").mkdir()
 
-    with patch("quodeq.services.evaluation_mixin.run_git_clone", side_effect=fake_clone):
+    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
         uuid = _register_project(
             "https://github.com/example/repo.git",
             None,
@@ -88,7 +88,7 @@ def test_register_url_clone_failure_raises(tmp_path):
     clone_dest.mkdir()
 
     with patch(
-        "quodeq.services.evaluation_mixin.run_git_clone",
+        "quodeq.services.project_registration.run_git_clone",
         side_effect=CloneError("network", "git clone failed (network)"),
     ):
         with pytest.raises(CloneError):
@@ -142,7 +142,7 @@ def test_register_url_rejects_private_address_before_clone(tmp_path, monkeypatch
         (Path(dest) / "README.md").write_text("# fake\n")
         (Path(dest) / ".git").mkdir()
 
-    with patch("quodeq.services.evaluation_mixin.run_git_clone", side_effect=fake_clone):
+    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
         with pytest.raises(ValueError, match="private"):
             _register_project(
                 "https://169.254.169.254/latest/meta-data",
@@ -170,7 +170,7 @@ def test_register_url_rejects_localhost_before_clone(tmp_path, monkeypatch):
         (Path(dest) / "README.md").write_text("# fake\n")
         (Path(dest) / ".git").mkdir()
 
-    with patch("quodeq.services.evaluation_mixin.run_git_clone", side_effect=fake_clone):
+    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
         with pytest.raises(ValueError):
             _register_project(
                 "https://localhost/git/repo.git",
@@ -270,7 +270,7 @@ def test_register_url_repo_persists_origin_url(tmp_path, monkeypatch):
         (dest / ".git").mkdir()
         (dest / "main.py").write_text("print('hi')\n")
 
-    with patch("quodeq.services.evaluation_mixin.run_git_clone", side_effect=fake_clone):
+    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
         uuid = _register_project(url, None, str(reports), ephemeral=True)
 
     assert _read_info(reports, uuid)["originUrl"] == url

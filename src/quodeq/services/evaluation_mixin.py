@@ -14,16 +14,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Protocol
 
 from quodeq.core.types import JobSnapshot
-from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_TIME_LIMIT
+from quodeq.services.base import EvaluationOptions, DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
 from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
-from quodeq.core.evidence.parser import parse_jsonl_to_evidence, EvidenceContext
-from quodeq.core.scoring.engine import score_evidence
-from quodeq.services.grade_formula import load_params
-from quodeq.analysis.report import write_dimension_report
-from quodeq.data.fs.repo_validation import validate_remote_url
-from quodeq.services._fs_clone import run_git_clone
-from quodeq.services._fs_scan import scan_project
-from quodeq.shared._env import get_clones_dir
+from quodeq.services.project_registration import mark_onboarding_complete, register_project
+from quodeq.services.score_run import score_completed_evidence
 from quodeq.shared.provider_env import provider_env_exports
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo
 
@@ -34,25 +28,6 @@ _logger = logging.getLogger(__name__)
 
 _LOCATION_ONLINE = "online"
 _LOCATION_LOCAL = "local"
-
-# Mirrors _CREDENTIALS_RE in quodeq.api._evaluation_helpers. Not imported from
-# there: services must not depend on the api layer (no other services module
-# does), so the pattern is duplicated here rather than layered across.
-# Userinfo cannot contain an unencoded "/", so excluding it keeps matches
-# identical while a failing scan stays linear (no polynomial backtracking
-# on inputs like repeated "http://" runs).
-_CREDENTIALS_RE = re.compile(r"(https?://)([^/@]+)@")
-
-
-def _strip_credentials(url: str) -> str:
-    """Remove embedded userinfo (``user:pass@`` / ``token@``) from *url*.
-
-    Only applies to scheme'd URLs (``https://user@host/...``). scp-style
-    remotes (``git@github.com:org/repo.git``) are left untouched, since the
-    leading ``git@`` there is a username convention, not a credential.
-    """
-    return _CREDENTIALS_RE.sub(r"\1", url)
-
 
 class EvaluationDispatcher(Protocol):
     """Abstraction for dispatching evaluation work.
@@ -119,7 +94,7 @@ def _build_evaluate_cmd(
             cmd += ["-d", str(options.dimensions)]
     if options.numerical:
         cmd += ["-m", "numerical"]
-    if options.max_subagents != _DEFAULT_MAX_SUBAGENTS:
+    if options.max_subagents != DEFAULT_MAX_SUBAGENTS:
         cmd += ["--n-subagents", str(options.max_subagents)]
     if options.clean_scan:
         cmd += ["--clean-scan"]
@@ -128,161 +103,6 @@ def _build_evaluate_cmd(
     if options.scope_path:
         cmd += ["--scope", options.scope_path]
     return cmd
-
-
-def _scan_parent_project(project_dir: Path, reports_path: Path, repo_path: Path) -> None:
-    """Scan the parent project directory if it lacks a scan.json."""
-    info_path = project_dir / "repository_info.json"
-    try:
-        parent_uuid = json.loads(info_path.read_text(encoding="utf-8")).get("parent")
-        if parent_uuid:
-            parent_dir = reports_path / parent_uuid
-            if not (parent_dir / "scan.json").exists():
-                scan_project(repo_path, output_dir=parent_dir)
-    except (json.JSONDecodeError, OSError):
-        pass
-
-
-def _read_origin_remote(repo_dir: Path) -> str | None:
-    """Best-effort ``git remote get-url origin`` for a local working copy."""
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_dir), "remote", "get-url", "origin"],
-            capture_output=True, text=True, encoding="utf-8", timeout=10,
-        )
-    except (subprocess.SubprocessError, OSError):
-        return None
-    origin = result.stdout.strip()
-    if result.returncode != 0 or not origin:
-        return None
-    return _strip_credentials(origin)
-
-
-def _register_project(
-    repo: str,
-    discipline: str | None,
-    reports_dir: str,
-    scope_path: str | None = None,
-    *,
-    clone_dest: str | None = None,
-    ephemeral: bool = False,
-) -> str:
-    """Resolve/register project and run a scan.
-
-    For URL inputs, clones the repo before scanning. Either *clone_dest* (a
-    user-chosen parent directory) or *ephemeral=True* must be set when *repo*
-    is a URL. Ephemeral clones land under ``~/.quodeq/clones/<uuid>/``.
-
-    For local path inputs, scans in place; *clone_dest* and *ephemeral* are
-    ignored.
-
-    Returns the project's UUID.
-    """
-    is_url = is_repo_url(repo)
-    if is_url:
-        # SSRF guard: reject private/loopback/link-local hosts before any clone
-        # or directory side effects. Mirrors the CLI prepare_repository path so
-        # the web API (POST /api/projects) cannot be pointed at internal hosts.
-        validate_remote_url(repo)
-    if is_url and not ephemeral and clone_dest is None:
-        raise ValueError(
-            "URL repos require either clone_dest (user-chosen path) or ephemeral=True"
-        )
-    if is_url and not ephemeral:
-        dest = Path(clone_dest)
-        if not dest.is_dir():
-            raise FileNotFoundError(
-                f"clone destination does not exist or is not a directory: {clone_dest}"
-            )
-
-    project_name = project_name_from_repo(repo)
-    repo_resolved = repo if is_url else str(Path(repo).resolve())
-    reports_path = Path(reports_dir)
-
-    project_uuid = resolve_project_uuid(
-        reports_path,
-        ProjectIdentity(project_name, repo_resolved, discipline, _LOCATION_LOCAL, scope_path=scope_path),
-    )
-    project_dir = reports_path / project_uuid
-    _ensure_onboarding_field(project_dir)
-
-    # Resolve the on-disk path the project will live at.
-    if is_url:
-        if ephemeral:
-            target_path = get_clones_dir() / project_uuid
-        else:
-            target_path = Path(clone_dest).resolve() / project_name
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        # run_git_clone raises CloneError on failure (Task A8). We let it propagate.
-        run_git_clone(repo, target_path)
-    else:
-        target_path = Path(repo_resolved)
-        if not target_path.is_dir():
-            raise FileNotFoundError(f"Repo path does not exist: {target_path}")
-
-    # Persist the resolved path + ephemeral flag in repository_info.json.
-    info_path = project_dir / "repository_info.json"
-    info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.exists() else {}
-    info["path"] = str(target_path.resolve())
-    info["location"] = _LOCATION_LOCAL
-    info["ephemeral"] = bool(ephemeral)
-    origin_url = repo if is_url else _read_origin_remote(target_path)
-    if origin_url:
-        # Defense in depth: _read_origin_remote already strips credentials
-        # from the local-remote branch, but strip again here so the
-        # URL-registration branch (raw *repo*) is covered too, and so this
-        # call site stays safe even if the helper's behavior changes.
-        info["originUrl"] = _strip_credentials(origin_url)
-    info_path.write_text(json.dumps(info, indent=2), encoding="utf-8")
-
-    # Scan now that files are guaranteed on disk.
-    scan_project(target_path, output_dir=project_dir)
-    if scope_path:
-        _scan_parent_project(project_dir, reports_path, target_path)
-
-    return project_uuid
-
-
-def _ensure_onboarding_field(project_dir: Path) -> None:
-    """Add `onboardingCompletedAt: null` to repository_info.json if absent.
-
-    Called from `_register_project` so newly-registered projects start with the
-    field set to null. Existing projects without the field get a backfill on
-    read (see `_backfill_onboarding_field` in _fs_project_helpers.py).
-    """
-    info_path = project_dir / "repository_info.json"
-    if not info_path.exists():
-        return
-    try:
-        data = json.loads(info_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return
-    if "onboardingCompletedAt" in data:
-        return
-    data["onboardingCompletedAt"] = None
-    info_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
-
-def _mark_onboarding_complete(project_dir: Path) -> None:
-    """Stamp `onboardingCompletedAt` in repository_info.json if not already set.
-
-    An existing timestamp is left untouched so re-evaluations don't move the
-    original completion time.
-    """
-    info_path = project_dir / "repository_info.json"
-    if not info_path.exists():
-        return
-    try:
-        data = json.loads(info_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return
-    if data.get("onboardingCompletedAt"):
-        return
-    data["onboardingCompletedAt"] = datetime.now(timezone.utc).isoformat()
-    try:
-        info_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    except OSError:
-        pass
 
 
 class FsEvaluationMixin:
@@ -373,12 +193,12 @@ class FsEvaluationMixin:
             )
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
-        project_uuid = _register_project(repo, options.discipline, reports_dir, scope_path=options.scope_path)
+        project_uuid = register_project(repo, options.discipline, reports_dir, scope_path=options.scope_path)
         # Launching an evaluation is the terminal step of project setup, so
         # the 'Resume setup' badge must clear here. Without this stamp the
         # null written at registration persists forever (the lazy backfill
         # only fills in a *missing* field, never a null one).
-        _mark_onboarding_complete(Path(reports_dir) / project_uuid)
+        mark_onboarding_complete(Path(reports_dir) / project_uuid)
         # Keep JobManager aware of the current reports root so _tee_run_log
         # can resolve run.log paths for dashboard-spawned evaluations.
         # Guard with hasattr so custom/stub job managers remain compatible.
@@ -429,7 +249,7 @@ class FsEvaluationMixin:
         resolve correctly via the SQLite index (Plan B1 override on
         ``FilesystemActionProvider``). Before this, ``get_job`` returned
         ``None`` for ``ext-`` ids and the scoring block was dead for them.
-        ``_score_completed_evidence`` is idempotent (skips dimensions whose
+        ``score_completed_evidence`` is idempotent (skips dimensions whose
         report file already exists), so double-firing with the route-level
         scoring in ``_evaluation_routes`` is a no-op.
 
@@ -461,7 +281,7 @@ class FsEvaluationMixin:
                     "outputRunId": job.output_run_id,
                 })
             else:
-                _score_completed_evidence(reports_dir, {
+                score_completed_evidence(reports_dir, {
                     "outputProject": job.output_project,
                     "outputRunId": job.output_run_id,
                 })
@@ -472,7 +292,7 @@ class FsEvaluationMixin:
         job = self._jobs.get_job(job_id)
         if not job or job.get("status") not in ("failed", "cancelled"):
             return False
-        _score_completed_evidence(reports_dir, job)
+        score_completed_evidence(reports_dir, job)
         return True
 
     def list_evaluations(
@@ -600,106 +420,3 @@ def _discard_run_state(reports_dir: str, job: dict) -> None:
                 pass
             except OSError as exc:
                 _logger.warning("Could not discard %s: %s", victim, exc)
-
-
-def _read_queue_files_count(queue_path: Path) -> int:
-    """Sum of files dispatched across all batches in a dim's queue.json.
-
-    Used to populate ``files_read`` when scoring residual evidence —
-    without this, ``_score_completed_evidence`` writes eval stubs with
-    ``filesRead: 0``, which the ``scoring_view`` trust rule rejects as
-    untrustworthy. Returning the queue's taken count yields a faithful
-    coverage figure: every file that was actually dispatched to an agent.
-    """
-    try:
-        data = json.loads(queue_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        return 0
-    taken = data.get("taken") if isinstance(data, dict) else None
-    if not isinstance(taken, list):
-        return 0
-    total = 0
-    for entry in taken:
-        files = entry.get("files") if isinstance(entry, dict) else None
-        if isinstance(files, list):
-            total += len(files)
-    return total
-
-
-def _read_project_source_file_count(reports_dir: str, project: str) -> int:
-    """Read ``scan.json`` total_files for the project. Returns 0 on failure."""
-    scan_path = Path(reports_dir) / project / "scan.json"
-    try:
-        data = json.loads(scan_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        return 0
-    raw = data.get("total_files") if isinstance(data, dict) else None
-    return int(raw) if isinstance(raw, int) else 0
-
-
-def _score_completed_evidence(reports_dir: str, job: dict) -> None:
-    """Score any dimensions that have evidence but no evaluation report.
-
-    Called after cancellation so completed dimensions are preserved in the
-    dashboard even when the overall run was cancelled.
-
-    Populates ``files_read`` from the dim's queue.json (count of dispatched
-    files) and ``source_file_count`` from the project's scan.json. Without
-    these, the scored eval has ``filesRead: 0``, which ``scoring_view``'s
-    trust rule rejects — the user sees the cancelled run's data fall
-    through to an older run's stale value despite real findings on disk.
-    """
-    project = job.get("outputProject")
-    run_id = job.get("outputRunId")
-    if not project or not run_id:
-        return
-
-    _log = _logger
-
-    evidence_dir = Path(reports_dir) / project / run_id / "evidence"
-    evaluation_dir = Path(reports_dir) / project / run_id / "evaluation"
-    if not evidence_dir.is_dir():
-        return
-
-    evaluation_dir.mkdir(parents=True, exist_ok=True)
-    source_file_count = _read_project_source_file_count(reports_dir, project)
-    params = load_params()
-    # Same standard dirs as a completed run's scoring, so off-standard
-    # findings are quarantined here too instead of entering the grade.
-    from quodeq.services.evidence_rescore import standard_dirs  # noqa: PLC0415
-    compiled_dir, evaluators_dir = standard_dirs()
-
-    from quodeq.data.fs.dimensions_state_store import read_dimensions
-    dim_states = read_dimensions(Path(reports_dir) / project / run_id).get("dimensions", {})
-
-    for jsonl_path in evidence_dir.glob("*_evidence.jsonl"):
-        dim_id = jsonl_path.name.replace("_evidence.jsonl", "")
-        eval_file = evaluation_dir / f"{dim_id}.json"
-        if eval_file.exists():
-            continue  # already scored
-        if dim_states.get(dim_id, {}).get("state") == "incomplete":
-            _logger.info("Skipping scoring for incomplete dim %s", dim_id)
-            continue
-        if jsonl_path.stat().st_size == 0:
-            continue  # no findings
-        # Only score dimensions that passed verification (analysis queue exists)
-        queue_file = evidence_dir / f"{dim_id}_queue.json"
-        if not queue_file.exists():
-            continue  # verification not completed for this dimension
-
-        files_read = _read_queue_files_count(queue_file)
-        try:
-            evidence = parse_jsonl_to_evidence(jsonl_path, EvidenceContext(
-                language="", repository="", date_str="",
-                source_file_count=source_file_count, files_read=files_read,
-            ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir)
-            if evidence is None:
-                continue
-            scores = score_evidence(evidence, mode="numerical", params=params)
-            write_dimension_report(evidence, scores, dim_id, evaluation_dir)
-            _log.info(
-                "Scored cancelled dimension '%s' for run %s (files_read=%d)",
-                dim_id, run_id[:8], files_read,
-            )
-        except (OSError, json.JSONDecodeError, ValueError, KeyError) as exc:
-            _log.debug("Could not score cancelled dimension '%s': %s", dim_id, exc)

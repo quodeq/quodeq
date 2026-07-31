@@ -49,7 +49,7 @@ def test_post_projects_url_with_clone_dest_returns_real_scan(client, tmp_path):
         return uuid
 
     with patch(
-        "quodeq.services.evaluation_mixin._register_project", side_effect=fake_register
+        "quodeq.services.project_registration.register_project", side_effect=fake_register
     ):
         resp = client.post(
             "/api/projects",
@@ -79,7 +79,7 @@ def test_post_projects_url_ephemeral_skips_clone_dest(client, tmp_path):
         return uuid
 
     with patch(
-        "quodeq.services.evaluation_mixin._register_project", side_effect=fake_register
+        "quodeq.services.project_registration.register_project", side_effect=fake_register
     ):
         resp = client.post(
             "/api/projects",
@@ -97,7 +97,7 @@ def test_post_projects_rejects_metadata_endpoint_ssrf(client):
     with 400 and never reaches git clone."""
     clone_calls = []
     with patch(
-        "quodeq.services.evaluation_mixin.run_git_clone",
+        "quodeq.services.project_registration.run_git_clone",
         side_effect=lambda url, dest: clone_calls.append(url),
     ):
         resp = client.post(

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 from quodeq.shared._env import _env_int
-from quodeq.shared.constants import _DEFAULT_TIME_LIMIT
+from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 
 if TYPE_CHECKING:
     from quodeq.analysis._types import RunConfig
@@ -33,7 +33,7 @@ class AnalysisConfig:
     ai_model: str | None = None
     max_turns: int | None = _DEFAULT_MAX_TURNS
     max_duration: int | None = _DEFAULT_MAX_DURATION
-    time_limit: int = _DEFAULT_TIME_LIMIT
+    time_limit: int = DEFAULT_TIME_LIMIT
     deadline_at: float | None = None
     """Absolute monotonic-clock deadline for the whole run. None = unlimited."""
     compiled_dir: Path | None = None

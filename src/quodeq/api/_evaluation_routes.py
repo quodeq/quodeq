@@ -21,7 +21,7 @@ from quodeq.core.types import to_camel_dict
 from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.api.routes import _reports_dir
 from quodeq.services.base import ActionProvider
-from quodeq.services.evaluation_mixin import _score_completed_evidence
+from quodeq.services.score_run import score_completed_evidence
 from quodeq.services.scan_progress import build_scan_progress
 from quodeq.services.run_events import read_dimensions
 from quodeq.shared.utils import is_repo_url
@@ -190,7 +190,7 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
 
             def _score_in_bg(reports_dir: str, score_args: dict) -> None:
                 try:
-                    _score_completed_evidence(reports_dir, score_args)
+                    score_completed_evidence(reports_dir, score_args)
                 except Exception as exc:
                     _logger.debug(
                         "Could not score cancelled dimension for %s: %s",

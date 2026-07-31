@@ -19,6 +19,8 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.services.dismissed import load_dismissed
+from quodeq.services.suppression_keys import is_deleted
 from quodeq.core.events.models import (
     FindingUndismissed,
     FindingUndismissedEvent,
@@ -123,8 +125,6 @@ def delete_all_dismissed(project_dir: Path) -> int:
     undismisses all of them via the action log.
     Returns the count of dismissed entries removed.
     """
-    from quodeq.services.dismissed import load_dismissed  # noqa: PLC0415
-
     with _locked(project_dir):
         dismissed_entries = load_dismissed(project_dir)
         if not dismissed_entries:
@@ -204,8 +204,6 @@ def is_finding_deleted(
     file: str,
 ) -> bool:
     """Return True if ``(dimension, principle, file)`` is in *deleted*."""
-    from quodeq.services.suppression import is_deleted  # noqa: PLC0415
-
     return is_deleted(deleted, dimension=dimension, principle=principle, file=file)
 
 

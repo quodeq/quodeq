@@ -340,7 +340,7 @@ class TestScoringSkipsIncompleteDim:
         """A run with one done dim + one incomplete dim writes a summary
         that includes only the done dim's report. The incomplete dim is
         NOT scored as 0 / NA."""
-        from quodeq.services.evaluation_mixin import _score_completed_evidence
+        from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
 
         reports = tmp_path / "reports"
         run = reports / "proj" / "run-1"
