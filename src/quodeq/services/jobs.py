@@ -276,7 +276,10 @@ class JobManager:
         elif phase in ("analyzing", "scoring"):
             job.current_dimension = marker.get("dimension")
             job.phase = phase
-        elif phase == "analyzing_start":
+        elif phase in ("analyzing_start", "deadline_extended"):
+            # deadline_extended: the pool auto-scale ratcheted the run
+            # deadline forward; the watchdog must follow or it kills a
+            # healthy run at the original deadline.
             job.deadline_at = marker.get("deadline_at")
         elif phase == "report_path":
             project = marker.get("project")

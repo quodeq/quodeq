@@ -520,6 +520,10 @@ def _run_pipeline_with_cleanup(
                             datetime.now(timezone.utc) + timedelta(seconds=budget_s)
                         ).isoformat()
                         lifecycle.set_deadline(deadline_iso)
+                        # Let the pool auto-scale push the deadline outward
+                        # in status.json too, so the dashboard countdown and
+                        # exit-reason labeling track the granted budget.
+                        config.options.on_deadline_extended = lifecycle.set_deadline
                     result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
                     # If the loops broke out on --max-duration, the pipeline
                     # returns cleanly with no exception. Tag the lifecycle so

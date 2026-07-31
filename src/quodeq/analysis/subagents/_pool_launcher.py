@@ -2,15 +2,18 @@
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis._runner_markers import emit_marker
+from quodeq.analysis._types import AnalysisOptions, RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
-from quodeq.shared.logging import log_info
+from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.utils import get_ai_cmd
 
 _MAX_FILES_PER_AGENT = 30
@@ -45,6 +48,34 @@ def _resolve_time_limit(user_budget: int | None, queue_size: int) -> int:
         return base
     needed = queue_size * _SECONDS_PER_FILE_AUTOSCALE
     return min(_MAX_AUTO_POOL_BUDGET, max(base, needed))
+
+
+def _extend_run_deadline(options: AnalysisOptions, time_limit: int) -> None:
+    """Ratchet the run-level deadline forward to cover this pool's budget.
+
+    The granted (possibly auto-scaled) pool budget can exceed the run
+    deadline computed from the user's original limit; without this, the
+    job watchdog SIGTERMs a healthy run at original-limit+grace while the
+    pool believes it has hours left. Never shortens the deadline, and
+    leaves unlimited runs (no deadline) alone. Emits a marker so the job
+    watchdog follows, and notifies the lifecycle (via the CLI-wired
+    callback) so status.json and the dashboard countdown follow too.
+    """
+    if time_limit == _UNLIMITED_BUDGET or options.deadline_at is None:
+        return
+    new_deadline = time.monotonic() + time_limit
+    if new_deadline <= options.deadline_at:
+        return
+    options.deadline_at = new_deadline
+    new_iso = (
+        datetime.now(timezone.utc) + timedelta(seconds=time_limit)
+    ).isoformat()
+    emit_marker("deadline_extended", deadline_at=new_iso, budget_s=time_limit)
+    if options.on_deadline_extended is not None:
+        try:
+            options.on_deadline_extended(new_iso)
+        except Exception as exc:  # noqa: BLE001 — a status write must not kill the launch
+            log_warning(f"deadline extension notify failed: {exc}")
 
 
 def _compute_files_per_agent(total_files: int) -> int:
@@ -86,6 +117,10 @@ def _launch_pool(
             f"  [{dim_id}] Time limit auto-scaled: {base_user_budget}s → {time_limit}s"
             f" for {queue_size} files"
         )
+    # Must happen BEFORE base_ac is built: the pool snapshots deadline_at,
+    # and every deadline consumer (watchdog, drain checks, dashboard
+    # countdown) must agree on the granted budget, not the pre-scale one.
+    _extend_run_deadline(config.options, time_limit)
     base_ac = AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,

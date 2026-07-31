@@ -41,3 +41,24 @@ def test_to_dict_includes_deadline_at():
     job.deadline_at = "2026-05-02T10:00:00+00:00"
     snapshot = job.to_dict()
     assert snapshot.deadline_at == "2026-05-02T10:00:00+00:00"
+
+
+def test_deadline_extended_marker_updates_deadline_on_job():
+    """The pool auto-scale emits deadline_extended mid-run; the watchdog's
+    deadline must follow it, else it kills a healthy run at the ORIGINAL
+    deadline while the pool believes it has hours left."""
+    job = _job()
+    first = (datetime.now(timezone.utc) + timedelta(seconds=60)).isoformat()
+    JobManager._apply_marker(
+        job, json.dumps({"_cc": "analyzing_start", "deadline_at": first, "budget_s": 60})
+    )
+    extended = (datetime.now(timezone.utc) + timedelta(seconds=7200)).isoformat()
+
+    JobManager._apply_marker(
+        job,
+        json.dumps(
+            {"_cc": "deadline_extended", "deadline_at": extended, "budget_s": 7200}
+        ),
+    )
+
+    assert job.deadline_at == extended
