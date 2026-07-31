@@ -27,8 +27,15 @@ LAYER_RULES = {
     # context/ compiles cross-run knowledge (precedents, project shape) for the
     # analysis pipeline; llm_bridge access is for the embeddings client only.
     "context": {"core", "data", "llm_bridge"},
+    # shared/ is cross-cutting FOR OTHERS to import; itself it may import
+    # nothing but stdlib (ARCHITECTURE.md: "None (stdlib only)").
+    "shared": set(),
 }
 CROSS_CUTTING = {"shared", "config"}
+# Strict layers get NO blanket cross-cutting allowance: core/ must not import
+# shared/config (burn-down: WS4 of the clean-architecture roadmap), and
+# shared/ must not import anything. Grandfathered cases live in the baseline.
+STRICT_LAYERS = {"core", "shared"}
 IMPORT_RE = re.compile(
     r"^\s*(?:from\s+quodeq\.(\w+)|import\s+quodeq\.(\w+))"
 )
@@ -46,7 +53,9 @@ def source_layer(path: Path) -> str | None:
 def check_file(path: Path, layer: str) -> list[tuple[int, str, str]]:
     """Return list of (lineno, target_layer, line) violations."""
     violations = []
-    allowed = LAYER_RULES[layer] | CROSS_CUTTING | {layer}
+    allowed = LAYER_RULES[layer] | {layer}
+    if layer not in STRICT_LAYERS:
+        allowed |= CROSS_CUTTING
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeDecodeError) as e:

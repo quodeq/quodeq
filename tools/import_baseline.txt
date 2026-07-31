@@ -8,6 +8,11 @@ src/quodeq/api/import_project.py:32:data
 src/quodeq/api/import_project.py:33:data
 src/quodeq/api/llm_bridge_routes.py:8:llm_bridge
 src/quodeq/api/routes_project_list.py:275:analysis
+src/quodeq/core/evidence/_jsonl.py:13:shared
+src/quodeq/core/evidence/parser.py:9:shared
+src/quodeq/core/standards/loader.py:10:shared
+src/quodeq/core/standards/loader.py:9:shared
+src/quodeq/core/standards/refs.py:16:shared
 src/quodeq/data/fs/project_resolver.py:17:services
 src/quodeq/data/fs/repo_clone.py:19:context
 src/quodeq/data/fs/report_parser/runs.py:190:services
@@ -25,3 +30,6 @@ src/quodeq/services/evaluation_mixin.py:540:analysis
 src/quodeq/services/jobs.py:20:analysis
 src/quodeq/services/scan_progress.py:23:analysis
 src/quodeq/services/tooling_mixin.py:17:analysis
+src/quodeq/shared/prereqs.py:10:analysis
+src/quodeq/shared/project_resolver.py:2:data
+src/quodeq/shared/repo_handler.py:2:data
