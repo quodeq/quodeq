@@ -7,6 +7,7 @@ mutual dependencies.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -35,6 +36,10 @@ class AnalysisOptions:
     consolidated: bool = True
     time_limit: int | None = None
     deadline_at: float | None = None
+    # Invoked with the new ISO deadline whenever the pool auto-scale ratchets
+    # ``deadline_at`` forward — wired by the CLI layer to the lifecycle so
+    # status.json (dashboard countdown, exit-reason labeling) follows.
+    on_deadline_extended: Callable[[str], None] | None = None
     incremental: bool = True
     incremental_file_filter: set[str] | None = None
     dry_run: bool = False
