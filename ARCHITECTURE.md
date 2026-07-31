@@ -12,10 +12,10 @@
 | `api/` | HTTP layer: Flask routes, security, rate limiting | core/, services/, update/, assistant/ |
 | `analysis/` | Evaluation pipeline: AI orchestration, subagents, prompts, MCP | core/, engine/, data/, services/, context/ |
 | `dashboard/` | Server/process management: build UI, start API, health checks | services/, api/, update/ |
-| `llm_bridge/` | LLM provider bridge: Ollama, OpenRouter, CLI-tool providers | (not yet covered by import checker) |
+| `llm_bridge/` | LLM provider bridge: Ollama, OpenRouter, CLI-tool providers | (nothing — leaf; one grandfathered analysis import) |
 | `terminal/` | Embedded-terminal PTY backends (Unix pty / Windows ConPTY) + manager | core/ |
 | `update/` | Update-notification subsystem (notify-only; never self-replaces the binary) | None |
-| `ci/` | CI integration: report posting, evidence reading, SARIF export | (not yet covered by import checker) |
+| `ci/` | CI integration: report posting, evidence reading, SARIF export | core/, services/, analysis/, context/ |
 | `context/` | Context enrichment: path-role classification, project shape, precedent fingerprinting | core/, data/, llm_bridge/ |
 | `ui/` | React + Vite dashboard frontend (npm project, served by the Flask API) | n/a (JavaScript) |
 | `shared/` | Cross-cutting utilities: config, logging, env helpers | None (stdlib only) |
@@ -35,11 +35,15 @@ dashboard/     -> services/, api/, update/
 terminal/      -> core/
 update/        -> (nothing)
 context/       -> core/, data/, llm_bridge/
+shared/        -> (nothing; strict — no cross-cutting blanket)
+llm_bridge/    -> (nothing)
+ci/            -> core/, services/, analysis/, context/
 ```
 
 Every checked layer may additionally import stdlib plus the cross-cutting
-`shared/` and `config/` packages. Layers not listed (`llm_bridge/`, `ci/`,
-`ui/`) are not yet covered by the checker.
+`shared/` and `config/` packages. Only `ui/` (JavaScript) and package-root
+modules (`cli.py`, `_cli_*.py`) are outside the checker. `core/` and `shared/`
+are strict: the cross-cutting allowance does not apply to them.
 
 These rules are enforced in CI by `tools/check_imports.py` via `tests/tools/test_import_layers.py`.
 Pre-existing violations are grandfathered in `tools/import_baseline.txt` (a burn-down list: fix
