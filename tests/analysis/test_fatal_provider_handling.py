@@ -314,6 +314,6 @@ class TestLoopFatalMapping:
 
 class TestLifecycleMapping:
     def test_fatal_provider_error_recognised_by_name(self):
-        from quodeq.shared.run_lifecycle import RunLifecycleContext
+        from quodeq.analysis.run_lifecycle import RunLifecycleContext
         assert RunLifecycleContext._is_named_error(FatalProviderError, "FatalProviderError")
         assert not RunLifecycleContext._is_named_error(ValueError, "FatalProviderError")

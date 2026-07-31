@@ -16,7 +16,7 @@ import pytest
 
 from quodeq.services.filesystem import FilesystemActionProvider
 from quodeq.data.sqlite.run_index import open_index
-from quodeq.shared.run_status import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, write_status
 
 
 def _make_run_dir(reports: Path, project: str, run_id: str) -> Path:

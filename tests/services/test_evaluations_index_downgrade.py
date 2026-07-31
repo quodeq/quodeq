@@ -16,7 +16,7 @@ from pathlib import Path
 from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services._job_model import InMemoryJobStore
 from quodeq.services.jobs import JobManager
-from quodeq.shared.run_status import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, write_status
 
 
 def _seed_run(reports_root: Path, project: str, run_id: str) -> None:

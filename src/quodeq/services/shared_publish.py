@@ -28,8 +28,8 @@ from quodeq.services.shared_repo import (
     refresh_shared_clone,
     run_git,
 )
-from quodeq.shared.dimensions_state import FILENAME as DIMENSIONS_FILENAME
-from quodeq.shared.run_status import STATUS_FILENAME, UnsupportedSchemaError, read_status
+from quodeq.data.fs.dimensions_state_store import FILENAME as DIMENSIONS_FILENAME
+from quodeq.data.fs.run_status_store import STATUS_FILENAME, UnsupportedSchemaError, read_status
 from quodeq.shared.validation import validate_path_segment
 
 logger = logging.getLogger(__name__)

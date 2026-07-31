@@ -20,7 +20,7 @@ from quodeq.data.fs.grade_formula_store import (  # noqa: F401 — re-exported A
     reset_params,
     save_params,
 )
-from quodeq.shared.run_status import UnsupportedSchemaError, read_status
+from quodeq.data.fs.run_status_store import UnsupportedSchemaError, read_status
 
 _logger = logging.getLogger(__name__)
 

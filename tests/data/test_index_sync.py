@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.shared.run_status import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, write_status
 from quodeq.data.sqlite.run_index import open_index, sync_index
 from quodeq.data.sqlite._index_sync import (
     _is_pid_alive,
@@ -138,7 +138,7 @@ def test_stale_promotion_old_heartbeat_dead_pid(tmp_path: Path) -> None:
         row = db.execute("SELECT state, exit_reason FROM runs WHERE job_id = ?", ("ext-r7",)).fetchone()
         assert row[0] == "cancelled"
         assert row[1] == "stale_detected"
-        from quodeq.shared.run_status import read_status
+        from quodeq.data.fs.run_status_store import read_status
         disk = read_status(run)
         assert disk["state"] == "cancelled"
     finally:
@@ -347,7 +347,7 @@ def test_force_promote_preserves_provider_model_deadline(tmp_path: Path) -> None
         promoted = force_promote_to_cancelled_stale(db, "ext-r11", run_dir=run)
         assert promoted is True
 
-        from quodeq.shared.run_status import read_status
+        from quodeq.data.fs.run_status_store import read_status
         disk = read_status(run)
         assert disk is not None
         assert disk["state"] == "cancelled"

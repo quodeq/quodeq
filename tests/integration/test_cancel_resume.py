@@ -25,7 +25,7 @@ from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis.subagents.runner import DimensionCallbacks
 from quodeq.core.evidence.model import Evidence
 from quodeq.shared import cancellation
-from quodeq.shared.dimensions_state import DimState, read_dimensions, write_dim_state
+from quodeq.data.fs.dimensions_state_store import DimState, read_dimensions, write_dim_state
 
 
 # ---------------------------------------------------------------------------

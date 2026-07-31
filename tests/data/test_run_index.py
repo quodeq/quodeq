@@ -127,7 +127,7 @@ def test_get_index_db_path_default_and_env(tmp_path, monkeypatch) -> None:
     assert Path(get_index_db_path()) == tmp_path / "custom.db"
 
 
-from quodeq.shared.run_status import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, write_status
 from quodeq.data.sqlite.run_index import (
     get_run, list_runs, rebuild_index, sync_index, sync_index_for_run,
 )

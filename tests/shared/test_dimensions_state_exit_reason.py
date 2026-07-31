@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.shared.dimensions_state import DimState, read_dimensions, write_dim_state
+from quodeq.data.fs.dimensions_state_store import DimState, read_dimensions, write_dim_state
 
 
 def test_write_dim_state_persists_exit_reason_on_done(tmp_path: Path):

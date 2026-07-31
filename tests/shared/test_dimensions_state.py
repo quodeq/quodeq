@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.shared.dimensions_state import (
+from quodeq.data.fs.dimensions_state_store import (
     DimState,
     IllegalDimTransitionError,
     read_dimensions,

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.shared.run_status import (
+from quodeq.data.fs.run_status_store import (
     RunState,
     TERMINAL_STATES,
     UnsupportedSchemaError,

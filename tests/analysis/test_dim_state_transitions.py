@@ -8,7 +8,7 @@ import pytest
 from quodeq.analysis._loops import run_per_dimension_loop, run_incremental_loop
 from quodeq.analysis._types import RunConfig, AnalysisOptions
 from quodeq.shared import cancellation
-from quodeq.shared.dimensions_state import read_dimensions
+from quodeq.data.fs.dimensions_state_store import read_dimensions
 
 
 @pytest.fixture(autouse=True)
@@ -225,8 +225,8 @@ class TestRunDirResolution:
 
     def test_loop_state_lands_where_lifecycle_seeds(self, tmp_path: Path):
         """End-to-end: lifecycle seeds + loop transitions write to ONE file."""
-        from quodeq.shared.run_lifecycle import RunLifecycleContext
-        from quodeq.shared.dimensions_state import DimState, read_dimensions
+        from quodeq.analysis.run_lifecycle import RunLifecycleContext
+        from quodeq.data.fs.dimensions_state_store import DimState, read_dimensions
 
         run_dir = tmp_path / "run"
         evidence_dir = run_dir / "evidence"

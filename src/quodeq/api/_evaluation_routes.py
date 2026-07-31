@@ -23,7 +23,7 @@ from quodeq.api.routes import _reports_dir
 from quodeq.services.base import ActionProvider
 from quodeq.services.evaluation_mixin import _score_completed_evidence
 from quodeq.services.scan_progress import build_scan_progress, progress_to_dict
-from quodeq.shared.dimensions_state import read_dimensions
+from quodeq.services.run_events import read_dimensions
 from quodeq.shared.utils import is_repo_url
 
 _logger = logging.getLogger(__name__)

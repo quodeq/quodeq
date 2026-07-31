@@ -8,7 +8,7 @@ from quodeq.data.projection.grade_projector import (
     recompute_grades,
 )
 from quodeq.data.sqlite.state_store import SQLiteStateStore
-from quodeq.shared.dimensions_state import DimState, write_dim_state
+from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
 
 
 def test_read_source_file_count_skips_non_dict_json(tmp_path: Path) -> None:
