@@ -8,7 +8,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable
 
-from quodeq.services.ports import RunInfo, read_run_data
+from quodeq.data.fs.report_parser.runs import RunInfo, read_run_data
 from quodeq.core.types import DimensionResult
 
 # Files whose contents feed read_run_data for a single run. A completed run is

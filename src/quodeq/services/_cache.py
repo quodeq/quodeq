@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from quodeq.services.ports import read_run_data
+from quodeq.data.fs.report_parser.runs import read_run_data
 from quodeq.core.types import DimensionResult
 
 _logger = logging.getLogger(__name__)

@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 
 from quodeq.services.accumulated import _build_accumulated_for_runs
-from quodeq.services.ports import RunInfo
+from quodeq.data.fs.report_parser.runs import RunInfo
 
 
 def _write_eval(run_dir: Path, name: str, score: str, grade: str) -> None:

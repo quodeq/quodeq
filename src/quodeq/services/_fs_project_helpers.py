@@ -15,7 +15,7 @@ from quodeq.services._fs_metadata import (
     _read_language_stats,
     _read_repo_info,
 )
-from quodeq.services.ports import RunInfo
+from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.shared.utils import _env_int
 
 

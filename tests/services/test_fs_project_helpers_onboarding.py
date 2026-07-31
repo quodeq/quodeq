@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 
 from quodeq.services._fs_project_helpers import _build_project_entry
-from quodeq.services.ports import RunInfo
+from quodeq.data.fs.report_parser.runs import RunInfo
 
 
 def _make_project(tmp_path: Path, name: str = "proj-1", *, onboarding=None) -> Path:

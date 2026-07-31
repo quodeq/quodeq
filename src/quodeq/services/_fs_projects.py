@@ -21,7 +21,7 @@ from quodeq.services._fs_project_helpers import (
     _build_project_entry,
     _max_projects_listed,
 )
-from quodeq.services.ports import list_runs, safe_read_dir
+from quodeq.data.fs.report_parser.runs import list_runs, safe_read_dir
 from quodeq.data.fs.repo_handler import is_valid_repo_url
 from quodeq.shared.utils import is_repo_url
 
