@@ -30,6 +30,12 @@ LAYER_RULES = {
     # shared/ is cross-cutting FOR OTHERS to import; itself it may import
     # nothing but stdlib (ARCHITECTURE.md: "None (stdlib only)").
     "shared": set(),
+    # llm_bridge talks to LLM providers only; app knowledge flows TO it, not
+    # from it. Its one analysis import is grandfathered (burn-down: WS2/WS5).
+    "llm_bridge": set(),
+    # ci/ is a delivery mechanism (like api/): it may orchestrate services and
+    # read evaluation output, but nothing imports ci/.
+    "ci": {"core", "services", "analysis", "context"},
 }
 CROSS_CUTTING = {"shared", "config"}
 # Strict layers get NO blanket cross-cutting allowance: core/ must not import

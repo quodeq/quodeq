@@ -41,3 +41,22 @@ def test_shared_may_import_itself(tmp_path):
     f = tmp_path / "mod.py"
     f.write_text("from quodeq.shared.constants import DEFAULT_TIMEOUT\n", encoding="utf-8")
     assert check_imports.check_file(f, "shared") == []
+
+
+def test_llm_bridge_is_a_leaf_layer():
+    assert check_imports.LAYER_RULES["llm_bridge"] == set()
+
+
+def test_ci_layer_rule():
+    assert check_imports.LAYER_RULES["ci"] == {"core", "services", "analysis", "context"}
+
+
+def test_llm_bridge_may_import_shared_but_not_services(tmp_path):
+    f = tmp_path / "mod.py"
+    f.write_text(
+        "from quodeq.shared.utils import read_json\n"
+        "from quodeq.services.jobs import start_job\n",
+        encoding="utf-8",
+    )
+    violations = check_imports.check_file(f, "llm_bridge")
+    assert [target for _lineno, target, _line in violations] == ["services"]
