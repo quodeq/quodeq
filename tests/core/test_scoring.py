@@ -3,7 +3,7 @@ from __future__ import annotations
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
 from quodeq.core.scoring.engine import score_evidence
 
-from tests.engine.conftest import make_evidence_with_confidence
+from tests._evidence_helpers import make_evidence_with_confidence
 
 _TEST_FILE = "a.ts"
 _TEST_SNIPPET = "eval(x)"

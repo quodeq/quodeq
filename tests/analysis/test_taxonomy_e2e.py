@@ -14,7 +14,7 @@ import pytest
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.core.scoring.engine import score_evidence
 
-from tests.engine.conftest import _evidence_line
+from tests._evidence_helpers import _evidence_line
 
 
 def test_taxonomy_used_on_parse_then_score(tmp_path):

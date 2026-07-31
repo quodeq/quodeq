@@ -8,12 +8,12 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
-from quodeq.engine.scoring_pipeline import run_full
+from quodeq.analysis.scoring_pipeline import run_full
 from quodeq.analysis.runner import run, RunConfig, EvaluationError
 from quodeq.analysis._types import AnalysisOptions
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
-from tests.engine.conftest import _evidence_line
+from tests._evidence_helpers import _evidence_line
 
 
 def _make_universal_config(base: Path) -> dict:

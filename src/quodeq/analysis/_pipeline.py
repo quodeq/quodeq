@@ -16,7 +16,7 @@ from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.analysis.subprocess import _get_provider_type
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.merge import merge_evidence
-from quodeq.engine._runner_markers import emit_marker
+from quodeq.analysis._runner_markers import emit_marker
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.utils import get_ai_cmd
 

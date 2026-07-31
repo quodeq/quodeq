@@ -9,8 +9,8 @@ import pytest
 
 from quodeq.analysis.subprocess import AnalysisConfig, _build_ai_cmd
 from quodeq.analysis.stream.parser import _extract_jsonl_from_text, extract_evidence_from_stream
-from quodeq.engine.stream_validation import is_stream_valid
-from tests.engine.conftest import _evidence_line
+from quodeq.analysis.stream.validation import is_stream_valid
+from tests._evidence_helpers import _evidence_line
 
 
 # ---------------------------------------------------------------------------

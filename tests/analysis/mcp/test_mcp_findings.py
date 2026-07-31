@@ -9,10 +9,10 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.engine import mcp_findings
+from quodeq.analysis.mcp import findings_server as mcp_findings
 from quodeq.core.standards.refs import load_compiled_refs
 
-from tests.engine.conftest import _make_request, _run_server
+from tests._evidence_helpers import _make_request, _run_server
 
 _JSONRPC_METHOD_NOT_FOUND = -32601
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.analysis.report import write_dimension_report
 from quodeq.analysis.runner import RunConfig, run_per_dimension
-from quodeq.engine._runner_markers import cleanup_stream
+from quodeq.analysis._runner_markers import cleanup_stream
 from quodeq.services.grade_formula import load_params
 
 _NUMERICAL_MODE = "numerical"

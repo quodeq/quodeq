@@ -13,7 +13,7 @@ from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
 from quodeq.analysis.subagents.runner import DimensionCallbacks
 from quodeq.core.evidence.model import Evidence
-from quodeq.engine._runner_markers import emit_marker
+from quodeq.analysis._runner_markers import emit_marker
 from quodeq.shared.logging import log_info, log_success, log_warning
 
 

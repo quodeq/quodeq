@@ -11,7 +11,7 @@ from quodeq.core.evidence.parser import (
     parse_jsonl_to_evidence,
 )
 
-from tests.engine.conftest import _evidence_line
+from tests._evidence_helpers import _evidence_line
 
 
 
