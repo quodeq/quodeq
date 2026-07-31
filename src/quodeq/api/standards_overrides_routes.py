@@ -17,10 +17,12 @@ from quodeq.api.helpers import error_response
 from quodeq.shared.validation import validate_path_segment
 from quodeq.core.standards.overrides import (
     OVERRIDES_RELPATH,
-    collect_declared_params,
     dimension_params,
-    load_project_overrides,
     validate_overrides,
+)
+from quodeq.services.standards_prefs import (
+    collect_declared_params,
+    load_project_overrides,
 )
 
 logger = logging.getLogger(__name__)

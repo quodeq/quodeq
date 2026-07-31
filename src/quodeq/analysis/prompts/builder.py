@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from quodeq.analysis.prompts import _context as ctx
-from quodeq.core.standards.overrides import load_project_overrides
+from quodeq.data.fs.standards_prefs import load_project_overrides
 from quodeq.analysis.prompts._renderers import (
     _load_dimension_data,
     render_compiled_standards,

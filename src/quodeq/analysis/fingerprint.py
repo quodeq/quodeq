@@ -20,8 +20,8 @@ from quodeq.config.paths import default_paths
 from quodeq.core.standards.overrides import (
     OVERRIDES_RELPATH,
     dimension_params,
-    load_project_overrides,
 )
+from quodeq.data.fs.standards_prefs import load_project_overrides
 
 _HASH_CHUNK_SIZE = 1 << 16  # 64 KiB
 

@@ -28,7 +28,7 @@ this one still runs.
 import json
 
 from quodeq.assistant.tools import ToolContext, build_registry
-from quodeq.core.standards.visibility import load_visible_standard_ids, save_visible_standard_ids
+from quodeq.data.fs.standards_prefs import load_visible_standard_ids, save_visible_standard_ids
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 # Accumulated (cross-run) payload backing get_overview/get_scores/get_violations

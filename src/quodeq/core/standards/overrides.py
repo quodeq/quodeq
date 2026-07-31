@@ -10,7 +10,6 @@ Invalid entries are skipped with a warning; a bad file never fails analysis.
 """
 from __future__ import annotations
 
-import json
 import logging
 import re
 from pathlib import Path
@@ -19,25 +18,6 @@ _logger = logging.getLogger(__name__)
 
 OVERRIDES_RELPATH = Path(".quodeq") / "standards-overrides.json"
 _PLACEHOLDER_RE = re.compile(r"\{([a-z_][a-z0-9_]*)\}")
-
-
-def load_project_overrides(project_root: str | Path | None) -> dict[str, dict]:
-    """Load ``{req_id: {param: value}}``; ``{}`` when absent or malformed."""
-    if not project_root:
-        return {}
-    path = Path(project_root) / OVERRIDES_RELPATH
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, UnicodeDecodeError) as exc:
-        _logger.warning("Ignoring malformed standards overrides %s: %s", path, exc)
-        return {}
-    overrides = data.get("overrides") if isinstance(data, dict) else None
-    if not isinstance(overrides, dict):
-        _logger.warning("Ignoring standards overrides %s: no 'overrides' object", path)
-        return {}
-    return {req_id: vals for req_id, vals in overrides.items() if isinstance(vals, dict)}
 
 
 def _is_valid(value: object, spec: dict) -> bool:
@@ -102,21 +82,6 @@ def dimension_params(
             if diff:
                 non_default[req_id] = diff
     return effective, non_default
-
-
-def collect_declared_params(compiled_dir: Path) -> dict[str, dict]:
-    """Collect ``{req_id: params_spec}`` across every compiled dimension file."""
-    declared: dict[str, dict] = {}
-    for path in sorted(Path(compiled_dir).glob("*.json")):
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError, UnicodeDecodeError):
-            continue
-        for principle in data.get("principles", []):
-            for req in principle.get("requirements", []):
-                if req.get("id") and req.get("params"):
-                    declared[req["id"]] = req["params"]
-    return declared
 
 
 def validate_overrides(raw: object, declared: dict[str, dict]) -> tuple[dict, list[str]]:

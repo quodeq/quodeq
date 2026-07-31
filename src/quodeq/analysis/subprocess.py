@@ -409,7 +409,7 @@ def _run_api_analysis_bridge(
     if source_files is None:
         return
 
-    from quodeq.core.standards.overrides import load_project_overrides  # noqa: PLC0415
+    from quodeq.data.fs.standards_prefs import load_project_overrides  # noqa: PLC0415
 
     overrides = load_project_overrides(work_dir)
     standards_text = _load_standards_text(cfg.compiled_dir, cfg.dimension, overrides=overrides)

@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from quodeq.core.standards.visibility import load_visible_standard_ids
+from quodeq.data.fs.standards_prefs import load_visible_standard_ids
 from quodeq.services.ports import RunInfo, read_run_data, safe_read_dir, summarize_dimensions
 from quodeq.shared.validation import validate_path_segment
 

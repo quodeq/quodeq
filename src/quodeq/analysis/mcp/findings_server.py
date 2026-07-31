@@ -20,7 +20,7 @@ from quodeq.core.standards.refs import load_compiled_refs as _load_compiled_refs
 from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
 from quodeq.core.standards.refs import load_compiled_requirements as _load_compiled_requirements
-from quodeq.core.standards.overrides import load_project_overrides
+from quodeq.data.fs.standards_prefs import load_project_overrides
 
 # Re-export public API so existing imports keep working.
 from quodeq.analysis.mcp.enricher import CompiledContext, FileReader  # noqa: F401

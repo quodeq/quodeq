@@ -11,7 +11,7 @@ from flask import Flask, current_app
 from quodeq.assistant import AssistantRepository
 from quodeq.assistant.tools import ToolContext
 from quodeq.assistant import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
-from quodeq.core.standards.visibility import load_visible_standard_ids
+from quodeq.services.standards_prefs import load_visible_standard_ids
 from quodeq.services._fs_projects import get_project_info
 from quodeq.services.shared_repo import (
     read_state,
