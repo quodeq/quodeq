@@ -11,6 +11,7 @@ import sqlite3
 from dataclasses import replace
 from pathlib import Path
 
+from quodeq.services.suppression_keys import is_dismissed
 from quodeq.core.events.models import (
     EventType,
     FindingDismissed,
@@ -274,8 +275,6 @@ def filter_dismissed_from_dimensions(
     Recalculates totals for any dimension whose violations were filtered.
     Leaves compliance, principles, overall_score, overall_grade unchanged.
     """
-    from quodeq.services.suppression import is_dismissed  # noqa: PLC0415
-
     keys = dismissed_keys(project_dir)
     if not keys:
         return dimensions
