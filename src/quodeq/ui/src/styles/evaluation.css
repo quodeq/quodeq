@@ -2860,6 +2860,12 @@ button.eval-provider-badge--clickable:focus-visible {
   color: var(--color-sev-critical-text, #f85149);
   border-bottom: 1px solid var(--color-border-soft, var(--color-border));
 }
+/* Raw log line under the labelled reason: keep it readable but secondary. */
+.scan-progress__error-detail {
+  margin-top: 4px;
+  font-size: 10px;
+  opacity: 0.75;
+}
 
 
 .scan-progress__bar {

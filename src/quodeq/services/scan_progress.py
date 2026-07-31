@@ -60,6 +60,10 @@ class _ScanProgress:
     # The time limit is one deadline for the whole run, shared across all
     # selected dimensions — never a per-dimension allowance.
     budget_s: int | None = None
+    # Run-level exit_reason from status.json (e.g. "provider_fatal",
+    # "failure_streak"). Lets the UI say WHY a failed run stopped instead of
+    # only that it did.
+    exit_reason: str | None = None
     dimensions: list[_DimProgress] = field(default_factory=list)
 
 
@@ -352,6 +356,7 @@ def build_scan_progress(
             project_files=project_files,
             total_elapsed_s=total_elapsed_s,
             budget_s=run_budget_s,
+            exit_reason=status.get("exit_reason"),
             dimensions=[_consolidated_dim_progress(run_dir)],
         )
 
@@ -372,7 +377,12 @@ def build_scan_progress(
             has_evaluation=eval_path.is_file(),
         )
         record = dim_records.get(dim_id) if isinstance(dim_records, dict) else None
-        exit_reason = record.get("exit_reason") if isinstance(record, dict) else None
+        # DONE dims carry `exit_reason`; INCOMPLETE dims carry `reason`
+        # (e.g. "provider_fatal", "cancelled_signal"). Fall back so an
+        # interrupted dim still tells the UI why it stopped.
+        exit_reason = None
+        if isinstance(record, dict):
+            exit_reason = record.get("exit_reason") or record.get("reason")
 
         if queue is not None:
             # `taken` is a list of batch entries [{"files": [...], "agent": ..., "ts": ...}, ...].
@@ -438,6 +448,7 @@ def build_scan_progress(
         project_files=project_files,
         total_elapsed_s=total_elapsed_s,
         budget_s=run_budget_s,
+        exit_reason=status.get("exit_reason"),
         dimensions=dim_results,
     )
 

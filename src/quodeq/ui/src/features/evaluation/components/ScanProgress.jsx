@@ -7,6 +7,7 @@ import { SectionLabel } from '../../../components/terminal/index.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useRunElapsed } from '../hooks/useRunElapsed.js';
 import { formatDuration, formatDurationCoarse } from '../../../utils/formatters.js';
+import { exitReasonInfo, exitReasonLabel, exitReasonHint } from '../../../models/exitReason.js';
 
 const TERMINAL_STATES = new Set(['done', 'failed', 'cancelled']);
 const STATUS_MARKERS = { arrow: '→', check: '✓', error: 'Error:', failed: 'failed' };
@@ -69,8 +70,9 @@ function DimRow({ dim }) {
   } else if (isDone) {
     const coveragePct = total > 0 ? Math.round((taken / total) * 100) : null;
     const isPartial = typeof dim.exitReason === 'string' && dim.exitReason !== 'done';
+    const hint = exitReasonHint(dim.exitReason);
     const partialTooltip = isPartial
-      ? `stopped: ${dim.exitReason} · ${taken} of ${total} files`
+      ? `stopped: ${exitReasonLabel(dim.exitReason)} · ${taken} of ${total} files${hint ? ` · ${hint}` : ''}`
       : undefined;
     meta = (
       <>
@@ -181,8 +183,22 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   }
 
   // Failed / lost: show the error message inline above the progress bar.
+  // When the run recorded a recognised exit reason (status.json, surfaced
+  // through the progress payload), lead with the human label and the
+  // actionable hint; keep the raw log line underneath as the detail.
+  const failInfo = exitReasonInfo(progress?.exitReason);
+  const failDetail = lastRelevantLog(job.logs);
   const errorBanner = isFailed
-    ? <div className="scan-progress__error">{lastRelevantLog(job.logs) || 'Analysis failed'}</div>
+    ? (
+      <div className="scan-progress__error">
+        {failInfo ? (
+          <>
+            <div><strong>{failInfo.label}</strong>{failInfo.hint && <> · {failInfo.hint}</>}</div>
+            {failDetail && <div className="scan-progress__error-detail">{failDetail}</div>}
+          </>
+        ) : (failDetail || 'Analysis failed')}
+      </div>
+    )
     : isLost
       ? <div className="scan-progress__error">Server restarted, job tracking lost</div>
       : null;

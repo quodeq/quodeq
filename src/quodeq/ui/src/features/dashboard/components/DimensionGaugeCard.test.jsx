@@ -61,7 +61,7 @@ describe('DimensionGaugeCard', () => {
       );
     });
 
-    it('appends "stopped: <exitReason>" to the tooltip when exitReason is set', () => {
+    it('appends "stopped: <label> · <hint>" to the tooltip when exitReason is set', () => {
       render(
         <DimensionGaugeCard
           item={{
@@ -76,7 +76,8 @@ describe('DimensionGaugeCard', () => {
       );
       const line = screen.getByText(coverageLineMatcher(`${dateLabel} · 28%`));
       expect(line.getAttribute('title')).toBe(
-        'Partial run · 850 of 3,037 files · stopped: deadline',
+        'Partial run · 850 of 3,037 files · stopped: time limit reached · '
+          + 'Raise the time limit or scan fewer dimensions to cover the remaining files.',
       );
     });
 
@@ -95,7 +96,8 @@ describe('DimensionGaugeCard', () => {
       );
       const line = screen.getByText(coverageLineMatcher(`${dateLabel} · 90%`));
       expect(line.getAttribute('title')).toBe(
-        'Partial run · 90 of 100 files · stopped: failure_streak · excluded from grade',
+        'Partial run · 90 of 100 files · stopped: repeated failures · excluded from grade · '
+          + 'Stopped after consecutive agent failures. Check that the AI provider is running and reachable, then run again.',
       );
     });
 
@@ -114,7 +116,8 @@ describe('DimensionGaugeCard', () => {
       );
       const line = screen.getByText(coverageLineMatcher(`${dateLabel} · 100%`));
       expect(line.getAttribute('title')).toBe(
-        'Partial run · 100 of 100 files · stopped: deadline',
+        'Partial run · 100 of 100 files · stopped: time limit reached · '
+          + 'Raise the time limit or scan fewer dimensions to cover the remaining files.',
       );
     });
 
@@ -157,7 +160,8 @@ describe('DimensionGaugeCard', () => {
       );
       const line = screen.getByText(dateLabel);
       expect(line.getAttribute('title')).toBe(
-        'Partial run · stopped: deadline',
+        'Partial run · stopped: time limit reached · '
+          + 'Raise the time limit or scan fewer dimensions to cover the remaining files.',
       );
     });
 
