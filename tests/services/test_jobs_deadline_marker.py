@@ -62,3 +62,15 @@ def test_deadline_extended_marker_updates_deadline_on_job():
     )
 
     assert job.deadline_at == extended
+
+
+def test_watchdog_grace_covers_a_full_drain():
+    """The watchdog exists to reap HUNG runs, never to cut loaded agents.
+    Past the deadline the pool stops dispatching and in-flight calls drain;
+    the longest legitimate in-flight call is one scaled local read timeout
+    (500s x subagents, realistically up to 3). The grace must exceed that,
+    or the watchdog SIGTERMs a healthy drain and the batch's work is lost."""
+    from quodeq.analysis._api_runner import _LOCAL_TIMEOUT
+    from quodeq.services import jobs as jobs_mod
+
+    assert jobs_mod._WATCHDOG_DEADLINE_GRACE_S >= _LOCAL_TIMEOUT.read * 3
