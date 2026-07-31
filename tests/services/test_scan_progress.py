@@ -8,7 +8,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.services.scan_progress import build_scan_progress, progress_to_dict
+from quodeq.core.types import to_camel_dict
+from quodeq.services.scan_progress import build_scan_progress
 
 
 def _write_status(run_dir: Path, *, dimensions: list[str], state: str = "running",
@@ -322,7 +323,7 @@ class TestCoverageFields:
         )
 
         progress = build_scan_progress("j1", run_dir)
-        payload = progress_to_dict(progress)
+        payload = to_camel_dict(progress)
         dim = payload["dimensions"][0]
         assert dim["filesCached"] == 80
         assert dim["filesProjectTotal"] == 100

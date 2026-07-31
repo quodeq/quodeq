@@ -451,18 +451,3 @@ def build_scan_progress(
         exit_reason=status.get("exit_reason"),
         dimensions=dim_results,
     )
-
-
-def progress_to_dict(progress: _ScanProgress) -> dict:
-    """Serialize the dataclass tree to a camelCase dict for jsonify.
-
-    Uses to_camel_dict so dataclass field names like ``exit_reason`` and
-    ``estimate_reason`` become ``exitReason`` and ``estimateReason`` in the
-    JSON the client sees. The route still wraps the result in to_camel_dict;
-    that second pass is a no-op for already-camelCased dicts.
-    """
-    from quodeq.core.types import to_camel_dict
-    result = to_camel_dict(progress)
-    if not isinstance(result, dict):
-        return {}
-    return result
