@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 
 from quodeq.data.actions_log import ACTIONS_LOG_FILENAME
-from quodeq.services.shared_repo import (
+from quodeq.data.fs.shared_repo import (
     MARKER_FILENAME,
     PUBLISHED_META_FILENAME,
     bootstrap_repo_layout,

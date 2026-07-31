@@ -13,7 +13,7 @@ def windows_unlink_semantics(monkeypatch):
     even when the code under test would fail on Windows. This fixture
     reproduces the Windows failure mode so those tests are meaningful on
     every platform. Deletion code must clear the read-only bit before
-    retrying the unlink (see quodeq.services.shared_repo.remove_clone_dir).
+    retrying the unlink (see quodeq.data.fs.shared_repo.remove_clone_dir).
     """
     real_unlink = os.unlink
 

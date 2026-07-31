@@ -14,7 +14,7 @@ import pytest
 
 from quodeq.api.app import create_app
 from quodeq.services import shared_publish
-from quodeq.services.shared_repo import (
+from quodeq.data.fs.shared_repo import (
     FORMAT_NAME,
     clone_lock,
     ensure_shared_clone,

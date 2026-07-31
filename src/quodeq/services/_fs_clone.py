@@ -8,7 +8,7 @@ import os
 import subprocess as _subprocess
 from pathlib import Path
 
-from quodeq.services.shared_repo import remove_clone_dir
+from quodeq.data.fs.shared_repo import remove_clone_dir
 from quodeq.shared._env import env_int
 
 _logger = logging.getLogger(__name__)

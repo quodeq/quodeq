@@ -4,7 +4,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from quodeq.services.shared_repo import (
+from quodeq.data.fs.shared_repo import (
     FORMAT_NAME,
     MARKER_FILENAME,
     _git_env,
@@ -102,7 +102,7 @@ def test_refresh_shared_clone_passes_explicit_timeout_to_both_git_calls(tmp_path
         seen_timeouts.append(timeout)
         return real_run_git(args, cwd=cwd, timeout=timeout)
 
-    monkeypatch.setattr("quodeq.services.shared_repo.run_git", _spy)
+    monkeypatch.setattr("quodeq.data.fs.shared_repo.run_git", _spy)
 
     ok, _ = refresh_shared_clone(url, timeout=7)
     assert ok is True
@@ -123,7 +123,7 @@ def test_refresh_shared_clone_default_timeout_is_bounded_not_300s(tmp_path, monk
         seen_timeouts.append(timeout)
         return real_run_git(args, cwd=cwd, timeout=timeout)
 
-    monkeypatch.setattr("quodeq.services.shared_repo.run_git", _spy)
+    monkeypatch.setattr("quodeq.data.fs.shared_repo.run_git", _spy)
 
     ok, _ = refresh_shared_clone(url)
     assert ok is True

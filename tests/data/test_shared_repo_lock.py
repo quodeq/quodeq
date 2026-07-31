@@ -12,9 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.services import shared_publish, shared_repo
+from quodeq.services import shared_publish
+from quodeq.data.fs import shared_repo
 from quodeq.services.shared_publish import publish_project
-from quodeq.services.shared_repo import clone_lock, ensure_shared_clone, refresh_shared_clone
+from quodeq.data.fs.shared_repo import clone_lock, ensure_shared_clone, refresh_shared_clone
 from tests._timeouts import budget
 
 # The thread join()/wait() calls below are deadlock guards, not performance
