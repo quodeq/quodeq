@@ -179,6 +179,23 @@ def get_index_db_path(default: str | None = None, env: dict[str, str] | None = N
     return default or str(_DEFAULT_INDEX_DB_PATH)
 
 
+_DEFAULT_GRADE_FORMULA_PATH = Path.home() / ".quodeq" / "grade_formula.json"
+
+
+def get_grade_formula_path(env: dict[str, str] | None = None) -> str:
+    """Return the path of the user-tuned grade-formula params file.
+
+    Resolution order: QUODEQ_GRADE_FORMULA_PATH env var, then
+    ~/.quodeq/grade_formula.json. Env override exists so the test suite can
+    sandbox the file (a developer's real custom formula must never leak into
+    score assertions).
+    """
+    environ = env if env is not None else os.environ
+    if "QUODEQ_GRADE_FORMULA_PATH" in environ:
+        return environ["QUODEQ_GRADE_FORMULA_PATH"]
+    return str(_DEFAULT_GRADE_FORMULA_PATH)
+
+
 _DEFAULT_SCORE_CACHE_PATH = Path.home() / ".quodeq" / "score_cache.db"
 
 

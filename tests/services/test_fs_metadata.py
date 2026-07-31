@@ -337,9 +337,7 @@ class TestReadAccumulatedSummary:
         from quodeq.services.dashboard import clear_shared_dimension_cache
         from quodeq.services.ports import RunInfo
 
-        monkeypatch.setattr(
-            grade_formula, "grade_formula_path", lambda: tmp_path / "grade_formula.json",
-        )
+        monkeypatch.setenv("QUODEQ_GRADE_FORMULA_PATH", str(tmp_path / "grade_formula.json"))
         clear_shared_dimension_cache()
 
         reports_root = tmp_path / "reports"
