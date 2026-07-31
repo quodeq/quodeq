@@ -17,7 +17,7 @@ from __future__ import annotations
 from quodeq.analysis._report_constants import _COMPLIANCE_FIELDS, _VIOLATION_FIELDS
 from quodeq.core.scoring._principle import compute_tallies
 from quodeq.core.types.finding import Finding
-from quodeq.services.scoring.projector_scoring import compute_principle_grade
+from quodeq.core.scoring.projector_scoring import compute_principle_grade
 
 
 def test_confidence_absent_from_scored_fields():

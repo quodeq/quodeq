@@ -174,7 +174,7 @@ def preview_scores(
     """
     from quodeq.data.projection.grade_projector import compute_run_grades  # noqa: PLC0415
     from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
-    from quodeq.services.scoring.projector_scoring import compute_run_score  # noqa: PLC0415
+    from quodeq.core.scoring.projector_scoring import compute_run_score  # noqa: PLC0415
 
     project_dir = reports_root / project
     if not project_dir.is_dir():

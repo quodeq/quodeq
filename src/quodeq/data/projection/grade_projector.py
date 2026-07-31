@@ -17,7 +17,7 @@ from quodeq.core.types.finding import Finding
 from quodeq.data.sqlite._row_mappers import row_to_finding
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
-from quodeq.services.scoring.projector_scoring import (
+from quodeq.core.scoring.projector_scoring import (
     compute_dimension_score,
     compute_principle_grade,
 )

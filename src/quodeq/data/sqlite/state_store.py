@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     from quodeq.core.scoring.params import ScoringParams
 
 from quodeq.core.events.models import Judgment
+from quodeq.core.scoring.params import DEFAULT_PARAMS
+from quodeq.core.scoring.projector_scoring import compute_run_score
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite._row_mappers import judgment_to_row
 
@@ -269,7 +271,5 @@ class SQLiteStateStore:
 
     def read_run_score_from_dim_scores(self, params: "ScoringParams | None" = None) -> dict:
         """Compute the run-level score from non-null dimension scores (weighted when params enable dimension weights)."""
-        from quodeq.services.scoring.projector_scoring import compute_run_score  # noqa: PLC0415
-        from quodeq.core.scoring.params import DEFAULT_PARAMS  # noqa: PLC0415
         rows = self.read_dimension_scores()
         return compute_run_score(rows, params=params if params is not None else DEFAULT_PARAMS)

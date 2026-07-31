@@ -7,7 +7,7 @@ the tests guard against drift.
 from __future__ import annotations
 
 from quodeq.core.types.finding import Finding
-from quodeq.services.scoring.projector_scoring import (
+from quodeq.core.scoring.projector_scoring import (
     compute_dimension_score,
     compute_principle_grade,
     compute_run_score,
@@ -229,7 +229,7 @@ def test_compute_dimension_score_with_custom_thresholds_changes_grade():
     params = dataclasses.replace(DEFAULT_PARAMS, grade_thresholds=(
         (9.9, "Exemplary"), (9.0, "Good"), (8.0, "Adequate"), (7.0, "Poor"),
     ))
-    from quodeq.services.scoring.projector_scoring import compute_dimension_score
+    from quodeq.core.scoring.projector_scoring import compute_dimension_score
     grades = [{"score": 8.5, "grade": "Good"}]
     result = compute_dimension_score(
         dimension="security", principle_grades=grades, params=params,
@@ -243,7 +243,7 @@ def test_compute_run_score_applies_dimension_weights_when_enabled():
         dimension_weights_enabled=True,
         dimension_weights={"security": 1.2, "performance": 0.8},
     )
-    from quodeq.services.scoring.projector_scoring import compute_run_score
+    from quodeq.core.scoring.projector_scoring import compute_run_score
     dims = [
         {"dimension": "security", "score": 8.0},
         {"dimension": "performance", "score": 6.0},
@@ -254,7 +254,7 @@ def test_compute_run_score_applies_dimension_weights_when_enabled():
 
 
 def test_compute_run_score_plain_mean_when_disabled():
-    from quodeq.services.scoring.projector_scoring import compute_run_score
+    from quodeq.core.scoring.projector_scoring import compute_run_score
     dims = [
         {"dimension": "security", "score": 8.0},
         {"dimension": "performance", "score": 6.0},
