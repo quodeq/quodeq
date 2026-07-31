@@ -140,6 +140,34 @@ class ApiRunnerConfig:
     temperature: float = 0.1
     max_tokens: int | None = None
     context_size: int = 0
+    n_subagents: int = 1
+    """Pool size this call competes with; scales the local read timeout."""
+
+
+def _resolve_timeout(config: ApiRunnerConfig, *, is_openai: bool) -> httpx.Timeout:
+    """Read budget for one completion call.
+
+    Local servers serve one request per loaded model, so with N subagents a
+    queued request can wait up to (N-1) inferences before its own starts:
+    a fixed budget times out queued-but-healthy calls, and each timeout burns
+    the whole budget for zero findings. Scale the read budget linearly with N.
+    Cloud backends parallelize, so their budget stays fixed.
+    QUODEQ_API_READ_TIMEOUT (whole seconds) overrides the read budget outright.
+    """
+    base = _CLOUD_TIMEOUT if is_openai else _LOCAL_TIMEOUT
+    env_val = os.environ.get("QUODEQ_API_READ_TIMEOUT", "").strip()
+    if env_val.isdigit() and int(env_val) > 0:
+        return httpx.Timeout(
+            connect=base.connect, read=float(env_val),
+            write=base.write, pool=base.pool,
+        )
+    scale = max(1, config.n_subagents)
+    if is_openai or scale == 1:
+        return base
+    return httpx.Timeout(
+        connect=base.connect, read=base.read * scale,
+        write=base.write, pool=base.pool,
+    )
 
 
 # A dict that fails `_Finding` validation but carries the required, domain-specific
@@ -313,7 +341,7 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     if config.max_tokens is not None:
         create_kwargs["max_tokens"] = config.max_tokens
 
-    timeout = _CLOUD_TIMEOUT if is_openai else _LOCAL_TIMEOUT
+    timeout = _resolve_timeout(config, is_openai=is_openai)
     _log.debug("Calling %s model=%s (per-finding parse)", config.api_base, config.model)
     start = time.monotonic()
     with openai.OpenAI(

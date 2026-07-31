@@ -27,11 +27,12 @@ def _warn_if_local_api_oversubscribed(config: RunConfig) -> None:
     """Warn when subagents will queue behind one local-API inference slot.
 
     Local model servers (Ollama, llama.cpp, omlx) default to serving one
-    request per loaded model. With ``--n-subagents > 1`` the second agent
-    queues behind the first and typically exceeds the read timeout, surfacing
-    as silent timeouts. The fix is either ``--n-subagents 1`` or raising the
-    server's parallelism (e.g. ``OLLAMA_NUM_PARALLEL``). Cloud API providers
-    don't have this constraint, so we narrow the warning to loopback bases.
+    request per loaded model, so with ``--n-subagents > 1`` the extra agents
+    queue behind the first. The read timeout scales with the subagent count
+    (see ``_api_runner._resolve_timeout``) so queued calls no longer die, but
+    throughput is still capped at the server's parallelism until it is raised
+    (e.g. ``OLLAMA_NUM_PARALLEL``). Cloud API providers don't have this
+    constraint, so we narrow the warning to loopback bases.
     """
     if config.options.max_subagents <= 1:
         return
@@ -43,11 +44,10 @@ def _warn_if_local_api_oversubscribed(config: RunConfig) -> None:
         return
     log_warning(
         f"--n-subagents={config.options.max_subagents} with local provider "
-        f"'{ai_cmd}' will likely time out: local model servers serve one "
-        f"request per model by default, so subagents queue and the second "
-        f"exceeds the read timeout. Use --n-subagents 1 or raise the "
-        f"server's parallelism (e.g. OLLAMA_NUM_PARALLEL="
-        f"{config.options.max_subagents})."
+        f"'{ai_cmd}': local model servers serve one request per model by "
+        f"default, so subagents queue and add little throughput. To run "
+        f"them truly in parallel, raise the server's parallelism (e.g. "
+        f"OLLAMA_NUM_PARALLEL={config.options.max_subagents})."
     )
 
 

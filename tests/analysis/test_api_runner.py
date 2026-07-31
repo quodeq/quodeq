@@ -59,6 +59,67 @@ def api_config():
     )
 
 
+class TestResolveTimeout:
+    """The read budget scales with the subagent count on local providers.
+
+    Local servers serve one request per loaded model, so with N subagents a
+    queued request waits up to (N-1) inferences before its own starts. A fixed
+    read budget times out queued-but-healthy calls, burning the whole budget
+    for zero findings and feeding the failure-streak breaker.
+    """
+
+    def test_local_single_agent_keeps_default(self):
+        from quodeq.analysis._api_runner import _resolve_timeout
+        cfg = ApiRunnerConfig(model="m", api_base="http://localhost:11434/v1")
+        assert _resolve_timeout(cfg, is_openai=False) == _LOCAL_TIMEOUT
+
+    def test_local_read_budget_scales_with_subagents(self):
+        from quodeq.analysis._api_runner import _resolve_timeout
+        cfg = ApiRunnerConfig(
+            model="m", api_base="http://localhost:11434/v1", n_subagents=3,
+        )
+        t = _resolve_timeout(cfg, is_openai=False)
+        assert t.read == _LOCAL_TIMEOUT.read * 3
+        assert t.connect == _LOCAL_TIMEOUT.connect
+        assert t.write == _LOCAL_TIMEOUT.write
+        assert t.pool == _LOCAL_TIMEOUT.pool
+
+    def test_cloud_budget_ignores_subagents(self):
+        from quodeq.analysis._api_runner import _resolve_timeout, _CLOUD_TIMEOUT
+        cfg = ApiRunnerConfig(
+            model="m", api_base="https://api.openai.com/v1", n_subagents=3,
+        )
+        assert _resolve_timeout(cfg, is_openai=True) == _CLOUD_TIMEOUT
+
+    def test_env_override_wins(self, monkeypatch):
+        from quodeq.analysis._api_runner import _resolve_timeout
+        monkeypatch.setenv("QUODEQ_API_READ_TIMEOUT", "900")
+        cfg = ApiRunnerConfig(
+            model="m", api_base="http://localhost:11434/v1", n_subagents=2,
+        )
+        assert _resolve_timeout(cfg, is_openai=False).read == 900.0
+
+    def test_env_override_garbage_is_ignored(self, monkeypatch):
+        from quodeq.analysis._api_runner import _resolve_timeout
+        monkeypatch.setenv("QUODEQ_API_READ_TIMEOUT", "soon")
+        cfg = ApiRunnerConfig(
+            model="m", api_base="http://localhost:11434/v1", n_subagents=2,
+        )
+        assert _resolve_timeout(cfg, is_openai=False).read == _LOCAL_TIMEOUT.read * 2
+
+    def test_call_api_passes_scaled_timeout_to_client(self):
+        cfg = ApiRunnerConfig(
+            model="m", api_base="http://localhost:8000/v1",
+            api_key="k", n_subagents=2,
+        )
+        raw_client = _mock_raw_client('{"findings":[]}')
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
+            _call_api("prompt", cfg)
+        timeout = mock_oa.call_args.kwargs["timeout"]
+        assert timeout.read == _LOCAL_TIMEOUT.read * 2
+
+
 class TestRunApiAnalysis:
     """run_api_analysis calls LLM via raw OpenAI client and writes JSONL evidence."""
 
