@@ -1,4 +1,4 @@
-"""Shared test helpers for engine tests."""
+"""Shared evidence/MCP test helpers (formerly tests/engine/conftest.py)."""
 from __future__ import annotations
 
 import json
@@ -6,7 +6,7 @@ import sys
 from io import StringIO
 from unittest.mock import patch
 
-from quodeq.engine import mcp_findings
+from quodeq.analysis.mcp import findings_server as mcp_findings
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
 from quodeq.analysis.subagents.file_queue import FileQueue
 

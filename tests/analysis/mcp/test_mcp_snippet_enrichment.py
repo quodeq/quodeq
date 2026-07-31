@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.engine import mcp_findings
+from quodeq.analysis.mcp import findings_server as mcp_findings
 from quodeq.analysis.mcp.findings_server import CompiledContext
 
 

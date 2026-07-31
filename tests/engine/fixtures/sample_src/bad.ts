@@ -1,1 +1,0 @@
-const result = eval(userInput);
