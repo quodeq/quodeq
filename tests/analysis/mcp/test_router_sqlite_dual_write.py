@@ -3,8 +3,8 @@ import io
 from pathlib import Path
 
 from quodeq.analysis.mcp.router import FindingsRouter
-from quodeq.core.events.reader import EventLogReader
-from quodeq.core.events.writer import EventLogWriter
+from quodeq.data.events.reader import EventLogReader
+from quodeq.data.events.writer import EventLogWriter
 from quodeq.core.events.models import EventType
 
 

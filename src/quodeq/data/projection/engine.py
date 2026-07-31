@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from quodeq.core.events.reader import EventLogReader
+from quodeq.data.events.reader import EventLogReader
 from quodeq.data.projection.handlers import handle
 from quodeq.data.sqlite.state_store import SQLiteStateStore
 

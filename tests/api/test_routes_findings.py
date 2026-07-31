@@ -75,7 +75,7 @@ class TestDismissEndpoint:
         required.
         """
         from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
-        from quodeq.core.events.writer import EventLogWriter
+        from quodeq.data.events.writer import EventLogWriter
         from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
         run_dir = tmp_path / "my-project" / "run-1"
@@ -112,7 +112,7 @@ class TestDismissEndpoint:
         rollup for the Overview.
         """
         from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
-        from quodeq.core.events.writer import EventLogWriter
+        from quodeq.data.events.writer import EventLogWriter
         from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
         run_dir = tmp_path / "my-project" / "run-1"
@@ -193,7 +193,7 @@ class TestRestoreEndpoint:
         instantly and invalidates the run-detail violation source.
         """
         from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
-        from quodeq.core.events.writer import EventLogWriter
+        from quodeq.data.events.writer import EventLogWriter
         from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
         run_dir = tmp_path / "my-project" / "run-1"
@@ -355,7 +355,7 @@ class TestListDismissedEndpoint:
         symptom that motivated this regression.
         """
         from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
-        from quodeq.core.events.writer import EventLogWriter
+        from quodeq.data.events.writer import EventLogWriter
 
         run_dir = tmp_path / "my-project" / "run-A"
         run_dir.mkdir(parents=True)
@@ -392,7 +392,7 @@ class TestListDismissedEndpoint:
         rescore returns None, the projection-all-runs fallback kicks in.
         """
         from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
-        from quodeq.core.events.writer import EventLogWriter
+        from quodeq.data.events.writer import EventLogWriter
 
         run_dir = tmp_path / "my-project" / "run-A"
         run_dir.mkdir(parents=True)

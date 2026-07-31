@@ -21,7 +21,7 @@ import json
 from pathlib import Path
 
 from quodeq.core.events.models import JudgmentCreatedEvent
-from quodeq.core.events.reader import EventLogReader
+from quodeq.data.events.reader import EventLogReader
 
 
 _LEGACY_EVENT_JSON = {

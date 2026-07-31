@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 
 from quodeq.analysis.mcp.router import FindingsRouter
-from quodeq.core.events.writer import EventLogWriter
+from quodeq.data.events.writer import EventLogWriter
 from quodeq.data.fs.report_parser._evidence import load_evidence_map
 from quodeq.data.projection.engine import ProjectionEngine
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository

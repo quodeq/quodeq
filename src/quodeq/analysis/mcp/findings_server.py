@@ -113,7 +113,7 @@ def _build_router(
     project_dir = run_dir.parent
     ctx.precedent_fingerprints = load_precedent_fingerprints(project_dir)
     ctx.precedent_corpus = load_precedent_corpus(project_dir, run_dir)
-    from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
+    from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
     event_log = EventLogWriter(run_dir / "events.jsonl")
 
     cache_writer = None

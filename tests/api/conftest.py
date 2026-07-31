@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
-from quodeq.core.events.writer import EventLogWriter
+from quodeq.data.events.writer import EventLogWriter
 from quodeq.services.shared_publish import publish_project
 from quodeq.services.shared_repo import (
     ensure_shared_clone,

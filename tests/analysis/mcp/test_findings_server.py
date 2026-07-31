@@ -6,7 +6,7 @@ from quodeq.analysis.mcp.findings_server import _build_router
 from quodeq.analysis.mcp.enricher import CompiledContext
 from quodeq.analysis.mcp.args import ServerArgs
 from quodeq.core.events.models import EventType
-from quodeq.core.events.reader import EventLogReader
+from quodeq.data.events.reader import EventLogReader
 
 
 def test_build_router_wires_event_log_with_run_dir(tmp_path: Path):
@@ -25,7 +25,7 @@ def test_build_router_wires_event_log_with_run_dir(tmp_path: Path):
 def test_build_router_loads_precedent_fingerprints_from_project_dir(tmp_path: Path):
     from quodeq.context.precedent import fingerprint
     from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
-    from quodeq.core.events.writer import EventLogWriter
+    from quodeq.data.events.writer import EventLogWriter
     from quodeq.data.projection.projector import Projector
     from quodeq.services.dismissed import dismiss_finding
 

@@ -156,7 +156,7 @@ class TestBuildDashboard:
         import sqlite3
 
         from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
-        from quodeq.core.events.writer import EventLogWriter
+        from quodeq.data.events.writer import EventLogWriter
         from quodeq.data.projection.projector import Projector
         from quodeq.data.sqlite._schema import SCHEMA_VERSION
 
@@ -197,7 +197,7 @@ class TestBuildDashboard:
         build. Widening the seam to DatabaseError (which SchemaVersionError
         subclasses) covers both the too-new and the corrupt case."""
         from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
-        from quodeq.core.events.writer import EventLogWriter
+        from quodeq.data.events.writer import EventLogWriter
 
         run_dir = tmp_path / "proj" / "r1"
         run_dir.mkdir(parents=True)

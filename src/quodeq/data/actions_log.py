@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Iterator
 
 from quodeq.core.events.models import EVENT_MODEL_MAP, BaseEvent, EventType
-from quodeq.core.utils.locking import get_file_lock
+from quodeq.data.locking import get_file_lock
 
 
 _logger = logging.getLogger(__name__)

@@ -180,7 +180,7 @@ def _read_new_findings_from_events(
     if not events_log.is_file():
         return []
     try:
-        from quodeq.core.events.reader import EventLogReader  # noqa: PLC0415
+        from quodeq.services.run_events import EventLogReader  # noqa: PLC0415
         from quodeq.core.events.models import EventType  # noqa: PLC0415
         results: list[tuple[datetime, int, dict[str, Any]]] = []
         counter = counter_start
