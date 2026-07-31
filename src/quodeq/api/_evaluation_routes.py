@@ -22,7 +22,7 @@ from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.api.routes import _reports_dir
 from quodeq.services.base import ActionProvider
 from quodeq.services.evaluation_mixin import _score_completed_evidence
-from quodeq.services.scan_progress import build_scan_progress, progress_to_dict
+from quodeq.services.scan_progress import build_scan_progress
 from quodeq.services.run_events import read_dimensions
 from quodeq.shared.utils import is_repo_url
 
@@ -229,7 +229,7 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
         if progress is None:
             body, status = error_response("Run not ready", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
-        return jsonify(to_camel_dict(progress_to_dict(progress)))
+        return jsonify(to_camel_dict(progress))
 
     @app.delete("/api/evaluations/<job_id>")
     def cancel_or_delete_evaluation(job_id: str) -> Response | tuple[Response, int]:
