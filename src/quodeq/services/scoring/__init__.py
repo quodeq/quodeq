@@ -45,7 +45,7 @@ from quodeq.services.score_cache import (
     cached_accumulated,
     per_run_versions,
 )
-from quodeq.services.ports import RunInfo, list_runs, read_run_data, read_run_scalars
+from quodeq.data.fs.report_parser.runs import RunInfo, list_runs, read_run_data, read_run_scalars
 from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
 from quodeq.shared._env import env_int
 from quodeq.shared.validation import validate_path_segment
@@ -325,7 +325,7 @@ def get_scores_raw(
         import sqlite3  # noqa: PLC0415
         try:
             repo = SqliteFindingsRepository(run_dir)
-            repo._ensure_fresh()  # noqa: SLF001
+            repo.ensure_projected()
             store = SQLiteStateStore(run_dir)
             if store.read_dimension_scores():
                 return _build_response_from_grade_tables(run_dir, params=params)

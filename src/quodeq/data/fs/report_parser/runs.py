@@ -2,7 +2,7 @@
 
 The module-level functions (``read_run_data``, ``list_runs``) provide the
 default filesystem implementation.  The ``RunStorage`` protocol is defined
-in ``quodeq.services.ports`` — alternative backends (S3, database) should
+in ``quodeq.data.fs.report_parser.runs`` — alternative backends should
 implement that protocol and be injected at the call site.
 """
 

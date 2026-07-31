@@ -165,7 +165,7 @@ class TestSelectDefaultViewRuns:
 
     @staticmethod
     def _run(run_id, status):
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
         return RunInfo(run_id=run_id, date_iso="2026-01-01", date_label="Jan 01", status=status)
 
     def test_complete_runs_win(self):
@@ -204,7 +204,7 @@ class TestSelectTrendRuns:
 
     @staticmethod
     def _run(run_id, status):
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
         return RunInfo(run_id=run_id, date_iso="2026-01-01", date_label="Jan 01", status=status)
 
     def test_keeps_complete_and_in_progress_drops_cancelled_and_failed(self):

@@ -110,7 +110,7 @@ def _project_all_runs(project_dir: Path) -> None:
         if not (run_dir / "events.jsonl").is_file():
             continue
         try:
-            SqliteFindingsRepository(run_dir)._ensure_fresh()  # noqa: SLF001
+            SqliteFindingsRepository(run_dir).ensure_projected()
         except Exception:
             _logger.warning("Projection after mutation failed for %s", run_dir, exc_info=True)
 
@@ -163,7 +163,7 @@ def _resolve_default_run_id(evaluations_dir: str, project: str) -> str | None:
     so ``isLatest`` matches what the Overview actually shows.
     """
     from quodeq.services.dim_resolution import is_eligible_for_default_view  # noqa: PLC0415
-    from quodeq.services.ports import list_runs  # noqa: PLC0415
+    from quodeq.data.fs.report_parser.runs import list_runs  # noqa: PLC0415
 
     reports_root = Path(evaluations_dir).resolve()
     try:

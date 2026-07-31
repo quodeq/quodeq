@@ -6,7 +6,7 @@
 |-------|---------|--------------|
 | `core/` | Domain logic: evidence models, scoring algorithms, standards definitions, type definitions | None (stdlib only) |
 | `data/` | Data access: filesystem repositories, web API clients, report parsers | core/ |
-| `services/` | Business logic: dashboard, accumulated views, dismissals, standards CRUD | core/, data/ (via `services/ports.py`) |
+| `services/` | Business logic: dashboard, accumulated views, dismissals, standards CRUD | core/, data/ |
 | `assistant/` | Embedded LLM assistant: sessions, tool registry, provider turn adapters, guard | core/, data/, services/, llm_bridge/ |
 | `api/` | HTTP layer: Flask routes, security, rate limiting | core/, services/, update/, assistant/ |
 | `analysis/` | Evaluation pipeline: AI orchestration, subagents, prompts, MCP, markers, scoring pipeline | core/, data/, services/, context/ |
@@ -25,7 +25,7 @@
 ```
 core/          -> core/
 data/          -> core/
-services/      -> core/, data/ (by convention via services/ports.py)
+services/      -> core/, data/
 assistant/     -> core/, data/, services/, llm_bridge/
 api/           -> core/, services/, update/, assistant/, terminal/
 analysis/      -> core/, data/, services/, context/

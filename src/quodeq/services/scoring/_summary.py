@@ -5,7 +5,7 @@ from typing import Any
 
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
-from quodeq.services.ports import most_frequent_grade, parse_numeric_score
+from quodeq.data.fs.report_parser.grades import most_frequent_grade, parse_numeric_score
 
 
 def recompute_summary(

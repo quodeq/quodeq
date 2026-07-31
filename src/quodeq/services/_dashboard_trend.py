@@ -6,7 +6,8 @@ from typing import Any, Callable
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import DimensionResult
-from quodeq.services.ports import RunInfo, most_frequent_grade, parse_numeric_score
+from quodeq.data.fs.report_parser.grades import most_frequent_grade, parse_numeric_score
+from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.services.accumulated import numeric_average
 
 

@@ -12,13 +12,8 @@ from typing import Any, Callable
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types import DimensionResult, DimensionSummary, to_camel_dict
 
-from quodeq.services.ports import (
-    RunInfo,
-    calculate_trend,
-    list_runs,
-    read_run_data,
-    summarize_dimensions,
-)
+from quodeq.data.fs.report_parser.grades import calculate_trend, summarize_dimensions
+from quodeq.data.fs.report_parser.runs import RunInfo, list_runs, read_run_data
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services._dashboard_trend import build_accumulated_trend
