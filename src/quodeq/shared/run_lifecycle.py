@@ -132,6 +132,12 @@ class RunLifecycleContext:
             # from regular failures so the UI can surface it differently.
             if self._current_state not in TERMINAL_STATES:
                 self._transition(RunState.FAILED, exit_reason="failure_streak")
+        elif self._is_named_error(exc_type, "FatalProviderError"):
+            # Provider reported an unrecoverable condition (quota exhausted,
+            # auth failure, out of credits). Distinct exit_reason so the
+            # History entry says why instead of a generic exception.
+            if self._current_state not in TERMINAL_STATES:
+                self._transition(RunState.FAILED, exit_reason="provider_fatal")
         else:
             # Any other exception → failed.
             if self._current_state not in TERMINAL_STATES:
@@ -209,19 +215,20 @@ class RunLifecycleContext:
                 _logger.warning("failed to seed dim state for %s: %s", dim, exc)
 
     @staticmethod
-    def _is_circuit_breaker_error(exc_type: type[BaseException] | None) -> bool:
-        """Detect CircuitBreakerError without a hard import dependency.
+    def _is_named_error(exc_type: type[BaseException] | None, name: str) -> bool:
+        """Detect an analysis-layer error class without a hard import dependency.
 
-        Lifecycle is a shared/low-level module; importing from analysis.cache
+        Lifecycle is a shared/low-level module; importing from analysis
         would invert the dependency graph. Class-name match is enough since
         we control both ends.
         """
         if exc_type is None:
             return False
-        for cls in exc_type.__mro__:
-            if cls.__name__ == "CircuitBreakerError":
-                return True
-        return False
+        return any(cls.__name__ == name for cls in exc_type.__mro__)
+
+    @staticmethod
+    def _is_circuit_breaker_error(exc_type: type[BaseException] | None) -> bool:
+        return RunLifecycleContext._is_named_error(exc_type, "CircuitBreakerError")
 
     def _install_signal_handlers(self) -> None:
         def _handle(signum: int, frame: Any) -> None:

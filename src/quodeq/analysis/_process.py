@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from quodeq.analysis._config import AnalysisConfig, _SpawnPaths
-from quodeq.analysis.errors import ProviderError
+from quodeq.analysis.errors import FatalProviderError, ProviderError, classify_fatal_provider_message
 from quodeq.analysis.stream.progress_reader import _IncrementalProgressReader
 from quodeq.shared import cancellation
 from quodeq.shared.logging import log_warning
@@ -88,7 +88,12 @@ def _run_with_heartbeat(
 
 
 def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
-    """Raise AnalysisError if the process exited with a non-zero code."""
+    """Raise AnalysisError if the process exited with a non-zero code.
+
+    Raises FatalProviderError instead when stderr matches a known
+    unrecoverable provider message (quota exhausted, auth failure, out of
+    credits): retrying those only respawns agents that die the same way.
+    """
     if process.returncode != 0:
         stderr_text = ""
         if stream_err.exists():
@@ -96,10 +101,14 @@ def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
                 stderr_text = _sanitize_stderr(stream_err.read_text(encoding="utf-8").strip())
             except (OSError, UnicodeDecodeError):
                 stderr_text = "(stderr unreadable)"
-        raise AnalysisError(
+        message = (
             f"AI CLI exited with code {process.returncode}"
             + (f": {stderr_text}" if stderr_text else "")
         )
+        fatal_reason = classify_fatal_provider_message(stderr_text)
+        if fatal_reason is not None:
+            raise FatalProviderError(message, reason=fatal_reason)
+        raise AnalysisError(message)
 
 
 def _spawn_and_monitor(
