@@ -100,23 +100,60 @@ def _interruption_reason(exc: BaseException | None = None) -> str:
     return "failed_exception"
 
 
-def _raise_on_fatal_cancel() -> None:
-    """Fail the run loudly when cancellation came from a dead provider.
+def _count_ok_files(run_dir: Path | None) -> int:
+    """Files successfully analysed by THIS run's workers, across all dims.
 
-    Without this, a run whose agents were killed by quota/auth exhaustion
-    (or by the pool's agent-failure-streak backstop) would end as DONE with
-    silently incomplete dimensions. Raising here gives the lifecycle exit
-    handler a typed exception to map to a distinct exit_reason.
+    ``ok`` file_done markers are written only by dispatch workers; cache
+    replays write findings without markers. So this count measures fresh
+    progress this run made, never carried-forward data.
+    """
+    if run_dir is None:
+        return 0
+    evidence_dir = Path(run_dir) / "evidence"
+    if not evidence_dir.is_dir():
+        return 0
+    total = 0
+    for jsonl in evidence_dir.glob("*_evidence.jsonl"):
+        ok, _err = _tally_markers(jsonl)
+        total += ok
+    return total
+
+
+def _raise_on_fatal_cancel(run_dir: Path | None) -> None:
+    """Fail the run loudly when a dead provider stopped it before ANY analysis.
+
+    Two outcomes, keyed on whether this run already analysed files
+    successfully (``ok`` markers, see ``_count_ok_files``):
+
+    - No successful analysis: the run is worthless. Raise so the lifecycle
+      maps it to a failed run with a distinct exit_reason, instead of DONE
+      with silently incomplete dimensions.
+    - Partial success (e.g. quota died halfway): the data is worth keeping.
+      Return without raising so the run finalizes as done; the CLI hook
+      (``_record_provider_fatal_if_cancelled``) stamps the exit_reason so
+      the UI says "stopped early, results are partial" rather than showing
+      a clean completion.
     """
     reason = cancellation.cancel_reason() or ""
-    if reason.startswith("provider_fatal"):
+    is_provider_fatal = reason.startswith("provider_fatal")
+    is_streak = reason == "agent_failure_streak"
+    if not (is_provider_fatal or is_streak):
+        return
+    ok_files = _count_ok_files(run_dir)
+    if ok_files > 0:
+        log_warning(
+            f"[loop] provider failed mid-run after {ok_files} file(s) were "
+            f"analysed -- keeping partial results, run finalizes as done "
+            f"with a stopped-early warning"
+        )
+        return
+    if is_provider_fatal:
         raise FatalProviderError(
             f"evaluation aborted: {reason.partition(':')[2].strip() or 'fatal provider error'}",
             reason="provider_fatal",
         )
-    if reason == "agent_failure_streak":
-        from quodeq.analysis.cache._failure_streak import CircuitBreakerError
-        raise CircuitBreakerError("agent_failure_streak")
+    from quodeq.analysis.cache._failure_streak import CircuitBreakerError
+    raise CircuitBreakerError("agent_failure_streak")
 
 
 def _silence_broken_stdout() -> None:
@@ -382,7 +419,7 @@ def run_incremental_loop(
     # Before the guards: the drop-ratio summary must land even when a
     # guard raises (a high drop ratio and a worthless run often co-occur).
     report_run_drop_stats()
-    _raise_on_fatal_cancel()
+    _raise_on_fatal_cancel(_run_dir_for(config))
     check_zero_findings(
         result, config.source_file_count,
         incremental_filter_active=config.options.incremental_file_filter is not None
@@ -496,7 +533,7 @@ def run_per_dimension_loop(
     # Before the guards: the drop-ratio summary must land even when a
     # guard raises (a high drop ratio and a worthless run often co-occur).
     report_run_drop_stats()
-    _raise_on_fatal_cancel()
+    _raise_on_fatal_cancel(_run_dir_for(config))
     check_zero_findings(
         result, config.source_file_count, skipped_count,
         incremental_filter_active=config.options.incremental_file_filter is not None

@@ -8,14 +8,19 @@
  * to the old verbatim behaviour instead of hiding information.
  */
 
+// Not an error: hitting the time budget is the user's own setting doing its
+// job. The hint just says what happens to the remainder.
 const TIME_LIMIT = {
   label: 'time limit reached',
-  hint: 'Raise the time limit or scan fewer dimensions to cover the remaining files.',
+  hint: 'Remaining files carry over to the next run. Raise the time limit to cover more in one run.',
 };
 
 const FAILURE_STREAK = {
   label: 'repeated failures',
   hint: 'Stopped after consecutive agent failures. Check that the AI provider is running and reachable, then run again.',
+  // A run can finish `done` with this reason when the provider died after
+  // partial progress; the UI should then warn that results are incomplete.
+  warn: true,
 };
 
 const CANCELLED = { label: 'cancelled', hint: null };
@@ -24,6 +29,7 @@ export const EXIT_REASON_INFO = {
   provider_fatal: {
     label: 'AI provider error',
     hint: 'The AI provider rejected every request: quota exhausted, out of credits, or an invalid API key. Check your plan, billing or API key, then run again.',
+    warn: true,
   },
   failure_streak: FAILURE_STREAK,
   agent_failure_streak: FAILURE_STREAK,
@@ -50,4 +56,12 @@ export function exitReasonLabel(code) {
 /** Actionable hint for a code, or null when there is nothing to suggest. */
 export function exitReasonHint(code) {
   return exitReasonInfo(code)?.hint ?? null;
+}
+
+/**
+ * True when a run that finished `done` with this reason should still show a
+ * "stopped early, results are partial" warning (provider died mid-run).
+ */
+export function exitReasonWarn(code) {
+  return exitReasonInfo(code)?.warn === true;
 }

@@ -1,6 +1,7 @@
 """Fatal provider errors (quota/auth/billing) abort the run instead of respawning agents."""
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -263,22 +264,52 @@ class TestLoopFatalMapping:
         cancellation.request_cancel()
         assert _interruption_reason() == "cancelled_signal"
 
-    def test_raise_on_fatal_cancel_raises_fatal(self):
+    def test_raise_on_fatal_cancel_raises_fatal(self, tmp_path):
         cancellation.request_cancel(reason="provider_fatal:quota: credits gone")
         with pytest.raises(FatalProviderError, match="credits gone"):
-            _raise_on_fatal_cancel()
+            _raise_on_fatal_cancel(tmp_path)
 
-    def test_raise_on_fatal_cancel_raises_breaker_for_streak(self):
+    def test_raise_on_fatal_cancel_raises_breaker_for_streak(self, tmp_path):
         cancellation.request_cancel(reason="agent_failure_streak")
         with pytest.raises(CircuitBreakerError):
-            _raise_on_fatal_cancel()
+            _raise_on_fatal_cancel(tmp_path)
 
-    def test_raise_on_fatal_cancel_noop_without_reason(self):
+    def test_raise_on_fatal_cancel_noop_without_reason(self, tmp_path):
         cancellation.request_cancel()
-        _raise_on_fatal_cancel()
+        _raise_on_fatal_cancel(tmp_path)
 
-    def test_raise_on_fatal_cancel_noop_when_not_cancelled(self):
-        _raise_on_fatal_cancel()
+    def test_raise_on_fatal_cancel_noop_when_not_cancelled(self, tmp_path):
+        _raise_on_fatal_cancel(tmp_path)
+
+    @staticmethod
+    def _write_markers(run_dir, *statuses):
+        evidence = run_dir / "evidence"
+        evidence.mkdir()
+        lines = [
+            json.dumps({"_marker": "file_done", "file": f"f{i}.py", "status": s})
+            for i, s in enumerate(statuses)
+        ]
+        (evidence / "security_evidence.jsonl").write_text(
+            "\n".join(lines) + "\n", encoding="utf-8",
+        )
+
+    def test_partial_success_keeps_run_alive(self, tmp_path):
+        """Quota died halfway: files were analysed, run finalizes as done."""
+        self._write_markers(tmp_path, "ok", "ok", "error")
+        cancellation.request_cancel(reason="provider_fatal:quota: credits gone")
+        _raise_on_fatal_cancel(tmp_path)  # must not raise
+
+    def test_partial_success_keeps_run_alive_for_streak(self, tmp_path):
+        self._write_markers(tmp_path, "ok", "error", "error")
+        cancellation.request_cancel(reason="agent_failure_streak")
+        _raise_on_fatal_cancel(tmp_path)  # must not raise
+
+    def test_error_only_markers_still_fail_the_run(self, tmp_path):
+        """Markers exist but nothing succeeded: the run produced no analysis."""
+        self._write_markers(tmp_path, "error", "error")
+        cancellation.request_cancel(reason="provider_fatal:quota: credits gone")
+        with pytest.raises(FatalProviderError):
+            _raise_on_fatal_cancel(tmp_path)
 
 
 class TestLifecycleMapping:

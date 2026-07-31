@@ -77,7 +77,7 @@ describe('DimensionGaugeCard', () => {
       const line = screen.getByText(coverageLineMatcher(`${dateLabel} · 28%`));
       expect(line.getAttribute('title')).toBe(
         'Partial run · 850 of 3,037 files · stopped: time limit reached · '
-          + 'Raise the time limit or scan fewer dimensions to cover the remaining files.',
+          + 'Remaining files carry over to the next run. Raise the time limit to cover more in one run.',
       );
     });
 
@@ -117,7 +117,7 @@ describe('DimensionGaugeCard', () => {
       const line = screen.getByText(coverageLineMatcher(`${dateLabel} · 100%`));
       expect(line.getAttribute('title')).toBe(
         'Partial run · 100 of 100 files · stopped: time limit reached · '
-          + 'Raise the time limit or scan fewer dimensions to cover the remaining files.',
+          + 'Remaining files carry over to the next run. Raise the time limit to cover more in one run.',
       );
     });
 
@@ -161,7 +161,7 @@ describe('DimensionGaugeCard', () => {
       const line = screen.getByText(dateLabel);
       expect(line.getAttribute('title')).toBe(
         'Partial run · stopped: time limit reached · '
-          + 'Raise the time limit or scan fewer dimensions to cover the remaining files.',
+          + 'Remaining files carry over to the next run. Raise the time limit to cover more in one run.',
       );
     });
 
