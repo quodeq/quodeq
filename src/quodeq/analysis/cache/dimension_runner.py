@@ -60,7 +60,7 @@ from quodeq.analysis.subagents.runner import (
     process_dimension_with_subagents,
 )
 from quodeq.core.evidence.model import Evidence
-from quodeq.engine._runner_markers import emit_marker
+from quodeq.analysis._runner_markers import emit_marker
 
 _logger = logging.getLogger(__name__)
 

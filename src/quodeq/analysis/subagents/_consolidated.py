@@ -16,7 +16,7 @@ from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.analysis.subagents._pool_launcher import _default_subagent_model, _compute_files_per_agent
 from quodeq.analysis.subagents._source_files import _list_source_files
-from quodeq.engine._runner_markers import cleanup_stream
+from quodeq.analysis._runner_markers import cleanup_stream
 from quodeq.shared.logging import log_info, log_warning
 
 

@@ -11,7 +11,7 @@ from quodeq.analysis.stream.validation import get_mcp_status, is_stream_valid
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
-from quodeq.engine._runner_markers import make_heartbeat
+from quodeq.analysis._runner_markers import make_heartbeat
 from quodeq.shared.logging import log_warning
 
 

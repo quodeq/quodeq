@@ -98,7 +98,7 @@ def report_run_drop_stats() -> DropStats:
             stats.ratio * 100, stats.dropped, stats.parsed,
             DROP_RATIO_WARN_THRESHOLD * 100,
         )
-    from quodeq.engine._runner_markers import emit_marker  # noqa: PLC0415
+    from quodeq.analysis._runner_markers import emit_marker  # noqa: PLC0415
     emit_marker(
         "drop_stats",
         dropped=stats.dropped, kept=stats.kept, ratio=round(stats.ratio, 4),

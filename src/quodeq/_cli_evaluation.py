@@ -22,7 +22,7 @@ from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, 
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
-from quodeq.engine.scoring_pipeline import run_full
+from quodeq.analysis.scoring_pipeline import run_full
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.evidence_rescore import score_dimension_from_evidence, standard_dirs
@@ -32,7 +32,7 @@ from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.logging import log_error, log_info, log_warning
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo, write_text
 from quodeq.shared.repo_handler import cleanup_cloned_repo
-from quodeq.engine._runner_markers import emit_marker
+from quodeq.analysis._runner_markers import emit_marker
 from quodeq.shared.prereqs import check_evaluate_prereqs
 from quodeq.analysis._dimension_aliases import expand_dimension_aliases
 from quodeq.analysis._diff_resolver import DiffResolveError, resolve_diff_files

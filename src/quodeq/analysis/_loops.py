@@ -15,7 +15,7 @@ from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.analysis.errors import EvaluationError, FatalProviderError
 from quodeq.core.evidence.model import Evidence
-from quodeq.engine._runner_markers import emit_marker
+from quodeq.analysis._runner_markers import emit_marker
 # NOTE: logging in inner layer - tracked for middleware extraction
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared import cancellation
