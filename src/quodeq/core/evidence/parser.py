@@ -6,7 +6,7 @@ from pathlib import Path
 
 from quodeq.core.evidence._jsonl import judgment_to_dict, parse_jsonl_line, read_judgments
 from quodeq.core.evidence._refs import build_req_refs_lookup, enrich_judgment, resolve_llm_refs
-from quodeq.shared.utils import open_text
+from quodeq.core.utils.io import open_text
 from quodeq.core.events.models import Judgment
 from quodeq.core.evidence._req_mapping import _GroupedJudgments, _group_judgments
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence, compute_coverage_pct

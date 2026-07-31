@@ -6,7 +6,9 @@ import check_imports
 
 def test_shared_is_a_checked_layer():
     assert "shared" in check_imports.LAYER_RULES
-    assert check_imports.LAYER_RULES["shared"] == set()
+    # Only core (innermost) is allowed: shared re-exports a few pure helpers
+    # whose real home is core/utils/io.py. Dependencies point inward.
+    assert check_imports.LAYER_RULES["shared"] == {"core"}
 
 
 def test_core_and_shared_are_strict():

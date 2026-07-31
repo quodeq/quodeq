@@ -27,8 +27,9 @@ LAYER_RULES = {
     # analysis pipeline; llm_bridge access is for the embeddings client only.
     "context": {"core", "data", "llm_bridge"},
     # shared/ is cross-cutting FOR OTHERS to import; itself it may import
-    # nothing but stdlib (ARCHITECTURE.md: "None (stdlib only)").
-    "shared": set(),
+    # only stdlib and core (dependencies point inward — shared re-exports a
+    # few pure helpers whose real home is core/utils/io.py).
+    "shared": {"core"},
     # llm_bridge talks to LLM providers only; app knowledge flows TO it, not
     # from it. Its one analysis import is grandfathered (burn-down: WS2/WS5).
     "llm_bridge": set(),

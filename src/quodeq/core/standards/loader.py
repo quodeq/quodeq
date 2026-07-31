@@ -6,8 +6,8 @@ on-disk standard definitions into the domain model.
 from __future__ import annotations
 from pathlib import Path
 
-from quodeq.shared.utils import read_json
-from quodeq.shared.validation import validate_path_segment
+from quodeq.core.utils.io import read_json
+from quodeq.core.utils.io import validate_path_segment
 
 
 def _resolve_standards_dir(standards_dir: Path | None = None, *, paths_fn=None) -> Path:

@@ -10,7 +10,7 @@ from pathlib import Path
 from quodeq.core.evidence._refs import enrich_judgment
 from quodeq.core.events.models import Judgment
 from quodeq.core.types.req_ref import ReqRef
-from quodeq.shared.utils import open_text
+from quodeq.core.utils.io import open_text
 
 _logger = logging.getLogger(__name__)
 

@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from quodeq.shared.utils import read_json
+from quodeq.core.utils.io import read_json
 from quodeq.core.standards.overrides import resolve_requirement_text
 
 _logger = logging.getLogger(__name__)
