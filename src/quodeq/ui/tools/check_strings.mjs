@@ -29,7 +29,10 @@ async function collectCounts() {
     if (fatal.length > 0) {
       throw new Error(`lint failed on ${r.filePath}: ${fatal[0].message}`);
     }
-    const n = r.errorCount + r.warningCount;
+    // Count only the ratchet rule itself. Stray messages from other sources
+    // (e.g. an eslint-disable comment naming a rule this single-rule config
+    // doesn't define) must not masquerade as hardcoded strings.
+    const n = r.messages.filter((m) => m.ruleId === 'react/jsx-no-literals').length;
     if (n > 0) {
       counts[path.relative(UI_ROOT, r.filePath).split(path.sep).join('/')] = n;
     }

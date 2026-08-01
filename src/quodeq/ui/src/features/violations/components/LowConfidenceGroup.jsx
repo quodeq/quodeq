@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { t } from '../../../strings/index.js';
 
 const LOW_CONFIDENCE_THRESHOLD = 50;
 
@@ -18,10 +19,10 @@ export default function LowConfidenceGroup({ violations, renderViolation }) {
         aria-expanded={expanded}
         onClick={() => setExpanded((v) => !v)}
       >
-        <span className="violation-group-title">Low confidence</span>
+        <span className="violation-group-title">{t('violations.lowConfidence')}</span>
         <span className="violation-group-count">{count}</span>
         <span className="low-confidence-group-hint">
-          {expanded ? 'Hide' : 'Show'} likely false positives
+          {expanded ? t('violations.hideLikelyFp') : t('violations.showLikelyFp')}
         </span>
       </button>
       {expanded && (

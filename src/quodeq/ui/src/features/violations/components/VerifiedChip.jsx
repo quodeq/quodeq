@@ -1,4 +1,5 @@
 import { useVerifiedFindings } from './verifiedFindingsContext.jsx';
+import { t } from '../../../strings/index.js';
 
 /**
  * Shared verified-badge chip for any violation row.
@@ -19,7 +20,7 @@ export function VerifiedChip({ v }) {
   // visual chip but as a plain, non-interactive span: no button role, no
   // onClick, no "Click to remove" copy — there is nothing to click into.
   if (verifiedCtx.readOnly) {
-    const readOnlyLabel = note ? `Verified: ${note}` : 'Verified by the assistant';
+    const readOnlyLabel = note ? t('violations.verifiedNote', { note }) : t('violations.verifiedByAssistant');
     return (
       <span className="verified-chip verified-chip--readonly" title={readOnlyLabel} aria-label={readOnlyLabel}>
         {icon}
@@ -29,10 +30,10 @@ export function VerifiedChip({ v }) {
   // Icon-only badge: a filled accent circle with a check (theme-aligned, not
   // a fixed blue). The tooltip carries the note; the aria-label always starts
   // with "Verified" so the control is named for assistive tech and tests.
-  const hover = `${note || 'Verified by the assistant'}. Click to remove the badge.`;
+  const hover = note ? t('violations.noteRemove', { note }) : t('violations.verifiedByAssistantRemove');
   const label = note
-    ? `Verified: ${note}. Click to remove the badge.`
-    : 'Verified by the assistant. Click to remove the badge.';
+    ? t('violations.verifiedNoteRemove', { note })
+    : t('violations.verifiedByAssistantRemove');
   return (
     <button
       type="button"
