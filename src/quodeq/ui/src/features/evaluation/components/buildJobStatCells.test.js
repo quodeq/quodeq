@@ -443,3 +443,31 @@ test('deriveScanMode: null when coverage is unknown', () => {
   assert.equal(deriveScanMode(null), null);
   assert.equal(deriveScanMode({ dimensions: [{ id: 'a', state: 'running', files: { taken: 1, total: 10 } }] }), null);
 });
+
+// ---------------------------------------------------------------------------
+// buildJobStatCells: time-limit exits
+// ---------------------------------------------------------------------------
+
+test('buildJobStatCells: deadline-cancelled job reads time limit reached, not user cancelled', () => {
+  const cells = buildJobStatCells('cancelled', { ...baseInputs, exitReason: 'deadline' });
+  assert.equal(cells[0].label, 'STATUS');
+  assert.equal(cells[0].hint, 'time limit reached');
+  assert.equal(cells[0].tone, 'default');
+});
+
+test('buildJobStatCells: failed job with time_limit reason softens tone and hint', () => {
+  const cells = buildJobStatCells('failed', { ...baseInputs, exitReason: 'time_limit' });
+  assert.equal(cells[0].hint, 'time limit reached');
+  assert.equal(cells[0].tone, 'default');
+});
+
+test('buildJobStatCells: plain cancelled still reads user cancelled', () => {
+  const cells = buildJobStatCells('cancelled', baseInputs);
+  assert.equal(cells[0].hint, 'user cancelled');
+});
+
+test('buildJobStatCells: plain failed keeps critical tone and see-logs hint', () => {
+  const cells = buildJobStatCells('failed', baseInputs);
+  assert.equal(cells[0].hint, 'see logs');
+  assert.equal(cells[0].tone, 'critical');
+});

@@ -61,12 +61,13 @@ export default function JobStatStrip({ job, liveViolations, hiddenCarriedCount =
     return buildJobStatCells(job.status, {
       overallPct, takenFiles, totalFiles, elapsedS, liveCount, etaHint, suppressedCount,
       carriedCount: hiddenCarriedCount,
+      exitReason: job.exitReason,
       dimCycle: buildDimensionCycle(progress),
       sevCounts: sumSeverities(liveViolations),
       scanMode: deriveScanMode(progress),
     });
     // `elapsedS` advances once per second via useRunElapsed; the sample store is read (not a dep).
-  }, [jobId, job?.status, isTerminal, progress, liveViolations, hiddenCarriedCount, elapsedS]);
+  }, [jobId, job?.status, job?.exitReason, isTerminal, progress, liveViolations, hiddenCarriedCount, elapsedS]);
 
   if (!jobId) return null;
 

@@ -9,27 +9,38 @@ import { IdentityStrip, IdentityCell } from './IdentityStrip.jsx';
 import { deriveScanMode } from './buildJobStatCells.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import useLiveFeedSettings from '../../settings/hooks/useLiveFeedSettings.js';
+import { exitReasonLabel, isTimeLimitExit } from '../../../models/exitReason.js';
 
 const STATUS = { RUNNING: 'running', DONE: 'done', FAILED: 'failed', LOST: 'lost' };
 const TERMINAL_STATES = new Set(['done', 'completed', 'failed', 'cancelled', 'lost']);
 
-function termNameForStatus(status) {
+// A cancelled/failed job whose run hit its time budget is not an error:
+// the header must agree with the coverage banner below it, which already
+// says "time limit reached" from the run's status.json. Done runs keep
+// their "complete" header; the banner tells the truncation story there.
+function isTimeLimitEnd(status, exitReason) {
+  return (status === 'cancelled' || status === STATUS.FAILED) && isTimeLimitExit(exitReason);
+}
+
+function termNameForStatus(status, exitReason) {
   if (status === STATUS.RUNNING) return 'evaluation_in_progress';
+  if (isTimeLimitEnd(status, exitReason)) return 'evaluation_time_limit';
   if (status === STATUS.DONE)    return 'evaluation_complete';
   if (status === STATUS.FAILED)  return 'evaluation_failed';
   if (status === STATUS.LOST)    return 'evaluation_lost';
   return 'evaluation_cancelled';
 }
 
-function RunPill({ status }) {
+function RunPill({ status, exitReason }) {
+  const timeLimit = isTimeLimitEnd(status, exitReason);
   const mod = status === STATUS.RUNNING ? 'running'
     : status === STATUS.DONE ? 'done'
-    : (status === STATUS.FAILED || status === STATUS.LOST) ? 'failed'
+    : !timeLimit && (status === STATUS.FAILED || status === STATUS.LOST) ? 'failed'
     : 'neutral';
   return (
     <span className={`eval-run-pill eval-run-pill--${mod}`}>
       {status === STATUS.RUNNING && <span className="eval-run-pill__dot" aria-hidden="true" />}
-      {status}
+      {timeLimit ? exitReasonLabel(exitReason) : status}
     </span>
   );
 }
@@ -39,7 +50,10 @@ function JobHeader({ job, onDismiss, onCancel }) {
   const isDone = job.status === STATUS.DONE;
   return (
     <div className="evaluate-panel__top evaluate-panel__top--row">
-      <TermHeader name={termNameForStatus(job.status)} badge={<RunPill status={job.status} />} />
+      <TermHeader
+        name={termNameForStatus(job.status, job.exitReason)}
+        badge={<RunPill status={job.status} exitReason={job.exitReason} />}
+      />
       <div className="evaluate-panel__top-actions">
         {isRunning && (
           <button type="button" className="term-btn term-btn--ghost term-btn--sm" onClick={onCancel}>cancel</button>

@@ -46,6 +46,10 @@ class Job:
     ai_provider: str | None = None
     ai_model: str | None = None
     time_limit_s: int | None = None  # 0 = unlimited, None = unknown
+    # Why the job ended ("deadline", "time_limit", ...); None for clean
+    # completions and plain failures. Lets the UI tell a time-budget kill
+    # apart from a real failure.
+    exit_reason: str | None = None
 
     def complete(self, exit_code: int, ended_at: str) -> None:
         """Transition job to a terminal state based on exit code."""
@@ -89,6 +93,7 @@ class Job:
             ai_provider=self.ai_provider,
             ai_model=self.ai_model,
             time_limit_s=self.time_limit_s,
+            exit_reason=self.exit_reason,
         )
 
 
@@ -193,6 +198,7 @@ def _job_to_json(job: Job) -> dict:
         "ai_provider": job.ai_provider,
         "ai_model": job.ai_model,
         "time_limit_s": job.time_limit_s,
+        "exit_reason": job.exit_reason,
     }
 
 
@@ -216,6 +222,7 @@ def _job_from_json(data: dict) -> Job:
         ai_provider=data.get("ai_provider"),
         ai_model=data.get("ai_model"),
         time_limit_s=data.get("time_limit_s"),
+        exit_reason=data.get("exit_reason"),
     )
 
 
