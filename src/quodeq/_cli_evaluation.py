@@ -166,7 +166,7 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
     # different local paths share a single project identity.
     remote_url = None
     if location == "local":
-        from quodeq.shared._repo import git_remote_url
+        from quodeq.data.git_cli import git_remote_url
         remote_url = git_remote_url(str(src))
 
     project_uuid = resolve_project_uuid(

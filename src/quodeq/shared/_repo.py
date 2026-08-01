@@ -1,7 +1,10 @@
-"""Repository URL helpers."""
+"""Repository URL helpers — pure string/path logic only.
+
+Anything that shells out to git lives in ``data/git_cli.py``; this module
+stays importable from the core-only ``shared`` layer.
+"""
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 
@@ -26,15 +29,8 @@ def project_name_from_repo(repo: str) -> str:
     return Path(repo).resolve().name
 
 
-def git_remote_url(repo_path: str) -> str | None:
-    """Return the normalized canonical URL of the git 'origin' remote, if any.
-
-    Reads the origin remote URL via ``git config`` from *repo_path*.
-    Returns ``None`` if:
-    - path is not a git repo
-    - no 'origin' remote configured
-    - git is not installed
-    - remote URL is malformed / empty
+def normalize_remote_url(url: str) -> str | None:
+    """Fold equivalent git remote URL forms into one canonical form.
 
     Normalization maps these equivalent forms to a single canonical form:
       - ``git@github.com:owner/repo.git`` -> ``github.com/owner/repo``
@@ -45,18 +41,9 @@ def git_remote_url(repo_path: str) -> str | None:
     Trailing ``.git`` is stripped. Leading ``https://`` / ``ssh://`` / ``git@``
     is stripped. The colon in ``git@host:path`` form is converted to ``/``.
     Non-standard ports (e.g. ``host:22/path``) are not supported.
+    Returns ``None`` for an empty/blank input.
     """
-    try:
-        result = subprocess.run(
-            ["git", "-C", repo_path, "config", "--get", "remote.origin.url"],
-            capture_output=True,
-            text=True, encoding="utf-8",
-            check=True,
-        )
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return None
-
-    url = result.stdout.strip()
+    url = (url or "").strip()
     if not url:
         return None
 
