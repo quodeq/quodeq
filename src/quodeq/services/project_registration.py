@@ -10,6 +10,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.data.fs.project_files import read_repository_info, write_repository_info
 from quodeq.data.git_cli import remote_origin_url_raw
 from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.data.fs.repo_validation import validate_remote_url
@@ -123,8 +124,9 @@ def register_project(
             raise FileNotFoundError(f"Repo path does not exist: {target_path}")
 
     # Persist the resolved path + ephemeral flag in repository_info.json.
-    info_path = project_dir / "repository_info.json"
-    info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.exists() else {}
+    # A corrupt existing file is treated as empty and rewritten (self-heal);
+    # registration is the flow that owns this file's creation.
+    info = read_repository_info(project_dir) or {}
     info["path"] = str(target_path.resolve())
     info["location"] = _LOCATION_LOCAL
     info["ephemeral"] = bool(ephemeral)
@@ -135,7 +137,7 @@ def register_project(
         # URL-registration branch (raw *repo*) is covered too, and so this
         # call site stays safe even if the helper's behavior changes.
         info["originUrl"] = _strip_credentials(origin_url)
-    info_path.write_text(json.dumps(info, indent=2), encoding="utf-8")
+    write_repository_info(project_dir, info)
 
     # Scan now that files are guaranteed on disk.
     scan_project(target_path, output_dir=project_dir)
@@ -152,17 +154,11 @@ def _ensure_onboarding_field(project_dir: Path) -> None:
     field set to null. Existing projects without the field get a backfill on
     read (see `_backfill_onboarding_field` in _fs_project_helpers.py).
     """
-    info_path = project_dir / "repository_info.json"
-    if not info_path.exists():
-        return
-    try:
-        data = json.loads(info_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return
-    if "onboardingCompletedAt" in data:
+    data = read_repository_info(project_dir)
+    if data is None or "onboardingCompletedAt" in data:
         return
     data["onboardingCompletedAt"] = None
-    info_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    write_repository_info(project_dir, data)
 
 
 def mark_onboarding_complete(project_dir: Path) -> None:
@@ -171,17 +167,8 @@ def mark_onboarding_complete(project_dir: Path) -> None:
     An existing timestamp is left untouched so re-evaluations don't move the
     original completion time.
     """
-    info_path = project_dir / "repository_info.json"
-    if not info_path.exists():
-        return
-    try:
-        data = json.loads(info_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return
-    if data.get("onboardingCompletedAt"):
+    data = read_repository_info(project_dir)
+    if data is None or data.get("onboardingCompletedAt"):
         return
     data["onboardingCompletedAt"] = datetime.now(timezone.utc).isoformat()
-    try:
-        info_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    except OSError:
-        pass
+    write_repository_info(project_dir, data)
