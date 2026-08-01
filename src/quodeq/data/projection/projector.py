@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,7 +16,25 @@ class ProjectionResult:
     rebuilt: bool
 
 
-_ensure_locks: dict[Path, threading.Lock] = defaultdict(threading.Lock)
+class EnsureLockRegistry:
+    """Per-run-dir locks serializing ``ensure_projected``.
+
+    The default registry below is process-wide on purpose — concurrent
+    callers projecting the same run must share one lock. Tests inject a
+    fresh registry so lock state never leaks between them.
+    """
+
+    def __init__(self) -> None:
+        self._locks: dict[Path, threading.Lock] = defaultdict(threading.Lock)
+
+    def lock_for(self, run_dir: Path) -> threading.Lock:
+        return self._locks[run_dir]
+
+    def clear(self) -> None:
+        self._locks.clear()
+
+
+_DEFAULT_LOCKS = EnsureLockRegistry()
 
 
 class Projector:
@@ -26,8 +45,15 @@ class Projector:
     surface it.
     """
 
-    def __init__(self, engine: ProjectionEngine | None = None) -> None:
+    def __init__(
+        self,
+        engine: ProjectionEngine | None = None,
+        store_factory: Callable[[Path], SQLiteStateStore] | None = None,
+        locks: EnsureLockRegistry | None = None,
+    ) -> None:
         self._engine = engine or ProjectionEngine()
+        self._store_factory = store_factory or SQLiteStateStore
+        self._locks = locks or _DEFAULT_LOCKS
 
     def project(
         self,
@@ -44,7 +70,7 @@ class Projector:
         if not events_path.is_file():
             raise FileNotFoundError(f"Event log not found: {events_path}")
 
-        do_rebuild = force_rebuild or SQLiteStateStore(run_dir).get_checkpoint() is None
+        do_rebuild = force_rebuild or self._store_factory(run_dir).get_checkpoint() is None
 
         if do_rebuild:
             count = self._engine.rebuild(events_path, run_dir)
@@ -64,13 +90,13 @@ class Projector:
         if not events_path.is_file():
             raise FileNotFoundError(f"Event log not found: {events_path}")
 
-        with _ensure_locks[run_dir]:
+        with self._locks.lock_for(run_dir):
             if project_dir is not None:
                 from quodeq.data.migrations.dismissed_json_to_actions_log import (  # noqa: PLC0415
                     migrate_if_needed,
                 )
                 migrate_if_needed(project_dir)
-            store = SQLiteStateStore(run_dir)
+            store = self._store_factory(run_dir)
 
             # Events.jsonl branch (today's behavior)
             projected_size = store.get_projected_size()

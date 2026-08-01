@@ -14,7 +14,7 @@ import pytest
 from flask import Flask
 
 from quodeq.api.routes_findings import register_findings_routes
-from quodeq.services.mutation_rescore import _projection_locks
+from quodeq.services.mutation_rescore import _DEFAULT_PROJECT_LOCKS
 from tests._timeouts import budget
 
 
@@ -75,7 +75,7 @@ def test_concurrent_dismisses_same_project_call_project_all_runs_once(
     skip projection when the first is still running.
     """
     # Clear any leftover lock state from previous tests.
-    _projection_locks.clear()
+    _DEFAULT_PROJECT_LOCKS.clear()
 
     (tmp_path / "proj").mkdir()
 
