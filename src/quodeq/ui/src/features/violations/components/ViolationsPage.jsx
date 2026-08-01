@@ -9,6 +9,7 @@ import { useDismissedFindings } from './useDismissedFindings.js';
 import EmptyState from '../../../components/EmptyState.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
+import { t } from '../../../strings/index.js';
 
 const MAX_TREE_DEPTH = 64;
 
@@ -54,10 +55,10 @@ function buildBreadcrumbPath(root, path) {
 
 function FileBreadcrumb({ path, onNavigate, onBack }) {
   if (path.length === 0) return null;
-  const segments = [{ name: 'Root', path: '' }, ...path];
+  const segments = [{ name: t('violations.rootCrumb'), path: '' }, ...path];
   return (
     <div className="map-breadcrumb">
-      <button type="button" className="map-breadcrumb-back" onClick={onBack} title="Go back">
+      <button type="button" className="map-breadcrumb-back" onClick={onBack} title={t('violations.goBackTitle')}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
       </button>
       {segments.map((seg, i) => (
@@ -186,7 +187,7 @@ export function ViolationsSubTabContent(props) {
           onDeleteAll={isShared ? undefined : handleDeleteAll}
         />
       )
-      : <p className="empty-state">No dismissed violations.</p>;
+      : <p className="empty-state">{t('violations.noDismissedViolations')}</p>;
   }
   return null;
 }
@@ -246,11 +247,11 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
   if (projects.length === 0 && selectedSource !== 'shared') {
     return (
       <div className="violations-page violations-page--terminal">
-        <TermHeader name="violations" sub="no projects yet" />
+        <TermHeader name={t('violations.termName')} sub={t('violations.subNoProjects')} />
         <EmptyState
-          title="No projects yet"
-          description="Add a project to start analyzing code quality."
-          actionLabel="Add a project"
+          title={t('overview.noProjectsTitle')}
+          description={t('overview.noProjectsDesc')}
+          actionLabel={t('overview.addProject')}
           onAction={() => onNavigate?.('projects')}
         />
       </div>
@@ -259,11 +260,11 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
   if (!selectedProject) {
     return (
       <div className="violations-page violations-page--terminal">
-        <TermHeader name="violations" sub="no project selected" />
+        <TermHeader name={t('violations.termName')} sub={t('violations.subNoProjectSelected')} />
         <EmptyState
-          title="No project selected"
-          description="Pick a project to view its violations."
-          actionLabel="Choose project"
+          title={t('overview.noProjectSelectedTitle')}
+          description={t('violations.noProjectSelectedDesc')}
+          actionLabel={t('overview.chooseProject')}
           onAction={() => onNavigate?.('projects')}
         />
       </div>
@@ -275,7 +276,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
     if (loading) {
       return (
         <div className="violations-page violations-page--terminal">
-          <TermHeader name="violations" sub="loading…" />
+          <TermHeader name={t('violations.termName')} sub={t('overview.loading')} />
           <LoadingScreen variant="inline" />
         </div>
       );
@@ -289,18 +290,18 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
       if (isFetching) {
         return (
           <div className="violations-page violations-page--terminal">
-            <TermHeader name="violations" sub="loading…" />
+            <TermHeader name={t('violations.termName')} sub={t('overview.loading')} />
             <LoadingScreen variant="inline" />
           </div>
         );
       }
       return (
         <div className="violations-page violations-page--terminal">
-          <TermHeader name="violations" sub="error" />
+          <TermHeader name={t('violations.termName')} sub={t('violations.subError')} />
           <EmptyState
-            title="Couldn't load this project"
+            title={t('overview.loadProjectFailedTitle')}
             description={error}
-            actionLabel="Retry"
+            actionLabel={t('overview.retry')}
             onAction={() => onRetry?.()}
           />
         </div>
@@ -313,21 +314,21 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
     if (selectedSource === 'shared') {
       return (
         <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
-          <TermHeader name="violations" sub="no evaluations yet" />
+          <TermHeader name={t('violations.termName')} sub={t('violations.subNoEvals')} />
           <EmptyState
-            title="No completed evaluation yet"
-            description="no completed evaluation in this remote project yet"
+            title={t('overview.noCompletedEvalTitle')}
+            description={t('overview.noCompletedEvalSharedDesc')}
           />
         </div>
       );
     }
     return (
       <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
-        <TermHeader name="violations" sub="no evaluations yet" />
+        <TermHeader name={t('violations.termName')} sub={t('violations.subNoEvals')} />
         <EmptyState
-          title="No evaluations yet"
-          description={`Run an evaluation for ${projectName || selectedProject} to populate this page.`}
-          actionLabel="Start evaluation"
+          title={t('overview.noEvalsTitle')}
+          description={t('overview.noEvalsDesc', { name: projectName || selectedProject })}
+          actionLabel={t('overview.startEvaluation')}
           onAction={() => onNavigate?.('evaluate')}
         />
       </div>
@@ -336,10 +337,12 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
 
   const total = summary.totalViolations || 0;
   const subParts = [
-    `${total} total`,
-    `${visibleDimensions.length} dim${visibleDimensions.length !== 1 ? 's' : ''}`,
-    `${uniquePrinciples} princ.`,
-    `${topFilesCount} files`,
+    t('violations.subTotal', { count: total }),
+    visibleDimensions.length === 1
+      ? t('violations.subDim', { count: visibleDimensions.length })
+      : t('violations.subDims', { count: visibleDimensions.length }),
+    t('violations.subPrinciples', { count: uniquePrinciples }),
+    t('violations.subFiles', { count: topFilesCount }),
   ];
   const subLine = (
     <span className="violations-sub">
@@ -353,14 +356,14 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
       {restoreError && <div className="error-banner">{restoreError}</div>}
       <div className="violations-page__top">
         <TermHeader
-          name="violations"
+          name={t('violations.termName')}
           sub={subLine}
           badge={selectedSource === 'shared' ? <SharedReadOnlyBadge /> : null}
         />
         <div className="violations-flag-row">
-          <FlagPill flag="by-dimension" active={activeSubTab === 'dimension'} onClick={() => setActiveSubTab('dimension')} />
-          <FlagPill flag="by-file"      active={activeSubTab === 'file'}      onClick={() => setActiveSubTab('file')} />
-          <FlagPill flag="dismissed"    active={activeSubTab === 'dismissed'} count={dismissed.length || undefined} onClick={() => setActiveSubTab('dismissed')} />
+          <FlagPill flag={t('violations.flagByDimension')} active={activeSubTab === 'dimension'} onClick={() => setActiveSubTab('dimension')} />
+          <FlagPill flag={t('violations.flagByFile')}      active={activeSubTab === 'file'}      onClick={() => setActiveSubTab('file')} />
+          <FlagPill flag={t('violations.flagDismissed')}   active={activeSubTab === 'dismissed'} count={dismissed.length || undefined} onClick={() => setActiveSubTab('dismissed')} />
         </div>
       </div>
       <ViolationsSubTabContent
