@@ -85,7 +85,7 @@ pipx install quodeq    # isolated, recommended
 # or: pip install quodeq
 ```
 
-Prefer a desktop app to the CLI? See [Desktop apps](#desktop-apps) below.
+Prefer a desktop app to the CLI? See [Desktop apps](#desktop-apps-beta) below.
 
 ### 3. Pick an AI provider
 
@@ -103,6 +103,9 @@ ollama serve    # runs in the background
 - [Codex CLI](https://developers.openai.com/codex/quickstart) — `npm install -g @openai/codex`
 - [Gemini CLI](https://geminicli.com/docs/get-started/installation/) — `npm install -g @google/gemini-cli`
 
+[llama.cpp](#ai-providers) is also supported. See [AI Providers](#ai-providers) for the
+full list and how to choose.
+
 ### 4. Launch the dashboard
 
 ```bash
@@ -112,8 +115,6 @@ quodeq
 The dashboard opens at `http://127.0.0.1:7863`. Use **Settings → AI Provider** to select the one you installed in step 3, then **Evaluate** to point at a project and start your first scan.
 
 If the native window doesn't show up (common on Linux without GTK), run `quodeq --browser` instead.
-
-<a id="desktop-apps"></a>
 
 ### Desktop apps (beta)
 
@@ -214,19 +215,6 @@ Upload to GitHub code scanning:
 
 ---
 
-## Updates
-
-Quodeq checks for new versions once a day in the background (PyPI for
-`pip`/`pipx`/`uv` installs, GitHub Releases for the macOS/Windows apps) and
-shows a dismissible notice with the right upgrade step. It never auto-replaces
-itself and sends no telemetry — the only network call is an unauthenticated
-request to PyPI/GitHub.
-
-Disable it by setting `QUODEQ_NO_UPDATE_NOTIFIER=1`, or toggle "Automatic
-checks" off under Settings → Updates.
-
----
-
 ## AI Providers
 
 Choose what fits your workflow. Configure in **Settings** from the dashboard.
@@ -280,6 +268,20 @@ Numeric thresholds on the built-in standards (max function lines, max parameters
 
 ---
 
+## Privacy
+
+There is no Quodeq account, no Quodeq server, and no telemetry. Your source code is read
+locally and evaluation results are written to `~/.quodeq/evaluations/` as plain JSON. If
+you run a local provider, nothing about your code leaves the machine at all. If you pick a
+cloud provider, your code goes to that provider under your own API key and nowhere else.
+
+Quodeq makes exactly one network call of its own: a daily unauthenticated version check
+(PyPI for `pip`/`pipx`/`uv` installs, GitHub Releases for the desktop apps). It shows a
+dismissible notice with the right upgrade step and never replaces itself. Turn it off with
+`QUODEQ_NO_UPDATE_NOTIFIER=1`, or under **Settings → Updates**.
+
+---
+
 ## Development
 
 Run from a fresh checkout:
@@ -295,9 +297,25 @@ Same OS prerequisites as the pipx install (Python 3.12+), plus Node 20+ and npm 
 
 If the dashboard window doesn't appear on Linux, run `uv run quodeq --browser` (the native window needs `python3-gi` + `gir1.2-webkit2-4.1`, which aren't pulled in by the pip wheel).
 
+---
+
+## Contributing
+
+Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the
+development setup, the test suite, and how changes get reviewed. Everyone taking part is
+expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+- **Found a bug or want a feature?** [Open an issue](https://github.com/quodeq/quodeq/issues).
+- **Want to ask something, or show what you built?** [Discussions](https://github.com/quodeq/quodeq/discussions).
+- **Found a security problem?** Please don't open a public issue. [SECURITY.md](SECURITY.md) has the disclosure process.
+
+If Quodeq is useful to you, starring the repo genuinely helps other people find it.
+
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for release history.
+See [CHANGELOG.md](CHANGELOG.md) for release history, or the
+[release announcements](https://github.com/quodeq/quodeq/discussions/categories/announcements)
+for the readable version.
 
 ## License
 
