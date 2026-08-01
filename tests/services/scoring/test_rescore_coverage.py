@@ -36,52 +36,47 @@ def test_dims_expecting_rescore_needs_a_source_run():
     assert _dims_expecting_rescore(dims) == {"security"}
 
 
-def test_no_suppressions_is_complete(monkeypatch):
-    monkeypatch.setattr(scoring, "dismissed_keys", lambda pdir: set())
-    monkeypatch.setattr(scoring, "deleted_keys", lambda pdir: set())
+def test_no_suppressions_is_complete():
+    deps = scoring.ScoringDeps(
+        dismissed_keys=lambda pdir: set(), deleted_keys=lambda pdir: set(),
+    )
     payload, complete = _rescore_accumulated_with_coverage(
-        _acc([_dim("security")]), Path("/reports"), "proj",
+        _acc([_dim("security")]), Path("/reports"), "proj", deps=deps,
     )
     assert complete is True
     assert payload["dimensions"] == [_dim("security")]
 
 
-def test_full_coverage_is_complete(monkeypatch):
-    monkeypatch.setattr(scoring, "dismissed_keys", lambda pdir: {("R1", "a.py", 1)})
-    monkeypatch.setattr(scoring, "deleted_keys", lambda pdir: set())
-    monkeypatch.setattr(
-        scoring, "_rescore_runs_by_dimension",
-        lambda dims, root, project, dismissed, deleted=None, params=None: {
+def test_full_coverage_is_complete():
+    deps = scoring.ScoringDeps(
+        dismissed_keys=lambda pdir: {("R1", "a.py", 1)},
+        deleted_keys=lambda pdir: set(),
+        rescore_runs_by_dimension=lambda dims, root, project, dismissed, deleted=None, params=None: {
             "security": {"overallScore": "7.5/10", "overallGrade": "Good"},
             "performance": {"overallScore": "8.2/10", "overallGrade": "Good"},
         },
-    )
-    monkeypatch.setattr(
-        scoring, "recompute_summary", lambda dims, summary, params=None: summary,
+        recompute_summary=lambda dims, summary, params=None: summary,
     )
     payload, complete = _rescore_accumulated_with_coverage(
-        _acc([_dim("security"), _dim("performance")]), Path("/reports"), "proj",
+        _acc([_dim("security"), _dim("performance")]), Path("/reports"), "proj", deps=deps,
     )
     assert complete is True
     assert payload["dimensions"][0]["overallScore"] == "7.5/10"
     assert payload["dimensions"][1]["overallScore"] == "8.2/10"
 
 
-def test_partial_coverage_is_flagged_incomplete(monkeypatch):
+def test_partial_coverage_is_flagged_incomplete():
     """Rescore came back for security only: serve it, but flag it uncacheable."""
-    monkeypatch.setattr(scoring, "dismissed_keys", lambda pdir: {("R1", "a.py", 1)})
-    monkeypatch.setattr(scoring, "deleted_keys", lambda pdir: set())
-    monkeypatch.setattr(
-        scoring, "_rescore_runs_by_dimension",
-        lambda dims, root, project, dismissed, deleted=None, params=None: {
+    deps = scoring.ScoringDeps(
+        dismissed_keys=lambda pdir: {("R1", "a.py", 1)},
+        deleted_keys=lambda pdir: set(),
+        rescore_runs_by_dimension=lambda dims, root, project, dismissed, deleted=None, params=None: {
             "security": {"overallScore": "7.5/10", "overallGrade": "Good"},
         },
-    )
-    monkeypatch.setattr(
-        scoring, "recompute_summary", lambda dims, summary, params=None: summary,
+        recompute_summary=lambda dims, summary, params=None: summary,
     )
     payload, complete = _rescore_accumulated_with_coverage(
-        _acc([_dim("security"), _dim("performance")]), Path("/reports"), "proj",
+        _acc([_dim("security"), _dim("performance")]), Path("/reports"), "proj", deps=deps,
     )
     assert complete is False
     # The payload is still the best available answer for THIS request.
