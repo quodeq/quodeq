@@ -16,6 +16,7 @@
  * @property {string|null}   deadlineAt     - ISO-8601 wall-clock deadline for the run; null when unlimited or not yet set
  * @property {number|null}   exitCode
  * @property {string|null}   error
+ * @property {string|null}   exitReason     - Why the job ended ('deadline', 'time_limit', ...); null for clean completions and plain failures
  * @property {'internal'|'external'} source  - 'internal' = launched from dashboard; 'external' = CLI/CI
  * @property {string|null}   aiProvider     - Provider this job is actually using (e.g. 'ollama', 'llamacpp')
  * @property {string|null}   aiModel        - Model this job is actually using

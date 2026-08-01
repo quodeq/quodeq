@@ -65,3 +65,12 @@ export function exitReasonHint(code) {
 export function exitReasonWarn(code) {
   return exitReasonInfo(code)?.warn === true;
 }
+
+/**
+ * True when the run ended because it hit its time budget. Not an error:
+ * the user's own limit doing its job, so callers should render it with
+ * neutral styling instead of failure styling.
+ */
+export function isTimeLimitExit(code) {
+  return code === 'deadline' || code === 'time_limit';
+}

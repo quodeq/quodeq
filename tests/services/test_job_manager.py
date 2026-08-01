@@ -448,7 +448,10 @@ class TestMonitorProcess:
 
         assert proc.killed is True
         assert job.exit_code == _EXIT_CODE_TIMEOUT
-        assert job.status == STATUS_FAILED
+        # Watchdog kills are time-budget exits, not failures: the header
+        # renders them as "time limit reached" via the exit_reason.
+        assert job.status == STATUS_CANCELLED
+        assert job.exit_reason == "deadline"
 
     def test_no_cap_no_deadline_does_not_kill(self, monkeypatch):
         """With no QUODEQ_JOB_TIMEOUT_S and no deadline_at, the watchdog must
@@ -513,7 +516,9 @@ class TestMonitorProcess:
 
         assert proc.killed is True
         assert job.exit_code == _EXIT_CODE_TIMEOUT
-        assert job.status == STATUS_FAILED
+        # Deadline kill = the user's own time budget doing its job.
+        assert job.status == STATUS_CANCELLED
+        assert job.exit_reason == "deadline"
 
     def test_watchdog_kill_terminates_the_process_tree(self, monkeypatch):
         """The watchdog must kill the process GROUP, not just the parent PID.
@@ -546,7 +551,7 @@ class TestMonitorProcess:
 
         assert calls == [proc], "watchdog kill must go through _terminate_process"
         assert job.exit_code == _EXIT_CODE_TIMEOUT
-        assert job.status == STATUS_FAILED
+        assert job.status == STATUS_CANCELLED
 
 
 class _NeverExitsProcess:

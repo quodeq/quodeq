@@ -5,6 +5,7 @@
 
 import { computeOverallProgress } from './scanProgressTotals.js';
 import { formatDuration } from '../../../utils/formatters.js';
+import { isTimeLimitExit } from '../../../models/exitReason.js';
 
 // Throughput estimate tuning. The eval completes only a few files per MINUTE
 // (one slow LLM call per file), so the rate is shown per minute and measured
@@ -260,14 +261,24 @@ function foundCell(liveCount, label = 'FOUND', hint = 'live violations', suppres
  * @param {number} inputs.liveCount
  * @param {number} [inputs.suppressedCount] — re-found findings already dismissed/deleted
  * @param {number} [inputs.carriedCount] — carried-forward findings the live-feed preference hid
+ * @param {string|null} [inputs.exitReason] — job.exitReason; time-limit reasons soften the status cell
  * @param {object|null} [inputs.dimCycle] — from buildDimensionCycle (running only)
  * @param {object} [inputs.sevCounts] — from sumSeverities (running only)
  * @param {string|null} [inputs.scanMode] — from deriveScanMode (running only)
  * @returns {Array<{label,value,hint,tone,trailing?}>} exactly 4 cells.
  */
 export function buildJobStatCells(status, inputs) {
-  const tone = statusTone(status);
-  const statusCell = { label: 'STATUS', value: status, tone, hint: statusHint(status) };
+  // A run that ended at its time budget is not user-cancelled and not an
+  // error: agree with the header pill ("time limit reached") instead of
+  // showing "user cancelled" / critical "see logs" under it.
+  const timeLimit = isTimeLimitExit(inputs.exitReason);
+  const tone = timeLimit ? 'default' : statusTone(status);
+  const statusCell = {
+    label: 'STATUS',
+    value: status,
+    tone,
+    hint: timeLimit ? 'time limit reached' : statusHint(status),
+  };
 
   if (status === 'done' || status === 'completed') {
     return [

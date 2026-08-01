@@ -150,6 +150,48 @@ def test_get_evaluation_scores_only_once_for_same_job(client):
     )
 
 
+class _DeadlineCancelledProvider(_FailedJobProvider):
+    """Deadline-killed job: status 'cancelled' with exit_reason 'deadline'."""
+
+    def get_evaluation_status(self, job_id, reports_dir=None):
+        if job_id != "j1":
+            return None
+        return JobSnapshot(
+            job_id="j1",
+            status="cancelled",
+            exit_reason="deadline",
+            logs=[],
+            output_project="proj",
+            output_run_id="run-1",
+        )
+
+
+def test_deadline_cancelled_job_still_triggers_salvage_scoring(reports_root):
+    """Guards the deadline-exit design in services/jobs.py: watchdog-killed
+    jobs end as status='cancelled' (+ exit_reason='deadline') and rely on
+    'cancelled' staying in this route's salvage-scoring trigger list.
+    """
+    client = create_app(_DeadlineCancelledProvider()).test_client()
+    scoring_started = threading.Event()
+
+    def _score(reports_dir, args):
+        scoring_started.set()
+
+    with patch(
+        "quodeq.api._evaluation_routes.score_completed_evidence",
+        side_effect=_score,
+    ):
+        resp = client.get("/api/evaluations/j1")
+
+    assert resp.status_code == 200
+    # The UI reads exitReason off this payload to render "time limit reached".
+    assert resp.get_json().get("exitReason") == "deadline"
+    assert scoring_started.wait(timeout=budget(2)), (
+        "Deadline-cancelled job never spawned salvage scoring — did "
+        "'cancelled' fall out of the trigger list in _evaluation_routes?"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Unit tests for _claim_scoring (race-closure + bounded-registry guarantees)
 # ---------------------------------------------------------------------------

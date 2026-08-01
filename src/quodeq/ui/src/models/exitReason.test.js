@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { exitReasonInfo, exitReasonLabel, exitReasonHint, exitReasonWarn } from './exitReason.js';
+import { exitReasonInfo, exitReasonLabel, exitReasonHint, exitReasonWarn, isTimeLimitExit } from './exitReason.js';
 
 test('provider_fatal maps to a label and an actionable hint', () => {
   const info = exitReasonInfo('provider_fatal');
@@ -27,6 +27,15 @@ test('unknown codes pass through verbatim with no hint', () => {
   assert.equal(exitReasonInfo('some_future_code'), null);
   assert.equal(exitReasonLabel('some_future_code'), 'some_future_code');
   assert.equal(exitReasonHint('some_future_code'), null);
+});
+
+test('isTimeLimitExit is true only for time-budget reasons', () => {
+  assert.equal(isTimeLimitExit('deadline'), true);
+  assert.equal(isTimeLimitExit('time_limit'), true);
+  assert.equal(isTimeLimitExit('provider_fatal'), false);
+  assert.equal(isTimeLimitExit('cancelled'), false);
+  assert.equal(isTimeLimitExit(null), false);
+  assert.equal(isTimeLimitExit(undefined), false);
 });
 
 test('provider failures warn on done runs, clean stops do not', () => {
