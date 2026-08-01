@@ -99,3 +99,10 @@ jobs:
         working-directory: src/quodeq/ui
         # test:all = node --test (.test.js) + vitest run (.test.jsx).
         run: npm run test:all
+
+      - name: Check hardcoded UI strings (i18n ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on user-visible string literals not in tools/strings_baseline.json.
+        # New strings go in src/strings/en.json via t(); shrunk counts are locked
+        # in with `npm run lint:strings:update`.
+        run: npm run lint:strings
