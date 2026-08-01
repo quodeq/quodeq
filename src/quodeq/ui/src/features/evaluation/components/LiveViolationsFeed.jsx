@@ -4,6 +4,8 @@ import ContextBlock from '../../../components/ContextBlock.jsx';
 import { parseFileRef } from '../../../utils/formatters.js';
 import { SectionLabel, SevBadge } from '../../../components/terminal/index.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
+import { t } from '../../../strings/index.js';
+import { severityLabel } from '../../../strings/labels.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 40;
 const ANIM_MAX_DELAY_MS = 400;
@@ -38,7 +40,7 @@ function ViolationDetail({ v }) {
       {(v.title || v.reason) && (
         <div className="vlive-detail-section">
           <div className="vlive-detail-section-header">
-            <span className="vlive-detail-section-label">Reason</span>
+            <span className="vlive-detail-section-label">{t('violations.reasonLabel')}</span>
             {(() => {
               const urlRefs = v.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url)) || [];
               return urlRefs.length > 0 && (
@@ -50,7 +52,7 @@ function ViolationDetail({ v }) {
           </div>
           {v.title && <p className="vlive-detail-title">{v.title}</p>}
           {v.reason && <>
-            <span className="vlive-detail-section-label">Detail</span>
+            <span className="vlive-detail-section-label">{t('violations.detailLabel')}</span>
             <p className="vlive-detail-reason">{v.reason}</p>
           </>}
         </div>
@@ -79,14 +81,14 @@ function ViolationLiveRow({ violation, index }) {
         role="button"
         tabIndex={0}
         aria-expanded={open}
-        aria-label={`${v.severity} finding: ${v.title || v.file || 'details'}`}
+        aria-label={t('evaluate.findingAria', { severity: severityLabel(v.severity), title: v.title || v.file || t('evaluate.detailsFallback') })}
         onClick={() => setOpen(o => !o)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
       >
         <span className="vlive-rail" aria-hidden="true" />
         {KNOWN_SEVERITIES.has(v.severity)
           ? <SevBadge level={v.severity} format="long" />
-          : <span className={`severity-tag ${v.severity}`}>{v.severity}</span>}
+          : <span className={`severity-tag ${v.severity}`}>{severityLabel(v.severity)}</span>}
         <span className="vrow-rule">{v.principle || ''}</span>
         {filename ? <FileCopyBtn display={display} copyText={ref} /> : <span />}
         <svg
@@ -173,15 +175,17 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
     <div className="vlive-feed">
       <div className="vlive-head">
         <span className="vlive-head-left">
-          <SectionLabel>live violations</SectionLabel>
+          <SectionLabel>{t('evaluate.liveViolationsLabel')}</SectionLabel>
           <span className="vlive-counter">
             {totalCount > 0
-              ? <>{totalCount} across {orderedDims.length} dimension{orderedDims.length !== 1 ? 's' : ''}</>
-              : 'no new findings'}
+              ? (orderedDims.length === 1
+                  ? t('evaluate.acrossDimsOne', { count: totalCount, dims: orderedDims.length })
+                  : t('evaluate.acrossDimsMany', { count: totalCount, dims: orderedDims.length }))
+              : t('evaluate.noNewFindings')}
             {hiddenCarriedCount > 0 && (
-              <span className="vlive-counter-hidden"> · {hiddenCarriedCount} carried forward hidden</span>
+              <span className="vlive-counter-hidden"> · {t('evaluate.carriedForwardHidden', { count: hiddenCarriedCount })}</span>
             )}
-            {isRunning && ' · streaming'}
+            {isRunning && <> · {t('evaluate.streaming')}</>}
           </span>
         </span>
         {isRunning && progress?.currentDimension && (
@@ -202,7 +206,7 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
           {isRunning && (
             <div className="vlive-footer">
               <span className="vlive-footer__dot" aria-hidden="true" />
-              scanning for more{queued != null ? <> · {queued} files queued</> : null}
+              {t('evaluate.scanningForMore')}{queued != null ? <> · {t('evaluate.filesQueued', { count: queued })}</> : null}
             </div>
           )}
         </div>

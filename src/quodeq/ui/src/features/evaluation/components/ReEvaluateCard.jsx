@@ -15,17 +15,18 @@ import HelpHint from '../../../components/HelpHint.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
 import { ACTIVE_PROVIDER_KEY } from '../../../constants.js';
 import { resolveProviderSettings } from '../../../utils/effectiveProviderSettings.js';
+import { t } from '../../../strings/index.js';
 
 const EVAL_OPTIONS_HINT = (
   <>
-    <div><strong>Scope</strong>: click the scope cell to restrict the evaluation to a subfolder. Default is the whole project.</div>
-    <div><strong>Model</strong>: click the model cell to pick the provider/model in Settings.</div>
-    <div><strong>Scan mode</strong>: incremental re-analyzes only files changed since the last run; clean scan re-evaluates everything from scratch.</div>
-    <div><strong>Time budget</strong>: total limit for the whole run, shared across the selected dimensions. Whatever doesn't finish in time is picked up by the next run.</div>
+    <div><strong>{t('evaluate.hintScopeLabel')}</strong>: {t('evaluate.hintScopeText')}</div>
+    <div><strong>{t('evaluate.hintModelLabel')}</strong>: {t('evaluate.hintModelText')}</div>
+    <div><strong>{t('evaluate.hintScanModeLabel')}</strong>: {t('evaluate.hintScanModeText')}</div>
+    <div><strong>{t('evaluate.hintBudgetLabel')}</strong>: {t('evaluate.hintBudgetText')}</div>
   </>
 );
 
-const NO_STANDARDS_MESSAGE = 'Select at least one standard before evaluating.';
+const NO_STANDARDS_MESSAGE = t('evaluate.noStandardsMessage');
 
 export function buildScanPayload({ info, branch, scopePath, selectedDims, cleanScan, project, timeLimitS }) {
   const payload = { repo: info.path };
@@ -79,7 +80,7 @@ function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }
       .catch(() => {
         if (!initialInfo) {
           setInfo(null);
-          setError('Could not load project info. The project may have been removed.');
+          setError(t('evaluate.projectInfoLoadFailed'));
         }
       });
   }, [project, reloadKey]);
@@ -97,7 +98,7 @@ function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }
       setInfo(updated);
       setUrlInput('');
     } catch (err) {
-      setUrlError(err.message || 'Failed to update URL');
+      setUrlError(err.message || t('evaluate.urlUpdateFailed'));
     } finally {
       setUrlSaving(false);
     }
@@ -193,7 +194,7 @@ function useReEvaluateCard(project, onStart, projectInfo, preselectDims) {
 function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore }) {
   return (
     <div className="re-eval-stale-warning">
-      <p>This project was evaluated from a remote repo but the original URL was not saved. Enter the URL to restore reevaluation.</p>
+      <p>{t('evaluate.urlRestoreBody')}</p>
       <div style={{ display: 'flex', gap: BUTTON_ROW_GAP, alignItems: 'center' }}>
         <input
           type="text"
@@ -203,7 +204,7 @@ function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, handleU
           placeholder={REPO_URL_PLACEHOLDER}
           className="re-eval-url-input"
           disabled={urlSaving}
-          aria-label="Repository URL for reevaluation"
+          aria-label={t('evaluate.urlRestoreAria')}
         />
         <button
           type="button"
@@ -211,7 +212,7 @@ function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, handleU
           disabled={!urlInput.trim() || urlSaving}
           onClick={handleUrlRestore}
         >
-          {urlSaving ? 'Saving...' : 'Restore'}
+          {urlSaving ? t('evaluate.saving') : t('violations.restore')}
         </button>
       </div>
       {urlError && <p className="inline-error">{urlError}</p>}
@@ -224,7 +225,7 @@ function DetectedLine({ scanData }) {
   const langs = detectedLanguages(scanData.languages);
   return (
     <div className="eval-detected-line">
-      detected {n(scanData.code_files)} source files
+      {t('evaluate.detectedSourceFiles', { count: n(scanData.code_files) })}
       {langs.map(({ name, count }) => (
         <span key={name}> · {name} {n(count)}</span>
       ))}
@@ -237,8 +238,8 @@ function BudgetChips({ valueS, onChange, disabled }) {
   return (
     <div className="eval-budget">
       <div className="eval-budget__head">
-        <span className="eval-budget__label">time budget</span>
-        <span className="eval-budget__sub">total for the run · shared across dimensions</span>
+        <span className="eval-budget__label">{t('evaluate.timeBudgetLabel')}</span>
+        <span className="eval-budget__sub">{t('evaluate.timeBudgetSub')}</span>
       </div>
       <div className="eval-budget-chips">
         {BUDGET_CHOICES_S.map((s) => (
@@ -259,9 +260,9 @@ function BudgetChips({ valueS, onChange, disabled }) {
             className="eval-budget-chips__chip eval-budget-chips__chip--selected"
             disabled={disabled}
             aria-pressed="true"
-            title="Custom limit from Settings"
+            title={t('evaluate.customLimitTitle')}
           >
-            custom {formatBudgetLabel(valueS)}
+            {t('evaluate.customBudget', { label: formatBudgetLabel(valueS) })}
           </button>
         )}
       </div>
@@ -281,19 +282,23 @@ function RunBar({ disabled, canStart, handleScan, selectedDims, estimates, clean
       }, null)
     : null;
 
-  const budgetPart = timeLimitS > 0 ? `${formatBudgetLabel(timeLimitS)} total budget` : 'no time limit';
+  const budgetPart = timeLimitS > 0 ? t('evaluate.totalBudget', { label: formatBudgetLabel(timeLimitS) }) : t('evaluate.noTimeLimit');
   const line1 = picked > 0
     ? [
-        `${picked} dimension${picked === 1 ? '' : 's'}`,
-        scanFiles != null ? `${n(scanFiles)} ${isClean ? 'files, full rescan' : 'changed files this run'}` : null,
+        picked === 1 ? t('evaluate.dimSingular', { count: picked }) : t('evaluate.dimPlural', { count: picked }),
+        scanFiles != null
+          ? (isClean
+              ? t('evaluate.filesFullRescan', { count: n(scanFiles) })
+              : t('evaluate.changedFilesThisRun', { count: n(scanFiles) }))
+          : null,
         budgetPart,
       ].filter(Boolean).join(' · ')
-    : 'no dimensions selected';
+    : t('evaluate.noDimsSelected');
   const line2 = picked > 0
     ? (pickedSum != null
-        ? `${n(pickedSum)} file-analyses queued across those dimensions`
-        : 'duration depends on the run')
-    : 'pick at least one dimension to start a scan';
+        ? t('evaluate.fileAnalysesQueued', { count: n(pickedSum) })
+        : t('evaluate.durationDepends'))
+    : t('evaluate.pickOneDim');
 
   return (
     <div className="eval-run-bar">
@@ -308,7 +313,7 @@ function RunBar({ disabled, canStart, handleScan, selectedDims, estimates, clean
         disabled={!canStart}
         onClick={handleScan}
       >
-        {disabled ? 'Running...' : (<><span aria-hidden="true">▸</span> scan</>)}
+        {disabled ? t('evaluate.running') : (<><span aria-hidden="true">▸</span> {t('evaluate.scanBtn')}</>)}
       </button>
     </div>
   );
@@ -338,10 +343,10 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
         if (!(total > 0)) return [id, null];
         const count = isClean ? total : (est.count ?? 0);
         const cached = isClean ? 0 : (est.cached ?? 0);
-        if (count === 0) return [id, ['up to date']];
+        if (count === 0) return [id, [t('evaluate.upToDate')]];
         const pct = Math.round((cached / total) * 100);
-        const lines = [`${count.toLocaleString()} files to analyze`];
-        if (pct > 0) lines.push(`${pct}% analyzed`);
+        const lines = [t('evaluate.filesToAnalyze', { count: count.toLocaleString() })];
+        if (pct > 0) lines.push(t('evaluate.pctAnalyzed', { pct }));
         return [id, lines];
       }))
     : null;
@@ -349,30 +354,30 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
   const branchLabel = scope.isLocal ? (scope.scanData?.currentBranch || scope.branch) : null;
   const scopeValue = scope.scopePath
     ? `${scope.scopePath}/`
-    : `${info.path}/ · whole project`;
+    : `${info.path}/ · ${t('evaluate.wholeProject')}`;
 
   return (
     <div className="panel evaluate-panel evaluate-panel--terminal">
       <div className="evaluate-panel__top evaluate-panel__top--row">
-        <TermHeader name="new_evaluation" />
+        <TermHeader name={t('evaluate.termNewEvaluation')} />
         <div className="re-eval-toggle-row">
-          <HelpHint label="Evaluation options help">{EVAL_OPTIONS_HINT}</HelpHint>
+          <HelpHint label={t('evaluate.optionsHelpAria')}>{EVAL_OPTIONS_HINT}</HelpHint>
         </div>
       </div>
 
       <IdentityStrip>
-        <IdentityCell label="repository" title="Open projects" onClick={onGoToProjects}>{info.name || project}</IdentityCell>
+        <IdentityCell label={t('evaluate.idRepository')} title={t('evaluate.openProjectsTitle')} onClick={onGoToProjects}>{info.name || project}</IdentityCell>
         <IdentityCell
-          label="scope"
+          label={t('evaluate.idScope')}
           grow
-          title={scope.isLocal ? 'Restrict the evaluation to a subfolder' : (scope.scopePath || info.path)}
+          title={scope.isLocal ? t('evaluate.scopeCellTitle') : (scope.scopePath || info.path)}
           onClick={scope.isLocal ? () => setScopeBrowserOpen(true) : undefined}
           trailing={scope.scopePath ? (
             <button
               type="button"
               className="eval-identity__clear"
               onClick={() => scope.setScopePath(null)}
-              aria-label="Clear scope"
+              aria-label={t('evaluate.clearScopeAria')}
             >
               ×
             </button>
@@ -382,8 +387,8 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
           {branchLabel && <span className="eval-identity__branch">@ {branchLabel}</span>}
         </IdentityCell>
         <IdentityCell
-          label="model"
-          title="Open provider settings"
+          label={t('evaluate.idModel')}
+          title={t('evaluate.openProviderSettingsTitle')}
           onClick={onGoToSettings}
         >
           {activeModel ? (
@@ -392,7 +397,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
               {activeModel.model && <span className="eval-provider-sep" aria-hidden="true"> · </span>}
               {activeModel.model}
             </>
-          ) : 'choose model'}
+          ) : t('evaluate.chooseModel')}
         </IdentityCell>
       </IdentityStrip>
 
@@ -404,8 +409,8 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
             setScopeBrowserOpen(false);
           }}
           onClose={() => setScopeBrowserOpen(false)}
-          title="Select scope"
-          confirmText="Select"
+          title={t('evaluate.selectScopeTitle')}
+          confirmText={t('evaluate.select')}
           showFiles={true}
           rootPath={info.path}
         />
@@ -415,8 +420,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
 
       {isReadOnlyEphemeral && (
         <div className="ephemeral-completed-note">
-          This was a one-shot ephemeral evaluation. The working copy was deleted after it ran,
-          so re-evaluating would require cloning again. Add the project from URL once more if you want a fresh run.
+          {t('evaluate.ephemeralNote')}
         </div>
       )}
 
@@ -466,12 +470,12 @@ export default function ReEvaluateCard({ project, projectInfo, onStart, disabled
   if (error) return (
     <div className="panel evaluate-panel evaluate-panel--terminal">
       <div className="evaluate-panel__top">
-        <TermHeader name="new_evaluation" sub="error" />
+        <TermHeader name={t('evaluate.termNewEvaluation')} sub={t('violations.subError')} />
       </div>
       <EmptyState
-        title="Couldn't load this project"
+        title={t('overview.loadProjectFailedTitle')}
         description={error}
-        actionLabel="Retry"
+        actionLabel={t('overview.retry')}
         onAction={retry}
       />
     </div>
@@ -479,7 +483,7 @@ export default function ReEvaluateCard({ project, projectInfo, onStart, disabled
   if (!info) return (
     <div className="panel evaluate-panel evaluate-panel--terminal">
       <div className="evaluate-panel__top">
-        <TermHeader name="new_evaluation" sub="loading project..." />
+        <TermHeader name={t('evaluate.termNewEvaluation')} sub={t('evaluate.loadingProject')} />
       </div>
     </div>
   );

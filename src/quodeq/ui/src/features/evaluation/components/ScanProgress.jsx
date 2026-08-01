@@ -8,6 +8,7 @@ import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useRunElapsed } from '../hooks/useRunElapsed.js';
 import { formatDuration, formatDurationCoarse } from '../../../utils/formatters.js';
 import { exitReasonInfo, exitReasonLabel, exitReasonHint, exitReasonWarn } from '../../../models/exitReason.js';
+import { t } from '../../../strings/index.js';
 
 const TERMINAL_STATES = new Set(['done', 'failed', 'cancelled']);
 const STATUS_MARKERS = { arrow: '→', check: '✓', error: 'Error:', failed: 'failed' };
@@ -28,10 +29,10 @@ function lastRelevantLog(logs) {
 
 // Reasons surfaced as a badge so an unusually large estimate isn't a mystery.
 const ESTIMATE_REASON_LABEL = {
-  'catching-up': 'catching up',
-  'first-run': 'first run',
-  'standards-changed': 'standards changed',
-  'prompts-changed': 'prompts changed',
+  'catching-up': t('evaluate.estimateCatchingUp'),
+  'first-run': t('evaluate.estimateFirstRun'),
+  'standards-changed': t('evaluate.estimateStandardsChanged'),
+  'prompts-changed': t('evaluate.estimatePromptsChanged'),
 };
 
 function DimRow({ dim }) {
@@ -58,26 +59,26 @@ function DimRow({ dim }) {
   let count;
   if (isPending) {
     count = total > 0
-      ? <span className="scan-progress__dim-meta-projected">0 / {total}</span>
-      : <span className="scan-progress__dim-meta-projected">estimating…</span>;
+      ? <span className="scan-progress__dim-meta-projected">{t('evaluate.countOf', { taken: 0, total })}</span>
+      : <span className="scan-progress__dim-meta-projected">{t('evaluate.estimating')}</span>;
   } else {
-    count = <>{taken} / {total || '—'}</>;
+    count = <>{t('evaluate.countOf', { taken, total: total || '—' })}</>;
   }
 
   let meta;
   if (isPending) {
-    meta = <span className="scan-progress__dim-meta-projected">queued{reasonBadge}</span>;
+    meta = <span className="scan-progress__dim-meta-projected">{t('evaluate.queued')}{reasonBadge}</span>;
   } else if (isDone) {
     const coveragePct = total > 0 ? Math.round((taken / total) * 100) : null;
     const isPartial = typeof dim.exitReason === 'string' && dim.exitReason !== 'done';
     const hint = exitReasonHint(dim.exitReason);
     const partialTooltip = isPartial
-      ? `stopped: ${exitReasonLabel(dim.exitReason)} · ${taken} of ${total} files${hint ? ` · ${hint}` : ''}`
+      ? `${t('overview.stoppedReason', { reason: exitReasonLabel(dim.exitReason) })} · ${t('overview.filesOf', { read: taken, total })}${hint ? ` · ${hint}` : ''}`
       : undefined;
     meta = (
       <>
-        {dim.violations > 0 && <><span className="scan-progress__v">{dim.violations}v</span> · </>}
-        {dim.compliance > 0 && <><span className="scan-progress__c">{dim.compliance}c</span> · </>}
+        {dim.violations > 0 && <><span className="scan-progress__v">{t('overview.violationsAbbrev', { count: dim.violations })}</span> · </>}
+        {dim.compliance > 0 && <><span className="scan-progress__c">{t('evaluate.complianceAbbrev', { count: dim.compliance })}</span> · </>}
         {coveragePct !== null && (
           <><span
             className={`scan-progress__coverage${isPartial ? ' scan-progress__coverage--partial' : ''}`}
@@ -97,10 +98,10 @@ function DimRow({ dim }) {
       : null;
     meta = (
       <>
-        {dim.activeAgents > 0 && <>{dim.activeAgents} agents</>}
+        {dim.activeAgents > 0 && <>{t('evaluate.agents', { count: dim.activeAgents })}</>}
         {reasonBadge}
-        {dim.violations > 0 && <> · <span className="scan-progress__v">{dim.violations}v</span></>}
-        {dim.compliance > 0 && <> · <span className="scan-progress__c">{dim.compliance}c</span></>}
+        {dim.violations > 0 && <> · <span className="scan-progress__v">{t('overview.violationsAbbrev', { count: dim.violations })}</span></>}
+        {dim.compliance > 0 && <> · <span className="scan-progress__c">{t('evaluate.complianceAbbrev', { count: dim.compliance })}</span></>}
         {clockPart && <> · {clockPart}</>}
       </>
     );
@@ -166,9 +167,9 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   const runPctWidth = showCoverage ? ((coveredFiles - cachedFiles) / projectTotal) * 100 : 0;
   const scanMode = deriveScanMode(progress);
   const inlineLabel = progress?.currentDimension
-    ? <>running <span className="scan-progress__dim-active">{progress.currentDimension}</span></>
+    ? <>{t('evaluate.runningPrefix')} <span className="scan-progress__dim-active">{progress.currentDimension}</span></>
     : progress?.phase
-      ? <>phase: <span className="scan-progress__dim-active">{progress.phase}</span></>
+      ? <>{t('evaluate.phasePrefix')} <span className="scan-progress__dim-active">{progress.phase}</span></>
       : null;
 
   function toggleDetail() {
@@ -196,18 +197,18 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
             <div><strong>{failInfo.label}</strong>{failInfo.hint && <> · {failInfo.hint}</>}</div>
             {failDetail && <div className="scan-progress__error-detail">{failDetail}</div>}
           </>
-        ) : (failDetail || 'Analysis failed')}
+        ) : (failDetail || t('evaluate.analysisFailed'))}
       </div>
     )
     : isLost
-      ? <div className="scan-progress__error">Server restarted, job tracking lost</div>
+      ? <div className="scan-progress__error">{t('evaluate.jobTrackingLost')}</div>
       // Done-with-errors: the provider died mid-run but files had already
       // been analysed, so the run kept its partial results. Warn that the
       // numbers below cover only part of the project.
       : status === 'done' && failInfo && exitReasonWarn(progress?.exitReason)
         ? (
           <div className="scan-progress__warning">
-            <strong>{failInfo.label}</strong> · run stopped early, results are partial
+            <strong>{failInfo.label}</strong> · {t('evaluate.runStoppedEarly')}
             {failInfo.hint && <> · {failInfo.hint}</>}
           </div>
         )
@@ -222,38 +223,38 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
   const clockPart = isRunning && runBudgetS > 0
     ? (
       <> · <span className={overrun ? 'scan-progress__budget scan-progress__budget--overrun' : 'scan-progress__budget'}>
-        {formatDuration(elapsedS)} of {formatDurationCoarse(runBudgetS)} budget
+        {t('evaluate.elapsedOfBudget', { elapsed: formatDuration(elapsedS), budget: formatDurationCoarse(runBudgetS) })}
       </span></>
     )
     : elapsedS != null
-      ? <> · {formatDuration(elapsedS)} total</>
+      ? <> · {t('evaluate.elapsedTotal', { elapsed: formatDuration(elapsedS) })}</>
       : null;
 
   let summary;
   if (showCoverage) {
     summary = totalFiles > 0
-      ? <>this run targets <strong>{totalFiles}</strong> changed files · {takenFiles} done ({overallPct}%){excludedFiles > 0 && <> · {excludedFiles} excluded (size cap)</>}{clockPart}</>
-      : <>nothing new this run{clockPart}</>;
+      ? <>{t('evaluate.targetsPrefix')} <strong>{totalFiles}</strong> {t('evaluate.changedFilesSuffix')} · {t('evaluate.doneCount', { count: takenFiles, pct: overallPct })}{excludedFiles > 0 && <> · {t('evaluate.excludedSizeCap', { count: excludedFiles })}</>}{clockPart}</>
+      : <>{t('evaluate.nothingNew')}{clockPart}</>;
   } else if (totalFiles > 0) {
     summary = scanMode === 'clean scan'
-      ? <>this run re-analyzes all <strong>{totalFiles}</strong> files · {takenFiles} done ({overallPct}%){excludedFiles > 0 && <> · {excludedFiles} excluded (size cap)</>}{clockPart}</>
-      : <><strong>{takenFiles} / {totalFiles}</strong> checks · {overallPct}%{isRunning && inlineLabel && <> · {inlineLabel}</>}{clockPart}</>;
+      ? <>{t('evaluate.reanalyzesPrefix')} <strong>{totalFiles}</strong> {t('evaluate.filesLabel')} · {t('evaluate.doneCount', { count: takenFiles, pct: overallPct })}{excludedFiles > 0 && <> · {t('evaluate.excludedSizeCap', { count: excludedFiles })}</>}{clockPart}</>
+      : <><strong>{t('evaluate.countOf', { taken: takenFiles, total: totalFiles })}</strong> {t('evaluate.checksLabel')} · {overallPct}%{isRunning && inlineLabel && <> · {inlineLabel}</>}{clockPart}</>;
   } else {
-    summary = <><strong>preparing…</strong>{isRunning && inlineLabel && <> · {inlineLabel}</>}</>;
+    summary = <><strong>{t('evaluate.preparing')}</strong>{isRunning && inlineLabel && <> · {inlineLabel}</>}</>;
   }
 
   return (
     <div className="scan-progress">
       <div className="scan-progress__head">
         <SectionLabel>
-          {showCoverage ? <>repository coverage · {projectTotal} files</> : 'progress'}
+          {showCoverage ? t('evaluate.repoCoverageFiles', { count: projectTotal }) : t('evaluate.progressLabel')}
         </SectionLabel>
-        {showCoverage && <span className="scan-progress__head-pct">{coveredPct}% analyzed</span>}
+        {showCoverage && <span className="scan-progress__head-pct">{t('evaluate.pctAnalyzed', { pct: coveredPct })}</span>}
       </div>
       {errorBanner}
       <div
         className="scan-progress__bar"
-        title={showCoverage ? `${cachedFiles} files analyzed in previous runs` : undefined}
+        title={showCoverage ? t('evaluate.cachedBarTitle', { count: cachedFiles }) : undefined}
       >
         {showCoverage && (
           <div
@@ -270,15 +271,15 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
         <div className="scan-progress__legend">
           <span className="scan-progress__legend-item">
             <span className="scan-progress__legend-swatch scan-progress__legend-swatch--cached" aria-hidden="true" />
-            {cachedFiles} cached from earlier runs
+            {t('evaluate.legendCached', { count: cachedFiles })}
           </span>
           <span className="scan-progress__legend-item">
             <span className="scan-progress__legend-swatch scan-progress__legend-swatch--run" aria-hidden="true" />
-            {takenFiles} analyzed in this run
+            {t('evaluate.legendRun', { count: takenFiles })}
           </span>
           <span className="scan-progress__legend-item">
             <span className="scan-progress__legend-swatch scan-progress__legend-swatch--track" aria-hidden="true" />
-            {Math.max(0, projectTotal - coveredFiles)} not yet analyzed
+            {t('evaluate.legendRemaining', { count: Math.max(0, projectTotal - coveredFiles) })}
           </span>
         </div>
       )}
@@ -291,14 +292,14 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
             onClick={toggleDetail}
             aria-expanded={detailOpen}
             aria-controls={`scan-progress-detail-${jobId}`}
-            title={detailOpen ? 'Hide per-dimension detail' : 'Show per-dimension detail'}
+            title={detailOpen ? t('evaluate.hideDetailTitle') : t('evaluate.showDetailTitle')}
           >
             <span className="scan-progress__detail-label">
               {/* Ghost label reserves the width of the longest label so the
                   button (and therefore the layout to its left) doesn't
                   reflow when toggling between "show detail" and "hide detail". */}
-              <span className="scan-progress__detail-label-ghost" aria-hidden="true">show detail</span>
-              <span className="scan-progress__detail-label-active">{detailOpen ? 'hide detail' : 'show detail'}</span>
+              <span className="scan-progress__detail-label-ghost" aria-hidden="true">{t('evaluate.showDetail')}</span>
+              <span className="scan-progress__detail-label-active">{detailOpen ? t('evaluate.hideDetail') : t('evaluate.showDetail')}</span>
             </span>
             <span className={`scan-progress__caret${detailOpen ? ' scan-progress__caret--open' : ''}`} aria-hidden="true">▸</span>
           </button>
@@ -307,7 +308,7 @@ export default function ScanProgress({ job, hasEvaluations = false }) {
       </div>
       {detailOpen && dims.length > 0 && (
         <div className="scan-progress__expanded" id={`scan-progress-detail-${jobId}`}>
-          <div className="scan-progress__expanded-label">per dimension</div>
+          <div className="scan-progress__expanded-label">{t('evaluate.perDimension')}</div>
           {dims.map((d) => <DimRow key={d.id} dim={d} />)}
         </div>
       )}

@@ -4,6 +4,7 @@ import ReEvaluateCard from './ReEvaluateCard.jsx';
 import { ACTIVE_PROVIDER_KEY } from '../../../constants.js';
 import { resolveProviderSettings } from '../../../utils/effectiveProviderSettings.js';
 import { TermHeader } from '../../../components/terminal/index.js';
+import { t } from '../../../strings/index.js';
 
 const TOAST_DISMISS_TIMEOUT_MS = 5000;
 
@@ -24,8 +25,8 @@ function EvaluateHeader() {
     <header className="evaluate-header evaluate-header--terminal">
       <div className="evaluate-header__left">
         <TermHeader
-          name="evaluate"
-          sub="run a comprehensive code quality evaluation on any repository"
+          name={t('evaluate.termName')}
+          sub={t('evaluate.termSub')}
         />
       </div>
     </header>
@@ -33,10 +34,10 @@ function EvaluateHeader() {
 }
 
 function sanitizeErrorMessage(message) {
-  if (typeof message !== 'string') return 'An error occurred';
+  if (typeof message !== 'string') return t('evaluate.errorOccurred');
   if (message.includes('\n') || /[/\\](?:usr|home|tmp|var|etc|src|node_modules)/.test(message) || message.length > 120) {
     console.error('Raw error:', message);
-    return 'An error occurred. Check the console for details.';
+    return t('evaluate.errorOccurredConsole');
   }
   return message;
 }
@@ -58,10 +59,10 @@ function NoProjectSelected({ onGoToProjects }) {
   return (
     <div className="panel evaluate-panel evaluate-panel--terminal evaluate-no-project">
       <div className="evaluate-panel__top">
-        <TermHeader name="no_project" sub="pick or add a project to start" />
+        <TermHeader name={t('evaluate.termNoProject')} sub={t('evaluate.noProjectSub')} />
       </div>
       <p className="evaluate-no-project__hint">
-        Add or pick a project from Projects to run an evaluation.
+        {t('evaluate.noProjectHint')}
       </p>
       {onGoToProjects && (
         <button
@@ -69,7 +70,7 @@ function NoProjectSelected({ onGoToProjects }) {
           className="term-btn term-btn--primary"
           onClick={onGoToProjects}
         >
-          <span aria-hidden="true">▸</span> go to projects
+          <span aria-hidden="true">▸</span> {t('evaluate.goToProjects')}
         </button>
       )}
     </div>
