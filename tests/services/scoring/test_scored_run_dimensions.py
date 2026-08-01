@@ -49,7 +49,7 @@ def _make_dimension(violations, compliance):
     )
 
 
-def test_scored_run_dimensions_applies_project_wide_dismissal(monkeypatch):
+def test_scored_run_dimensions_applies_project_wide_dismissal():
     """A dismissed violation must move the returned dimension score.
 
     Mirrors the real-data disparity: raw read_run_data reports one score,
@@ -64,11 +64,12 @@ def test_scored_run_dimensions_applies_project_wide_dismissal(monkeypatch):
     compliance = [_make_compliance(req=f"C{i}", file=f"c{i}.py", line=20) for i in range(5)]
     raw_dim = _make_dimension([crit, *extras], compliance)
 
-    monkeypatch.setattr(scoring, "read_run_data", lambda root, p, r: [raw_dim])
-    monkeypatch.setattr(scoring, "dismissed_keys", lambda pdir: {("R1", "a.py", 1)})
-    monkeypatch.setattr(scoring, "deleted_keys", lambda pdir: set())
-
-    result = scoring.scored_run_dimensions(Path("/reports"), "proj", "run1")
+    deps = scoring.ScoringDeps(
+        read_run_data=lambda root, p, r: [raw_dim],
+        dismissed_keys=lambda pdir: {("R1", "a.py", 1)},
+        deleted_keys=lambda pdir: set(),
+    )
+    result = scoring.scored_run_dimensions(Path("/reports"), "proj", "run1", deps=deps)
 
     assert len(result) == 1
     dim = result[0]
@@ -83,19 +84,20 @@ def test_scored_run_dimensions_applies_project_wide_dismissal(monkeypatch):
     assert new_num > raw_num, f"dismissing the critical should raise the score; {raw_num} -> {new_num}"
 
 
-def test_scored_run_dimensions_no_dismissals_returns_unchanged(monkeypatch):
+def test_scored_run_dimensions_no_dismissals_returns_unchanged():
     """With no dismissals/deletions, the raw dimensions pass through untouched."""
     raw_dim = _make_dimension([_make_violation()], [_make_compliance()])
-    monkeypatch.setattr(scoring, "read_run_data", lambda root, p, r: [raw_dim])
-    monkeypatch.setattr(scoring, "dismissed_keys", lambda pdir: set())
-    monkeypatch.setattr(scoring, "deleted_keys", lambda pdir: set())
-
-    result = scoring.scored_run_dimensions(Path("/reports"), "proj", "run1")
+    deps = scoring.ScoringDeps(
+        read_run_data=lambda root, p, r: [raw_dim],
+        dismissed_keys=lambda pdir: set(),
+        deleted_keys=lambda pdir: set(),
+    )
+    result = scoring.scored_run_dimensions(Path("/reports"), "proj", "run1", deps=deps)
 
     assert [d.overall_score for d in result] == [raw_dim.overall_score]
 
 
-def test_scored_run_dimensions_passes_the_run_dir_to_rescore(monkeypatch):
+def test_scored_run_dimensions_passes_the_run_dir_to_rescore():
     """The rescore must receive THIS run's directory as its evidence basis.
 
     ``_rescore_dimension`` scores from ``<run_dir>/evidence/<dim>_evidence.jsonl``
@@ -109,21 +111,19 @@ def test_scored_run_dimensions_passes_the_run_dir_to_rescore(monkeypatch):
         seen.append(run_dir)
         return dim
 
-    monkeypatch.setattr(scoring, "_rescore_dimension", fake_rescore)
-    monkeypatch.setattr(scoring, "read_run_data", lambda root, p, r: [raw_dim])
-    monkeypatch.setattr(scoring, "dismissed_keys", lambda pdir: {("R1", "a.py", 1)})
-    monkeypatch.setattr(scoring, "deleted_keys", lambda pdir: set())
-
-    scoring.scored_run_dimensions(Path("/reports"), "proj", "run1")
+    deps = scoring.ScoringDeps(
+        rescore_dimension=fake_rescore,
+        read_run_data=lambda root, p, r: [raw_dim],
+        dismissed_keys=lambda pdir: {("R1", "a.py", 1)},
+        deleted_keys=lambda pdir: set(),
+    )
+    scoring.scored_run_dimensions(Path("/reports"), "proj", "run1", deps=deps)
 
     assert seen == [Path("/reports/proj/run1")]
 
 
-def test_scored_run_dimensions_validates_path_segments(monkeypatch):
+def test_scored_run_dimensions_validates_path_segments():
     """Path-traversal segments are rejected like read_run_data does."""
-    monkeypatch.setattr(scoring, "read_run_data", lambda root, p, r: [])
-    monkeypatch.setattr(scoring, "dismissed_keys", lambda pdir: set())
-    monkeypatch.setattr(scoring, "deleted_keys", lambda pdir: set())
     with pytest.raises(ValueError):
         scoring.scored_run_dimensions(Path("/reports"), "../etc", "run1")
 

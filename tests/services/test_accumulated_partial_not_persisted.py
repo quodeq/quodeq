@@ -55,17 +55,16 @@ def persist_spy(monkeypatch):
     return calls
 
 
-def test_partial_rescore_is_served_but_not_persisted(project, monkeypatch, persist_spy):
+def test_partial_rescore_is_served_but_not_persisted(project, persist_spy):
     real = scoring._rescore_runs_by_dimension
 
-    def partial(dims, reports_root, project_name, dismissed, deleted=None, params=None):
+    def partial(dims, reports_root, project_name, dismissed, deleted=None, *, params=None):
         full = real(dims, reports_root, project_name, dismissed, deleted, params=params)
         # Simulate the incident: only the first-finished dimension came back.
         return {k: v for k, v in full.items() if k == "security"}
 
-    monkeypatch.setattr(scoring, "_rescore_runs_by_dimension", partial)
-
-    payload = get_project_scores(project, "proj")
+    deps = scoring.ScoringDeps(rescore_runs_by_dimension=partial)
+    payload = get_project_scores(project, "proj", deps=deps)
 
     assert payload is not None, "partial coverage must degrade to serving, not erroring"
     assert persist_spy == [], (
