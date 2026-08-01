@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { gradeLetter, formatPeriodLabel } from '../../../utils/formatters.js';
 import { SectionLabel, PeriodSelect } from '../../../components/terminal/index.js';
+import { t } from '../../../strings/index.js';
+import { granularityLabel } from '../../../strings/labels.js';
 import {
   ComposedChart,
   Area,
@@ -26,7 +28,11 @@ import {
 
 const MAX_CHART_RUNS = 20;
 const CHART_HEIGHT = 160;
-const GRANULARITY_SUFFIX = { day: 'd', week: 'w', month: 'mo' };
+const GRANULARITY_SUFFIX = {
+  day: t('granularity.dayAbbrev'),
+  week: t('granularity.weekAbbrev'),
+  month: t('granularity.monthAbbrev'),
+};
 
 
 function buildTrendData(trend, selectedRunId, granularity = 'day') {
@@ -153,7 +159,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBa
   if (!trend || trend.length < 1) return null;
 
   const hasChart = data.length >= 2;
-  const suffix = GRANULARITY_SUFFIX[granularity] || 'd';
+  const suffix = GRANULARITY_SUFFIX[granularity] || GRANULARITY_SUFFIX.day;
   let stats = null;
   if (hasChart) {
     // All-NaN buckets would make Math.min/max over an empty array yield
@@ -163,14 +169,14 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBa
       const min = Math.min(...valid);
       const max = Math.max(...valid);
       const avg = valid.reduce((s, n) => s + n, 0) / valid.length;
-      stats = `MIN ${min.toFixed(1)} / MAX ${max.toFixed(1)} / AVG ${avg.toFixed(1)}`;
+      stats = t('overview.minMaxAvg', { min: min.toFixed(1), max: max.toFixed(1), avg: avg.toFixed(1) });
     }
   }
 
   return (
-    <section className="run-history-panel run-history-panel--terminal panel" aria-label="Score history chart">
+    <section className="run-history-panel run-history-panel--terminal panel" aria-label={t('overview.scoreHistoryAria')}>
       <div className="run-history-panel__header">
-        <SectionLabel>score_history · {data.length}{suffix}</SectionLabel>
+        <SectionLabel>{t('overview.scoreHistoryLabel')} · {data.length}{suffix}</SectionLabel>
         <span className="run-history-panel__controls">
           {onGranularityChange && <PeriodSelect value={granularity} onChange={onGranularityChange} />}
           {stats && <span className="run-history-panel__stats">{stats}</span>}
@@ -182,7 +188,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBa
           interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }}
         />
       ) : (
-        <p className="run-history-panel__sparse">Only one {granularity} of data. Choose a finer grouping to see a trend.</p>
+        <p className="run-history-panel__sparse">{t('overview.sparseTrend', { period: granularityLabel(granularity) })}</p>
       )}
     </section>
   );

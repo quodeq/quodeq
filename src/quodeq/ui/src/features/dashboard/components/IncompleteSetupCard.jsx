@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import CloneTargetStep from '../../onboarding/components/steps/CloneTargetStep.jsx';
 import { registerProject } from '../../../api/index.js';
+import { t } from '../../../strings/index.js';
 
 /**
  * Surfaces a "Complete setup" CTA on the project view for legacy projects
@@ -29,7 +30,7 @@ export default function IncompleteSetupCard({ projectInfo, onComplete }) {
       }
       onComplete?.(result);
     } catch (err) {
-      setError(err?.message || 'Clone failed');
+      setError(err?.message || t('overview.cloneFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -38,9 +39,9 @@ export default function IncompleteSetupCard({ projectInfo, onComplete }) {
   if (!open) {
     return (
       <div className="incomplete-setup-card">
-        <p>This project was added by URL and has no local copy. Clone it now to enable evaluation.</p>
+        <p>{t('overview.incompleteSetupBody')}</p>
         <button type="button" className="term-btn term-btn--primary" onClick={() => setOpen(true)}>
-          Complete setup
+          {t('overview.completeSetup')}
         </button>
       </div>
     );

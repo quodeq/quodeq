@@ -10,6 +10,7 @@ import { formatRunId, gradeLetter, complianceRatio } from '../../../utils/format
 import { withDimensionsStr } from '../../../utils/dimensionUtils.js';
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import buildRunSummary from '../buildRunSummary.js';
+import { t } from '../../../strings/index.js';
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -71,39 +72,39 @@ export function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNav
   return (
     <section className="acc-eval-panel acc-eval-panel--terminal">
       <div className="acc-eval-panel__top">
-        <TermHeader name="run" sub={dateLabel} />
+        <TermHeader name={t('overview.termNameRun')} sub={dateLabel} />
       </div>
       <StatStrip cards>
         <Stat
-          label="SCORE"
+          label={t('overview.statScore')}
           value={scoreDisplay}
-          hint={grade ? `grade ${gradeLetter(grade)}` : null}
+          hint={grade ? t('overview.gradeHint', { letter: gradeLetter(grade) }) : null}
         />
         <Stat
-          label="VIOLATIONS"
+          label={t('overview.statViolations')}
           value={violations}
           hint={
             <>
               <SeverityBadgeRow severity={runSummary.severity} onSeverityClick={handleSeverity} />
               {suppressed > 0 && (
-                <span className="term-stat__suppressed-note">{suppressed} suppressed</span>
+                <span className="term-stat__suppressed-note">{t('overview.runSuppressed', { count: suppressed })}</span>
               )}
             </>
           }
           onClick={handleViolations}
-          ariaLabel={violations > 0 ? 'Show all violations for this run' : undefined}
+          ariaLabel={violations > 0 ? t('overview.showRunViolationsAria') : undefined}
         />
         <Stat
-          label="COMPLIANCE"
+          label={t('overview.statCompliance')}
           value={compliance}
-          hint={totalChecks > 0 ? `passing / ${totalChecks} checks` : null}
+          hint={totalChecks > 0 ? t('overview.passingChecks', { count: totalChecks }) : null}
           onClick={handleCompliance}
-          ariaLabel={compliance > 0 ? 'Show compliance entries for this run' : undefined}
+          ariaLabel={compliance > 0 ? t('overview.showRunComplianceAria') : undefined}
         />
         <Stat
-          label="RATIO"
+          label={t('overview.statRatio')}
           value={ratio}
-          hint="compliance : violations"
+          hint={t('overview.ratioHint')}
         />
       </StatStrip>
     </section>
@@ -113,10 +114,10 @@ export function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNav
 function RunFileViolations({ runTopFiles, onFileClick }) {
   if (runTopFiles.length === 0) return null;
   return (
-    <section className="qd-cards-panel offending-panel" aria-label="Violations by file">
+    <section className="qd-cards-panel offending-panel" aria-label={t('overview.violationsByFileAria')}>
       <div className="qd-cards-panel__head">
-        <SectionLabel>{`violations_by_file · ${runTopFiles.length}`}</SectionLabel>
-        <span className="run-history-panel__stats">SORTED BY SEVERITY</span>
+        <SectionLabel>{t('overview.violationsByFileLabel')} · {runTopFiles.length}</SectionLabel>
+        <span className="run-history-panel__stats">{t('overview.sortedBySeverity')}</span>
       </div>
       <TopOffendingFilesTable files={runTopFiles} onFileClick={onFileClick} />
     </section>
@@ -147,7 +148,7 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, projectName
     return {
       id: `report:run:${runId}`,
       type: 'report',
-      title: `${dateLabel} report`,
+      title: t('overview.reportTitle', { name: dateLabel }),
       render: () => <ReportContent markdown={buildMarkdown()} />,
       copy: () => buildMarkdown(),
       download: () => ({ filename: `run-${filenameLabel}-report.md`, body: buildMarkdown() }),
@@ -169,7 +170,7 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, projectName
     return {
       id: `fixplan:run:${runId}`,
       type: 'fixplan',
-      title: `${dateLabel} fix plan`,
+      title: t('overview.fixPlanTitle', { name: dateLabel }),
       render: () => <ReportContent markdown={buildMarkdown()} />,
       copy: () => buildMarkdown(),
       download: () => ({ filename: `run-${filenameLabel}-fix-plan.md`, body: buildMarkdown() }),
@@ -202,9 +203,9 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, projectName
   return (
     <div className="run-overview-fade run-overview-ready">
       <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} runSummary={runSummary} onCardNavigate={onCardNavigate} />
-      <section className="quality-dimensions" aria-label="Quality dimensions">
+      <section className="quality-dimensions" aria-label={t('overview.qualityDimensionsAria')}>
         <div className="quality-dimensions__head">
-          <SectionLabel>quality_dimensions · {dimCount}</SectionLabel>
+          <SectionLabel>{t('overview.qualityDimensionsLabel')} · {dimCount}</SectionLabel>
         </div>
         <div className="dimensions-panel">
           <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} trendDeltas={trendDeltas} />
